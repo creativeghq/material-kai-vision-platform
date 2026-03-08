@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FollowButton } from '@/components/features/social/FollowButton';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
   designer: 'Designer',
@@ -125,17 +126,14 @@ export const DiscoverPage: React.FC = () => {
     (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="h-6 w-6 text-primary" />
-          Discover Creators
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Browse public profiles, find designers, architects, and sourcing specialists.
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        icon={Users}
+        title="Discover Creators"
+        subtitle="Browse public profiles, find designers, architects, and sourcing specialists."
+      />
 
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -259,6 +257,7 @@ export const DiscoverPage: React.FC = () => {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };

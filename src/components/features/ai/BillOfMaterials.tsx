@@ -117,7 +117,7 @@ export const BillOfMaterials: React.FC<BillOfMaterialsProps> = ({
         {/* Table */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-gray-50/90 backdrop-blur-sm border-b border-border">
+            <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zone</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Material</th>

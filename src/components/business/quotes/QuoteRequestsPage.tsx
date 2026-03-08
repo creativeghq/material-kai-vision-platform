@@ -2,13 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import {
@@ -175,29 +168,27 @@ export const QuoteRequestsPage: React.FC = () => {
       {/* Quote Requests Table */}
       <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {quoteRequests.length === 0 ? (
-          <Card className="bg-card border-border">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-lg mb-4">No quote requests yet</p>
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-primary hover:bg-primary/90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Quote Request
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm flex flex-col items-center justify-center py-14 text-center">
+            <FileText className="h-12 w-12 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">No quote requests yet</p>
+            <Button onClick={() => setShowCreateModal(true)} className="rounded-full gap-1.5">
+              <Plus className="h-4 w-4" />
+              Create Your First Quote Request
+            </Button>
+          </div>
         ) : (
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-card-foreground">All Quote Requests</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {quoteRequests.length} total request{quoteRequests.length !== 1 ? 's' : ''}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+              <div>
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> All Quote Requests
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {quoteRequests.length} total request{quoteRequests.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border">
@@ -252,8 +243,8 @@ export const QuoteRequestsPage: React.FC = () => {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
 

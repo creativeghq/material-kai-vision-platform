@@ -893,36 +893,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (filteredData.length === 0) return null;
 
     return (
-      <Card className="bg-white border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200 py-3">
-          <CardTitle className="text-base font-bold text-gray-900">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {filteredData.map(([key, value]) => {
-              const str = renderValue(value);
-              const parts = str.split(', ').filter(p => p.trim());
-              return (
-                <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{key}</p>
-                  {parts.length >= 3 ? (
-                    <ul className="space-y-0.5 mt-1">
-                      {parts.map((part, i) => (
-                        <li key={i} className="text-sm font-semibold text-gray-900 flex items-start gap-1.5">
-                          <span className="mt-2 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
-                          {part.trim()}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm font-bold text-gray-900">{str}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{title}</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {filteredData.map(([key, value]) => {
+            const str = renderValue(value);
+            const parts = str.split(', ').filter(p => p.trim());
+            return (
+              <div key={key} className="bg-muted/30 rounded-lg p-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
+                {parts.length >= 3 ? (
+                  <ul className="space-y-0.5 mt-1">
+                    {parts.map((part, i) => (
+                      <li key={i} className="text-xs font-semibold flex items-start gap-1.5">
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+                        {part.trim()}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs font-semibold">{str}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
   };
 
@@ -931,39 +929,37 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (productVariants.length === 0) return null;
 
     return (
-      <Card className="bg-white border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200 py-3">
-          <CardTitle className="text-base font-bold text-gray-900">
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
             Product Variants ({productVariants.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
+          </h3>
+        </div>
+        <div className="overflow-hidden -mx-6 -mb-6 mt-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">SKU</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Variant Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Color</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Pattern</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Size</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Mapei Code</th>
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                <tr className="text-xs font-semibold text-muted-foreground">
+                  <th className="text-left px-6 py-2.5 font-medium">SKU</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Variant Name</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Color</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Pattern</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Size</th>
+                  <th className="text-left px-6 py-2.5 font-medium">Mapei Code</th>
                 </tr>
               </thead>
               <tbody>
                 {productVariants.map((variant, index) => (
                   <tr
                     key={`${variant.sku}-${index}`}
-                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                    }`}
+                    className="border-b border-border/30 hover:bg-muted/30 transition-colors"
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-gray-900">{variant.sku}</td>
-                    <td className="py-3 px-4 text-gray-800">{variant.name}</td>
-                    <td className="py-3 px-4">
+                    <td className="px-6 py-2 font-mono font-semibold">{variant.sku}</td>
+                    <td className="px-3 py-2 font-medium">{variant.name}</td>
+                    <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-2">
                         <span
-                          className="w-3 h-3 rounded-full border border-gray-300"
+                          className="w-3 h-3 rounded-full border border-border/50 flex-shrink-0"
                           style={{
                             backgroundColor:
                               variant.color.toLowerCase() === 'white' ? '#f5f5f5' :
@@ -982,44 +978,44 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         {variant.color}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-700">{variant.pattern}</td>
-                    <td className="py-3 px-4 text-gray-700">{variant.size}</td>
-                    <td className="py-3 px-4 font-mono text-gray-600">{variant.groutCode}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{variant.pattern}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{variant.size}</td>
+                    <td className="px-6 py-2 font-mono text-muted-foreground">{variant.groutCode}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         {/* Header with Factory/Brand Info */}
         <DialogHeader className="border-b pb-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <Factory className="h-5 w-5 text-gray-600" />
+                <Factory className="h-5 w-5 text-muted-foreground" />
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900">{factory}</span>
+                  <span className="text-sm font-semibold">{factory}</span>
                   {origin && (
                     <>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-sm text-gray-600">{origin}</span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span className="text-sm text-muted-foreground">{origin}</span>
                     </>
                   )}
                 </div>
               </div>
-              <DialogTitle className="text-3xl font-bold text-gray-900 mb-1">
+              <DialogTitle className="text-2xl mb-1">
                 {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
-              <div className="flex items-center gap-3 text-sm text-gray-600">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 {collection && <span className="font-medium">{collection}</span>}
-                <span className="text-gray-400">•</span>
+                <span className="text-muted-foreground/40">•</span>
                 <span>SKU: {safeString(product.sku, 'N/A')}</span>
               </div>
             </div>
@@ -1035,35 +1031,35 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {safeString(product.status, 'active')}
             </Badge>
           </div>
-          <DialogDescription className="text-base text-gray-700 mt-3">
+          <DialogDescription className="text-sm text-muted-foreground mt-3">
             {safeString(product.description)}
           </DialogDescription>
         </DialogHeader>
 
         {/* Tabs for Details and Monitor */}
         <Tabs defaultValue="details" className="mt-6">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'}`}>
-            <TabsTrigger value="details" className="flex items-center gap-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="details" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Info className="h-4 w-4" />
               Details
             </TabsTrigger>
             {isAdmin && (
               <>
-                <TabsTrigger value="chunks" className="flex items-center gap-2">
+                <TabsTrigger value="chunks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <FileText className="h-4 w-4" />
                   Chunks ({chunks.length})
                 </TabsTrigger>
-                <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                <TabsTrigger value="knowledge" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <BookOpen className="h-4 w-4" />
                   Knowledge
                 </TabsTrigger>
-                <TabsTrigger value="extraction" className="flex items-center gap-2">
+                <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Database className="h-4 w-4" />
                   Extraction
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="monitor" className="flex items-center gap-2">
+            <TabsTrigger value="monitor" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Monitor
             </TabsTrigger>
@@ -1075,12 +1071,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Left Column: Image Slider (3/5 width) */}
           <div className="lg:col-span-3 space-y-4">
             {isLoadingImages ? (
-              <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : images.length > 0 ? (
               <>
-                <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
+                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border">
                   <img
                     src={currentImage?.url}
                     alt={product.name}
@@ -1125,8 +1121,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         onClick={() => setCurrentImageIndex(index)}
                         className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden transition-all ${
                           index === currentImageIndex
-                            ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2'
-                            : 'border-gray-200 hover:border-gray-400'
+                            ? 'border-primary ring-2 ring-primary ring-offset-2'
+                            : 'border-border hover:border-muted-foreground/50'
                         }`}
                       >
                         <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
@@ -1136,8 +1132,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </>
             ) : (
-              <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
-                <p className="text-gray-500">No images available</p>
+              <div className="relative aspect-square bg-muted/50 rounded-xl overflow-hidden border border-border flex items-center justify-center">
+                <p className="text-muted-foreground">No images available</p>
               </div>
             )}
           </div>
@@ -1145,81 +1141,87 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Right Column: Technical Details (2/5 width) */}
           <div className="lg:col-span-2 space-y-4">
             {/* Key Specifications Card */}
-            <Card className="bg-gray-50 border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-bold text-gray-900">Key Specifications</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <span className="text-sm font-medium text-gray-600">Material</span>
-                  <span className="text-sm font-semibold text-gray-900">{material}</span>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Key Specifications
+                </h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-border/30">
+                  <span className="text-xs text-muted-foreground">Material</span>
+                  <span className="text-xs font-semibold">{material}</span>
                 </div>
-                <div className="py-2 border-b border-gray-200">
-                  <span className="text-sm font-medium text-gray-600">Size</span>
+                <div className="py-2 border-b border-border/30">
+                  <span className="text-xs text-muted-foreground">Size</span>
                   {size === 'N/A' ? (
-                    <span className="block text-sm font-semibold text-gray-900 mt-1">N/A</span>
+                    <span className="block text-xs font-semibold mt-1">N/A</span>
                   ) : (
                     <ul className="mt-1 space-y-0.5">
                       {size.split(', ').map((s, i) => (
-                        <li key={i} className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
+                        <li key={i} className="text-xs font-semibold flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
                           {s.trim()}
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <span className="text-sm font-medium text-gray-600">Thickness</span>
-                  <span className="text-sm font-semibold text-gray-900">{thickness}</span>
+                <div className="flex justify-between items-center py-2 border-b border-border/30">
+                  <span className="text-xs text-muted-foreground">Thickness</span>
+                  <span className="text-xs font-semibold">{thickness}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-sm font-medium text-gray-600">Finish</span>
-                  <span className="text-sm font-semibold text-gray-900">{finish}</span>
+                  <span className="text-xs text-muted-foreground">Finish</span>
+                  <span className="text-xs font-semibold">{finish}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Pricing & Stock */}
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900">Pricing & Availability</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Retail Price</p>
-                    <p className="text-xl font-bold text-gray-900">
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Pricing & Availability
+                </h3>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-muted/30 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Retail Price</p>
+                    <p className="text-lg font-semibold">
                       {product.pricing?.currency === 'EUR' ? '€' : '$'}
                       {(product.pricing?.retail || 0).toFixed(2)}
                     </p>
                   </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Wholesale</p>
-                    <p className="text-xl font-bold text-gray-900">
+                  <div className="bg-muted/30 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Wholesale</p>
+                    <p className="text-lg font-semibold">
                       {product.pricing?.currency === 'EUR' ? '€' : '$'}
                       {(product.pricing?.wholesale || 0).toFixed(2)}
                     </p>
                   </div>
                 </div>
-                <div className="pt-3 border-t border-gray-200">
+                <div className="pt-3 border-t border-border/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">In Stock:</span>
+                    <span className="text-xs text-muted-foreground">In Stock:</span>
                     <Badge
-                      className={`text-sm px-3 py-1 ${
+                      className={`text-xs px-2 py-0.5 ${
                         product.stock?.status === 'High'
-                          ? 'bg-green-100 text-green-800 border-green-300'
+                          ? 'bg-green-100 text-green-800 hover:bg-green-100'
                           : product.stock?.status === 'Medium'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
-                            : 'bg-red-100 text-red-800 border-red-300'
+                            ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                            : 'bg-red-100 text-red-800 hover:bg-red-100'
                       }`}
                     >
                       {product.stock?.quantity ?? 0} {product.stock?.unit ?? 'pcs'}
                     </Badge>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3">
@@ -1310,7 +1312,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
                         {chunk.content}
                       </p>
                     </CardContent>
@@ -1325,10 +1327,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <p className="text-muted-foreground mb-4">No chunks linked to this product</p>
                     {product?.source_document_id && (
                       <div className="space-y-2">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           This product has a source document but no chunk relationships.
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           Click "Re-link Chunks" above to create chunk-product relationships.
                         </p>
                       </div>

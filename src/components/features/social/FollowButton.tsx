@@ -8,12 +8,13 @@ import { flowEventService } from '@/services/flows/flowEventService';
 interface FollowButtonProps {
   targetUserId: string;
   currentUserId?: string;
+  onToggle?: (nowFollowing: boolean) => void;
 }
 
-export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, currentUserId }) => {
+export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, currentUserId, onToggle }) => {
   const { toast } = useToast();
   const [following, setFollowing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!currentUserId && currentUserId !== targetUserId);
 
   useEffect(() => {
     if (!currentUserId || currentUserId === targetUserId) {
@@ -48,11 +49,13 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
         .eq('follower_id', currentUserId)
         .eq('following_id', targetUserId);
       setFollowing(false);
+      onToggle?.(false);
     } else {
       await supabase
         .from('user_follows')
         .insert({ follower_id: currentUserId, following_id: targetUserId });
       setFollowing(true);
+      onToggle?.(true);
       flowEventService.emit('profile_followed', {
         follower_id: currentUserId,
         following_id: targetUserId,
@@ -62,8 +65,8 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
     setLoading(false);
   };
 
-  // Don't show for own profile or while checking
-  if (!currentUserId || currentUserId === targetUserId) return null;
+  // Don't show for own profile
+  if (currentUserId && currentUserId === targetUserId) return null;
 
   return (
     <Button
@@ -71,7 +74,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
       size="default"
       onClick={toggle}
       disabled={loading}
-      className="gap-2"
+      className="rounded-full gap-2"
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />

@@ -1234,7 +1234,7 @@ export const OperationsDashboard: React.FC = () => {
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
+                    <TableRow>
                       <TableHead className="font-semibold">Email</TableHead>
                       <TableHead className="font-semibold">Subscription</TableHead>
                       <TableHead className="font-semibold">Status</TableHead>
@@ -1244,7 +1244,7 @@ export const OperationsDashboard: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {userProfiles.slice(0, 20).map((profile) => (
-                      <TableRow key={profile.id} className="hover:bg-gray-50">
+                      <TableRow key={profile.id}>
                         <TableCell className="font-medium">{profile.email}</TableCell>
                         <TableCell>
                           <Badge
@@ -1487,7 +1487,7 @@ export const OperationsDashboard: React.FC = () => {
                   <CardContent>
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50">
+                        <TableRow>
                           <TableHead className="font-semibold">Service</TableHead>
                           <TableHead className="text-right font-semibold">Operations</TableHead>
                           <TableHead className="text-right font-semibold">Credits</TableHead>
@@ -1497,7 +1497,7 @@ export const OperationsDashboard: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {extServiceData.by_service.map((svc) => (
-                          <TableRow key={svc.service} className="hover:bg-gray-50">
+                          <TableRow key={svc.service}>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Globe className="h-4 w-4 text-blue-600" />
@@ -1541,7 +1541,7 @@ export const OperationsDashboard: React.FC = () => {
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-gray-50">
+                          <TableRow>
                             <TableHead className="font-semibold">User ID</TableHead>
                             <TableHead className="text-right font-semibold">Operations</TableHead>
                             <TableHead className="text-right font-semibold">Credits Used</TableHead>
@@ -1550,7 +1550,7 @@ export const OperationsDashboard: React.FC = () => {
                         </TableHeader>
                         <TableBody>
                           {extServiceData.by_user.map((user) => (
-                            <TableRow key={user.user_id} className="hover:bg-gray-50">
+                            <TableRow key={user.user_id}>
                               <TableCell className="font-mono text-sm">
                                 {user.user_id.slice(0, 8)}...
                               </TableCell>
@@ -1743,7 +1743,7 @@ export const OperationsDashboard: React.FC = () => {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-gray-50">
+                      <TableRow>
                         <TableHead className="font-semibold">Model</TableHead>
                         <TableHead className="text-right font-semibold">API Calls</TableHead>
                         <TableHead className="text-right font-semibold">Input Tokens</TableHead>
@@ -1755,7 +1755,7 @@ export const OperationsDashboard: React.FC = () => {
                     </TableHeader>
                     <TableBody>
                       {modelUsage.map((model: any) => (
-                        <TableRow key={model.model_name} className="hover:bg-gray-50">
+                        <TableRow key={model.model_name}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               <Bot className="h-4 w-4 text-blue-600" />
@@ -1790,7 +1790,7 @@ export const OperationsDashboard: React.FC = () => {
                       {modelUsage.length === 0 && (
                         <>
                           {/* Chat/Completion Models */}
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1806,7 +1806,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1822,7 +1822,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1838,7 +1838,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1854,7 +1854,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1870,7 +1870,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1887,7 +1887,7 @@ export const OperationsDashboard: React.FC = () => {
                             </TableCell>
                           </TableRow>
                           {/* Embedding Models */}
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1903,7 +1903,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
@@ -1919,7 +1919,7 @@ export const OperationsDashboard: React.FC = () => {
                               <Badge variant="secondary">0.0%</Badge>
                             </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-gray-50">
+                          <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />

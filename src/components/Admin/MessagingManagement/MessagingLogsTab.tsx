@@ -140,8 +140,8 @@ export const MessagingLogsTab: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b">
+              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                <tr>
                   <th className="text-left py-3 px-4 font-medium">Channel</th>
                   <th className="text-left py-3 px-4 font-medium">To</th>
                   <th className="text-left py-3 px-4 font-medium">Content</th>

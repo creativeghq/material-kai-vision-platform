@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderTree, Plus, Edit, Trash2 } from 'lucide-react';
+import { FolderTree, Plus, Edit, Trash2, ExternalLink } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -87,14 +87,19 @@ export const CategoryManager: React.FC = () => {
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('kb_categories')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('sort_order', { ascending: true });
+      const [{ data, error }, { data: docCounts }] = await Promise.all([
+        supabase.from('kb_categories').select('*').eq('workspace_id', workspaceId).order('sort_order', { ascending: true }),
+        supabase.from('kb_docs').select('category_id').eq('workspace_id', workspaceId).eq('status', 'published'),
+      ]);
 
       if (error) throw error;
-      setCategories(data || []);
+
+      const countMap: Record<string, number> = {};
+      (docCounts || []).forEach((d) => {
+        if (d.category_id) countMap[d.category_id] = (countMap[d.category_id] || 0) + 1;
+      });
+
+      setCategories((data || []).map((c) => ({ ...c, document_count: countMap[c.id] || 0 })));
     } catch (error) {
       console.error('Failed to load categories:', error);
       toast({
@@ -275,6 +280,16 @@ export const CategoryManager: React.FC = () => {
                       <TableCell>{category.document_count || 0}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {category.access_level === 'public' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="View on public KB"
+                              onClick={() => window.open('/knowledge-base', '_blank')}
+                            >
+                              <ExternalLink className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(category)}>
                             <Edit className="h-4 w-4" />
                           </Button>

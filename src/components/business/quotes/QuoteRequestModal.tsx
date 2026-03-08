@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, FileText, Package, DollarSign, Check, Loader2, GitBranch, AlertCircle } from 'lucide-react';
+import { X, Calendar, FileText, Package, DollarSign, Check, Loader2, GitBranch, AlertCircle, Timer } from 'lucide-react';
 
 import {
   Dialog,
@@ -146,8 +146,11 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl">{quote.name || 'Quote Request'}</DialogTitle>
-              <DialogDescription className="mt-1">
-                Created {formatDate(quote.created_at)}
+              <DialogDescription className="mt-1 flex items-center gap-4">
+                <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Created {formatDate(quote.created_at)}</span>
+                {quote.expires_at && (
+                  <span className="flex items-center gap-1"><Timer className="h-3.5 w-3.5" /> Expires {formatDate(quote.expires_at)}</span>
+                )}
               </DialogDescription>
             </div>
             <Badge variant="secondary" className={getStatusColor(quote.status)}>
@@ -168,55 +171,42 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
             </Alert>
           )}
           {/* Summary */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-            <h3 className="text-lg font-medium mb-3 text-gray-900">Summary</h3>
-
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center bg-blue-50 rounded-lg"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                }}
-              >
-                <Package className="h-4 w-4 text-blue-600" />
+          <div className="dashboard-card rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Package className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Items</p>
-                <p className="font-medium text-gray-900">{quote.items?.length || 0} items</p>
+                <p className="text-xs text-muted-foreground">Items</p>
+                <p className="text-sm font-semibold">{quote.items?.length || 0}</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
-                <FileText className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <FileText className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Quote Name</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {quote.name || 'Untitled Quote'}
-                </p>
+                <p className="text-xs text-muted-foreground">Quote</p>
+                <p className="text-sm font-semibold truncate">{quote.name || 'Untitled'}</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
-                <Calendar className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Calendar className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Created</p>
-                <p className="font-medium text-gray-900">{formatDate(quote.created_at)}</p>
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="text-sm font-semibold">{formatDate(quote.created_at)}</p>
               </div>
             </div>
-
-            {quote.updated_at !== quote.created_at && (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
-                  <Calendar className="h-4 w-4 text-blue-600" />
+            {quote.expires_at && (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Timer className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Last Updated</p>
-                  <p className="font-medium text-gray-900">{formatDate(quote.updated_at)}</p>
+                  <p className="text-xs text-muted-foreground">Expires</p>
+                  <p className="text-sm font-semibold">{formatDate(quote.expires_at)}</p>
                 </div>
               </div>
             )}
@@ -224,19 +214,19 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
           {/* Notes */}
           {quote.notes && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-lg font-medium mb-2 text-gray-900">Notes</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
+            <div className="dashboard-card rounded-2xl p-4">
+              <h3 className="text-sm font-semibold text-primary mb-2">Notes</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
             </div>
           )}
 
           {/* Extras/Upsells Section */}
           {quoteUpsells.length > 0 && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="dashboard-card rounded-2xl p-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
+                <h3 className="text-sm font-semibold text-primary">
                   Additional Extras
-                  <span className="text-sm font-normal text-gray-600 ml-2">
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
                     ({quoteUpsells.length} item{quoteUpsells.length !== 1 ? 's' : ''})
                   </span>
                 </h3>
@@ -279,8 +269,8 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <Package className="h-4 w-4 text-gray-400" />
-                                <h4 className="font-medium text-gray-900">{upsell.name}</h4>
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                                <h4 className="font-medium">{upsell.name}</h4>
                                 {isAccepted && (
                                   <Badge className="bg-green-100 text-green-700 border-green-300">
                                     Accepted
@@ -298,7 +288,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                                 )}
                               </div>
                               {upsell.description && (
-                                <p className="text-sm text-gray-600 mb-2">{upsell.description}</p>
+                                <p className="text-sm text-muted-foreground mb-2">{upsell.description}</p>
                               )}
                               <div className="flex items-center gap-1 text-green-600 font-semibold">
                                 <DollarSign className="h-4 w-4" />
@@ -312,7 +302,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                               {isUpdating ? (
                                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                               ) : isLocked ? (
-                                <span className="text-sm text-gray-500 italic">Locked</span>
+                                <span className="text-sm text-muted-foreground italic">Locked</span>
                               ) : (
                                 <>
                                   <Button
@@ -345,9 +335,9 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
                   {/* Extras Total */}
                   {quoteUpsells.some(qu => qu.customer_accepted === true) && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="mt-4 pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Accepted Extras Total:</span>
+                        <span className="text-sm text-muted-foreground">Accepted Extras Total:</span>
                         <span className="font-semibold text-green-600">
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',

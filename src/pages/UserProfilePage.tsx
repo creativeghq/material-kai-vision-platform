@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
@@ -23,12 +24,14 @@ export const UserProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">My Profile</h1>
-        <p className="text-sm text-muted-foreground">Manage your account, credits, and billing</p>
-      </div>
+    <div>
+      <PageHeader
+        icon={User}
+        title="My Profile"
+        subtitle="Manage your account, credits, and billing"
+      />
 
+      <div className="max-w-5xl mx-auto px-6 py-8">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -100,6 +103,7 @@ export const UserProfilePage: React.FC = () => {
           <BillingHistoryTab />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

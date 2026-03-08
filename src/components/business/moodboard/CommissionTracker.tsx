@@ -157,7 +157,7 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
       {/* Commissions Table */}
       <div className="overflow-x-auto border rounded-lg">
         <table className="w-full">
-          <thead className="bg-gray-100 border-b">
+          <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
             <tr>
               <th className="text-left p-3">Moodboard</th>
               <th className="text-left p-3">Requester</th>

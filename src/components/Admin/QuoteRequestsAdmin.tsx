@@ -208,12 +208,12 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800' },
-      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800' },
-      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800' },
-      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800' },
-      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800' },
-      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600' },
+      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
+      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
+      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
+      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 hover:bg-red-100' },
+      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;

@@ -872,6 +872,27 @@ const createKnowledgeBaseSearchTool = (workspaceId: string) => {
           }
 
           console.log(`✅ Knowledge Base search returned ${results.totalResults} results (${results.articles.length} articles, ${results.products.length} products)`);
+
+          // Track agent mentions for returned KB docs (fire-and-forget)
+          if (results.articles.length > 0) {
+            const titles = [...new Set(results.articles.map((a: any) => a.documentTitle).filter(Boolean))];
+            if (titles.length > 0) {
+              supabase
+                .from('kb_docs')
+                .select('id')
+                .in('title', titles)
+                .eq('workspace_id', workspaceId)
+                .then(({ data: matchedDocs }) => {
+                  if (matchedDocs && matchedDocs.length > 0) {
+                    matchedDocs.forEach(({ id }: { id: string }) => {
+                      supabase.rpc('increment_kb_doc_agent_mention', { doc_id: id }).catch(() => {});
+                    });
+                  }
+                })
+                .catch(() => {});
+            }
+          }
+
           return JSON.stringify(results);
         } catch (fetchError) {
           clearTimeout(timeoutId);
@@ -1010,6 +1031,268 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
         models: z.array(z.string()).optional().describe('Specific model IDs to use (e.g., ["flux-dev", "sdxl"]), or omit to use all 7 models'),
       }),
     }
+  );
+};
+
+// Edit intent patterns for multi-turn conversational editing
+const EDIT_INTENT_PATTERNS = [
+  /change\s+the\s+(floor|wall|ceiling|furniture|tile|color|material|rug|sofa|door|window)/i,
+  /replace\s+the\s+/i,
+  /make\s+it\s+(more|less)\s+/i,
+  /swap\s+(the|this)\s+/i,
+  /now\s+(use|apply|add|make)\s+/i,
+  /update\s+the\s+(floor|wall|ceiling|style|color)/i,
+  /can\s+you\s+(change|update|replace|modify)/i,
+  /different\s+(color|material|style|floor|wall)/i,
+  /instead\s+of\s+/i,
+  /keep\s+everything\s+but\s+/i,
+];
+
+function detectEditIntent(message: string): boolean {
+  return EDIT_INTENT_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+/**
+ * LangChain Tool: Gemini Interior Design Generation
+ *
+ * Uses Gemini 3.1 Flash Image / Pro for:
+ * - Fast text-to-image generation
+ * - Multi-turn conversational image editing
+ * - Floor plan → photorealistic render
+ * - Two-step floor plan from text
+ * - Multi-reference material generation
+ */
+const createGeminiGenerationTool = (
+  userId: string,
+  workspaceId: string,
+  images: string[],
+  conversationImages: string[],
+  onChunk?: (chunk: any) => void,
+  pinnedMaterialImages: string[] = [],
+) => {
+  return tool(
+    async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm }) => {
+      try {
+        console.log('✨ Starting Gemini interior design generation, mode:', mode);
+
+        // Auto-detect edit intent if mode not specified
+        let resolvedMode = mode;
+        if (!resolvedMode) {
+          const hasRecentGeneration = conversationImages.length > 0;
+          if (detectEditIntent(prompt) && hasRecentGeneration) {
+            resolvedMode = 'image-edit';
+          } else if (referenceImageUrl && !editInstruction) {
+            resolvedMode = 'floor-plan-render';
+          } else if (prompt?.toLowerCase().includes('floor plan') || sqm) {
+            resolvedMode = 'floor-plan-text';
+          } else {
+            resolvedMode = 'text-to-image';
+          }
+        }
+
+        // For image-edit: use most recent generated image if no explicit reference
+        const resolvedReferenceUrl =
+          referenceImageUrl ||
+          (resolvedMode === 'image-edit' ? conversationImages[conversationImages.length - 1] : undefined);
+
+        // For floor-plan-render: use attached image if available
+        const floorPlanImageUrl =
+          resolvedMode === 'floor-plan-render'
+            ? (resolvedReferenceUrl || (images.length > 0 ? images[0] : undefined))
+            : resolvedReferenceUrl;
+
+        const body: Record<string, unknown> = {
+          mode: resolvedMode,
+          prompt,
+          room_type: roomType,
+          style,
+          sqm,
+          model_tier: modelTier ?? 'fast',
+          user_id: userId,
+          workspace_id: workspaceId,
+          ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}),
+          ...(editInstruction ? { edit_instruction: editInstruction } : {}),
+          ...((() => {
+            const merged = [...(materialImages || []), ...pinnedMaterialImages].slice(0, 14);
+            return merged.length > 0 ? { material_images: merged } : {};
+          })()),
+        };
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-gemini`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gemini generation error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Gemini generation failed');
+        }
+
+        console.log('✅ Gemini generation complete:', result.image_url);
+
+        // Emit image result via streaming
+        onChunk?.({
+          type: 'gemini_image_ready',
+          job_id: result.job_id,
+          image_url: result.image_url,
+          diagram_url: result.diagram_url,
+          mode: resolvedMode,
+          model: result.model,
+          credits_used: result.credits_used,
+        });
+
+        const modeLabels: Record<string, string> = {
+          'text-to-image': 'generated a new design',
+          'image-edit': 'applied your edit',
+          'floor-plan-render': 'rendered your floor plan',
+          'floor-plan-text': 'created your floor plan',
+        };
+
+        return JSON.stringify({
+          success: true,
+          job_id: result.job_id,
+          image_url: result.image_url,
+          model: result.model,
+          credits_used: result.credits_used,
+          message: `I've ${modeLabels[resolvedMode] || 'generated the image'}! ${modelTier === 'pro' ? 'Using Gemini Pro for maximum quality.' : 'You can ask me to refine it — e.g., "change the floor to marble" or "make it warmer".'}`,
+        });
+      } catch (error) {
+        console.error('Gemini generation error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Generation failed',
+        });
+      }
+    },
+    {
+      name: 'generate_gemini',
+      description: `Generate or edit interior design images using Gemini AI. Use this for:
+- Fast single image generation (text-to-image)
+- Editing an existing generated image ("change the floor", "make it darker", "swap the tiles")
+- Converting a 2D floor plan image to a photorealistic top-down render
+- Generating a floor plan from a text description (two-step)
+- Generating a design using specific catalog materials as references
+Prefer this over generate_3d for single fast results and iterative editing.`,
+      schema: z.object({
+        prompt: z.string().describe('Design description or edit instruction'),
+        roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, etc.)'),
+        style: z.string().optional().describe('Design style (modern, scandinavian, industrial, cabin, japandi, etc.)'),
+        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text']).optional().describe('Generation mode. Omit to auto-detect.'),
+        referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render'),
+        editInstruction: z.string().optional().describe('Specific edit instruction when mode=image-edit'),
+        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits)'),
+        materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
+        sqm: z.number().optional().describe('Floor area in sqm for floor plan generation'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Virtual Staging
+ *
+ * Stages an empty room with AI-generated furniture using proplabs/virtual-staging.
+ * Use when the user wants to see how an empty room would look furnished.
+ */
+const createVirtualStagingTool = (
+  userId: string,
+  workspaceId: string,
+  conversationImages: string[],
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ sourceImageUrl, room, furnitureStyle, furnitureItems }) => {
+      try {
+        console.log('🏠 Starting virtual staging, room:', room, 'style:', furnitureStyle);
+
+        // Fall back to most recent conversation image if no explicit URL given
+        const resolvedImageUrl =
+          sourceImageUrl || conversationImages[conversationImages.length - 1];
+
+        if (!resolvedImageUrl) {
+          return JSON.stringify({
+            success: false,
+            error: 'No image available to stage. Please provide a room photo or generate a design first.',
+          });
+        }
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-virtual-staging`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            source_image_url: resolvedImageUrl,
+            room,
+            furniture_style: furnitureStyle || 'Default (AI decides)',
+            furniture_items: furnitureItems,
+            workspace_id: workspaceId,
+            user_id: userId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Virtual staging error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Virtual staging failed');
+        }
+
+        console.log('✅ Virtual staging complete:', result.image_url);
+
+        onChunk?.({
+          type: 'virtual_staging_ready',
+          job_id: result.job_id,
+          image_url: result.image_url,
+          room: result.room,
+          furniture_style: result.furniture_style,
+          credits_used: result.credits_used,
+        });
+
+        return JSON.stringify({
+          success: true,
+          job_id: result.job_id,
+          image_url: result.image_url,
+          room: result.room,
+          furniture_style: result.furniture_style,
+          credits_used: result.credits_used,
+          message: `Virtual staging complete! The ${result.room} has been staged in ${result.furniture_style} style. ${result.credits_used} credits used.`,
+        });
+      } catch (error) {
+        console.error('Virtual staging error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Virtual staging failed',
+        });
+      }
+    },
+    {
+      name: 'virtual_staging',
+      description: `Stage an empty room with AI-generated furniture. Use this when the user wants to:
+- See how an empty room would look with furniture
+- Stage a property for real estate
+- Visualize a room layout before buying furniture
+Requires a room photo URL (from a previous generation or uploaded image). Ask the user for the room type and style preference if not specified.`,
+      schema: z.object({
+        sourceImageUrl: z.string().optional().describe('Public URL of the empty room image. If omitted, uses the most recently generated image.'),
+        room: z.enum(['Living Room', 'Bedroom', 'Balcony', 'Dining Room', 'Office', 'Kitchen', 'Bathroom', 'Garden', 'Swimming Pool']).describe('Room type to stage'),
+        furnitureStyle: z.enum(['Default (AI decides)', 'Modern', 'Scandinavian', 'Transitional', 'Rustic', 'Mid-Century Modern', 'Urban Industrial', 'Farmhouse', 'Coastal', 'Traditional', 'Modern Organic', 'Scandinavian Oasis', 'Transitional Luxury', 'B&W Modern', 'Farmhouse Hacienda', 'Metro Industrial', 'NYC Modern']).optional().describe('Furniture style'),
+        furnitureItems: z.string().optional().describe('Specific furniture items to include, comma-separated'),
+      }),
+    },
   );
 };
 
@@ -3674,7 +3957,8 @@ async function executeAgent(
   messages: any[],
   images: string[], // User-attached images as data URLs
   userRole: string, // User's workspace role for RBAC tool gating
-  onChunk?: (chunk: any) => void
+  onChunk?: (chunk: any) => void,
+  pinnedMaterialImages: string[] = [], // Catalog product images pinned by user for Gemini multi-reference
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -3706,6 +3990,19 @@ async function executeAgent(
     agentId = config.id;
     config = AGENT_CONFIGS[agentId];
   }
+
+  // Extract previously generated image URLs from assistant messages (for edit mode)
+  const conversationImages: string[] = messages
+    .filter((m: any) => m.role === 'assistant')
+    .flatMap((m: any) => {
+      // Check tool_calls / tool_results for gemini_image_ready or generation_job image URLs
+      if (Array.isArray(m.tool_results)) {
+        return m.tool_results
+          .filter((tr: any) => tr.image_url)
+          .map((tr: any) => tr.image_url as string);
+      }
+      return [];
+    });
 
   // Collect material results from search tool calls
   let collectedProducts: any[] = [];
@@ -3814,6 +4111,8 @@ async function executeAgent(
   // --- Interior Designer tools ---
   if (config.tools.includes('generate_3d')) {
     tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
+    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages));
+    tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk));
     tools.push(createGenerationStatusTool());
   }
 
@@ -4282,9 +4581,10 @@ Deno.serve(async (req) => {
     console.log('🎯 Handler started - parsing request body...');
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [] } = await req.json();
     // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
     // conversation_id: string | null — Supabase conversation ID, used to post background task results back
+    // pinned_material_images: string[] — catalog product image URLs pinned by user for Gemini multi-reference generation
 
     console.log('✅ Request body parsed successfully');
 
@@ -4432,7 +4732,8 @@ Deno.serve(async (req) => {
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }
-              }
+              },
+              pinned_material_images, // Catalog product images pinned by user
             );
             console.log('✅ executeAgent completed, result:', finalResult ? 'SUCCESS' : 'NULL');
             if (finalResult) {

@@ -112,11 +112,6 @@ export const MIVAA_ACTION_MAP: Record<
     method: 'POST',
   },
 
-  // Search
-  semantic_search: { path: '/api/search/semantic', method: 'POST' },
-  vector_search: { path: '/api/search/vector', method: 'POST' },
-  hybrid_search: { path: '/api/search/hybrid', method: 'POST' },
-
   // Chat & AI - Use valid mivaa-gateway actions
   rag_chat: { path: '/api/rag/chat', method: 'POST' },
   rag_query: { path: '/api/rag/query', method: 'POST' },

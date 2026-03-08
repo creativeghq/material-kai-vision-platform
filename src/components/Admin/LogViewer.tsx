@@ -466,7 +466,7 @@ export function LogViewer() {
                 ) : (
                   <>
                     <table className="w-full">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Level</th>

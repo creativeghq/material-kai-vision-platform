@@ -5,7 +5,6 @@ import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -479,7 +478,18 @@ export const QuoteDetailPage: React.FC = () => {
     <div className="min-h-screen">
       <GlobalAdminHeader
         title={quote.name || 'Untitled Quote'}
-        description={`Created ${new Date(quote.created_at).toLocaleDateString()}`}
+        description={
+          <span className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              Created {new Date(quote.created_at).toLocaleDateString()}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Timer className="h-3.5 w-3.5" />
+              Expires {new Date(quote.expires_at).toLocaleDateString()}
+            </span>
+          </span>
+        }
         badge="Quote Details"
       />
 
@@ -574,7 +584,7 @@ export const QuoteDetailPage: React.FC = () => {
         </div>
 
         {/* Compact Quote Information Row - dashboard card styling */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
@@ -662,44 +672,6 @@ export const QuoteDetailPage: React.FC = () => {
                   backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
-                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="text-lg font-semibold">{new Date(quote.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Timer className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Expires</p>
-                <p className="text-lg font-semibold">{new Date(quote.expires_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
                 <User className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               </div>
               <div className="min-w-0">
@@ -756,7 +728,7 @@ export const QuoteDetailPage: React.FC = () => {
         )}
 
         {/* Tabs */}
-        <Tabs defaultValue="items" className="w-full">
+        <Tabs defaultValue="items" className="w-full mt-2">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Boxes className="h-4 w-4" />
@@ -781,7 +753,7 @@ export const QuoteDetailPage: React.FC = () => {
           </TabsList>
 
           {/* Items Tab */}
-          <TabsContent value="items">
+          <TabsContent value="items" className="mt-5">
             <QuoteItemsList
               items={quote.items || []}
               variant="detailed"
@@ -800,18 +772,15 @@ export const QuoteDetailPage: React.FC = () => {
           </TabsContent>
 
           {/* Pricing Tab */}
-          <TabsContent value="pricing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Set Item Prices
-                </CardTitle>
-                <CardDescription>
-                  Set a unit price for each item. Line totals and the grand total are calculated automatically.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          <TabsContent value="pricing" className="space-y-5 mt-5">
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <DollarSign className="h-4 w-4" /> Set Item Prices
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Set a unit price for each item. Line totals and the grand total are calculated automatically.</p>
+              </div>
+              <div>
                 {(quote.items || []).length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">No items in this quote.</p>
                 ) : (
@@ -819,8 +788,8 @@ export const QuoteDetailPage: React.FC = () => {
                     {/* Pricing Table */}
                     <div className="border rounded-lg overflow-hidden">
                       <table className="w-full">
-                        <thead>
-                          <tr className="bg-muted/50">
+                        <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                          <tr>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3">Product</th>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-20">Qty</th>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-32">Unit Price</th>
@@ -907,24 +876,21 @@ export const QuoteDetailPage: React.FC = () => {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Extras Tab */}
-          <TabsContent value="extras" className="space-y-6">
+          <TabsContent value="extras" className="space-y-5 mt-5">
             {/* Add Upsell Dropdown Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gift className="h-5 w-5" />
-                  Add Extra/Upsell
-                </CardTitle>
-                <CardDescription>
-                  Select an upsell from the dropdown and customize price, quantity, and measurement
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <Gift className="h-4 w-4" /> Add Extra/Upsell
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Select an upsell from the dropdown and customize price, quantity, and measurement</p>
+              </div>
+              <div>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                   {/* Upsell Dropdown */}
                   <div className="md:col-span-2">
@@ -1002,18 +968,18 @@ export const QuoteDetailPage: React.FC = () => {
                   )}
                   Add Upsell to Quote
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Attached Upsells */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Attached Extras/Upsells</span>
-                  <Badge variant="secondary">{quoteUpsells.length} items</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <Gift className="h-4 w-4" /> Attached Extras/Upsells
+                </h3>
+                <Badge variant="secondary">{quoteUpsells.length} items</Badge>
+              </div>
+              <div>
                 {loadingUpsells ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin" />
@@ -1070,24 +1036,21 @@ export const QuoteDetailPage: React.FC = () => {
                     })}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Timeline Tab */}
-          <TabsContent value="timeline" className="space-y-6">
+          <TabsContent value="timeline" className="space-y-5 mt-5">
             {/* Add Timeline Step Dropdown Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ListChecks className="h-5 w-5" />
-                  Add Timeline Step
-                </CardTitle>
-                <CardDescription>
-                  Select a timeline step from the dropdown and optionally add a note
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <ListChecks className="h-4 w-4" /> Add Timeline Step
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Select a timeline step from the dropdown and optionally add a note</p>
+              </div>
+              <div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   {/* Timeline Step Dropdown */}
                   <div>
@@ -1154,18 +1117,18 @@ export const QuoteDetailPage: React.FC = () => {
                     Initialize All Steps
                   </Button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Timeline Steps List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Project Timeline</span>
-                  <Badge variant="secondary">{quoteTimeline.length} steps</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <Milestone className="h-4 w-4" /> Project Timeline
+                </h3>
+                <Badge variant="secondary">{quoteTimeline.length} steps</Badge>
+              </div>
+              <div>
                 {loadingTimeline ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
@@ -1298,20 +1261,18 @@ export const QuoteDetailPage: React.FC = () => {
                     })}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Activity Tab */}
-          <TabsContent value="activity">
-            <Card>
-              <CardHeader>
-                <CardTitle>Activity Log</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Activity log will be displayed here</p>
-              </CardContent>
-            </Card>
+          <TabsContent value="activity" className="mt-5">
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-primary mb-4">
+                <Activity className="h-4 w-4" /> Activity Log
+              </h3>
+              <p className="text-sm text-muted-foreground">Activity log will be displayed here</p>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

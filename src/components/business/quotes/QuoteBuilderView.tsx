@@ -13,6 +13,8 @@ import {
   FileText,
   X,
   Eye,
+  Calendar,
+  Timer,
 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -310,69 +312,48 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Quote Summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium flex items-center gap-2 text-gray-900">
-            <div className="bg-blue-50 rounded-lg flex items-center justify-center" style={{ width: '2rem', height: '2rem' }}>
-              <Package className="h-4 w-4 text-blue-600" />
-            </div>
+      <div className="dashboard-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <Package className="h-4 w-4 text-primary" />
             {quote.name || `Quote #${quote.id.substring(0, 8)}`}
           </h3>
-          <Badge variant="secondary">
-            {quote.status}
-          </Badge>
+          <Badge variant="secondary" className="rounded-full capitalize">{quote.status}</Badge>
         </div>
-        <div className="space-y-2">
-          <div className="text-gray-600 text-sm">
-            {quoteType === 'products'
-              ? `${items.length} material${items.length !== 1 ? 's' : ''}`
-              : 'Custom request'
-            }
-          </div>
-          <div className="text-muted-foreground text-sm">
-            Created: {new Date(quote.created_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </div>
-          {/* Expiration Status */}
-          {expirationStatus && (
-            <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${expirationStatus.bgColor}`}>
-              {expirationStatus.status === 'expired' ? (
-                <>
-                  <AlertCircle className={`h-4 w-4 ${expirationStatus.color}`} />
-                  <span className={expirationStatus.color}>This quote has expired</span>
-                </>
-              ) : expirationStatus.status === 'expiring-soon' ? (
-                <>
-                  <Clock className={`h-4 w-4 ${expirationStatus.color}`} />
-                  <span className={expirationStatus.color}>
-                    Expires in {expirationStatus.days} day{expirationStatus.days !== 1 ? 's' : ''}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Clock className={`h-4 w-4 ${expirationStatus.color}`} />
-                  <span className={expirationStatus.color}>
-                    Expires in {expirationStatus.days} days
-                  </span>
-                </>
+        <p className="text-xs text-muted-foreground mb-2">
+          {quoteType === 'products'
+            ? `${items.length} material${items.length !== 1 ? 's' : ''}`
+            : 'Custom request'
+          }
+        </p>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3.5 w-3.5" />
+            Created {new Date(quote.created_at).toLocaleDateString()}
+          </span>
+          {quote.expires_at && (
+            <span className={`flex items-center gap-1 ${expirationStatus?.status === 'expired' ? 'text-red-500' : expirationStatus?.status === 'expiring-soon' ? 'text-yellow-600' : ''}`}>
+              <Timer className="h-3.5 w-3.5" />
+              Expires {new Date(quote.expires_at).toLocaleDateString()}
+              {expirationStatus && expirationStatus.status !== 'active' && (
+                <span className="ml-1">
+                  {expirationStatus.status === 'expired' ? '(expired)' : `(${expirationStatus.days}d left)`}
+                </span>
               )}
-            </div>
+            </span>
           )}
         </div>
       </div>
 
       {/* Quote Type Tabs */}
       <Tabs value={quoteType} onValueChange={(value) => setQuoteType(value as 'products' | 'custom')}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="products">
-            <Package className="h-4 w-4 mr-2" />
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="products" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Package className="h-4 w-4" />
             Products
           </TabsTrigger>
-          <TabsTrigger value="custom">
-            <FileText className="h-4 w-4 mr-2" />
+          <TabsTrigger value="custom" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <FileText className="h-4 w-4" />
             Custom Request
           </TabsTrigger>
         </TabsList>

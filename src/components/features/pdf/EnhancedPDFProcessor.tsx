@@ -334,12 +334,11 @@ export function EnhancedPDFProcessor() {
       // Perform real semantic search using MIVAA gateway
       const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
         body: {
-          action: 'semantic_search',
+          action: 'rag_search',
           payload: {
             query: searchQuery,
-            limit: 10,
+            top_k: 10,
             similarity_threshold: 0.7,
-            include_metadata: true,
           },
         },
       });

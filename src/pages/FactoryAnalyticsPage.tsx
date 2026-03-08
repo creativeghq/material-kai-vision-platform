@@ -8,13 +8,13 @@ import {
   Building2, TrendingUp, Star, Users, MessageSquare, Eye,
   Package, Loader2, Search, Target, Zap, Award, Globe, Layers, Activity,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { supabase } from '@/integrations/supabase/client';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 // ── Color palette ──────────────────────────────────────────────
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
@@ -402,9 +402,9 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Radar */}
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Factory Performance Overview</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Activity className="h-4 w-4" /> Factory Performance Overview</h3>
+          <div>
             <ResponsiveContainer width="100%" height={280}>
               <RadarChart data={radarData}>
                 <PolarGrid stroke="hsl(var(--border))" />
@@ -413,13 +413,13 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                 <Radar name="Score" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.25} />
               </RadarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Rating distribution */}
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Rating Distribution</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Star className="h-4 w-4" /> Rating Distribution</h3>
+          <div>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={ratingDist} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -429,14 +429,14 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                 <Bar dataKey="count" name="Reviews" fill={COLORS[2]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Activity over time */}
-      <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">Activity Over Time (last 8 weeks)</CardTitle></CardHeader>
-        <CardContent>
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Activity Over Time (last 8 weeks)</h3>
+        <div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={activityData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -448,17 +448,17 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
               <Line type="monotone" dataKey="hires" stroke={COLORS[2]} name="Hire Requests" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Top products */}
       {topProducts.length > 0 && (
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Products by Activity</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Package className="h-4 w-4" /> Top Products by Activity</h3>
+          <div>
             <div className="overflow-auto max-h-[320px]">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                   <tr className="border-b text-xs text-muted-foreground">
                     <th className="text-left py-2 pr-4 font-medium">#</th>
                     <th className="text-left py-2 pr-4 font-medium">Product</th>
@@ -482,16 +482,16 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Quote Pipeline for Factory Materials */}
       {quoteByStatus.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="rounded-2xl">
-            <CardHeader><CardTitle className="text-sm">Quote Pipeline for Your Materials</CardTitle></CardHeader>
-            <CardContent>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Quote Pipeline for Your Materials</h3>
+            <div>
               <p className="text-xs text-muted-foreground mb-3">Quote request statuses across all quotes including your products</p>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={quoteByStatus} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
@@ -512,12 +512,12 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="rounded-2xl">
-            <CardHeader><CardTitle className="text-sm">Conversion Funnel — Your Materials</CardTitle></CardHeader>
-            <CardContent>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Award className="h-4 w-4" /> Conversion Funnel — Your Materials</h3>
+            <div>
               <p className="text-xs text-muted-foreground mb-4">From first save to accepted quote</p>
               <div className="space-y-3">
                 {[
@@ -536,8 +536,8 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
@@ -557,16 +557,16 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Factory name searches */}
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Searches Mentioning Your Factory (12w)</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Search className="h-4 w-4" /> Searches Mentioning Your Factory (12w)</h3>
+          <div>
             <p className="text-xs text-muted-foreground mb-3">Buyer search queries containing "{factoryName}"</p>
             {factorySearches.length === 0 ? (
               <EmptyState message="No factory-name searches recorded in this period" />
             ) : (
               <div className="overflow-auto max-h-[280px]">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="border-b text-xs text-muted-foreground">
                       <th className="text-left py-2 pr-4 font-medium">#</th>
                       <th className="text-left py-2 pr-4 font-medium">Search Query</th>
@@ -585,13 +585,13 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                 </table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Moodboard by category donut */}
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Moodboard Saves by Material Category</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Layers className="h-4 w-4" /> Moodboard Saves by Material Category</h3>
+          <div>
             <p className="text-xs text-muted-foreground mb-2">Which categories of your materials buyers save most</p>
             {moodboardByCategory.length === 0 ? (
               <EmptyState message="No moodboard saves yet" />
@@ -608,14 +608,14 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
                 </PieChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Follower growth */}
-      <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">New Followers Per Week (last 8 weeks)</CardTitle></CardHeader>
-        <CardContent>
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Users className="h-4 w-4" /> New Followers Per Week (last 8 weeks)</h3>
+        <div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={followerTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -625,8 +625,8 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
               <Bar dataKey="follows" name="New Followers" fill={COLORS[4]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ──── Material Attribute Explorer ─────────────────── */}
       <SectionHeader
@@ -635,10 +635,10 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
         icon={Layers}
       />
 
-      <Card className="rounded-2xl">
-        <CardHeader>
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm">Saves & Quotes by Attribute Value</CardTitle>
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Saves & Quotes by Attribute Value</h3>
             {availableKeys.length > 0 && (
               <Select value={attributeKey} onValueChange={setAttributeKey}>
                 <SelectTrigger className="w-[200px] h-8 text-xs">
@@ -652,8 +652,8 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
               </Select>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {availableKeys.length === 0 ? (
             <EmptyState message="No metadata attributes found in your product catalog" />
           ) : attributeData.length === 0 ? (
@@ -661,7 +661,7 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
           ) : (
             <div className="overflow-auto max-h-[360px]">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                   <tr className="border-b text-xs text-muted-foreground">
                     <th className="text-left py-2 pr-4 font-medium">#</th>
                     <th className="text-left py-2 pr-4 font-medium capitalize">{attributeKey.replace(/_/g, ' ')}</th>
@@ -682,8 +682,8 @@ function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: st
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1767,12 +1767,12 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
             {/* Material growth rates */}
-            <Card className="rounded-xl border-border/50 lg:col-span-1">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Rising & Declining Materials</CardTitle>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 lg:col-span-1">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Rising & Declining Materials</h3>
                 <p className="text-xs text-muted-foreground">Save velocity change — this 4 weeks vs prior 4 weeks</p>
-              </CardHeader>
-              <CardContent className="p-0">
+              </div>
+              <div className="overflow-hidden -mx-6 -mb-6 mt-2">
                 <div className="divide-y divide-border/30">
                   {materialGrowthRates.slice(0, 8).map((row, i) => (
                     <div key={i} className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/30 transition-colors">
@@ -1789,16 +1789,16 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Room type trends */}
-            <Card className="rounded-xl border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">3D Room Type Trends</CardTitle>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Eye className="h-4 w-4" /> 3D Room Type Trends</h3>
                 <p className="text-xs text-muted-foreground">Which spaces buyers are designing most actively</p>
-              </CardHeader>
-              <CardContent className="p-0">
+              </div>
+              <div className="overflow-hidden -mx-6 -mb-6 mt-2">
                 <div className="divide-y divide-border/30">
                   {roomTypeTrends.slice(0, 6).map((row, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
@@ -1817,16 +1817,16 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Buyer segment growth */}
-            <Card className="rounded-xl border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Buyer Segment Growth</CardTitle>
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Buyer Segment Growth</h3>
                 <p className="text-xs text-muted-foreground">New registrations by professional type — which buyers are arriving fastest</p>
-              </CardHeader>
-              <CardContent className="p-0">
+              </div>
+              <div className="overflow-hidden -mx-6 -mb-6 mt-2">
                 <div className="divide-y divide-border/30">
                   {segmentGrowth.slice(0, 6).map((row, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
@@ -1840,8 +1840,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -1854,13 +1854,14 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
       />
 
       {/* Demanded Materials table */}
-      <Card className="rounded-xl border-border/50">
-        <CardHeader className="pb-2">
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-semibold">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                <Package className="h-4 w-4" />
                 {viewScope === 'factory' ? "Your Products — Market Demand Ranking" : 'Top 15 Demanded Materials'}
-              </CardTitle>
+              </h3>
               {viewScope === 'factory' && topDemands.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {topDemands.filter((d) => d.mentions > 0).length}/{topDemands.length} products with demand signals
@@ -1868,12 +1869,12 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               )}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+        <div className="overflow-hidden -mx-6 -mb-6 mt-2">
           {topDemands.length === 0 ? <div className="px-4 pb-4"><EmptyState /></div> : (
             <div className="overflow-auto max-h-[400px]">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-card border-b border-border/50">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                   <tr className="text-xs font-semibold text-muted-foreground">
                     <th className="text-left px-4 py-2.5 font-medium">#</th>
                     <th className="text-left px-3 py-2.5 font-medium">Material</th>
@@ -1919,15 +1920,15 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Trending Material Attributes */}
-      <Card className="rounded-xl border-border/50">
-        <CardHeader>
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="text-sm font-semibold">Trending Material Attributes</CardTitle>
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Trending Material Attributes</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {attrSource
                   ? `Showing: ${metadataFieldLabels.get(attrSource) ?? prettifyKey(attrSource)}${selectedCategory !== 'all' ? ` · ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ''}${viewScope === 'factory' ? ' · your products' : ''}`
@@ -1947,8 +1948,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               </Select>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {!attrSource || displayedAttributes.length === 0 ? (
             <EmptyState message={attrSourceKeys.length === 0 ? 'No attribute data recorded yet — attributes appear once products are saved to moodboards' : `No products with "${metadataFieldLabels.get(attrSource) ?? prettifyKey(attrSource)}" attribute found`} />
           ) : (
@@ -1969,8 +1970,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               </BarChart>
             </ResponsiveContainer>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── Discovery Channel per Product ── */}
       {discoveryByProduct.length > 0 && (
@@ -1980,15 +1981,15 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             desc={viewScope === 'factory' ? 'Which channels buyers use to find your products — optimize for the source that converts best' : 'How buyers are discovering top materials — search-led vs AI-led vs 3D scene exploration'}
             icon={Search}
           />
-          <Card className="rounded-xl border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Discovery Source Breakdown — Top Products</CardTitle>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> Discovery Source Breakdown — Top Products</h3>
               <p className="text-xs text-muted-foreground">Each row shows what % of saves + quote interactions came from each channel</p>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[360px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">Product</th>
                       <th className="text-right px-2 py-2.5 font-medium text-blue-500">Search</th>
@@ -2021,8 +2022,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2033,18 +2034,19 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
         icon={Layers}
       />
 
-      <Card className="rounded-xl border-border/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+            <Layers className="h-4 w-4" />
             {viewScope === 'factory' ? 'Your Most Board-Saved Products' : 'Top Products Saved to Moodboards'}
-          </CardTitle>
+          </h3>
           <p className="text-xs text-muted-foreground mt-0.5">Products buyers include most often in design boards — strong intent signal</p>
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+        <div className="overflow-hidden -mx-6 -mb-6 mt-2">
           {topMoodboardItems.length === 0 ? <div className="px-4 pb-4"><EmptyState message="No moodboard saves recorded in this period" /></div> : (
             <div className="overflow-auto max-h-[360px]">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-card border-b border-border/50">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                   <tr className="text-xs font-semibold text-muted-foreground">
                     <th className="text-left px-4 py-2.5 font-medium">#</th>
                     <th className="text-left px-3 py-2.5 font-medium">Product</th>
@@ -2065,8 +2067,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ──── Quote Purchase Flow ───────────────────────── */}
       <SectionHeader
@@ -2076,18 +2078,19 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="rounded-xl border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <Target className="h-4 w-4" />
               {viewScope === 'factory' ? 'Your Most Quoted Products' : 'Top Products in Buyer Quotes'}
-            </CardTitle>
+            </h3>
             <p className="text-xs text-muted-foreground mt-0.5">Direct purchase intent — products requested in quotes</p>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
+          <div className="overflow-hidden -mx-6 -mb-6 mt-2">
             {topQuotedItems.length === 0 ? <div className="px-4 pb-4"><EmptyState message="No quotes recorded in this period" /></div> : (
               <div className="overflow-auto max-h-[320px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs font-semibold text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">#</th>
                       <th className="text-left px-3 py-2.5 font-medium">Product</th>
@@ -2108,15 +2111,15 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                 </table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="rounded-xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">How Buyers Found Quoted Products</CardTitle>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> How Buyers Found Quoted Products</h3>
             <p className="text-xs text-muted-foreground mt-1">Attribution — which touchpoint led to the quote request</p>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {discoveryChannels.length === 0 ? <EmptyState message="No quote source data available" /> : (
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
@@ -2128,8 +2131,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                 </PieChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* ──── Quote Intelligence (factory mode only) ──── */}
@@ -2160,9 +2163,11 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="rounded-xl border-border/50">
-          <CardHeader><CardTitle className="text-sm font-semibold">Activity by Professional Type</CardTitle></CardHeader>
-          <CardContent>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Activity by Professional Type</h3>
+          </div>
+          <div>
             {buyerTypeData.length === 0 ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart
@@ -2179,23 +2184,23 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="rounded-xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Buyer Segment Breakdown & Conversion</CardTitle>
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Buyer Segment Breakdown & Conversion</h3>
             {viewScope === 'factory' && buyerTypeData[0] && (
               <p className="text-xs text-muted-foreground mt-1">
                 Your #1 segment is <span className="text-primary font-medium">{formatProfType(buyerTypeData[0].type)}</span> — focus your catalog on their preferred styles
               </p>
             )}
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {buyerTypeData.length === 0 ? <EmptyState /> : (
               <div className="overflow-auto max-h-[280px]">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
                       <th className="text-left py-2.5 pr-3 font-bold">Buyer Type</th>
                       <th className="text-right py-2.5 pr-3 font-bold">Saves</th>
@@ -2218,8 +2223,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                 </table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
 
@@ -2236,17 +2241,18 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             <KpiCard label="Unique Materials Used in 3D" value={vrKpis.uniqueMaterials} icon={Package} color="text-cyan-600" />
             <KpiCard label="Top Room Type" value={vrKpis.topRoomType} icon={Globe} color="text-amber-500" />
           </div>
-          <Card className="rounded-xl border-border/50">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                <Layers className="h-4 w-4" />
                 {viewScope === 'factory' ? 'Your Products in 3D Scenes' : 'Top Materials Used in 3D Generations'}
-              </CardTitle>
+              </h3>
               <p className="text-xs text-muted-foreground mt-0.5">Materials actively placed in room visualizations — buyers are testing purchase decisions</p>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[300px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">#</th>
                       <th className="text-left px-3 py-2.5 font-medium">Material</th>
@@ -2266,8 +2272,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2296,19 +2302,19 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
               <p className="text-xs text-muted-foreground mt-1">No supplier currently serves these searches</p>
             </div>
           </div>
-          <Card className="rounded-xl border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">What Buyers Want but Cannot Find</CardTitle>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> What Buyers Want but Cannot Find</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {viewScope === 'factory'
                   ? 'Ranked by search frequency — any term adjacent to your category is a launch opportunity'
                   : 'Platform-wide gaps — first supplier to list wins all organic demand for these terms'}
               </p>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[320px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">#</th>
                       <th className="text-left px-3 py-2.5 font-medium">Buyer Search Term</th>
@@ -2342,8 +2348,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2355,17 +2361,18 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             desc={viewScope === 'factory' ? 'Products buyers pair with yours in the same quote — reveals complementary catalog opportunities' : 'Products most frequently co-quoted together — reveals buyer project composition'}
             icon={Award}
           />
-          <Card className="rounded-xl border-border/50">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                <Award className="h-4 w-4" />
                 {viewScope === 'factory' ? 'Co-Quoted with Your Products' : 'Most Co-Quoted Product Pairs'}
-              </CardTitle>
+              </h3>
               <p className="text-xs text-muted-foreground mt-0.5">When buyers build quotes, they include these products together — understand project composition</p>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
               <div className="overflow-auto max-h-[280px]">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs text-muted-foreground">
                       <th className="text-left px-4 py-2.5 font-medium">#</th>
                       <th className="text-left px-3 py-2.5 font-medium">Product A</th>
@@ -2385,8 +2392,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2425,12 +2432,12 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             desc={viewScope === 'factory' ? 'How buyers progress from first contact to accepting a quote for your materials' : 'Platform-wide buyer journey from material interest to confirmed purchase'}
             icon={TrendingUp}
           />
-          <Card className="rounded-xl border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">From Interest to Conversion</CardTitle>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> From Interest to Conversion</h3>
               <p className="text-xs text-muted-foreground">Each stage shows drop-off — where buyers disengage in the purchase journey</p>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className="space-y-3">
                 {engagementFunnel.map((stage, i) => {
                   const maxCount = engagementFunnel[0]?.count || 1;
@@ -2451,8 +2458,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2469,18 +2476,18 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             <KpiCard label="Public Boards" value={moodboardStats.public} icon={Globe} color="text-cyan-600" />
             <KpiCard label="Public Share" value={moodboardStats.total > 0 ? `${Math.round((moodboardStats.public / moodboardStats.total) * 100)}%` : '—'} icon={Eye} color="text-green-600" />
           </div>
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-sm">Material Pairing Analysis</CardTitle>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> Material Pairing Analysis</h3>
               <p className="text-xs text-muted-foreground mt-1">When buyers save your materials to moodboards, they also most often include these products — revealing the design contexts your materials belong to</p>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               {moodboardPairings.length === 0 ? (
                 <EmptyState message="No co-save data yet — grow your catalog visibility to see pairing patterns" />
               ) : (
                 <div className="overflow-auto max-h-[300px]">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-background">
+                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                       <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
                         <th className="text-left py-2.5 pr-4 font-bold">#</th>
                         <th className="text-left py-2.5 pr-4 font-bold">Partner Product</th>
@@ -2501,8 +2508,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2514,18 +2521,18 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             desc="Materials buyers are actively demanding that are not in your catalog — actionable expansion signals"
             icon={Search}
           />
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-sm">Catalog Gaps — Top Unserved Demands</CardTitle>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Target className="h-4 w-4" /> Catalog Gaps — Top Unserved Demands</h3>
               <p className="text-xs text-muted-foreground mt-1">Top platform demand signals that don't match any product in your catalog</p>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               {catalogGaps.length === 0 ? (
                 <EmptyState message="Your catalog covers all top demanded materials" />
               ) : (
                 <div className="overflow-auto max-h-[260px]">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-background">
+                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                       <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
                         <th className="text-left py-2.5 pr-4 font-bold">#</th>
                         <th className="text-left py-2.5 pr-4 font-bold">Demanded Material</th>
@@ -2548,8 +2555,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
@@ -2557,11 +2564,11 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
       {viewScope === 'factory' && productVelocity.length > 0 && (
         <>
           <SectionHeader title="Product Velocity" desc="Week-over-week traction — last 4 weeks vs prior 4 weeks" icon={Zap} />
-          <Card className="rounded-2xl">
-            <CardContent className="pt-4">
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div>
               <div className="overflow-auto max-h-[300px]">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
                       <th className="text-left py-2.5 pr-4 font-bold">#</th>
                       <th className="text-left py-2.5 pr-4 font-bold">Product</th>
@@ -2589,8 +2596,8 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
     </div>
@@ -2626,19 +2633,16 @@ export default function FactoryAnalyticsPage() {
   const defaultTab = isFactory ? 'my-factory' : 'market-trends';
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          Factory Analytics
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isAdmin ? 'Full platform + factory analytics view' : 'Your factory performance and market trends'}
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        icon={Building2}
+        title="Factory Analytics"
+        subtitle={isAdmin ? 'Full platform + factory analytics view' : 'Your factory performance and market trends'}
+      />
 
+      <div className="max-w-7xl mx-auto px-6 py-8">
       <Tabs defaultValue={defaultTab} className="space-y-6">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           {isFactory && (
             <TabsTrigger value="my-factory" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4" />My Factory
@@ -2659,6 +2663,7 @@ export default function FactoryAnalyticsPage() {
           <MarketTrendsTab isFactory={isFactory} factoryName={factoryClaimedName ?? undefined} />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

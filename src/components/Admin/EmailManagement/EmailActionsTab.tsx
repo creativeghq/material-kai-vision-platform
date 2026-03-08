@@ -124,8 +124,8 @@ export const EmailActionsTab: React.FC = () => {
       <div className="dashboard-card">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="border-b">
+            <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+              <tr>
                 <th className="text-left py-3 px-4 font-medium">Action</th>
                 <th className="text-left py-3 px-4 font-medium">Description</th>
                 <th className="text-left py-3 px-4 font-medium">Template</th>

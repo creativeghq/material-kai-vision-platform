@@ -8,6 +8,7 @@ import {
   XCircle,
   Clock,
   RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -268,6 +269,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {doc.status === 'published' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="View on public KB"
+                          onClick={() => window.open(`/knowledge-base?doc=${doc.id}`, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4 text-blue-500" />
+                        </Button>
+                      )}
                       {doc.embedding_status !== 'success' && (
                         <Button
                           variant="ghost"

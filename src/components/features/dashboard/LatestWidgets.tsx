@@ -7,16 +7,15 @@ import { supabase } from '@/integrations/supabase/client';
 interface LatestMaterial {
   id: string;
   name: string;
-  brand: string | null;
   created_at: string;
-  image_url?: string;
+  image_url?: string | null;
 }
 
 interface LatestDocument {
   id: string;
   title: string | null;
-  filename: string;
   created_at: string;
+  category_id: string | null;
 }
 
 interface LatestProfile {
@@ -74,13 +73,13 @@ function Widget({
       </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex items-center gap-3 animate-pulse">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 shrink-0" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-3 bg-primary/10 rounded w-3/4" />
-                <div className="h-2.5 bg-primary/10 rounded w-1/2" />
+        <div className="grid grid-cols-2 gap-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex items-center gap-2 animate-pulse">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 shrink-0" />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="h-2.5 bg-primary/10 rounded w-4/5" />
+                <div className="h-2 bg-primary/10 rounded w-1/2" />
               </div>
             </div>
           ))}
@@ -88,7 +87,7 @@ function Widget({
       ) : empty ? (
         <p className="text-xs text-muted-foreground py-4 text-center">Nothing here yet.</p>
       ) : (
-        <div className="space-y-3 flex-1">{children}</div>
+        <div className="grid grid-cols-2 gap-2 flex-1">{children}</div>
       )}
     </div>
   );
@@ -101,14 +100,14 @@ function ImageThumb({ src, fallback }: { src?: string | null; fallback: string }
       <img
         src={src}
         alt=""
-        className="w-9 h-9 rounded-lg object-cover shrink-0 bg-primary/10"
+        className="w-8 h-8 rounded-lg object-cover shrink-0 bg-primary/10"
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
       />
     );
   }
   return (
-    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-      <span className="text-xs font-medium text-primary">
+    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <span className="text-[10px] font-medium text-primary">
         {fallback.slice(0, 2).toUpperCase()}
       </span>
     </div>
@@ -123,26 +122,17 @@ function MaterialsWidget() {
   useEffect(() => {
     supabase
       .from('products')
-      .select('id, name, brand, created_at')
+      .select('id, name, created_at, image_product_associations(document_images(image_url))')
       .order('created_at', { ascending: false })
-      .limit(4)
-      .then(async ({ data }) => {
-        const products = (data ?? []) as LatestMaterial[];
-        // Fetch one image per product
-        const withImages = await Promise.all(
-          products.map(async (p) => {
-            const { data: rel } = await supabase
-              .from('product_image_relationships')
-              .select('document_images(image_url)')
-              .eq('product_id', p.id)
-              .order('relevance_score', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            // @ts-expect-error nested typing
-            return { ...p, image_url: rel?.document_images?.image_url };
-          })
-        );
-        setItems(withImages);
+      .limit(6)
+      .then(({ data }) => {
+        const products = (data ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          created_at: p.created_at,
+          image_url: p.image_product_associations?.[0]?.document_images?.image_url ?? null,
+        }));
+        setItems(products);
         setLoading(false);
       });
   }, []);
@@ -150,13 +140,11 @@ function MaterialsWidget() {
   return (
     <Widget icon={Package} title="Latest Materials" viewAllLink="/agent-hub?prompt=Show me the latest and newest materials recently added to the platform" loading={loading} empty={items.length === 0}>
       {items.map((item) => (
-        <div key={item.id} className="flex items-center gap-3">
+        <div key={item.id} className="flex items-center gap-2 min-w-0">
           <ImageThumb src={item.image_url} fallback={item.name} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate leading-tight">{item.name}</p>
-            {item.brand && (
-              <p className="text-xs text-muted-foreground truncate">{item.brand}</p>
-            )}
+            <p className="text-xs font-medium truncate leading-tight">{item.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
         </div>
       ))}
@@ -171,10 +159,11 @@ function KnowledgeWidget() {
 
   useEffect(() => {
     supabase
-      .from('documents')
-      .select('id, title, filename, created_at')
+      .from('kb_docs')
+      .select('id, title, created_at, category_id')
+      .eq('status', 'published')
       .order('created_at', { ascending: false })
-      .limit(4)
+      .limit(6)
       .then(({ data }) => {
         setItems((data ?? []) as LatestDocument[]);
         setLoading(false);
@@ -184,17 +173,13 @@ function KnowledgeWidget() {
   return (
     <Widget icon={BookOpen} title="Latest Knowledge" viewAllLink="/knowledge-base" loading={loading} empty={items.length === 0}>
       {items.map((doc) => (
-        <div key={doc.id} className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <FileText className="h-4 w-4 text-primary" />
+        <div key={doc.id} className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="h-3.5 w-3.5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate leading-tight">
-              {doc.title || doc.filename}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
+            <p className="text-xs font-medium truncate leading-tight">{doc.title || 'Untitled'}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
         </div>
       ))}
@@ -213,8 +198,8 @@ function ProfilesWidget() {
       .select('user_id, full_name, professional_type, location, avatar_url')
       .eq('is_public', true)
       .not('professional_type', 'in', '("manufacturer","brand","supplier")')
-      .order('profile_views', { ascending: false })
-      .limit(4)
+      .order('created_at', { ascending: false })
+      .limit(6)
       .then(({ data }) => {
         setItems((data ?? []) as LatestProfile[]);
         setLoading(false);
@@ -224,11 +209,11 @@ function ProfilesWidget() {
   return (
     <Widget icon={Users} title="Latest Profiles" viewAllLink="/discover" loading={loading} empty={items.length === 0}>
       {items.map((profile) => (
-        <Link key={profile.user_id} to={`/u/${profile.user_id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link key={profile.user_id} to={`/u/${profile.user_id}`} className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
           <ImageThumb src={profile.avatar_url} fallback={profile.full_name || 'U'} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate leading-tight">{profile.full_name || 'Anonymous'}</p>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs font-medium truncate leading-tight">{profile.full_name || 'Anonymous'}</p>
+            <p className="text-[11px] text-muted-foreground truncate">
               {profile.professional_type ? (PROF_LABELS[profile.professional_type] ?? profile.professional_type) : ''}
               {profile.location ? ` · ${profile.location}` : ''}
             </p>
@@ -248,10 +233,9 @@ function FactoriesWidget() {
     supabase
       .from('user_profiles')
       .select('user_id, full_name, company, professional_type, location, avatar_url')
-      .eq('is_public', true)
       .in('professional_type', ['manufacturer', 'brand', 'supplier'])
-      .order('profile_views', { ascending: false })
-      .limit(4)
+      .order('created_at', { ascending: false })
+      .limit(6)
       .then(({ data }) => {
         setItems((data ?? []) as LatestFactory[]);
         setLoading(false);
@@ -261,18 +245,13 @@ function FactoriesWidget() {
   return (
     <Widget icon={Factory} title="Latest Factories" viewAllLink="/agent-hub?prompt=Show me the latest manufacturers, brands and suppliers on the platform" loading={loading} empty={items.length === 0}>
       {items.map((f) => (
-        <Link key={f.user_id} to={`/u/${f.user_id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link key={f.user_id} to={`/u/${f.user_id}`} className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
           <ImageThumb src={f.avatar_url} fallback={f.company || f.full_name || 'F'} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate leading-tight">{f.company || f.full_name || 'Unknown'}</p>
-            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+            <p className="text-xs font-medium truncate leading-tight">{f.company || f.full_name || 'Unknown'}</p>
+            <p className="text-[11px] text-muted-foreground truncate">
               {f.professional_type ? (PROF_LABELS[f.professional_type] ?? f.professional_type) : ''}
-              {f.location && (
-                <>
-                  <MapPin className="h-2.5 w-2.5 shrink-0" />
-                  {f.location}
-                </>
-              )}
+              {f.location ? ` · ${f.location}` : ''}
             </p>
           </div>
         </Link>

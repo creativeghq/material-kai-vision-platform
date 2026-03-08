@@ -27,7 +27,7 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 };
 
 // ── Imports ──
-import { generateText, Output } from 'npm:ai@6';
+import { generateText, generateImage, experimental_generateVideo as generateVideo, Output } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 import { z, type ZodType } from 'npm:zod@3';
@@ -201,6 +201,74 @@ export async function generateStructuredWithClaude<T>(
       outputTokens: usage?.completionTokens ?? 0,
       totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
     },
+    model: modelId,
+  };
+}
+
+// ── Gemini: Image generation + editing ──
+export type GeminiImageModel = 'gemini-3.1-flash-image-preview' | 'gemini-3-pro-image-preview';
+export type ImageAspectRatio = '1:1' | '16:9' | '3:2' | '4:3' | '9:16' | '3:4' | '4:5' | '5:4' | '21:9' | '2:3';
+
+export interface GeminiImageResult {
+  base64: string;
+  mimeType: string;
+  model: GeminiImageModel;
+}
+
+export async function generateImageWithGemini(
+  prompt: string | { text: string; images: (Uint8Array | string)[] },
+  config?: {
+    model?: GeminiImageModel;
+    aspectRatio?: ImageAspectRatio;
+  },
+): Promise<GeminiImageResult> {
+  const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image-preview';
+
+  const { image } = await generateImage({
+    model: google.image(modelId),
+    prompt: prompt as any,
+    aspectRatio: config?.aspectRatio ?? '16:9',
+  });
+
+  return {
+    base64: image.base64,
+    mimeType: image.mimeType ?? 'image/png',
+    model: modelId,
+  };
+}
+
+// ── Veo: Video generation ──
+export type VeoModel = 'veo-2.0-generate-001';
+
+export interface VeoVideoResult {
+  base64: string;
+  mimeType: string;
+  model: VeoModel;
+}
+
+export async function generateVideoWithVeo(
+  prompt: string,
+  config?: {
+    model?: VeoModel;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    durationSeconds?: number;
+    resolution?: '1280x720' | '1920x1080';
+  },
+): Promise<VeoVideoResult> {
+  const modelId: VeoModel = config?.model ?? 'veo-2.0-generate-001';
+
+  const { video } = await generateVideo({
+    model: google.video(modelId),
+    prompt,
+    aspectRatio: config?.aspectRatio ?? '16:9',
+    durationSeconds: config?.durationSeconds ?? 8,
+    resolution: config?.resolution ?? '1280x720',
+    pollTimeoutMs: 600000, // 10 min max
+  } as any);
+
+  return {
+    base64: (video as any).base64,
+    mimeType: (video as any).mimeType ?? 'video/mp4',
     model: modelId,
   };
 }

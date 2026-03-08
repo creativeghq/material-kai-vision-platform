@@ -34,6 +34,7 @@ import type { MoodBoard } from '@/types/materials';
 import { quotesService } from '@/services/quotes/QuotesService';
 import { useNavigate } from 'react-router-dom';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
@@ -195,36 +196,20 @@ export const MoodBoardPage = () => {
 
   return (
     <div>
-      {/* Page Header */}
-      <div className="bg-card py-6">
-        <div className="page-container">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Palette className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold">MoodBoards</h1>
-                <p className="text-muted-foreground">
-                  Organize and curate your favorite materials
-                </p>
-              </div>
-            </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={Palette}
+        title="MoodBoards"
+        subtitle="Organize and curate your favorite materials"
+        actions={
           <Button
             onClick={() => setShowCreateDialog(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setShowCreateDialog(true);
-              }
-            }}
+            className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20"
           >
             <Plus className="h-4 w-4 mr-2" />
             New MoodBoard
           </Button>
-          </div>
-        </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Content */}
       <div className="page-container py-6">

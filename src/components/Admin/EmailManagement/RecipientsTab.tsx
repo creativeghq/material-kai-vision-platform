@@ -138,7 +138,7 @@ export const RecipientsTab: React.FC<RecipientsTabProps> = ({ campaignId }) => {
       <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto max-h-96">
           <table className="w-full">
-            <thead className="bg-muted sticky top-0">
+            <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
               <tr>
                 <th className="text-left p-3 text-sm font-medium">Email</th>
                 <th className="text-left p-3 text-sm font-medium">Status</th>

@@ -5,12 +5,13 @@ import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, Do
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
 import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 /**
  * Customer-facing Quote Detail Page
@@ -163,12 +164,12 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800' },
-      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800' },
-      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800' },
-      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800' },
-      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800' },
-      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600' },
+      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
+      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
+      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
+      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 hover:bg-red-100' },
+      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
     };
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     const Icon = config.icon;
@@ -238,55 +239,44 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Page Header */}
-      <div className="bg-card py-6">
-        <div className="page-container">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ShoppingCart className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold">{quote.name || 'Untitled Quote'}</h1>
-                <p className="text-muted-foreground">
-                  Created {new Date(quote.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              {getStatusBadge(quote.status)}
-              {/* Submit/Finalize Quote button for draft status */}
-              {quote.status === 'draft' && (
-                <Button
-                  onClick={handleSubmitQuote}
-                  disabled={submittingQuote || (quote.items?.length || 0) === 0}
-                  style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
-                  className="hover:opacity-90"
-                >
-                  {submittingQuote ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <FileText className="h-4 w-4 mr-2" />
-                  )}
-                  Submit Quote Request
-                </Button>
-              )}
-              {quote.status === 'quoted' && (
-                <Button
-                  onClick={handleAcceptQuote}
-                  disabled={!canAcceptQuote || acceptingQuote}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {acceptingQuote ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  Accept Quote
-                </Button>
-              )}
-            </div>
+      <PageHeader
+        icon={ShoppingCart}
+        title={quote.name || 'Untitled Quote'}
+        subtitle={`Created ${new Date(quote.created_at).toLocaleDateString()} · Expires ${new Date(quote.expires_at).toLocaleDateString()}`}
+        actions={
+          <div className="flex items-center gap-3">
+            {getStatusBadge(quote.status)}
+            {quote.status === 'draft' && (
+              <Button
+                onClick={handleSubmitQuote}
+                disabled={submittingQuote || (quote.items?.length || 0) === 0}
+                className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20"
+              >
+                {submittingQuote ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                Submit Quote Request
+              </Button>
+            )}
+            {quote.status === 'quoted' && (
+              <Button
+                onClick={handleAcceptQuote}
+                disabled={!canAcceptQuote || acceptingQuote}
+                className="rounded-full bg-green-500/80 hover:bg-green-500 text-white border border-green-400/30"
+              >
+                {acceptingQuote ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Accept Quote
+              </Button>
+            )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Stats Row */}
       <div className="border-b">
@@ -304,7 +294,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           )}
 
           {/* Quote Information Grid - compact stats with proper card styling */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
@@ -386,44 +376,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center flex-shrink-0"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <Calendar className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Created</p>
-                  <p className="text-lg font-semibold">{new Date(quote.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center flex-shrink-0"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <Timer className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Expires</p>
-                  <p className="text-lg font-semibold">{new Date(quote.expires_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Custom Request (if exists) */}
@@ -444,23 +396,23 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       {/* Main Content */}
       <div className="page-container py-6">
         {/* Tabs */}
-        <Tabs defaultValue="items" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="items" className="flex items-center gap-2">
+        <Tabs defaultValue="items" className="w-full mt-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
             </TabsTrigger>
-            <TabsTrigger value="extras" className="flex items-center gap-2">
+            <TabsTrigger value="extras" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Gift className="h-4 w-4" />
               Extras ({quoteUpsells.length})
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Milestone className="h-4 w-4" />
               Timeline
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="items" className="mt-4">
+          <TabsContent value="items" className="mt-5">
             <QuoteItemsList
               items={quote.items || []}
               showAddButton={quote.status === 'draft'}
@@ -500,15 +452,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             />
           </TabsContent>
 
-          <TabsContent value="extras" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Extras & Add-ons</CardTitle>
-                <CardDescription>
-                  Review and accept or reject additional services. Accepted extras will be added to your total.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          <TabsContent value="extras" className="mt-5">
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <Gift className="h-4 w-4" /> Extras & Add-ons
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Review and accept or reject additional services. Accepted extras will be added to your total.</p>
+              </div>
+              <div>
                 {quoteUpsells.length > 0 ? (
                   <div className="space-y-4">
                     {quoteUpsells.map((qu) => {
@@ -636,48 +588,48 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No extras added to this quote</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">No extras added to this quote</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
-          <TabsContent value="timeline" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Timeline</CardTitle>
-                <CardDescription>Track the progress of your quote</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {quoteTimeline.length > 0 ? (
-                  <div className="space-y-4">
-                    {quoteTimeline.map((step, index) => (
-                      <div key={step.id} className="flex items-start gap-4">
-                        <div className="flex flex-col items-center">
-                          {getTimelineStatusIcon(step.status)}
-                          {index < quoteTimeline.length - 1 && (
-                            <div className="w-0.5 h-8 bg-gray-200 mt-2" />
-                          )}
-                        </div>
-                        <div className="flex-1 pb-4">
-                          <p className="font-medium">{step.timeline_step?.name || 'Step'}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {step.timeline_step?.description}
-                          </p>
-                          <Badge variant="outline" className="mt-2">
-                            {step.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
+          <TabsContent value="timeline" className="mt-5">
+            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <Milestone className="h-4 w-4" /> Project Timeline
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Track the progress of your quote</p>
+              </div>
+              {quoteTimeline.length > 0 ? (
+                <div className="space-y-4">
+                  {quoteTimeline.map((step, index) => (
+                    <div key={step.id} className="flex items-start gap-4">
+                      <div className="flex flex-col items-center">
+                        {getTimelineStatusIcon(step.status)}
+                        {index < quoteTimeline.length - 1 && (
+                          <div className="w-0.5 h-8 bg-border mt-2" />
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">
-                    Timeline not yet initialized for this quote
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+                      <div className="flex-1 pb-4">
+                        <p className="font-medium text-sm">{step.timeline_step?.name || 'Step'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {step.timeline_step?.description}
+                        </p>
+                        <Badge variant="outline" className="mt-2 rounded-full text-xs capitalize">
+                          {step.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Timeline not yet initialized for this quote
+                </p>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

@@ -7,7 +7,7 @@ import { Badge } from '@/components/core/ui/badge';
 
 interface GlobalAdminHeaderProps {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   breadcrumbs?: { label: string; path?: string }[];
   badge?: string;
 }
@@ -46,7 +46,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             {description && (
-              <p className="text-sm text-muted-foreground">{description}</p>
+              <div className="text-sm text-muted-foreground">{description}</div>
             )}
           </div>
         </div>

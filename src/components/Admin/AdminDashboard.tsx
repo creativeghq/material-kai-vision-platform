@@ -19,10 +19,18 @@ import {
   Mail,
   MessageSquare,
   Workflow,
+  ChevronDown,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
 
@@ -291,38 +299,35 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button
-              onClick={() => window.open('https://ethosco.sentry.io/issues/', '_blank')}
-              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-              variant="ghost"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Sentry
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-            <ResetPlatformDialog />
-            <Button
-              onClick={() => window.open('https://v1api.materialshub.gr/docs', '_blank')}
-              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-              variant="ghost"
-            >
-              <Book className="h-4 w-4" />
-              API Docs
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-            <Button
-              onClick={() => window.open('https://v1api.materialshub.gr/redoc', '_blank')}
-              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-              variant="ghost"
-            >
-              <FileText className="h-4 w-4" />
-              ReDoc
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-            <div className="h-6 w-px bg-white/20" />
-            <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
-              Administrator Access
-            </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 px-3 py-1 text-sm rounded-full">
+                  Tools
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                <DropdownMenuItem onClick={() => window.open('https://ethosco.sentry.io/issues/', '_blank')} className="flex items-center gap-2 cursor-pointer">
+                  <AlertTriangle className="h-4 w-4" />
+                  Sentry
+                  <ExternalLink className="h-3 w-3 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open('https://v1api.materialshub.gr/docs', '_blank')} className="flex items-center gap-2 cursor-pointer">
+                  <Book className="h-4 w-4" />
+                  API Docs
+                  <ExternalLink className="h-3 w-3 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open('https://v1api.materialshub.gr/redoc', '_blank')} className="flex items-center gap-2 cursor-pointer">
+                  <FileText className="h-4 w-4" />
+                  ReDoc
+                  <ExternalLink className="h-3 w-3 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5">
+                  <ResetPlatformDialog />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

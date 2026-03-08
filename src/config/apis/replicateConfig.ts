@@ -20,36 +20,6 @@ const commonImageParams = z.object({
   seed: z.number().int().optional(),
 });
 
-// Interior AI model schema (erayyavuz/interior-ai)
-const interiorAISchema = z.object({
-  image: z.string().url('Image URL is required'),
-  prompt: z.string().min(1, 'Prompt is required'),
-  room_type: z
-    .enum([
-      'Living room',
-      'Dining room',
-      'Bedroom',
-      'Bathroom',
-      'Kitchen',
-      'Reading room',
-      'Home office',
-    ])
-    .optional(),
-  style: z
-    .enum([
-      'Modern',
-      'Minimalist',
-      'Contemporary',
-      'Transitional',
-      'Traditional',
-      'Rustic',
-      'Industrial',
-    ])
-    .optional(),
-  num_inference_steps: z.number().int().min(10).max(50).default(20),
-  guidance_scale: z.number().min(1).max(20).default(7),
-  seed: z.number().int().optional(),
-});
 
 // ComfyUI Interior Remodel schema (jschoormans/comfyui-interior-remodel)
 const comfyUIInteriorSchema = z.object({
@@ -62,19 +32,6 @@ const comfyUIInteriorSchema = z.object({
   seed: z.number().int().optional(),
 });
 
-// Interior V2 schema (jschoormans/interior-v2)
-const interiorV2Schema = z.object({
-  image: z.string().url('Image URL is required'),
-  prompt: z.string().min(1, 'Prompt is required'),
-  negative_prompt: z.string().optional(),
-  room_type: z.string().optional(),
-  design_style: z.string().optional(),
-  color_scheme: z.string().optional(),
-  num_inference_steps: z.number().int().min(10).max(50).default(20),
-  guidance_scale: z.number().min(1).max(20).default(7.5),
-  strength: z.number().min(0).max(1).default(0.8),
-  seed: z.number().int().optional(),
-});
 
 // Interiorly Gen1 Dev schema (julian-at/interiorly-gen1-dev)
 const interiorlyGen1Schema = z.object({
@@ -129,19 +86,7 @@ export const replicateConfig: ReplicateApiConfig = {
   },
   environment: 'development', // Will be overridden by registry
   models: {
-    // Interior AI Models
-    'erayyavuz/interior-ai': {
-      version: 'latest', // Use latest version
-      inputSchema: interiorAISchema,
-      outputSchema: imageOutputSchema,
-      defaultParams: {
-        num_inference_steps: 20,
-        guidance_scale: 7,
-      },
-      description: 'AI-powered interior design transformation',
-      category: 'interior-design',
-    },
-
+    // Interior Design Models
     'jschoormans/comfyui-interior-remodel': {
       version: 'latest',
       inputSchema: comfyUIInteriorSchema,
@@ -155,19 +100,6 @@ export const replicateConfig: ReplicateApiConfig = {
       category: 'interior-design',
     },
 
-    'jschoormans/interior-v2': {
-      version: 'latest',
-      inputSchema: interiorV2Schema,
-      outputSchema: imageOutputSchema,
-      defaultParams: {
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
-        strength: 0.8,
-      },
-      description: 'Advanced interior design transformation v2',
-      category: 'interior-design',
-    },
-
     'julian-at/interiorly-gen1-dev': {
       version: 'latest',
       inputSchema: interiorlyGen1Schema,
@@ -178,6 +110,149 @@ export const replicateConfig: ReplicateApiConfig = {
         strength: 0.75,
       },
       description: 'Interiorly generation model v1 development',
+      category: 'interior-design',
+    },
+
+    'adirik/interior-design': {
+      version: 'latest',
+      inputSchema: z.object({
+        image: z.string().url('Image URL is required'),
+        prompt: z.string().min(1, 'Prompt is required'),
+        negative_prompt: z.string().optional(),
+        num_inference_steps: z.number().int().min(1).max(100).default(25),
+        guidance_scale: z.number().min(1).max(20).default(7.5),
+        prompt_strength: z.number().min(0).max(1).default(0.8),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: {
+        num_inference_steps: 25,
+        guidance_scale: 7.5,
+        prompt_strength: 0.8,
+      },
+      description: 'Interior design transformation with ControlNet depth',
+      category: 'interior-design',
+    },
+
+    'erayyavuz/interior-ai': {
+      version: 'e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9',
+      inputSchema: z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        input: z.string().url('Image URL is required'), // NOTE: 'input', not 'image'
+        negative_prompt: z.string().optional(),
+        num_inference_steps: z.number().int().min(1).max(500).default(50).optional(),
+        guidance_scale: z.number().min(1).max(50).default(7.5).optional(),
+        strength: z.number().min(0).max(1).default(0.8).optional(),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: { num_inference_steps: 50, guidance_scale: 7.5, strength: 0.8 },
+      description: 'Lifelike interior designs from text and image references',
+      category: 'interior-design',
+    },
+
+    'jschoormans/interior-v2': {
+      version: 'latest',
+      inputSchema: z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        image: z.string().url('Image URL is required'),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: {},
+      description: 'Interior design v2 — fast generation',
+      category: 'interior-design',
+    },
+
+    'doobls-ai/interor-2': {
+      version: '91f2ef63c76a73d2ec4c67cf7b2a9672e074046cf4fde1d98e46a5829f7ea68b',
+      inputSchema: z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        image: z.string().url().optional(),
+        prompt_strength: z.number().min(0).max(1).default(0.8).optional(),
+        aspect_ratio: z.enum(['1:1', '16:9', '21:9', '3:2', '2:3', '4:5', '5:4', '3:4', '4:3', '9:16', '9:21']).default('1:1').optional(),
+        num_inference_steps: z.number().int().min(1).max(50).default(28).optional(),
+        guidance_scale: z.number().min(0).max(10).default(3).optional(),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: { num_inference_steps: 28, guidance_scale: 3, prompt_strength: 0.8 },
+      description: 'Flux LoRA interior design — fast generation with img2img support',
+      category: 'interior-design',
+    },
+
+    'rihan-a/colourful_interiors': {
+      version: 'ba0425bc2e4bebafa8bd918519fdf3b5a022969a6a7c8ba0746b807bb5b541a3',
+      inputSchema: z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        image: z.string().url().optional(),
+        prompt_strength: z.number().min(0).max(1).default(0.8).optional(),
+        aspect_ratio: z.enum(['1:1', '16:9', '21:9', '3:2', '2:3', '4:5', '5:4', '3:4', '4:3', '9:16', '9:21']).default('1:1').optional(),
+        num_inference_steps: z.number().int().min(1).max(50).default(28).optional(),
+        guidance_scale: z.number().min(0).max(10).default(3).optional(),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: { num_inference_steps: 28, guidance_scale: 3, prompt_strength: 0.8 },
+      description: 'Flux LoRA for vibrant colourful interiors (trigger word: INTR)',
+      category: 'interior-design',
+    },
+
+    'pointblack/stable-interiors-v2': {
+      version: '569b1bd6e4df6c9c900ad932d4a3a9f05585fac957dc6bc627aa1654853a97b5',
+      inputSchema: z.object({
+        image: z.string().url('Image URL is required'),
+        prompt: z.string().min(1, 'Prompt is required'),
+        negative_prompt: z.string().optional(),
+        num_inference_steps: z.number().int().default(50).optional(),
+        guidance_scale: z.number().default(15).optional(),
+        prompt_strength: z.number().min(0).max(1).default(0.8).optional(),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: { num_inference_steps: 50, guidance_scale: 15, prompt_strength: 0.8 },
+      description: 'SD-based img2img interior transformation',
+      category: 'interior-design',
+    },
+
+    'youzu/stable-interiors-v2': {
+      version: '4836eb257a4fb8b87bac9eacbef9292ee8e1a497398ab96207067403a4be2daf',
+      inputSchema: z.object({
+        image: z.string().url('Image URL is required'),
+        prompt: z.string().min(1, 'Prompt is required'),
+        negative_prompt: z.string().optional(),
+        num_inference_steps: z.number().int().default(50).optional(),
+        guidance_scale: z.number().default(15).optional(),
+        prompt_strength: z.number().min(0).max(1).default(0.8).optional(),
+        seed: z.number().int().optional(),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: { num_inference_steps: 50, guidance_scale: 15, prompt_strength: 0.8 },
+      description: 'Fast SD-based img2img interior transformation (~12s)',
+      category: 'interior-design',
+    },
+
+    'rocketdigitalai/interior-design-sdxl': {
+      version: 'latest',
+      inputSchema: z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        negative_prompt: z.string().optional(),
+        scheduler: z.enum(['DPM++ 2M Karras', 'K_EULER']).default('DPM++ 2M Karras'),
+        inference_steps: z.number().int().min(10).max(150).default(60),
+        guidance_scale: z.number().min(1).max(20).default(7),
+        depth_strength: z.number().min(0).max(2).default(0.8),
+        promax_strength: z.number().min(0).max(2).default(0.8),
+        refiner_strength: z.number().min(0).max(1).default(0.5),
+      }),
+      outputSchema: imageOutputSchema,
+      defaultParams: {
+        inference_steps: 60,
+        guidance_scale: 7,
+        depth_strength: 0.8,
+        promax_strength: 0.8,
+        refiner_strength: 0.5,
+        scheduler: 'DPM++ 2M Karras',
+      },
+      description: 'SDXL + ControlNet depth/ProMax for photorealistic interior renders',
       category: 'interior-design',
     },
 
@@ -238,29 +313,6 @@ export const replicateConfig: ReplicateApiConfig = {
       category: '3d-generation',
     },
 
-    // Additional Interior Design Models (from platform audit)
-    'adirik/interior-design': {
-      version: 'latest',
-      inputSchema: z.object({
-        image: z.string().url('Image URL is required'),
-        prompt: z.string().min(1, 'Prompt is required'),
-        negative_prompt: z.string().optional(),
-        num_inference_steps: z.number().int().min(10).max(50).default(20),
-        guidance_scale: z.number().min(1).max(20).default(7.5),
-        strength: z.number().min(0).max(1).default(0.8),
-        seed: z.number().int().optional(),
-      }),
-      outputSchema: imageOutputSchema,
-      defaultParams: {
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
-        strength: 0.8,
-      },
-      description: 'Interior design AI transformation',
-      category: 'interior-design',
-      status: 'failing', // 422 errors
-    },
-
     'davisbrown/designer-architecture': {
       version: 'latest',
       inputSchema: z.object({
@@ -284,27 +336,6 @@ export const replicateConfig: ReplicateApiConfig = {
       status: 'working',
     },
 
-    'rocketdigitalai/interior-design-sdxl': {
-      version: 'latest',
-      inputSchema: z.object({
-        image: z.string().url('Image URL is required'),
-        prompt: z.string().min(1, 'Prompt is required'),
-        negative_prompt: z.string().optional(),
-        num_inference_steps: z.number().int().min(10).max(50).default(20),
-        guidance_scale: z.number().min(1).max(20).default(7.5),
-        strength: z.number().min(0).max(1).default(0.8),
-        seed: z.number().int().optional(),
-      }),
-      outputSchema: imageOutputSchema,
-      defaultParams: {
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
-        strength: 0.8,
-      },
-      description: 'Interior design with SDXL',
-      category: 'interior-design',
-      status: 'failing', // 422 errors
-    },
   },
 };
 

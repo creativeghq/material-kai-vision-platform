@@ -139,7 +139,10 @@ export function PlatformOverviewTab() {
   // ── Knowledge Base Health ─────────────────────────────────────
   const [chunkGrowth, setChunkGrowth] = useState<{ week: string; count: number }[]>([]);
   const [kbDocsByCategory, setKbDocsByCategory] = useState<{ name: string; value: number }[]>([]);
-  const [kbKpis, setKbKpis] = useState({ totalChunks: 0, totalDocs: 0 });
+  const [kbKpis, setKbKpis] = useState({ totalChunks: 0, totalDocs: 0, publishedDocs: 0, embeddingSuccessRate: '—' });
+  const [kbStatusBreakdown, setKbStatusBreakdown] = useState<{ name: string; value: number }[]>([]);
+  const [kbEmbeddingHealth, setKbEmbeddingHealth] = useState<{ name: string; value: number }[]>([]);
+  const [kbTopViewed, setKbTopViewed] = useState<{ title: string; views: number; category: string; agentMentions: number }[]>([]);
 
   // ── Pipeline Health ───────────────────────────────────────────
   const [pdfJobTrend, setPdfJobTrend] = useState<{ week: string; success: number; failed: number }[]>([]);
@@ -511,7 +514,7 @@ export function PlatformOverviewTab() {
         // KB health
         Promise.all([
           supabase.from('document_chunks').select('created_at').gte('created_at', ago12.toISOString()),
-          supabase.from('kb_docs').select('created_at,kb_category_id'),
+          supabase.from('kb_docs').select('id,created_at,category_id,status,embedding_status,view_count,agent_mention_count,title'),
           supabase.from('kb_categories').select('id,name'),
         ]),
         // Pipeline health
@@ -624,11 +627,43 @@ export function PlatformOverviewTab() {
         const ckMap = new Map<string, number>(wks12.map(w => [w, 0]));
         (chunks ?? []).forEach((c: any) => { const l = weekLabel(new Date(c.created_at)); if (ckMap.has(l)) ckMap.set(l, (ckMap.get(l) ?? 0) + 1); });
         setChunkGrowth(Array.from(ckMap.entries()).map(([week, count]) => ({ week, count })));
+
         const catMap = new Map((kbCats ?? []).map((c: any) => [c.id, c.name]));
         const docCatMap = new Map<string, number>();
-        (kbDocs ?? []).forEach((d: any) => { const n = catMap.get(d.kb_category_id) ?? 'Uncategorized'; docCatMap.set(n, (docCatMap.get(n) ?? 0) + 1); });
+        const docStatusMap = new Map<string, number>();
+        const embMap = new Map<string, number>();
+        let publishedCount = 0;
+        let embSuccessCount = 0;
+        const docs = kbDocs ?? [];
+
+        docs.forEach((d: any) => {
+          // Category distribution
+          const n = catMap.get(d.category_id) ?? 'Uncategorized';
+          docCatMap.set(n, (docCatMap.get(n) ?? 0) + 1);
+          // Status breakdown
+          const s = d.status ?? 'draft';
+          docStatusMap.set(s, (docStatusMap.get(s) ?? 0) + 1);
+          if (s === 'published') publishedCount++;
+          // Embedding health
+          const e = d.embedding_status ?? 'pending';
+          embMap.set(e, (embMap.get(e) ?? 0) + 1);
+          if (e === 'success') embSuccessCount++;
+        });
+
         setKbDocsByCategory(Array.from(docCatMap.entries()).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value })));
-        setKbKpis({ totalChunks: (chunks ?? []).length, totalDocs: (kbDocs ?? []).length });
+        setKbStatusBreakdown(Array.from(docStatusMap.entries()).map(([name, value]) => ({ name, value })));
+        setKbEmbeddingHealth(Array.from(embMap.entries()).map(([name, value]) => ({ name, value })));
+
+        const embRate = docs.length > 0 ? `${Math.round((embSuccessCount / docs.length) * 100)}%` : '—';
+        setKbKpis({ totalChunks: (chunks ?? []).length, totalDocs: docs.length, publishedDocs: publishedCount, embeddingSuccessRate: embRate });
+
+        // Top viewed docs
+        const topViewed = [...docs]
+          .filter((d: any) => (d.view_count ?? 0) > 0)
+          .sort((a: any, b: any) => (b.view_count ?? 0) - (a.view_count ?? 0))
+          .slice(0, 8)
+          .map((d: any) => ({ title: d.title ?? '—', views: d.view_count ?? 0, category: catMap.get(d.category_id) ?? 'Uncategorized', agentMentions: d.agent_mention_count ?? 0 }));
+        setKbTopViewed(topViewed);
       }
 
       // Process pipeline health
@@ -767,7 +802,7 @@ export function PlatformOverviewTab() {
           <CardHeader><CardTitle className="text-sm">Top 10 Quoted Products</CardTitle></CardHeader>
           <CardContent>
             <div className="overflow-auto max-h-[280px]">
-              <table className="w-full text-sm"><thead className="sticky top-0 bg-background"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Product</th><th className="text-right py-2 font-medium">Inclusions</th></tr></thead>
+              <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Product</th><th className="text-right py-2 font-medium">Inclusions</th></tr></thead>
                 <tbody>{topQuotedProducts.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-medium">{row.name}</td><td className="py-2 text-right tabular-nums text-primary font-semibold">{row.count}</td></tr>))}</tbody>
               </table>
             </div>
@@ -787,7 +822,7 @@ export function PlatformOverviewTab() {
           <CardHeader><CardTitle className="text-sm">Top Factories by Buyer Engagement (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Ranked by combined moodboard saves + quote inclusions</p></CardHeader>
           <CardContent>
             <div className="overflow-auto max-h-[340px]">
-              <table className="w-full text-sm"><thead className="sticky top-0 bg-background"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Factory</th><th className="text-right py-2 pr-4 font-medium">Catalog</th><th className="text-right py-2 pr-4 font-medium">Saves</th><th className="text-right py-2 pr-4 font-medium">Quotes</th><th className="text-right py-2 font-medium">Conv.</th></tr></thead>
+              <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Factory</th><th className="text-right py-2 pr-4 font-medium">Catalog</th><th className="text-right py-2 pr-4 font-medium">Saves</th><th className="text-right py-2 pr-4 font-medium">Quotes</th><th className="text-right py-2 font-medium">Conv.</th></tr></thead>
                 <tbody>{topFactories.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-medium">{row.name}</td><td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{row.products}</td><td className="py-2 pr-4 text-right tabular-nums">{row.saves}</td><td className="py-2 pr-4 text-right tabular-nums text-primary font-semibold">{row.quotes}</td><td className="py-2 text-right tabular-nums text-green-600 text-xs">{row.saves > 0 ? `${Math.round((row.quotes / row.saves) * 100)}%` : '—'}</td></tr>))}</tbody>
               </table>
             </div>
@@ -898,7 +933,7 @@ export function PlatformOverviewTab() {
           <CardContent>
             {topCreditConsumers.length === 0 ? <EmptyState message="No usage data yet" /> : (
               <div className="overflow-auto max-h-[220px]">
-                <table className="w-full text-sm"><thead className="sticky top-0 bg-background"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">User ID</th><th className="text-right py-2 pr-4 font-medium">Credits</th><th className="text-right py-2 font-medium">Top Op</th></tr></thead>
+                <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">User ID</th><th className="text-right py-2 pr-4 font-medium">Credits</th><th className="text-right py-2 font-medium">Top Op</th></tr></thead>
                   <tbody>{topCreditConsumers.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-mono text-xs">…{row.userId}</td><td className="py-2 pr-4 text-right tabular-nums text-primary font-semibold">{row.credits.toLocaleString()}</td><td className="py-2 text-right text-xs text-muted-foreground">{row.topOp}</td></tr>))}</tbody>
                 </table>
               </div>
@@ -1336,7 +1371,7 @@ export function PlatformOverviewTab() {
           <CardContent>
             {topSearches.length === 0 ? <EmptyState message="No searches recorded" /> : (
               <div className="overflow-auto max-h-[240px]">
-                <table className="w-full text-sm"><thead className="sticky top-0 bg-background"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">Term</th><th className="text-right py-2 font-medium">Searches</th></tr></thead>
+                <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">Term</th><th className="text-right py-2 font-medium">Searches</th></tr></thead>
                   <tbody>{topSearches.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 font-medium">{row.term}</td><td className="py-2 text-right tabular-nums text-primary font-semibold">{row.count}</td></tr>))}</tbody>
                 </table>
               </div>
@@ -1356,35 +1391,78 @@ export function PlatformOverviewTab() {
       </div>
 
       {/* ─── 8. Content & Knowledge Base Health ─────────────────── */}
-      <SectionHeader title="Content & Knowledge Base Health" desc="Document chunk growth, KB category distribution, and knowledge base coverage" icon={Database} />
-      <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Total Chunks (12w)" value={kbKpis.totalChunks.toLocaleString()} icon={Database} color="text-violet-600" sub="new document chunks indexed" />
+      <SectionHeader title="Content & Knowledge Base Health" desc="KB document status, embedding coverage, category distribution, and top viewed articles" icon={Database} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Total KB Docs" value={kbKpis.totalDocs.toLocaleString()} icon={FileText} color="text-cyan-600" />
+        <KpiCard label="Published Docs" value={kbKpis.publishedDocs.toLocaleString()} icon={FileText} color="text-green-600" />
+        <KpiCard label="Embedding Success" value={kbKpis.embeddingSuccessRate} icon={Database} color="text-violet-600" sub="docs with embeddings" />
+        <KpiCard label="RAG Chunks (12w)" value={kbKpis.totalChunks.toLocaleString()} icon={Database} color="text-indigo-600" sub="new chunks indexed" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Document Chunks Indexed per Week (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">New text chunks added to the RAG knowledge base</p></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Docs by Status</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chunkGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="week" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip /><Bar dataKey="count" name="Chunks" fill={COLORS[5]} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {kbStatusBreakdown.length === 0 ? <EmptyState message="No KB docs" /> : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart><Pie data={kbStatusBreakdown} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={65}>{kbStatusBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Knowledge Base Docs by Category</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Embedding Health</CardTitle><p className="text-xs text-muted-foreground mt-1">success / pending / failed</p></CardHeader>
+          <CardContent>
+            {kbEmbeddingHealth.length === 0 ? <EmptyState message="No embedding data" /> : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart><Pie data={kbEmbeddingHealth} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={65}>{kbEmbeddingHealth.map((entry, i) => <Cell key={i} fill={entry.name === 'success' ? '#10b981' : entry.name === 'failed' ? '#ef4444' : '#f59e0b'} />)}</Pie><Tooltip /><Legend /></PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl">
+          <CardHeader><CardTitle className="text-sm">Docs by Category</CardTitle></CardHeader>
           <CardContent>
             {kbDocsByCategory.length === 0 ? <EmptyState message="No KB docs found" /> : (
               <ResponsiveContainer width="100%" height={220}>
-                <PieChart><Pie data={kbDocsByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} label={({ name, value }) => `${name}: ${value}`} labelLine={false}>{kbDocsByCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /></PieChart>
+                <PieChart><Pie data={kbDocsByCategory} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={65}>{kbDocsByCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
       </div>
+      {kbTopViewed.length > 0 && (
+        <Card className="rounded-2xl">
+          <CardHeader><CardTitle className="text-sm">Top Viewed Articles</CardTitle><p className="text-xs text-muted-foreground mt-1">Most read KB documents</p></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {kbTopViewed.map((doc, i) => (
+                <div key={i} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{doc.title}</p>
+                    <p className="text-xs text-muted-foreground">{doc.category}</p>
+                  </div>
+                  <div className="ml-4 shrink-0 flex items-center gap-3 tabular-nums text-muted-foreground text-xs">
+                    <span title="Page views">{doc.views} views</span>
+                    {doc.agentMentions > 0 && <span title="AI agent mentions" className="text-violet-600">🤖 {doc.agentMentions}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <Card className="rounded-2xl">
+        <CardHeader><CardTitle className="text-sm">Document Chunks Indexed per Week (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">New text chunks added to the RAG knowledge base</p></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={chunkGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="week" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip /><Bar dataKey="count" name="Chunks" fill={COLORS[5]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {/* ─── 9. Data Pipeline Health ─────────────────────────────── */}
       <SectionHeader title="Data Pipeline Health" desc="PDF ingestion reliability, XML import throughput, and product enrichment coverage" icon={FileText} />
@@ -1447,7 +1525,7 @@ export function PlatformOverviewTab() {
             </div>
             {recentRequests.length > 0 && (
               <div className="overflow-auto max-h-[200px]">
-                <table className="w-full text-xs"><thead className="sticky top-0 bg-background border-b"><tr className="text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">Company</th><th className="text-left py-2 pr-4 font-medium">Type</th><th className="text-left py-2 pr-4 font-medium">Status</th><th className="text-right py-2 font-medium">Date</th></tr></thead>
+                <table className="w-full text-xs"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">Company</th><th className="text-left py-2 pr-4 font-medium">Type</th><th className="text-left py-2 pr-4 font-medium">Status</th><th className="text-right py-2 font-medium">Date</th></tr></thead>
                   <tbody>{recentRequests.map((r, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 font-medium">{r.name}</td><td className="py-2 pr-4 text-muted-foreground capitalize">{r.type}</td><td className="py-2 pr-4"><span className={`text-xs px-1.5 py-0.5 rounded ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : r.status === 'approved' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>{r.status}</span></td><td className="py-2 text-right text-muted-foreground">{r.date}</td></tr>))}</tbody>
                 </table>
               </div>

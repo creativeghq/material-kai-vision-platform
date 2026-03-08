@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Package, Plus, Eye, ChevronRight, Trash2, Minus, Ruler } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -24,7 +23,7 @@ interface QuoteItemsListProps {
   variant?: 'compact' | 'detailed';
   emptyMessage?: string;
   emptyButtonText?: string;
-  editable?: boolean; // Allow editing quantities and removing items
+  editable?: boolean;
 }
 
 // Convert quote product to display product format
@@ -73,8 +72,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
   const handleViewProduct = (product: SimpleProduct) => {
-    const displayProduct = convertToDisplayProduct(product);
-    setSelectedProduct(displayProduct);
+    setSelectedProduct(convertToDisplayProduct(product));
     setIsModalOpen(true);
   };
 
@@ -99,267 +97,215 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     }
   };
 
-  const renderCompactItem = (item: QuoteItemWithProduct) => {
-    const selectedSize = extractSizeFromNotes(item.notes);
-    return (
-    <div
-      key={item.id}
-      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
-      style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}
-      onClick={() => item.product && handleViewProduct(item.product)}
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded bg-muted overflow-hidden flex-shrink-0">
-          {item.product?.image_url ? (
-            <img
-              src={item.product.image_url}
-              alt={item.product.name || 'Product'}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package className="h-5 w-5 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-        <div>
-          <p className="font-medium">{item.product?.name || 'Unknown Product'}</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            {item.product?.sku && (
-              <span className="text-xs text-muted-foreground">SKU: {item.product.sku}</span>
-            )}
-            {selectedSize && (
-              <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Ruler className="h-3 w-3" />
-                {selectedSize}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        {editable && onUpdateQuantity ? (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={updatingItemId === item.id || item.quantity <= 1}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuantityChange(item.id, item.quantity - 1);
-              }}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Input
-              type="number"
-              min={1}
-              value={item.quantity}
-              onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
-              className="w-14 h-7 text-center text-sm"
-              disabled={updatingItemId === item.id}
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={updatingItemId === item.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuantityChange(item.id, item.quantity + 1);
-              }}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <Badge variant="secondary" className="text-sm">
-            Qty: {item.quantity}
-          </Badge>
-        )}
-        {editable && onRemoveItem && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-            disabled={removingItemId === item.id}
-            onClick={(e) => handleRemoveItem(e, item.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
-    </div>
-    );
-  };
-
-  const renderDetailedItem = (item: QuoteItemWithProduct, index: number) => {
-    const selectedSize = extractSizeFromNotes(item.notes);
-    return (
-    <div
-      key={item.id}
-      className="flex items-start gap-4 p-4 border rounded-lg bg-card hover:shadow-md transition-all cursor-pointer group"
-      style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}
-      onClick={() => item.product && handleViewProduct(item.product)}
-    >
-      {/* Item Image */}
-      <div className="w-20 h-20 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-        {item.product?.image_url ? (
-          <img
-            src={item.product.image_url}
-            alt={item.product.name || 'Product'}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
-      </div>
-
-      {/* Item Details */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h4 className="font-semibold truncate group-hover:text-primary transition-colors">
-              {item.product?.name || `Item ${index + 1}`}
-            </h4>
-            {item.product?.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.product.description}</p>
-            )}
-            {item.product?.sku && (
-              <p className="text-xs text-muted-foreground mt-1">SKU: {item.product.sku}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            {editable && onUpdateQuantity ? (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={updatingItemId === item.id || item.quantity <= 1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQuantityChange(item.id, item.quantity - 1);
-                  }}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Input
-                  type="number"
-                  min={1}
-                  value={item.quantity}
-                  onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
-                  className="w-16 h-8 text-center text-sm"
-                  disabled={updatingItemId === item.id}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={updatingItemId === item.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQuantityChange(item.id, item.quantity + 1);
-                  }}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <Badge variant="secondary">Qty: {item.quantity}</Badge>
-            )}
-            {editable && onRemoveItem && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                disabled={removingItemId === item.id}
-                onClick={(e) => handleRemoveItem(e, item.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                item.product && handleViewProduct(item.product);
-              }}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Item Notes - show size badge instead of raw notes */}
-        {selectedSize && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded flex items-center gap-1">
-              <Ruler className="h-3 w-3" />
-              Size: {selectedSize}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-    );
-  };
-
   return (
     <>
-      <Card style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
           <div>
-            <CardTitle>Quote Items</CardTitle>
-            <CardDescription>
-              {items.length > 0 ? `${items.length} item${items.length !== 1 ? 's' : ''} in this quote - Click to view details` : 'Materials included in this quote'}
-            </CardDescription>
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Quote Items
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {items.length > 0
+                ? `${items.length} item${items.length !== 1 ? 's' : ''} · Click a row to view product details`
+                : 'Materials included in this quote'}
+            </p>
           </div>
           {showAddButton && onAddProducts && (
-            <Button onClick={onAddProducts} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={onAddProducts} size="sm" className="rounded-full gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
               Add Products
             </Button>
           )}
-        </CardHeader>
-        <CardContent>
-          {items.length > 0 ? (
-            <div className="space-y-3">
-              {items.map((item, index) =>
-                variant === 'compact' ? renderCompactItem(item) : renderDetailedItem(item, index),
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">{emptyMessage}</p>
-              {showAddButton && onAddProducts && (
-                <Button onClick={onAddProducts} variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {emptyButtonText}
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {items.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                <tr>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Product</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Options</th>
+                  {/* Unit price and line total columns — only shown in detailed variant */}
+                  {variant === 'detailed' && (
+                    <>
+                      <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Unit Price</th>
+                      <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Total</th>
+                    </>
+                  )}
+                  <th className="text-center text-xs font-medium text-muted-foreground px-4 py-3">Qty</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {items.map((item) => {
+                  const selectedSize = extractSizeFromNotes(item.notes);
+                  const isUpdating = updatingItemId === item.id;
+                  const isRemoving = removingItemId === item.id;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-muted/20 transition-colors cursor-pointer group"
+                      onClick={() => item.product && handleViewProduct(item.product)}
+                    >
+                      {/* Product cell */}
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                            {item.product?.image_url ? (
+                              <img
+                                src={item.product.image_url}
+                                alt={item.product.name || 'Product'}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="h-4 w-4 text-muted-foreground/50" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium leading-tight group-hover:text-primary transition-colors truncate max-w-[200px]">
+                              {item.product?.name || 'Unknown Product'}
+                            </p>
+                            {item.product?.sku && (
+                              <p className="text-xs text-muted-foreground mt-0.5">SKU: {item.product.sku}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Options (size / color) */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1.5">
+                          {(item.selected_size || selectedSize) && (
+                            <Badge variant="secondary" className="text-xs rounded-full gap-1 font-normal">
+                              <Ruler className="h-2.5 w-2.5" />
+                              {item.selected_size || selectedSize}
+                            </Badge>
+                          )}
+                          {item.selected_color && (
+                            <Badge variant="secondary" className="text-xs rounded-full font-normal">
+                              {item.selected_color}
+                            </Badge>
+                          )}
+                          {!item.selected_size && !selectedSize && !item.selected_color && (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Unit price + line total (detailed only) */}
+                      {variant === 'detailed' && (
+                        <>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm text-muted-foreground">
+                              {item.unit_price != null ? `€${Number(item.unit_price).toFixed(2)}` : '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm font-medium">
+                              {item.line_total != null ? `€${Number(item.line_total).toFixed(2)}` : '—'}
+                            </span>
+                          </td>
+                        </>
+                      )}
+
+                      {/* Quantity */}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        {onUpdateQuantity ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                              disabled={isUpdating || item.quantity <= 1}
+                              onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity - 1); }}
+                            >
+                              {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
+                            </Button>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
+                              className="w-12 h-6 text-center text-xs px-1"
+                              disabled={isUpdating}
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                              disabled={isUpdating}
+                              onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity + 1); }}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <Badge variant="secondary" className="rounded-full text-xs font-normal px-3">
+                              {item.quantity}
+                            </Badge>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => { e.stopPropagation(); item.product && handleViewProduct(item.product); }}
+                            title="View product"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          {onRemoveItem && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              disabled={isRemoving || !editable}
+                              onClick={(e) => editable && handleRemoveItem(e, item.id)}
+                              title="Remove item"
+                            >
+                              {isRemoving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-14">
+            <Package className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">{emptyMessage}</p>
+            {showAddButton && onAddProducts && (
+              <Button onClick={onAddProducts} variant="outline" className="rounded-full gap-1.5">
+                <Plus className="h-4 w-4" />
+                {emptyButtonText}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Product Detail Modal */}
       <ProductDetailModal
         product={selectedProduct}
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedProduct(null);
-        }}
+        onClose={() => { setIsModalOpen(false); setSelectedProduct(null); }}
       />
     </>
   );
 };
-

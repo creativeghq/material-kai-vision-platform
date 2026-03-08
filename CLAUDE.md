@@ -77,6 +77,6 @@ Full reference: `.claude/design-system.md`
 - **Primary**: `#3E192A` deep plum (`--primary: 330 43% 17%`). **Accent**: warm peach (`--accent: 22 100% 93%`). **Background**: warm beige (`--background: 40 25% 96%`).
 - **Font**: Open Sans. `font-bold` → 300, `font-semibold/medium` → 400 globally. Headings are light weight by design.
 - **Glass cards**: `.dashboard-card` class (rgba white 0.7 + blur 12px). Never recreate inline.
-- **Tabs active**: `data-[state=active]:bg-primary data-[state=active]:text-primary-foreground`. TabsList: `w-full h-auto flex-wrap justify-start gap-2 p-2`.
+- **Tabs active**: TabsList: `w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0`. TabsTrigger: `flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground`. **NEVER add `rounded-full` to TabsTrigger** — that is only for Buttons.
 - **Tables**: `<CardContent className="p-0">`, no wrapper div, no fixed column widths.
 - **Buttons**: all pill-shaped (`rounded-full`). Variants: default (plum), outline (white→peach), secondary (peach), ghost, destructive, link.

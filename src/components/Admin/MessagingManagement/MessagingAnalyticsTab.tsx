@@ -255,8 +255,8 @@ export const MessagingAnalyticsTab: React.FC = () => {
               <h4 className="font-semibold mb-4">Daily Breakdown</h4>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                    <tr>
                       <th className="text-left py-2 px-4 font-medium">Date</th>
                       <th className="text-left py-2 px-4 font-medium">Channel</th>
                       <th className="text-right py-2 px-4 font-medium">Sent</th>

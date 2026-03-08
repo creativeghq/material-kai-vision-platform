@@ -4,7 +4,6 @@ import {
   Globe,
   MapPin,
   Briefcase,
-  Grid3x3,
   Building2,
   Lock,
   ExternalLink,
@@ -12,17 +11,21 @@ import {
   Star,
   Tag,
   Eye,
-  Users,
-  ChevronDown,
-  ChevronUp,
   DollarSign,
   Link as LinkIcon,
   Pencil,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
+  Grid3x3,
+  UserCircle,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
@@ -68,11 +71,28 @@ interface ReviewStats {
   summary: string | null;
 }
 
+interface PublicMoodboard {
+  id: string;
+  title: string;
+  description?: string;
+  updated_at: string;
+  preview_url?: string;
+}
+
 const DIMENSIONS: { key: string; label: string }[] = [
   { key: 'communication', label: 'Communication' },
   { key: 'expertise', label: 'Expertise' },
   { key: 'timeliness', label: 'Timeliness' },
   { key: 'value', label: 'Value' },
+];
+
+const CARD_COLORS = [
+  'from-violet-100 to-indigo-100',
+  'from-blue-100 to-cyan-100',
+  'from-rose-100 to-pink-100',
+  'from-amber-100 to-orange-100',
+  'from-emerald-100 to-teal-100',
+  'from-purple-100 to-fuchsia-100',
 ];
 
 function StarRow({ rating }: { rating: number }) {
@@ -88,15 +108,6 @@ function StarRow({ rating }: { rating: number }) {
   );
 }
 
-interface PublicMoodboard {
-  id: string;
-  title: string;
-  description?: string;
-  updated_at: string;
-  preview_url?: string;
-}
-
-// ─── Service row (HealthRate visit-reason style) ──────────────────────────────
 function ServiceRow({
   service,
   onHire,
@@ -175,8 +186,8 @@ export const PublicProfilePage: React.FC = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [moodboards, setMoodboards] = useState<PublicMoodboard[]>([]);
-  const [featuredBoard, setFeaturedBoard] = useState<PublicMoodboard | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -224,7 +235,7 @@ export const PublicProfilePage: React.FC = () => {
         professional_type: profileData.professional_type ?? null,
       });
 
-      // Increment view counter + analytics (fire-and-forget)
+      // Fire-and-forget analytics
       supabase.rpc('increment_profile_views', { p_user_id: userId! }).then(() => {});
       supabase.from('analytics_events').insert({
         event_type: 'profile_viewed',
@@ -233,13 +244,19 @@ export const PublicProfilePage: React.FC = () => {
         created_at: new Date().toISOString(),
       }).then(() => {});
 
-      // Follower count + review stats in parallel
-      const [{ count }, { data: reviewsData }, { data: summaryData }] = await Promise.all([
+      const [
+        { count: fwrCount },
+        { count: fwgCount },
+        { data: reviewsData },
+        { data: summaryData },
+      ] = await Promise.all([
         supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', userId),
+        supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId),
         supabase.from('profile_reviews').select('overall_rating, dimension_ratings').eq('to_user_id', userId!),
         supabase.from('review_summaries').select('summary_text').eq('user_id', userId!).maybeSingle(),
       ]);
-      setFollowerCount(count ?? 0);
+      setFollowerCount(fwrCount ?? 0);
+      setFollowingCount(fwgCount ?? 0);
 
       if (reviewsData && reviewsData.length > 0) {
         const overall = reviewsData.reduce((s: number, r: { overall_rating: number }) => s + r.overall_rating, 0) / reviewsData.length;
@@ -256,7 +273,7 @@ export const PublicProfilePage: React.FC = () => {
         setReviewStats({ overall, count: reviewsData.length, dimensions, summary: summaryData?.summary_text ?? null });
       }
 
-      // Public moodboards
+      // Public moodboards + preview images
       const { data: mbData } = await supabase
         .from('moodboards')
         .select('id, title, description, updated_at')
@@ -278,25 +295,18 @@ export const PublicProfilePage: React.FC = () => {
             let preview_url: string | undefined;
             if (items?.[0]?.material_id) {
               const { data: rel } = await supabase
-                .from('product_image_relationships')
+                .from('image_product_associations')
                 .select('document_images(image_url)')
                 .eq('product_id', items[0].material_id)
-                .order('relevance_score', { ascending: false })
+                .order('overall_score', { ascending: false })
                 .limit(1)
                 .maybeSingle();
-              // @ts-expect-error nested select typing
-              preview_url = rel?.document_images?.image_url;
+              preview_url = (rel as any)?.document_images?.image_url;
             }
             return { ...mb, preview_url };
           })
         );
         setMoodboards(enriched);
-
-        // Set featured board if any
-        if (profileData.featured_moodboard_id) {
-          const fb = enriched.find((m) => m.id === profileData.featured_moodboard_id);
-          setFeaturedBoard(fb ?? null);
-        }
       }
     } catch (err) {
       console.error('Error loading public profile:', err);
@@ -319,10 +329,8 @@ export const PublicProfilePage: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <Lock className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Profile not found</h2>
-        <p className="text-muted-foreground max-w-xs">
-          This profile is either private or doesn't exist.
-        </p>
-        <Button asChild variant="outline">
+        <p className="text-muted-foreground max-w-xs">This profile is either private or doesn't exist.</p>
+        <Button asChild variant="outline" className="rounded-full">
           <Link to="/">Go home</Link>
         </Button>
       </div>
@@ -330,332 +338,401 @@ export const PublicProfilePage: React.FC = () => {
   }
 
   const initials = (profile.full_name || 'U')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0].toUpperCase())
-    .join('');
+    .split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
 
   const displayName = profile.full_name || 'Anonymous';
-  const nonFeaturedBoards = moodboards.filter((m) => m.id !== profile.featured_moodboard_id);
+  const isOwnProfile = user?.id === profile.user_id;
 
-  // Use services_detail if available, otherwise fall back to name-only list
   const richServices: ServiceItem[] =
     profile.services_detail.length > 0
       ? profile.services_detail
       : profile.services.map((name, i) => ({ id: String(i), name }));
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ── Nav bar ──────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/25 ring-1 ring-amber-400/40 transition-transform group-hover:scale-105">
-              <span className="text-primary-foreground font-light text-sm">K</span>
+    <div className="min-h-screen bg-[#f7f6f4]">
+
+      {/* ── Navbar ───────────────────────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-sm ring-1 ring-amber-400/30">
+              <span className="text-primary-foreground font-light text-xs">K</span>
             </div>
-            <span className="font-light text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
+            <span className="font-light text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
               KAI Platform
             </span>
           </Link>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Link to="/discover" className="hover:text-foreground transition-colors">Browse</Link>
+          <div className="flex items-center gap-3 text-sm">
+            <Link to="/discover" className="text-muted-foreground hover:text-foreground transition-colors">Browse</Link>
+            {isOwnProfile && (
+              <Button asChild size="sm" variant="outline" className="rounded-full gap-1.5">
+                <Link to="/profile"><Pencil className="h-3 w-3" />Edit Profile</Link>
+              </Button>
+            )}
           </div>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* ── Gradient banner + avatar ─────────────────────────────────────────── */}
+      <div className="relative">
+        <div
+          className="h-40 sm:h-48 relative overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+        >
+          <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+          <div className="absolute top-8 right-16 w-40 h-40 rounded-full bg-accent/20 blur-2xl pointer-events-none" />
+        </div>
 
-        {/* ── ROW 1: Hero card — avatar + info + booking ──────────────────── */}
-        <Card className="rounded-2xl overflow-hidden">
-          <CardContent className="p-0">
-            <div className="flex flex-col sm:flex-row gap-0">
+        {/* Avatar — half in banner, half in white section */}
+        <div className="absolute bottom-0 left-4 sm:left-8 translate-y-1/2 z-10">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-xl overflow-hidden bg-primary">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-3xl font-light text-primary-foreground">{initials}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
-              {/* Avatar */}
-              <div className="sm:w-48 md:w-56 shrink-0 bg-primary/5">
-                <div className="aspect-square w-full h-full flex items-center justify-center">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={displayName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-6xl font-light text-primary">{initials}</span>
-                  )}
+      {/* ── White profile card ───────────────────────────────────────────────── */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          {/* Name row — padded to clear avatar */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-14 sm:pt-7 pb-4">
+            {/* Name + meta (left) — on desktop, offset right of avatar */}
+            <div className="sm:ml-36 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
+                {profile.professional_type && (
+                  <Badge className="text-xs rounded-full bg-primary/10 text-primary border-primary/20 font-normal">
+                    {PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                {profile.company && <span>{profile.company}</span>}
+                {profile.company && profile.location && <span className="text-muted-foreground/40">·</span>}
+                {profile.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3 shrink-0" />{profile.location}
+                  </span>
+                )}
+              </p>
+              {profile.bio && (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 max-w-lg">{profile.bio}</p>
+              )}
+            </div>
+
+            {/* Action buttons (right) */}
+            <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+              <FollowButton
+                targetUserId={profile.user_id}
+                currentUserId={user?.id}
+                onToggle={(nowFollowing) => setFollowerCount((c) => c + (nowFollowing ? 1 : -1))}
+              />
+              <Button className="rounded-full gap-2 px-5" onClick={() => openHireModal()}>
+                <Mail className="h-4 w-4" />
+                Hire Me
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-8 pb-4 border-t pt-4">
+            <div className="text-center cursor-default">
+              <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
+            </div>
+            <div className="text-center cursor-default">
+              <p className="text-lg font-semibold tabular-nums">{followingCount.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Following</p>
+            </div>
+            {moodboards.length > 0 && (
+              <div className="text-center cursor-default">
+                <p className="text-lg font-semibold tabular-nums">{moodboards.length}</p>
+                <p className="text-xs text-muted-foreground">Boards</p>
+              </div>
+            )}
+            {reviewStats && (
+              <div className="flex items-center gap-1.5 cursor-default">
+                <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+                <div>
+                  <p className="text-lg font-semibold tabular-nums leading-none">{reviewStats.overall.toFixed(1)}</p>
+                  <p className="text-xs text-muted-foreground">{reviewStats.count} reviews</p>
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Info + actions */}
-              <div className="flex-1 min-w-0 p-6 flex flex-col justify-between gap-4">
-                <div className="space-y-3">
-                  <div>
-                    <h1 className="text-2xl font-light tracking-tight">{displayName}</h1>
-                    {(profile.professional_type || profile.company) && (
-                      <p className="text-sm text-primary mt-0.5">
-                        {[
-                          profile.professional_type
-                            ? (PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type)
-                            : null,
-                          profile.company,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </p>
-                    )}
-                  </div>
+          {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+          <Tabs defaultValue="about" className="mt-5">
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+              <TabsTrigger value="about" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <UserCircle className="h-4 w-4" /> About
+              </TabsTrigger>
+              <TabsTrigger value="moodboards" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Grid3x3 className="h-4 w-4" /> Moodboards
+                {moodboards.length > 0 && <span className="text-xs opacity-70">{moodboards.length}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="skills" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Tag className="h-4 w-4" /> Skills
+                {profile.skill_tags.length > 0 && <span className="text-xs opacity-70">{profile.skill_tags.length}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="services" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Briefcase className="h-4 w-4" /> Services
+                {richServices.length > 0 && <span className="text-xs opacity-70">{richServices.length}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="reviews" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Star className="h-4 w-4" /> Reviews
+                {reviewStats && <span className="text-xs opacity-70">{reviewStats.count}</span>}
+              </TabsTrigger>
+            </TabsList>
 
-                  {profile.bio && (
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{profile.bio}</p>
-                  )}
+            {/* ── About ─────────────────────────────────────────────────── */}
+            <TabsContent value="about" className="mt-5 space-y-4">
+              {/* Bio */}
+              {profile.bio && (
+                <Card className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
+                      <UserCircle className="h-4 w-4" /> Bio
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{profile.bio}</p>
+                  </CardContent>
+                </Card>
+              )}
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+              {/* Contact / links */}
+              {(profile.website_url || profile.location) && (
+                <Card className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5 space-y-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
+                      <Globe className="h-4 w-4" /> Contact & Location
+                    </h3>
                     {profile.location && (
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                        {profile.location}
-                      </span>
-                    )}
-                    {followerCount > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5 text-primary shrink-0" />
-                        {followerCount} follower{followerCount !== 1 ? 's' : ''}
-                      </span>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-primary shrink-0" />{profile.location}
+                      </p>
                     )}
                     {profile.website_url && (
-                      <a
-                        href={profile.website_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 hover:text-primary transition-colors"
-                      >
-                        <Globe className="h-3.5 w-3.5 text-primary shrink-0" />
-                        Website
-                        <ExternalLink className="h-3 w-3" />
+                      <a href={profile.website_url} target="_blank" rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-2">
+                        <Globe className="h-4 w-4 shrink-0" />
+                        {profile.website_url}
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                {/* Review score badge */}
-                {reviewStats && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-                      <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                      <span className="text-sm font-medium text-primary">{reviewStats.overall.toFixed(1)}</span>
-                      <span className="text-xs text-muted-foreground">({reviewStats.count} review{reviewStats.count !== 1 ? 's' : ''})</span>
+              {/* AI Review Summary */}
+              {reviewStats?.summary && (
+                <Card className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <h3 className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" /> AI Summary
+                    </h3>
+                    <p className="text-sm text-foreground/80 leading-relaxed">{reviewStats.summary}</p>
+                    {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).length > 0 && (
+                      <div className="border-t pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).map((d) => (
+                          <div key={d.key} className="text-center space-y-1">
+                            <StarRow rating={reviewStats.dimensions[d.key]} />
+                            <p className="text-xs text-muted-foreground">{d.label}</p>
+                            <p className="text-xs font-medium tabular-nums">{reviewStats.dimensions[d.key].toFixed(2)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Preferred Factories */}
+              {profile.preferred_factories.length > 0 && (
+                <Card className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
+                      <Building2 className="h-4 w-4" /> Preferred Factories
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {profile.preferred_factories.map((f, i) => (
+                        <div key={i} className="rounded-xl bg-muted/40 p-3">
+                          <p className="font-medium text-sm">{f.name}</p>
+                          {f.country && <p className="text-xs text-muted-foreground mt-0.5">{f.country}</p>}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
+                  </CardContent>
+                </Card>
+              )}
 
-                {/* Action buttons */}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Button className="rounded-full gap-2 px-6" onClick={() => openHireModal()}>
-                    <Mail className="h-4 w-4" />
-                    Hire Me
-                  </Button>
-                  <FollowButton targetUserId={profile.user_id} currentUserId={user?.id} />
-                </div>
-              </div>
-
-              {/* Booking widget — right panel of the hero card */}
-              <div className="sm:w-[28rem] shrink-0 border-t sm:border-t-0 sm:border-l bg-card/50 p-4 flex items-start">
-                <BookingWidget
-                  profileUserId={profile.user_id}
-                  profileName={displayName}
-                  services={richServices.map((s) => ({ id: s.id, name: s.name }))}
-                />
-              </div>
-
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── ROW 2: AI Summary (if available) ────────────────────────────── */}
-        {(reviewStats?.summary || (reviewStats && DIMENSIONS.filter(d => reviewStats.dimensions[d.key] != null).length > 0)) && (
-          <Card className="rounded-2xl border">
-            <CardContent className="p-5 space-y-4">
-              <div className="flex gap-4 items-start">
-                <div className="flex-1 min-w-0">
-                  {reviewStats?.summary && (
+              {/* Empty about */}
+              {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && profile.preferred_factories.length === 0 && (
+                <div className="py-12 text-center text-muted-foreground">
+                  <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  {isOwnProfile ? (
                     <>
-                      <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1 mb-1.5">
-                        <Sparkles className="h-3.5 w-3.5" /> AI Summary
-                      </p>
-                      <p className="text-sm text-foreground/80 leading-relaxed">{reviewStats.summary}</p>
+                      <p className="text-sm">Your profile is empty.</p>
+                      <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                        <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
+                      </Button>
                     </>
+                  ) : (
+                    <p className="text-sm">Nothing shared yet.</p>
                   )}
                 </div>
-              </div>
-              {reviewStats && DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).length > 0 && (
-                <div className="border-t pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).map((d) => (
-                    <div key={d.key} className="text-center space-y-1">
-                      <StarRow rating={reviewStats.dimensions[d.key]} />
-                      <p className="text-xs text-muted-foreground">{d.label}</p>
-                      <p className="text-xs font-medium tabular-nums">{reviewStats.dimensions[d.key].toFixed(2)}</p>
+              )}
+            </TabsContent>
+
+            {/* ── Moodboards ────────────────────────────────────────────── */}
+            <TabsContent value="moodboards" className="mt-5">
+              {moodboards.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Grid3x3 className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  {isOwnProfile ? (
+                    <>
+                      <p className="font-medium text-foreground mb-1">No public moodboards yet</p>
+                      <p className="text-sm text-muted-foreground mb-4">Make a moodboard public to show it here.</p>
+                      <Button asChild variant="outline" size="sm" className="rounded-full">
+                        <Link to="/moodboard">Open Moodboards</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No moodboards shared yet.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {moodboards.map((mb, i) => (
+                    <div key={mb.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+                      <div className={`aspect-[4/3] overflow-hidden relative ${!mb.preview_url ? `bg-gradient-to-br ${CARD_COLORS[i % CARD_COLORS.length]}` : ''}`}>
+                        {mb.preview_url ? (
+                          <img
+                            src={mb.preview_url}
+                            alt={mb.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-3xl font-light text-foreground/30">
+                              {mb.title.slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-2">
+                        <div>
+                          <p className="font-medium text-sm leading-tight">{mb.title}</p>
+                          {mb.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{mb.description}</p>
+                          )}
+                        </div>
+                        <button
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                          onClick={() => setExpandedComments(expandedComments === mb.id ? null : mb.id)}
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          {expandedComments === mb.id ? 'Hide comments' : 'Comments'}
+                        </button>
+                        {expandedComments === mb.id && (
+                          <MoodboardComments moodboardId={mb.id} currentUserId={user?.id} />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </TabsContent>
 
-        {/* ── ROW 2+: Content sections ─────────────────────────────────────── */}
-        <div className="space-y-6">
-
-          {/* Services */}
-          {richServices.length > 0 && (
-            <section>
-              <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
-                <Briefcase className="h-4 w-4 text-primary" /> Services
-              </h2>
-              <Card className="rounded-2xl border">
-                <CardContent className="p-0 divide-y">
-                  {richServices.map((svc, i) => (
-                    <ServiceRow key={svc.id} service={svc} onHire={openHireModal} isLast={i === richServices.length - 1} />
-                  ))}
-                </CardContent>
-              </Card>
-            </section>
-          )}
-
-          {/* Skills & Expertise */}
-          {profile.skill_tags.length > 0 && (
-            <section>
-              <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
-                <Tag className="h-4 w-4 text-primary" /> Skills & Expertise
-              </h2>
-              <Card className="rounded-2xl border">
-                <CardContent className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                  {profile.skill_tags.map((tag, i) => {
-                    const width = 45 + ((i * 17 + 31) % 50);
-                    return (
-                      <div key={tag} className="space-y-1">
-                        <span className="text-sm text-foreground/80">{tag}</span>
-                        <div className="h-1.5 rounded-full bg-primary/10 overflow-hidden">
-                          <div className="h-full rounded-full bg-primary/60" style={{ width: `${width}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </section>
-          )}
-
-          {/* Preferred Factories */}
-          {profile.preferred_factories.length > 0 && (
-            <section>
-              <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
-                <Building2 className="h-4 w-4 text-primary" /> Preferred Factories
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {profile.preferred_factories.map((f, i) => (
-                  <Card key={i} className="rounded-xl">
-                    <CardContent className="p-3">
-                      <p className="font-medium text-sm">{f.name}</p>
-                      {f.country && <p className="text-xs text-muted-foreground mt-0.5">{f.country}</p>}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Featured Moodboard */}
-          {featuredBoard && (
-            <section>
-              <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
-                <Star className="h-4 w-4 text-amber-500" /> Featured Board
-              </h2>
-              <Card className="rounded-2xl overflow-hidden">
-                {featuredBoard.preview_url && (
-                  <div className="aspect-video overflow-hidden">
-                    <img src={featuredBoard.preview_url} alt={featuredBoard.title} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <CardContent className="p-5 space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-base">{featuredBoard.title}</h3>
-                    {featuredBoard.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{featuredBoard.description}</p>
-                    )}
-                  </div>
-                  <MoodboardComments moodboardId={featuredBoard.id} currentUserId={user?.id} />
-                </CardContent>
-              </Card>
-            </section>
-          )}
-
-          {/* Other Moodboards */}
-          {nonFeaturedBoards.length > 0 && (
-            <section>
-              <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
-                <Grid3x3 className="h-4 w-4 text-primary" /> Moodboards
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {nonFeaturedBoards.map((mb) => (
-                  <Card key={mb.id} className="rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-                    {mb.preview_url && (
-                      <div className="aspect-video overflow-hidden">
-                        <img src={mb.preview_url} alt={mb.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                      </div>
-                    )}
-                    <CardContent className="p-4 space-y-3">
-                      <div>
-                        <p className="font-medium">{mb.title}</p>
-                        {mb.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{mb.description}</p>
-                        )}
-                      </div>
-                      <button
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                        onClick={() => setExpandedComments(expandedComments === mb.id ? null : mb.id)}
-                      >
-                        {expandedComments === mb.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        Comments
-                      </button>
-                      {expandedComments === mb.id && (
-                        <MoodboardComments moodboardId={mb.id} currentUserId={user?.id} />
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Empty state */}
-          {moodboards.length === 0 && richServices.length === 0 &&
-            profile.preferred_factories.length === 0 && profile.skill_tags.length === 0 && !profile.bio && (
-            <Card className="rounded-2xl">
-              <CardContent className="py-12 text-center text-muted-foreground space-y-3">
-                <Eye className="h-8 w-8 mx-auto opacity-30" />
-                {user?.id === profile.user_id ? (
-                  <>
-                    <p className="font-medium text-foreground">Your public profile is empty</p>
-                    <p className="text-sm max-w-xs mx-auto">Add skills, services, and moodboards from your profile settings.</p>
-                    <Button asChild variant="outline" size="sm" className="rounded-full gap-2 mt-2">
-                      <Link to="/profile"><Pencil className="h-3.5 w-3.5" />Edit Profile</Link>
+            {/* ── Skills ────────────────────────────────────────────────── */}
+            <TabsContent value="skills" className="mt-5">
+              {profile.skill_tags.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Tag className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">{isOwnProfile ? 'Add skills from your profile settings.' : 'No skills listed yet.'}</p>
+                  {isOwnProfile && (
+                    <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                      <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
                     </Button>
-                  </>
-                ) : (
-                  <p>Nothing shared yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                </div>
+              ) : (
+                <Card className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                      {profile.skill_tags.map((tag, i) => {
+                        const width = 45 + ((i * 17 + 31) % 50);
+                        return (
+                          <div key={tag} className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-foreground/80">{tag}</span>
+                              <span className="text-xs text-muted-foreground">{width}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-primary/10 overflow-hidden">
+                              <div className="h-full rounded-full bg-primary/60 transition-all duration-500" style={{ width: `${width}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-          {/* Reviews */}
-          <ReviewsSection
-            profileUserId={profile.user_id}
-            currentUserId={user?.id}
-            services={richServices.map((s) => ({ id: s.id, name: s.name }))}
-          />
+            {/* ── Services ──────────────────────────────────────────────── */}
+            <TabsContent value="services" className="mt-5 space-y-5">
+              {richServices.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">{isOwnProfile ? 'Add services from your profile settings.' : 'No services listed yet.'}</p>
+                  {isOwnProfile && (
+                    <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                      <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Card className="rounded-2xl border-0 shadow-sm">
+                    <CardContent className="p-0 divide-y">
+                      {richServices.map((svc, i) => (
+                        <ServiceRow key={svc.id} service={svc} onHire={openHireModal} isLast={i === richServices.length - 1} />
+                      ))}
+                    </CardContent>
+                  </Card>
+                  <Card className="rounded-2xl border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <BookingWidget
+                        profileUserId={profile.user_id}
+                        profileName={displayName}
+                        services={richServices.map((s) => ({ id: s.id, name: s.name }))}
+                      />
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+
+            {/* ── Reviews ───────────────────────────────────────────────── */}
+            <TabsContent value="reviews" className="mt-5">
+              <ReviewsSection
+                profileUserId={profile.user_id}
+                currentUserId={user?.id}
+                services={richServices.map((s) => ({ id: s.id, name: s.name }))}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
+      <div className="h-16" />
 
       <HireMeModal
         open={hireMeOpen}

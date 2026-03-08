@@ -21,6 +21,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Trash2,
+  Video,
+  Pin,
+  X,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -180,6 +183,26 @@ interface Message {
     topic: string;
     target_keyword: string;
   }; // SEO article pipeline data for SEOArticleViewer
+  geminiImageData?: {
+    image_url: string;
+    diagram_url?: string;
+    mode: string;
+    model: string;
+    job_id: string;
+    credits_used: number;
+  }; // Gemini image generation result
+  videoData?: {
+    video_url: string;
+    job_id: string;
+    status: 'processing' | 'completed' | 'failed';
+  }; // Veo video walkthrough
+  virtualStagingData?: {
+    image_url: string;
+    job_id: string;
+    room: string;
+    furniture_style: string;
+    credits_used: number;
+  }; // Virtual staging result
 }
 
 interface AgentHubProps {
@@ -252,6 +275,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Pending material replacement — set by "Replace in Image" on ProductStrip cards
   const [pendingReplacement, setPendingReplacement] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
+
+  // Pinned materials tray — catalog products pinned for Gemini multi-reference generation
+  const [pinnedMaterials, setPinnedMaterials] = useState<{ id: string; name: string; imageUrl?: string }[]>([]);
+
+  const handlePinMaterial = useCallback((material: { id: string; name: string; imageUrl?: string }) => {
+    setPinnedMaterials(prev => {
+      if (prev.some(m => m.id === material.id)) return prev; // avoid duplicates
+      if (prev.length >= 14) return prev; // Gemini supports max 14 reference images
+      return [...prev, material];
+    });
+    toast({ title: 'Pinned to design tray', description: material.name });
+  }, [toast]);
+
+  const handleUnpinMaterial = useCallback((materialId: string) => {
+    setPinnedMaterials(prev => prev.filter(m => m.id !== materialId));
+  }, []);
 
   // Material Modal State
   const [showMaterialModal, setShowMaterialModal] = useState(false);
@@ -626,6 +665,51 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [currentConversationId, toast]);
 
+  // Generate Veo video walkthrough from a Gemini-generated image
+  const handleGenerateVideo = useCallback(async (imageUrl: string, sourceMessage: Message) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+
+      toast({ title: 'Generating video walkthrough…', description: 'This may take 30–60 seconds.' });
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_image_url: imageUrl,
+          workspace_id: workspaceId,
+        }),
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || 'Video generation failed');
+
+      // Patch the source message to include videoData
+      setMessages(prev => prev.map(m => {
+        if (m.id !== sourceMessage.id) return m;
+        return {
+          ...m,
+          videoData: {
+            video_url: result.video_url,
+            job_id: result.job_id,
+            status: 'completed' as const,
+          },
+        };
+      }));
+
+      toast({ title: 'Video ready!', description: `${result.credits_used} credits used.` });
+    } catch (error: any) {
+      console.error('Video generation error:', error);
+      toast({ title: 'Video generation failed', description: error.message, variant: 'destructive' });
+    }
+  }, [workspaceId, toast]);
+
   const handleSendMessage = useCallback(async () => {
     console.log('🎯 handleSendMessage CALLED');
     console.log('Input:', input);
@@ -727,6 +811,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           model: selectedModel,
           images: attachedImages,
           conversation_id: currentConversationId,
+          ...(pinnedMaterials.length > 0 && selectedAgent === 'interior-designer'
+            ? { pinned_material_images: pinnedMaterials.filter(m => m.imageUrl).map(m => m.imageUrl!) }
+            : {}),
         };
 
         // REMOVED: PDF data attachment - PDF processing moved to /admin/data-import page
@@ -935,6 +1022,77 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     room_type: chunk.room_type,
                     style: chunk.style,
                   },
+                };
+              // Handle gemini_image_ready — Gemini single-image generation result
+              } else if (chunk.type === 'gemini_image_ready') {
+                const modeLabels: Record<string, string> = {
+                  'text-to-image': 'Design generated',
+                  'image-edit': 'Edit applied',
+                  'floor-plan-render': 'Floor plan rendered',
+                  'floor-plan-text': 'Floor plan created',
+                };
+                const geminiMsg: Message = {
+                  id: `msg-gemini-${Date.now()}`,
+                  role: 'assistant',
+                  content: `✨ ${modeLabels[chunk.mode] || 'Image generated'} — ${chunk.credits_used} credits used`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  geminiImageData: {
+                    image_url: chunk.image_url,
+                    diagram_url: chunk.diagram_url,
+                    mode: chunk.mode,
+                    model: chunk.model,
+                    job_id: chunk.job_id,
+                    credits_used: chunk.credits_used,
+                  },
+                };
+                setMessages(prev => [...prev, geminiMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: geminiMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, geminiImageData: geminiMsg.geminiImageData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: geminiMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
+              // Handle virtual_staging_ready — virtual staging result
+              } else if (chunk.type === 'virtual_staging_ready') {
+                const stagingMsg: Message = {
+                  id: `msg-staging-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Virtual Staging complete — ${chunk.room} in ${chunk.furniture_style} style. ${chunk.credits_used} credits used.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  virtualStagingData: {
+                    image_url: chunk.image_url,
+                    job_id: chunk.job_id,
+                    room: chunk.room,
+                    furniture_style: chunk.furniture_style,
+                    credits_used: chunk.credits_used,
+                  },
+                };
+                setMessages(prev => [...prev, stagingMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: stagingMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, virtualStagingData: stagingMsg.virtualStagingData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: stagingMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
                 };
               // Handle article_generation_started - SEO pipeline async
               } else if (chunk.type === 'article_generation_started') {
@@ -1422,15 +1580,6 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
     }
   }, [userId, initialPrompt]);
 
-  // Load a specific conversation when navigated with ?conversation=
-  const initialConvLoaded = useRef(false);
-  useEffect(() => {
-    if (initialConversationId && !initialConvLoaded.current) {
-      initialConvLoaded.current = true;
-      handleLoadConversation(initialConversationId);
-    }
-  }, [initialConversationId, handleLoadConversation]);
-
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -1480,11 +1629,21 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
           worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
           articleData: msg.metadata?.articleData as any | undefined, // Restore SEO article data
+          virtualStagingData: msg.metadata?.virtualStagingData as any | undefined, // Restore virtual staging data
         })),
       );
     },
     [],
   );
+
+  // Load a specific conversation when navigated with ?conversation=
+  const initialConvLoaded = useRef(false);
+  useEffect(() => {
+    if (initialConversationId && !initialConvLoaded.current) {
+      initialConvLoaded.current = true;
+      handleLoadConversation(initialConversationId);
+    }
+  }, [initialConversationId, handleLoadConversation]);
 
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
@@ -1728,7 +1887,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.virtualStagingData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-accent border border-accent-foreground/10 text-foreground shadow-sm'
                         : 'bg-white/40 border border-white/30 text-foreground backdrop-blur-sm shadow-sm'
@@ -1812,6 +1971,88 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           </div>
                         )}
                       </div>
+                    ) : message.geminiImageData ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">{normalizeContent(message.content)}</p>
+                        <img
+                          src={message.geminiImageData.image_url}
+                          alt="Gemini interior design"
+                          className="w-full rounded-xl border border-white/20 shadow-md"
+                          loading="lazy"
+                        />
+                        {message.geminiImageData.diagram_url && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Step 1 diagram:</span>
+                            <a href={message.geminiImageData.diagram_url} target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                              View floor plan
+                            </a>
+                          </div>
+                        )}
+                        {/* Actions: Video + VR World */}
+                        <div className="flex flex-wrap gap-2">
+                          {message.videoData ? (
+                            <video
+                              src={message.videoData.video_url}
+                              controls
+                              className="w-full rounded-xl border border-white/20 shadow-md"
+                            />
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => handleGenerateVideo(message.geminiImageData!.image_url, message)}
+                            >
+                              <Video className="h-4 w-4" />
+                              Generate Video Walkthrough
+                              <span className="text-muted-foreground text-xs ml-1">30 credits</span>
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => handleGenerateVR(
+                              message.geminiImageData!.image_url,
+                              { prompt: normalizeContent(message.content) },
+                              message,
+                            )}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Explore in VR World
+                            <span className="text-muted-foreground text-xs ml-1">50 credits</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : message.virtualStagingData ? (
+                      <div className="space-y-3">
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <img
+                          src={message.virtualStagingData.image_url}
+                          alt={`Virtual staging — ${message.virtualStagingData.room}`}
+                          className="w-full rounded-xl border border-white/20 shadow-md object-cover"
+                          loading="lazy"
+                        />
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">{message.virtualStagingData.room}</span>
+                          <span className="bg-accent px-2 py-0.5 rounded-full">{message.virtualStagingData.furniture_style}</span>
+                          <span className="ml-auto">{message.virtualStagingData.credits_used} credits used</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = message.virtualStagingData!.image_url;
+                            a.download = `virtual-staging-${message.virtualStagingData!.room.toLowerCase().replace(' ', '-')}.jpg`;
+                            a.click();
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
                         <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
@@ -1858,6 +2099,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                                 imageUrl: primaryImage?.url,
                               });
                             }}
+                            onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
                           />
                         )}
 
@@ -2050,6 +2292,38 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
           )}
 
           {/* REMOVED: Attached PDF display - PDF processing moved to /admin/data-import page */}
+
+          {/* Pinned Materials Tray (Interior Designer only) */}
+          {selectedAgent === 'interior-designer' && pinnedMaterials.length > 0 && (
+            <div className="px-4 pt-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Pin className="h-3 w-3" /> Pinned materials ({pinnedMaterials.length}/14)
+                </span>
+                {pinnedMaterials.map(m => (
+                  <div key={m.id} className="relative group flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-full pl-1 pr-2 py-0.5">
+                    {m.imageUrl && (
+                      <img src={m.imageUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                    )}
+                    <span className="text-xs text-amber-900 max-w-[80px] truncate">{m.name}</span>
+                    <button
+                      onClick={() => handleUnpinMaterial(m.id)}
+                      className="ml-0.5 text-amber-500 hover:text-amber-700"
+                      title="Unpin"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setPinnedMaterials([])}
+                  className="text-xs text-muted-foreground hover:text-destructive underline"
+                >
+                  Clear all
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Agent Selector */}
           <div className="px-4 pt-3 pb-1 flex items-center gap-2">

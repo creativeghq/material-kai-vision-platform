@@ -12,17 +12,10 @@ import {
   Trash2,
   Filter,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/core/ui/table';
 import {
   Popover,
   PopoverContent,
@@ -90,12 +83,12 @@ export const QuotesPage: React.FC = () => {
   // Get status badge styling
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800' },
-      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800' },
-      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800' },
-      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800' },
-      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800' },
-      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600' },
+      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
+      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
+      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
+      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 hover:bg-red-100' },
+      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
@@ -157,43 +150,26 @@ export const QuotesPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Page Header */}
-      <div className="bg-card py-6">
-        <div className="page-container">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ShoppingCart className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold">My Quotes</h1>
-                <p className="text-muted-foreground">
-                  Create and manage your material quotes
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Quote
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={ShoppingCart}
+        title="My Quotes"
+        subtitle="Create and manage your material quotes"
+        actions={
+          <Button onClick={() => setShowCreateModal(true)} className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20">
+            <Plus className="h-4 w-4 mr-2" />
+            New Quote
+          </Button>
+        }
+      />
 
       {/* Main Content */}
-      <div className="page-container py-6">
-        {/* Stats Cards - Compact like /quotes/:id */}
+      <div className="page-container pt-6 pb-6 space-y-6">
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <ShoppingCart className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <ShoppingCart className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Total Quotes</p>
@@ -201,18 +177,10 @@ export const QuotesPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Clock className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <Clock className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Pending</p>
@@ -220,18 +188,10 @@ export const QuotesPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <CheckCircle className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <CheckCircle className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Accepted</p>
@@ -239,18 +199,10 @@ export const QuotesPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <FileText className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Drafts</p>
@@ -260,155 +212,116 @@ export const QuotesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Toolbar - Minimal */}
-        <div className="flex items-center justify-end py-3 mt-6 mb-4 border-b border-border">
-          {/* Searchable Filter */}
-          <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-8 px-2 hover:bg-muted ${statusFilter !== 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                <Filter className="h-4 w-4 mr-1.5" />
-                <span className="text-sm">
-                  {statusFilter === 'all' ? 'Filter' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Search status..." />
-                <CommandList>
-                  <CommandEmpty>No status found.</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('all'); setFilterOpen(false); }}
-                      className={statusFilter === 'all' ? 'bg-primary/10' : ''}
-                    >
-                      All Statuses
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('draft'); setFilterOpen(false); }}
-                      className={statusFilter === 'draft' ? 'bg-primary/10' : ''}
-                    >
-                      Draft
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('submitted'); setFilterOpen(false); }}
-                      className={statusFilter === 'submitted' ? 'bg-primary/10' : ''}
-                    >
-                      Submitted
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('quoted'); setFilterOpen(false); }}
-                      className={statusFilter === 'quoted' ? 'bg-primary/10' : ''}
-                    >
-                      Quoted
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('accepted'); setFilterOpen(false); }}
-                      className={statusFilter === 'accepted' ? 'bg-primary/10' : ''}
-                    >
-                      Accepted
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('rejected'); setFilterOpen(false); }}
-                      className={statusFilter === 'rejected' ? 'bg-primary/10' : ''}
-                    >
-                      Rejected
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => { setStatusFilter('expired'); setFilterOpen(false); }}
-                      className={statusFilter === 'expired' ? 'bg-primary/10' : ''}
-                    >
-                      Expired
-                    </CommandItem>
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-
         {/* Quotes Table */}
-        <div className="dashboard-card" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Quote Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredQuotes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {quotes.length === 0 ? (
-                      <div>
-                        <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="mb-4">No quotes yet. Create your first quote to get started.</p>
-                        <Button onClick={() => setShowCreateModal(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Your First Quote
-                        </Button>
-                      </div>
-                    ) : (
-                      'No quotes match your filter'
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredQuotes.map((quote) => (
-                  <TableRow
-                    key={quote.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleViewQuote(quote.id)}
-                  >
-                    <TableCell className="font-medium">
-                      {quote.name || 'Untitled Quote'}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                    <TableCell>{quote.total_items || quote.items?.length || 0}</TableCell>
-                    <TableCell className="text-sm">
-                      {new Date(quote.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {new Date(quote.expires_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewQuote(quote.id);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteQuote(quote.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Quote Requests
+              {statusFilter !== 'all' && (
+                <span className="text-xs text-muted-foreground font-normal">· {statusFilter}</span>
               )}
-            </TableBody>
-          </Table>
+            </h3>
+            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-7 px-2 hover:bg-muted ${statusFilter !== 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  <span className="text-xs">
+                    {statusFilter === 'all' ? 'Filter' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-0" align="end">
+                <Command>
+                  <CommandInput placeholder="Search status..." />
+                  <CommandList>
+                    <CommandEmpty>No status found.</CommandEmpty>
+                    <CommandGroup>
+                      {(['all', 'draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'] as const).map((s) => (
+                        <CommandItem
+                          key={s}
+                          onSelect={() => { setStatusFilter(s); setFilterOpen(false); }}
+                          className={statusFilter === s ? 'bg-accent' : ''}
+                        >
+                          {s === 'all' ? 'All Statuses' : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="overflow-hidden -mx-6 -mb-6 mt-2">
+            {filteredQuotes.length === 0 ? (
+              <div className="px-6 pb-6 text-center py-12 text-muted-foreground">
+                {quotes.length === 0 ? (
+                  <div>
+                    <ShoppingCart className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+                    <p className="text-sm mb-4">No quotes yet. Create your first quote to get started.</p>
+                    <Button onClick={() => setShowCreateModal(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Quote
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm">No quotes match your filter</p>
+                )}
+              </div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                  <tr className="text-xs font-semibold text-muted-foreground">
+                    <th className="text-left px-6 py-2.5 font-medium">Quote Name</th>
+                    <th className="text-left px-3 py-2.5 font-medium">Status</th>
+                    <th className="text-left px-3 py-2.5 font-medium">Items</th>
+                    <th className="text-left px-3 py-2.5 font-medium">Created</th>
+                    <th className="text-left px-3 py-2.5 font-medium">Expires</th>
+                    <th className="text-right px-6 py-2.5 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredQuotes.map((quote) => (
+                    <tr
+                      key={quote.id}
+                      className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => handleViewQuote(quote.id)}
+                    >
+                      <td className="px-6 py-2.5 font-medium">{quote.name || 'Untitled Quote'}</td>
+                      <td className="px-3 py-2.5">{getStatusBadge(quote.status)}</td>
+                      <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.expires_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => { e.stopPropagation(); handleViewQuote(quote.id); }}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteQuote(quote.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 

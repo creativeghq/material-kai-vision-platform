@@ -159,14 +159,7 @@ const MIVAA_ENDPOINTS = {
   // ==================== PDF HEALTH ====================
   'pdf_health': { path: '/api/pdf/health', method: 'GET' },  // PDF service health
 
-  // ==================== SEARCH (LEGACY - Use /api/rag/search instead) ====================
-  'search_documents': { path: '/api/search/documents/{document_id}/query', method: 'POST' },  // Query specific document
-  'search_semantic': { path: '/api/search/semantic', method: 'POST' },  // Semantic search (legacy)
-  'search_vector': { path: '/api/search/vector-similarity', method: 'POST' },  // Vector search (legacy)
-  'search_multimodal': { path: '/api/search/multimodal', method: 'POST' },  // Multimodal search (legacy)
-  'search_materials': { path: '/api/search/materials', method: 'POST' },  // Material search (legacy)
-  'search_materials_visual': { path: '/api/search/materials/visual', method: 'POST' },  // Visual material search (legacy)
-  'search_hybrid': { path: '/api/search/hybrid', method: 'POST' },  // Hybrid search (legacy)
+  // ==================== SEARCH ANALYTICS & RECOMMENDATIONS ====================
   'search_recommendations': { path: '/api/search/recommendations', method: 'GET' },  // Search recommendations
   'search_analytics': { path: '/api/search/analytics', method: 'POST' },  // Search analytics
   'search_health': { path: '/api/search/health', method: 'GET' },  // Search service health

@@ -115,103 +115,75 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Brain className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <Brain className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Documents</p>
+                <p className="text-lg font-semibold">{stats.totalDocs}</p>
               </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">{stats.totalDocs}</div>
-            <div className="text-sm text-muted-foreground">Total Documents</div>
           </div>
 
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <FolderTree className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <FolderTree className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Categories</p>
+                <p className="text-lg font-semibold">{stats.totalCategories}</p>
               </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">{stats.totalCategories}</div>
-            <div className="text-sm text-muted-foreground">Categories</div>
           </div>
 
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Link2 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <Link2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Product Links</p>
+                <p className="text-lg font-semibold">{stats.totalAttachments}</p>
               </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">{stats.totalAttachments}</div>
-            <div className="text-sm text-muted-foreground">Product Links</div>
           </div>
 
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <BarChart3 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Searches</p>
+                <p className="text-lg font-semibold">{stats.totalSearches}</p>
               </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">{stats.totalSearches}</div>
-            <div className="text-sm text-muted-foreground">Total Searches</div>
           </div>
         </div>
 
         {/* Main Content - Tabs without Card wrapper to match platform design */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between mb-6">
-            <TabsList>
-              <TabsTrigger value="documents" className="flex items-center gap-2">
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsTrigger value="documents" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <FileText className="h-4 w-4" />
                 Documents
               </TabsTrigger>
-              <TabsTrigger value="search" className="flex items-center gap-2">
+              <TabsTrigger value="search" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Search className="h-4 w-4" />
                 Search
               </TabsTrigger>
-              <TabsTrigger value="categories" className="flex items-center gap-2">
+              <TabsTrigger value="categories" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <FolderTree className="h-4 w-4" />
                 Categories
               </TabsTrigger>
-              <TabsTrigger value="attachments" className="flex items-center gap-2">
+              <TabsTrigger value="attachments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Link2 className="h-4 w-4" />
                 Product Links
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Analytics
               </TabsTrigger>
             </TabsList>
             <Button
@@ -245,16 +217,6 @@ export const KnowledgeBaseManagement: React.FC = () => {
             <ProductAttachments />
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Search Analytics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Analytics coming soon...</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
 

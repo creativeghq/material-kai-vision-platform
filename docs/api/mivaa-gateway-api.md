@@ -153,44 +153,7 @@ X-API-Key: <mivaa_api_key>
 
 ### Search Routes
 
-#### Semantic Search
-```typescript
-{
-  action: 'search_semantic',
-  payload: {
-    query: string,
-    limit?: number,
-    filters?: object
-  }
-}
-```
-
-#### Material Search
-```typescript
-{
-  action: 'search_materials',
-  payload: {
-    query: string,
-    limit?: number,
-    filters?: {
-      category?: string,
-      price_range?: [number, number],
-      sustainability?: boolean
-    }
-  }
-}
-```
-
-#### Visual Material Search
-```typescript
-{
-  action: 'search_materials_visual',
-  payload: {
-    image_url: string,
-    limit?: number
-  }
-}
-```
+Use `rag_search` with a `strategy` parameter for all search operations. See [RAG/Document Processing actions](#rag--document-processing) above.
 
 ### AI Services
 
