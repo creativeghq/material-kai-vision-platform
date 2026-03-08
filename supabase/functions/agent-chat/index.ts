@@ -280,7 +280,8 @@ type AgentState = typeof AgentStateAnnotation.State;
 function createAgentGraph(
   model: any,
   tools: any[],
-  onChunk?: (chunk: any) => void
+  onChunk?: (chunk: any) => void,
+  forceToolCall?: boolean
 ) {
   const maxIterations = 10;
 
@@ -302,7 +303,9 @@ function createAgentGraph(
     }
 
     // Invoke model
-    const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
+    const modelWithTools = tools.length > 0
+      ? model.bindTools(tools, forceToolCall ? { tool_choice: 'any' } : undefined)
+      : model;
     const invokeStartTime = Date.now();
 
     const response = await modelWithTools.invoke(state.messages, {
@@ -4223,8 +4226,9 @@ async function executeAgent(
     console.log('🔄 Restoring from checkpoint...');
   }
 
-  // Create the agent graph
-  const agentGraph = createAgentGraph(selectedModel, tools, onChunk);
+  // Create the agent graph — force tool use for interior-designer (prevents JARVIS text-first responses)
+  const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
+  const agentGraph = createAgentGraph(selectedModel, tools, onChunk, forceToolCall);
 
   // Convert messages to LangChain format, with multimodal support for images
   const lastUserMsgIndex = messages.reduce((last: number, msg: any, i: number) =>

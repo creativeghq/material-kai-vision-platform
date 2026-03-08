@@ -476,8 +476,12 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
           console.log('No valid interior design prompts found, using defaults');
           setPrompts(DEFAULT_PROMPTS);
         } else {
-          console.log(`✅ Loaded ${interiorPrompts.length} interior design prompts`);
-          setPrompts(interiorPrompts as PromptTemplate[]);
+          // Supplement DB prompts with defaults for any subcategories not in the DB
+          const dbSubcats = new Set(interiorPrompts.map((p: any) => p.subcategory));
+          const missingDefaults = DEFAULT_PROMPTS.filter(p => !dbSubcats.has(p.subcategory));
+          const merged = [...interiorPrompts, ...missingDefaults] as PromptTemplate[];
+          console.log(`✅ Loaded ${interiorPrompts.length} DB prompts + ${missingDefaults.length} defaults for missing categories`);
+          setPrompts(merged);
         }
       }
     } catch (error) {
