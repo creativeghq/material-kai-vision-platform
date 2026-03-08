@@ -302,9 +302,9 @@ function createAgentGraph(
       console.log('⚠️ Stream closed, continuing without streaming');
     }
 
-    // Invoke model
+    // Invoke model — force tool use only on the first iteration to avoid infinite tool loops
     const modelWithTools = tools.length > 0
-      ? model.bindTools(tools, forceToolCall ? { tool_choice: 'any' } : undefined)
+      ? model.bindTools(tools, (forceToolCall && state.iteration === 0) ? { tool_choice: 'any' } : undefined)
       : model;
     const invokeStartTime = Date.now();
 

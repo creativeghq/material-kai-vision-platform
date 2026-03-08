@@ -557,54 +557,51 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
           'grid-cols-2 md:grid-cols-4'
         }`}>
           {modelResults.map((result) => (
-            <div
-              key={result.model_id}
-              className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all"
-              onClick={() => handleImageClick(result)}
-            >
-              {result.status === 'pending' || result.status === 'processing' ? (
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 animate-pulse">
-                  <div className="absolute inset-0 opacity-30">
-                    <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-blue-200 rounded-full blur-3xl" />
-                    <div className="absolute bottom-1/4 right-1/4 w-1/3 h-1/3 bg-purple-200 rounded-full blur-2xl" />
+            <div key={result.model_id} className="flex flex-col gap-1.5">
+              <div
+                className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all"
+                onClick={() => handleImageClick(result)}
+              >
+                {result.status === 'pending' || result.status === 'processing' ? (
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 animate-pulse">
+                    <div className="absolute inset-0 opacity-30">
+                      <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-blue-200 rounded-full blur-3xl" />
+                      <div className="absolute bottom-1/4 right-1/4 w-1/3 h-1/3 bg-purple-200 rounded-full blur-2xl" />
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    </div>
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                ) : result.status === 'completed' && result.image_urls[0] ? (
+                  <>
+                    <img
+                      src={result.image_urls[0]}
+                      alt={result.model_name}
+                      className="w-full h-full object-cover animate-fade-in"
+                    />
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center opacity-0 hover:opacity-100">
+                      <ZoomIn className="w-8 h-8 text-white" />
+                    </div>
+                  </>
+                ) : result.status === 'failed' ? (
+                  <div className="absolute inset-0 bg-red-50 flex items-center justify-center">
+                    <div className="text-center p-4">
+                      <p className="text-red-600 text-sm font-medium">Failed</p>
+                      <p className="text-red-500 text-xs mt-1">{result.error}</p>
+                    </div>
                   </div>
-                </div>
-              ) : result.status === 'completed' && result.image_urls[0] ? (
-                <>
-                  <img
-                    src={result.image_urls[0]}
-                    alt={result.model_name}
-                    className="w-full h-full object-cover animate-fade-in"
-                  />
-                  <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center opacity-0 hover:opacity-100">
-                    <ZoomIn className="w-8 h-8 text-white" />
-                  </div>
-                </>
-              ) : result.status === 'failed' ? (
-                <div className="absolute inset-0 bg-red-50 flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <p className="text-red-600 text-sm font-medium">Failed</p>
-                    <p className="text-red-500 text-xs mt-1">{result.error}</p>
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {/* Model badge */}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2">
-                <p className="text-xs font-medium truncate">{result.model_name}</p>
-                <p className="text-xs text-gray-300">{result.provider}</p>
+                {result.status === 'completed' && (
+                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
               </div>
-
-              {result.status === 'completed' && (
-                <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+              {/* Model label below the image */}
+              <p className="text-xs font-medium text-center text-foreground truncate px-1 leading-tight">{result.model_name}</p>
             </div>
           ))}
         </div>
