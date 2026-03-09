@@ -644,7 +644,7 @@ export class QuotesService {
   /**
    * Update quote status tag
    */
-  async updateQuoteStatusTag(quoteId: string, statusTagId: string): Promise<Quote> {
+  async updateQuoteStatusTag(quoteId: string, statusTagId: string | null): Promise<Quote> {
     const { data: quote, error } = await supabase
       .from('quotes')
       .update({ status_tag_id: statusTagId })

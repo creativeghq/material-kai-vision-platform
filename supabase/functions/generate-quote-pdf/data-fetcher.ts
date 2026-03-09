@@ -35,6 +35,7 @@ export async function fetchQuoteData(
         id,
         name,
         sku,
+        description,
         metadata
       )
     `)
@@ -70,6 +71,7 @@ export async function fetchQuoteData(
     return {
       id: item.id,
       product_name: product?.name || 'Unknown Product',
+      description: product?.description || metadata?.description || null,
       sku: product?.sku || metadata?.sku || null,
       selected_size: item.selected_size || null,
       selected_color: item.selected_color || null,
@@ -209,9 +211,13 @@ export async function fetchTemplateConfig(
   const config = data.setting_value as Record<string, any>;
 
   return {
-    cover_image_path: config.cover_image_path || 'cover.png',
-    backcover_image_path: config.backcover_image_path || 'backcover.png',
-    items_background_path: config.items_background_path || 'items-background.png',
+    cover_image_path: config.first_page_path || config.cover_image_path || 'cover.png',
+    first_page_path: config.first_page_path || config.cover_image_path,
+    company_details_page_path: config.company_details_page_path,
+    content_page_path: config.content_page_path,
+    items_background_path: config.content_page_path || config.items_background_path || 'items-background.png',
+    backcover_image_path: config.last_page_path || config.backcover_image_path || 'backcover.png',
+    last_page_path: config.last_page_path || config.backcover_image_path,
     company_name: config.company_name || '',
     company_address: config.company_address || '',
     company_phone: config.company_phone || '',

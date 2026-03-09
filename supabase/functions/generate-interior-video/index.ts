@@ -64,9 +64,10 @@ async function deductCredits(
   credits: number,
   description: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc('deduct_credits', {
+  const { error } = await supabase.rpc('debit_user_credits', {
     p_user_id: userId,
     p_amount: credits,
+    p_operation_type: 'veo_generation',
     p_description: description,
   });
   if (error) throw new Error(`Credit deduction failed: ${error.message}`);

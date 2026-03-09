@@ -572,19 +572,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (!message || !currentConversationId) return;
 
     try {
-      // Save rating to database via message metadata update
+      // Find the actual DB row by conversation + timestamp proximity
+      // (local message IDs are not DB UUIDs, so we can't match by id directly)
+      const { data: dbMessages } = await supabase
+        .from('agent_chat_messages')
+        .select('id, metadata, created_at')
+        .eq('conversation_id', currentConversationId)
+        .eq('role', 'assistant')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const targetMs = message.timestamp.getTime();
+      const match = dbMessages?.reduce((best: any, row: any) => {
+        const diff = Math.abs(new Date(row.created_at).getTime() - targetMs);
+        const bestDiff = best ? Math.abs(new Date(best.created_at).getTime() - targetMs) : Infinity;
+        return diff < bestDiff ? row : best;
+      }, null);
+
+      if (!match) {
+        console.error('Rating: could not find matching DB message');
+        return;
+      }
+
       await supabase
         .from('agent_chat_messages')
         .update({
           metadata: {
-            ...(message as any).metadata,
+            ...(match.metadata || {}),
             rating: newRating,
             ratedAt: new Date().toISOString(),
           },
         })
-        .eq('conversation_id', currentConversationId)
-        .eq('content', message.content)
-        .eq('role', 'assistant');
+        .eq('id', match.id);
 
       toast({
         title: newRating ? (newRating === 'up' ? '👍 Thanks!' : '👎 Thanks for the feedback') : 'Rating removed',
@@ -690,25 +709,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const result = await res.json();
       if (!result.success) throw new Error(result.error || 'Video generation failed');
 
-      // Patch the source message to include videoData
-      setMessages(prev => prev.map(m => {
-        if (m.id !== sourceMessage.id) return m;
-        return {
-          ...m,
-          videoData: {
-            video_url: result.video_url,
-            job_id: result.job_id,
-            status: 'completed' as const,
-          },
-        };
-      }));
+      // Add a new chat message with the video (same pattern as VR world)
+      const videoMessage: Message = {
+        id: `video-${Date.now()}`,
+        role: 'assistant',
+        content: `Your video walkthrough is ready! ${result.credits_used} credits used.`,
+        timestamp: new Date(),
+        agentId: 'interior-designer',
+        videoData: {
+          video_url: result.video_url,
+          job_id: result.job_id,
+          status: 'completed' as const,
+        },
+      };
+
+      setMessages(prev => [...prev, videoMessage]);
+
+      if (currentConversationId) {
+        await agentChatHistoryService.saveMessage({
+          conversationId: currentConversationId,
+          role: 'assistant',
+          content: videoMessage.content,
+          metadata: { videoData: videoMessage.videoData },
+        });
+      }
 
       toast({ title: 'Video ready!', description: `${result.credits_used} credits used.` });
     } catch (error: any) {
       console.error('Video generation error:', error);
       toast({ title: 'Video generation failed', description: error.message, variant: 'destructive' });
     }
-  }, [workspaceId, toast]);
+  }, [workspaceId, currentConversationId, toast]);
 
   const handleSendMessage = useCallback(async () => {
     console.log('🎯 handleSendMessage CALLED');
@@ -1628,6 +1659,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
           worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
+          videoData: msg.metadata?.videoData as any | undefined, // Restore video data
           articleData: msg.metadata?.articleData as any | undefined, // Restore SEO article data
           virtualStagingData: msg.metadata?.virtualStagingData as any | undefined, // Restore virtual staging data
         })),
@@ -1887,7 +1919,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.virtualStagingData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-accent border border-accent-foreground/10 text-foreground shadow-sm'
                         : 'bg-white/40 border border-white/30 text-foreground backdrop-blur-sm shadow-sm'
@@ -1928,6 +1960,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           qualityAssessment={message.designData.qualityAssessment}
                           processingTimeMs={message.designData.processingTimeMs}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
                           onMaterialClick={(materialId) => {
                             console.log('Material clicked:', materialId);
                           }}
@@ -2053,6 +2086,27 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           Download
                         </Button>
                       </div>
+                    ) : message.videoData ? (
+                      <div className="space-y-3">
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <video
+                          src={message.videoData.video_url}
+                          controls
+                          autoPlay
+                          loop
+                          className="w-full rounded-xl border border-white/20 shadow-md"
+                          style={{ maxHeight: '480px' }}
+                        />
+                        <div className="flex gap-2">
+                          <a
+                            href={message.videoData.video_url}
+                            download
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 hover:bg-white/80 border border-white/30 rounded-full text-xs font-medium transition-colors"
+                          >
+                            Download Video
+                          </a>
+                        </div>
+                      </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
                         <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
@@ -2115,6 +2169,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                                 console.log('🖼️ Image clicked:', url, name);
                               }}
                               onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                              onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
                               onAskKAI={(segment) => {
                                 const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
                                 setInput(prompt);

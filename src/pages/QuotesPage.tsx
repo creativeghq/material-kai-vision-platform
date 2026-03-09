@@ -4,14 +4,14 @@ import {
   ShoppingCart,
   Plus,
   Loader2,
-  Clock,
-  CheckCircle,
-  XCircle,
-  FileText,
   Eye,
   Trash2,
   Filter,
+  FileText,
+  Clock,
+  CheckCircle,
 } from 'lucide-react';
+import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
@@ -80,27 +80,6 @@ export const QuotesPage: React.FC = () => {
     return true;
   });
 
-  // Get status badge styling
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
-      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
-      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
-      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 hover:bg-red-100' },
-      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    const Icon = config.icon;
-
-    return (
-      <Badge className={config.className}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status}
-      </Badge>
-    );
-  };
 
   // Handle quote click - navigate to detail page
   const handleViewQuote = (quoteId: string) => {
@@ -292,7 +271,7 @@ export const QuotesPage: React.FC = () => {
                       onClick={() => handleViewQuote(quote.id)}
                     >
                       <td className="px-6 py-2.5 font-medium">{quote.name || 'Untitled Quote'}</td>
-                      <td className="px-3 py-2.5">{getStatusBadge(quote.status)}</td>
+                      <td className="px-3 py-2.5"><QuoteStatusBadge status={quote.status} /></td>
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.expires_at).toLocaleDateString()}</td>

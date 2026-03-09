@@ -23,6 +23,7 @@ import {
   Search,
   Globe,
   Loader2,
+  Video,
 } from 'lucide-react';
 
 interface ModelResult {
@@ -71,6 +72,7 @@ interface DesignCanvasProps {
   onFindMaterials?: (imageUrl: string) => void;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   vrGenerating?: boolean;
+  onGenerateVideo?: (imageUrl: string) => void;
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -88,6 +90,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   onViewAllMaterials,
   onGenerateVR,
   vrGenerating,
+  onGenerateVideo,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
@@ -260,6 +263,21 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                       <Globe className="w-5 h-5" />
                     )}
                     <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
+                  </button>
+                )}
+
+                {/* Generate Video Button */}
+                {onGenerateVideo && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGenerateVideo(images[currentImageIndex]);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors shadow-lg"
+                    title="Generate video walkthrough with Veo (30 credits)"
+                  >
+                    <Video className="w-5 h-5" />
+                    <span className="font-medium">Generate Video</span>
                   </button>
                 )}
 

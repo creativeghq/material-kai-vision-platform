@@ -12,6 +12,9 @@ import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/ser
 import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
 import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { QuoteStatusBadge } from '@/lib/quoteStatus';
+import { QuoteDownloadButtons } from '@/components/quotes/QuoteDownloadButtons';
+import { useQuoteDocument } from '@/hooks/useQuoteDocument';
 
 /**
  * Customer-facing Quote Detail Page
@@ -30,6 +33,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [acceptingQuote, setAcceptingQuote] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [showAddProducts, setShowAddProducts] = useState(false);
+
+  const { data: docData } = useQuoteDocument(id || '');
 
   useEffect(() => {
     if (id) {
@@ -162,24 +167,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
-      submitted: { icon: FileText, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
-      quoted: { icon: CheckCircle, className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
-      accepted: { icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 hover:bg-red-100' },
-      expired: { icon: XCircle, className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
-    };
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    const Icon = config.icon;
-    return (
-      <Badge className={config.className}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status}
-      </Badge>
-    );
-  };
 
   const getTimelineStatusIcon = (status: string) => {
     switch (status) {
@@ -245,7 +232,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         subtitle={`Created ${new Date(quote.created_at).toLocaleDateString()} · Expires ${new Date(quote.expires_at).toLocaleDateString()}`}
         actions={
           <div className="flex items-center gap-3">
-            {getStatusBadge(quote.status)}
+            <QuoteStatusBadge status={quote.status} />
             {quote.status === 'draft' && (
               <Button
                 onClick={handleSubmitQuote}
@@ -273,6 +260,14 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 )}
                 Accept Quote
               </Button>
+            )}
+            {/* Preview & PDF download — available whenever the quote has items */}
+            {(quote.items?.length || quote.total_items || 0) > 0 && (
+              <QuoteDownloadButtons
+                quoteId={quote.id}
+                quoteNumber={quote.quote_number}
+                data={docData}
+              />
             )}
           </div>
         }
@@ -310,7 +305,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Status</p>
-                  {getStatusBadge(quote.status)}
+                  <QuoteStatusBadge status={quote.status} />
                 </div>
               </div>
             </div>

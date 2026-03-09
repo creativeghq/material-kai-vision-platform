@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  MinusCircle,
   RefreshCw,
   Clock,
   Zap,
@@ -550,6 +551,8 @@ export const SystemHealthMonitor: React.FC = () => {
                   </div>
                   {health.ai_services.claude?.status === 'healthy' ? (
                     <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : health.ai_services.claude?.error === 'API key not configured' ? (
+                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
                     <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
@@ -558,7 +561,7 @@ export const SystemHealthMonitor: React.FC = () => {
                   {health.ai_services.claude?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.claude.latency_ms}ms</span>
                   )}
-                  {health.ai_services.claude?.error && (
+                  {health.ai_services.claude?.error && health.ai_services.claude.error !== 'API key not configured' && (
                     <span className="text-red-600 truncate" title={health.ai_services.claude.error}>{health.ai_services.claude.error}</span>
                   )}
                 </div>
@@ -573,6 +576,8 @@ export const SystemHealthMonitor: React.FC = () => {
                   </div>
                   {health.ai_services.chatgpt?.status === 'healthy' ? (
                     <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : health.ai_services.chatgpt?.error === 'API key not configured' ? (
+                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
                     <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
@@ -581,7 +586,7 @@ export const SystemHealthMonitor: React.FC = () => {
                   {health.ai_services.chatgpt?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.chatgpt.latency_ms}ms</span>
                   )}
-                  {health.ai_services.chatgpt?.error && (
+                  {health.ai_services.chatgpt?.error && health.ai_services.chatgpt.error !== 'API key not configured' && (
                     <span className="text-red-600 truncate" title={health.ai_services.chatgpt.error}>{health.ai_services.chatgpt.error}</span>
                   )}
                 </div>
@@ -596,6 +601,8 @@ export const SystemHealthMonitor: React.FC = () => {
                   </div>
                   {health.ai_services.huggingface?.status === 'healthy' ? (
                     <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : health.ai_services.huggingface?.error === 'API key not configured' ? (
+                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
                     <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
@@ -607,7 +614,7 @@ export const SystemHealthMonitor: React.FC = () => {
                   {health.ai_services.huggingface?.message && health.ai_services.huggingface.status === 'healthy' && (
                     <span className="truncate">{health.ai_services.huggingface.message}</span>
                   )}
-                  {health.ai_services.huggingface?.error && (
+                  {health.ai_services.huggingface?.error && health.ai_services.huggingface.error !== 'API key not configured' && (
                     <span className="text-red-600 truncate" title={health.ai_services.huggingface.error}>{health.ai_services.huggingface.error}</span>
                   )}
                 </div>
@@ -622,6 +629,8 @@ export const SystemHealthMonitor: React.FC = () => {
                   </div>
                   {health.ai_services.voyage_ai?.status === 'healthy' ? (
                     <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : health.ai_services.voyage_ai?.error === 'API key not configured' ? (
+                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
                     <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
@@ -630,7 +639,7 @@ export const SystemHealthMonitor: React.FC = () => {
                   {health.ai_services.voyage_ai?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.voyage_ai.latency_ms}ms</span>
                   )}
-                  {health.ai_services.voyage_ai?.error && (
+                  {health.ai_services.voyage_ai?.error && health.ai_services.voyage_ai.error !== 'API key not configured' && (
                     <span className="text-red-600 truncate" title={health.ai_services.voyage_ai.error}>{health.ai_services.voyage_ai.error}</span>
                   )}
                 </div>
@@ -644,6 +653,8 @@ export const SystemHealthMonitor: React.FC = () => {
                 </div>
                 {health.ai_services.embeddings?.status === 'healthy' ? (
                   <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                ) : health.ai_services.embeddings?.error === 'API key not configured' ? (
+                  <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                 ) : (
                   <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
@@ -657,6 +668,8 @@ export const SystemHealthMonitor: React.FC = () => {
                 </div>
                 {health.ai_services.ai_services?.status === 'healthy' ? (
                   <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                ) : health.ai_services.ai_services?.error === 'API key not configured' ? (
+                  <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                 ) : (
                   <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}

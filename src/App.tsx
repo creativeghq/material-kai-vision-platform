@@ -47,6 +47,7 @@ const CreditPackagesPage = lazy(() => import('./components/business/billing/Cred
 const QuoteRequestsPage = lazy(() => import('./components/business/quotes/QuoteRequestsPage').then(m => ({ default: m.QuoteRequestsPage })));
 const QuotesPage = lazy(() => import('./pages/QuotesPage').then(m => ({ default: m.QuotesPage })));
 const QuoteDetailCustomerPage = lazy(() => import('./pages/QuoteDetailCustomerPage').then(m => ({ default: m.QuoteDetailCustomerPage })));
+const QuotePreviewPage = lazy(() => import('./pages/QuotePreviewPage').then(m => ({ default: m.QuotePreviewPage })));
 
 // CRM detail pages
 const ContactDetailPage = lazy(() => import('./pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
@@ -592,6 +593,15 @@ const App = () => (
                       <Layout>
                         <QuoteDetailCustomerPage />
                       </Layout>
+                    </AuthGuard>
+                  }
+                />
+                {/* Quote preview — full-screen, no Layout chrome */}
+                <Route
+                  path="/quotes/:id/preview"
+                  element={
+                    <AuthGuard>
+                      <QuotePreviewPage />
                     </AuthGuard>
                   }
                 />

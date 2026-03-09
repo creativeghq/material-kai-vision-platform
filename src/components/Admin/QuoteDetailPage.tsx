@@ -10,6 +10,9 @@ import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import { quotePDFService } from '@/services/quotes/QuotePDFService';
+import { QuoteDownloadButtons } from '@/components/quotes/QuoteDownloadButtons';
+import { useQuoteDocument } from '@/hooks/useQuoteDocument';
+import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
 import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
@@ -65,6 +68,9 @@ export const QuoteDetailPage: React.FC = () => {
   // PDF generation state
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  // HTML/client-side PDF — hook must be at top level (before any early returns)
+  const { data: docData } = useQuoteDocument(id || '');
 
   useEffect(() => {
     if (id) {
@@ -402,7 +408,8 @@ export const QuoteDetailPage: React.FC = () => {
 
     try {
       setUpdatingStatus(true);
-      await quotesService.updateQuoteStatusTag(quote.id, tagId);
+      // '__none__' is the sentinel value for clearing the tag
+      await quotesService.updateQuoteStatusTag(quote.id, tagId === '__none__' ? null : tagId);
       await loadQuoteDetails();
       toast({
         title: 'Success',
@@ -430,17 +437,6 @@ export const QuoteDetailPage: React.FC = () => {
     });
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      draft: 'bg-gray-100 text-gray-700 border-gray-300',
-      submitted: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-      quoted: 'bg-purple-100 text-purple-700 border-purple-300',
-      accepted: 'bg-green-100 text-green-700 border-green-300',
-      rejected: 'bg-red-100 text-red-700 border-red-300',
-      expired: 'bg-gray-100 text-gray-600 border-gray-300',
-    };
-    return colors[status as keyof typeof colors] || colors.draft;
-  };
 
   if (loading) {
     return (
@@ -502,6 +498,13 @@ export const QuoteDetailPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-3">
+            {/* HTML Preview + client-side PDF (always available) */}
+            <QuoteDownloadButtons
+              quoteId={quote.id}
+              quoteNumber={quote.quote_number}
+              data={docData}
+            />
+
             {/* PDF Actions */}
             {quote.pdf_storage_path && quote.pdf_generation_status === 'completed' && (
               <>
@@ -539,9 +542,7 @@ export const QuoteDetailPage: React.FC = () => {
             </Button>
 
             {/* Quote Status Badge */}
-            <Badge className={`border ${getStatusColor(quote.status)}`}>
-              {quote.status}
-            </Badge>
+            <QuoteStatusBadge status={quote.status} />
 
             {/* Status Tag Selector */}
             <Select
@@ -549,24 +550,26 @@ export const QuoteDetailPage: React.FC = () => {
               onValueChange={handleStatusTagChange}
               disabled={updatingStatus}
             >
-              <SelectTrigger className="w-48 h-9 bg-white border-2">
-                {updatingStatus ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <SelectValue placeholder="Assign Status Tag">
-                    {selectedTag && (
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: selectedTag.color }}
-                        />
-                        <span className="truncate">{selectedTag.name}</span>
-                      </div>
-                    )}
-                  </SelectValue>
+              <SelectTrigger className="w-48 h-9 bg-white border-2 relative">
+                {updatingStatus && (
+                  <Loader2 className="h-4 w-4 animate-spin absolute left-3" />
                 )}
+                <SelectValue placeholder="Assign Status Tag">
+                  {selectedTag && (
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: selectedTag.color }}
+                      />
+                      <span className="truncate">{selectedTag.name}</span>
+                    </div>
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__">
+                  <span className="text-muted-foreground">No tag</span>
+                </SelectItem>
                 {statusTags.map((tag) => (
                   <SelectItem key={tag.id} value={tag.id}>
                     <div className="flex items-center gap-2">
@@ -1281,8 +1284,9 @@ export const QuoteDetailPage: React.FC = () => {
       {id && (
         <AddProductsSheet
           quoteId={id}
-          isOpen={isAddProductsOpen}
-          onClose={() => setIsAddProductsOpen(false)}
+          open={isAddProductsOpen}
+          onOpenChange={setIsAddProductsOpen}
+          existingProductIds={(quote?.items || []).map((i: any) => i.product_id).filter(Boolean)}
           onProductsAdded={loadQuoteDetails}
         />
       )}

@@ -351,6 +351,7 @@ export const OperationsDashboard: React.FC = () => {
   const [extServiceData, setExtServiceData] = useState<ExternalServiceUsageData | null>(null);
   const [extServicePeriod, setExtServicePeriod] = useState('7d');
   const [extServiceLoading, setExtServiceLoading] = useState(false);
+  const [svcAllTimeTotals, setSvcAllTimeTotals] = useState<Record<string, { operations: number; cost_usd: number }>>({});
   const { toast } = useToast();
 
 
@@ -582,11 +583,32 @@ export const OperationsDashboard: React.FC = () => {
           return;
         }
       } else if (aiLogs) {
-        console.log('✅ AI Usage Logs:', aiLogs.length);
-        setAIUsageLogs(aiLogs);
+        // Also fetch agent_usage_logs (agent chat usage — stored separately by log_agent_usage RPC)
+        const { data: agentLogs } = await supabase
+          .from('agent_usage_logs')
+          .select('id, user_id, agent_type, model_name, input_tokens, output_tokens, billed_cost_usd, raw_cost_usd, credits_debited, created_at')
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        // Normalize agent_usage_logs rows to AIUsageLog shape and merge
+        const normalizedAgentLogs: AIUsageLog[] = (agentLogs || []).map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id,
+          operation_type: `agent_chat:${row.agent_type || 'kai'}`,
+          model_name: row.model_name,
+          input_tokens: row.input_tokens || 0,
+          output_tokens: row.output_tokens || 0,
+          total_cost_usd: row.billed_cost_usd || 0,
+          credits_debited: row.credits_debited || 0,
+          created_at: row.created_at,
+        }));
+
+        const combinedLogs: AIUsageLog[] = [...aiLogs, ...normalizedAgentLogs];
+        console.log(`✅ AI Usage Logs: ${aiLogs.length} from ai_usage_logs + ${normalizedAgentLogs.length} from agent_usage_logs`);
+        setAIUsageLogs(combinedLogs);
 
         // Calculate total credits used
-        const totalCreditsUsed = aiLogs.reduce((sum: number, log: AIUsageLog) => sum + (log.credits_debited || 0), 0);
+        const totalCreditsUsed = combinedLogs.reduce((sum: number, log: AIUsageLog) => sum + (log.credits_debited || 0), 0);
 
         setSubscriptionStats(prev => ({
           ...prev,
@@ -604,7 +626,7 @@ export const OperationsDashboard: React.FC = () => {
           success_count: number;
         }> = {};
 
-        aiLogs.forEach((log: AIUsageLog) => {
+        combinedLogs.forEach((log: AIUsageLog) => {
           const model = log.model_name || 'unknown';
           if (!modelStats[model]) {
             modelStats[model] = {
@@ -834,6 +856,31 @@ export const OperationsDashboard: React.FC = () => {
     fetchExtServiceUsage(extServicePeriod);
   }, [extServicePeriod, fetchExtServiceUsage]);
 
+  // Fetch all-time totals per external service from ai_usage_logs
+  useEffect(() => {
+    const SERVICE_KEYS = [
+      'twilio-sms', 'twilio-whatsapp',
+      'apollo-enrich', 'apollo-people-match',
+      'hunter-email-finder', 'hunter-domain-search',
+      'zerobounce-validate', 'firecrawl-scrape',
+    ];
+    supabase
+      .from('ai_usage_logs')
+      .select('model_name, total_cost_usd')
+      .in('model_name', SERVICE_KEYS)
+      .then(({ data }) => {
+        if (!data) return;
+        const totals: Record<string, { operations: number; cost_usd: number }> = {};
+        data.forEach((row: any) => {
+          const key = row.model_name;
+          if (!totals[key]) totals[key] = { operations: 0, cost_usd: 0 };
+          totals[key].operations += 1;
+          totals[key].cost_usd += Number(row.total_cost_usd) || 0;
+        });
+        setSvcAllTimeTotals(totals);
+      });
+  }, []);
+
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return 'text-green-600';
     if (status >= 400 && status < 500) return 'text-yellow-600';
@@ -976,7 +1023,7 @@ export const OperationsDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {/* Summary Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                   <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
                     <div className="text-sm text-slate-600">Total Chats</div>
                     <div className="text-2xl font-bold text-slate-900">{agentChats.length}</div>
@@ -995,9 +1042,27 @@ export const OperationsDashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
-                    <div className="text-sm text-green-700">Positive Ratings</div>
+                    <div className="text-sm text-green-700 flex items-center gap-1">
+                      <ThumbsUp className="h-3.5 w-3.5" /> Positive Ratings
+                    </div>
                     <div className="text-2xl font-bold text-green-600">
                       {agentChats.filter((c) => c.metadata?.rating === 'up').length}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {agentChats.filter((c) => c.metadata?.rating).length > 0
+                        ? `${Math.round(agentChats.filter((c) => c.metadata?.rating === 'up').length / agentChats.filter((c) => c.metadata?.rating).length * 100)}% approval`
+                        : 'No ratings yet'}
+                    </div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-red-200 shadow-sm">
+                    <div className="text-sm text-red-700 flex items-center gap-1">
+                      <ThumbsDown className="h-3.5 w-3.5" /> Negative Ratings
+                    </div>
+                    <div className="text-2xl font-bold text-red-600">
+                      {agentChats.filter((c) => c.metadata?.rating === 'down').length}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Needs improvement
                     </div>
                   </div>
                   <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
@@ -1154,137 +1219,86 @@ export const OperationsDashboard: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* Services & Billing Tab (merged from External Services + Subscriptions) */}
+          {/* Services & Billing Tab — 3rd Party API Services */}
           <TabsContent value="services-billing" className="space-y-6">
-            {/* Subscription Overview */}
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Services & Billing</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-1">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Subscription revenue, user credit balances, and external service usage across Twilio, Apollo, Hunter, ZeroBounce, and Firecrawl.
+                Live usage and cost tracking for all external APIs: Twilio, Apollo, Hunter.io, ZeroBounce, and Firecrawl. For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
             </div>
 
-            {/* Subscription Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Crown className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Pro Subscribers</div>
-                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.proUsers}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of {subscriptionStats.totalUsers} users
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Monthly Revenue</div>
-                    <div className="text-2xl font-bold text-foreground">${subscriptionStats.totalRevenue}</div>
-                    <div className="text-xs text-muted-foreground mt-1">From Pro subscriptions</div>
-                  </div>
-                </div>
-              </div>
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Zap className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">AI Credits Used</div>
-                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.totalCreditsUsed.toFixed(1)}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Across all users</div>
-                  </div>
-                </div>
-              </div>
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Ext. Service Credits</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {extServiceData?.summary.total_credits.toFixed(1) || '0.0'}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {extServiceData?.summary.total_operations || 0} operations
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* User Subscriptions Table */}
+            {/* API Catalogue — static reference */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  User Subscriptions & Credit Balances
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Globe className="h-4 w-4" />
+                  Configured API Services
                 </CardTitle>
-                <CardDescription>All users with subscription tier, status, and current credit balance</CardDescription>
+                <CardDescription>All 3rd party integrations active on this platform and their per-unit pricing</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">Email</TableHead>
-                      <TableHead className="font-semibold">Subscription</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="text-right font-semibold">Credits Balance</TableHead>
-                      <TableHead className="font-semibold">Joined</TableHead>
+                      <TableHead className="font-semibold">Service</TableHead>
+                      <TableHead className="font-semibold">Category</TableHead>
+                      <TableHead className="font-semibold">Unit</TableHead>
+                      <TableHead className="text-right font-semibold">Cost / Unit</TableHead>
+                      <TableHead className="text-right font-semibold">Billed / Unit</TableHead>
+                      <TableHead className="text-right font-semibold">Total Ops</TableHead>
+                      <TableHead className="text-right font-semibold">Total Spend</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userProfiles.slice(0, 20).map((profile) => (
-                      <TableRow key={profile.id}>
-                        <TableCell className="font-medium">{profile.email}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              profile.subscription_tier === 'pro'
-                                ? 'bg-blue-500'
-                                : 'bg-gray-500'
-                            }
-                          >
-                            {profile.subscription_tier || 'free'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={profile.subscription_status === 'active' ? 'default' : 'secondary'}
-                          >
-                            {profile.subscription_status || 'inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          {(profile.credits_balance || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-500">
-                          {new Date(profile.created_at).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {[
+                      { key: 'twilio-sms',            label: 'Twilio SMS',           category: 'Messaging',    unit: 'message', raw: 0.0079, billed: 0.01185 },
+                      { key: 'twilio-whatsapp',       label: 'Twilio WhatsApp',      category: 'Messaging',    unit: 'message', raw: 0.005,  billed: 0.0075 },
+                      { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact', raw: 0.05,   billed: 0.075 },
+                      { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',   raw: 0.02,   billed: 0.03 },
+                      { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',   raw: 0.01,   billed: 0.015 },
+                      { key: 'hunter-domain-search',  label: 'Hunter Domain Search', category: 'B2B Data',     unit: 'search',  raw: 0.01,   billed: 0.015 },
+                      { key: 'zerobounce-validate',   label: 'ZeroBounce Validate',  category: 'Email',        unit: 'email',   raw: 0.008,  billed: 0.012 },
+                      { key: 'firecrawl-scrape',      label: 'Firecrawl Scrape',     category: 'Web Scraping', unit: 'page',    raw: 0.001,  billed: 0.0015 },
+                    ].map((svc) => {
+                      const allTime = svcAllTimeTotals[svc.key];
+                      return (
+                        <TableRow key={svc.key}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-4 w-4 text-blue-600" />
+                              {svc.label}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{svc.category}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">per {svc.unit}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">${svc.raw.toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${svc.billed.toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {allTime ? allTime.operations.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            {allTime ? (
+                              <span className={allTime.cost_usd > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+                                ${allTime.cost_usd.toFixed(4)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
-                {userProfiles.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No user profiles found.
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* External Service Usage Section */}
+            {/* Live Usage Section */}
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">External Service Usage</h3>
+              <h3 className="text-lg font-semibold text-foreground">Live Usage</h3>
               <div className="flex items-center gap-2">
                 {(['1h', '24h', '7d', '30d'] as const).map((period) => (
                   <Button
@@ -1308,16 +1322,16 @@ export const OperationsDashboard: React.FC = () => {
             </div>
 
             {extServiceLoading && !extServiceData ? (
-              <div className="flex items-center justify-center h-64 text-muted-foreground">
+              <div className="flex items-center justify-center h-40 text-muted-foreground">
                 <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-                Loading external service data...
+                Loading usage data...
               </div>
             ) : !extServiceData || extServiceData.summary.total_operations === 0 ? (
               <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <Globe className="h-12 w-12 mb-4 opacity-30" />
-                  <p className="text-lg font-medium">No external service usage yet</p>
-                  <p className="text-sm">Usage data will appear here once B2B tools, messaging, or web scraping services are used.</p>
+                <CardContent className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                  <Activity className="h-10 w-10 mb-3 opacity-30" />
+                  <p className="font-medium">No usage in this period</p>
+                  <p className="text-sm mt-1">Activity will appear once B2B, messaging, or scraping tools are invoked.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -1327,16 +1341,14 @@ export const OperationsDashboard: React.FC = () => {
                   <div className="dashboard-card">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                        <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                        <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                       </div>
                       <div>
-                        <div className="text-sm text-muted-foreground font-medium">Total Credits</div>
+                        <div className="text-sm text-muted-foreground font-medium">Total Cost</div>
                         <div className="text-2xl font-bold text-foreground">
-                          {extServiceData.summary.total_credits.toFixed(1)}
+                          ${extServiceData.summary.total_cost_usd.toFixed(4)}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          ${extServiceData.summary.total_cost_usd.toFixed(4)} billed
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Billed to platform</div>
                       </div>
                     </div>
                   </div>
@@ -1352,7 +1364,7 @@ export const OperationsDashboard: React.FC = () => {
                           {extServiceData.summary.total_operations.toLocaleString()}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {extServiceData.by_service.length} services active
+                          Across {extServiceData.by_service.length} services
                         </div>
                       </div>
                     </div>
@@ -1364,14 +1376,14 @@ export const OperationsDashboard: React.FC = () => {
                         <TrendingUp className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                       </div>
                       <div>
-                        <div className="text-sm text-muted-foreground font-medium">Most Used Service</div>
+                        <div className="text-sm text-muted-foreground font-medium">Most Used</div>
                         <div className="text-2xl font-bold text-foreground">
                           {extServiceData.by_service[0]
                             ? (EXT_SERVICE_LABELS[extServiceData.by_service[0].service] || extServiceData.by_service[0].service)
                             : 'N/A'}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {extServiceData.by_service[0]?.operations || 0} operations
+                          {extServiceData.by_service[0]?.operations || 0} ops
                         </div>
                       </div>
                     </div>
@@ -1380,18 +1392,16 @@ export const OperationsDashboard: React.FC = () => {
                   <div className="dashboard-card">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                        <Users className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                        <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                       </div>
                       <div>
-                        <div className="text-sm text-muted-foreground font-medium">Top User</div>
+                        <div className="text-sm text-muted-foreground font-medium">Avg Cost / Op</div>
                         <div className="text-2xl font-bold text-foreground">
-                          {extServiceData.by_user[0]
-                            ? `${extServiceData.by_user[0].total_credits.toFixed(1)} cr`
-                            : 'N/A'}
+                          ${extServiceData.summary.total_operations > 0
+                            ? (extServiceData.summary.total_cost_usd / extServiceData.summary.total_operations).toFixed(5)
+                            : '0.00000'}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {extServiceData.by_user[0]?.operations || 0} operations
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Across all services</div>
                       </div>
                     </div>
                   </div>
@@ -1399,14 +1409,13 @@ export const OperationsDashboard: React.FC = () => {
 
                 {/* Charts Row */}
                 <div className="grid gap-6 md:grid-cols-2">
-                  {/* Cost Breakdown Pie Chart */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <DollarSign className="h-4 w-4" />
-                        Credit Breakdown by Service
+                        Cost Breakdown by Service
                       </CardTitle>
-                      <CardDescription>Distribution of credits consumed per service</CardDescription>
+                      <CardDescription>Distribution of spend per service in this period</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={280}>
@@ -1416,48 +1425,36 @@ export const OperationsDashboard: React.FC = () => {
                               ...s,
                               label: EXT_SERVICE_LABELS[s.service] || s.service,
                             }))}
-                            dataKey="credits"
+                            dataKey="cost_usd"
                             nameKey="label"
                             cx="50%"
                             cy="50%"
                             outerRadius={100}
-                            label={({ label, percent }) =>
-                              `${label} (${(percent * 100).toFixed(0)}%)`
-                            }
+                            label={({ label, percent }) => `${label} (${(percent * 100).toFixed(0)}%)`}
                           >
                             {extServiceData.by_service.map((_, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={EXT_SERVICE_COLORS[index % EXT_SERVICE_COLORS.length]}
-                              />
+                              <Cell key={`cell-${index}`} fill={EXT_SERVICE_COLORS[index % EXT_SERVICE_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip
-                            formatter={(value: number) => [`${value.toFixed(2)} credits`, 'Credits']}
-                          />
+                          <Tooltip formatter={(value: number) => [`$${value.toFixed(5)}`, 'Cost (USD)']} />
                         </PieChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
 
-                  {/* Timeline Bar Chart */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <BarChart3 className="h-4 w-4" />
                         Daily Usage Timeline
                       </CardTitle>
-                      <CardDescription>Credits consumed and operations per day</CardDescription>
+                      <CardDescription>Operations and cost per day</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={extServiceData.timeline}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="date"
-                            tickFormatter={(d: string) => d.slice(5)}
-                            fontSize={12}
-                          />
+                          <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} fontSize={12} />
                           <YAxis yAxisId="left" fontSize={12} />
                           <YAxis yAxisId="right" orientation="right" fontSize={12} />
                           <Tooltip
@@ -1482,7 +1479,7 @@ export const OperationsDashboard: React.FC = () => {
                       <Globe className="h-4 w-4" />
                       Per-Service Breakdown
                     </CardTitle>
-                    <CardDescription>Detailed usage and cost metrics per external service</CardDescription>
+                    <CardDescription>Detailed usage and cost per external service in the selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -1490,9 +1487,8 @@ export const OperationsDashboard: React.FC = () => {
                         <TableRow>
                           <TableHead className="font-semibold">Service</TableHead>
                           <TableHead className="text-right font-semibold">Operations</TableHead>
-                          <TableHead className="text-right font-semibold">Credits</TableHead>
                           <TableHead className="text-right font-semibold">Cost (USD)</TableHead>
-                          <TableHead className="text-right font-semibold">Avg Credits/Op</TableHead>
+                          <TableHead className="text-right font-semibold">Avg Cost / Op</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1502,24 +1498,17 @@ export const OperationsDashboard: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <Globe className="h-4 w-4 text-blue-600" />
                                 <span>{EXT_SERVICE_LABELS[svc.service] || svc.service}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {svc.service}
-                                </Badge>
+                                <Badge variant="outline" className="text-xs">{svc.service}</Badge>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
                               {svc.operations.toLocaleString()}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-sm font-semibold text-blue-600">
-                              {svc.credits.toFixed(2)}
+                            <TableCell className="text-right font-mono text-sm font-semibold">
+                              ${svc.cost_usd.toFixed(5)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              ${svc.cost_usd.toFixed(4)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-600">
-                              {svc.operations > 0
-                                ? (svc.credits / svc.operations).toFixed(3)
-                                : '0.000'}
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                              ${svc.operations > 0 ? (svc.cost_usd / svc.operations).toFixed(5) : '0.00000'}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1527,63 +1516,6 @@ export const OperationsDashboard: React.FC = () => {
                     </Table>
                   </CardContent>
                 </Card>
-
-                {/* Per-User Table */}
-                {extServiceData.by_user.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Users className="h-4 w-4" />
-                        Top Users by External Service Credits
-                      </CardTitle>
-                      <CardDescription>Top 20 users by credit consumption on external services</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="font-semibold">User ID</TableHead>
-                            <TableHead className="text-right font-semibold">Operations</TableHead>
-                            <TableHead className="text-right font-semibold">Credits Used</TableHead>
-                            <TableHead className="text-right font-semibold">Share</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {extServiceData.by_user.map((user) => (
-                            <TableRow key={user.user_id}>
-                              <TableCell className="font-mono text-sm">
-                                {user.user_id.slice(0, 8)}...
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {user.operations.toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm font-semibold text-blue-600">
-                                {user.total_credits.toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Progress
-                                    value={
-                                      extServiceData.summary.total_credits > 0
-                                        ? (user.total_credits / extServiceData.summary.total_credits) * 100
-                                        : 0
-                                    }
-                                    className="w-16 h-2"
-                                  />
-                                  <span className="text-xs text-muted-foreground w-10 text-right">
-                                    {extServiceData.summary.total_credits > 0
-                                      ? ((user.total_credits / extServiceData.summary.total_credits) * 100).toFixed(0)
-                                      : 0}%
-                                  </span>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                )}
               </>
             )}
           </TabsContent>

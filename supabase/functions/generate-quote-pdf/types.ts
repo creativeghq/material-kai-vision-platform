@@ -33,6 +33,7 @@ export interface QuoteData {
 export interface QuoteItemData {
   id: string;
   product_name: string;
+  description: string | null;
   sku: string | null;
   selected_size: string | null;
   selected_color: string | null;
@@ -56,9 +57,20 @@ export interface ClientData {
 }
 
 export interface TemplateConfig {
+  /** Legacy key: cover page image path */
   cover_image_path: string;
-  backcover_image_path: string;
+  /** Alias: first page image path */
+  first_page_path?: string;
+  /** Company / client details page background image */
+  company_details_page_path?: string;
+  /** Items / content pages background image */
+  content_page_path?: string;
+  /** Alias: items background image path */
   items_background_path: string;
+  /** Legacy key: back cover image path */
+  backcover_image_path: string;
+  /** Alias: last page image path */
+  last_page_path?: string;
   company_name: string;
   company_address: string;
   company_phone: string;
