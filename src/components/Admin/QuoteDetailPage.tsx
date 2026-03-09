@@ -503,6 +503,7 @@ export const QuoteDetailPage: React.FC = () => {
               quoteId={quote.id}
               quoteNumber={quote.quote_number}
               data={docData}
+              headerMode
             />
 
             {/* PDF Actions */}

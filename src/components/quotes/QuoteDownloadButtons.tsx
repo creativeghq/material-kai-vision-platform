@@ -25,6 +25,8 @@ interface QuoteDownloadButtonsProps {
   data?: QuoteDocumentData | null;
   /** Called when the user clicks "Open Preview" — defaults to window.open */
   onPreview?: () => void;
+  /** When true, applies glass/white-tinted styling for use on dark primary headers */
+  headerMode?: boolean;
 }
 
 export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
@@ -32,6 +34,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
   quoteNumber,
   data,
   onPreview,
+  headerMode = false,
 }) => {
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
@@ -118,6 +121,9 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
           variant="outline"
           size="sm"
           onClick={handlePreview}
+          className={headerMode
+            ? 'rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20 hover:text-white'
+            : 'rounded-full'}
         >
           <Eye className="h-4 w-4 mr-2" />
           Preview
@@ -129,6 +135,9 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
           onClick={handleDownloadPDF}
           disabled={!data || generating}
           title={!data ? 'Loading quote data…' : undefined}
+          className={headerMode
+            ? 'rounded-full bg-white/20 hover:bg-white/30 text-white border border-white/20 hover:text-white disabled:opacity-40'
+            : 'rounded-full'}
         >
           {generating ? (
             <>

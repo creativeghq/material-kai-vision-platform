@@ -267,6 +267,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 quoteId={quote.id}
                 quoteNumber={quote.quote_number}
                 data={docData}
+                headerMode
               />
             )}
           </div>

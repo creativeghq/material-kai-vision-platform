@@ -95,7 +95,7 @@ export function useQuoteDocument(quoteId: string) {
           .from('quote_items')
           .select(`
             id, quantity, notes, selected_size, selected_color, unit_price, line_total,
-            products ( id, name, sku, description, metadata )
+            products ( id, name, metadata )
           `)
           .eq('quote_id', quoteId)
           .order('added_at', { ascending: true });
@@ -108,8 +108,8 @@ export function useQuoteDocument(quoteId: string) {
           return {
             id: item.id,
             product_name: product?.name || 'Unknown Product',
-            description: product?.description || meta.description || null,
-            sku: product?.sku || meta.sku || null,
+            description: meta.description || null,
+            sku: meta.sku || null,
             quantity: item.quantity,
             unit: meta.unit || 'pcs',
             unit_price: parseFloat(item.unit_price) || 0,
