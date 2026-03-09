@@ -444,7 +444,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 }
               }}
               editable={quote.status === 'draft'}
-              variant="compact"
+              editPricing={false}
             />
           </TabsContent>
 

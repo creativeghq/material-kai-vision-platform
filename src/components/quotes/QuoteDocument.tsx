@@ -23,7 +23,7 @@ export const PAGE_PX_H = 3508;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 6;
 
 const PAGE_STYLE: React.CSSProperties = {
   width: PAGE_PX_W,
@@ -156,10 +156,11 @@ const IntroPage: React.FC<{ bgUrl: string | null }> = ({ bgUrl }) => (
 
 const COL_WIDTHS = {
   num: '4%',
-  product: '44%',
-  qty: '9%',
-  unitPrice: '20%',
-  total: '21%',
+  product: '36%',
+  qty: '8%',
+  unitPrice: '16%',
+  discPrice: '16%',
+  total: '18%',
 };
 
 const ItemsPage: React.FC<{
@@ -179,7 +180,7 @@ const ItemsPage: React.FC<{
       */}
       <div style={{
         position: 'absolute',
-        top: 251, left: 351, right: 351, bottom: 201,
+        top: 251, left: 351, right: 351, bottom: 351,
         display: 'flex',
         flexDirection: 'column',
       }}>
@@ -193,18 +194,19 @@ const ItemsPage: React.FC<{
         )}
 
         {/* Table — transparent rows so background image shows through */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', flex: 1 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: COL_WIDTHS.num }} />
             <col style={{ width: COL_WIDTHS.product }} />
             <col style={{ width: COL_WIDTHS.qty }} />
             <col style={{ width: COL_WIDTHS.unitPrice }} />
+            <col style={{ width: COL_WIDTHS.discPrice }} />
             <col style={{ width: COL_WIDTHS.total }} />
           </colgroup>
 
           <thead>
             <tr style={{ backgroundColor: C.tableHeader }}>
-              {['#', 'Product', 'Qty', 'Unit Price', 'Total'].map((h, i) => (
+              {['#', 'Product', 'Qty', 'Unit Price', 'Disc. Price', 'Total'].map((h, i) => (
                 <th
                   key={h}
                   style={{
@@ -212,7 +214,7 @@ const ItemsPage: React.FC<{
                     fontSize: 65,
                     fontWeight: 700,
                     color: C.white,
-                    textAlign: i >= 2 ? 'right' : 'left',
+                    textAlign: i >= 2 ? 'right' : 'left' as React.CSSProperties['textAlign'],
                     letterSpacing: 4,
                     textTransform: 'uppercase',
                   }}
@@ -260,8 +262,14 @@ const ItemsPage: React.FC<{
                     {item.quantity} {item.unit}
                   </td>
                   {/* Unit Price */}
-                  <td style={{ padding: '35px 60px', fontSize: 65, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
-                    {fmt(item.unit_price, data.currency)}
+                  <td style={{ padding: '35px 60px', fontSize: 65, color: item.discounted_price != null ? C.gray : C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                    {item.discounted_price != null ? (
+                      <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{fmt(item.unit_price, data.currency)}</span>
+                    ) : fmt(item.unit_price, data.currency)}
+                  </td>
+                  {/* Disc. Price */}
+                  <td style={{ padding: '35px 60px', fontSize: 65, color: item.discounted_price != null ? C.primary : C.gray, textAlign: 'right', verticalAlign: 'top', opacity: item.discounted_price != null ? 1 : 0.3 }}>
+                    {item.discounted_price != null ? fmt(item.discounted_price, data.currency) : '—'}
                   </td>
                   {/* Total */}
                   <td style={{ padding: '35px 60px', fontSize: 65, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>

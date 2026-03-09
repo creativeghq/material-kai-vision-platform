@@ -9,6 +9,7 @@ export interface QuoteDocumentItem {
   quantity: number;
   unit: string;
   unit_price: number;
+  discounted_price: number | null;
   line_total: number;
   selected_size: string | null;
   selected_color: string | null;
@@ -95,7 +96,8 @@ export function useQuoteDocument(quoteId: string) {
         const { data: rawItems, error: iErr } = await supabase
           .from('quote_items')
           .select(`
-            id, quantity, notes, selected_size, selected_color, unit_price, line_total,
+            id, quantity, notes, selected_size, selected_color, unit_price, discounted_price, line_total,
+            custom_product_name, custom_product_description, custom_sku, custom_unit,
             products ( id, name, metadata )
           `)
           .eq('quote_id', quoteId)
@@ -106,14 +108,20 @@ export function useQuoteDocument(quoteId: string) {
         const items: QuoteDocumentItem[] = (rawItems || []).map((item: any) => {
           const product = item.products;
           const meta = product?.metadata || {};
+          const isCustom = !product;
           return {
             id: item.id,
-            product_name: product?.name || 'Unknown Product',
-            description: meta.description || null,
-            sku: meta.sku || null,
+            product_name: isCustom
+              ? (item.custom_product_name || 'Custom Item')
+              : (product?.name || 'Unknown Product'),
+            description: isCustom
+              ? (item.custom_product_description || null)
+              : (meta.description || null),
+            sku: isCustom ? (item.custom_sku || null) : (meta.sku || null),
             quantity: item.quantity,
-            unit: meta.unit || 'pcs',
+            unit: isCustom ? (item.custom_unit || 'pcs') : (meta.unit || 'pcs'),
             unit_price: parseFloat(item.unit_price) || 0,
+            discounted_price: item.discounted_price != null ? parseFloat(item.discounted_price) : null,
             line_total: parseFloat(item.line_total) || 0,
             selected_size: item.selected_size || null,
             selected_color: item.selected_color || null,

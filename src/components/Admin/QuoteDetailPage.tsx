@@ -767,11 +767,16 @@ export const QuoteDetailPage: React.FC = () => {
                 await quotesService.updateItem(itemId, { quantity });
                 await loadQuoteDetails();
               } : undefined}
+              onUpdateItem={quote.status === 'draft' ? async (itemId, data) => {
+                await quotesService.updateItem(itemId, data);
+                await loadQuoteDetails();
+              } : undefined}
               onRemoveItem={async (itemId) => {
                 await quotesService.removeItem(itemId);
                 await loadQuoteDetails();
               }}
               editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
+              editPricing={quote.status === 'draft'}
             />
           </TabsContent>
 

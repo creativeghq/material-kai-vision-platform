@@ -36,15 +36,21 @@ export interface Quote {
 export interface QuoteItem {
   id: string;
   quote_id: string;
-  product_id: string;
+  product_id: string | null;
   quantity: number;
   notes?: string;
   added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page';
   added_at: string;
   selected_size?: string;
   selected_color?: string;
+  // Custom product fields (when product_id is null)
+  custom_product_name?: string;
+  custom_product_description?: string;
+  custom_sku?: string;
+  custom_unit?: string;
   // Pricing fields
   unit_price?: number;
+  discounted_price?: number;
   line_total?: number;
 }
 
@@ -353,7 +359,7 @@ export class QuotesService {
   }
 
   /**
-   * Add item to quote
+   * Add item to quote (catalog product)
    */
   async addItem(data: {
     quote_id: string;
@@ -391,6 +397,47 @@ export class QuotesService {
   }
 
   /**
+   * Add a custom (non-catalog) item to quote
+   */
+  async addCustomItem(data: {
+    quote_id: string;
+    custom_product_name: string;
+    custom_product_description?: string;
+    custom_sku?: string;
+    custom_unit?: string;
+    unit_price?: number;
+    quantity?: number;
+    selected_size?: string;
+    selected_color?: string;
+    notes?: string;
+  }): Promise<QuoteItem> {
+    const qty = data.quantity || 1;
+    const unitPrice = data.unit_price ?? null;
+    const { data: item, error } = await supabase
+      .from('quote_items')
+      .insert({
+        quote_id: data.quote_id,
+        product_id: null,
+        custom_product_name: data.custom_product_name,
+        custom_product_description: data.custom_product_description || null,
+        custom_sku: data.custom_sku || null,
+        custom_unit: data.custom_unit || null,
+        quantity: qty,
+        unit_price: unitPrice,
+        line_total: unitPrice != null ? unitPrice * qty : null,
+        selected_size: data.selected_size || null,
+        selected_color: data.selected_color || null,
+        notes: data.notes || null,
+        added_from: 'manual',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return item;
+  }
+
+  /**
    * Update quote item
    */
   async updateItem(
@@ -400,11 +447,32 @@ export class QuotesService {
       notes?: string;
       selected_size?: string;
       selected_color?: string;
+      unit_price?: number | null;
+      discounted_price?: number | null;
+      custom_unit?: string;
     },
   ): Promise<QuoteItem> {
+    // Recalculate line_total when pricing or quantity changes
+    const payload: Record<string, any> = { ...data };
+    if (data.unit_price !== undefined || data.discounted_price !== undefined || data.quantity !== undefined) {
+      // Fetch current item to get missing values for recalculation
+      const { data: current } = await supabase
+        .from('quote_items')
+        .select('unit_price, discounted_price, quantity')
+        .eq('id', itemId)
+        .single();
+      if (current) {
+        const qty = data.quantity ?? current.quantity ?? 1;
+        const effectivePrice = data.discounted_price !== undefined
+          ? data.discounted_price
+          : (current.discounted_price ?? (data.unit_price !== undefined ? data.unit_price : current.unit_price));
+        payload.line_total = effectivePrice != null ? Number(effectivePrice) * qty : null;
+      }
+    }
+
     const { data: item, error } = await supabase
       .from('quote_items')
-      .update(data)
+      .update(payload)
       .eq('id', itemId)
       .select()
       .single();
