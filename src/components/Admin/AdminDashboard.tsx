@@ -323,6 +323,11 @@ const AdminDashboard: React.FC = () => {
                   <ExternalLink className="h-3 w-3 ml-auto" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/admin/system-settings')} className="flex items-center gap-2 cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  System Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <div className="px-2 py-1.5">
                   <ResetPlatformDialog />
                 </div>

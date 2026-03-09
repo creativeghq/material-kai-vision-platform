@@ -1,9 +1,10 @@
 /**
- * QuoteDocument — A4 landscape HTML renderer
+ * QuoteDocument — high-resolution HTML renderer
  *
- * Renders a complete quote as a stack of A4 landscape "pages" (297mm × 210mm).
+ * Pages render at 4961 × 3508 px (A4 landscape @ 300 DPI).
  * Each page has a full-bleed background image with content overlaid on top.
- * Used for both on-screen preview and PDF generation via html2canvas + jsPDF.
+ * Used for both on-screen preview (via CSS zoom) and PDF generation via
+ * html2canvas (scale: 1) + jsPDF.
  *
  * Page structure:
  *  1. First page      — pure background image
@@ -15,13 +16,19 @@
 import React, { forwardRef } from 'react';
 import { QuoteDocumentData, QuoteDocumentItem } from '@/hooks/useQuoteDocument';
 
+// ─── Output dimensions ────────────────────────────────────────────────────────
+
+/** Target page pixel dimensions — A4 landscape @ 300 DPI */
+export const PAGE_PX_W = 4961;
+export const PAGE_PX_H = 3508;
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ITEMS_PER_PAGE = 8;
 
 const PAGE_STYLE: React.CSSProperties = {
-  width: '297mm',
-  height: '210mm',
+  width: PAGE_PX_W,
+  height: PAGE_PX_H,
   position: 'relative',
   overflow: 'hidden',
   backgroundColor: '#ffffff',
@@ -34,7 +41,7 @@ const BG_STYLE: React.CSSProperties = {
   inset: 0,
   width: '100%',
   height: '100%',
-  objectFit: 'cover',
+  objectFit: 'fill',
   display: 'block',
 };
 
@@ -99,19 +106,19 @@ const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
 
   const field = (label: string, value: string | null) =>
     value ? (
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 7, color: C.gray, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 }}>
+      <div style={{ marginBottom: 27 }}>
+        <div style={{ fontSize: 31, color: C.gray, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
           {label}
         </div>
-        <div style={{ fontSize: 9.5, color: C.black, fontWeight: 600 }}>{value}</div>
+        <div style={{ fontSize: 42, color: C.black, fontWeight: 600 }}>{value}</div>
       </div>
     ) : null;
 
   const sectionLabel = (text: string) => (
     <div style={{
-      fontSize: 7.5, fontWeight: 700, color: C.primary,
-      textTransform: 'uppercase', letterSpacing: 1,
-      borderBottom: `1px solid ${C.lightGray}`, paddingBottom: 4, marginBottom: 8,
+      fontSize: 33, fontWeight: 700, color: C.primary,
+      textTransform: 'uppercase', letterSpacing: 4,
+      borderBottom: `4px solid ${C.lightGray}`, paddingBottom: 18, marginBottom: 35,
     }}>
       {text}
     </div>
@@ -121,34 +128,35 @@ const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
 
   return (
     <BgPage bgUrl={data.template.company_details_page_url}>
-      {/* Content panel */}
+      {/* Inset: 14mm proportional → 234px at 4961px page width */}
       <div style={{
         position: 'absolute',
-        top: '14mm', left: '14mm', right: '14mm', bottom: '14mm',
-        display: 'flex', flexDirection: 'column', gap: 0,
+        top: 234, left: 234, right: 234, bottom: 234,
+        display: 'flex', flexDirection: 'column',
       }}>
         {/* Header row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 44 }}>
           <div>
-            <div style={{ fontSize: 20, fontWeight: 300, color: C.primary, letterSpacing: -0.5 }}>QUOTE</div>
+            <div style={{ fontSize: 88, fontWeight: 300, color: C.primary, letterSpacing: -2 }}>QUOTE</div>
             {quote_number && (
-              <div style={{ fontSize: 9, color: C.gray, marginTop: 2 }}>{quote_number}</div>
+              <div style={{ fontSize: 40, color: C.gray, marginTop: 9 }}>{quote_number}</div>
             )}
           </div>
-          <div style={{ textAlign: 'right', fontSize: 8, color: C.gray }}>
+          <div style={{ textAlign: 'right', fontSize: 35, color: C.gray }}>
             <div>Date: {fmtDate(created_at)}</div>
-            {expires_at && <div style={{ marginTop: 2 }}>Expires: {fmtDate(expires_at)}</div>}
+            {expires_at && <div style={{ marginTop: 9 }}>Expires: {fmtDate(expires_at)}</div>}
           </div>
         </div>
 
-        {/* Two-column details */}
-        <div style={{ display: 'flex', gap: 16, flex: 1 }}>
+        {/* Two-column detail panels */}
+        <div style={{ display: 'flex', gap: 71, flex: 1, minHeight: 0 }}>
           {/* Left: Client */}
           <div style={{
             flex: 1,
             backgroundColor: 'rgba(255,255,255,0.88)',
-            borderRadius: 6,
-            padding: '10px 12px',
+            borderRadius: 27,
+            padding: '44px 53px',
+            overflow: 'hidden',
           }}>
             {sectionLabel('Client Details')}
             {field('Contact', client.contact_name)}
@@ -156,11 +164,11 @@ const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
             {field('Email', client.email)}
             {field('Phone', client.phone)}
             {(client.address || addressLine || client.country) && (
-              <div style={{ marginBottom: 6 }}>
-                <div style={{ fontSize: 7, color: C.gray, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 }}>Address</div>
-                {client.address && <div style={{ fontSize: 9.5, color: C.black, fontWeight: 600 }}>{client.address}</div>}
-                {addressLine && <div style={{ fontSize: 9.5, color: C.black }}>{addressLine}</div>}
-                {client.country && <div style={{ fontSize: 9.5, color: C.black }}>{client.country}</div>}
+              <div style={{ marginBottom: 27 }}>
+                <div style={{ fontSize: 31, color: C.gray, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>Address</div>
+                {client.address && <div style={{ fontSize: 42, color: C.black, fontWeight: 600 }}>{client.address}</div>}
+                {addressLine && <div style={{ fontSize: 42, color: C.black }}>{addressLine}</div>}
+                {client.country && <div style={{ fontSize: 42, color: C.black }}>{client.country}</div>}
               </div>
             )}
             {field('VAT Number', client.vat_number)}
@@ -170,8 +178,9 @@ const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
           <div style={{
             flex: 1,
             backgroundColor: 'rgba(255,255,255,0.88)',
-            borderRadius: 6,
-            padding: '10px 12px',
+            borderRadius: 27,
+            padding: '44px 53px',
+            overflow: 'hidden',
           }}>
             {sectionLabel('From')}
             {field('Company', template.company_name || null)}
@@ -182,8 +191,8 @@ const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
 
             {notes && (
               <>
-                <div style={{ marginTop: 12 }}>{sectionLabel('Notes')}</div>
-                <div style={{ fontSize: 8.5, color: C.black, lineHeight: 1.5, marginTop: 4 }}>
+                <div style={{ marginTop: 53 }}>{sectionLabel('Notes')}</div>
+                <div style={{ fontSize: 38, color: C.black, lineHeight: 1.5, marginTop: 18 }}>
                   {notes}
                 </div>
               </>
@@ -216,32 +225,27 @@ const ItemsPage: React.FC<{
 
   return (
     <BgPage bgUrl={data.template.content_page_url}>
+      {/* Inset: top 15mm → 251px, sides 12mm → 201px */}
       <div style={{
         position: 'absolute',
-        top: '15mm', left: '12mm', right: '12mm', bottom: '12mm',
+        top: 251, left: 201, right: 201, bottom: 201,
         display: 'flex',
         flexDirection: 'column',
       }}>
         {/* Page title + pagination */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.white, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 27 }}>
+          <div style={{ fontSize: 49, fontWeight: 700, color: C.white, textShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
             QUOTE ITEMS
           </div>
           {totalPages > 1 && (
-            <div style={{ fontSize: 8, color: C.white, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+            <div style={{ fontSize: 35, color: C.white, textShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
               Page {pageIndex + 1} of {totalPages}
             </div>
           )}
         </div>
 
         {/* Table */}
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-          flex: 1,
-        }}>
-          {/* Column widths */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', flex: 1 }}>
           <colgroup>
             <col style={{ width: COL_WIDTHS.num }} />
             <col style={{ width: COL_WIDTHS.product }} />
@@ -250,19 +254,18 @@ const ItemsPage: React.FC<{
             <col style={{ width: COL_WIDTHS.total }} />
           </colgroup>
 
-          {/* Header */}
           <thead>
             <tr style={{ backgroundColor: C.headerBg }}>
               {['#', 'Product', 'Qty', 'Unit Price', 'Total'].map((h, i) => (
                 <th
                   key={h}
                   style={{
-                    padding: '5px 8px',
-                    fontSize: 7.5,
+                    padding: '22px 35px',
+                    fontSize: 33,
                     fontWeight: 700,
                     color: C.white,
                     textAlign: i >= 2 ? 'right' : 'left',
-                    letterSpacing: 0.5,
+                    letterSpacing: 2,
                     textTransform: 'uppercase',
                   }}
                 >
@@ -272,7 +275,6 @@ const ItemsPage: React.FC<{
             </tr>
           </thead>
 
-          {/* Rows */}
           <tbody>
             {pageItems.map((item, i) => {
               const rowNum = startIndex + i + 1;
@@ -280,42 +282,42 @@ const ItemsPage: React.FC<{
               return (
                 <tr key={item.id} style={{ backgroundColor: isAlt ? C.rowAlt : C.white }}>
                   {/* # */}
-                  <td style={{ padding: '5px 8px', fontSize: 8, color: C.gray, verticalAlign: 'top' }}>
+                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.gray, verticalAlign: 'top' }}>
                     {rowNum}
                   </td>
                   {/* Product + description */}
-                  <td style={{ padding: '5px 8px', verticalAlign: 'top' }}>
-                    <div style={{ fontSize: 8.5, fontWeight: 700, color: C.black, lineHeight: 1.3 }}>
+                  <td style={{ padding: '22px 35px', verticalAlign: 'top' }}>
+                    <div style={{ fontSize: 38, fontWeight: 700, color: C.black, lineHeight: 1.3 }}>
                       {item.product_name}
                       {item.sku && (
-                        <span style={{ fontSize: 7, fontWeight: 400, color: C.gray, marginLeft: 6 }}>
+                        <span style={{ fontSize: 31, fontWeight: 400, color: C.gray, marginLeft: 27 }}>
                           SKU: {item.sku}
                         </span>
                       )}
                     </div>
                     {item.description && (
-                      <div style={{ fontSize: 7.5, color: C.gray, marginTop: 1.5, lineHeight: 1.35 }}>
+                      <div style={{ fontSize: 33, color: C.gray, marginTop: 7, lineHeight: 1.35 }}>
                         {item.description.length > 120
                           ? item.description.slice(0, 120) + '…'
                           : item.description}
                       </div>
                     )}
                     {(item.selected_size || item.selected_color) && (
-                      <div style={{ fontSize: 7, color: C.gray, marginTop: 1 }}>
+                      <div style={{ fontSize: 31, color: C.gray, marginTop: 4 }}>
                         {[item.selected_size, item.selected_color].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </td>
                   {/* Qty */}
-                  <td style={{ padding: '5px 8px', fontSize: 8, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {item.quantity} {item.unit}
                   </td>
                   {/* Unit Price */}
-                  <td style={{ padding: '5px 8px', fontSize: 8, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {fmt(item.unit_price, data.currency)}
                   </td>
                   {/* Total */}
-                  <td style={{ padding: '5px 8px', fontSize: 8, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '22px 35px', fontSize: 35, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {fmt(item.line_total, data.currency)}
                   </td>
                 </tr>
@@ -324,20 +326,20 @@ const ItemsPage: React.FC<{
           </tbody>
         </table>
 
-        {/* Totals section — only on last items page */}
+        {/* Totals — last items page only */}
         {showTotals && (
           <div style={{
-            marginTop: 8,
-            paddingTop: 8,
-            borderTop: `1px solid rgba(255,255,255,0.5)`,
+            marginTop: 35,
+            paddingTop: 35,
+            borderTop: `4px solid rgba(255,255,255,0.5)`,
             display: 'flex',
             justifyContent: 'flex-end',
           }}>
             <div style={{
               backgroundColor: 'rgba(255,255,255,0.92)',
-              borderRadius: 6,
-              padding: '8px 14px',
-              minWidth: 180,
+              borderRadius: 27,
+              padding: '35px 62px',
+              minWidth: 796,
             }}>
               <TotalsBlock data={data} />
             </div>
@@ -352,24 +354,20 @@ const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => (
   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
     <tbody>
       <tr>
-        <td style={{ fontSize: 8, color: C.gray, paddingBottom: 3 }}>Subtotal</td>
-        <td style={{ fontSize: 8, color: C.black, textAlign: 'right', paddingBottom: 3 }}>
+        <td style={{ fontSize: 35, color: C.gray, paddingBottom: 13 }}>Subtotal</td>
+        <td style={{ fontSize: 35, color: C.black, textAlign: 'right', paddingBottom: 13 }}>
           {fmt(data.subtotal, data.currency)}
         </td>
       </tr>
       <tr>
-        <td style={{ fontSize: 8, color: C.gray, paddingBottom: 5 }}>
-          VAT ({data.vat_rate}%)
-        </td>
-        <td style={{ fontSize: 8, color: C.gray, textAlign: 'right', paddingBottom: 5 }}>
+        <td style={{ fontSize: 35, color: C.gray, paddingBottom: 22 }}>VAT ({data.vat_rate}%)</td>
+        <td style={{ fontSize: 35, color: C.gray, textAlign: 'right', paddingBottom: 22 }}>
           {fmt(data.vat_amount, data.currency)}
         </td>
       </tr>
-      <tr style={{ borderTop: `1px solid ${C.lightGray}` }}>
-        <td style={{ fontSize: 10, fontWeight: 700, color: C.primary, paddingTop: 5 }}>
-          GRAND TOTAL
-        </td>
-        <td style={{ fontSize: 10, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 5 }}>
+      <tr style={{ borderTop: `4px solid ${C.lightGray}` }}>
+        <td style={{ fontSize: 44, fontWeight: 700, color: C.primary, paddingTop: 22 }}>GRAND TOTAL</td>
+        <td style={{ fontSize: 44, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 22 }}>
           {fmt(data.grand_total, data.currency)}
         </td>
       </tr>
@@ -395,12 +393,10 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
   ({ data, className }, ref) => {
     const { items, template } = data;
 
-    // Split items into pages
     const itemPages: QuoteDocumentItem[][] = [];
     for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
       itemPages.push(items.slice(i, i + ITEMS_PER_PAGE));
     }
-    // If no items, show one empty items page
     if (itemPages.length === 0) itemPages.push([]);
 
     return (
@@ -409,13 +405,8 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
         className={className}
         style={{ display: 'flex', flexDirection: 'column', gap: 0, alignItems: 'flex-start' }}
       >
-        {/* Page 1: Cover */}
         <CoverPage bgUrl={template.first_page_url} />
-
-        {/* Page 2: Client / Company details */}
         <DetailsPage data={data} />
-
-        {/* Pages 3+: Items */}
         {itemPages.map((pageItems, idx) => (
           <ItemsPage
             key={idx}
@@ -426,8 +417,6 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
             showTotals={idx === itemPages.length - 1}
           />
         ))}
-
-        {/* Last page: Back cover */}
         <BackCoverPage bgUrl={template.last_page_url} />
       </div>
     );

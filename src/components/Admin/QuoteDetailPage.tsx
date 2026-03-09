@@ -763,10 +763,10 @@ export const QuoteDetailPage: React.FC = () => {
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
               onAddProducts={() => setIsAddProductsOpen(true)}
-              onUpdateQuantity={async (itemId, quantity) => {
+              onUpdateQuantity={quote.status === 'draft' ? async (itemId, quantity) => {
                 await quotesService.updateItem(itemId, { quantity });
                 await loadQuoteDetails();
-              }}
+              } : undefined}
               onRemoveItem={async (itemId) => {
                 await quotesService.removeItem(itemId);
                 await loadQuoteDetails();

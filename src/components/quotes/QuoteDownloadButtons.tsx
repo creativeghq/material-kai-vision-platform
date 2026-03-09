@@ -73,7 +73,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
         if (i > 0) pdf.addPage('a4', 'landscape');
 
         const canvas = await html2canvas(pages[i], {
-          scale: 2,
+          scale: 1,
           useCORS: true,
           allowTaint: false,
           logging: false,

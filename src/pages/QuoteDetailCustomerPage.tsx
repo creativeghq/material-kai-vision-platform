@@ -413,7 +413,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               items={quote.items || []}
               showAddButton={quote.status === 'draft'}
               onAddProducts={() => setShowAddProducts(true)}
-              onUpdateQuantity={async (itemId, quantity) => {
+              onUpdateQuantity={quote.status === 'draft' ? async (itemId, quantity) => {
                 try {
                   await quotesService.updateItem(itemId, { quantity });
                   await loadQuoteDetails();
@@ -425,7 +425,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                     variant: 'destructive',
                   });
                 }
-              }}
+              } : undefined}
               onRemoveItem={async (itemId) => {
                 try {
                   await quotesService.removeItem(itemId);

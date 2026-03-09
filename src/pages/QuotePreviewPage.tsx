@@ -44,7 +44,7 @@ export function QuotePreviewPage() {
       for (let i = 0; i < pages.length; i++) {
         if (i > 0) pdf.addPage('a4', 'landscape');
         const canvas = await html2canvas(pages[i], {
-          scale: 2,
+          scale: 1,
           useCORS: true,
           allowTaint: false,
           logging: false,
@@ -132,14 +132,21 @@ export function QuotePreviewPage() {
 
         {data && (
           <>
-            {/* Page gap between each A4 page for visual separation */}
+            {/*
+              Pages are 4961×3508 px (300 DPI). CSS zoom: 0.25 scales them down
+              to ~1240×877 px for on-screen display while preserving the exact
+              pixel layout captured by html2canvas (scale: 1).
+              Gap is 96px pre-zoom → 24px visual gap after zoom.
+            */}
             <style>{`
               .quote-page + .quote-page {
-                margin-top: 24px;
+                margin-top: 96px;
               }
             `}</style>
 
-            <QuoteDocument ref={documentRef} data={data} />
+            <div style={{ zoom: 0.25 }}>
+              <QuoteDocument ref={documentRef} data={data} />
+            </div>
           </>
         )}
       </div>
