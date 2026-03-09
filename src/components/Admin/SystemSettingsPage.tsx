@@ -117,13 +117,13 @@ export const SystemSettingsPage: React.FC = () => {
           ...config,
         });
         setPdfSettingId(data.id);
-      }
 
-      // Load image previews
-      loadImagePreview('cover.png', setCoverPreview);
-      if (config.intro_page_path) loadImagePreview(config.intro_page_path, setIntroPreview);
-      loadImagePreview('backcover.png', setBackcoverPreview);
-      loadImagePreview('items-background.png', setBgPreview);
+        // Load image previews using resolved config paths
+        loadImagePreview(config.first_page_path || config.cover_image_path || 'cover.png', setCoverPreview);
+        if (config.intro_page_path) loadImagePreview(config.intro_page_path, setIntroPreview);
+        loadImagePreview(config.last_page_path || config.backcover_image_path || 'backcover.png', setBackcoverPreview);
+        loadImagePreview(config.content_page_path || config.items_background_path || 'items-background.png', setBgPreview);
+      }
     } catch (error) {
       console.error('Error loading PDF template config:', error);
     }
