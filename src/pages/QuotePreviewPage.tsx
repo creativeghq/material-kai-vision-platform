@@ -55,7 +55,7 @@ export function QuotePreviewPage() {
       <style>{`
         @media print {
           @page {
-            size: A4 landscape;
+            size: A3 landscape;
             margin: 0;
           }
 

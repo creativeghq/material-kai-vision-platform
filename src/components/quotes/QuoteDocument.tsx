@@ -1,10 +1,9 @@
 /**
  * QuoteDocument — high-resolution HTML renderer
  *
- * Pages render at 4961 × 3508 px (A4 landscape @ 300 DPI).
+ * Pages render at 4961 × 3508 px (A3 landscape @ 300 DPI).
  * Each page has a full-bleed background image with content overlaid on top.
- * Used for both on-screen preview (via CSS zoom) and PDF generation via
- * html2canvas (scale: 1) + jsPDF.
+ * Used for both on-screen preview (via CSS zoom) and PDF via window.print().
  *
  * Page structure:
  *  1. Cover page      — background image + client info line at bottom
@@ -17,7 +16,7 @@ import { QuoteDocumentData, QuoteDocumentItem } from '@/hooks/useQuoteDocument';
 
 // ─── Output dimensions ────────────────────────────────────────────────────────
 
-/** Target page pixel dimensions — A4 landscape @ 300 DPI */
+/** Target page pixel dimensions — A3 landscape @ 300 DPI */
 export const PAGE_PX_W = 4961;
 export const PAGE_PX_H = 3508;
 
