@@ -18,10 +18,10 @@ interface SystemSetting {
 }
 
 interface PDFTemplateConfig {
-  cover_image_path: string;
+  first_page_path: string;
   intro_page_path: string;
-  backcover_image_path: string;
-  items_background_path: string;
+  last_page_path: string;
+  content_page_path: string;
   company_name: string;
   company_address: string;
   company_phone: string;
@@ -31,10 +31,10 @@ interface PDFTemplateConfig {
 }
 
 const DEFAULT_PDF_CONFIG: PDFTemplateConfig = {
-  cover_image_path: 'cover.png',
+  first_page_path: '',
   intro_page_path: '',
-  backcover_image_path: 'backcover.png',
-  items_background_path: 'items-background.png',
+  last_page_path: '',
+  content_page_path: '',
   company_name: '',
   company_address: '',
   company_phone: '',
@@ -111,18 +111,29 @@ export const SystemSettingsPage: React.FC = () => {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        const config = data.setting_value as Record<string, any>;
-        setPdfConfig({
+        const raw = data.setting_value as Record<string, any>;
+        // Normalize legacy key names to canonical keys
+        const config: PDFTemplateConfig = {
           ...DEFAULT_PDF_CONFIG,
-          ...config,
-        });
+          first_page_path: raw.first_page_path || raw.cover_image_path || '',
+          intro_page_path: raw.intro_page_path || '',
+          last_page_path: raw.last_page_path || raw.backcover_image_path || '',
+          content_page_path: raw.content_page_path || raw.items_background_path || '',
+          company_name: raw.company_name || '',
+          company_address: raw.company_address || '',
+          company_phone: raw.company_phone || '',
+          company_email: raw.company_email || '',
+          company_vat: raw.company_vat || '',
+          vat_rate_default: raw.vat_rate_default ?? 24,
+        };
+        setPdfConfig(config);
         setPdfSettingId(data.id);
 
-        // Load image previews using resolved config paths
-        loadImagePreview(config.first_page_path || config.cover_image_path || 'cover.png', setCoverPreview);
+        // Load image previews using canonical paths
+        if (config.first_page_path) loadImagePreview(config.first_page_path, setCoverPreview);
         if (config.intro_page_path) loadImagePreview(config.intro_page_path, setIntroPreview);
-        loadImagePreview(config.last_page_path || config.backcover_image_path || 'backcover.png', setBackcoverPreview);
-        loadImagePreview(config.content_page_path || config.items_background_path || 'items-background.png', setBgPreview);
+        if (config.last_page_path) loadImagePreview(config.last_page_path, setBackcoverPreview);
+        if (config.content_page_path) loadImagePreview(config.content_page_path, setBgPreview);
       }
     } catch (error) {
       console.error('Error loading PDF template config:', error);
@@ -395,7 +406,7 @@ export const SystemSettingsPage: React.FC = () => {
                           <span className="text-sm">Click to upload cover</span>
                         </div>
                       )}
-                      {uploadingImage === 'cover.png' && (
+                      {uploadingImage === 'template-cover.png' && (
                         <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Uploading...
@@ -404,7 +415,7 @@ export const SystemSettingsPage: React.FC = () => {
                     </div>
                     {coverPreview && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleImageDelete('cover.png', setCoverPreview, 'cover_image_path'); }}
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.first_page_path || 'template-cover.png', setCoverPreview, 'first_page_path'); }}
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                         title="Delete image"
                       >
@@ -419,7 +430,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'cover.png', setCoverPreview, 'cover_image_path');
+                      if (file) handleImageUpload(file, 'template-cover.png', setCoverPreview, 'first_page_path');
                       e.target.value = '';
                     }}
                   />
@@ -441,7 +452,7 @@ export const SystemSettingsPage: React.FC = () => {
                           <span className="text-sm">Click to upload intro page</span>
                         </div>
                       )}
-                      {uploadingImage === 'intro-page.png' && (
+                      {uploadingImage === 'template-intro.png' && (
                         <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Uploading...
@@ -450,7 +461,7 @@ export const SystemSettingsPage: React.FC = () => {
                     </div>
                     {introPreview && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleImageDelete('intro-page.png', setIntroPreview, 'intro_page_path'); }}
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.intro_page_path || 'template-intro.png', setIntroPreview, 'intro_page_path'); }}
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                         title="Delete image"
                       >
@@ -465,7 +476,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'intro-page.png', setIntroPreview, 'intro_page_path');
+                      if (file) handleImageUpload(file, 'template-intro.png', setIntroPreview, 'intro_page_path');
                       e.target.value = '';
                     }}
                   />
@@ -487,7 +498,7 @@ export const SystemSettingsPage: React.FC = () => {
                           <span className="text-sm">Click to upload background</span>
                         </div>
                       )}
-                      {uploadingImage === 'items-background.png' && (
+                      {uploadingImage === 'template-content.png' && (
                         <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Uploading...
@@ -496,7 +507,7 @@ export const SystemSettingsPage: React.FC = () => {
                     </div>
                     {bgPreview && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleImageDelete('items-background.png', setBgPreview, 'items_background_path'); }}
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.content_page_path || 'template-content.png', setBgPreview, 'content_page_path'); }}
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                         title="Delete image"
                       >
@@ -511,7 +522,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'items-background.png', setBgPreview, 'items_background_path');
+                      if (file) handleImageUpload(file, 'template-content.png', setBgPreview, 'content_page_path');
                       e.target.value = '';
                     }}
                   />
@@ -533,7 +544,7 @@ export const SystemSettingsPage: React.FC = () => {
                           <span className="text-sm">Click to upload back cover</span>
                         </div>
                       )}
-                      {uploadingImage === 'backcover.png' && (
+                      {uploadingImage === 'template-backcover.png' && (
                         <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Uploading...
@@ -542,7 +553,7 @@ export const SystemSettingsPage: React.FC = () => {
                     </div>
                     {backcoverPreview && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleImageDelete('backcover.png', setBackcoverPreview, 'backcover_image_path'); }}
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.last_page_path || 'template-backcover.png', setBackcoverPreview, 'last_page_path'); }}
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                         title="Delete image"
                       >
@@ -557,7 +568,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'backcover.png', setBackcoverPreview, 'backcover_image_path');
+                      if (file) handleImageUpload(file, 'template-backcover.png', setBackcoverPreview, 'last_page_path');
                       e.target.value = '';
                     }}
                   />

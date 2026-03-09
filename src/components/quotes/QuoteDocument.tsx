@@ -32,7 +32,7 @@ const PAGE_STYLE: React.CSSProperties = {
   overflow: 'hidden',
   backgroundColor: '#ffffff',
   flexShrink: 0,
-  fontFamily: '"Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif',
+  fontFamily: '"Roboto Slab", "Georgia", serif',
 };
 
 const BG_STYLE: React.CSSProperties = {
@@ -179,21 +179,18 @@ const ItemsPage: React.FC<{
       */}
       <div style={{
         position: 'absolute',
-        top: 251, left: 251, right: 251, bottom: 201,
+        top: 251, left: 351, right: 351, bottom: 201,
         display: 'flex',
         flexDirection: 'column',
       }}>
-        {/* Page title + pagination */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 27 }}>
-          <div style={{ fontSize: 49, fontWeight: 700, color: C.white, textShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-            QUOTE ITEMS
-          </div>
-          {totalPages > 1 && (
-            <div style={{ fontSize: 35, color: C.white, textShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+        {/* Pagination — only shown when multiple pages */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 40 }}>
+            <div style={{ fontSize: 120, color: C.white, textShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
               Page {pageIndex + 1} of {totalPages}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Table — transparent rows so background image shows through */}
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', flex: 1 }}>
@@ -211,12 +208,12 @@ const ItemsPage: React.FC<{
                 <th
                   key={h}
                   style={{
-                    padding: '22px 35px',
-                    fontSize: 33,
+                    padding: '40px 60px',
+                    fontSize: 150,
                     fontWeight: 700,
                     color: C.white,
                     textAlign: i >= 2 ? 'right' : 'left',
-                    letterSpacing: 2,
+                    letterSpacing: 4,
                     textTransform: 'uppercase',
                   }}
                 >
@@ -232,42 +229,42 @@ const ItemsPage: React.FC<{
               return (
                 <tr key={item.id} style={{ backgroundColor: 'transparent' }}>
                   {/* # */}
-                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.gray, verticalAlign: 'top' }}>
+                  <td style={{ padding: '35px 60px', fontSize: 130, color: C.gray, verticalAlign: 'top' }}>
                     {rowNum}
                   </td>
                   {/* Product + description */}
-                  <td style={{ padding: '22px 35px', verticalAlign: 'top' }}>
-                    <div style={{ fontSize: 38, fontWeight: 700, color: C.black, lineHeight: 1.3 }}>
+                  <td style={{ padding: '35px 60px', verticalAlign: 'top' }}>
+                    <div style={{ fontSize: 150, fontWeight: 700, color: C.black, lineHeight: 1.3 }}>
                       {item.product_name}
                       {item.sku && (
-                        <span style={{ fontSize: 31, fontWeight: 400, color: C.gray, marginLeft: 27 }}>
+                        <span style={{ fontSize: 110, fontWeight: 400, color: C.gray, marginLeft: 40 }}>
                           SKU: {item.sku}
                         </span>
                       )}
                     </div>
                     {item.description && (
-                      <div style={{ fontSize: 33, color: C.gray, marginTop: 7, lineHeight: 1.35 }}>
+                      <div style={{ fontSize: 120, color: C.gray, marginTop: 16, lineHeight: 1.35 }}>
                         {item.description.length > 120
                           ? item.description.slice(0, 120) + '…'
                           : item.description}
                       </div>
                     )}
                     {(item.selected_size || item.selected_color) && (
-                      <div style={{ fontSize: 31, color: C.gray, marginTop: 4 }}>
+                      <div style={{ fontSize: 110, color: C.gray, marginTop: 10 }}>
                         {[item.selected_size, item.selected_color].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </td>
                   {/* Qty */}
-                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '35px 60px', fontSize: 150, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {item.quantity} {item.unit}
                   </td>
                   {/* Unit Price */}
-                  <td style={{ padding: '22px 35px', fontSize: 35, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '35px 60px', fontSize: 150, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {fmt(item.unit_price, data.currency)}
                   </td>
                   {/* Total */}
-                  <td style={{ padding: '22px 35px', fontSize: 35, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  <td style={{ padding: '35px 60px', fontSize: 150, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {fmt(item.line_total, data.currency)}
                   </td>
                 </tr>
@@ -279,13 +276,13 @@ const ItemsPage: React.FC<{
         {/* Totals — last items page only, transparent background */}
         {showTotals && (
           <div style={{
-            marginTop: 35,
-            paddingTop: 35,
-            borderTop: `4px solid rgba(0,0,0,0.15)`,
+            marginTop: 80,
+            paddingTop: 60,
+            borderTop: `6px solid rgba(0,0,0,0.15)`,
             display: 'flex',
             justifyContent: 'flex-end',
           }}>
-            <div style={{ minWidth: 796 }}>
+            <div style={{ minWidth: 2400 }}>
               <TotalsBlock data={data} />
             </div>
           </div>
@@ -299,20 +296,20 @@ const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => (
   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
     <tbody>
       <tr>
-        <td style={{ fontSize: 35, color: C.gray, paddingBottom: 13 }}>Subtotal</td>
-        <td style={{ fontSize: 35, color: C.black, textAlign: 'right', paddingBottom: 13 }}>
+        <td style={{ fontSize: 130, color: C.gray, paddingBottom: 30 }}>Subtotal</td>
+        <td style={{ fontSize: 130, color: C.black, textAlign: 'right', paddingBottom: 30 }}>
           {fmt(data.subtotal, data.currency)}
         </td>
       </tr>
       <tr>
-        <td style={{ fontSize: 35, color: C.gray, paddingBottom: 22 }}>VAT ({data.vat_rate}%)</td>
-        <td style={{ fontSize: 35, color: C.gray, textAlign: 'right', paddingBottom: 22 }}>
+        <td style={{ fontSize: 130, color: C.gray, paddingBottom: 40 }}>VAT ({data.vat_rate}%)</td>
+        <td style={{ fontSize: 130, color: C.gray, textAlign: 'right', paddingBottom: 40 }}>
           {fmt(data.vat_amount, data.currency)}
         </td>
       </tr>
-      <tr style={{ borderTop: `4px solid ${C.lightGray}` }}>
-        <td style={{ fontSize: 44, fontWeight: 700, color: C.primary, paddingTop: 22 }}>GRAND TOTAL</td>
-        <td style={{ fontSize: 44, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 22 }}>
+      <tr style={{ borderTop: `6px solid ${C.lightGray}` }}>
+        <td style={{ fontSize: 170, fontWeight: 700, color: C.primary, paddingTop: 40 }}>GRAND TOTAL</td>
+        <td style={{ fontSize: 170, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 40 }}>
           {fmt(data.grand_total, data.currency)}
         </td>
       </tr>
