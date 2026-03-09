@@ -178,17 +178,18 @@ export const SystemSettingsPage: React.FC = () => {
     }
   };
 
+  /** Upload an image, optionally update a config path key, then auto-save config to DB. */
   const handleImageUpload = async (
     file: File,
     targetPath: string,
-    previewSetter: (url: string | null) => void
+    previewSetter: (url: string | null) => void,
+    configKey?: keyof PDFTemplateConfig
   ) => {
     const allowedTypes = ['image/png', 'image/jpeg'];
     if (!allowedTypes.includes(file.type)) {
       toast({ title: 'Invalid file type', description: 'Only PNG and JPG images are allowed.', variant: 'destructive' });
       return;
     }
-
     if (file.size > 10 * 1024 * 1024) {
       toast({ title: 'File too large', description: 'Maximum file size is 10MB.', variant: 'destructive' });
       return;
@@ -205,10 +206,60 @@ export const SystemSettingsPage: React.FC = () => {
       // Refresh preview
       await loadImagePreview(targetPath, previewSetter);
 
-      toast({ title: 'Image uploaded', description: `${targetPath} updated successfully.` });
+      // If this upload changes a config path, update state + auto-save to DB
+      const updatedConfig = configKey
+        ? { ...pdfConfig, [configKey]: targetPath }
+        : pdfConfig;
+
+      if (configKey) {
+        setPdfConfig(updatedConfig);
+      }
+
+      if (pdfSettingId) {
+        await supabase
+          .from('system_settings')
+          .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
+          .eq('id', pdfSettingId);
+      }
+
+      toast({ title: 'Image uploaded', description: `${targetPath} saved successfully.` });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({ title: 'Upload failed', description: 'Failed to upload image.', variant: 'destructive' });
+    } finally {
+      setUploadingImage(null);
+    }
+  };
+
+  /** Delete an image from storage, clear its config path, and auto-save. */
+  const handleImageDelete = async (
+    storagePath: string,
+    previewSetter: (url: string | null) => void,
+    configKey?: keyof PDFTemplateConfig
+  ) => {
+    try {
+      setUploadingImage(storagePath);
+      await supabase.storage.from('quote-templates').remove([storagePath]);
+
+      previewSetter(null);
+
+      const updatedConfig = configKey
+        ? { ...pdfConfig, [configKey]: '' }
+        : pdfConfig;
+
+      if (configKey) setPdfConfig(updatedConfig);
+
+      if (pdfSettingId) {
+        await supabase
+          .from('system_settings')
+          .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
+          .eq('id', pdfSettingId);
+      }
+
+      toast({ title: 'Image deleted', description: `${storagePath} removed.` });
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      toast({ title: 'Delete failed', description: 'Failed to delete image.', variant: 'destructive' });
     } finally {
       setUploadingImage(null);
     }
@@ -331,23 +382,34 @@ export const SystemSettingsPage: React.FC = () => {
                 {/* Cover Image */}
                 <div className="space-y-2">
                   <Label>Cover Page</Label>
-                  <div
-                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => coverInputRef.current?.click()}
-                  >
-                    {coverPreview ? (
-                      <img src={coverPreview} alt="Cover" className="w-full h-40 object-cover rounded" />
-                    ) : (
-                      <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
-                        <Image className="h-8 w-8 mb-2" />
-                        <span className="text-sm">Click to upload cover</span>
-                      </div>
-                    )}
-                    {uploadingImage === 'cover.png' && (
-                      <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Uploading...
-                      </div>
+                  <div className="relative">
+                    <div
+                      className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {coverPreview ? (
+                        <img src={coverPreview} alt="Cover" className="w-full h-40 object-cover rounded" />
+                      ) : (
+                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                          <Image className="h-8 w-8 mb-2" />
+                          <span className="text-sm">Click to upload cover</span>
+                        </div>
+                      )}
+                      {uploadingImage === 'cover.png' && (
+                        <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    {coverPreview && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete('cover.png', setCoverPreview, 'cover_image_path'); }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        title="Delete image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                   <input
@@ -357,7 +419,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'cover.png', setCoverPreview);
+                      if (file) handleImageUpload(file, 'cover.png', setCoverPreview, 'cover_image_path');
                       e.target.value = '';
                     }}
                   />
@@ -366,23 +428,34 @@ export const SystemSettingsPage: React.FC = () => {
                 {/* Intro Page Image */}
                 <div className="space-y-2">
                   <Label>Intro Page</Label>
-                  <div
-                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => introInputRef.current?.click()}
-                  >
-                    {introPreview ? (
-                      <img src={introPreview} alt="Intro" className="w-full h-40 object-cover rounded" />
-                    ) : (
-                      <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
-                        <Image className="h-8 w-8 mb-2" />
-                        <span className="text-sm">Click to upload intro page</span>
-                      </div>
-                    )}
-                    {uploadingImage === 'intro-page.png' && (
-                      <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Uploading...
-                      </div>
+                  <div className="relative">
+                    <div
+                      className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => introInputRef.current?.click()}
+                    >
+                      {introPreview ? (
+                        <img src={introPreview} alt="Intro" className="w-full h-40 object-cover rounded" />
+                      ) : (
+                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                          <Image className="h-8 w-8 mb-2" />
+                          <span className="text-sm">Click to upload intro page</span>
+                        </div>
+                      )}
+                      {uploadingImage === 'intro-page.png' && (
+                        <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    {introPreview && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete('intro-page.png', setIntroPreview, 'intro_page_path'); }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        title="Delete image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                   <input
@@ -392,10 +465,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageUpload(file, 'intro-page.png', setIntroPreview);
-                        setPdfConfig(prev => ({ ...prev, intro_page_path: 'intro-page.png' }));
-                      }
+                      if (file) handleImageUpload(file, 'intro-page.png', setIntroPreview, 'intro_page_path');
                       e.target.value = '';
                     }}
                   />
@@ -404,23 +474,34 @@ export const SystemSettingsPage: React.FC = () => {
                 {/* Items Background Image */}
                 <div className="space-y-2">
                   <Label>Items Background</Label>
-                  <div
-                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => bgInputRef.current?.click()}
-                  >
-                    {bgPreview ? (
-                      <img src={bgPreview} alt="Background" className="w-full h-40 object-cover rounded" />
-                    ) : (
-                      <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
-                        <Image className="h-8 w-8 mb-2" />
-                        <span className="text-sm">Click to upload background</span>
-                      </div>
-                    )}
-                    {uploadingImage === 'items-background.png' && (
-                      <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Uploading...
-                      </div>
+                  <div className="relative">
+                    <div
+                      className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => bgInputRef.current?.click()}
+                    >
+                      {bgPreview ? (
+                        <img src={bgPreview} alt="Background" className="w-full h-40 object-cover rounded" />
+                      ) : (
+                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                          <Image className="h-8 w-8 mb-2" />
+                          <span className="text-sm">Click to upload background</span>
+                        </div>
+                      )}
+                      {uploadingImage === 'items-background.png' && (
+                        <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    {bgPreview && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete('items-background.png', setBgPreview, 'items_background_path'); }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        title="Delete image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                   <input
@@ -430,7 +511,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'items-background.png', setBgPreview);
+                      if (file) handleImageUpload(file, 'items-background.png', setBgPreview, 'items_background_path');
                       e.target.value = '';
                     }}
                   />
@@ -439,23 +520,34 @@ export const SystemSettingsPage: React.FC = () => {
                 {/* Back Cover Image */}
                 <div className="space-y-2">
                   <Label>Back Cover Page</Label>
-                  <div
-                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => backcoverInputRef.current?.click()}
-                  >
-                    {backcoverPreview ? (
-                      <img src={backcoverPreview} alt="Back Cover" className="w-full h-40 object-cover rounded" />
-                    ) : (
-                      <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
-                        <Image className="h-8 w-8 mb-2" />
-                        <span className="text-sm">Click to upload back cover</span>
-                      </div>
-                    )}
-                    {uploadingImage === 'backcover.png' && (
-                      <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Uploading...
-                      </div>
+                  <div className="relative">
+                    <div
+                      className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => backcoverInputRef.current?.click()}
+                    >
+                      {backcoverPreview ? (
+                        <img src={backcoverPreview} alt="Back Cover" className="w-full h-40 object-cover rounded" />
+                      ) : (
+                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                          <Image className="h-8 w-8 mb-2" />
+                          <span className="text-sm">Click to upload back cover</span>
+                        </div>
+                      )}
+                      {uploadingImage === 'backcover.png' && (
+                        <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    {backcoverPreview && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete('backcover.png', setBackcoverPreview, 'backcover_image_path'); }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        title="Delete image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                   <input
@@ -465,7 +557,7 @@ export const SystemSettingsPage: React.FC = () => {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'backcover.png', setBackcoverPreview);
+                      if (file) handleImageUpload(file, 'backcover.png', setBackcoverPreview, 'backcover_image_path');
                       e.target.value = '';
                     }}
                   />
