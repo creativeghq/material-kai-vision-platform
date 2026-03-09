@@ -28,6 +28,7 @@ export interface QuoteDocumentClient {
 
 export interface QuoteTemplateConfig {
   first_page_url: string | null;
+  intro_page_url: string | null;
   company_details_page_url: string | null;
   content_page_url: string | null;
   last_page_url: string | null;
@@ -136,8 +137,9 @@ export function useQuoteDocument(quoteId: string) {
         }
 
         // Resolve signed URLs for template images
-        const [firstUrl, detailsUrl, contentUrl, lastUrl] = await Promise.all([
+        const [firstUrl, introUrl, detailsUrl, contentUrl, lastUrl] = await Promise.all([
           getSignedUrl('quote-templates', cfg.first_page_path || cfg.cover_image_path || null),
+          getSignedUrl('quote-templates', cfg.intro_page_path || null),
           getSignedUrl('quote-templates', cfg.company_details_page_path || null),
           getSignedUrl('quote-templates', cfg.content_page_path || cfg.items_background_path || null),
           getSignedUrl('quote-templates', cfg.last_page_path || cfg.backcover_image_path || null),
@@ -145,6 +147,7 @@ export function useQuoteDocument(quoteId: string) {
 
         const template: QuoteTemplateConfig = {
           first_page_url: firstUrl,
+          intro_page_url: introUrl,
           company_details_page_url: detailsUrl,
           content_page_url: contentUrl,
           last_page_url: lastUrl,

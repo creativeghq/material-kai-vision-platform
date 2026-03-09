@@ -127,7 +127,9 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>Global Timeline Elements</li>
               <li>Material Metadata Field Definitions</li>
               <li>PDF files in pdf-documents folder</li>
-              <li>System Settings & Configuration</li>
+              <li><strong>System Settings & Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
+              <li><strong>Uploaded Template Images</strong> (cover, back cover, items background in quote-templates)</li>
+              <li><strong>User Avatars</strong> (profile pictures in profile-avatars)</li>
             </ul>
 
             <div className="pt-4 space-y-2">

@@ -7,6 +7,28 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// ============================================================
+// PRESERVED (never deleted during platform reset):
+//
+// DB Tables:
+//   - system_settings          ← /admin/system-settings config (quote expiration, PDF template, company details)
+//   - upsells                  ← global admin-managed upsell catalogue
+//   - timeline_steps           ← global project timeline steps
+//   - kb_docs                  ← Knowledge Base documents
+//   - kb_categories            ← KB categories
+//   - kb_doc_attachments       ← KB product links
+//   - kb_search_analytics      ← KB search analytics
+//   - crm_companies            ← CRM companies
+//   - crm_contacts             ← CRM contacts
+//   - crm_contact_relationships← CRM relationships
+//   - profiles / auth.users    ← user accounts
+//
+// Storage Buckets:
+//   - quote-templates          ← cover.png / backcover.png / items-background.png uploaded via system settings
+//   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
+//   - pdf-documents            ← original uploaded PDF files
+// ============================================================
+
 // Tables to clear (in order to respect foreign key constraints)
 // Order matters! Delete child tables before parent tables
 const TABLES_TO_CLEAR = [
@@ -28,6 +50,7 @@ const TABLES_TO_CLEAR = [
   'quotes',                        // Quotes
   'status_tags',                   // Custom status tags
   // NOTE: 'upsells' and 'timeline_steps' are PRESERVED (global data)
+  // NOTE: 'system_settings' is PRESERVED (platform config, PDF template, company details)
 
   // Moodboards (DELETE)
   'moodboard_quote_requests',      // Moodboard quote requests (child of moodboards)
@@ -100,9 +123,51 @@ const TABLES_TO_CLEAR = [
   // ============================================================
 ];
 
+// ============================================================
+// Storage buckets to clear (AI/processing-generated content only)
+//
+// PRESERVED buckets (NOT in this list):
+//   - quote-templates   ← cover.png / backcover.png / items-background.png (admin uploads via system settings)
+//   - profile-avatars   ← user avatar images ({userId}/avatar.ext)
+//   - pdf-documents     ← original uploaded PDF files
+// ============================================================
+const BUCKETS_TO_CLEAR = ['pdf-tiles', 'material-images', 'moodboard-images', '3d-renders'];
+
+/**
+ * Recursively list every file path in a bucket folder (handles subdirectories).
+ * Returns a flat array of full file paths suitable for storage.remove().
+ */
+async function listAllFiles(bucketName: string, folderPath = ''): Promise<string[]> {
+  const { data: items, error } = await supabase.storage
+    .from(bucketName)
+    .list(folderPath || undefined, { limit: 1000 });
+
+  if (error || !items) return [];
+
+  const filePaths: string[] = [];
+
+  for (const item of items) {
+    const itemPath = folderPath ? `${folderPath}/${item.name}` : item.name;
+
+    if (item.metadata == null) {
+      // item.metadata is null for folders — recurse
+      const nested = await listAllFiles(bucketName, itemPath);
+      filePaths.push(...nested);
+    } else {
+      // it's a file
+      filePaths.push(itemPath);
+    }
+  }
+
+  return filePaths;
+}
+
 /**
  * Reset Platform Edge Function
- * Clears all user-generated data while preserving system configuration
+ * Clears all user-generated data while preserving system configuration.
+ *
+ * PRESERVED: system_settings, upsells, timeline_steps, kb_* tables,
+ *            crm_companies, crm_contacts, quote-templates bucket, pdf-documents bucket
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -123,9 +188,6 @@ Deno.serve(async (req) => {
         { status: auth.error?.includes('Required roles') ? 403 : 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-
-    const user = auth.user;
-    const userId = auth.userId;
 
     const body = await req.json();
     if (!body.confirm) {
@@ -179,46 +241,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    // STEP 2: Clear storage buckets (except pdf-documents)
+    // STEP 2: Clear storage buckets (AI/processing content only — NOT quote-templates or pdf-documents)
     console.log('\n🗑️  STEP 2: Clear storage buckets');
-    const bucketsToClean = ['pdf-tiles', 'material-images', 'moodboard-images', '3d-renders'];
 
-    for (const bucketName of bucketsToClean) {
+    for (const bucketName of BUCKETS_TO_CLEAR) {
       try {
         console.log(`   Clearing bucket: ${bucketName}...`);
 
-        // List all files in bucket
-        const { data: files, error: listError } = await supabase
-          .storage
-          .from(bucketName)
-          .list();
+        // Recursively list all files including those in subdirectories
+        const allFiles = await listAllFiles(bucketName);
 
-        if (listError) {
-          console.log(`   ⚠️ Bucket ${bucketName} not found or empty`);
-          results.storage.push({ bucket: bucketName, deleted: 0, error: listError.message });
-          continue;
-        }
-
-        if (!files || files.length === 0) {
+        if (allFiles.length === 0) {
           console.log(`   ✅ Bucket ${bucketName} is already empty`);
           results.storage.push({ bucket: bucketName, deleted: 0 });
           continue;
         }
 
-        // Delete all files
-        const filePaths = files.map(file => file.name);
-        const { error: deleteError } = await supabase
-          .storage
-          .from(bucketName)
-          .remove(filePaths);
+        // Delete in batches of 100 (Supabase storage remove limit)
+        const BATCH_SIZE = 100;
+        let totalDeletedFromBucket = 0;
+        let bucketError: string | undefined;
 
-        if (deleteError) {
-          console.error(`   ❌ Failed to clear bucket ${bucketName}:`, deleteError);
-          results.storage.push({ bucket: bucketName, deleted: 0, error: deleteError.message });
-        } else {
-          console.log(`   ✅ Deleted ${filePaths.length} files from ${bucketName}`);
-          results.storage.push({ bucket: bucketName, deleted: filePaths.length });
+        for (let i = 0; i < allFiles.length; i += BATCH_SIZE) {
+          const batch = allFiles.slice(i, i + BATCH_SIZE);
+          const { error: deleteError } = await supabase.storage.from(bucketName).remove(batch);
+
+          if (deleteError) {
+            console.error(`   ❌ Failed to delete batch from ${bucketName}:`, deleteError);
+            bucketError = deleteError.message;
+          } else {
+            totalDeletedFromBucket += batch.length;
+          }
         }
+
+        console.log(`   ✅ Deleted ${totalDeletedFromBucket} files from ${bucketName}`);
+        results.storage.push({ bucket: bucketName, deleted: totalDeletedFromBucket, error: bucketError });
       } catch (error: any) {
         console.error(`   ❌ Error clearing bucket ${bucketName}:`, error);
         results.storage.push({ bucket: bucketName, deleted: 0, error: error.message });

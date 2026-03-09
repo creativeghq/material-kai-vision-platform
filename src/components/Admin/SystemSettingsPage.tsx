@@ -19,6 +19,7 @@ interface SystemSetting {
 
 interface PDFTemplateConfig {
   cover_image_path: string;
+  intro_page_path: string;
   backcover_image_path: string;
   items_background_path: string;
   company_name: string;
@@ -31,6 +32,7 @@ interface PDFTemplateConfig {
 
 const DEFAULT_PDF_CONFIG: PDFTemplateConfig = {
   cover_image_path: 'cover.png',
+  intro_page_path: '',
   backcover_image_path: 'backcover.png',
   items_background_path: 'items-background.png',
   company_name: '',
@@ -56,11 +58,13 @@ export const SystemSettingsPage: React.FC = () => {
 
   // Image preview URLs
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [introPreview, setIntroPreview] = useState<string | null>(null);
   const [backcoverPreview, setBackcoverPreview] = useState<string | null>(null);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
 
   // File input refs
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const introInputRef = useRef<HTMLInputElement>(null);
   const backcoverInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +121,7 @@ export const SystemSettingsPage: React.FC = () => {
 
       // Load image previews
       loadImagePreview('cover.png', setCoverPreview);
+      if (config.intro_page_path) loadImagePreview(config.intro_page_path, setIntroPreview);
       loadImagePreview('backcover.png', setBackcoverPreview);
       loadImagePreview('items-background.png', setBgPreview);
     } catch (error) {
@@ -322,7 +327,7 @@ export const SystemSettingsPage: React.FC = () => {
             {/* Template Images */}
             <div className="space-y-4">
               <h3 className="text-base font-medium">Template Images</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Cover Image */}
                 <div className="space-y-2">
                   <Label>Cover Page</Label>
@@ -353,6 +358,44 @@ export const SystemSettingsPage: React.FC = () => {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleImageUpload(file, 'cover.png', setCoverPreview);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+
+                {/* Intro Page Image */}
+                <div className="space-y-2">
+                  <Label>Intro Page</Label>
+                  <div
+                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => introInputRef.current?.click()}
+                  >
+                    {introPreview ? (
+                      <img src={introPreview} alt="Intro" className="w-full h-40 object-cover rounded" />
+                    ) : (
+                      <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                        <Image className="h-8 w-8 mb-2" />
+                        <span className="text-sm">Click to upload intro page</span>
+                      </div>
+                    )}
+                    {uploadingImage === 'intro-page.png' && (
+                      <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={introInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, 'intro-page.png', setIntroPreview);
+                        setPdfConfig(prev => ({ ...prev, intro_page_path: 'intro-page.png' }));
+                      }
                       e.target.value = '';
                     }}
                   />

@@ -7,9 +7,8 @@
  * html2canvas (scale: 1) + jsPDF.
  *
  * Page structure:
- *  1. First page      — pure background image
- *  2. Details page    — background image + client/company info overlay
- *  3+. Items pages    — background image + items table (opaque rows)
+ *  1. Cover page      — background image + client info line at bottom
+ *  2+. Items pages    — background image + transparent items table
  *  Last. Back page    — pure background image
  */
 
@@ -54,14 +53,12 @@ const CONTENT_STYLE: React.CSSProperties = {
 // ─── Colour palette ───────────────────────────────────────────────────────────
 
 const C = {
-  dark: '#1a1a2e',
   primary: '#3E192A',
   gray: '#6b7280',
   lightGray: '#d1d5db',
   black: '#111827',
   white: '#ffffff',
-  rowAlt: '#f9fafb',
-  headerBg: '#1a1a2e',
+  tableHeader: '#21201F',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,116 +90,67 @@ const BgPage: React.FC<{ bgUrl: string | null; children?: React.ReactNode; class
   </div>
 );
 
-// ─── Page 1: Cover (pure image) ───────────────────────────────────────────────
+// ─── Page 1: Cover — background image + client info line at bottom ─────────────
 
-const CoverPage: React.FC<{ bgUrl: string | null }> = ({ bgUrl }) => (
-  <BgPage bgUrl={bgUrl} />
-);
+const CoverPage: React.FC<{ bgUrl: string | null; data: QuoteDocumentData }> = ({ bgUrl, data }) => {
+  const { client, quote_number, created_at, expires_at } = data;
 
-// ─── Page 2: Client / Company Details ─────────────────────────────────────────
+  const clientParts = [
+    client.contact_name,
+    client.company_name,
+    client.email,
+    client.phone,
+  ].filter(Boolean);
 
-const DetailsPage: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
-  const { client, template, quote_number, created_at, expires_at, notes } = data;
-
-  const field = (label: string, value: string | null) =>
-    value ? (
-      <div style={{ marginBottom: 27 }}>
-        <div style={{ fontSize: 31, color: C.gray, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
-          {label}
-        </div>
-        <div style={{ fontSize: 42, color: C.black, fontWeight: 600 }}>{value}</div>
-      </div>
-    ) : null;
-
-  const sectionLabel = (text: string) => (
-    <div style={{
-      fontSize: 33, fontWeight: 700, color: C.primary,
-      textTransform: 'uppercase', letterSpacing: 4,
-      borderBottom: `4px solid ${C.lightGray}`, paddingBottom: 18, marginBottom: 35,
-    }}>
-      {text}
-    </div>
-  );
-
-  const addressLine = [client.city, client.postal_code].filter(Boolean).join(', ');
+  const metaParts = [
+    quote_number && `Quote ${quote_number}`,
+    `Date: ${fmtDate(created_at)}`,
+    expires_at && `Expires: ${fmtDate(expires_at)}`,
+  ].filter(Boolean);
 
   return (
-    <BgPage bgUrl={data.template.company_details_page_url}>
-      {/* Inset: 14mm proportional → 234px at 4961px page width */}
+    <BgPage bgUrl={bgUrl}>
+      {/* Single client info line just before the bottom edge */}
       <div style={{
         position: 'absolute',
-        top: 234, left: 234, right: 234, bottom: 234,
-        display: 'flex', flexDirection: 'column',
+        bottom: 220,
+        left: 234,
+        right: 234,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
       }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 44 }}>
-          <div>
-            <div style={{ fontSize: 88, fontWeight: 300, color: C.primary, letterSpacing: -2 }}>QUOTE</div>
-            {quote_number && (
-              <div style={{ fontSize: 40, color: C.gray, marginTop: 9 }}>{quote_number}</div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right', fontSize: 35, color: C.gray }}>
-            <div>Date: {fmtDate(created_at)}</div>
-            {expires_at && <div style={{ marginTop: 9 }}>Expires: {fmtDate(expires_at)}</div>}
-          </div>
+        {/* Client name / company */}
+        <div style={{
+          fontSize: 38,
+          color: C.white,
+          fontWeight: 400,
+          letterSpacing: 1,
+          textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+        }}>
+          {clientParts.join('  ·  ')}
         </div>
-
-        {/* Two-column detail panels */}
-        <div style={{ display: 'flex', gap: 71, flex: 1, minHeight: 0 }}>
-          {/* Left: Client */}
+        {/* Quote number + dates */}
+        {metaParts.length > 0 && (
           <div style={{
-            flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.88)',
-            borderRadius: 27,
-            padding: '44px 53px',
-            overflow: 'hidden',
+            fontSize: 35,
+            color: C.white,
+            opacity: 0.85,
+            textShadow: '0 2px 8px rgba(0,0,0,0.6)',
           }}>
-            {sectionLabel('Client Details')}
-            {field('Contact', client.contact_name)}
-            {field('Company', client.company_name)}
-            {field('Email', client.email)}
-            {field('Phone', client.phone)}
-            {(client.address || addressLine || client.country) && (
-              <div style={{ marginBottom: 27 }}>
-                <div style={{ fontSize: 31, color: C.gray, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>Address</div>
-                {client.address && <div style={{ fontSize: 42, color: C.black, fontWeight: 600 }}>{client.address}</div>}
-                {addressLine && <div style={{ fontSize: 42, color: C.black }}>{addressLine}</div>}
-                {client.country && <div style={{ fontSize: 42, color: C.black }}>{client.country}</div>}
-              </div>
-            )}
-            {field('VAT Number', client.vat_number)}
+            {metaParts.join('  ·  ')}
           </div>
-
-          {/* Right: Our company */}
-          <div style={{
-            flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.88)',
-            borderRadius: 27,
-            padding: '44px 53px',
-            overflow: 'hidden',
-          }}>
-            {sectionLabel('From')}
-            {field('Company', template.company_name || null)}
-            {field('Address', template.company_address || null)}
-            {field('Phone', template.company_phone || null)}
-            {field('Email', template.company_email || null)}
-            {field('VAT', template.company_vat || null)}
-
-            {notes && (
-              <>
-                <div style={{ marginTop: 53 }}>{sectionLabel('Notes')}</div>
-                <div style={{ fontSize: 38, color: C.black, lineHeight: 1.5, marginTop: 18 }}>
-                  {notes}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </BgPage>
   );
 };
+
+// ─── Page 2: Intro (pure image) ───────────────────────────────────────────────
+
+const IntroPage: React.FC<{ bgUrl: string | null }> = ({ bgUrl }) => (
+  <BgPage bgUrl={bgUrl} />
+);
 
 // ─── Items pages ──────────────────────────────────────────────────────────────
 
@@ -225,10 +173,13 @@ const ItemsPage: React.FC<{
 
   return (
     <BgPage bgUrl={data.template.content_page_url}>
-      {/* Inset: top 15mm → 251px, sides 12mm → 201px */}
+      {/*
+        Inset: top 15mm → 251px, sides 12mm → 201px + 50px extra each side = 251px
+        The extra 50px on each side keeps the table clear of the design's side panels.
+      */}
       <div style={{
         position: 'absolute',
-        top: 251, left: 201, right: 201, bottom: 201,
+        top: 251, left: 251, right: 251, bottom: 201,
         display: 'flex',
         flexDirection: 'column',
       }}>
@@ -244,7 +195,7 @@ const ItemsPage: React.FC<{
           )}
         </div>
 
-        {/* Table */}
+        {/* Table — transparent rows so background image shows through */}
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', flex: 1 }}>
           <colgroup>
             <col style={{ width: COL_WIDTHS.num }} />
@@ -255,7 +206,7 @@ const ItemsPage: React.FC<{
           </colgroup>
 
           <thead>
-            <tr style={{ backgroundColor: C.headerBg }}>
+            <tr style={{ backgroundColor: C.tableHeader }}>
               {['#', 'Product', 'Qty', 'Unit Price', 'Total'].map((h, i) => (
                 <th
                   key={h}
@@ -278,9 +229,8 @@ const ItemsPage: React.FC<{
           <tbody>
             {pageItems.map((item, i) => {
               const rowNum = startIndex + i + 1;
-              const isAlt = i % 2 === 1;
               return (
-                <tr key={item.id} style={{ backgroundColor: isAlt ? C.rowAlt : C.white }}>
+                <tr key={item.id} style={{ backgroundColor: 'transparent' }}>
                   {/* # */}
                   <td style={{ padding: '22px 35px', fontSize: 35, color: C.gray, verticalAlign: 'top' }}>
                     {rowNum}
@@ -326,21 +276,16 @@ const ItemsPage: React.FC<{
           </tbody>
         </table>
 
-        {/* Totals — last items page only */}
+        {/* Totals — last items page only, transparent background */}
         {showTotals && (
           <div style={{
             marginTop: 35,
             paddingTop: 35,
-            borderTop: `4px solid rgba(255,255,255,0.5)`,
+            borderTop: `4px solid rgba(0,0,0,0.15)`,
             display: 'flex',
             justifyContent: 'flex-end',
           }}>
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.92)',
-              borderRadius: 27,
-              padding: '35px 62px',
-              minWidth: 796,
-            }}>
+            <div style={{ minWidth: 796 }}>
               <TotalsBlock data={data} />
             </div>
           </div>
@@ -405,8 +350,13 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
         className={className}
         style={{ display: 'flex', flexDirection: 'column', gap: 0, alignItems: 'flex-start' }}
       >
-        <CoverPage bgUrl={template.first_page_url} />
-        <DetailsPage data={data} />
+        {/* Page 1: Cover with client info line */}
+        <CoverPage bgUrl={template.first_page_url} data={data} />
+
+        {/* Page 2: Intro (pure image, only rendered if configured) */}
+        {template.intro_page_url && <IntroPage bgUrl={template.intro_page_url} />}
+
+        {/* Pages 3+: Items */}
         {itemPages.map((pageItems, idx) => (
           <ItemsPage
             key={idx}
@@ -417,6 +367,8 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
             showTotals={idx === itemPages.length - 1}
           />
         ))}
+
+        {/* Last page: Back cover */}
         <BackCoverPage bgUrl={template.last_page_url} />
       </div>
     );
