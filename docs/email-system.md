@@ -1,10 +1,11 @@
 # Email System
 
-Complete documentation for the Amazon SES email system with domain verification, template management, and delivery analytics.
+Complete documentation for the Resend email system with domain management, template management, and delivery analytics.
+
+> **Migration note (2026-03-11):** Email provider migrated from Amazon SES to **Resend**. AWS SES secrets (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET_NAME`) have been removed. Replace with `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET`.
 
 > **📚 Related Documentation:**
-> - [Campaign System](./campaign-system.md) - Email campaign management ✨ NEW
-> - [SES Webhook Setup](./ses-webhook-setup.md) - Bounce and complaint handling
+> - [Campaign System](./campaign-system.md) - Email campaign management
 > - [Deployment Guide](./deployment-guide.md) - Supabase Secrets configuration
 > - [API Endpoints](./api-endpoints.md) - Complete API reference
 > - [System Architecture](./system-architecture.md) - Platform overview
@@ -28,17 +29,17 @@ Complete documentation for the Amazon SES email system with domain verification,
 
 ## Overview
 
-The Email System provides enterprise-grade email capabilities using **Amazon SES** (Simple Email Service) with comprehensive tracking, analytics, and template management. All email operations are handled through Supabase Edge Functions with AWS credentials stored securely as Supabase Secrets.
+The Email System provides enterprise-grade email capabilities using **Resend** with comprehensive tracking, analytics, and template management. All email operations are handled through Supabase Edge Functions with the Resend API key stored securely as a Supabase Secret.
 
 ### Key Features
 
-- **Domain Verification** - DNS-based domain verification with SES
+- **Domain Management** - DNS-based domain verification via Resend Dashboard
 - **Template Management** - React Email components with variable substitution
 - **Delivery Tracking** - Real-time tracking of sent, delivered, bounced, complained emails
 - **Analytics Dashboard** - Delivery rates, bounce rates, complaint rates with charts
-- **Webhook Integration** - SNS webhooks for automatic event processing
+- **Webhook Integration** - Resend webhooks (Svix-signed) for automatic event processing
 - **Admin Interface** - Complete management UI at `/admin/emails`
-- **Security** - AWS credentials stored as Supabase Secrets (never in frontend)
+- **Security** - Resend API key stored as Supabase Secret (never in frontend)
 - **Audit Trail** - Complete email logs with metadata and tags
 
 ### Use Cases
@@ -63,16 +64,16 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ SUPABASE EDGE FUNCTIONS (Deno)                             │
-│ ├─ email-api (Send, Verify, Analytics)                     │
-│ └─ email-webhooks (SNS Event Processing)                   │
+│ ├─ email-api (Send, Domain Mgmt, Analytics)                │
+│ └─ email-webhooks (Resend Event Processing)                │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ AMAZON SES (Email Service)                                  │
-│ ├─ Domain Verification                                      │
-│ ├─ Email Sending                                            │
+│ RESEND (Email Service)                                      │
+│ ├─ Domain Verification (via Resend Dashboard)               │
+│ ├─ Email Sending (REST API)                                 │
 │ ├─ Bounce/Complaint Tracking                               │
-│ └─ SNS Notifications                                        │
+│ └─ Webhook Events (Svix-signed)                             │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -98,14 +99,16 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 **Location:** `supabase/functions/`
 
 **email-api** - Main email API with actions:
-- `send` - Send emails with/without templates
-- `verify-domain` - Initiate domain verification
-- `check-domain` - Check verification status
+- `send` - Send emails with/without templates via Resend
+- `add-domain` - Register a domain in the database
+- `mark-domain-verified` - Mark domain verified after Resend dashboard confirmation
+- `domains` - List domains from database
+- `logs` - Get email logs
 - `analytics` - Get email statistics
-- `sending-stats` - Get SES quota information
 
-**email-webhooks** - SNS webhook handler:
-- Process SES events (bounces, complaints, deliveries)
+**email-webhooks** - Resend webhook handler:
+- Process Resend events (bounces, complaints, deliveries, opens, clicks)
+- Svix HMAC-SHA256 signature verification
 - Auto-update email_logs table
 - Track email lifecycle
 
@@ -134,16 +137,15 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Domain Verification** | DNS-based verification with SES | ✅ Active |
-| **Email Sending** | Send via SES with templates or raw HTML | ✅ Active |
+| **Domain Management** | DNS verification via Resend Dashboard | ✅ Active |
+| **Email Sending** | Send via Resend REST API with templates or raw HTML | ✅ Active |
 | **Template Management** | React Email components with variables | ✅ Active |
 | **Delivery Tracking** | Track sent, delivered, bounced, complained | ✅ Active |
-| **Event Processing** | SNS webhooks for real-time updates | ✅ Active |
+| **Event Processing** | Resend webhooks (Svix-signed) for real-time updates | ✅ Active |
 | **Analytics Dashboard** | Delivery rates, charts, recommendations | ✅ Active |
 | **Email Logs** | Complete audit trail with filtering | ✅ Active |
 | **Bounce Handling** | Automatic bounce detection and logging | ✅ Active |
 | **Complaint Monitoring** | Track spam complaints | ✅ Active |
-| **Quota Monitoring** | Track SES sending limits | ✅ Active |
 | **Test Email** | Send test emails to verify configuration | ✅ Active |
 | **Multi-type Support** | Transactional, marketing, notification | ✅ Active |
 
@@ -158,7 +160,7 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 
 **Authentication:** Requires Supabase `anon` or `service_role` key in `Authorization` header
 
-All requests are made by invoking the `email-api` edge function with a body containing an `action` string (required: 'send', 'verify-domain', 'check-domain', 'analytics', 'sending-stats') plus action-specific parameters.
+All requests are made by invoking the `email-api` edge function with a body containing an `action` string. Available actions: `send`, `add-domain`, `mark-domain-verified`, `domains`, `logs`, `analytics`.
 
 ---
 
@@ -168,29 +170,27 @@ Send an email with or without a template.
 
 **Request parameters:** `to` (string or array of recipient emails), `subject`, optional `html` body, optional `text` body, optional `templateSlug`, optional `variables` for template substitution, optional `from` email, optional `fromName`, optional `cc` and `bcc` arrays, optional `emailType` ('transactional', 'marketing', or 'notification'), optional `tags`, and optional `metadata`.
 
-**Response:** `success: true`, `messageId` (SES message ID), `logId` (email_logs record ID).
+**Response:** `success: true`, `messageId` (Resend email UUID), `logId` (email_logs record ID).
 
 ---
 
-### Action: verify-domain
+### Action: add-domain
 
-Initiate domain verification with Amazon SES.
+Register a domain in the platform database (admin only). Verify the domain in the [Resend Dashboard](https://resend.com/domains) first, then mark it verified here.
 
-**Request parameters:** `action: 'verify-domain'`, `domain` (e.g., 'example.com').
+**Request parameters:** `action: 'add-domain'`, `domain` (e.g., 'example.com').
 
-**Response:** `success: true`, `verificationToken` (DNS TXT record value), `domain`.
-
-After receiving the token, add a DNS TXT record with name `_amazonses.yourdomain.com` and value set to the verification token.
+**Response:** `success: true`, `domain` object, `message` with instructions.
 
 ---
 
-### Action: check-domain
+### Action: mark-domain-verified
 
-Check domain verification status.
+Mark a domain as verified after confirming DNS records in Resend Dashboard (admin only).
 
-**Request parameters:** `action: 'check-domain'`, `domain`.
+**Request parameters:** `action: 'mark-domain-verified'`, `domain`.
 
-**Response:** `success: true`, `isVerified` (boolean), `status` ('pending', 'verified', or 'failed').
+**Response:** `success: true`.
 
 ---
 
@@ -200,17 +200,7 @@ Get email analytics for a date range.
 
 **Request parameters:** `action: 'analytics'`, optional `dateRange` object with `start` and `end` ISO date strings.
 
-**Response:** `success: true`, `totalSent`, `totalDelivered`, `totalBounced`, `totalComplained`, `deliveryRate` (percentage), `bounceRate` (percentage), `complaintRate` (percentage).
-
----
-
-### Action: sending-stats
-
-Get SES account sending statistics and quota.
-
-**Request parameters:** `action: 'sending-stats'`.
-
-**Response:** `success: true`, `max24HourSend`, `maxSendRate`, `sentLast24Hours`, `remainingQuota`.
+**Response:** `success: true`, `totalSent`, `totalDelivered`, `totalBounced`, `totalComplained`, `totalOpened`, `totalClicked`, `deliveryRate` (percentage), `bounceRate` (percentage), `complaintRate` (percentage), `openRate` (percentage), `clickRate` (percentage).
 
 
 ---
@@ -219,29 +209,33 @@ Get SES account sending statistics and quota.
 
 **Endpoint:** `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks`
 
-**Purpose:** Process SNS notifications from Amazon SES
+**Purpose:** Process Resend webhook events (delivery, bounce, complaint, open, click)
 
-**Authentication:** Public endpoint (SNS signature verification)
+**Authentication:** Svix HMAC-SHA256 signature verification using `RESEND_WEBHOOK_SECRET`
 
 **Supported Events:**
-- `Bounce` - Email bounced (hard or soft)
-- `Complaint` - Recipient marked as spam
-- `Delivery` - Email successfully delivered
-- `Send` - Email sent from SES
-- `Reject` - Email rejected by SES
-- `Open` - Email opened (requires tracking)
-- `Click` - Link clicked (requires tracking)
+
+| Resend Event | Internal Type | Description |
+|---|---|---|
+| `email.sent` | `send` | Accepted by Resend |
+| `email.delivered` | `delivery` | Delivered to recipient |
+| `email.delivery_delayed` | `delivery_delayed` | Temporary delay |
+| `email.bounced` | `bounce` | Permanent bounce |
+| `email.complained` | `complaint` | Spam complaint |
+| `email.opened` | `open` | Recipient opened |
+| `email.clicked` | `click` | Recipient clicked a link |
 
 **Auto-Processing:**
-- Updates `email_logs` table automatically
+- Verifies Svix webhook signature before processing
+- Updates `email_logs` status and timestamps
 - Creates `email_events` records
-- Triggers update email log status
+- DB trigger propagates status changes
 
 **Setup:**
-1. Create SNS topic in AWS Console
-2. Configure SES to publish events to SNS
-3. Subscribe this webhook endpoint to SNS topic
-4. Webhook auto-confirms subscription
+1. Deploy `email-webhooks` edge function
+2. In [Resend Dashboard → Webhooks](https://resend.com/webhooks), add endpoint: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks`
+3. Select all event types
+4. Copy signing secret → set as `RESEND_WEBHOOK_SECRET` in Supabase Edge Function secrets
 
 ---
 
@@ -256,7 +250,7 @@ Stores verified domains for sending emails.
 | `id` | UUID | Primary key |
 | `domain` | TEXT | Domain name (e.g., 'materialkai.com') |
 | `verification_status` | TEXT | 'pending', 'verified', 'failed' |
-| `verification_token` | TEXT | DNS TXT record value from SES |
+| `verification_token` | TEXT | DNS TXT record reference (verification done via Resend Dashboard) |
 | `dkim_tokens` | TEXT[] | DKIM token values |
 | `is_default` | BOOLEAN | Default domain for sending |
 | `reputation_score` | INTEGER | Domain reputation (0-100) |
@@ -302,7 +296,7 @@ Complete audit trail of all sent emails.
 | `id` | UUID | Primary key |
 | `template_id` | UUID | Reference to email_templates |
 | `domain_id` | UUID | Reference to email_domains |
-| `message_id` | TEXT | SES message ID |
+| `message_id` | TEXT | Resend email ID (UUID) |
 | `from_email` | TEXT | Sender email address |
 | `from_name` | TEXT | Sender display name |
 | `to_email` | TEXT | Recipient email address |
@@ -343,8 +337,8 @@ Tracks all email delivery events from SES.
 |--------|------|-------------|
 | `id` | UUID | Primary key |
 | `log_id` | UUID | Reference to email_logs |
-| `event_type` | TEXT | 'bounce', 'complaint', 'delivery', 'send', 'open', 'click' |
-| `event_data` | JSONB | Full event payload from SES |
+| `event_type` | TEXT | 'bounce', 'complaint', 'delivery', 'delivery_delayed', 'send', 'open', 'click' |
+| `event_data` | JSONB | Full event payload from Resend |
 | `timestamp` | TIMESTAMPTZ | Event timestamp |
 | `created_at` | TIMESTAMPTZ | Record creation timestamp |
 
@@ -385,42 +379,31 @@ Daily aggregated email statistics.
 
 ### Prerequisites
 
-- AWS Account with SES access
+- [Resend account](https://resend.com) with a verified domain
 - Supabase project (KAI - `bgbavxtjlbvgplozizxu`)
-- Domain with DNS access
 - Admin access to Material Kai platform
 
-### Step 1: AWS SES Configuration
+### Step 1: Create Resend API Key
 
-#### 1.1 Create IAM User
-
-1. Go to AWS Console → IAM → Users
-2. Click **Create User**
-3. Name: `material-kai-ses`
-4. Attach a policy granting permissions for ses:SendEmail, ses:SendRawEmail, ses:VerifyDomainIdentity, ses:GetIdentityVerificationAttributes, ses:GetSendQuota, ses:GetSendStatistics, and ses:GetAccount on all resources.
-5. Create access key → Save credentials
-
-#### 1.2 Request Production Access
-
-1. Go to AWS Console → SES
-2. Click **Request production access**
-3. Fill out form (use case, sending volume)
-4. Wait for approval (usually 24-48 hours)
+1. Log in to [resend.com](https://resend.com)
+2. Go to **API Keys** → **Create API Key**
+3. Name: `material-kai-production`
+4. Permission: **Full Access** (or Sending Access for sending only)
+5. Copy the key — it starts with `re_`
 
 ### Step 2: Configure Supabase Secrets
 
-**CRITICAL:** AWS credentials MUST be stored as Supabase Secrets, NOT environment variables.
+**CRITICAL:** The Resend API key MUST be stored as a Supabase Secret, NOT an environment variable.
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select project: **KAI** (`bgbavxtjlbvgplozizxu`)
-3. Navigate to **Edge Functions** → **Settings** → **Secrets**
+3. Navigate to **Edge Functions** → **Manage Secrets**
 4. Add these secrets:
 
-| Secret Name | Example Value | Description |
-|------------|---------------|-------------|
-| `AWS_REGION` | `us-east-1` | AWS region for SES |
-| `AWS_ACCESS_KEY_ID` | `AKIAIOSFODNN7EXAMPLE` | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` | IAM secret key |
+| Secret Name | Value | Description |
+|------------|-------|-------------|
+| `RESEND_API_KEY` | `re_xxxxxxxxxxxxxxxxxxxx` | Resend API key for email sending |
+| `RESEND_WEBHOOK_SECRET` | `whsec_xxxxxxxxxxxxxxxxxxxx` | Resend webhook signing secret (add after Step 4) |
 
 **Why Supabase Secrets?**
 - ✅ Never exposed to frontend code
@@ -428,56 +411,50 @@ Daily aggregated email statistics.
 - ✅ No redeployment needed when updating
 - ✅ Follows security best practices
 
-> **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → **Email Settings** button, not as environment variables. This allows for easy updates without redeploying Edge Functions.
+> **Note:** Default sender email and name are configured through the Admin Panel at `/admin/email` → **Email Settings**, not as environment variables.
 
-### Step 3: Deploy Edge Functions
+### Step 3: Configure Supabase Auth SMTP
 
-Deploy the edge functions using the Supabase CLI: `supabase functions deploy email-api` and `supabase functions deploy email-webhooks`. Verify the deployment by calling the `sending-stats` action on the deployed endpoint.
+Route Supabase Auth emails (magic links, confirmations, password resets) through Resend:
 
-### Step 4: Configure SNS Webhooks
+1. Go to Supabase Dashboard → **Authentication** → **Email** → **SMTP Settings**
+2. Enable custom SMTP
+3. Enter:
 
-#### 4.1 Create SNS Topic
+| Field | Value |
+|---|---|
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | Your `RESEND_API_KEY` |
+| Sender email | `noreply@yourdomain.com` |
+| Sender name | `Material KAI` |
 
-1. Go to AWS Console → SNS
-2. Click **Create topic**
-3. Type: **Standard**
-4. Name: `material-kai-ses-events`
-5. Click **Create topic**
+### Step 4: Deploy Edge Functions
 
-#### 4.2 Configure SES to Publish Events
+```bash
+supabase functions deploy email-api
+supabase functions deploy email-webhooks
+supabase functions deploy email-webhook
+```
 
-1. Go to AWS Console → SES → Configuration Sets
-2. Click **Create configuration set**
-3. Name: `material-kai-default`
-4. Add event destination:
-   - Event types: Bounce, Complaint, Delivery, Send
-   - Destination: SNS
-   - Topic: `material-kai-ses-events`
+### Step 5: Register Resend Webhook
 
-#### 4.3 Subscribe Webhook
+1. Go to [Resend Dashboard → Webhooks](https://resend.com/webhooks)
+2. Click **Add Endpoint**
+3. URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks`
+4. Select events: `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.opened`, `email.clicked`
+5. Save → Copy the **Signing Secret** (starts with `whsec_`)
+6. Add `RESEND_WEBHOOK_SECRET` to Supabase Edge Function secrets (Step 2)
 
-1. Go to SNS topic → **Create subscription**
-2. Protocol: **HTTPS**
-3. Endpoint: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks`
-4. Click **Create subscription**
-5. Webhook auto-confirms subscription
+### Step 6: Add & Verify Domain
 
-### Step 5: Verify Domain
+1. In [Resend Dashboard → Domains](https://resend.com/domains), add your domain and complete DNS verification
+2. Navigate to `/admin/emails` in Material Kai → **Domains** tab
+3. Click **Add Domain**, enter your domain name
+4. Once Resend shows the domain as verified, click **Mark Verified** in the admin panel
 
-1. Navigate to `/admin/emails` in Material Kai
-2. Click **Domains** tab
-3. Click **Add Domain**
-4. Enter domain: `materialkai.com`
-5. Copy DNS records shown
-6. Add to your DNS provider:
-
-**TXT Record:** Name: `_amazonses.materialkai.com`, Value: `[verification token from step 4]`, TTL: 1800
-
-7. Wait for DNS propagation (5-30 minutes)
-8. Click **Check Verification**
-9. Status should change to **Verified**
-
-### Step 6: Test Email Sending
+### Step 7: Test Email Sending
 
 1. Go to `/admin/emails`
 2. Click **Test Email** button
@@ -641,12 +618,12 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 | Practice | Description | Priority |
 |----------|-------------|----------|
-| **Use Supabase Secrets** | Never expose AWS credentials | Critical |
+| **Use Supabase Secrets** | Never expose Resend API key in frontend | Critical |
 | **Validate inputs** | Sanitize email addresses and content | High |
 | **Rate limiting** | Implement sending rate limits | High |
 | **Monitor abuse** | Watch for unusual sending patterns | High |
 | **Use HTTPS** | Always use HTTPS for webhooks | Critical |
-| **Verify SNS signatures** | Validate SNS webhook signatures | High |
+| **Verify webhook signatures** | Validate Resend/Svix webhook signatures via `RESEND_WEBHOOK_SECRET` | High |
 | **RLS policies** | Enable Row Level Security on all tables | Critical |
 | **Audit logs** | Track all email operations | Medium |
 
@@ -675,21 +652,16 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 **Solutions:**
 
-1. **Check Supabase Secrets:** Verify that `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` are set using `supabase secrets list`.
+1. **Check Supabase Secrets:** Verify that `RESEND_API_KEY` is set — run `supabase secrets list` and confirm it appears.
 
 2. **Check Domain Verification:**
    - Go to `/admin/emails` → Domains
    - Verify domain status is "Verified"
    - If pending, check DNS records
 
-3. **Check SES Sandbox Mode:**
-   - AWS Console → SES → Account dashboard
-   - If in sandbox, request production access
-   - In sandbox, can only send to verified addresses
+3. **Check Resend Dashboard:** Log in to [resend.com](https://resend.com) and confirm the domain is verified and the API key is active.
 
-4. **Check Sending Quota:** Invoke the `sending-stats` action and review the quota data. If quota exceeded, wait or request increase.
-
-5. **Check Edge Function Logs:** Run `supabase functions logs email-api` to review function output.
+4. **Check Edge Function Logs:** Run `supabase functions logs email-api` to review function output.
 
 ### Issue: High Bounce Rate
 
@@ -722,17 +694,16 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 **Solutions:**
 
-1. **Check SNS Subscription:**
-   - AWS Console → SNS → Subscriptions
-   - Verify subscription is "Confirmed"
-   - If pending, check webhook logs for confirmation
+1. **Check Resend Webhook Registration:**
+   - [Resend Dashboard → Webhooks](https://resend.com/webhooks)
+   - Verify the endpoint URL is correct
+   - Check that all required event types are selected
 
-2. **Check SES Configuration Set:**
-   - AWS Console → SES → Configuration Sets
-   - Verify event publishing is enabled
-   - Check SNS topic is correct
+2. **Check `RESEND_WEBHOOK_SECRET`:**
+   - Run `supabase secrets list` to confirm the secret is set
+   - The value must match the signing secret shown in Resend's webhook settings
 
-3. **Test Webhook:** Send a POST request to the email-webhooks endpoint with a test SubscriptionConfirmation body to verify it responds.
+3. **Test Webhook:** Send a test event from the Resend dashboard webhook page to verify the endpoint responds with 200.
 
 4. **Check Edge Function Logs:** Run `supabase functions logs email-webhooks` to review function output.
 
@@ -764,6 +735,6 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 ---
 
-**Last Updated:** 2025-12-25
-**Version:** 1.0.0
+**Last Updated:** 2026-03-11
+**Version:** 2.0.0 (Resend migration)
 **Maintainer:** Material Kai Development Team

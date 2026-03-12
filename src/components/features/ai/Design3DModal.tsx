@@ -7,8 +7,9 @@ import {
 } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { X, Package, Globe, Loader2 } from 'lucide-react';
+import { X, Package, Globe, Loader2, BookmarkPlus } from 'lucide-react';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 
 interface Design3DModalProps {
   design: {
@@ -129,40 +130,54 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
               </DialogHeader>
 
               {/* Design Image */}
-              <div className="flex-1 p-6 overflow-hidden">
-                <div className="relative w-full h-full rounded-lg overflow-hidden bg-white border border-gray-200 shadow-lg">
+              <div className="flex-1 p-6 pb-3 overflow-hidden">
+                <div className="w-full h-full rounded-lg overflow-hidden bg-white border border-gray-200 shadow-lg">
                   <img
                     src={design.image.url}
                     alt={design.image.alt}
                     className="w-full h-full object-cover"
                   />
-                  {/* VR Button */}
-                  {onGenerateVR && (
-                    <div className="absolute top-4 right-4 z-10">
-                      <button
-                        onClick={() => {
-                          if (!vrGenerating) {
-                            onGenerateVR(design.image.url, {
-                              roomType: design.room_type,
-                              style: design.style,
-                              prompt: design.description,
-                            });
-                          }
-                        }}
-                        disabled={vrGenerating}
-                        className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
-                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
-                      >
-                        {vrGenerating ? (
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Globe className="w-5 h-5" />
-                        )}
-                        <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
+              </div>
+
+              {/* Action bar — outside the overflow-hidden image container so buttons are always visible */}
+              <div className="px-6 pb-6 flex items-center gap-2">
+                <MoodboardSavePopover
+                  mediaUrl={design.image.url}
+                  mediaType="image"
+                  mediaTitle={design.title}
+                >
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                    title="Save this design to a moodboard"
+                  >
+                    <BookmarkPlus className="h-3.5 w-3.5" />
+                    Save to Moodboard
+                  </button>
+                </MoodboardSavePopover>
+                {onGenerateVR && (
+                  <button
+                    onClick={() => {
+                      if (!vrGenerating) {
+                        onGenerateVR(design.image.url, {
+                          roomType: design.room_type,
+                          style: design.style,
+                          prompt: design.description,
+                        });
+                      }
+                    }}
+                    disabled={vrGenerating}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                    title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                  >
+                    {vrGenerating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Globe className="w-3.5 h-3.5" />
+                    )}
+                    {vrGenerating ? 'Generating VR...' : 'Generate VR'}
+                  </button>
+                )}
               </div>
             </div>
 

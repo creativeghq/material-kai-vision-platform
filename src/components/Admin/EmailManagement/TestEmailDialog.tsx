@@ -86,11 +86,11 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
 
       // Check for common edge function errors
       if (errorMessage.includes('FunctionsRelayError') || errorMessage.includes('FunctionsHttpError')) {
-        errorMessage = 'Email service is not configured. Please check AWS SES credentials in Supabase Edge Function settings.';
-      } else if (errorMessage.includes('Email address is not verified') || errorMessage.includes('MessageRejected')) {
-        errorMessage = 'AWS SES is in Sandbox Mode. You must verify both sender and recipient email addresses in AWS SES Console, or request production access.';
-      } else if (errorMessage.includes('AccessDenied') || errorMessage.includes('InvalidClientTokenId')) {
-        errorMessage = 'AWS credentials are invalid or expired. Please check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Supabase secrets.';
+        errorMessage = 'Email service is not configured. Please check RESEND_API_KEY in Supabase Edge Function secrets.';
+      } else if (errorMessage.includes('RESEND_API_KEY is not configured')) {
+        errorMessage = 'Resend API key is missing. Add RESEND_API_KEY to Supabase Edge Function secrets.';
+      } else if (errorMessage.includes('domain is not verified') || errorMessage.includes('You can only send')) {
+        errorMessage = 'Sender domain is not verified in Resend. Verify your domain at resend.com/domains.';
       }
 
       toast({
@@ -109,7 +109,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
         <DialogHeader>
           <DialogTitle>Send Test Email</DialogTitle>
           <DialogDescription>
-            Send a test email to verify your email configuration is working correctly.
+            Send a test email via Resend to verify your configuration is working correctly.
           </DialogDescription>
         </DialogHeader>
 

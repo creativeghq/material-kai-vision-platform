@@ -24,7 +24,9 @@ import {
   Globe,
   Loader2,
   Video,
+  BookmarkPlus,
 } from 'lucide-react';
+import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 
 interface ModelResult {
   model_id: string;
@@ -73,6 +75,7 @@ interface DesignCanvasProps {
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   vrGenerating?: boolean;
   onGenerateVideo?: (imageUrl: string) => void;
+  onAddToMoodboard?: (imageUrl: string) => void;
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -91,6 +94,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   onGenerateVR,
   vrGenerating,
   onGenerateVideo,
+  onAddToMoodboard,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
@@ -238,73 +242,64 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 </>
               )}
 
-              {/* Action Buttons */}
-              <div className="absolute top-4 right-4 flex gap-2 z-10">
-                {/* Generate VR Button */}
-                {onGenerateVR && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!vrGenerating) {
-                        onGenerateVR(images[currentImageIndex], {
-                          prompt: parsedRequest?.enhanced_prompt,
-                          roomType: parsedRequest?.room_type,
-                          style: parsedRequest?.style,
-                        });
-                      }
-                    }}
-                    disabled={vrGenerating}
-                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
-                    title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
-                  >
-                    {vrGenerating ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Globe className="w-5 h-5" />
-                    )}
-                    <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
-                  </button>
-                )}
+            </div>
 
-                {/* Generate Video Button */}
-                {onGenerateVideo && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGenerateVideo(images[currentImageIndex]);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors shadow-lg"
-                    title="Generate video walkthrough with Veo (30 credits)"
-                  >
-                    <Video className="w-5 h-5" />
-                    <span className="font-medium">Generate Video</span>
-                  </button>
-                )}
-
-                {/* Find Materials Button */}
-                {onFindMaterials && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFindMaterials(images[currentImageIndex]);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg"
-                    title="Find matching materials for this design"
-                  >
-                    <Search className="w-5 h-5" />
-                    <span className="font-medium">Find Materials</span>
-                  </button>
-                )}
-
-                {/* Download Button */}
+            {/* Action bar — outside overflow-hidden so buttons are always visible */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              {onGenerateVR && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); downloadImage(images[currentImageIndex]); }}
-                  className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
-                  title="Download image"
+                  onClick={() => { if (!vrGenerating) onGenerateVR(images[currentImageIndex], { prompt: parsedRequest?.enhanced_prompt, roomType: parsedRequest?.room_type, style: parsedRequest?.style }); }}
+                  disabled={vrGenerating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                  title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
                 >
-                  <Download className="w-5 h-5" />
+                  {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                  {vrGenerating ? 'Generating VR World...' : 'Generate VR World'}
                 </button>
-              </div>
+              )}
+              {onGenerateVideo && (
+                <button
+                  onClick={() => onGenerateVideo(images[currentImageIndex])}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                  title="Generate video walkthrough with Veo (30 credits)"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Generate Video
+                </button>
+              )}
+              {onFindMaterials && (
+                <button
+                  onClick={() => onFindMaterials(images[currentImageIndex])}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-medium text-blue-700 transition-colors shadow-sm"
+                  title="Find matching materials for this design"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  Find Materials
+                </button>
+              )}
+              {images[currentImageIndex] && (
+                <MoodboardSavePopover
+                  mediaUrl={images[currentImageIndex]}
+                  mediaType="image"
+                  mediaTitle="Generated Design"
+                >
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-full text-xs font-medium text-pink-700 transition-colors shadow-sm"
+                    title="Save this design to a moodboard"
+                  >
+                    <BookmarkPlus className="w-3.5 h-3.5" />
+                    Save to Moodboard
+                  </button>
+                </MoodboardSavePopover>
+              )}
+              <button
+                onClick={() => downloadImage(images[currentImageIndex])}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors shadow-sm"
+                title="Download image"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download
+              </button>
             </div>
 
             {/* Multi-Model Summary Banner */}

@@ -1,10 +1,23 @@
 /**
- * Email Webhook Handler
- * Processes email events from email service provider (opens, clicks, bounces, complaints)
+ * Email Webhook Handler — Campaign Recipient Tracking
+ * Processes email events from Resend for campaign delivery tracking.
+ *
+ * Resend sends events with type like "email.delivered", "email.bounced", etc.
+ * This handler maps those to campaign_recipients table updates.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
+// Map Resend event types to our normalized event_type strings
+const RESEND_EVENT_MAP: Record<string, string> = {
+  'email.delivered': 'delivered',
+  'email.bounced': 'bounced',
+  'email.complained': 'complained',
+  'email.opened': 'opened',
+  'email.clicked': 'clicked',
+  'email.sent': 'sent',
+};
 
 serve(async (req) => {
   try {
@@ -12,18 +25,22 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const event = await req.json();
-    console.log('Received email event:', event);
+    const payload = await req.json();
+    console.log('Received email event:', payload);
 
-    // Extract event data (format depends on your email provider)
-    const {
-      event_type,
-      recipient_id,
-      campaign_id,
-      email,
-      timestamp,
-      metadata,
-    } = event;
+    // Normalize: support both direct event_type strings and Resend's typed format
+    let event_type: string = payload.event_type || payload.type || '';
+    if (RESEND_EVENT_MAP[event_type]) {
+      event_type = RESEND_EVENT_MAP[event_type];
+    }
+
+    // Resend wraps data under `data`; direct callers may pass fields at root
+    const data = payload.data || payload;
+    const recipient_id: string | undefined = data.recipient_id || payload.recipient_id;
+    const campaign_id: string | undefined = data.campaign_id || payload.campaign_id;
+    const email: string | undefined = data.to?.[0] || data.email || payload.email;
+    const timestamp: string | undefined = data.created_at || payload.timestamp;
+    const metadata = data.metadata || payload.metadata;
 
     if (!recipient_id && !campaign_id) {
       return new Response(
@@ -34,7 +51,7 @@ serve(async (req) => {
 
     // Find the recipient
     let query = supabase.from('campaign_recipients').select('*');
-    
+
     if (recipient_id) {
       query = query.eq('id', recipient_id);
     } else if (campaign_id && email) {
@@ -55,28 +72,23 @@ serve(async (req) => {
     const recipient = recipients[0];
     const now = new Date().toISOString();
 
-    // Update recipient based on event type
-    let updateData: any = {};
+    let updateData: Record<string, unknown> = {};
 
     switch (event_type) {
       case 'delivered':
-        updateData = {
-          delivered_at: timestamp || now,
-        };
+        updateData = { delivered_at: timestamp || now };
         break;
 
       case 'opened':
       case 'open':
-        updateData = {
-          opened_at: recipient.opened_at || timestamp || now, // Keep first open
-        };
+        updateData = { opened_at: recipient.opened_at || timestamp || now };
         break;
 
       case 'clicked':
       case 'click':
         updateData = {
-          clicked_at: recipient.clicked_at || timestamp || now, // Keep first click
-          opened_at: recipient.opened_at || timestamp || now, // Implicit open
+          clicked_at: recipient.clicked_at || timestamp || now,
+          opened_at: recipient.opened_at || timestamp || now,
         };
         break;
 
@@ -113,7 +125,6 @@ serve(async (req) => {
         );
     }
 
-    // Update the recipient
     const { error: updateError } = await supabase
       .from('campaign_recipients')
       .update(updateData)
@@ -130,9 +141,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Email webhook error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 });
-

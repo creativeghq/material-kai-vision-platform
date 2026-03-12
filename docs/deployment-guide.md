@@ -253,12 +253,14 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
-| `AWS_REGION` | Public | `email-api` | AWS region for SES (default: `us-east-1`) | `us-east-1` |
-| `AWS_ACCESS_KEY_ID` | **Secret** | `email-api` | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
-| `AWS_SECRET_ACCESS_KEY` | **Secret** | `email-api` | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `SES_CONFIGURATION_SET_NAME` | Public | `email-api` | AWS SES configuration set for tracking | `materialkai-ses-config` |
+| `RESEND_API_KEY` | **Secret** | `email-api` | Resend API key for email sending | `re_xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `RESEND_WEBHOOK_SECRET` | **Secret** | `email-webhooks` | Resend webhook signing secret (Svix, prefix `whsec_`) | `whsec_xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `TWILIO_ACCOUNT_SID` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 | `TWILIO_AUTH_TOKEN` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+
+> **Migration note (2026-03-11):** Email provider migrated from Amazon SES to Resend. The following secrets have been removed: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET_NAME`. Delete these from Supabase Edge Function secrets if they still exist.
+
+> **Supabase Auth SMTP:** Configure in Dashboard → Authentication → Email → SMTP Settings: Host `smtp.resend.com`, Port `465`, Username `resend`, Password = `RESEND_API_KEY`.
 
 #### **Agent Chat & AI Research Secrets**
 
@@ -953,6 +955,283 @@ Configure nginx to add: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DEN
 **Deploy Function**: Create new functions with `supabase functions new my-function` and deploy them with `supabase functions deploy my-function --project-ref bgbavxtjlbvgplozizxu`.
 
 **Environment Variables**: Set secrets via the Supabase Dashboard → Edge Functions → Secrets, or use `supabase secrets set JWT_SECRET_KEY=your_secret` from the CLI.
+
+---
+
+## 💼 Operation Management & Services Billing
+
+This section covers all third-party services used by the platform, their pricing plans, and billing management guidelines. Use this as the single reference for operational cost tracking.
+
+---
+
+### 📧 Resend (Email Service)
+
+**Role**: Transactional and marketing email delivery — replaced Amazon SES as of 2026-03-11.
+
+**Dashboard**: https://resend.com/overview
+**Billing**: https://resend.com/billing
+**Pricing Page**: https://resend.com/pricing
+
+#### Plans
+
+| Plan | Price | Emails/month | Domains | API Keys | Support |
+|------|-------|-------------|---------|----------|---------|
+| **Free** | $0/month | 3,000 | 1 | 1 | Community |
+| **Pro** | From $20/month | 50,000 | Unlimited | Unlimited | Email |
+| **Scale** | From $90/month | 300,000 | Unlimited | Unlimited | Priority Email |
+| **Enterprise** | Custom | Custom | Unlimited | Unlimited | Dedicated support |
+
+#### Pro Plan — Volume Pricing
+
+| Emails/month | Price |
+|-------------|-------|
+| Up to 50,000 | $20/month |
+| Up to 100,000 | $35/month |
+| Up to 200,000 | $60/month |
+| Up to 500,000 | $125/month |
+| Up to 1,000,000 | $200/month |
+
+#### Key Features by Plan
+
+- **Free**: 3,000 emails/month, 100 emails/day, 1 domain, basic API
+- **Pro**: Unlimited domains, webhooks, open/click tracking, suppression lists, scheduled sends, batch API
+- **Scale**: All Pro features + dedicated IPs (on request), SLA
+- **Enterprise**: All Scale features + custom volume, dedicated account manager, custom contracts
+
+#### What We Use
+
+| Feature | Used For |
+|---------|----------|
+| REST API (`POST /emails`) | Transactional emails (invitations, notifications, quotes, campaigns) |
+| Webhooks (Svix-signed) | Delivery tracking → `email_logs` table (delivered, bounced, complained, opened, clicked) |
+| SMTP relay (`smtp.resend.com:465`) | Supabase Auth emails (magic links, confirmations, password reset) |
+| Domain verification | Sender domain setup in Resend dashboard |
+
+#### Secrets Required
+
+| Secret | Location | Description |
+|--------|----------|-------------|
+| `RESEND_API_KEY` | Supabase Edge Function Secrets | API key for sending emails (prefix `re_`) |
+| `RESEND_WEBHOOK_SECRET` | Supabase Edge Function Secrets | Svix webhook signing secret (prefix `whsec_`) |
+
+#### Billing Tips
+
+- **Free plan** is sufficient for development and low-volume production (< 3,000 emails/month)
+- Upgrade to **Pro** when exceeding 3,000 emails/month or needing webhooks + tracking
+- Monitor usage in the Resend dashboard → Emails section; set up billing alerts at 80% of plan limit
+- Webhooks are required for delivery tracking — **Pro plan minimum** for production environments with reporting
+
+---
+
+### 💳 Stripe (Payments & Subscriptions)
+
+**Role**: Subscription management, one-time credit purchases, and payment processing.
+
+**Dashboard**: https://dashboard.stripe.com
+**Billing**: Stripe charges a percentage per transaction — no monthly platform fee.
+
+#### Pricing
+
+| Transaction Type | Fee |
+|----------------|-----|
+| Card payments (domestic) | 2.9% + $0.30 per transaction |
+| Card payments (international) | 3.9% + $0.30 per transaction |
+| Recurring subscriptions | 2.9% + $0.30 per payment |
+| Dispute/chargeback fee | $15 per dispute |
+
+#### What We Use
+
+| Feature | Used For |
+|---------|----------|
+| Subscription billing | Pro ($29/month) and Enterprise ($99/month) plans |
+| One-time payments | Credit pack purchases (100/600/1300 credits) |
+| Customer portal | Self-service subscription management |
+| Webhooks | `stripe-webhooks` edge function — updates subscription/credit state in DB |
+
+---
+
+### 🤖 Anthropic (Claude AI)
+
+**Role**: Core AI model for KAI agent, SEO article writing, B2B research, and various AI pipelines.
+
+**Dashboard**: https://console.anthropic.com
+**Pricing**: https://www.anthropic.com/pricing
+
+#### Key Models & Pricing
+
+| Model | Input | Output | Used For |
+|-------|-------|--------|---------|
+| Claude Sonnet 4.6 | $3/M tokens | $15/M tokens | KAI agent, SEO writing |
+| Claude Haiku 4.5 | $0.80/M tokens | $4/M tokens | Demo agent, B2B web search |
+| Claude Opus 4.6 | $15/M tokens | $75/M tokens | Complex reasoning (on demand) |
+
+---
+
+### 🧠 OpenAI
+
+**Role**: Embeddings and AI changelog generation in CI workflows.
+
+**Dashboard**: https://platform.openai.com
+**Pricing**: https://openai.com/pricing
+
+| Model | Price | Used For |
+|-------|-------|---------|
+| text-embedding-3-small | $0.02/M tokens | Embeddings (changelog workflow) |
+| GPT-4o | $2.50/$10/M tokens | AI changelog analysis |
+
+---
+
+### 🌊 Voyage AI
+
+**Role**: High-quality text embeddings (1024D) for semantic search across all product and document content.
+
+**Dashboard**: https://dash.voyageai.com
+**Pricing**: https://www.voyageai.com/pricing
+
+| Model | Price | Used For |
+|-------|-------|---------|
+| voyage-3-large | $0.18/M tokens | Understanding embeddings (1024D) |
+
+---
+
+### 🗄️ Supabase (Database + Auth + Edge Functions)
+
+**Role**: Primary database, authentication, real-time subscriptions, and serverless edge functions.
+
+**Dashboard**: https://supabase.com/dashboard
+**Pricing**: https://supabase.com/pricing
+
+#### Plans
+
+| Plan | Price | DB Size | Edge Function Invocations | Bandwidth |
+|------|-------|---------|--------------------------|-----------|
+| **Free** | $0/month | 500 MB | 500K/month | 5 GB |
+| **Pro** | $25/month | 8 GB | 2M/month | 250 GB |
+| **Team** | $599/month | Unlimited | Unlimited | Unlimited |
+
+#### Add-ons (Pro plan)
+
+| Add-on | Price |
+|--------|-------|
+| Additional DB storage | $0.125/GB/month |
+| Additional edge function invocations | $2 per 1M |
+| Additional bandwidth | $0.09/GB |
+| Point-in-time recovery (PITR) | $100/month |
+
+---
+
+### ☁️ Vercel (Frontend Hosting)
+
+**Role**: Frontend hosting, edge network, and preview deployments.
+
+**Dashboard**: https://vercel.com
+**Pricing**: https://vercel.com/pricing
+
+#### Plans
+
+| Plan | Price | Bandwidth | Build minutes |
+|------|-------|-----------|---------------|
+| **Hobby** | $0/month | 100 GB | 6,000 min/month |
+| **Pro** | $20/month per member | 1 TB | 24,000 min/month |
+| **Enterprise** | Custom | Custom | Custom |
+
+---
+
+### 🔥 Firecrawl (Web Scraping)
+
+**Role**: Website scraping for price monitoring and product data extraction.
+
+**Dashboard**: https://firecrawl.dev
+**Pricing**: https://firecrawl.dev/pricing
+
+| Plan | Price | Credits/month |
+|------|-------|--------------|
+| **Free** | $0 | 500 |
+| **Starter** | $16/month | 3,000 |
+| **Standard** | $83/month | 100,000 |
+| **Growth** | $333/month | 500,000 |
+
+---
+
+### 🤗 HuggingFace Inference Endpoints
+
+**Role**: GPU-accelerated vision models (Qwen3-VL, SigLIP2) and Chandra OCR.
+
+**Dashboard**: https://ui.endpoints.huggingface.co
+**Pricing**: https://huggingface.co/pricing
+
+| Endpoint | Instance | Rate | Auto-pause |
+|----------|----------|------|-----------|
+| Qwen3-VL-32B (Qwen analysis) | GPU (A100) | ~$3-5/hour | Yes (15 min idle) |
+| SigLIP2 (SLIG visual embeddings) | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
+| Chandra OCR | GPU (A10G) | ~$0.60/hour | Yes (60 sec idle) |
+
+**Cost control**: All endpoints use auto-pause — billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
+
+---
+
+### 📊 DataForSEO
+
+**Role**: Keyword research, SERP analysis, and content analysis for the SEO article pipeline.
+
+**Dashboard**: https://app.dataforseo.com
+**Pricing**: Pay-per-task (~$0.05–0.15 per keyword research task)
+
+---
+
+### 📱 Twilio (SMS/WhatsApp)
+
+**Role**: SMS and WhatsApp messaging for platform notifications.
+
+**Dashboard**: https://console.twilio.com
+**Pricing**: Pay-per-message
+
+| Channel | Price |
+|---------|-------|
+| SMS (outbound, US) | ~$0.0079/message |
+| WhatsApp (template) | ~$0.005/message |
+
+---
+
+### 🌍 WorldLabs Marble (VR World Generation)
+
+**Role**: Generates 3D Gaussian Splat worlds from product images for VR/AR preview features.
+
+**Dashboard**: https://worldlabs.ai
+**Pricing**: Credit-based
+
+| World Quality | Credits | Time |
+|--------------|---------|------|
+| Mini | 50 credits | ~30–45 seconds |
+| Plus | 200 credits | ~5 minutes |
+
+Credits are refunded on generation failure.
+
+---
+
+### 📈 Monthly Cost Estimate (Typical Production)
+
+| Service | Estimated Monthly Cost | Notes |
+|---------|----------------------|-------|
+| **Resend** | $20–$35 | Pro plan, ~50K–100K emails |
+| **Stripe** | 2.9% + $0.30/tx | Transaction-based |
+| **Anthropic** | $50–$200 | Depends on AI usage volume |
+| **OpenAI** | $5–$20 | Embeddings + changelog |
+| **Voyage AI** | $5–$30 | Embedding volume |
+| **Supabase** | $25–$75 | Pro + storage add-ons |
+| **Vercel** | $20/member | Pro plan |
+| **HuggingFace** | $5–$20 | Auto-paused endpoints |
+| **Firecrawl** | $16–$83 | Depends on scraping volume |
+| **DataForSEO** | $10–$50 | Depends on SEO pipeline usage |
+| **Twilio** | $5–$30 | Depends on messaging volume |
+| **WorldLabs** | Variable | Per-credit, on-demand |
+| **Total (est.)** | **~$160–$600/month** | Scales with usage |
+
+> **Cost optimization tips:**
+> - HuggingFace endpoints are auto-paused — ensure `auto_pause_timeout` is set correctly for all endpoints
+> - Resend Free plan covers 3,000 emails/month; upgrade to Pro only when needed
+> - Monitor Anthropic token usage in the console — KAI agent is the largest consumer
+> - Supabase PITR ($100/month) is optional but recommended for production data safety
 
 ---
 

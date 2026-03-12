@@ -18,9 +18,12 @@ export interface UpdateMoodBoardData {
 
 export interface AddMoodBoardItemData {
   moodboard_id: string;
-  material_id: string;
+  material_id?: string | null;
   notes?: string;
   position?: number;
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'vr_world';
+  media_title?: string;
 }
 
 class MoodBoardAPI {
@@ -275,9 +278,12 @@ class MoodBoardAPI {
       .from('moodboard_items')
       .insert({
         moodboard_id: itemData.moodboard_id,
-        material_id: itemData.material_id,
+        material_id: itemData.material_id ?? null,
         notes: itemData.notes,
         position: nextPosition,
+        ...(itemData.media_url ? { media_url: itemData.media_url } : {}),
+        ...(itemData.media_type ? { media_type: itemData.media_type } : {}),
+        ...(itemData.media_title ? { media_title: itemData.media_title } : {}),
       })
       .select(
         `

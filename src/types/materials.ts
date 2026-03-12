@@ -441,10 +441,14 @@ export interface MoodBoard {
 export interface MoodBoardItem {
   id: string;
   moodboard_id: string;
-  material_id: string;
+  material_id: string | null;
   notes?: string;
   position: number;
   added_at: string;
+  // Media fields (set when material_id is null)
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'vr_world';
+  media_title?: string;
   material?: {
     id: string;
     name: string;

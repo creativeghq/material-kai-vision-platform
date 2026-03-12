@@ -17,13 +17,13 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
-import { SimilarMaterials } from '@/components/features/recommendations';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
+import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
@@ -117,8 +117,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [embeddings, setEmbeddings] = useState<any>({});
   const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
   const [isRelinking, setIsRelinking] = useState(false);
+  // Modal stacking for recommendations — clicking a result opens that product
+  const [stackedProductId, setStackedProductId] = useState<string | null>(null);
+  const [stackedProduct, setStackedProduct] = useState<Product | null>(null);
 
   // All hooks must be declared before any conditional return (Rules of Hooks)
+
+  // Load stacked product when a recommendation card is clicked
+  useEffect(() => {
+    if (!stackedProductId) { setStackedProduct(null); return; }
+    supabase
+      .from('products')
+      .select('*')
+      .eq('id', stackedProductId)
+      .single()
+      .then(({ data }) => {
+        if (data) setStackedProduct(data as unknown as Product);
+      });
+  }, [stackedProductId]);
 
   // Check if user is admin
   useEffect(() => {
@@ -1059,6 +1075,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </TabsTrigger>
               </>
             )}
+            <TabsTrigger value="similar" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Sparkles className="h-4 w-4" />
+              Similar
+            </TabsTrigger>
+            <TabsTrigger value="works-with" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Puzzle className="h-4 w-4" />
+              Works Well With
+            </TabsTrigger>
             <TabsTrigger value="monitor" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Monitor
@@ -1261,10 +1285,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {renderVariantsTable()}
         </div>
 
-        {/* Similar Materials Section */}
-        <div className="mt-6">
-          <SimilarMaterials materialId={product.id} limit={10} />
-        </div>
       </TabsContent>
 
       {/* Chunks Tab - Admin Only */}
@@ -1422,6 +1442,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       )}
 
       {/* Monitor Tab */}
+      {/* Similar Products Tab */}
+      <TabsContent value="similar" className="mt-6">
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-foreground">Similar Products</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Other products from the same collection or with a matching visual style.
+          </p>
+          <ProductRecommendationsPanel
+            productId={product.id}
+            mode="similar"
+            onProductClick={(id) => setStackedProductId(id)}
+          />
+        </div>
+      </TabsContent>
+
+      {/* Works Well With Tab */}
+      <TabsContent value="works-with" className="mt-6">
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-foreground">Works Well With</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Products from different collections that pair well — complementary colors, textures, and categories.
+          </p>
+          <ProductRecommendationsPanel
+            productId={product.id}
+            mode="complementary"
+            onProductClick={(id) => setStackedProductId(id)}
+          />
+        </div>
+      </TabsContent>
+
       <TabsContent value="monitor" className="mt-6">
         <ProductMonitorTab
           productId={product.id}
@@ -1431,6 +1481,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         />
       </TabsContent>
     </Tabs>
+
+    {/* Stacked product modal — opened when clicking a recommendation card */}
+    {stackedProduct && (
+      <ProductDetailModal
+        product={stackedProduct}
+        isOpen={true}
+        onClose={() => { setStackedProductId(null); setStackedProduct(null); }}
+      />
+    )}
       </DialogContent>
     </Dialog>
   );

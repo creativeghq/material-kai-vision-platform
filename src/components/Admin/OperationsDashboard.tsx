@@ -23,6 +23,8 @@ import {
   Crown,
   Image,
   Globe,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -311,7 +313,19 @@ const EXT_SERVICE_LABELS: Record<string, string> = {
   'firecrawl-scrape': 'Firecrawl',
   'twilio-sms': 'Twilio SMS',
   'twilio-whatsapp': 'Twilio WhatsApp',
+  'resend-email': 'Resend Email',
 };
+
+interface ResendEmailStats {
+  total: number;
+  delivered: number;
+  bounced: number;
+  complained: number;
+  opened: number;
+  deliveryRate: number;
+  bounceRate: number;
+  openRate: number;
+}
 
 export const OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -352,6 +366,8 @@ export const OperationsDashboard: React.FC = () => {
   const [extServicePeriod, setExtServicePeriod] = useState('7d');
   const [extServiceLoading, setExtServiceLoading] = useState(false);
   const [svcAllTimeTotals, setSvcAllTimeTotals] = useState<Record<string, { operations: number; cost_usd: number }>>({});
+  const [resendEmailStats, setResendEmailStats] = useState<ResendEmailStats | null>(null);
+  const [resendEmailLoading, setResendEmailLoading] = useState(false);
   const { toast } = useToast();
 
 
@@ -856,6 +872,51 @@ export const OperationsDashboard: React.FC = () => {
     fetchExtServiceUsage(extServicePeriod);
   }, [extServicePeriod, fetchExtServiceUsage]);
 
+  // Fetch Resend email stats from email_logs
+  const fetchResendEmailStats = useCallback(async (period: string) => {
+    try {
+      setResendEmailLoading(true);
+      const now = new Date();
+      const fromDate = new Date();
+      if (period === '1h') fromDate.setHours(now.getHours() - 1);
+      else if (period === '24h') fromDate.setDate(now.getDate() - 1);
+      else if (period === '7d') fromDate.setDate(now.getDate() - 7);
+      else fromDate.setDate(now.getDate() - 30);
+
+      const { data } = await supabase
+        .from('email_logs')
+        .select('status')
+        .gte('created_at', fromDate.toISOString());
+
+      if (!data) return;
+
+      const total = data.length;
+      const delivered = data.filter((r: any) => r.status === 'delivered').length;
+      const bounced = data.filter((r: any) => r.status === 'bounced').length;
+      const complained = data.filter((r: any) => r.status === 'complained').length;
+      const opened = data.filter((r: any) => r.status === 'opened').length;
+
+      setResendEmailStats({
+        total,
+        delivered,
+        bounced,
+        complained,
+        opened,
+        deliveryRate: total > 0 ? (delivered / total) * 100 : 0,
+        bounceRate: total > 0 ? (bounced / total) * 100 : 0,
+        openRate: delivered > 0 ? (opened / delivered) * 100 : 0,
+      });
+    } catch (err) {
+      console.error('Failed to fetch Resend email stats:', err);
+    } finally {
+      setResendEmailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchResendEmailStats(extServicePeriod);
+  }, [extServicePeriod, fetchResendEmailStats]);
+
   // Fetch all-time totals per external service from ai_usage_logs
   useEffect(() => {
     const SERVICE_KEYS = [
@@ -1224,7 +1285,7 @@ export const OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-1">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Twilio, Apollo, Hunter.io, ZeroBounce, and Firecrawl. For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
+                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, and Firecrawl. For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
             </div>
 
@@ -1252,6 +1313,7 @@ export const OperationsDashboard: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {[
+                      { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',   raw: 0.0004, billed: null },
                       { key: 'twilio-sms',            label: 'Twilio SMS',           category: 'Messaging',    unit: 'message', raw: 0.0079, billed: 0.01185 },
                       { key: 'twilio-whatsapp',       label: 'Twilio WhatsApp',      category: 'Messaging',    unit: 'message', raw: 0.005,  billed: 0.0075 },
                       { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact', raw: 0.05,   billed: 0.075 },
@@ -1274,13 +1336,22 @@ export const OperationsDashboard: React.FC = () => {
                             <Badge variant="outline" className="text-xs">{svc.category}</Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">per {svc.unit}</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">${svc.raw.toFixed(4)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">${svc.billed.toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                            {svc.raw > 0 ? `$${svc.raw.toFixed(4)}` : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {allTime ? allTime.operations.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                            {svc.billed != null ? `$${svc.billed.toFixed(4)}` : <Badge variant="secondary" className="text-xs">Plan-based</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {svc.key === 'resend-email'
+                              ? (resendEmailStats ? resendEmailStats.total.toLocaleString() : <span className="text-muted-foreground">—</span>)
+                              : (allTime ? allTime.operations.toLocaleString() : <span className="text-muted-foreground">—</span>)
+                            }
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-semibold">
-                            {allTime ? (
+                            {svc.key === 'resend-email' ? (
+                              <span className="text-muted-foreground text-xs">See plan</span>
+                            ) : allTime ? (
                               <span className={allTime.cost_usd > 0 ? 'text-foreground' : 'text-muted-foreground'}>
                                 ${allTime.cost_usd.toFixed(4)}
                               </span>
@@ -1293,6 +1364,59 @@ export const OperationsDashboard: React.FC = () => {
                     })}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+
+            {/* Resend Email Delivery Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Mail className="h-4 w-4" />
+                  Email Delivery — Resend
+                </CardTitle>
+                <CardDescription>
+                  Live delivery metrics from <code>email_logs</code> for the selected period. Pricing is plan-based ($0/month Free · $20/month Pro · $90/month Scale).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {resendEmailLoading ? (
+                  <div className="flex items-center justify-center h-24 text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    Loading email stats...
+                  </div>
+                ) : resendEmailStats && resendEmailStats.total > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                        <Send className="h-3 w-3" /> Total Sent
+                      </p>
+                      <p className="text-2xl font-bold">{resendEmailStats.total.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">emails in period</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Delivery Rate</p>
+                      <p className="text-2xl font-bold text-green-600">{resendEmailStats.deliveryRate.toFixed(1)}%</p>
+                      <p className="text-xs text-muted-foreground">{resendEmailStats.delivered.toLocaleString()} delivered</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Bounce Rate</p>
+                      <p className={`text-2xl font-bold ${resendEmailStats.bounceRate > 5 ? 'text-red-600' : 'text-foreground'}`}>
+                        {resendEmailStats.bounceRate.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">{resendEmailStats.bounced.toLocaleString()} bounced</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Open Rate</p>
+                      <p className="text-2xl font-bold">{resendEmailStats.openRate.toFixed(1)}%</p>
+                      <p className="text-xs text-muted-foreground">{resendEmailStats.opened.toLocaleString()} opens</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
+                    <Mail className="h-8 w-8 mb-2 opacity-30" />
+                    <p className="text-sm">No emails sent in this period</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

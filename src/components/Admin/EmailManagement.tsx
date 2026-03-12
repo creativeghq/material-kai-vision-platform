@@ -25,14 +25,13 @@ export const EmailManagement: React.FC = () => {
     totalDelivered: 0,
     totalBounced: 0,
     totalComplained: 0,
+    totalOpened: 0,
+    totalClicked: 0,
     deliveryRate: 0,
     bounceRate: 0,
     complaintRate: 0,
-  });
-  const [sendingStats, setSendingStats] = useState({
-    max24HourSend: 0,
-    maxSendRate: 0,
-    sentLast24Hours: 0,
+    openRate: 0,
+    clickRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const [showTestDialog, setShowTestDialog] = useState(false);
@@ -46,17 +45,15 @@ export const EmailManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      // Load analytics for last 30 days
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - 30);
 
-      const [analyticsData, statsData] = await Promise.all([
-        emailService.getAnalytics(fromDate),
-        emailService.getSendingStats(),
-      ]);
+      const analyticsData = await emailService.getAnalytics({
+        start: fromDate.toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0],
+      });
 
       setAnalytics(analyticsData);
-      setSendingStats(statsData);
     } catch (error) {
       console.error('Error loading email data:', error);
     } finally {
@@ -160,7 +157,7 @@ export const EmailManagement: React.FC = () => {
             <p className="text-xs text-muted-foreground">bounced emails</p>
           </div>
 
-          {/* Daily Quota Card */}
+          {/* Open Rate Card */}
           <div className="dashboard-card" style={{ padding: 'var(--card-padding)' }}>
             <div className="flex items-center gap-3 mb-3">
               <div
@@ -175,21 +172,19 @@ export const EmailManagement: React.FC = () => {
                 <Database className="h-4 w-4" style={{ color: 'hsl(271 76% 53%)' }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Daily Quota</p>
-                <p className="text-lg font-bold">
-                  {sendingStats.sentLast24Hours} / {sendingStats.max24HourSend}
-                </p>
+                <p className="text-xs text-muted-foreground">Open Rate</p>
+                <p className="text-lg font-bold">{analytics.openRate.toFixed(1)}%</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {((sendingStats.sentLast24Hours / sendingStats.max24HourSend) * 100).toFixed(1)}% used
+              {analytics.totalOpened.toLocaleString()} opens
             </p>
           </div>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics

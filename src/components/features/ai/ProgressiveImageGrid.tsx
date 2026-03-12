@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -9,6 +9,7 @@ import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
 import { AddToQuoteModal } from '@/components/business/quotes/AddToQuoteModal';
+import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 
 interface ModelResult {
   model_id: string;
@@ -252,11 +253,30 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         return;
       }
 
-      // 2. Run segmentation API — pass URL so Python fetches it server-side (avoids CORS)
+      // 2. Fetch image bytes and convert to base64 (avoids canvas CORS taint issues)
+      let imageBase64: string;
+      try {
+        const res = await fetch(selectedImage.url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        imageBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        setModalSegmentError('Failed to load image for segmentation');
+        setModalSegmentsLoaded(true);
+        return;
+      }
+
+      console.log('[ProgressiveImageGrid] Calling segmentImage, base64 length:', imageBase64.length);
       const segRes = await mivaaApi.segmentImage({
-        image_url: selectedImage.url,
+        image_base64: imageBase64,
         workspace_id: workspaceId,
       });
+      console.log('[ProgressiveImageGrid] segmentImage response:', segRes);
 
       if (!segRes.success) {
         setModalSegmentError(segRes.error ?? 'Segmentation API returned an error');
@@ -265,6 +285,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
       }
 
       if (!segRes.data?.zones?.length) {
+        setModalSegmentError('No material zones detected in this image');
         setModalSegmentsLoaded(true);
         return;
       }
@@ -753,9 +774,6 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                     {editMode !== 'none' ? 'Editing' : 'Edit Mode'}
                   </button>
                 )}
-                <Badge className="text-xs bg-primary text-primary-foreground border-0">
-                  {selectedImage?.name || '3D Render'}
-                </Badge>
               </div>
             </div>
           </DialogHeader>
@@ -961,40 +979,49 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                           </div>
                         )}
 
-                        {(onGenerateVR || onGenerateVideo) && editMode === 'none' && (
-                          <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
-                            {onGenerateVideo && (
-                              <button
-                                onClick={() => onGenerateVideo(selectedImage.url)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-lg transition-colors shadow-md"
-                                title="Generate video walkthrough with Veo (30 credits)"
-                              >
-                                <Video className="w-3.5 h-3.5" />
-                                Generate Video
-                              </button>
-                            )}
-                            {onGenerateVR && (
-                              <button
-                                onClick={() => {
-                                  if (!vrGenerating) {
-                                    onGenerateVR(selectedImage.url, { prompt: selectedImage.name });
-                                  }
-                                }}
-                                disabled={vrGenerating}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white text-xs font-medium rounded-lg transition-colors shadow-md"
-                                title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
-                              >
-                                {vrGenerating ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Globe className="w-3.5 h-3.5" />
-                                )}
-                                {vrGenerating ? 'Generating VR…' : 'Generate VR'}
-                              </button>
-                            )}
-                          </div>
-                        )}
                       </>
+                    )}
+                  </div>
+                )}
+
+                {/* Action bar — below image, always visible */}
+                {editMode === 'none' && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2">
+                    {onGenerateVideo && (
+                      <button
+                        onClick={() => onGenerateVideo(selectedImage!.url)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                        title="Generate video walkthrough with Veo (30 credits)"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        Generate Video
+                      </button>
+                    )}
+                    {onGenerateVR && (
+                      <button
+                        onClick={() => { if (!vrGenerating) onGenerateVR(selectedImage!.url, { prompt: selectedImage!.name }); }}
+                        disabled={vrGenerating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                      >
+                        {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                        {vrGenerating ? 'Generating VR World…' : 'Generate VR World'}
+                      </button>
+                    )}
+                    {selectedImage && (
+                      <MoodboardSavePopover
+                        mediaUrl={selectedImage.url}
+                        mediaType="image"
+                        mediaTitle={selectedImage.name || 'Generated Design'}
+                      >
+                        <button
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-full text-xs font-medium text-pink-700 transition-colors shadow-sm"
+                          title="Save this design to a moodboard"
+                        >
+                          <BookmarkPlus className="w-3.5 h-3.5" />
+                          Save to Moodboard
+                        </button>
+                      </MoodboardSavePopover>
                     )}
                   </div>
                 )}

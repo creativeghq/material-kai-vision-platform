@@ -24,6 +24,7 @@ import {
   Video,
   Pin,
   X,
+  BookmarkPlus,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -51,6 +52,7 @@ import SEOArticleViewer from './SEOArticleViewer';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
+import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
@@ -740,6 +742,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       toast({ title: 'Video generation failed', description: error.message, variant: 'destructive' });
     }
   }, [workspaceId, currentConversationId, toast]);
+
+  // Use a product image as input for a 3D interior design scene
+  const handleUseProductIn3DScene = useCallback((imageUrl: string, productName: string) => {
+    setAttachedImages([imageUrl]);
+    setInput(`Design a 3D interior scene featuring this product: ${productName}`);
+    // Switch to interior-designer agent for best 3D generation results
+    setSelectedAgent('interior-designer');
+  }, []);
 
   const handleSendMessage = useCallback(async () => {
     console.log('🎯 handleSendMessage CALLED');
@@ -1879,9 +1889,9 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4">
@@ -1921,8 +1931,8 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                   <div
                     className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
-                        ? 'bg-accent border border-accent-foreground/10 text-foreground shadow-sm'
-                        : 'bg-white/40 border border-white/30 text-foreground backdrop-blur-sm shadow-sm'
+                        ? 'bg-[#1f2937] text-white shadow-md'
+                        : 'bg-[#3E192A] text-white shadow-sm'
                     }`}
                   >
                     {message.demoData ? (
@@ -1931,6 +1941,8 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                         <DemoAgentResults
                           result={message.demoData}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+                          onUseIn3DScene={handleUseProductIn3DScene}
                         />
                       </div>
                     ) : message.materialData ? (
@@ -1943,6 +1955,9 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                             data: message.materialData.products,
                             message: message.materialData.title || 'Material Results',
                           }}
+                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+                          onUseIn3DScene={handleUseProductIn3DScene}
                         />
                       </div>
                     ) : message.designData ? (
@@ -2055,6 +2070,11 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                             Explore in VR World
                             <span className="text-muted-foreground text-xs ml-1">50 credits</span>
                           </Button>
+                          <MoodboardSavePopover
+                            mediaUrl={message.geminiImageData!.image_url}
+                            mediaType="image"
+                            mediaTitle="Generated Design"
+                          />
                         </div>
                       </div>
                     ) : message.virtualStagingData ? (
@@ -2097,13 +2117,20 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           className="w-full rounded-xl border border-white/20 shadow-md"
                           style={{ maxHeight: '480px' }}
                         />
-                        <div className="flex gap-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <MoodboardSavePopover
+                            mediaUrl={message.videoData.video_url}
+                            mediaType="video"
+                            mediaTitle="Generated Video"
+                          />
                           <a
                             href={message.videoData.video_url}
                             download
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 hover:bg-white/80 border border-white/30 rounded-full text-xs font-medium transition-colors"
+                            title="Download video"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"
                           >
-                            Download Video
+                            <Download className="h-3.5 w-3.5" />
+                            Download
                           </a>
                         </div>
                       </div>
@@ -2130,6 +2157,15 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                             }
                           }}
                         />
+                        {message.worldData.splatUrl100k && (
+                          <div className="flex justify-end">
+                            <MoodboardSavePopover
+                              mediaUrl={message.worldData.splatUrl100k}
+                              mediaType="vr_world"
+                              mediaTitle={message.worldData.caption || message.worldData.prompt || 'VR World'}
+                            />
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -2137,7 +2173,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                         {message.role === 'assistant' ? (
                           <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap text-foreground">{normalizeContent(message.content)}</p>
+                          <p className="text-sm whitespace-pre-wrap text-white">{normalizeContent(message.content)}</p>
                         )}
 
                         {/* Show ProductStrip for messages with material data */}
@@ -2197,7 +2233,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                       </div>
                     )}
                     <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-white/50">
                         {message.timestamp.toLocaleTimeString()}
                       </p>
                       {/* Rating buttons for assistant messages */}

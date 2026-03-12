@@ -2,22 +2,26 @@
 
 ## Overview
 
-The Email API is a Supabase Edge Function that handles email sending, domain verification, and email analytics using AWS SES (Simple Email Service).
+The Email API is a Supabase Edge Function that handles email sending, domain management, and analytics via **Resend**.
 
-**Edge Function:** `email-api`  
+**Edge Function:** `email-api`
 **Base URL:** `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api`
+**Email Provider:** [Resend](https://resend.com)
+
+> **Migration note (2026-03-11):** Email provider migrated from Amazon SES to Resend. Actions `verify-domain`, `check-domain`, `list-ses-domains`, and `sending-stats` have been removed. Domain verification is now managed directly in the [Resend Dashboard](https://resend.com/domains).
+
+---
 
 ## Authentication
 
-All requests require authentication via Supabase Auth. You need a valid user JWT token (obtained after login):
+All requests require a valid Supabase user JWT:
 
-```typescript
+```http
 Authorization: Bearer <supabase_user_jwt_token>
+apikey: <SUPABASE_ANON_KEY>
 ```
 
-### Direct API Access (cURL)
-
-For direct API calls outside the Supabase client, you also need the `apikey` header:
+### cURL Example
 
 ```bash
 curl -X POST "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api" \
@@ -27,15 +31,17 @@ curl -X POST "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api" \
   -d '{"action": "send", "to": "user@example.com", "subject": "Test", "html": "<p>Hello</p>"}'
 ```
 
-**Note:** The `Authorization` header requires a valid user JWT token from `supabase.auth.getSession()`, not just the anon key. The function validates the user via `supabase.auth.getUser()`.
+---
 
 ## Actions
 
-The API uses an action-based routing system. All requests are POST with an `action` parameter.
+All requests use `POST` with an `action` field in the body.
+
+---
 
 ### 1. Send Email
 
-Send an email with or without a template.
+Send a transactional, marketing, or notification email. Supports plain HTML/text or a pre-saved template.
 
 **Action:** `send`
 
@@ -43,19 +49,19 @@ Send an email with or without a template.
 ```typescript
 {
   action: 'send',
-  to: string | string[],              // Recipient email(s)
-  from?: string,                       // Sender email (default: noreply@materialshub.gr)
-  fromName?: string,                   // Sender name
-  subject: string,                     // Email subject
-  html?: string,                       // HTML body
-  text?: string,                       // Plain text body
-  templateSlug?: string,               // Template slug from email_templates table
-  variables?: Record<string, string>,  // Variables for template rendering
-  cc?: string[],                       // CC recipients
-  bcc?: string[],                      // BCC recipients
-  replyTo?: string,                    // Reply-to address
-  tags?: Record<string, string>,       // Custom tags for tracking
-  emailType?: 'transactional' | 'marketing' | 'notification'
+  to: string | string[],              // Required. Up to 50 recipients.
+  subject: string,                    // Required.
+  from?: string,                      // Sender email. Default: platform default from DB.
+  fromName?: string,                  // Sender display name.
+  html?: string,                      // HTML body (required if no template and no text).
+  text?: string,                      // Plain text body (auto-generated from html if omitted).
+  templateSlug?: string,              // Slug of a saved template in email_templates table.
+  variables?: Record<string, string>, // Template variable substitution values.
+  cc?: string[],                      // CC recipients.
+  bcc?: string[],                     // BCC recipients.
+  replyTo?: string,                   // Reply-to address.
+  tags?: Record<string, string>,      // Key-value tags for tracking (max 256 chars each).
+  emailType?: 'transactional' | 'marketing' | 'notification'  // Default: 'transactional'
 }
 ```
 
@@ -63,12 +69,12 @@ Send an email with or without a template.
 ```typescript
 {
   success: true,
-  messageId: string,  // AWS SES message ID
+  messageId: string,  // Resend email ID (UUID)
   logId: string       // email_logs record ID
 }
 ```
 
-**Example:**
+**Supabase SDK Example:**
 ```typescript
 const { data, error } = await supabase.functions.invoke('email-api', {
   body: {
@@ -83,19 +89,39 @@ const { data, error } = await supabase.functions.invoke('email-api', {
     emailType: 'transactional'
   }
 });
+// Returns: { success: true, messageId: "49a3999c-...", logId: "uuid" }
 ```
 
-### 2. Verify Domain
+**cURL Example:**
+```bash
+curl -X POST "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api" \
+  -H "Authorization: Bearer <USER_JWT>" \
+  -H "apikey: <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "send",
+    "to": "customer@example.com",
+    "subject": "Your order is confirmed",
+    "html": "<h1>Order Confirmed</h1><p>Thank you for your order!</p>",
+    "emailType": "transactional"
+  }'
+```
 
-Initiate domain verification for sending emails.
+---
 
-**Action:** `verify-domain`
+### 2. Add Domain
+
+Register a domain in the platform database. **Requires admin role.**
+
+> Domain DNS verification must be completed in the [Resend Dashboard](https://resend.com/domains) before marking as verified.
+
+**Action:** `add-domain`
 
 **Request:**
 ```typescript
 {
-  action: 'verify-domain',
-  domain: string  // Domain to verify (e.g., 'materialshub.gr')
+  action: 'add-domain',
+  domain: string  // e.g. 'materialshub.gr'
 }
 ```
 
@@ -103,32 +129,40 @@ Initiate domain verification for sending emails.
 ```typescript
 {
   success: true,
-  verificationToken: string  // TXT record value to add to DNS
+  domain: {
+    id: string,
+    domain: string,
+    verification_status: 'pending',
+    created_at: string
+  },
+  message: string  // Instructions for Resend dashboard verification
 }
 ```
 
-### 3. Check Domain Status
+---
 
-Check the verification status of a domain.
+### 3. Mark Domain Verified
 
-**Action:** `check-domain`
+Mark a domain as verified after confirming DNS records in the Resend dashboard. **Requires admin role.**
+
+**Action:** `mark-domain-verified`
 
 **Request:**
 ```typescript
 {
-  action: 'check-domain',
-  domain: string  // Domain to check
+  action: 'mark-domain-verified',
+  domain: string  // e.g. 'materialshub.gr'
 }
 ```
 
 **Response:**
 ```typescript
 {
-  success: true,
-  status: 'Pending' | 'Success' | 'Failed' | 'TemporaryFailure' | 'NotStarted',
-  verificationToken?: string
+  success: true
 }
 ```
+
+---
 
 ### 4. List Domains
 
@@ -151,8 +185,10 @@ Get all email domains from the database.
     id: string,
     domain: string,
     verification_status: 'pending' | 'verified' | 'failed',
-    verification_token: string,
     is_default: boolean,
+    bounce_rate: number,
+    complaint_rate: number,
+    reputation_status: 'healthy' | 'warning' | 'critical',
     created_at: string,
     created_by: string
   }>
@@ -161,38 +197,15 @@ Get all email domains from the database.
 
 **Example:**
 ```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
+const { data } = await supabase.functions.invoke('email-api', {
   body: { action: 'domains' }
 });
 // Returns: { success: true, domains: [...] }
 ```
 
-### 5. List SES Domains
+---
 
-Get all domains directly from AWS SES with their verification status. **Requires admin role.**
-
-**Action:** `list-ses-domains`
-
-**Request:**
-```typescript
-{
-  action: 'list-ses-domains'
-}
-```
-
-**Response:**
-```typescript
-{
-  success: true,
-  domains: Array<{
-    domain: string,
-    verificationStatus: 'Pending' | 'Success' | 'Failed' | 'TemporaryFailure' | 'NotStarted',
-    verificationToken?: string
-  }>
-}
-```
-
-### 6. Get Email Logs
+### 5. Get Email Logs
 
 Retrieve email sending logs with optional filters.
 
@@ -202,9 +215,9 @@ Retrieve email sending logs with optional filters.
 ```typescript
 {
   action: 'logs',
-  status?: string,     // Filter by status: 'queued' | 'sent' | 'delivered' | 'bounced' | 'failed'
-  emailType?: string,  // Filter by type: 'transactional' | 'marketing' | 'notification'
-  limit?: number       // Number of logs to return (default: 50)
+  status?: 'queued' | 'sent' | 'delivered' | 'bounced' | 'complained' | 'failed',
+  emailType?: 'transactional' | 'marketing' | 'notification',
+  limit?: number  // Default: 50
 }
 ```
 
@@ -226,7 +239,7 @@ Retrieve email sending logs with optional filters.
     html_body?: string,
     text_body?: string,
     status: string,
-    message_id?: string,
+    message_id?: string,     // Resend email ID
     email_type: string,
     tags?: Record<string, string>,
     variables?: Record<string, string>,
@@ -244,19 +257,21 @@ Retrieve email sending logs with optional filters.
 
 **Example:**
 ```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
+const { data } = await supabase.functions.invoke('email-api', {
   body: {
     action: 'logs',
-    status: 'sent',
+    status: 'delivered',
     emailType: 'transactional',
     limit: 100
   }
 });
 ```
 
-### 7. Get Email Analytics
+---
 
-Retrieve email analytics for sent emails.
+### 6. Get Analytics
+
+Retrieve aggregated email analytics. Data is sourced from the `email_analytics` table, populated by Resend webhook events.
 
 **Action:** `analytics`
 
@@ -265,8 +280,8 @@ Retrieve email analytics for sent emails.
 {
   action: 'analytics',
   dateRange?: {
-    start: string,  // ISO date string
-    end: string     // ISO date string
+    start: string,  // ISO date string, e.g. '2024-01-01'
+    end: string     // ISO date string, e.g. '2024-01-31'
   }
 }
 ```
@@ -281,11 +296,11 @@ Retrieve email analytics for sent emails.
   totalComplained: number,
   totalOpened: number,
   totalClicked: number,
-  deliveryRate: number,   // Percentage
-  bounceRate: number,     // Percentage
-  complaintRate: number,  // Percentage
-  openRate: number,       // Percentage
-  clickRate: number,      // Percentage
+  deliveryRate: number,    // Percentage (0–100)
+  bounceRate: number,      // Percentage (0–100)
+  complaintRate: number,   // Percentage (0–100)
+  openRate: number,        // Percentage (0–100)
+  clickRate: number,       // Percentage (0–100)
   dailyData: Array<{
     date: string,
     total_sent: number,
@@ -300,76 +315,79 @@ Retrieve email analytics for sent emails.
 
 **Example:**
 ```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
+const { data } = await supabase.functions.invoke('email-api', {
   body: {
     action: 'analytics',
-    dateRange: {
-      start: '2024-01-01',
-      end: '2024-01-31'
-    }
+    dateRange: { start: '2024-01-01', end: '2024-01-31' }
   }
 });
 ```
 
-### 8. Get Sending Stats
-
-Get AWS SES quota and sending statistics.
-
-**Action:** `sending-stats`
-
-**Request:**
-```typescript
-{
-  action: 'sending-stats'
-}
-```
-
-**Response:**
-```typescript
-{
-  success: true,
-  stats: {
-    max24HourSend: number,      // Maximum emails allowed in 24 hours
-    maxSendRate: number,        // Maximum emails per second
-    sentLast24Hours: number     // Emails sent in last 24 hours
-  }
-}
-```
-
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: { action: 'sending-stats' }
-});
-// Returns: { success: true, stats: { max24HourSend: 50000, maxSendRate: 14, sentLast24Hours: 150 } }
-```
+---
 
 ## Actions Summary
 
 | Action | Description | Auth Required |
 |--------|-------------|---------------|
-| `send` | Send an email | User |
-| `verify-domain` | Initiate domain verification | Admin |
-| `check-domain` | Check domain verification status | User |
+| `send` | Send an email (HTML, text, or template) | User |
+| `add-domain` | Add a domain to the database | Admin |
+| `mark-domain-verified` | Mark a domain verified after Resend confirmation | Admin |
 | `domains` | List all domains from database | User |
-| `list-ses-domains` | List domains from AWS SES | Admin |
 | `logs` | Get email sending logs | User |
-| `analytics` | Get email analytics | User |
-| `sending-stats` | Get AWS SES quota/stats | User |
+| `analytics` | Get aggregated email analytics | User |
+
+---
+
+## Webhook Events
+
+Resend sends delivery events to:
+
+```
+https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks
+```
+
+Configure this endpoint in the [Resend Dashboard → Webhooks](https://resend.com/webhooks).
+
+**Events tracked:**
+
+| Resend Event | Internal Status | Description |
+|---|---|---|
+| `email.sent` | `send` | Email accepted by Resend |
+| `email.delivered` | `delivery` | Successfully delivered to recipient |
+| `email.delivery_delayed` | `delivery_delayed` | Temporary delivery delay |
+| `email.bounced` | `bounce` | Permanent bounce |
+| `email.complained` | `complaint` | Spam complaint |
+| `email.opened` | `open` | Recipient opened the email |
+| `email.clicked` | `click` | Recipient clicked a link |
+
+Webhook signatures are verified using `RESEND_WEBHOOK_SECRET` (Svix HMAC-SHA256).
+
+---
 
 ## Error Handling
 
-All errors return a standard format:
+All errors return:
 
 ```typescript
 {
   success: false,
-  error: string  // Error message
+  error: string  // Human-readable error message
 }
 ```
+
+Common errors:
+
+| Error | Cause |
+|---|---|
+| `RESEND_API_KEY is not configured` | Secret not set in Supabase Edge Function secrets |
+| `Template not found: <slug>` | Template slug doesn't exist or is inactive |
+| `Either html or text body must be provided` | No content in send request |
+| `Unauthorized: Admin access required` | Domain actions called by non-admin user |
+
+---
 
 ## Related Documentation
 
 - [Email System Documentation](../email-system.md)
-- [Email Templates Management](../email-system.md#templates)
-
+- [Deployment Guide — Secrets](../deployment-guide.md)
+- [Resend API Reference](https://resend.com/docs/api-reference/emails/send-email)

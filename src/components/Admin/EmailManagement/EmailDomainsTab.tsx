@@ -1,10 +1,10 @@
 /**
  * Email Domains Tab
- * Manage and verify email domains for SES
+ * Manage email domains for Resend
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle, XCircle, Clock, Copy, RefreshCw } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -23,7 +23,8 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newDomain, setNewDomain] = useState('');
-  const [verifying, setVerifying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [markingVerified, setMarkingVerified] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,11 +38,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
       setDomains(data);
     } catch (error) {
       console.error('Error loading domains:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load email domains',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to load email domains', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -51,12 +48,12 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
     if (!newDomain) return;
 
     try {
-      setVerifying(true);
-      const result = await emailService.verifyDomain(newDomain);
+      setSaving(true);
+      await emailService.addDomain(newDomain);
 
       toast({
         title: 'Domain Added',
-        description: `Verification token: ${result.verificationToken}`,
+        description: `${newDomain} has been added. Verify it in your Resend dashboard, then mark it verified here.`,
       });
 
       setShowAddDialog(false);
@@ -64,67 +61,42 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
       loadDomains();
     } catch (error) {
       console.error('Error adding domain:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add domain',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to add domain', variant: 'destructive' });
     } finally {
-      setVerifying(false);
+      setSaving(false);
     }
   };
 
-  const handleCheckVerification = async (domain: string) => {
+  const handleMarkVerified = async (domain: string) => {
     try {
-      const status = await emailService.checkDomainVerification(domain);
+      setMarkingVerified(domain);
+      await emailService.markDomainVerified(domain);
 
-      toast({
-        title: 'Verification Status',
-        description: `Domain is ${status}`,
-      });
+      toast({ title: 'Domain Verified', description: `${domain} has been marked as verified.` });
 
-      if (status === 'verified' && onDomainVerified) {
-        onDomainVerified();
-      }
-
+      if (onDomainVerified) onDomainVerified();
       loadDomains();
     } catch (error) {
-      console.error('Error checking verification:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to check verification status',
-        variant: 'destructive',
-      });
+      console.error('Error marking domain verified:', error);
+      toast({ title: 'Error', description: 'Failed to update domain status', variant: 'destructive' });
+    } finally {
+      setMarkingVerified(null);
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied',
-      description: 'Copied to clipboard',
-    });
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'verified':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'verified': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
+      default: return <Clock className="h-4 w-4 text-yellow-500" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'verified':
-        return <Badge variant="default">Verified</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="secondary">Pending</Badge>;
+      case 'verified': return <Badge variant="default">Verified</Badge>;
+      case 'failed': return <Badge variant="destructive">Failed</Badge>;
+      default: return <Badge variant="secondary">Pending</Badge>;
     }
   };
 
@@ -134,7 +106,15 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
         <div>
           <h3 className="text-lg font-semibold">Email Domains</h3>
           <p className="text-sm text-muted-foreground">
-            Manage verified domains for sending emails via Amazon SES
+            Manage sending domains via{' '}
+            <a
+              href="https://resend.com/domains"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 underline underline-offset-2"
+            >
+              Resend <ExternalLink className="h-3 w-3" />
+            </a>
           </p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -148,7 +128,16 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             <DialogHeader>
               <DialogTitle>Add Email Domain</DialogTitle>
               <DialogDescription>
-                Add a new domain to verify with Amazon SES. You'll need to add DNS records to verify ownership.
+                Add a domain you've already added to your{' '}
+                <a
+                  href="https://resend.com/domains"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  Resend dashboard
+                </a>
+                . After adding DNS records and verifying in Resend, mark it verified here.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -166,20 +155,32 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddDomain} disabled={verifying || !newDomain}>
-                {verifying ? 'Adding...' : 'Add Domain'}
+              <Button onClick={handleAddDomain} disabled={saving || !newDomain}>
+                {saving ? 'Adding...' : 'Add Domain'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Resend dashboard link banner */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        Domain DNS verification is managed in the{' '}
+        <a
+          href="https://resend.com/domains"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+        >
+          Resend Dashboard <ExternalLink className="h-3 w-3" />
+        </a>
+        . Once your domain is verified there, use the "Mark Verified" button below.
+      </div>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="dashboard-card">
-            <div className="py-8 text-center text-muted-foreground">
-              Loading domains...
-            </div>
+            <div className="py-8 text-center text-muted-foreground">Loading domains...</div>
           </div>
         ) : domains.length === 0 ? (
           <div className="dashboard-card">
@@ -200,55 +201,50 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
                   {getStatusBadge(domain.verification_status)}
                 </div>
               </div>
-              <div className="space-y-4">
-                {domain.verification_token && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Verification Token (TXT Record)</Label>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 rounded bg-muted px-3 py-2 text-sm">
-                        {domain.verification_token}
-                      </code>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => copyToClipboard(domain.verification_token!)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
 
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Bounce Rate:</span>
-                    <span className="ml-2 font-medium">{domain.bounce_rate.toFixed(2)}%</span>
+                    <span className="ml-2 font-medium">{(domain.bounce_rate ?? 0).toFixed(2)}%</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Complaint Rate:</span>
-                    <span className="ml-2 font-medium">{domain.complaint_rate.toFixed(2)}%</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Daily Quota:</span>
-                    <span className="ml-2 font-medium">{domain.daily_quota.toLocaleString()}</span>
+                    <span className="ml-2 font-medium">{(domain.complaint_rate ?? 0).toFixed(2)}%</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Reputation:</span>
-                    <Badge variant={domain.reputation_status === 'healthy' ? 'default' : 'destructive'}>
-                      {domain.reputation_status}
+                    <Badge
+                      className="ml-2"
+                      variant={domain.reputation_status === 'healthy' ? 'default' : 'destructive'}
+                    >
+                      {domain.reputation_status ?? 'healthy'}
                     </Badge>
                   </div>
                 </div>
 
                 {domain.verification_status === 'pending' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCheckVerification(domain.domain)}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Check Verification Status
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMarkVerified(domain.domain)}
+                      disabled={markingVerified === domain.domain}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      {markingVerified === domain.domain ? 'Updating...' : 'Mark Verified'}
+                    </Button>
+                    <a
+                      href="https://resend.com/domains"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="sm" variant="ghost">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Check in Resend
+                      </Button>
+                    </a>
+                  </div>
                 )}
               </div>
             </div>
@@ -260,4 +256,3 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
 };
 
 export default EmailDomainsTab;
-

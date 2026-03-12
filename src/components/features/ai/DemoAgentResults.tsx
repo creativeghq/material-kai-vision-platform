@@ -8,17 +8,20 @@ import type { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import Design3DModal from './Design3DModal';
 import SEOArticleViewer from './SEOArticleViewer';
+import { AddToMoodboardModal } from '@/components/business/moodboard/AddToMoodboardModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
-import { Star, Package } from 'lucide-react';
+import { Star, Package, BookmarkPlus, Globe, Video, Box } from 'lucide-react';
 
 
 interface DemoAgentResultsProps {
   result: any;
   categoryColors?: Record<string, string>;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  onGenerateVideo?: (imageUrl: string) => void;
+  onUseIn3DScene?: (imageUrl: string, productName: string) => void;
   vrGenerating?: boolean;
 }
 
@@ -35,12 +38,15 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   result,
   categoryColors = DEFAULT_CATEGORY_COLORS,
   onGenerateVR,
+  onGenerateVideo,
+  onUseIn3DScene,
   vrGenerating,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected3DDesign, setSelected3DDesign] = useState<any>(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+  const [moodboardProduct, setMoodboardProduct] = useState<{ id: string; name?: string; image?: string } | null>(null);
 
   const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
@@ -69,7 +75,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
         {/* Column headers */}
         <div
           className="grid px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold uppercase tracking-wider text-gray-400"
-          style={{ gridTemplateColumns: '1fr 120px 100px 110px' }}
+          style={{ gridTemplateColumns: '1fr 120px 100px 200px' }}
         >
           <span>Product Details</span>
           <span>Category</span>
@@ -89,7 +95,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
               <div
                 key={product.id}
                 className="grid items-center px-5 py-3 hover:bg-gray-50/70 transition-colors cursor-pointer group"
-                style={{ gridTemplateColumns: '1fr 120px 100px 110px' }}
+                style={{ gridTemplateColumns: '1fr 120px 100px 200px' }}
                 onClick={() => handleViewDetails(product)}
               >
                 {/* Thumbnail + name */}
@@ -164,6 +170,49 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                     showText={false}
                     className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+                    title="Add to Moodboard"
+                    onClick={() => setMoodboardProduct({ id: product.id, name: product.name, image: primaryImage?.url })}
+                  >
+                    <BookmarkPlus className="h-3.5 w-3.5" />
+                  </Button>
+                  {onUseIn3DScene && primaryImage?.url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                      title="Use in 3D Scene"
+                      onClick={() => onUseIn3DScene(primaryImage.url, product.name)}
+                    >
+                      <Box className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {onGenerateVR && primaryImage?.url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-violet-500 hover:text-violet-700 hover:bg-violet-50"
+                      title="Generate VR World (50 credits)"
+                      disabled={vrGenerating}
+                      onClick={() => onGenerateVR(primaryImage.url, { prompt: product.name })}
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {onGenerateVideo && primaryImage?.url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                      title="Generate Video (30 credits)"
+                      onClick={() => onGenerateVideo(primaryImage.url)}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             );
@@ -180,6 +229,16 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
               : undefined
           }
         />
+
+        {moodboardProduct && (
+          <AddToMoodboardModal
+            productId={moodboardProduct.id}
+            productName={moodboardProduct.name}
+            productImage={moodboardProduct.image}
+            onClose={() => setMoodboardProduct(null)}
+            onSuccess={(_name) => setMoodboardProduct(null)}
+          />
+        )}
       </div>
     );
   }
