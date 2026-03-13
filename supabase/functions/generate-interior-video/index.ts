@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
   // Build prompt — describe a camera walkthrough of the room
   const prompt = body.prompt
     ? body.prompt
-    : `Smooth cinematic camera walkthrough of this interior design space. The camera slowly pans and moves through the room, revealing the materials, furniture, and lighting in a professional real estate style video. Photorealistic, high quality, steady motion.`;
+    : `Smooth cinematic camera walkthrough of exactly this interior design space shown in the image. Start with a wide establishing shot, then slowly dolly forward and pan left to right, revealing the exact materials, furniture placement, colors, and lighting visible in the image. Maintain photorealistic consistency with the source image throughout. Professional real estate cinematography, steady motion, no cuts.`;
 
   // Insert initial row as 'processing'
   await supabase.from('generation_videos').insert({
@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
       aspectRatio,
       durationSeconds,
       resolution,
+      imageUrl: body.source_image_url,
     });
 
     const videoUrl = await uploadVideoToStorage(supabase, result.base64, jobId, result.mimeType);

@@ -253,13 +253,20 @@ export async function generateVideoWithVeo(
     aspectRatio?: '16:9' | '9:16' | '1:1';
     durationSeconds?: number;
     resolution?: '1280x720' | '1920x1080';
+    /** Source image URL or base64 data URL for image-to-video conditioning */
+    imageUrl?: string;
   },
 ): Promise<VeoVideoResult> {
   const modelId: VeoModel = config?.model ?? 'veo-2.0-generate-001';
 
+  // Use image-to-video when a source image is provided
+  const veoPrompt: any = config?.imageUrl
+    ? { image: config.imageUrl, text: prompt }
+    : prompt;
+
   const { video } = await generateVideo({
     model: google.video(modelId),
-    prompt,
+    prompt: veoPrompt,
     aspectRatio: config?.aspectRatio ?? '16:9',
     durationSeconds: config?.durationSeconds ?? 8,
     resolution: config?.resolution ?? '1280x720',

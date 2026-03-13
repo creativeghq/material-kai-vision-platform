@@ -149,10 +149,10 @@ Deno.serve(async (req) => {
 
   // Auth: accept user JWT or internal service role call from agent-chat
   const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let userId: string;
 
-  if (token === supabaseServiceKey) {
+  if (token === supabaseServiceKey.trim()) {
     // Internal call from agent-chat edge function — user_id must be in body
     const rawBody = await req.json() as VirtualStagingRequest;
     if (!rawBody.user_id) {

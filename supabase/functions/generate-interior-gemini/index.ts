@@ -130,15 +130,14 @@ Deno.serve(async (req) => {
   }
 
   // Auth: accept service role key (internal server-to-server) OR user JWT
+  // Internal calls send `apikey` header with the service role key (Supabase SDK pattern)
+  const apikeyHeader = (req.headers.get('apikey') || '').trim();
   const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let resolvedUserId: string;
 
-  if (token === supabaseServiceKey) {
-    // Internal call from Python backend — user_id must be in body
-    if (!body.user_id) {
-      return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
-    }
+  if (apikeyHeader === supabaseServiceKey.trim() && body.user_id) {
+    // Internal server-to-server call (Python backend, agent-chat, etc.)
     resolvedUserId = body.user_id;
   } else {
     // User JWT validation

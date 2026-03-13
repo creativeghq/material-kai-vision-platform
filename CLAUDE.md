@@ -29,7 +29,7 @@
 - Drop indexes BEFORE altering column types, then recreate with halfvec_cosine_ops
 - Embedding dict key is "text_1024" (was "text_1536" — fixed 2026-02-07)
 - Dead SQL functions cleaned up: enhanced_vector_search, enhanced_vector_search_service, vector_similarity_search, search_kb_docs
-- Legacy document_images columns (color_embedding_256, texture_embedding_256, application_embedding_512) still exist but are no longer populated — real embeddings are in VECS
+- document_images columns (color_embedding_256, texture_embedding_256, application_embedding_512) are still actively written to (background_image_processor.py, image_processing_service.py) and read in rag_routes.py, qualityControlService.ts, real_quality_scoring_service.py — do NOT drop them; they are NOT legacy
 
 ## Search Weight Configurations (7-vector)
 - unified_search: text 0.15, visual 0.15, understanding 0.20, color/texture/style/material 0.125

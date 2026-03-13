@@ -116,6 +116,15 @@ verify_jwt = false
 [functions.generate-vr-world]
 verify_jwt = false
 
+[functions.generate-interior-gemini]
+verify_jwt = false
+
+[functions.generate-interior-video]
+verify_jwt = false
+
+[functions.generate-virtual-staging]
+verify_jwt = false
+
 [functions.job-cleanup-cron]
 verify_jwt = false
 
