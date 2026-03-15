@@ -98,8 +98,15 @@ function listHtml(items: { image: string; title: string; subtitle: string; url?:
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join('')}</table>`;
 }
 
-// ── Live data fetcher + KAI block renderer ─────────────────────────────────
-async function renderKaiBlock(type: string, count: number, cols: number, layout: 'columns' | 'list'): Promise<string> {
+// ── Live data fetcher + MH block renderer ──────────────────────────────────
+async function renderKaiBlock(
+  type: string,
+  count: number,
+  cols: number,
+  layout: 'columns' | 'list',
+  category = '',
+  showDetails = true,
+): Promise<string> {
   const now = new Date();
   const weekAgo  = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -110,8 +117,9 @@ async function renderKaiBlock(type: string, count: number, cols: number, layout:
         .order('created_at', { ascending: false }).limit(count);
       if (type === 'top_week')  query = query.gte('created_at', weekAgo);
       if (type === 'top_month') query = query.gte('created_at', monthAgo);
+      if (category) query = query.filter('metadata->>material_category', 'eq', category);
       const { data: products } = await query;
-      if (!products?.length) return `<!-- KAI block: no ${type} data found -->`;
+      if (!products?.length) return `<!-- MH block: no ${type} data found -->`;
 
       const docIds = products.map(p => p.source_document_id).filter(Boolean);
       const imageMap: Record<string, string> = {};
@@ -122,7 +130,9 @@ async function renderKaiBlock(type: string, count: number, cols: number, layout:
       const items = products.map(p => ({
         image: p.source_document_id ? (imageMap[p.source_document_id] || '') : '',
         title: p.name || 'Untitled Material',
-        subtitle: [p.metadata?.material_category?.replace(/_/g, ' '), p.metadata?.available_colors?.slice(0, 2).join(', ')].filter(Boolean).join(' · ') || 'Material',
+        subtitle: showDetails
+          ? [p.metadata?.material_category?.replace(/_/g, ' '), p.metadata?.available_colors?.slice(0, 2).join(', ')].filter(Boolean).join(' · ') || 'Material'
+          : '',
         url: '#',
       }));
       return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 4)));
@@ -149,9 +159,9 @@ async function renderKaiBlock(type: string, count: number, cols: number, layout:
       return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 3)));
     }
   } catch (err) {
-    console.error('KAI block render error:', err);
+    console.error('MH block render error:', err);
   }
-  return `<!-- KAI block: failed to render ${type} -->`;
+  return `<!-- MH block: failed to render ${type} -->`;
 }
 
 // ── Post-processes exported HTML: replaces data-kai-block placeholders ─────
@@ -160,11 +170,13 @@ async function processEmailHtml(html: string): Promise<string> {
   const blocks = Array.from(doc.querySelectorAll('[data-kai-block]'));
   if (!blocks.length) return html;
   await Promise.all(blocks.map(async (el) => {
-    const type   = el.getAttribute('data-kai-block') || '';
-    const count  = parseInt(el.getAttribute('data-count') || '3');
-    const cols   = parseInt(el.getAttribute('data-cols') || '3');
-    const layout = (el.getAttribute('data-layout') || 'columns') as 'columns' | 'list';
-    const replacement = await renderKaiBlock(type, count, cols, layout);
+    const type        = el.getAttribute('data-kai-block') || '';
+    const count       = parseInt(el.getAttribute('data-count') || '3');
+    const cols        = parseInt(el.getAttribute('data-cols') || '3');
+    const layout      = (el.getAttribute('data-layout') || 'columns') as 'columns' | 'list';
+    const category    = el.getAttribute('data-category') || '';
+    const showDetails = el.getAttribute('data-show-details') !== 'false';
+    const replacement = await renderKaiBlock(type, count, cols, layout, category, showDetails);
     const wrapper = doc.createElement('div');
     wrapper.innerHTML = replacement;
     el.replaceWith(...Array.from(wrapper.childNodes));
@@ -180,34 +192,71 @@ function injectPreheader(html: string, text: string): string {
   return html.replace(/(<body[^>]*>)/i, `$1${snippet}`);
 }
 
-// ── KAI custom blocks for GrapesJS ─────────────────────────────────────────
-function addKaiBlocks(editor: GrapesEditor) {
-  const placeholder = (type: string, icon: string, label: string, count = 3, cols = 3, layout = 'columns') =>
-    `<div data-kai-block="${type}" data-count="${count}" data-cols="${cols}" data-layout="${layout}" ` +
-    `style="background:#f8f4f2;border:2px dashed #c4a0b0;border-radius:8px;padding:24px;text-align:center;font-family:sans-serif;margin:0;">` +
-      `<div style="font-size:24px;margin-bottom:8px;">${icon}</div>` +
-      `<strong style="color:#3E192A;font-size:13px;">${label}</strong>` +
-      `<div style="color:#999;font-size:11px;margin-top:4px;">${count} items · ${layout}${layout !== 'list' ? ` · ${cols} cols` : ''}</div>` +
-      `<div style="color:#bbb;font-size:10px;margin-top:2px;">Live data inserted on save / send</div>` +
-    `</div>`;
+// ── MH custom blocks for GrapesJS ──────────────────────────────────────────
+// Async: fetches material categories from DB to populate the category trait.
+async function addMhBlocks(editor: GrapesEditor) {
 
-  const icon = (emoji: string) =>
-    `<div style="font-size:26px;text-align:center;padding:6px 0;line-height:1;">${emoji}</div>`;
+  // SVG line icon helper — matches GrapesJS panel style
+  const svgIcon = (paths: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
+    `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ` +
+    `style="display:block;margin:auto;width:22px;height:22px;">${paths}</svg>`;
 
-  const KAI = 'KAI Blocks';
+  // Inline canvas preview SVG (larger, coloured for the block placeholder)
+  const previewSvg = (paths: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3E192A" ` +
+    `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ` +
+    `style="width:28px;height:28px;">${paths}</svg>`;
 
-  editor.BlockManager.add('kai-branded-header', {
-    label: 'Branded Header', category: KAI, media: icon('🏷️'),
-    content: `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">` +
+  // ── SVG icon paths ────────────────────────────────────────────────────────
+  const ICONS = {
+    grid:     `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>`,
+    trending: `<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>`,
+    calendar: `<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>`,
+    image:    `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>`,
+    cube:     `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>`,
+    header:   `<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><rect x="4" y="14" width="16" height="6" rx="1"/>`,
+    button:   `<rect x="2" y="8" width="20" height="8" rx="4"/><line x1="8" y1="12" x2="16" y2="12"/><polyline points="13 9 16 12 13 15"/>`,
+  };
+
+  // ── Category groups ───────────────────────────────────────────────────────
+  const CAT_MATERIALS   = { id: 'mh-materials',   label: 'MH · Materials',   open: true  };
+  const CAT_INSPIRATION = { id: 'mh-inspiration', label: 'MH · Inspiration', open: false };
+  const CAT_BRAND       = { id: 'mh-brand',       label: 'MH · Brand',       open: false };
+
+  // ── Fetch material categories from DB ─────────────────────────────────────
+  let categoryOptions: { id: string; label: string }[] = [{ id: '', label: 'All Categories' }];
+  try {
+    const { data: rows } = await supabase
+      .from('products').select('metadata').not('metadata', 'is', null).limit(300);
+    const cats = [...new Set(
+      (rows ?? []).map((r: any) => r.metadata?.material_category).filter(Boolean),
+    )].sort() as string[];
+    categoryOptions = [
+      { id: '', label: 'All Categories' },
+      ...cats.map(c => ({ id: c, label: c.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) })),
+    ];
+  } catch { /* use default */ }
+
+  // ── Static blocks (Branded Header + CTA Button — fully editable HTML) ────
+  editor.BlockManager.add('mh-branded-header', {
+    label: 'Branded Header',
+    category: CAT_BRAND,
+    media: svgIcon(ICONS.header),
+    content:
+      `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">` +
       `<tr><td align="center" style="padding:28px 24px;">` +
         `<div style="font-family:'Open Sans',Arial,sans-serif;color:#ffffff;font-size:28px;font-weight:300;letter-spacing:3px;">MATERIAL KAI</div>` +
         `<div style="font-family:'Open Sans',Arial,sans-serif;color:#ffffff;opacity:0.75;font-size:13px;margin-top:8px;letter-spacing:1px;">Your Weekly Materials Update</div>` +
       `</td></tr></table>`,
   });
 
-  editor.BlockManager.add('kai-cta-button', {
-    label: 'Brand CTA Button', category: KAI, media: icon('🔘'),
-    content: `<table width="100%" cellpadding="0" cellspacing="0" border="0">` +
+  editor.BlockManager.add('mh-cta-button', {
+    label: 'CTA Button',
+    category: CAT_BRAND,
+    media: svgIcon(ICONS.button),
+    content:
+      `<table width="100%" cellpadding="0" cellspacing="0" border="0">` +
       `<tr><td align="center" style="padding:24px;">` +
         `<a href="https://materialkai.com" style="background:#3E192A;color:#ffffff;` +
         `font-family:'Open Sans',Arial,sans-serif;font-size:15px;font-weight:600;` +
@@ -216,29 +265,174 @@ function addKaiBlocks(editor: GrapesEditor) {
         `</a></td></tr></table>`,
   });
 
-  editor.BlockManager.add('kai-material-card', {
-    label: 'Material Card', category: KAI, media: icon('📦'),
-    content: placeholder('material_card', '📦', 'Material Card', 3, 3),
-  });
+  // ── Shared layout traits (used by top_week, top_month, moodboard, vr3d) ──
+  const layoutTraits = [
+    { type: 'number', label: 'Items to show', name: 'data-count', min: 1, max: 12 },
+    { type: 'select', label: 'Layout', name: 'data-layout',
+      options: [{ id: 'columns', label: 'Grid' }, { id: 'list', label: 'List' }] },
+    { type: 'select', label: 'Columns', name: 'data-cols',
+      options: [{ id: '2', label: '2 columns' }, { id: '3', label: '3 columns' }] },
+  ];
 
-  editor.BlockManager.add('kai-top-week', {
-    label: 'Top Materials – Week', category: KAI, media: icon('📈'),
-    content: placeholder('top_week', '📈', 'Top Materials – This Week', 6, 3),
-  });
+  // ── Dynamic MH data block definitions ────────────────────────────────────
+  type MhBlock = {
+    blockId: string;
+    label: string;
+    iconKey: keyof typeof ICONS;
+    category: typeof CAT_MATERIALS | typeof CAT_INSPIRATION | typeof CAT_BRAND;
+    defaultCount: number;
+    defaultCols: number;
+    defaultAttrs?: Record<string, string>;
+    traits: object[];
+  };
 
-  editor.BlockManager.add('kai-top-month', {
-    label: 'Top Materials – Month', category: KAI, media: icon('📅'),
-    content: placeholder('top_month', '📅', 'Top Materials – This Month', 6, 3),
-  });
+  const MH_BLOCKS: MhBlock[] = [
+    {
+      blockId: 'material_card',
+      label: 'Material Cards',
+      iconKey: 'grid',
+      category: CAT_MATERIALS,
+      defaultCount: 3,
+      defaultCols: 3,
+      defaultAttrs: { 'data-category': '', 'data-show-details': 'true' },
+      traits: [
+        { type: 'select',   label: 'Category',         name: 'data-category',    options: categoryOptions },
+        { type: 'number',   label: 'Items to show',    name: 'data-count',       min: 1, max: 12 },
+        { type: 'select',   label: 'Layout',           name: 'data-layout',
+          options: [{ id: 'columns', label: 'Grid' }, { id: 'list', label: 'List' }] },
+        { type: 'select',   label: 'Columns',          name: 'data-cols',
+          options: [{ id: '2', label: '2 columns' }, { id: '3', label: '3 columns' }] },
+        { type: 'checkbox', label: 'Show material details (color, type…)', name: 'data-show-details',
+          valueTrue: 'true', valueFalse: 'false' },
+      ],
+    },
+    {
+      blockId: 'top_week',
+      label: 'Top This Week',
+      iconKey: 'trending',
+      category: CAT_MATERIALS,
+      defaultCount: 6,
+      defaultCols: 3,
+      traits: layoutTraits,
+    },
+    {
+      blockId: 'top_month',
+      label: 'Top This Month',
+      iconKey: 'calendar',
+      category: CAT_MATERIALS,
+      defaultCount: 6,
+      defaultCols: 3,
+      traits: layoutTraits,
+    },
+    {
+      blockId: 'moodboard',
+      label: 'Latest Moodboards',
+      iconKey: 'image',
+      category: CAT_INSPIRATION,
+      defaultCount: 3,
+      defaultCols: 3,
+      traits: layoutTraits,
+    },
+    {
+      blockId: 'vr3d',
+      label: 'Latest 3D Worlds',
+      iconKey: 'cube',
+      category: CAT_INSPIRATION,
+      defaultCount: 3,
+      defaultCols: 3,
+      traits: layoutTraits,
+    },
+  ];
 
-  editor.BlockManager.add('kai-moodboard', {
-    label: 'Latest Moodboards', category: KAI, media: icon('🎨'),
-    content: placeholder('moodboard', '🎨', 'Latest Public Moodboards', 3, 3),
-  });
+  // ── Register each block as a GrapesJS component type ─────────────────────
+  MH_BLOCKS.forEach(({ blockId, label, iconKey, category, defaultCount, defaultCols, defaultAttrs, traits }) => {
+    const typeId   = `mh-${blockId}`;
+    const iconPaths = ICONS[iconKey];
 
-  editor.BlockManager.add('kai-vr3d', {
-    label: 'Latest 3D Inspirations', category: KAI, media: icon('🌐'),
-    content: placeholder('vr3d', '🌐', 'Latest 3D Inspirations', 3, 3),
+    editor.DomComponents.addType(typeId, {
+      // Used when loading saved design JSON — re-identifies blocks in HTML
+      isComponent: (el: Element) =>
+        el instanceof HTMLElement && el.getAttribute('data-kai-block') === blockId,
+
+      model: {
+        defaults: {
+          tagName: 'div',
+          editable: false,
+          droppable: false,
+          // Prevent ANY child from being edited (text click, double-click, etc.)
+          propagate: ['editable', 'droppable'],
+          // No GrapesJS child components — canvas display is handled by the view
+          components: [],
+          attributes: {
+            'data-kai-block': blockId,
+            'data-count': String(defaultCount),
+            'data-cols': String(defaultCols),
+            'data-layout': 'columns',
+            ...defaultAttrs,
+          },
+          traits,
+        },
+      },
+
+      view: {
+        // Block all double-click-to-edit events
+        events: { dblclick: 'onDblClick' } as any,
+        onDblClick(e: Event) {
+          e.stopPropagation();
+          e.preventDefault();
+        },
+
+        // Re-render canvas placeholder whenever the component is rendered or attributes change
+        onRender() {
+          this._renderPreview();
+        },
+        _renderPreview() {
+          const el   = (this as any).el as HTMLElement;
+          const m    = (this as any).model;
+          const attrs = m.getAttributes();
+          const count  = attrs['data-count'] || defaultCount;
+          const layout = attrs['data-layout'] === 'list' ? 'List' : 'Grid';
+          const cols   = attrs['data-cols'] || defaultCols;
+          const rawCat = attrs['data-category'] || '';
+          const cat    = rawCat
+            ? rawCat.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+            : 'All Categories';
+
+          const detailLine = blockId === 'material_card'
+            ? `${cat} · ${count} items · ${layout}${layout === 'Grid' ? ` · ${cols} cols` : ''}`
+            : `${count} items · ${layout}${layout === 'Grid' ? ` · ${cols} cols` : ''}`;
+
+          el.style.cssText =
+            'background:#f8f4f2;border:2px dashed #c4a0b0;border-radius:8px;' +
+            'padding:20px 24px;text-align:center;font-family:sans-serif;' +
+            'margin:0;user-select:none;cursor:default;min-height:80px;' +
+            'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;';
+
+          el.innerHTML =
+            `<div style="pointer-events:none;margin-bottom:2px;">${previewSvg(iconPaths)}</div>` +
+            `<div style="pointer-events:none;color:#3E192A;font-size:13px;font-weight:600;">${label}</div>` +
+            `<div style="pointer-events:none;color:#888;font-size:11px;">${detailLine}</div>` +
+            `<div style="pointer-events:none;color:#bbb;font-size:10px;margin-top:2px;">` +
+              `Click to configure — live data on Save / Send` +
+            `</div>`;
+        },
+
+        // Re-render when the user changes traits (attributes change)
+        initialize(opts: any) {
+          (this as any).__proto__.initialize?.call(this, opts);
+          this.listenTo((this as any).model, 'change:attributes', (this as any)._renderPreview.bind(this));
+        },
+      } as any,
+    });
+
+    // Object-form content: GrapesJS instantiates the exact type directly on drop —
+    // no HTML parsing, no isComponent detection needed at drag-drop time.
+    editor.BlockManager.add(`mh-block-${blockId}`, {
+      label,
+      category,
+      media: svgIcon(iconPaths),
+      content: { type: typeId },
+    });
   });
 }
 
@@ -337,9 +531,10 @@ export const EmailTemplateBuilder: React.FC = () => {
       },
     });
 
-    addKaiBlocks(editor);
     editorRef.current = editor;
-    setEditorReady(true);
+
+    // addMhBlocks is async (fetches DB categories for the trait select)
+    addMhBlocks(editor).finally(() => setEditorReady(true));
 
     return () => {
       editor.destroy();
@@ -425,18 +620,26 @@ export const EmailTemplateBuilder: React.FC = () => {
     setPreviewHtml(injectPreheader(rawHtml, previewText));
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen"><p className="text-muted-foreground">Loading template…</p></div>;
-  }
-  if (!template) {
-    return <div className="flex items-center justify-center h-screen"><p className="text-muted-foreground">Template not found.</p></div>;
-  }
+  // NOTE: we never early-return while loading because containerRef must stay in the DOM
+  // so the GrapesJS useEffect (empty deps) can attach to it on first mount.
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
 
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
-      <div ref={topBarRef} className="border-b bg-background shrink-0">
+      {/* Loading / not-found overlays — rendered on top of the (hidden) editor */}
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
+          <p className="text-muted-foreground">Loading template…</p>
+        </div>
+      )}
+      {!loading && !template && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
+          <p className="text-muted-foreground">Template not found.</p>
+        </div>
+      )}
+
+      {/* ── Top bar — hidden until template is ready ──────────────────────── */}
+      <div ref={topBarRef} className="border-b bg-background shrink-0" style={{ display: (!loading && template) ? undefined : 'none' }}>
 
         {/* Row 1: nav + actions */}
         <div className="flex items-center justify-between px-4 py-2.5 gap-4">
@@ -445,8 +648,8 @@ export const EmailTemplateBuilder: React.FC = () => {
               <ArrowLeft className="h-4 w-4 mr-1" />Back
             </Button>
             <div>
-              <p className="font-semibold text-sm leading-tight">{template.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{template.category}</p>
+              <p className="font-semibold text-sm leading-tight">{template?.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{template?.category}</p>
             </div>
           </div>
 
@@ -506,8 +709,12 @@ export const EmailTemplateBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* ── GrapesJS canvas (fills remaining height) ─────────────────────── */}
-      <div ref={containerRef} className="flex-1 min-h-0" />
+      {/* ── GrapesJS canvas — always in DOM so the init useEffect can attach ── */}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0"
+        style={{ visibility: (!loading && template) ? 'visible' : 'hidden' }}
+      />
 
       {/* ── Tag info sheet ───────────────────────────────────────────────── */}
       <TagInfoPanel open={showTagInfo} onClose={() => setShowTagInfo(false)} />

@@ -201,7 +201,9 @@ Deno.serve(async (req) => {
 
         // Send via Resend
         const tags = Object.entries(body.tags || {}).map(([name, value]) => ({ name, value }));
-        tags.push({ name: 'type', value: body.emailType || 'transactional' });
+        if (!tags.some(t => t.name === 'type')) {
+          tags.push({ name: 'type', value: body.emailType || 'transactional' });
+        }
 
         const messageId = await sendViaResend({
           from: fromAddress,
@@ -378,6 +380,66 @@ Deno.serve(async (req) => {
             clickRate: parseFloat(clickRate.toFixed(2)),
             dailyData: data,
           }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'sync-domains': {
+        if (req.method !== 'POST') throw new Error('Method not allowed');
+
+        const isAdmin = user.user_metadata?.role === 'admin';
+        if (!isAdmin) throw new Error('Unauthorized: Admin access required');
+
+        const apiKey = Deno.env.get('RESEND_API_KEY');
+        if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+
+        // Fetch domains from Resend
+        const resendRes = await fetch('https://api.resend.com/domains', {
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+        });
+        const resendData = await resendRes.json();
+
+        if (!resendRes.ok) {
+          throw new Error(resendData.message || `Resend API error: ${resendRes.status}`);
+        }
+
+        const resendDomains: Array<{ id: string; name: string; status: string }> = resendData.data || [];
+        let added = 0;
+        let updated = 0;
+
+        for (const rd of resendDomains) {
+          const verificationStatus = rd.status === 'verified' ? 'verified' : rd.status === 'failed' ? 'failed' : 'pending';
+
+          const { data: existing } = await supabaseClient
+            .from('email_domains')
+            .select('id, verification_status')
+            .eq('domain', rd.name)
+            .single();
+
+          if (existing) {
+            // Update status if changed
+            if (existing.verification_status !== verificationStatus) {
+              await supabaseClient
+                .from('email_domains')
+                .update({ verification_status: verificationStatus })
+                .eq('id', existing.id);
+              updated++;
+            }
+          } else {
+            // Insert new domain
+            await supabaseClient
+              .from('email_domains')
+              .insert({
+                domain: rd.name,
+                verification_status: verificationStatus,
+                created_by: user.id,
+              });
+            added++;
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, added, updated, total: resendDomains.length }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

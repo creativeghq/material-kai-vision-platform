@@ -18,9 +18,7 @@ export interface EmailDomain {
   is_default: boolean;
   bounce_rate: number;
   complaint_rate: number;
-  reputation_status: 'healthy' | 'warning' | 'critical';
-  daily_quota: number;
-  max_send_rate: number;
+  reputation_score?: number;
 }
 
 export interface EmailTemplate {
@@ -62,6 +60,7 @@ export interface EmailLog {
   from_email: string;
   subject: string;
   status: 'queued' | 'sent' | 'delivered' | 'bounced' | 'complained' | 'failed';
+  email_type?: string;
   sent_at?: string;
   delivered_at?: string;
   opened_at?: string;
@@ -83,7 +82,11 @@ export class EmailService {
         throw new Error(error.message || 'Failed to send email');
       }
 
-      if (!data || !data.messageId) {
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to send email');
+      }
+
+      if (!data.messageId) {
         throw new Error('Invalid response from email service');
       }
 
@@ -159,6 +162,19 @@ export class EmailService {
     });
 
     if (error) throw error;
+  }
+
+  /**
+   * Sync domains from Resend into the local database
+   */
+  async syncDomains(): Promise<{ added: number; updated: number; total: number }> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'sync-domains' },
+    });
+
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || 'Failed to sync domains');
+    return data;
   }
 
   /**

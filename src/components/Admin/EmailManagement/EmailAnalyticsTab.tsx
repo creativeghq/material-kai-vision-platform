@@ -6,9 +6,9 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Mail, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { emailService } from '@/services/email/emailService';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export const EmailAnalyticsTab: React.FC = () => {
   const [analytics, setAnalytics] = useState({
@@ -33,11 +33,32 @@ export const EmailAnalyticsTab: React.FC = () => {
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - 30);
 
-      const data = await emailService.getAnalytics({
-        start: fromDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-        end: new Date().toISOString().split('T')[0],
+      const { data: logs, error } = await supabase
+        .from('email_logs')
+        .select('status, delivered_at, opened_at, clicked_at')
+        .gte('created_at', fromDate.toISOString());
+
+      if (error) throw error;
+
+      const rows = logs || [];
+      // Only count emails that were actually submitted to Resend (not queued/failed attempts)
+      const totalSent = rows.filter(r => ['sent', 'delivered', 'bounced', 'complained'].includes(r.status)).length;
+      // 'sent' = accepted by Resend; 'delivered' = confirmed via webhook
+      const totalDelivered = rows.filter(r => r.status === 'delivered' || r.status === 'sent' || r.delivered_at).length;
+      const totalBounced = rows.filter(r => r.status === 'bounced').length;
+      const totalComplained = rows.filter(r => r.status === 'complained').length;
+      const totalOpened = rows.filter(r => r.opened_at).length;
+      const totalClicked = rows.filter(r => r.clicked_at).length;
+
+      setAnalytics({
+        totalSent,
+        totalDelivered,
+        totalBounced,
+        totalComplained,
+        deliveryRate: totalSent > 0 ? parseFloat(((totalDelivered / totalSent) * 100).toFixed(2)) : 0,
+        bounceRate: totalSent > 0 ? parseFloat(((totalBounced / totalSent) * 100).toFixed(2)) : 0,
+        complaintRate: totalSent > 0 ? parseFloat(((totalComplained / totalSent) * 100).toFixed(2)) : 0,
       });
-      setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
       toast({
