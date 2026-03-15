@@ -161,6 +161,30 @@ verify_jwt = false
 [functions.suggest-fields]
 verify_jwt = false
 
+[functions.generate-interior-video-v2]
+verify_jwt = false
+
+[functions.generate-social-content]
+verify_jwt = false
+
+[functions.generate-social-image]
+verify_jwt = false
+
+[functions.generate-social-video]
+verify_jwt = false
+
+[functions.late-oauth]
+verify_jwt = false
+
+[functions.late-publish]
+verify_jwt = false
+
+[functions.late-analytics]
+verify_jwt = false
+
+[functions.late-webhook-handler]
+verify_jwt = false
+
 [auth]
 # JWT secret key for token signing and verification
 jwt_secret = "Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s"

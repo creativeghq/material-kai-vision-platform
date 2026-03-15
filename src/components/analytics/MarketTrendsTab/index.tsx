@@ -1,0 +1,1 @@
+export { MarketTrendsTab } from './MarketTrendsTab';

@@ -1,0 +1,1 @@
+export { MyFactoryTab } from './MyFactoryTab';

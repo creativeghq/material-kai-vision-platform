@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Globe,
   MapPin,
@@ -10,7 +10,6 @@ import {
   Mail,
   Star,
   Tag,
-  Eye,
   DollarSign,
   Link as LinkIcon,
   Pencil,
@@ -20,7 +19,7 @@ import {
   MessageCircle,
   Grid3x3,
   UserCircle,
-  Users,
+  ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -184,6 +183,7 @@ function ServiceRow({
 export const PublicProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [moodboards, setMoodboards] = useState<PublicMoodboard[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
@@ -363,6 +363,12 @@ export const PublicProfilePage: React.FC = () => {
             </span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
+            </button>
             <Link to="/discover" className="text-muted-foreground hover:text-foreground transition-colors">Browse</Link>
             {isOwnProfile && (
               <Button asChild size="sm" variant="outline" className="rounded-full gap-1.5">
@@ -373,62 +379,60 @@ export const PublicProfilePage: React.FC = () => {
         </div>
       </nav>
 
-      {/* ── Gradient banner + avatar ─────────────────────────────────────────── */}
-      <div className="relative">
-        <div
-          className="h-40 sm:h-48 relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
-        >
-          <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
-          <div className="absolute top-8 right-16 w-40 h-40 rounded-full bg-accent/20 blur-2xl pointer-events-none" />
-        </div>
-
-        {/* Avatar — half in banner, half in white section */}
-        <div className="absolute bottom-0 left-4 sm:left-8 translate-y-1/2 z-10">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-xl overflow-hidden bg-primary">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-3xl font-light text-primary-foreground">{initials}</span>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ── Gradient banner ──────────────────────────────────────────────────── */}
+      <div
+        className="h-28 sm:h-36 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+      >
+        <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+        <div className="absolute top-8 right-16 w-40 h-40 rounded-full bg-accent/20 blur-2xl pointer-events-none" />
       </div>
 
       {/* ── White profile card ───────────────────────────────────────────────── */}
-      <div className="bg-white shadow-sm">
+      <div className="bg-white shadow-sm relative z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          {/* Name row — padded to clear avatar */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-14 sm:pt-7 pb-4">
-            {/* Name + meta (left) — on desktop, offset right of avatar */}
-            <div className="sm:ml-36 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
-                {profile.professional_type && (
-                  <Badge className="text-xs rounded-full bg-primary/10 text-primary border-primary/20 font-normal">
-                    {PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type}
-                  </Badge>
+          {/* Name row — avatar inline, pulled up slightly over the banner */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pt-0 pb-4">
+            {/* Left: avatar + name/meta */}
+            <div className="flex items-start gap-4 flex-1 min-w-0">
+              {/* Avatar — pulled up over the banner */}
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow-xl overflow-hidden bg-primary shrink-0 -mt-10 sm:-mt-12">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-2xl font-light text-primary-foreground">{initials}</span>
+                  </div>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
-                {profile.company && <span>{profile.company}</span>}
-                {profile.company && profile.location && <span className="text-muted-foreground/40">·</span>}
-                {profile.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3 shrink-0" />{profile.location}
-                  </span>
+              {/* Name + meta */}
+              <div className="min-w-0 pt-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
+                  {profile.professional_type && (
+                    <Badge className="text-xs rounded-full bg-primary/10 text-primary border-primary/20 font-normal">
+                      {PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                  {profile.company && <span>{profile.company}</span>}
+                  {profile.company && profile.location && <span className="text-muted-foreground/40">·</span>}
+                  {profile.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3 shrink-0" />{profile.location}
+                    </span>
+                  )}
+                </p>
+                {profile.bio && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2 max-w-lg">{profile.bio}</p>
                 )}
-              </p>
-              {profile.bio && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 max-w-lg">{profile.bio}</p>
-              )}
+              </div>
             </div>
 
             {/* Action buttons (right) */}
-            <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+            <div className="flex items-center gap-2 shrink-0 pt-3">
               <FollowButton
                 targetUserId={profile.user_id}
                 currentUserId={user?.id}

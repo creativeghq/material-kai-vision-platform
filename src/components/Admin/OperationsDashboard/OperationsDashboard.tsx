@@ -55,277 +55,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { ChunkQualityDashboard } from './ChunkQualityDashboard';
-import { UnifiedProcessingMonitor } from './UnifiedProcessingMonitor';
-import { SystemHealthMonitor } from './SystemHealthMonitor';
-import { PlatformOverviewTab } from './PlatformOverviewTab';
+import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
+import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
+import { SystemHealthMonitor } from '../SystemHealthMonitor';
+import { PlatformOverviewTab } from '../PlatformOverviewTab';
 
-// Model pricing per 1M tokens (in USD)
-// Platform markup multiplier (50% markup for user billing)
-const MARKUP_MULTIPLIER = 1.50;
-
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  // Claude Models
-  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-  'claude-haiku-4-5': { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
-  'claude-opus-4-5': { input: 15.00, output: 75.00 },
-
-  // OpenAI Models
-  'gpt-4o': { input: 2.50, output: 10.00 },
-  'gpt-4o-mini': { input: 0.15, output: 0.60 },
-  'text-embedding-3-small': { input: 0.02, output: 0.00 },
-  'text-embedding-3-large': { input: 0.13, output: 0.00 },
-
-  // Voyage AI Embeddings
-  'voyage-3': { input: 0.06, output: 0.00 },
-  'voyage-3-lite': { input: 0.02, output: 0.00 },
-  'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
-
-  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
-  'qwen3-vl-32b': { input: 0.40, output: 0.40 },
-  'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
-};
-
-// Estimate tokens from content length (rough approximation: 4 chars = 1 token)
-const estimateTokens = (content: string): number => Math.ceil(content.length / 4);
-
-// Calculate cost based on model and tokens (returns both raw and billed cost with markup)
-const calculateCost = (model: string, inputTokens: number, outputTokens: number): {
-  input: number;
-  output: number;
-  total: number;
-  raw: number;
-  billed: number;
-  markup: number;
-} => {
-  const pricing = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }; // Default to Sonnet pricing
-  const inputCost = (inputTokens / 1_000_000) * pricing.input;
-  const outputCost = (outputTokens / 1_000_000) * pricing.output;
-  const rawTotal = inputCost + outputCost;
-  const billedTotal = rawTotal * MARKUP_MULTIPLIER;
-  return {
-    input: inputCost,
-    output: outputCost,
-    total: rawTotal, // For backward compatibility
-    raw: rawTotal,
-    billed: billedTotal,
-    markup: MARKUP_MULTIPLIER,
-  };
-};
-
-// Model configurations for Model Settings tab
-interface ModelConfig {
-  id: string;
-  name: string;
-  provider: 'anthropic' | 'openai' | 'meta' | 'google';
-  model: string;
-  inputCostPer1M: number;
-  outputCostPer1M: number;
-  speed: 'fast' | 'medium' | 'slow';
-  usedFor: string[];
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
-
-const MODEL_CONFIGS: ModelConfig[] = [
-  // Claude Models
-  { id: 'claude-haiku-4', name: 'Claude Haiku 4.5', provider: 'anthropic', model: 'claude-haiku-4-20250514', inputCostPer1M: 0.80, outputCostPer1M: 4.00, speed: 'fast', usedFor: ['Search Agent', 'Quick Queries', 'Validation'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4.5', provider: 'anthropic', model: 'claude-sonnet-4-20250514', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'claude-sonnet-3.5', name: 'Claude Sonnet 3.5', provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['Legacy Tasks'], totalInputTokens: 0, totalOutputTokens: 0 },
-
-  // OpenAI Models
-  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', model: 'gpt-5', inputCostPer1M: 5.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['High Accuracy Tasks', 'Discovery'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
-
-  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
-  { id: 'qwen3-vl-32b', name: 'Qwen3-VL-32B-Instruct', provider: 'huggingface', model: 'Qwen/Qwen3-VL-32B-Instruct', inputCostPer1M: 0.40, outputCostPer1M: 0.40, speed: 'medium', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
-
-  // Vision/Embedding Models (SLIG Cloud Endpoint)
-  { id: 'slig-768d', name: 'SLIG 768D', provider: 'huggingface', model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
-];
-
-const getProviderStyle = (provider: string) => {
-  switch (provider) {
-    case 'anthropic': return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: '🧠' };
-    case 'openai': return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: '🤖' };
-    case 'meta': return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: '🦙' };
-    case 'google': return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: '🔍' };
-    default: return { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: '⚙️' };
-  }
-};
-
-interface UsageAnalytics {
-  total_searches: number;
-  total_api_calls: number;
-  active_users: number;
-  avg_response_time: number;
-}
-
-interface AgentChatMessage {
-  id: string;
-  conversation_id: string;
-  role: string;
-  content: string;
-  metadata: {
-    agentId?: string;
-    model?: string;
-    responseTimeMs?: number;
-    productsCount?: number;
-    cachedResponse?: boolean;
-    rating?: 'up' | 'down' | null;
-  } | null;
-  created_at: string;
-  user_email?: string;
-  user_id?: string;
-}
-
-interface SearchAnalytic {
-  id: string;
-  query_text: string;
-  results_shown: number;
-  clicks_count: number;
-  satisfaction_rating: number;
-  created_at: string;
-  response_time_ms: number;
-}
-
-interface ApiUsageLog {
-  id: string;
-  api_key_id: string;
-  endpoint: string;
-  method: string;
-  status_code: number;
-  response_time_ms: number | null;
-  request_size_bytes: number | null;
-  response_size_bytes: number | null;
-  ip_address: string | null;
-  user_agent: string | null;
-  error_message: string | null;
-  created_at: string | null;
-}
-
-interface SubscriptionStats {
-  totalUsers: number;
-  freeUsers: number;
-  proUsers: number;
-  totalRevenue: number;
-  totalCreditsUsed: number;
-}
-
-interface UserProfile {
-  id: string;
-  email: string;
-  subscription_tier: string;
-  subscription_status: string;
-  credits_balance: number;
-  created_at: string;
-}
-
-interface DataProcessingStats {
-  pdf: {
-    total: number;
-    completed: number;
-    failed: number;
-    processing: number;
-    avgProcessingTime: number;
-  };
-  xml: {
-    total: number;
-    completed: number;
-    failed: number;
-    processing: number;
-    totalProducts: number;
-  };
-  scraping: {
-    total: number;
-    completed: number;
-    failed: number;
-    processing: number;
-    totalPages: number;
-  };
-}
-
-interface AIUsageLog {
-  id: string;
-  user_id: string;
-  operation_type: string;
-  model_name: string;
-  input_tokens: number;
-  output_tokens: number;
-  total_cost_usd: number;
-  credits_debited: number;
-  created_at: string;
-}
-
-interface InteriorDesignStats {
-  total_generations: number;
-  total_cost: number;
-  total_images: number;
-  unique_users: number;
-}
-
-interface ModelUsage {
-  model_id: string;
-  model_name: string;
-  usage_count: number;
-  total_cost: number;
-  success_rate: number;
-}
-
-interface ExternalServiceUsageData {
-  summary: {
-    total_credits: number;
-    total_cost_usd: number;
-    total_operations: number;
-  };
-  by_service: Array<{
-    service: string;
-    operations: number;
-    credits: number;
-    cost_usd: number;
-  }>;
-  by_user: Array<{
-    user_id: string;
-    total_credits: number;
-    operations: number;
-  }>;
-  timeline: Array<{
-    date: string;
-    credits: number;
-    operations: number;
-  }>;
-  time_period: string;
-}
-
-const EXT_SERVICE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
-
-const EXT_SERVICE_LABELS: Record<string, string> = {
-  'apollo-enrich': 'Apollo Enrich',
-  'apollo-people-match': 'Apollo People',
-  'hunter-email-finder': 'Hunter Email',
-  'hunter-domain-search': 'Hunter Domain',
-  'zerobounce-validate': 'ZeroBounce',
-  'firecrawl-scrape': 'Firecrawl',
-  'twilio-sms': 'Twilio SMS',
-  'twilio-whatsapp': 'Twilio WhatsApp',
-  'resend-email': 'Resend Email',
-};
-
-interface ResendEmailStats {
-  total: number;
-  delivered: number;
-  bounced: number;
-  complained: number;
-  opened: number;
-  deliveryRate: number;
-  bounceRate: number;
-  openRate: number;
-}
+import type {
+  UsageAnalytics,
+  AgentChatMessage,
+  SearchAnalytic,
+  ApiUsageLog,
+  SubscriptionStats,
+  UserProfile,
+  DataProcessingStats,
+  AIUsageLog,
+  InteriorDesignStats,
+  ModelUsage,
+  ExternalServiceUsageData,
+  ResendEmailStats,
+} from './types';
+import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
+import { estimateTokens, calculateCost } from './utils';
+import { StatCard } from './components/StatCard';
 
 export const OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -948,39 +700,6 @@ export const OperationsDashboard: React.FC = () => {
     if (status >= 500) return 'text-red-600';
     return 'text-gray-600';
   };
-
-  const StatCard = ({
-    title,
-    value,
-    icon: Icon,
-    description,
-    trend,
-  }: {
-    title: string;
-    value: string | number;
-    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    description: string;
-    trend?: number;
-  }) => (
-    <div className="dashboard-card">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-        <p className="text-xs text-muted-foreground">{title}</p>
-      </div>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="flex items-center justify-between mt-1">
-        <p className="text-xs text-muted-foreground">{description}</p>
-        {trend !== undefined && (
-          <Badge
-            className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800 border-green-300' : trend < 0 ? 'bg-red-100 text-red-800 border-red-300' : 'bg-slate-100 text-slate-800 border-slate-300'}`}
-          >
-            {trend > 0 ? '+' : ''}
-            {trend}%
-          </Badge>
-        )}
-      </div>
-    </div>
-  );
 
   if (loading) {
     return (

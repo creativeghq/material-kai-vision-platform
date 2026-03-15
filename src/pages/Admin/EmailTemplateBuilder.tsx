@@ -382,14 +382,24 @@ async function addMhBlocks(editor: GrapesEditor) {
           e.preventDefault();
         },
 
-        // Re-render canvas placeholder whenever the component is rendered or attributes change
+        // Called by GrapesJS after every render — paint the placeholder and attach
+        // the attribute-change listener once (guarded by _mhBound flag).
+        // NOTE: we intentionally do NOT override initialize() — doing so with
+        // (this).__proto__.initialize causes infinite recursion because __proto__
+        // resolves to the NewView prototype (our own methods), not ComponentView.
         onRender() {
-          this._renderPreview();
+          const self = this as any;
+          if (!self._mhBound) {
+            self._mhBound = true;
+            // listenTo is Backbone's memory-safe listener — auto-removed on destroy
+            self.listenTo(self.model, 'change:attributes', () => self._renderPreview());
+          }
+          self._renderPreview();
         },
+
         _renderPreview() {
-          const el   = (this as any).el as HTMLElement;
-          const m    = (this as any).model;
-          const attrs = m.getAttributes();
+          const el    = (this as any).el as HTMLElement;
+          const attrs = (this as any).model.getAttributes();
           const count  = attrs['data-count'] || defaultCount;
           const layout = attrs['data-layout'] === 'list' ? 'List' : 'Grid';
           const cols   = attrs['data-cols'] || defaultCols;
@@ -415,12 +425,6 @@ async function addMhBlocks(editor: GrapesEditor) {
             `<div style="pointer-events:none;color:#bbb;font-size:10px;margin-top:2px;">` +
               `Click to configure — live data on Save / Send` +
             `</div>`;
-        },
-
-        // Re-render when the user changes traits (attributes change)
-        initialize(opts: any) {
-          (this as any).__proto__.initialize?.call(this, opts);
-          this.listenTo((this as any).model, 'change:attributes', (this as any)._renderPreview.bind(this));
         },
       } as any,
     });

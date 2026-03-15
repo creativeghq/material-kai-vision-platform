@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle, XCircle, Clock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -25,7 +25,6 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
   const [newDomain, setNewDomain] = useState('');
   const [saving, setSaving] = useState(false);
   const [markingVerified, setMarkingVerified] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,23 +64,6 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
       toast({ title: 'Error', description: 'Failed to add domain', variant: 'destructive' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSyncFromResend = async () => {
-    try {
-      setSyncing(true);
-      const result = await emailService.syncDomains();
-      toast({
-        title: 'Sync Complete',
-        description: `${result.added} domain(s) added, ${result.updated} updated from Resend (${result.total} total in Resend).`,
-      });
-      loadDomains();
-    } catch (error) {
-      console.error('Error syncing domains:', error);
-      toast({ title: 'Error', description: 'Failed to sync domains from Resend', variant: 'destructive' });
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -135,12 +117,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             </a>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleSyncFromResend} disabled={syncing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync from Resend'}
-          </Button>
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -184,7 +161,6 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        </div>
       </div>
 
       {/* Resend dashboard link banner */}

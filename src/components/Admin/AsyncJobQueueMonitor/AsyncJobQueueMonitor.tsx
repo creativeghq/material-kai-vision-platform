@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Card,
@@ -15,8 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
-import { TempFileCleanupModal } from './TempFileCleanupModal';
-import { JobCheckpointTimeline } from './JobCheckpointTimeline';
+import { TempFileCleanupModal } from '../TempFileCleanupModal';
+import { JobCheckpointTimeline } from '../JobCheckpointTimeline';
 import {
   RefreshCw,
   AlertTriangle,
@@ -59,218 +59,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/core/ui/tooltip';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
-
-interface ProductProgress {
-  id: string;
-  job_id: string;
-  product_id: string | null;
-  product_name: string;
-  product_index: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
-  current_stage: string | null;
-  stages_completed: string[];
-  error_message: string | null;
-  error_stage: string | null;
-  metrics: {
-    chunks_created?: number;
-    images_processed?: number;
-    images_material?: number;
-    images_non_material?: number;
-    relationships_created?: number;
-    pages_extracted?: number;
-    product_db_id?: string;
-    processing_time_ms?: number;
-    text_embeddings_generated?: number;
-    clip_embeddings_generated?: number;
-    layout_regions_detected?: number;
-  };
-  metadata?: {
-    product_db_id?: string;
-    page_range?: number[];
-    confidence?: number;
-    [key: string]: any;
-  };
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface BackgroundJob {
-  id: string;
-  workspace_id: string;
-  document_id: string | null;
-  job_type: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted';
-  progress: number;
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  failed_at: string | null;
-  interrupted_at: string | null;
-  last_heartbeat: string | null;
-  error: string | null;
-  // AI cost tracking
-  total_ai_cost_usd?: number;
-  total_credits_used?: number;
-  user_id?: string;
-  metadata: {
-    filename?: string;
-    stage?: string;
-    products_discovered?: number;
-    chunks_created?: number;
-    images_extracted?: number;
-    embeddings_generated?: number;
-    processing_time_ms?: number;
-    ai_model?: string;
-    retry_count?: number;
-    // XML import specific
-    source_name?: string;
-    import_type?: string;
-    total_products?: number;
-    processed_products?: number;
-    failed_products?: number;
-    [key: string]: any;
-  } | null;
-}
-
-// XML Import Job from data_import_jobs table
-interface XMLImportJob {
-  id: string;
-  workspace_id: string;
-  import_type: string;
-  source_name: string | null;
-  source_url: string | null;
-  status: string;
-  total_products: number;
-  processed_products: number;
-  failed_products: number;
-  category: string | null;
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  error_message: string | null;
-  metadata: any;
-}
-
-interface JobCheckpoint {
-  id: string;
-  job_id: string;
-  stage: string;
-  checkpoint_data: any;
-  metadata: any;
-  created_at: string;
-}
-
-interface JobTypeMetrics {
-  pending: number;
-  processing: number;
-  completed: number;
-  failed: number;
-  retrying: number;
-  interrupted: number;
-  cancelled: number;
-  total: number;
-  success_rate: number;
-  avg_processing_time: number;
-}
-
-interface QueueMetrics {
-  pdf_processing: JobTypeMetrics;
-  web_scraping: JobTypeMetrics;
-  xml_import: JobTypeMetrics;
-  all_jobs: JobTypeMetrics;
-  total_documents: number;
-  total_products_created: number;
-  total_chunks_created: number;
-  total_images_extracted: number;
-}
-
-// Global Pipeline Definition for the Monitor (PDF Processing - default)
-const GLOBAL_PIPELINE_FLOW = [
-  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
-  { id: 'extraction', name: 'Document Extraction', icon: FileText, checkpoint: 'pdf_extracted' },
-  { id: 'discovery', name: 'Product Discovery', icon: Zap, checkpoint: 'products_detected' },
-  { id: 'processing', name: 'Product Processing', icon: Package, checkpoint: 'products_created' },
-  { id: 'entities', name: 'Document Entities', icon: Link, checkpoint: 'document_entities_created' },
-  { id: 'quality', name: 'Quality Enhancement', icon: Activity, checkpoint: 'completed' },
-];
-
-// XML Import Pipeline Stages
-const XML_IMPORT_PIPELINE_FLOW = [
-  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
-  { id: 'products_parsed', name: 'Products Parsed', icon: FileText, checkpoint: 'products_parsed' },
-  { id: 'images_downloaded', name: 'Images Downloaded', icon: Download, checkpoint: 'images_downloaded' },
-  { id: 'images_classified', name: 'Images Classified', icon: ImageIcon, checkpoint: 'images_classified' },
-  { id: 'clips_generated', name: 'CLIP Embeddings', icon: Zap, checkpoint: 'clips_generated' },
-  { id: 'chunks_created', name: 'Chunks Created', icon: FileText, checkpoint: 'chunks_created' },
-  { id: 'embeddings_queued', name: 'Embeddings Queued', icon: Activity, checkpoint: 'embeddings_queued' },
-  { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
-];
-
-// Web Scraping Pipeline Stages
-const WEB_SCRAPING_PIPELINE_FLOW = [
-  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
-  { id: 'pages_scraped', name: 'Pages Scraped', icon: Terminal, checkpoint: 'pages_scraped' },
-  { id: 'products_discovered', name: 'Products Discovered', icon: Package, checkpoint: 'products_discovered' },
-  { id: 'images_extracted', name: 'Images Extracted', icon: ImageIcon, checkpoint: 'images_extracted' },
-  { id: 'images_downloaded', name: 'Images Downloaded', icon: Download, checkpoint: 'images_downloaded' },
-  { id: 'images_classified', name: 'Images Classified', icon: ImageIcon, checkpoint: 'images_classified' },
-  { id: 'clips_generated', name: 'CLIP Embeddings', icon: Zap, checkpoint: 'clips_generated' },
-  { id: 'chunks_created', name: 'Chunks Created', icon: FileText, checkpoint: 'chunks_created' },
-  { id: 'embeddings_queued', name: 'Embeddings Queued', icon: Activity, checkpoint: 'embeddings_queued' },
-  { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
-];
-
-// Helper function to get pipeline stages based on job type
-const getPipelineForJobType = (jobType: string) => {
-  switch (jobType) {
-    case 'xml_import':
-      return XML_IMPORT_PIPELINE_FLOW;
-    case 'web_scraping':
-      return WEB_SCRAPING_PIPELINE_FLOW;
-    case 'pdf_processing':
-    default:
-      return GLOBAL_PIPELINE_FLOW;
-  }
-};
-
-// Enhanced Product Stages with detailed sub-steps
-const PRODUCT_STAGES = [
-  {
-    id: 'extraction',
-    name: 'Page Extraction',
-    icon: FileText,
-    description: 'Map catalog pages to PDF pages + YOLO layout detection'
-  },
-  {
-    id: 'chunking',
-    name: 'Text Chunking',
-    icon: FileText,
-    description: 'Create semantic chunks + embeddings'
-  },
-  {
-    id: 'images',
-    name: 'Image Processing',
-    icon: ImageIcon,
-    description: '4-layer extraction + Vision classification'
-  },
-  {
-    id: 'creation',
-    name: 'Product Creation',
-    icon: Package,
-    description: 'Create product record + metadata'
-  },
-  {
-    id: 'relationships',
-    name: 'Relationships',
-    icon: Link,
-    description: 'Link entities + create relations'
-  },
-];
+import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import type { ProductProgress, BackgroundJob, XMLImportJob, JobCheckpoint, JobTypeMetrics, QueueMetrics } from './types';
+import { GLOBAL_PIPELINE_FLOW, XML_IMPORT_PIPELINE_FLOW, WEB_SCRAPING_PIPELINE_FLOW, PRODUCT_STAGES, getPipelineForJobType } from './constants';
+import { LiveTimer } from './components/LiveTimer';
+import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [metrics, setMetrics] = useState<QueueMetrics | null>(null);
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
@@ -294,7 +90,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   // Debug log
-  console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
 
   const toggleStage = (stageId: number) => {
     setExpandedStages(prev => {
@@ -395,7 +190,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   // Fetch job details with checkpoints
   const fetchJobDetails = async (job: BackgroundJob) => {
-    console.log('fetchJobDetails called with job:', job);
     setPipelineValidationResult(null);
     try {
       setLoadingCheckpoints(true);
@@ -425,7 +219,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             return prev; // No change, keep same reference to prevent modal blink
           }
 
-          console.log('Selected job updated with new data');
           return jobData as BackgroundJob;
         });
       }
@@ -442,7 +235,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         throw error;
       }
 
-      console.log('Checkpoints fetched:', checkpoints);
 
       // Update checkpoints with deep comparison to prevent unnecessary re-renders
       setJobCheckpoints(prev => {
@@ -531,7 +323,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // Sort by created_at descending
       allJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      console.log(`✅ Fetched ${bgJobsData?.length || 0} background jobs + ${normalizedXMLJobs.length} XML jobs = ${allJobs.length} total`);
 
       setJobs(allJobs);
 
@@ -674,7 +465,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           table: 'background_jobs',
         },
         () => {
-          console.log('background_jobs changed - refreshing data');
           fetchQueueData();
         },
       )
@@ -690,7 +480,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           table: 'scraping_sessions',
         },
         () => {
-          console.log('scraping_sessions changed - refreshing data');
           fetchQueueData();
         },
       )
@@ -706,7 +495,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           table: 'data_import_jobs',
         },
         () => {
-          console.log('data_import_jobs changed - refreshing data');
           fetchQueueData();
         },
       )
@@ -722,7 +510,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           table: 'webhook_calls',
         },
         () => {
-          console.log('webhook_calls changed - refreshing data');
           fetchQueueData();
         },
       )
@@ -807,7 +594,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         );
 
         if (shouldFetchProducts) {
-          console.log(`🔄 Proactively fetching products (Discovered: ${productsDiscoveredCount})`);
           await fetchProductProgress(typedJobData.id);
         }
       } catch (error) {
@@ -832,7 +618,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     // Try to find job in loaded jobs first
     const job = jobs.find(j => j.id === jobId);
     if (job) {
-      console.log('🎯 Auto-opening modal for job from URL (found in jobs list):', jobId);
       fetchJobDetails(job);
       // Remove jobId from URL after opening
       setSearchParams({});
@@ -841,13 +626,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     // If jobs are still loading, wait for them
     if (loading) {
-      console.log('⏳ Jobs still loading, waiting...');
       return;
     }
 
     // If jobs loaded but job not found, fetch it directly from database
     if (jobs.length > 0) {
-      console.log('🔍 Job not in list, fetching directly from database:', jobId);
       supabase
         .from('background_jobs')
         .select('*')
@@ -859,7 +642,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             return;
           }
           if (data) {
-            console.log('✅ Found job in database, opening modal:', data);
             fetchJobDetails(data as BackgroundJob);
             setSearchParams({});
           }
@@ -867,37 +649,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   }, [searchParams, jobs, selectedJob, loading, setSearchParams]);
 
-  // Check if job has recent heartbeat (within last 30 seconds)
-  const hasRecentHeartbeat = (job: BackgroundJob): boolean => {
-    if (!job.last_heartbeat) return false;
-    const heartbeatTime = new Date(job.last_heartbeat).getTime();
-    const now = Date.now();
-    const thirtySecondsAgo = now - 30000;
-    return heartbeatTime > thirtySecondsAgo;
-  };
-
-  const getStatusBadge = (status: string, job?: BackgroundJob) => {
-    const statusConfig: Record<string, { color: string; icon: string }> = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
-      processing: { color: 'bg-blue-100 text-blue-800', icon: '⚙️' },
-      completed: { color: 'bg-green-100 text-green-800', icon: '✅' },
-      failed: { color: 'bg-red-100 text-red-800', icon: '❌' },
-      cancelled: { color: 'bg-gray-100 text-gray-800', icon: '🚫' },
-      interrupted: { color: 'bg-orange-100 text-orange-800', icon: '⚠️' },
-      retrying: { color: 'bg-purple-100 text-purple-800', icon: '🔄' },
-    };
-    const config = statusConfig[status] || statusConfig.pending;
-
-    // Add pulsing animation for actively processing jobs with recent heartbeat
-    const isActivelyProcessing = job && (status === 'processing' || status === 'retrying') && hasRecentHeartbeat(job);
-
-    return (
-      <Badge className={`${config.color} ${isActivelyProcessing ? 'animate-pulse' : ''}`}>
-        {config.icon} {status}
-        {isActivelyProcessing && <span className="ml-1 inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
-      </Badge>
-    );
-  };
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -1237,7 +988,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // Delete all related data using comprehensive cleanup
       const { stats } = await deleteJobWithAllData(jobId);
 
-      console.log('Cleanup stats:', stats);
 
       // Refresh the job list
       await fetchQueueData();
@@ -1321,7 +1071,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     const runCleanup = async () => {
       const cleanedCount = await cleanupOldCompletedJobs(30);
       if (cleanedCount > 0) {
-        console.log(`Auto-cleanup: Removed ${cleanedCount} completed jobs older than 30 days`);
         // Refresh the job list if any were cleaned
         await fetchQueueData();
       }
@@ -1606,26 +1355,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
-  // Live timer component for running jobs
-  const LiveTimer: React.FC<{ job: BackgroundJob }> = ({ job }) => {
-    const [, setTick] = useState(0);
-
-    useEffect(() => {
-      // Only update for running jobs
-      if (job.status !== 'processing' && job.status !== 'retrying') {
-        return;
-      }
-
-      // Update every second
-      const interval = setInterval(() => {
-        setTick(prev => prev + 1);
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, [job.status]);
-
-    return <span>{getElapsedTime(job)}</span>;
-  };
 
   if (loading) {
     return (
@@ -2678,7 +2407,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       {/* Job Details Modal */}
       <Dialog open={!!selectedJob} onOpenChange={(open) => {
-        console.log('Dialog onOpenChange:', open);
         if (!open) setSelectedJob(null);
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -3487,8 +3215,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                             <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Product</div>
                                             <button
                                               onClick={() => {
-                                                // TODO: Open product modal
-                                                toast.info(`Product ID: ${product.metrics.product_db_id}`);
+                                                navigate(`/admin/materials?productId=${product.metrics.product_db_id}`);
                                               }}
                                               className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
                                             >

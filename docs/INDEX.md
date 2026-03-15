@@ -100,6 +100,16 @@ Complete documentation for Material Kai Vision Platform.
 - Database schema (2 tables with indexes and RLS)
 - Cosine similarity and matrix factorization algorithms
 
+**[social-media-system.md](social-media-system.md)** - Social media creation & monitoring system ✨ NEW
+- KAI agent tools for social content (captions, images, videos)
+- Late.dev OAuth integration for per-user platform connections
+- Publishing, scheduling, analytics via Late.dev API
+- xAI Aurora / Gemini Flash / FLUX Dev image generation routing
+- Multi-model interior video (Veo 2, Kling 1.6 Pro, Wan, Runway)
+- Background agents for analytics sync
+- Admin panel at /admin/social-media/*
+- Deployment checklist + required secrets
+
 **[campaign-system.md](campaign-system.md)** - Email campaign management system ✨ NEW
 - Campaign creation and management
 - Audience targeting and segmentation

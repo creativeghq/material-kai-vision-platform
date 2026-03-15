@@ -50,6 +50,7 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   search: SearchIcon,
   classification: Cpu,
   tool: Wrench,
+  generation: Layers,
 };
 
 // Type-specific colors
@@ -58,6 +59,7 @@ const TYPE_COLORS: Record<string, string> = {
   extraction: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   template: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   search: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+  generation: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
   classification: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
   tool: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
 };

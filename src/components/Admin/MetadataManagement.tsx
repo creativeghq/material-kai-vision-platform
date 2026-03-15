@@ -15,12 +15,19 @@ import {
   Database,
   FileText,
   Package,
+  Tags,
+  Play,
+  CheckCircle,
+  XCircle,
+  SkipForward,
+  Loader2,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import { Switch } from '@/components/core/ui/switch';
 import {
   Select,
   SelectContent,
@@ -45,9 +52,37 @@ import {
 } from '@/components/core/ui/dialog';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
+
+// ── Batch Categorization types ──────────────────────────────────────────────
+interface CategorizeResult {
+  id: string;
+  name: string;
+  status: 'categorized' | 'failed' | 'skipped';
+  material_category?: string;
+  zone_intent?: string;
+  reason?: string;
+}
+
+interface BatchRunResult {
+  success: boolean;
+  total_found: number;
+  categorized: number;
+  failed: number;
+  skipped: number;
+  results: CategorizeResult[];
+  message: string;
+}
+
+const BATCH_STATUS_COLOR: Record<string, string> = {
+  categorized: 'bg-green-100 text-green-800',
+  failed: 'bg-red-100 text-red-800',
+  skipped: 'bg-amber-100 text-amber-800',
+};
 
 // Product-level aggregate fields that should not appear as individual metadata rows
 const AGGREGATE_FIELDS = new Set(['confidence', 'factory_group_name']);
@@ -75,6 +110,7 @@ interface MetadataStatistics {
 
 export const MetadataManagement: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // State
   const [metadata, setMetadata] = useState<MetadataItem[]>([]);
@@ -345,6 +381,75 @@ export const MetadataManagement: React.FC = () => {
     }
   };
 
+  // ── Batch Categorization state ──────────────────────────────────────────
+  const [batchWorkspaceId, setBatchWorkspaceId] = useState<string | null>(null);
+  const [uncategorizedCount, setUncategorizedCount] = useState<number | null>(null);
+  const [onlyUncategorized, setOnlyUncategorized] = useState(true);
+  const [batchLimit, setBatchLimit] = useState(200);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<BatchRunResult | null>(null);
+  const [batchApiUrl, setBatchApiUrl] = useState('');
+
+  useEffect(() => {
+    setBatchApiUrl(import.meta.env.VITE_MIVAA_API_URL || '');
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data: wm } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+      if (!wm) return;
+      setBatchWorkspaceId(wm.workspace_id);
+      const { count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', wm.workspace_id)
+        .or('metadata->material_category.is.null,metadata->>material_category.eq.');
+      setUncategorizedCount(count ?? 0);
+    };
+    load();
+  }, [user]);
+
+  const runBatch = async () => {
+    if (!batchWorkspaceId || !batchApiUrl) {
+      toast({ title: 'Not ready', description: 'Workspace or API URL not available', variant: 'destructive' });
+      return;
+    }
+    setBatchRunning(true);
+    setLastRun(null);
+    try {
+      const res = await fetch(`${batchApiUrl}/api/products/batch-categorize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: batchWorkspaceId, only_uncategorized: onlyUncategorized, limit: batchLimit }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data: BatchRunResult = await res.json();
+      setLastRun(data);
+      const { count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', batchWorkspaceId)
+        .or('metadata->material_category.is.null,metadata->>material_category.eq.');
+      setUncategorizedCount(count ?? 0);
+      toast({ title: 'Batch Complete', description: `${data.categorized} products categorized out of ${data.total_found} found` });
+    } catch (err) {
+      toast({ title: 'Batch Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBatchRunning(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
@@ -354,6 +459,19 @@ export const MetadataManagement: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
+        <Tabs defaultValue="metadata">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="metadata" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Database className="h-4 w-4" />
+              Metadata
+            </TabsTrigger>
+            <TabsTrigger value="batch-categorization" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Tags className="h-4 w-4" />
+              Batch AI Categorization
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="metadata" className="mt-6 space-y-6">
         {/* Statistics Cards */}
         {statistics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -529,6 +647,127 @@ export const MetadataManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="batch-categorization" className="mt-6 space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="dashboard-card">
+                <CardContent className="p-5">
+                  <p className="text-xs text-muted-foreground mb-1">Uncategorized Products</p>
+                  <p className="text-3xl font-light text-amber-600">
+                    {uncategorizedCount === null ? '—' : uncategorizedCount}
+                  </p>
+                </CardContent>
+              </Card>
+              {lastRun && (
+                <>
+                  <Card className="dashboard-card">
+                    <CardContent className="p-5">
+                      <p className="text-xs text-muted-foreground mb-1">Last Run — Categorized</p>
+                      <p className="text-3xl font-light text-green-600">{lastRun.categorized}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="dashboard-card">
+                    <CardContent className="p-5">
+                      <p className="text-xs text-muted-foreground mb-1">Last Run — Failed / Skipped</p>
+                      <p className="text-3xl font-light text-destructive">
+                        {lastRun.failed + lastRun.skipped}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+
+            {/* Controls */}
+            <Card className="dashboard-card">
+              <CardHeader>
+                <CardTitle className="text-base font-normal">Run Configuration</CardTitle>
+                <CardDescription>Configure and trigger a batch categorization run using Claude Haiku</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="only-uncategorized"
+                    checked={onlyUncategorized}
+                    onCheckedChange={setOnlyUncategorized}
+                  />
+                  <Label htmlFor="only-uncategorized" className="cursor-pointer">
+                    Only process products without a category
+                  </Label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Label className="w-32 shrink-0">Max products</Label>
+                  <div className="flex gap-2">
+                    {[50, 100, 200, 500].map((n) => (
+                      <Button
+                        key={n}
+                        variant={batchLimit === n ? 'default' : 'outline'}
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => setBatchLimit(n)}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={runBatch} disabled={batchRunning || !batchWorkspaceId} className="rounded-full">
+                  {batchRunning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Running…
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Batch Categorization
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Results */}
+            {lastRun && (
+              <Card className="dashboard-card">
+                <CardHeader>
+                  <CardTitle className="text-base font-normal">Results</CardTitle>
+                  <CardDescription>{lastRun.message}</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-[480px] overflow-y-auto divide-y">
+                    {lastRun.results.map((r) => (
+                      <div key={r.id} className="flex items-center gap-3 px-5 py-3 hover:bg-accent/30">
+                        {r.status === 'categorized' && <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />}
+                        {r.status === 'failed'      && <XCircle     className="h-4 w-4 text-destructive shrink-0" />}
+                        {r.status === 'skipped'     && <SkipForward className="h-4 w-4 text-amber-500 shrink-0" />}
+                        <span className="flex-1 text-sm truncate">{r.name || r.id}</span>
+                        {r.material_category && (
+                          <Badge variant="secondary" className="text-xs shrink-0">{r.material_category}</Badge>
+                        )}
+                        {r.zone_intent && (
+                          <Badge variant="outline" className="text-xs shrink-0">{r.zone_intent}</Badge>
+                        )}
+                        {r.reason && (
+                          <span className="text-xs text-muted-foreground truncate max-w-48" title={r.reason}>
+                            {r.reason}
+                          </span>
+                        )}
+                        <Badge className={`text-xs shrink-0 ${BATCH_STATUS_COLOR[r.status]}`}>
+                          {r.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Dialog */}

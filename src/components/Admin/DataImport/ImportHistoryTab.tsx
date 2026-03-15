@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +35,7 @@ interface ImportJob {
 }
 
 const ImportHistoryTab: React.FC = () => {
+  const navigate = useNavigate();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
@@ -245,8 +247,7 @@ const ImportHistoryTab: React.FC = () => {
           job={job as XMLImportJob}
           onRetry={handleManualRerun}
           onViewDetails={(jobId) => {
-            // TODO: Navigate to job details page
-            console.log('View details for job:', jobId);
+            navigate(`/admin/async-queue-monitor?jobId=${jobId}`);
           }}
         />
       ))}

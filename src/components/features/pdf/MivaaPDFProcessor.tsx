@@ -99,17 +99,25 @@ export const MivaaPDFProcessor: React.FC = () => {
         // Call MIVAA API for PDF processing
         const response = await mivaaApi.uploadPDF(formData);
 
-        // If we get a job ID, start polling for status updates
-        if (response.success && response.data?.job_id) {
-          console.log('🔄 Starting polling for job:', response.data.job_id);
-          // Note: In a real implementation, you'd want to show a progress modal here
-          // and use the consolidatedPDFWorkflowService.startJobPolling method
-        }
-
         if (response.success && response.data) {
-          // Cast to any to handle both async job response and potential legacy sync response
-          // TODO: Refactor to use proper job polling for async processing
           const data = response.data as any;
+
+          // Async job: backend queued the file — track it in the job monitor
+          if (data.job_id && !data.markdown_content) {
+            toast.success(
+              `"${file.name}" queued for processing (job ${data.job_id.slice(0, 8)}…). Track progress in the Job Monitor.`,
+              {
+                action: {
+                  label: 'View Job',
+                  onClick: () => window.open(`/admin/async-queue-monitor?jobId=${data.job_id}`, '_blank'),
+                },
+                duration: 8000,
+              }
+            );
+            continue;
+          }
+
+          // Sync response: markdown returned immediately
           processingResults.push({
             id: crypto.randomUUID(),
             fileName: file.name,

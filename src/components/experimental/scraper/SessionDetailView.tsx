@@ -52,6 +52,21 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
   const [session, setSession] = useState<ScrapingSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string>('default');
+
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      if (data?.id) setWorkspaceId(data.id);
+    };
+    loadWorkspace();
+  }, []);
 
   useEffect(() => {
     loadSession();
@@ -179,7 +194,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
           action: 'process_scraping_session',
           payload: {
             session_id: sessionId,
-            workspace_id: 'default', // TODO: Get from user context
+            workspace_id: workspaceId,
             categories: ['products'],
             model: 'claude',
           },

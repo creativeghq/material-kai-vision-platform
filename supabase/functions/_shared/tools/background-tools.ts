@@ -1,0 +1,185 @@
+/**
+ * Background Tools: createDispatchBackgroundTaskTool, createInteriorVideoV2Tool
+ */
+
+const { tool } = await import('npm:@langchain/core@1.1.15/tools');
+const { z } = await import('npm:zod@3.24.0');
+const { createClient } = await import('npm:@supabase/supabase-js@2');
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+/**
+ * Agent Configurations with RBAC
+ */
+/**
+ * LangChain Tool: Dispatch Background Task
+ *
+ * Admin-only. Called by KAI when a task is too large or time-consuming
+ * to complete inline. Creates an agent_runs row and fires the
+ * background-agent-runner edge function asynchronously.
+ *
+ * The user receives an immediate acknowledgement with the run_id
+ * so they can track progress on the admin monitoring page.
+ */
+const KAI_SYSTEM_AGENT_ID = '00000000-0000-0000-0000-000000000001';
+
+export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: string, conversationId: string | null) => {
+  return tool(
+    async ({ task_prompt, model_override, context_snippet, reason }) => {
+      try {
+
+        // 1. Create an agent_runs row in pending state
+        const { data: run, error: runError } = await supabase
+          .from('agent_runs')
+          .insert({
+            agent_id:     KAI_SYSTEM_AGENT_ID,
+            status:       'pending',
+            triggered_by: 'chat',
+            input_data:   {
+              task_prompt,
+              context_snippet: context_snippet ?? '',
+              model_override:  model_override ?? null,
+              dispatched_by:   userId,
+              conversation_id: conversationId,   // used to post result back to chat
+            },
+            workspace_id: workspaceId,
+          })
+          .select('id')
+          .single();
+
+        if (runError || !run) {
+          throw new Error(`Failed to create run: ${runError?.message}`);
+        }
+
+        const runId = run.id as string;
+
+        // 2. Fire-and-forget to background-agent-runner
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            agent_id:     KAI_SYSTEM_AGENT_ID,
+            run_id:       runId,
+            triggered_by: 'chat',
+            input_data:   { task_prompt, context_snippet, model_override },
+          }),
+        }).catch(err => console.error('[dispatch_background_task] Fire-and-forget error:', err));
+
+
+        return JSON.stringify({
+          success:    true,
+          run_id:     runId,
+          message:    `Background task started. I'll post the results back here in this conversation once complete${conversationId ? '' : ' (check Admin → Background Tasks to monitor progress)'}.`,
+          task_preview: task_prompt.slice(0, 120),
+          reason,
+        });
+      } catch (error) {
+        console.error('[dispatch_background_task] Error:', error);
+        return JSON.stringify({
+          success: false,
+          error:   error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    {
+      name: 'dispatch_background_task',
+      description: [
+        'Dispatch a complex or long-running task to run asynchronously in the background.',
+        'Use this when: (1) the task would take more than ~30 seconds, (2) it requires many iterations or large batch processing,',
+        '(3) the user explicitly asks to run something in the background, or (4) it is a repeatable scheduled operation.',
+        'The task will be executed by the KAI background agent using the full tool suite.',
+        'Returns immediately with a run_id the user can use to track progress.',
+      ].join(' '),
+      schema: z.object({
+        task_prompt:      z.string().describe('The complete task description — be detailed, include all context the background agent will need.'),
+        reason:           z.string().describe('One sentence explaining WHY you are dispatching this to the background (e.g., "requires processing 500 products which would exceed the response time limit").'),
+        model_override:   z.string().optional().describe('Specific model to use, e.g. claude-sonnet-4-6, gpt-4o, gemini-1.5-pro. Omit to use default.'),
+        context_snippet:  z.string().optional().describe('Relevant excerpt from the current conversation for context (max 500 chars).'),
+      }),
+    }
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Interior Video V2 Tool (multi-model: Veo / Kling / Wan2.1 / Runway)
+// ═══════════════════════════════════════════════════════════════
+
+export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ source_image_url, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url }) => {
+      try {
+        onChunk?.({ type: 'tool_progress', status: `Starting ${video_type} video generation with ${model ?? 'auto-selected model'}...`, timestamp: Date.now() });
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-video-v2`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            workspace_id: workspaceId,
+            source_image_url,
+            video_type,
+            model,
+            prompt,
+            aspect_ratio: aspect_ratio ?? '16:9',
+            duration_seconds: duration_seconds ?? 8,
+            before_image_url,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.video_url) {
+          onChunk?.({
+            type: 'video_generated',
+            video_url: result.video_url,
+            job_id: result.job_id,
+            model: result.model_used,
+            credits_used: result.credits_used,
+            video_type,
+          });
+        }
+
+        return JSON.stringify(result);
+      } catch (error) {
+        return JSON.stringify({ success: false, error: String(error) });
+      }
+    },
+    {
+      name: 'generate_video',
+      description: `Generate an interior design video using AI. Routes to the best model based on video type.
+Video types and recommended models:
+- walkthrough: Veo 2.0 (30cr) — cinematic camera moves through a room
+- product_spotlight: Kling 1.6 Pro (15cr) — focuses on a specific material/product
+- before_after: Kling 1.6 Pro (15cr) — transition between two room states (requires before_image_url)
+- floorplan_flythrough: Veo 2.0 (30cr) — aerial view flythrough
+- social_reel: Kling 1.6 Pro (15cr) — 9:16 short-form video for social media
+- premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
+
+Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
+      schema: z.object({
+        source_image_url: z.string().describe('Source image URL to animate or base the video on'),
+        video_type: z.enum(['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'])
+          .describe('Type of video to generate'),
+        model: z.enum(['veo-2', 'kling-1.6-pro', 'wan2.1-i2v', 'runway-gen4-turbo']).optional()
+          .describe('Override model selection (default: auto based on video_type)'),
+        prompt: z.string().optional().describe('Additional prompt for the video generation'),
+        aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
+          .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),
+        duration_seconds: z.number().int().min(5).max(16).optional()
+          .describe('Duration in seconds (default: 8)'),
+        before_image_url: z.string().optional()
+          .describe('Required only for before_after type: the "before" state image URL'),
+      }),
+    }
+  );
+};

@@ -20,7 +20,6 @@ import {
   MessageSquare,
   Workflow,
   ChevronDown,
-  Tags,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -143,6 +142,22 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'API management',
       },
+      {
+        title: 'Background Agents',
+        description: 'Autonomous AI agents that run on schedules, events, or chains behind the scenes',
+        icon: Bot,
+        path: '/admin/background-agents',
+        status: 'active',
+        count: 'AI Agents',
+      },
+      {
+        title: 'Duplicate Detection',
+        description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
+        icon: AlertTriangle,
+        path: '/admin/duplicate-detection',
+        status: 'active',
+        count: 'AI Detection',
+      },
     ],
     'CRM & User Management': [
       {
@@ -165,11 +180,11 @@ const AdminDashboard: React.FC = () => {
     'Communications': [
       {
         title: 'Email Management',
-        description: 'Manage email domains, templates, and monitor delivery analytics with Amazon SES',
+        description: 'Manage email domains, templates, and monitor delivery analytics with Resend',
         icon: Mail,
         path: '/admin/emails',
         status: 'active',
-        count: 'SES Integration',
+        count: 'Resend',
       },
       {
         title: 'Messaging (SMS/WhatsApp)',
@@ -186,30 +201,6 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/flows',
         status: 'active',
         count: 'Visual Builder',
-      },
-      {
-        title: 'Background Agents',
-        description: 'Autonomous AI agents that run on schedules, events, or chains behind the scenes',
-        icon: Bot,
-        path: '/admin/background-agents',
-        status: 'active',
-        count: 'AI Agents',
-      },
-      {
-        title: 'Duplicate Detection',
-        description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
-        icon: AlertTriangle,
-        path: '/admin/duplicate-detection',
-        status: 'active',
-        count: 'AI Detection',
-      },
-      {
-        title: 'Batch AI Categorization',
-        description: 'Bulk re-categorize uncategorized products using Claude Haiku material classification',
-        icon: Tags,
-        path: '/admin/batch-categorization',
-        status: 'active',
-        count: 'AI Tagging',
       },
     ],
     'System Monitoring': [

@@ -1,10 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Get Supabase URL from the Supabase client instance to ensure consistency
-// Remove any trailing slashes to prevent double slashes in URLs
+// Get Supabase URL — remove any trailing slashes to prevent double slashes in URLs
 const getSupabaseUrl = (): string => {
-  // @ts-ignore - accessing internal supabaseUrl property
-  const url = supabase.supabaseUrl || process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const url = import.meta.env.VITE_SUPABASE_URL;
   if (!url) {
     throw new Error('SUPABASE_URL is not defined');
   }

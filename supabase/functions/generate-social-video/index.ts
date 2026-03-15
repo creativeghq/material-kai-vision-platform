@@ -1,0 +1,269 @@
+/**
+ * Generate Social Video Edge Function
+ *
+ * Generates short-form social media videos via Replicate:
+ *   kling-1.6-pro  → 15 credits (fast, great for reels)
+ *   veo-2          → 30 credits (premium quality via existing generate-interior-video)
+ *
+ * Uses async polling pattern: returns prediction_id immediately if generation
+ * takes > 55s (edge function limit). Frontend polls via generate_3d_status tool.
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
+import { checkCreditBalance } from '../_shared/credit-utils.ts';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
+
+type VideoModel = 'kling-1.6-pro' | 'veo-2';
+
+const CREDIT_COSTS: Record<VideoModel, number> = {
+  'kling-1.6-pro': 15,
+  'veo-2':         30,
+};
+
+// Replicate model versions for social video
+const REPLICATE_MODELS: Record<string, string> = {
+  'kling-1.6-pro': 'klingai/kling-1.6-pro',
+};
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function createReplicatePrediction(
+  model: string,
+  input: Record<string, unknown>,
+): Promise<{ id: string; status: string; urls: { get: string } }> {
+  const res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${REPLICATE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ input }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Replicate error ${res.status}: ${text}`);
+  }
+
+  return await res.json();
+}
+
+async function pollReplicate(
+  predictionId: string,
+  timeoutMs = 50_000,
+): Promise<{ status: string; output?: string | string[]; error?: string }> {
+  const start = Date.now();
+  const pollUrl = `https://api.replicate.com/v1/predictions/${predictionId}`;
+
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, 5000));
+    const res = await fetch(pollUrl, {
+      headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` },
+    });
+    const data = await res.json() as { status: string; output?: string | string[]; error?: string };
+
+    if (data.status === 'succeeded' || data.status === 'failed') return data;
+  }
+
+  return { status: 'processing' }; // Timed out — return processing for async handling
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const auth = await authenticate(req);
+  if (!auth.user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+  const userId = auth.user.id;
+
+  if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
+
+  const body = await req.json();
+  const {
+    prompt,
+    source_image_url,
+    model = 'kling-1.6-pro' as VideoModel,
+    aspect_ratio = '9:16',
+    duration_seconds = 10,
+    workspace_id,
+    post_id,
+  } = body;
+
+  if (!source_image_url) return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
+
+  const creditCost = CREDIT_COSTS[model as VideoModel] ?? 15;
+
+  // ① Pre-flight check
+  const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-1.6-pro');
+  if (!sufficient) {
+    return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
+  }
+
+  // ② Debit upfront
+  const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
+    p_user_id: userId,
+    p_amount: creditCost,
+    p_operation_type: 'social_video_generation',
+    p_description: `Social video generation (${model}, ${duration_seconds}s)`,
+    p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
+  });
+
+  const debit = Array.isArray(debitData) ? debitData[0] : debitData;
+  if (debitError || !debit?.success) {
+    return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
+  }
+
+  // ③ Create prediction
+  try {
+    let predictionId: string;
+    let replicateModel: string;
+
+    if (model === 'veo-2') {
+      // Route to existing generate-interior-video (handles Veo 2.0)
+      const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_image_url,
+          prompt,
+          aspect_ratio,
+          duration_s: Math.min(duration_seconds, 8),
+          workspace_id,
+          _skip_credit_debit: true, // Credits already debited above
+        }),
+      });
+      const veoResult = await veoRes.json();
+      if (!veoResult.success) {
+        throw new Error(veoResult.error || 'Veo generation failed');
+      }
+      return jsonResponse({
+        success: true,
+        video_url: veoResult.video_url,
+        job_id: veoResult.job_id,
+        model_used: 'veo-2',
+        credits_used: creditCost,
+        status: 'completed',
+      });
+    }
+
+    replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-1.6-pro'];
+    const prediction = await createReplicatePrediction(replicateModel, {
+      image: source_image_url,
+      prompt: prompt || 'Smooth cinematic camera motion, professional quality',
+      duration: duration_seconds,
+      aspect_ratio,
+      cfg_scale: 0.5,
+    });
+    predictionId = prediction.id;
+
+    // ④ Poll (up to 50s — leave 10s buffer for edge function overhead)
+    const pollResult = await pollReplicate(predictionId, 50_000);
+
+    if (pollResult.status === 'succeeded') {
+      const videoUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output;
+
+      // Update social_posts if provided
+      if (post_id && videoUrl) {
+        const { data: existingPost } = await supabase
+          .from('social_posts')
+          .select('credits_used, credits_breakdown')
+          .eq('id', post_id)
+          .single();
+
+        if (existingPost) {
+          await supabase.from('social_posts').update({
+            video_url: videoUrl,
+            credits_used: (existingPost.credits_used || 0) + creditCost,
+            credits_breakdown: { ...(existingPost.credits_breakdown || {}), video: creditCost },
+          }).eq('id', post_id);
+        }
+      }
+
+      // Log to ai_usage_logs
+      await supabase.from('ai_usage_logs').insert({
+        user_id: userId,
+        operation_type: 'social_video_generation',
+        model_name: model,
+        api_provider: 'replicate',
+        input_tokens: 0, output_tokens: 0,
+        input_cost_usd: 0, output_cost_usd: 0,
+        raw_cost_usd: creditCost * 0.01 / 1.5, // reverse markup to get raw
+        markup_multiplier: 1.5,
+        billed_cost_usd: creditCost * 0.01,
+        total_cost_usd: creditCost * 0.01,
+        credits_debited: creditCost,
+        metadata: { model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId },
+      });
+
+      return jsonResponse({
+        success: true,
+        video_url: videoUrl,
+        prediction_id: predictionId,
+        model_used: model,
+        credits_used: creditCost,
+        status: 'completed',
+      });
+
+    } else if (pollResult.status === 'processing') {
+      // Store prediction_id in generation_videos for async polling
+      const { data: videoRecord } = await supabase.from('generation_videos').insert({
+        user_id: userId,
+        workspace_id,
+        source_image_url,
+        prompt,
+        status: 'processing',
+        model,
+        aspect_ratio,
+        duration_s: duration_seconds,
+        credits_used: creditCost,
+        video_type: 'social_reel',
+        model_version: replicateModel,
+        replicate_prediction_id: predictionId,
+      }).select('id').single();
+
+      return jsonResponse({
+        success: true,
+        status: 'processing',
+        prediction_id: predictionId,
+        job_id: videoRecord?.id,
+        model_used: model,
+        credits_used: creditCost,
+        message: 'Video is being generated. Poll using the job_id to check status.',
+      });
+
+    } else {
+      // Failed — refund
+      await supabase.rpc('debit_user_credits', {
+        p_user_id: userId,
+        p_amount: -creditCost,
+        p_operation_type: 'social_video_generation_refund',
+        p_description: `Refund: ${model} video generation failed`,
+      });
+      return jsonResponse({ success: false, error: pollResult.error || 'Video generation failed' }, 500);
+    }
+
+  } catch (err) {
+    // Refund on exception
+    await supabase.rpc('debit_user_credits', {
+      p_user_id: userId,
+      p_amount: -creditCost,
+      p_operation_type: 'social_video_generation_refund',
+      p_description: `Refund: social video error`,
+    });
+    console.error('[generate-social-video] Error:', err);
+    return jsonResponse({ success: false, error: String(err) }, 500);
+  }
+});

@@ -106,6 +106,14 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
     unit: 'image',
     category: 'interior_design',
   },
+  {
+    id: 'materials_selection_board',
+    label: 'Materials Selection Board',
+    description: 'AI-generated design presentation board — presentation, selection, or photorealistic render',
+    creditsPerAction: 15,
+    unit: 'board',
+    category: 'interior_design',
+  },
 
   // B2B Company Research
   {

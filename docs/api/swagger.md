@@ -904,12 +904,14 @@ For subscription:
 
 **Endpoint**: `POST /functions/v1/email-api`
 **Auth**: User JWT or Service Role Key
-**Description**: Action-based email service powered by AWS SES.
+**Description**: Action-based email service powered by **Resend**.
+
+> **Migration note (2026-03-11):** Email provider migrated from Amazon SES to Resend. Actions `verify-domain`, `check-domain`, `list-ses-domains`, and `sending-stats` have been removed. Domain verification is now managed directly in the [Resend Dashboard](https://resend.com/domains).
 
 All requests use `POST` with `{ "action": "<action>", ...params }` in the body.
 
 ### Action: send
-Send an email.
+Send a transactional, marketing, or notification email. Supports plain HTML/text or a pre-saved template.
 
 **Request Body**:
 ```json
@@ -937,59 +939,72 @@ Either `html`/`text` or `templateSlug` is required. `templateSlug` renders a Rea
 
 **Response**:
 ```json
-{ "success": true, "messageId": "ses-message-id", "logId": "uuid" }
+{ "success": true, "messageId": "resend-email-uuid", "logId": "uuid" }
 ```
 
 ---
 
-### Action: verify-domain (Admin only)
-Register a domain with AWS SES.
+### Action: add-domain (Admin only)
+Register a domain in the platform database. DNS verification must be completed separately in the [Resend Dashboard](https://resend.com/domains).
 
 ```json
-{ "action": "verify-domain", "domain": "yourdomain.com" }
+{ "action": "add-domain", "domain": "yourdomain.com" }
 ```
 
 **Response**:
 ```json
 {
   "success": true,
-  "domain": {},
-  "verificationToken": "TXT record value to add to DNS"
+  "domain": {
+    "id": "uuid",
+    "domain": "yourdomain.com",
+    "verification_status": "pending",
+    "created_at": "2026-03-11T00:00:00Z"
+  },
+  "message": "Domain added. Verify it in your Resend dashboard at resend.com/domains, then mark it verified here."
 }
 ```
 
 ---
 
-### Action: check-domain
-Check domain verification status with SES.
+### Action: mark-domain-verified (Admin only)
+Mark a domain as verified after confirming DNS records in the Resend dashboard.
 
 ```json
-{ "action": "check-domain", "domain": "yourdomain.com" }
+{ "action": "mark-domain-verified", "domain": "yourdomain.com" }
 ```
 
 **Response**:
 ```json
-{ "success": true, "status": "verified" }
+{ "success": true }
 ```
-
-Valid statuses: `"verified"`, `"pending"`, `"failed"`
 
 ---
 
 ### Action: domains
-List all registered email domains.
+List all registered email domains from the database.
 
 ```json
 { "action": "domains" }
 ```
 
----
-
-### Action: list-ses-domains (Admin only)
-List all domains in SES with verification status.
-
+**Response**:
 ```json
-{ "action": "list-ses-domains" }
+{
+  "success": true,
+  "domains": [
+    {
+      "id": "uuid",
+      "domain": "yourdomain.com",
+      "verification_status": "verified",
+      "is_default": true,
+      "bounce_rate": 0.5,
+      "complaint_rate": 0.1,
+      "reputation_status": "healthy",
+      "created_at": "2026-03-11T00:00:00Z"
+    }
+  ]
+}
 ```
 
 ---
@@ -1001,12 +1016,14 @@ Get email send logs.
 { "action": "logs" }
 ```
 
-Optional query params or body fields: `status`, `emailType`, `limit` (default 50).
+Optional body fields: `status`, `emailType`, `limit` (default 50).
+
+Valid `status` values: `"queued"`, `"sent"`, `"delivered"`, `"bounced"`, `"complained"`, `"failed"`
 
 ---
 
 ### Action: analytics
-Get email delivery analytics.
+Get email delivery analytics. Data is sourced from the `email_analytics` table, populated by Resend webhook events.
 
 ```json
 {
@@ -1036,24 +1053,30 @@ Get email delivery analytics.
 
 ---
 
-### Action: sending-stats
-Get SES account sending quota.
+### Actions Summary
 
-```json
-{ "action": "sending-stats" }
-```
+| Action | Description | Auth |
+|--------|-------------|------|
+| `send` | Send an email (HTML, text, or template) | User |
+| `add-domain` | Add a domain to the database | Admin |
+| `mark-domain-verified` | Mark domain verified after Resend dashboard confirmation | Admin |
+| `domains` | List all domains from database | User |
+| `logs` | Get email sending logs | User |
+| `analytics` | Get aggregated email analytics | User |
 
-**Response**:
-```json
-{
-  "success": true,
-  "stats": {
-    "max24HourSend": 50000,
-    "maxSendRate": 14,
-    "sentLast24Hours": 1200
-  }
-}
-```
+### Webhook Events
+
+Resend sends delivery events to `POST /functions/v1/email-webhooks`. Configure this endpoint in the [Resend Dashboard → Webhooks](https://resend.com/webhooks). Signatures are verified using `RESEND_WEBHOOK_SECRET` (Svix HMAC-SHA256).
+
+| Resend Event | Description |
+|---|---|
+| `email.sent` | Email accepted by Resend |
+| `email.delivered` | Successfully delivered to recipient |
+| `email.delivery_delayed` | Temporary delivery delay |
+| `email.bounced` | Permanent bounce |
+| `email.complained` | Spam complaint |
+| `email.opened` | Recipient opened the email |
+| `email.clicked` | Recipient clicked a link |
 
 ---
 
@@ -2159,9 +2182,7 @@ The following functions are internal automation functions not intended for direc
 | `xml-import-orchestrator` | Orchestrates XML product import batches |
 | `campaign-processor` | Processes and sends email campaigns |
 | `notification-dispatcher` | Dispatches in-platform notifications |
-| `email-webhook` | Receives SES bounce and complaint webhooks |
-| `email-webhooks` | Alternate SES webhook receiver |
-| `ses-webhook` | SES delivery status webhook handler |
+| `email-webhooks` | Receives Resend delivery event webhooks (bounce, complaint, delivery, open, click) |
 | `messaging-webhook` | Receives Twilio status callbacks |
 | `messaging-processor` | Processes inbound messages |
 | `ai-pricing-updater` | AI-assisted product pricing updates |

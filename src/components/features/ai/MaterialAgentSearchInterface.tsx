@@ -1268,9 +1268,8 @@ export const MaterialAgentSearchInterface: React.FC<
                           jobId={message.metadata.asyncJob.job_id}
                           modelCount={message.metadata.asyncJob.model_count}
                           models={message.metadata.asyncJob.models}
-                          onImageClick={(imageUrl, modelName) => {
-                            console.log('Image clicked:', imageUrl, modelName);
-                            // TODO: Trigger related material search
+                          onImageClick={(_imageUrl, modelName) => {
+                            setInput(`Find materials matching the ${modelName ? modelName + ' ' : ''}generated design`);
                           }}
                         />
                       </div>

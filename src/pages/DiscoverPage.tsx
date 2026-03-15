@@ -1,14 +1,30 @@
-import React, { useEffect, useState } from 'react';
-import { Search, Users, MapPin, Briefcase, Globe } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  Search, Users, MapPin, Globe, Building2, Package,
+  Layers, X, Package2, ExternalLink, ChevronLeft, ChevronRight as ChevronRightIcon,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
+import { Dialog, DialogContent } from '@/components/core/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import { Product } from '@/components/features/products/types';
+import { ProfileModal } from '@/components/features/discover/ProfileModal';
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
   designer: 'Designer',
@@ -21,6 +37,66 @@ const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
   consultant: 'Consultant',
   other: 'Other',
 };
+
+const MATERIAL_CATS = [
+  'tiles', 'wood', 'stone', 'paint', 'fabric', 'metal', 'glass', 'composite',
+] as const;
+
+const CAT_COLORS: Record<string, string> = {
+  tiles:     '#3b82f6',
+  wood:      '#92400e',
+  stone:     '#6b7280',
+  paint:     '#10b981',
+  fabric:    '#8b5cf6',
+  metal:     '#6366f1',
+  glass:     '#06b6d4',
+  composite: '#f59e0b',
+  other:     '#3E192A',
+};
+
+const PER_PAGE = 20;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function catLabel(c: string) {
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
+function detectCat(meta: Record<string, any>): string {
+  const raw = (meta?.material_category || '').toLowerCase();
+  if (raw.includes('tile') || raw.includes('ceramic') || raw.includes('porcelain') || raw === 'wall_tile' || raw === 'floor_tile') return 'tiles';
+  if (raw.includes('wood') || raw.includes('parquet') || raw.includes('laminate')) return 'wood';
+  if (raw.includes('stone') || raw.includes('marble') || raw.includes('granite')) return 'stone';
+  if (raw.includes('paint') || raw.includes('coating')) return 'paint';
+  if (raw.includes('fabric') || raw.includes('textile') || raw.includes('upholstery')) return 'fabric';
+  if (raw.includes('metal') || raw.includes('steel') || raw.includes('aluminum')) return 'metal';
+  if (raw.includes('glass')) return 'glass';
+  if (raw.includes('composite') || raw.includes('engineered')) return 'composite';
+  return raw || 'other';
+}
+
+function initials(name?: string) {
+  return (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
+}
+
+function toProduct(p: RawProduct): Product {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    category: catLabel(p.detectedCat),
+    type: p.metadata?.material_category || '',
+    status: p.status || 'active',
+    images: [],
+    metadata: p.metadata,
+    pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+    stock: { quantity: 0, status: 'Unknown', unit: 'unit' },
+    tags: [],
+    sku: '',
+  };
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface PublicCreator {
   user_id: string;
@@ -37,227 +113,696 @@ interface PublicCreator {
   follower_count?: number;
 }
 
+interface RawProduct {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  metadata: Record<string, any>;
+  detectedCat: string;
+  factoryName: string;
+}
+
+interface Factory {
+  name: string;
+  productCount: number;
+  categories: string[];
+}
+
+// ─── Skeletons ────────────────────────────────────────────────────────────────
+
+function SkeletonRows({ count = 6 }: { count?: number }) {
+  return (
+    <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-3">
+          <div className="w-10 h-10 rounded-md bg-muted animate-pulse shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-2.5 w-32 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SkeletonCards({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function Empty({ icon: Icon, text }: { icon: React.ComponentType<{ className?: string }>; text: string }) {
+  return (
+    <div className="text-center py-16 text-muted-foreground">
+      <Icon className="h-10 w-10 mx-auto mb-3 opacity-30" />
+      <p>{text}</p>
+    </div>
+  );
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+
+function Pagination({ page, total, onPage }: { page: number; total: number; onPage: (n: number) => void }) {
+  if (total <= 1) return null;
+
+  const pages = Array.from({ length: total }, (_, i) => i + 1);
+  // Show at most 7 page buttons: first, last, current ±2, with ellipsis
+  const visible = pages.filter((n) =>
+    n === 1 || n === total || Math.abs(n - page) <= 2
+  );
+
+  const buttons: (number | '…')[] = [];
+  visible.forEach((n, i) => {
+    if (i > 0 && n - (visible[i - 1] as number) > 1) buttons.push('…');
+    buttons.push(n);
+  });
+
+  return (
+    <div className="flex items-center justify-center gap-1 mt-4">
+      <button
+        disabled={page === 1}
+        onClick={() => onPage(page - 1)}
+        className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      {buttons.map((b, i) =>
+        b === '…' ? (
+          <span key={`ellipsis-${i}`} className="w-7 h-7 flex items-center justify-center text-xs text-muted-foreground">…</span>
+        ) : (
+          <button
+            key={b}
+            onClick={() => onPage(b as number)}
+            className={`w-7 h-7 rounded text-xs transition-colors ${page === b ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+          >
+            {b}
+          </button>
+        )
+      )}
+      <button
+        disabled={page === total}
+        onClick={() => onPage(page + 1)}
+        className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronRightIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Product Row ──────────────────────────────────────────────────────────────
+
+function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawProduct) => void }) {
+  const color = CAT_COLORS[product.detectedCat] ?? CAT_COLORS.other;
+  const displayCat = product.metadata?.material_category
+    ? product.metadata.material_category.replace(/_/g, ' ')
+    : catLabel(product.detectedCat);
+
+  return (
+    <div
+      className="grid items-center px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group"
+      style={{ gridTemplateColumns: '1fr 130px 120px' }}
+      onClick={() => onView(product)}
+    >
+      {/* Thumbnail + name */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-10 h-10 flex-shrink-0 rounded-md flex items-center justify-center">
+          <Package className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+            {product.name}
+          </p>
+          {product.factoryName !== 'Unknown' && (
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{product.factoryName}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Category */}
+      <div>
+        <Badge
+          variant="outline"
+          className="text-[10px] px-1.5 py-0 h-4 rounded font-normal capitalize"
+          style={{ color, borderColor: `${color}50` }}
+        >
+          {displayCat}
+        </Badge>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        <AddToMoodboardButton
+          productId={product.id}
+          productName={product.name}
+          variant="ghost"
+          size="sm"
+          showText={false}
+          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+        <AddToQuoteButton
+          productId={product.id}
+          productName={product.name}
+          variant="ghost"
+          size="sm"
+          showText={false}
+          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-[11px] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => onView(product)}
+        >
+          View
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Product List with pagination ────────────────────────────────────────────
+
+function ProductList({ products, onView }: { products: RawProduct[]; onView: (p: RawProduct) => void }) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(products.length / PER_PAGE);
+  const paged = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  // Reset page when filtered list changes
+  React.useEffect(() => { setPage(1); }, [products.length]);
+
+  return (
+    <div>
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div
+          className="grid px-4 py-2 bg-muted/40 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border"
+          style={{ gridTemplateColumns: '1fr 130px 120px' }}
+        >
+          <span>Product</span>
+          <span>Category</span>
+          <span className="text-right">Actions</span>
+        </div>
+        <div className="divide-y divide-border">
+          {paged.map((p) => (
+            <ProductRow key={p.id} product={p} onView={onView} />
+          ))}
+        </div>
+      </div>
+      <Pagination page={page} total={totalPages} onPage={setPage} />
+    </div>
+  );
+}
+
+// ─── Factory Modal ────────────────────────────────────────────────────────────
+
+function FactoryModal({
+  factory,
+  products,
+  onClose,
+  onViewProduct,
+}: {
+  factory: Factory | null;
+  products: RawProduct[];
+  onClose: () => void;
+  onViewProduct: (p: RawProduct) => void;
+}) {
+  if (!factory) return null;
+
+  return (
+    <Dialog open={!!factory} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+        {/* Banner */}
+        <div
+          className="h-28 sm:h-36 relative overflow-hidden shrink-0"
+          style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+        >
+          <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+
+          {/* Top-right controls */}
+          <div className="absolute top-3 right-3 flex items-center gap-1.5">
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <X className="h-3.5 w-3.5 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Info header — outside overflow-y so icon isn't clipped by scroll container */}
+        <div className="bg-white shadow-sm shrink-0 relative z-10 px-6 pb-4">
+          <div className="flex items-start gap-4">
+            {/* Factory icon pulled up over banner */}
+            <div
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12"
+              style={{ background: 'linear-gradient(135deg, hsl(330,43%,22%) 0%, hsl(280,35%,38%) 100%)' }}
+            >
+              <Building2 className="h-8 w-8 text-white" />
+            </div>
+
+            {/* Name + categories */}
+            <div className="flex-1 min-w-0 pt-3">
+              <h2 className="text-xl font-semibold tracking-tight">{factory.name}</h2>
+              {factory.categories.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {factory.categories.map((c) => (
+                    <Badge
+                      key={c}
+                      className="text-xs px-1.5 py-0"
+                      style={{
+                        backgroundColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}18`,
+                        color: CAT_COLORS[c] ?? CAT_COLORS.other,
+                        borderColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}40`,
+                      }}
+                    >
+                      {catLabel(c)}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-8 mt-4 pt-4 border-t">
+            <div className="text-center">
+              <p className="text-lg font-semibold tabular-nums">{factory.productCount}</p>
+              <p className="text-xs text-muted-foreground">Materials</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold tabular-nums">{factory.categories.length}</p>
+              <p className="text-xs text-muted-foreground">Categories</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 bg-[#f7f6f4]">
+          {/* Products list */}
+          <div className="p-6 space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">
+              All Materials <span className="text-xs">({products.length})</span>
+            </p>
+            {products.length === 0 ? (
+              <Empty icon={Package2} text="No materials found." />
+            ) : (
+              <ProductList products={products} onView={onViewProduct} />
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export const DiscoverPage: React.FC = () => {
   const { user } = useAuth();
+
+  // Profiles
   const [creators, setCreators] = useState<PublicCreator[]>([]);
-  const [filtered, setFiltered] = useState<PublicCreator[]>([]);
+  const [profileSearch, setProfileSearch] = useState('');
+  const [profileType, setProfileType] = useState('all');
+
+  // Products / Factories
+  const [products, setProducts] = useState<RawProduct[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [productCat, setProductCat] = useState('all');
+  const [factorySearch, setFactorySearch] = useState('');
+  const [factoryCat, setFactoryCat] = useState('all');
+
+  // Modals
+  const [selectedFactory, setSelectedFactory] = useState<Factory | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [modalProduct, setModalProduct] = useState<Product | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCreators();
+    Promise.all([loadCreators(), loadProducts()]).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    let result = creators;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.full_name?.toLowerCase().includes(q) ||
-          c.company?.toLowerCase().includes(q) ||
-          c.bio?.toLowerCase().includes(q) ||
-          c.services.some((s) => s.toLowerCase().includes(q)) ||
-          c.skill_tags.some((t) => t.toLowerCase().includes(q)) ||
-          c.location?.toLowerCase().includes(q)
-      );
-    }
-    if (activeTag) {
-      result = result.filter(
-        (c) =>
-          c.services.includes(activeTag) ||
-          c.skill_tags.includes(activeTag) ||
-          (c.professional_type && PROFESSIONAL_TYPE_LABELS[c.professional_type] === activeTag)
-      );
-    }
-    setFiltered(result);
-  }, [search, activeTag, creators]);
-
-  const loadCreators = async () => {
+  async function loadCreators() {
     const { data } = await supabase
       .from('user_profiles')
       .select('user_id, full_name, company, bio, avatar_url, location, website_url, services, skill_tags, profile_views, professional_type')
       .eq('is_public', true)
       .order('profile_views', { ascending: false })
-      .limit(60);
+      .limit(80);
+    if (!data) return;
 
-    if (data) {
-      // Get follower counts
-      const userIds = data.map((p) => p.user_id);
-      const { data: follows } = await supabase
-        .from('user_follows')
-        .select('following_id')
-        .in('following_id', userIds);
+    const ids = data.map((p) => p.user_id);
+    const { data: follows } = await supabase
+      .from('user_follows').select('following_id').in('following_id', ids);
 
-      const countMap: Record<string, number> = {};
-      follows?.forEach((f) => {
-        countMap[f.following_id] = (countMap[f.following_id] ?? 0) + 1;
-      });
+    const countMap: Record<string, number> = {};
+    follows?.forEach((f) => { countMap[f.following_id] = (countMap[f.following_id] ?? 0) + 1; });
 
-      const enriched = data.map((p) => ({
+    setCreators(data.map((p) => ({
+      ...p,
+      services: p.services ?? [],
+      skill_tags: p.skill_tags ?? [],
+      follower_count: countMap[p.user_id] ?? 0,
+    })));
+  }
+
+  async function loadProducts() {
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, description, status, metadata')
+      .limit(300);
+    if (!data) return;
+
+    setProducts(data.map((p) => {
+      const meta = (p.metadata ?? {}) as Record<string, any>;
+      return {
         ...p,
-        services: p.services ?? [],
-        skill_tags: p.skill_tags ?? [],
-        follower_count: countMap[p.user_id] ?? 0,
-      }));
-      setCreators(enriched);
-      setFiltered(enriched);
+        metadata: meta,
+        detectedCat: detectCat(meta),
+        factoryName: meta.factory_group_name || 'Unknown',
+      };
+    }));
+  }
+
+  function openProduct(p: RawProduct) {
+    setModalProduct(toProduct(p));
+  }
+
+  // Derived factories
+  const factories = useMemo<Factory[]>(() => {
+    const map = new Map<string, { count: number; cats: Set<string> }>();
+    products.forEach((p) => {
+      if (!map.has(p.factoryName)) map.set(p.factoryName, { count: 0, cats: new Set() });
+      const e = map.get(p.factoryName)!;
+      e.count++;
+      if (p.detectedCat !== 'other') e.cats.add(p.detectedCat);
+    });
+    return Array.from(map.entries())
+      .filter(([name]) => name !== 'Unknown')
+      .map(([name, { count, cats }]) => ({ name, productCount: count, categories: Array.from(cats) }))
+      .sort((a, b) => b.productCount - a.productCount);
+  }, [products]);
+
+  const filteredProfiles = useMemo(() => {
+    let r = creators;
+    if (profileSearch.trim()) {
+      const q = profileSearch.toLowerCase();
+      r = r.filter((c) =>
+        c.full_name?.toLowerCase().includes(q) ||
+        c.company?.toLowerCase().includes(q) ||
+        c.bio?.toLowerCase().includes(q) ||
+        c.location?.toLowerCase().includes(q) ||
+        c.services.some((s) => s.toLowerCase().includes(q))
+      );
     }
-    setLoading(false);
-  };
+    if (profileType !== 'all') r = r.filter((c) => c.professional_type === profileType);
+    return r;
+  }, [creators, profileSearch, profileType]);
 
-  // Collect all unique tags: professional types first, then services + skill_tags
-  const professionalTypeFilters = Array.from(
-    new Set(
-      creators
-        .filter((c) => c.professional_type)
-        .map((c) => PROFESSIONAL_TYPE_LABELS[c.professional_type!] ?? c.professional_type!)
-    )
+  const filteredFactories = useMemo(() => {
+    let r = factories;
+    if (factorySearch.trim()) {
+      const q = factorySearch.toLowerCase();
+      r = r.filter((f) => f.name.toLowerCase().includes(q));
+    }
+    if (factoryCat !== 'all') r = r.filter((f) => f.categories.includes(factoryCat));
+    return r;
+  }, [factories, factorySearch, factoryCat]);
+
+  const filteredProducts = useMemo(() => {
+    let r = products;
+    if (productSearch.trim()) {
+      const q = productSearch.toLowerCase();
+      r = r.filter((p) =>
+        p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.factoryName?.toLowerCase().includes(q)
+      );
+    }
+    if (productCat !== 'all') r = r.filter((p) => p.detectedCat === productCat);
+    return r;
+  }, [products, productSearch, productCat]);
+
+  const factoryModalProducts = useMemo(() =>
+    selectedFactory ? products.filter((p) => p.factoryName === selectedFactory.name) : [],
+    [products, selectedFactory]
   );
-  const allTags = Array.from(
-    new Set([
-      ...professionalTypeFilters,
-      ...creators.flatMap((c) => [...c.services, ...c.skill_tags]),
-    ])
-  ).slice(0, 24);
 
-  const initials = (name?: string) =>
-    (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
+  const availableTypes = useMemo(() =>
+    Array.from(new Set(creators.filter((c) => c.professional_type).map((c) => c.professional_type!))),
+    [creators]
+  );
 
   return (
     <div>
       <PageHeader
-        icon={Users}
-        title="Discover Creators"
-        subtitle="Browse public profiles, find designers, architects, and sourcing specialists."
+        icon={Layers}
+        title="Discover"
+        subtitle="Explore profiles, factories, and materials from the community."
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, service, location…"
-          className="pl-9"
-        />
-      </div>
+      <div className="px-6 py-8 space-y-6">
+        <Tabs defaultValue="profiles">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="profiles" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Users className="h-4 w-4" /> Profiles
+            </TabsTrigger>
+            <TabsTrigger value="factory" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Building2 className="h-4 w-4" /> Factory
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Package className="h-4 w-4" /> Products
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Tag filters */}
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                activeTag === tag
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
+          {/* ── PROFILES ──────────────────────────────────────────────── */}
+          <TabsContent value="profiles" className="mt-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input value={profileSearch} onChange={(e) => setProfileSearch(e.target.value)}
+                  placeholder="Search by name, service, location…" className="pl-9" />
+              </div>
+              <Select value={profileType} onValueChange={setProfileType}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Professional type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  {availableTypes.map((t) => (
+                    <SelectItem key={t} value={t}>{PROFESSIONAL_TYPE_LABELS[t] ?? t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-40 rounded-2xl bg-muted animate-pulse" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p>No creators found.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((creator) => (
-            <Card key={creator.user_id} className="rounded-2xl hover:shadow-md transition-shadow">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <Link to={`/u/${creator.user_id}`} className="shrink-0">
-                    <Avatar className="h-12 w-12">
-                      {creator.avatar_url && <AvatarImage src={creator.avatar_url} />}
-                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {initials(creator.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Link
-                        to={`/u/${creator.user_id}`}
-                        className="font-semibold text-sm hover:text-primary transition-colors truncate"
-                      >
-                        {creator.full_name || 'Anonymous'}
-                      </Link>
-                      {creator.professional_type && (
-                        <Badge className="text-xs px-1.5 py-0 bg-primary/10 text-primary border-primary/20 shrink-0">
-                          {PROFESSIONAL_TYPE_LABELS[creator.professional_type] ?? creator.professional_type}
-                        </Badge>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-36 rounded-2xl bg-muted animate-pulse" />
+                ))}
+              </div>
+            ) : filteredProfiles.length === 0 ? (
+              <Empty icon={Users} text="No profiles found." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredProfiles.map((creator) => (
+                  <Card
+                    key={creator.user_id}
+                    onClick={() => setSelectedProfileId(creator.user_id)}
+                    className="rounded-2xl hover:shadow-md hover:ring-1 hover:ring-primary/30 transition-all cursor-pointer"
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-12 w-12 shrink-0">
+                          {creator.avatar_url && <AvatarImage src={creator.avatar_url} />}
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                            {initials(creator.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-sm truncate">{creator.full_name || 'Anonymous'}</span>
+                            {creator.professional_type && (
+                              <Badge className="text-xs px-1.5 py-0 bg-primary/10 text-primary border-primary/20 shrink-0">
+                                {PROFESSIONAL_TYPE_LABELS[creator.professional_type] ?? creator.professional_type}
+                              </Badge>
+                            )}
+                          </div>
+                          {creator.company && <p className="text-xs text-muted-foreground truncate">{creator.company}</p>}
+                          {creator.location && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" /> {creator.location}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {creator.bio && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{creator.bio}</p>
                       )}
-                    </div>
-                    {creator.company && (
-                      <p className="text-xs text-muted-foreground truncate">{creator.company}</p>
-                    )}
-                    {creator.location && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <MapPin className="h-3 w-3" /> {creator.location}
-                      </p>
-                    )}
-                  </div>
-                </div>
 
-                {creator.bio && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">{creator.bio}</p>
-                )}
+                      {creator.services.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {creator.services.slice(0, 3).map((s) => (
+                            <Badge key={s} variant="secondary" className="text-xs px-2 py-0">{s}</Badge>
+                          ))}
+                          {creator.services.length > 3 && (
+                            <Badge variant="outline" className="text-xs px-2 py-0">+{creator.services.length - 3}</Badge>
+                          )}
+                        </div>
+                      )}
 
-                {creator.services.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {creator.services.slice(0, 3).map((s) => (
-                      <Badge key={s} variant="secondary" className="text-xs px-2 py-0">
-                        {s}
-                      </Badge>
-                    ))}
-                    {creator.services.length > 3 && (
-                      <Badge variant="outline" className="text-xs px-2 py-0">
-                        +{creator.services.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                )}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {!!creator.follower_count && (
+                            <span>{creator.follower_count} follower{creator.follower_count !== 1 ? 's' : ''}</span>
+                          )}
+                          {creator.website_url && (
+                            <a href={creator.website_url} target="_blank" rel="noopener noreferrer"
+                              className="hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                              <Globe className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <FollowButton targetUserId={creator.user_id} currentUserId={user?.id} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    {creator.follower_count !== undefined && creator.follower_count > 0 && (
-                      <span>{creator.follower_count} follower{creator.follower_count !== 1 ? 's' : ''}</span>
-                    )}
-                    {creator.website_url && (
-                      <a
-                        href={creator.website_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-primary"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Globe className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </div>
-                  <FollowButton targetUserId={creator.user_id} currentUserId={user?.id} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+          {/* ── FACTORY ───────────────────────────────────────────────── */}
+          <TabsContent value="factory" className="mt-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input value={factorySearch} onChange={(e) => setFactorySearch(e.target.value)}
+                  placeholder="Search factories…" className="pl-9" />
+              </div>
+              <Select value={factoryCat} onValueChange={setFactoryCat}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Material category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {MATERIAL_CATS.map((c) => (
+                    <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading ? (
+              <SkeletonCards count={6} />
+            ) : filteredFactories.length === 0 ? (
+              <Empty icon={Building2} text="No factories found." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredFactories.map((factory) => (
+                  <Card
+                    key={factory.name}
+                    onClick={() => setSelectedFactory(factory)}
+                    className="rounded-2xl cursor-pointer transition-all hover:shadow-md hover:ring-1 hover:ring-primary/30"
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{factory.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {factory.productCount} material{factory.productCount !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {factory.categories.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {factory.categories.slice(0, 4).map((c) => (
+                            <Badge key={c} className="text-xs px-1.5 py-0"
+                              style={{
+                                backgroundColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}18`,
+                                color: CAT_COLORS[c] ?? CAT_COLORS.other,
+                                borderColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}40`,
+                              }}>
+                              {catLabel(c)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── PRODUCTS ──────────────────────────────────────────────── */}
+          <TabsContent value="products" className="mt-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search materials by name or factory…" className="pl-9" />
+              </div>
+              <Select value={productCat} onValueChange={setProductCat}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {MATERIAL_CATS.map((c) => (
+                    <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading ? (
+              <SkeletonRows count={8} />
+            ) : filteredProducts.length === 0 ? (
+              <Empty icon={Package} text="No materials found." />
+            ) : (
+              <ProductList products={filteredProducts} onView={openProduct} />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Factory modal */}
+      <FactoryModal
+        factory={selectedFactory}
+        products={factoryModalProducts}
+        onClose={() => setSelectedFactory(null)}
+        onViewProduct={openProduct}
+      />
+
+      {/* Profile modal */}
+      <ProfileModal
+        userId={selectedProfileId}
+        onClose={() => setSelectedProfileId(null)}
+      />
+
+      {/* Product detail modal */}
+      <ProductDetailModal
+        product={modalProduct}
+        isOpen={!!modalProduct}
+        onClose={() => setModalProduct(null)}
+      />
     </div>
   );
 };

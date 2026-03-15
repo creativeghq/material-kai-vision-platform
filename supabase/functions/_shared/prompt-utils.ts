@@ -56,3 +56,31 @@ export async function getToolPrompt(
   console.log(`✅ Loaded system prompt for tool '${toolName}' from database`);
   return data.system_prompt;
 }
+
+/**
+ * Load a generation prompt from the database with a hardcoded fallback.
+ * prompt_type = 'generation', category = promptName
+ * Never throws — returns fallback if DB row is missing.
+ */
+export async function getGenerationPrompt(
+  supabase: SupabaseClient,
+  promptName: string,
+  fallback: string,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('system_prompt')
+    .eq('prompt_type', 'generation')
+    .eq('category', promptName)
+    .eq('is_active', true)
+    .eq('status', 'active')
+    .single();
+
+  if (error || !data?.system_prompt) {
+    console.warn(`⚠️ No DB prompt for '${promptName}', using hardcoded fallback`);
+    return fallback;
+  }
+
+  console.log(`✅ Loaded generation prompt '${promptName}' from database`);
+  return data.system_prompt;
+}

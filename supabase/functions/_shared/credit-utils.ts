@@ -21,6 +21,17 @@ const EXTERNAL_SERVICE_PRICING: Record<string, { cost_per_unit: number; unit: st
   'hunter-domain-search': { cost_per_unit: 0.01,   unit: 'search' },
   'zerobounce-validate':  { cost_per_unit: 0.008,  unit: 'validation' },
   'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit' },
+  // Social media image generation
+  'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image' },    // → ~10 cr after markup
+  'flux-dev':             { cost_per_unit: 0.04,   unit: 'image' },    // → ~6 cr after markup
+  // Social media video generation (cost per second of output)
+  'kling-1.6-pro':        { cost_per_unit: 0.08,   unit: 'second' },   // 15s reel → ~18 cr after markup
+  'wan2.1-i2v':           { cost_per_unit: 0.05,   unit: 'second' },   // 10s → ~8 cr after markup
+  'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second' },   // 10s → ~23 cr after markup
+  // Social caption/hashtag generation (Claude Haiku)
+  'social-caption':       { cost_per_unit: 0.002,  unit: 'generation' }, // → ~2 cr after markup
+  // Late.dev publishing (flat subscription — zero per-post cost)
+  'late-publish':         { cost_per_unit: 0.0,    unit: 'post' },
 };
 
 // Platform markup (50% on top of raw cost)
