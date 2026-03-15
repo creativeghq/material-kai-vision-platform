@@ -453,19 +453,6 @@ export function validationFailure<E = string>(
   return { success: false, error };
 }
 
-/**
- * Helper to create a successful result.
- */
-export function ok<T>(value: T): Result<T> {
-  return { ok: true, value };
-}
-
-/**
- * Helper to create a failed result.
- */
-export function err<E = Error>(error: E): Result<never, E> {
-  return { ok: false, error };
-}
 
 // =============================================================================
 // TYPE ASSERTIONS AND GUARDS

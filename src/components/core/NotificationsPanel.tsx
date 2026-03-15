@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bell, Inbox, Calendar, Star, Bot, CheckCheck, X,
+  Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +25,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   appointment_cancelled:  <Calendar className="h-4 w-4 text-destructive" />,
   review_received:        <Star className="h-4 w-4 text-amber-400" />,
   agent_completed:        <Bot className="h-4 w-4 text-primary" />,
+  material_alert:         <Sparkles className="h-4 w-4 text-primary" />,
 };
 
 function timeAgo(iso: string) {

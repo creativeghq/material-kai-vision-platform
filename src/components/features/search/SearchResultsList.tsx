@@ -56,7 +56,6 @@ interface SearchResultsListProps {
   onPageChange?: (page: number) => void;
   onView?: (result: SearchResult) => void;
   onDownload?: (result: SearchResult) => void;
-  onFavorite?: (result: SearchResult) => void;
   onTagClick?: (tag: string) => void;
   onBulkDownload?: (results: SearchResult[]) => void;
   className?: string;
@@ -95,7 +94,6 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
   onPageChange,
   onView,
   onDownload,
-  onFavorite,
   onTagClick,
   onBulkDownload,
   className,
@@ -451,7 +449,6 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                         viewMode={viewMode}
                         onView={onView || (() => {})}
                         onDownload={onDownload || (() => {})}
-                        onFavorite={onFavorite || (() => {})}
                         onTagClick={onTagClick || (() => {})}
                       />
                     </div>
@@ -465,7 +462,6 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     viewMode={viewMode}
                     onView={onView || (() => {})}
                     onDownload={onDownload || (() => {})}
-                    onFavorite={onFavorite || (() => {})}
                     onTagClick={onTagClick || (() => {})}
                     className="pt-8"
                   />

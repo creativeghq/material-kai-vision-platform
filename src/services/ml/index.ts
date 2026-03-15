@@ -2,9 +2,6 @@
 // Note: All ML/AI services now use MIVAA API directly via mivaaApiClient
 // Client-side ML services have been removed to eliminate duplicates
 
-// Utility services
-export { DeviceDetector } from './deviceDetector';
-
 // Types
 export type * from './types';
 

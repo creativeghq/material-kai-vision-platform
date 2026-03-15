@@ -51,9 +51,11 @@ export const XMLProcessingMonitor: React.FC = () => {
           : { count: 0 };
 
         // Step 4: Fetch remaining data in parallel
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const [
           { count: totalXMLDocuments },
           { count: totalXMLImages },
+          { count: recentXMLErrors },
         ] = await Promise.all([
           supabase
             .from('documents')
@@ -63,11 +65,17 @@ export const XMLProcessingMonitor: React.FC = () => {
             .from('images')
             .select('*', { count: 'exact', head: true })
             .eq('source_type', 'xml'),
+          supabase
+            .from('background_jobs')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'failed')
+            .ilike('filename', '%.xml')
+            .gte('failed_at', since24h),
         ]);
 
-        // Calculate metrics
+        const recentXMLProcessingErrors = recentXMLErrors || 0;
         const xmlProcessingSuccessRate = totalXMLDocuments > 0
-          ? ((totalXMLDocuments - 0) / totalXMLDocuments) * 100
+          ? ((totalXMLDocuments - recentXMLProcessingErrors) / totalXMLDocuments) * 100
           : 0;
         const averageProductsPerXML = totalXMLDocuments > 0
           ? (totalXMLProducts || 0) / totalXMLDocuments
@@ -89,7 +97,7 @@ export const XMLProcessingMonitor: React.FC = () => {
           averageProductsPerXML,
           averageImagesPerXML,
           averageChunksPerProduct,
-          recentXMLProcessingErrors: 0, // TODO: Implement error tracking
+          recentXMLProcessingErrors,
         });
       } catch (err) {
         console.error('Error fetching XML metrics:', err);

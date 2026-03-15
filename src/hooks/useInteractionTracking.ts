@@ -61,14 +61,6 @@ export const useInteractionTracking = ({
     });
   }, [materialId, source, metadata]);
 
-  // Track save/favorite
-  const trackSave = useCallback(() => {
-    RecommendationsService.trackSave(materialId, {
-      source,
-      ...metadata,
-    });
-  }, [materialId, source, metadata]);
-
   // Track rating
   const trackRating = useCallback((rating: number) => {
     RecommendationsService.trackRating(materialId, rating, {
@@ -88,7 +80,6 @@ export const useInteractionTracking = ({
   return {
     elementRef,
     trackClick,
-    trackSave,
     trackRating,
     trackAddToQuote,
   };

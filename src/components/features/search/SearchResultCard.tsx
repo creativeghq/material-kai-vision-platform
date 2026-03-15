@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Download,
   Eye,
-  Star,
   Clock,
   User,
   Hash,
@@ -46,7 +45,6 @@ export interface SearchResult {
   semanticScore?: number;
   highlights?: string[];
   metadata?: Record<string, unknown>;
-  isFavorite?: boolean;
   viewCount?: number;
   downloadCount?: number;
   product_id?: string; // For adding to quotes
@@ -64,7 +62,6 @@ interface SearchResultCardProps {
   viewMode?: 'card' | 'list' | 'compact';
   onView?: (result: SearchResult) => void;
   onDownload?: (result: SearchResult) => void;
-  onFavorite?: (result: SearchResult) => void;
   onTagClick?: (tag: string) => void;
   className?: string;
 }
@@ -88,7 +85,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   viewMode = 'card',
   onView,
   onDownload,
-  onFavorite,
   onTagClick,
   className,
 }) => {
@@ -128,11 +124,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDownload?.(result);
-  };
-
-  const handleFavorite = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onFavorite?.(result);
   };
 
   const handleTagClick = (e: React.MouseEvent, tag: string) => {
@@ -176,9 +167,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
 
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <span>{formatScore(result.relevanceScore)}%</span>
-          {result.isFavorite && (
-            <Star className="h-3 w-3 text-yellow-500 fill-current" />
-          )}
         </div>
       </div>
     );
@@ -226,9 +214,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 >
                   {result.type}
                 </Badge>
-                {result.isFavorite && (
-                  <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                )}
               </div>
 
               <p className="text-sm text-gray-600 line-clamp-2 mb-2">
@@ -326,36 +311,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
               </div>
 
               <div className="flex gap-1">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                        onClick={handleFavorite}
-                        onKeyDown={(e) =>
-                          e.key === 'Enter' && handleFavorite(e as any)
-                        }
-                      >
-                        <Star
-                          className={cn(
-                            'h-4 w-4',
-                            result.isFavorite
-                              ? 'text-yellow-500 fill-current'
-                              : 'text-gray-400',
-                          )}
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {result.isFavorite
-                          ? 'Remove from favorites'
-                          : 'Add to favorites'}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
                 {onDownload && (
                   <TooltipProvider>
                     <Tooltip>
@@ -463,9 +418,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <h3 className="font-semibold text-gray-900 truncate">
                   {result.title}
                 </h3>
-                {result.isFavorite && (
-                  <Star className="h-4 w-4 text-yellow-500 fill-current flex-shrink-0" />
-                )}
               </div>
               <Badge
                 className={cn(
@@ -581,36 +533,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
           </div>
 
           <div className="flex gap-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                    onClick={handleFavorite}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' && handleFavorite(e as any)
-                    }
-                  >
-                    <Star
-                      className={cn(
-                        'h-4 w-4',
-                        result.isFavorite
-                          ? 'text-yellow-500 fill-current'
-                          : 'text-gray-400',
-                      )}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {result.isFavorite
-                      ? 'Remove from favorites'
-                      : 'Add to favorites'}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
             {onDownload && (
               <TooltipProvider>
                 <Tooltip>

@@ -7,6 +7,7 @@ import {
 import {
   Building2, TrendingUp, Star, Users, MessageSquare, Eye,
   Package, Loader2, Search, Target, Zap, Award, Globe, Layers, Activity,
+  Download, Calendar, ChevronUp, ChevronDown, Minus,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
@@ -116,6 +117,38 @@ function LifecycleBadge({ stage }: { stage: string }) {
   };
   const { label, cls } = map[stage] ?? map.established;
   return <span className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded border ${cls}`}>{label}</span>;
+}
+
+// ── Seasonal helper: group moodboard items by month ───────────
+function buildMonthlyTrend(rows: { created_at: string }[]) {
+  const thisYear = new Date().getFullYear();
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = MONTH_LABELS.map((label) => ({ label, thisYear: 0, lastYear: 0 }));
+  rows.forEach((row) => {
+    try {
+      const d = new Date(row.created_at);
+      const yr = d.getFullYear();
+      const mo = d.getMonth();
+      if (yr === thisYear)      months[mo].thisYear++;
+      else if (yr === thisYear - 1) months[mo].lastYear++;
+    } catch { /* skip */ }
+  });
+  return months;
+}
+
+// ── Linear forecast: project n weeks ahead ────────────────────
+function forecastWeeks(thisWeek: number, growthPct: number, n: number): number[] {
+  // Clamp rate to avoid unrealistic explosions
+  const rate = Math.max(-0.4, Math.min(0.8, growthPct / 100));
+  return Array.from({ length: n }, (_, i) => Math.round(thisWeek * Math.pow(1 + rate, i + 1)));
+}
+
+// ── Download helper ───────────────────────────────────────────
+function downloadCSV(filename: string, rows: string[][]): void {
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -739,8 +772,21 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
   const [roomTypeTrends, setRoomTypeTrends] = useState<{ roomType: string; thisWeek: number; priorWeek: number; growthPct: number }[]>([]);
   const [segmentGrowth, setSegmentGrowth] = useState<{ type: string; thisWeek: number; priorWeek: number; growthPct: number }[]>([]);
 
+  // ── Seasonal trends (monthly, this year vs last year)
+  const [monthlyTrend, setMonthlyTrend] = useState<{ label: string; thisYear: number; lastYear: number }[]>([]);
+
   // ── Computed inline
   const displayedAttributes = metadataByKey.get(attrSource) ?? [];
+
+  // ── Export handler
+  const handleExport = () => {
+    const header = ['Material', 'This Period Saves', 'Prior Period Saves', 'Growth %', 'Lifecycle', 'Forecast W+1', 'Forecast W+2', 'Forecast W+3', 'Forecast W+4'];
+    const dataRows = materialGrowthRates.slice(0, 20).map((r) => {
+      const fc = forecastWeeks(r.thisWeek, r.growthPct, 4);
+      return [r.name, String(r.thisWeek), String(r.priorWeek), `${r.growthPct}%`, r.lifecycle, ...fc.map(String)];
+    });
+    downloadCSV(`material-trends-${new Date().toISOString().slice(0,10)}.csv`, [header, ...dataRows]);
+  };
 
   // ── Load platform categories once on mount
   useEffect(() => {
@@ -1248,6 +1294,15 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
           setSegmentGrowth(segArr);
         } catch (e) { console.warn('Market direction load failed:', e); }
 
+        // ── Seasonal trend: moodboard saves by month (24 months)
+        try {
+          const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+          const { data: monthData } = await supabase
+            .from('moodboard_items').select('created_at')
+            .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
+          setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
+        } catch (e) { console.warn('Seasonal load failed:', e); }
+
         setIsDemoData(false);
         setKpis({
           activeDemandSignals: (demandData ?? []).length,
@@ -1650,6 +1705,16 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
           })));
         } catch (e) { console.warn('Factory zero-result load failed:', e); }
 
+        // ── Seasonal trend: factory product moodboard saves by month
+        try {
+          const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+          const { data: monthData } = await supabase
+            .from('moodboard_items').select('created_at')
+            .in('material_id', effectiveIds)
+            .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
+          setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
+        } catch (e) { console.warn('Seasonal load failed:', e); }
+
         setIsDemoData(false);
         setKpis({
           activeDemandSignals: factoryDemands.length,
@@ -1715,6 +1780,15 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
             My Factory · {factoryName}
           </span>
         )}
+        <button
+          onClick={handleExport}
+          disabled={materialGrowthRates.length === 0}
+          className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border/60 rounded-lg px-3 py-1.5 hover:bg-accent/50 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          title="Download trend data as CSV"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export CSV
+        </button>
       </div>
 
       {/* ── Key Insights (factory mode only) ── */}
@@ -2597,6 +2671,105 @@ function MarketTrendsTab({ factoryName, isFactory }: { factoryName?: string; isF
                 </table>
               </div>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ──── Demand Forecast ──────────────────────────────── */}
+      {materialGrowthRates.length > 0 && (
+        <>
+          <SectionHeader
+            title="4-Week Demand Forecast"
+            desc="Projected save velocity based on current growth rate — clipped at ±40%/week to avoid outlier distortion"
+            icon={TrendingUp}
+          />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-4 text-muted-foreground font-normal">Material</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">Now</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+1</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+2</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+3</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+4</th>
+                    <th className="text-right py-2 pl-3 text-muted-foreground font-normal">Trend</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {materialGrowthRates.slice(0, 10).map((row, i) => {
+                    const fc = forecastWeeks(row.thisWeek, row.growthPct, 4);
+                    const up = row.growthPct > 5;
+                    const down = row.growthPct < -5;
+                    return (
+                      <tr key={i} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-2.5 pr-4 font-medium truncate max-w-[160px]">{row.name}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{row.thisWeek}</td>
+                        {fc.map((v, j) => (
+                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-600' : down ? 'text-red-500' : 'text-foreground'}`}>{v}</td>
+                        ))}
+                        <td className="py-2.5 pl-3 text-right">
+                          {up   ? <ChevronUp   className="h-4 w-4 text-green-500 ml-auto" />
+                          : down ? <ChevronDown className="h-4 w-4 text-red-400 ml-auto" />
+                          :        <Minus       className="h-4 w-4 text-muted-foreground ml-auto" />}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-4 italic">
+              Forecast uses linear compound growth. Assumes market conditions remain stable. Treat as directional guidance only.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* ──── Seasonal Patterns ───────────────────────────── */}
+      {monthlyTrend.some((m) => m.thisYear > 0 || m.lastYear > 0) && (
+        <>
+          <SectionHeader
+            title="Seasonal Patterns"
+            desc="Monthly moodboard save volume — current year vs prior year. Reveals demand cycles and seasonal peaks."
+            icon={Calendar}
+          />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/70" />
+                {new Date().getFullYear()}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/30" />
+                {new Date().getFullYear() - 1}
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthlyTrend} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={30} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                  formatter={(v: number, name: string) => [v, name === 'thisYear' ? String(new Date().getFullYear()) : String(new Date().getFullYear() - 1)]}
+                />
+                <Bar dataKey="lastYear" fill="hsl(var(--muted-foreground) / 0.25)" radius={[3,3,0,0]} />
+                <Bar dataKey="thisYear"  fill="hsl(var(--primary) / 0.75)"          radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            {(() => {
+              const peak = [...monthlyTrend].sort((a, b) => b.thisYear - a.thisYear)[0];
+              const slow = [...monthlyTrend].filter((m) => m.thisYear > 0).sort((a, b) => a.thisYear - b.thisYear)[0];
+              if (!peak || peak.thisYear === 0) return null;
+              return (
+                <div className="mt-4 flex gap-4 text-xs text-muted-foreground">
+                  <span>Peak month: <span className="font-semibold text-foreground">{peak.label}</span> ({peak.thisYear} saves)</span>
+                  {slow && <span>Slowest: <span className="font-semibold text-foreground">{slow.label}</span> ({slow.thisYear} saves)</span>}
+                </div>
+              );
+            })()}
           </div>
         </>
       )}

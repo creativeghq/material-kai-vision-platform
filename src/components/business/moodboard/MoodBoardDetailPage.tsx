@@ -15,6 +15,9 @@ import {
   Video,
   Globe,
   Image,
+  Share2,
+  Link,
+  LockKeyhole,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -87,6 +90,7 @@ export const MoodBoardDetailPage: React.FC = () => {
 
   const [relatedQuotes, setRelatedQuotes] = useState<any[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [sharingToggle, setSharingToggle] = useState(false);
 
   useEffect(() => {
     if (id) loadMoodboardDetails();
@@ -135,6 +139,38 @@ export const MoodBoardDetailPage: React.FC = () => {
     } catch {
       toast({ title: 'Error', description: 'Failed to delete moodboard', variant: 'destructive' });
     }
+  };
+
+  const handleToggleShare = async () => {
+    if (!moodboard) return;
+    const newPublic = !moodboard.isPublic;
+    setSharingToggle(true);
+    try {
+      const { error } = await supabase
+        .from('moodboards')
+        .update({ is_public: newPublic })
+        .eq('id', moodboard.id);
+      if (error) throw error;
+      setMoodboard({ ...moodboard, isPublic: newPublic });
+      if (newPublic) {
+        const url = `${window.location.origin}/board/${moodboard.id}`;
+        await navigator.clipboard.writeText(url).catch(() => {});
+        toast({ title: 'Board is now public', description: 'Share link copied to clipboard.' });
+      } else {
+        toast({ title: 'Board is now private' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update visibility', variant: 'destructive' });
+    } finally {
+      setSharingToggle(false);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!moodboard) return;
+    const url = `${window.location.origin}/board/${moodboard.id}`;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    toast({ title: 'Link copied!' });
   };
 
   const handleCreateProposal = async () => {
@@ -289,17 +325,50 @@ export const MoodBoardDetailPage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        {/* Delete button — top-right of hero */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-4 right-4 rounded-full gap-1.5 text-white/70 hover:text-red-300 hover:bg-black/30 backdrop-blur-sm"
-          onClick={handleDeleteMoodboard}
-          title="Delete this moodboard"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Delete
-        </Button>
+        {/* Top-right controls */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {/* Share / visibility toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`rounded-full gap-1.5 backdrop-blur-sm ${
+              moodboard.isPublic
+                ? 'text-green-300 hover:text-green-200 hover:bg-black/30'
+                : 'text-white/70 hover:text-white hover:bg-black/30'
+            }`}
+            onClick={handleToggleShare}
+            disabled={sharingToggle}
+            title={moodboard.isPublic ? 'Public — click to make private' : 'Private — click to make public'}
+          >
+            {moodboard.isPublic ? <Globe className="h-3.5 w-3.5" /> : <LockKeyhole className="h-3.5 w-3.5" />}
+            {moodboard.isPublic ? 'Public' : 'Private'}
+          </Button>
+
+          {/* Copy link (only when public) */}
+          {moodboard.isPublic && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full gap-1.5 text-white/70 hover:text-white hover:bg-black/30 backdrop-blur-sm"
+              onClick={handleCopyShareLink}
+              title="Copy share link"
+            >
+              <Link className="h-3.5 w-3.5" />
+              Copy link
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full gap-1.5 text-white/70 hover:text-red-300 hover:bg-black/30 backdrop-blur-sm"
+            onClick={handleDeleteMoodboard}
+            title="Delete this moodboard"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </div>
 
         {/* Hero content — bottom aligned */}
         <div className="absolute bottom-0 left-0 right-0 px-8 pb-7">

@@ -72,10 +72,18 @@ export const PriceMonitoringDashboard: React.FC = () => {
       const todayJobs = jobs?.filter(j => new Date(j.created_at) >= todayStart) || [];
       const creditsUsed = todayJobs.reduce((sum, j) => sum + (j.credits_consumed || 0), 0);
 
+      // Count price drops today from alert history
+      const { count: priceDropCount } = await supabase
+        .from('price_alert_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .lt('price_change_amount', 0)
+        .gte('triggered_at', todayStart.toISOString());
+
       setStats({
         totalMonitored: products?.length || 0,
         activeMonitoring: activeCount,
-        priceDropsToday: 0, // TODO: Calculate from price_alert_history
+        priceDropsToday: priceDropCount ?? 0,
         creditsUsedToday: creditsUsed,
       });
 

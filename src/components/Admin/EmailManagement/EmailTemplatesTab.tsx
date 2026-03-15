@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CreateTemplateModal from './CreateTemplateModal';
@@ -20,13 +21,16 @@ interface EmailTemplate {
   category: string;
   is_active: boolean;
   variables: string[];
+  html_template?: string;
   created_at: string;
 }
 
 export const EmailTemplatesTab: React.FC = () => {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,6 +56,18 @@ export const EmailTemplatesTab: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (template: EmailTemplate) => {
+    if (!confirm(`Delete "${template.name}"? This cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.from('email_templates').delete().eq('id', template.id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: `"${template.name}" has been deleted.` });
+      loadTemplates();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete template', variant: 'destructive' });
     }
   };
 
@@ -130,15 +146,15 @@ export const EmailTemplatesTab: React.FC = () => {
                   )}
 
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => setPreviewTemplate(template)}>
                       <Eye className="mr-2 h-4 w-4" />
                       Preview
                     </Button>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/admin/email-templates/${template.id}/edit`)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </Button>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => handleDelete(template)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </Button>
@@ -150,23 +166,6 @@ export const EmailTemplatesTab: React.FC = () => {
         )}
       </div>
 
-      {/* Template Builder Info */}
-      <div className="dashboard-card">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold">About Email Templates</h3>
-        </div>
-        <div className="space-y-2 text-sm">
-          <p>
-            Email templates are stored in the database and can be edited by administrators.
-            All templates use HTML with inline CSS for maximum email client compatibility.
-          </p>
-          <p className="text-muted-foreground">
-            Templates support dynamic variables using the <code className="rounded bg-muted px-1">{'{{variable}}'}</code> syntax.
-            Variables are replaced with actual values when sending emails.
-          </p>
-        </div>
-      </div>
-
       {/* Create Template Modal */}
       {showCreateModal && (
         <CreateTemplateModal
@@ -176,6 +175,31 @@ export const EmailTemplatesTab: React.FC = () => {
             loadTemplates();
           }}
         />
+      )}
+
+      {/* HTML Preview Dialog */}
+      {previewTemplate && (
+        <Dialog open onOpenChange={() => setPreviewTemplate(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{previewTemplate.name} — Preview</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden rounded border bg-white">
+              {previewTemplate.html_template ? (
+                <iframe
+                  srcDoc={previewTemplate.html_template}
+                  className="w-full h-[600px]"
+                  sandbox="allow-same-origin"
+                  title="Email preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                  No preview available — open the editor and save the template first.
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

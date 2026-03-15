@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Star, Download, Share2 } from 'lucide-react';
+import { Eye, Download, Share2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -156,12 +156,6 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="flex space-x-1">
-                    <Button
-                      className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0"
-                      title="Add to favorites"
-                    >
-                      <Star className="w-3 h-3" />
-                    </Button>
                     <Button
                       className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0"
                       title="Download material data"

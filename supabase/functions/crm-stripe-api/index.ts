@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'https://esm.sh/stripe@14.10.0';
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
@@ -8,6 +9,10 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const stripe = new Stripe(stripeSecretKey, {
+  apiVersion: '2023-10-16',
+  httpClient: Stripe.createFetchHttpClient(),
+});
 
 /**
  * CRM Stripe API
@@ -74,14 +79,39 @@ Deno.serve(async (req) => {
         .eq('user_id', userId)
         .single();
 
-      // TODO: Create Stripe checkout session
-      // This requires Stripe API integration
+      // Get or create Stripe customer
+      let customerId: string;
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('stripe_customer_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (profile?.stripe_customer_id) {
+        customerId = profile.stripe_customer_id;
+      } else {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { supabase_user_id: userId },
+        });
+        customerId = customer.id;
+        await supabase
+          .from('user_profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', userId);
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
+        subscription_data: { metadata: { user_id: userId } },
+        success_url: `${Deno.env.get('APP_URL') || 'https://app.example.com'}/billing?success=1`,
+        cancel_url: `${Deno.env.get('APP_URL') || 'https://app.example.com'}/billing?cancelled=1`,
+      });
 
       return new Response(
-        JSON.stringify({
-          message: 'Checkout session creation requires Stripe API setup',
-          plan: plan,
-        }),
+        JSON.stringify({ url: session.url }),
         { status: 200, headers: corsHeaders },
       );
     }
@@ -112,14 +142,45 @@ Deno.serve(async (req) => {
         );
       }
 
-      // TODO: Create Stripe checkout for credit purchase
-      // This requires Stripe API integration
+      // Get or create Stripe customer
+      let customerId: string;
+      const { data: creditProfile } = await supabase
+        .from('user_profiles')
+        .select('stripe_customer_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (creditProfile?.stripe_customer_id) {
+        customerId = creditProfile.stripe_customer_id;
+      } else {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { supabase_user_id: userId },
+        });
+        customerId = customer.id;
+        await supabase
+          .from('user_profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', userId);
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'payment',
+        line_items: [{ price: creditPackage.stripe_price_id, quantity: 1 }],
+        payment_intent_data: {
+          metadata: {
+            type: 'credit_purchase',
+            user_id: userId,
+            credit_amount: creditPackage.credits.toString(),
+          },
+        },
+        success_url: `${Deno.env.get('APP_URL') || 'https://app.example.com'}/billing?success=1`,
+        cancel_url: `${Deno.env.get('APP_URL') || 'https://app.example.com'}/billing?cancelled=1`,
+      });
 
       return new Response(
-        JSON.stringify({
-          message: 'Credit purchase requires Stripe API setup',
-          package: creditPackage,
-        }),
+        JSON.stringify({ url: session.url }),
         { status: 200, headers: corsHeaders },
       );
     }

@@ -72,13 +72,6 @@ export class RecommendationsService {
   }
 
   /**
-   * Track when user saves a material to favorites
-   */
-  static async trackSave(materialId: string, metadata?: Record<string, any>): Promise<void> {
-    await this.trackInteraction(materialId, 'save', 3.0, metadata);
-  }
-
-  /**
    * Track when user rates a material
    */
   static async trackRating(materialId: string, rating: number, metadata?: Record<string, any>): Promise<void> {

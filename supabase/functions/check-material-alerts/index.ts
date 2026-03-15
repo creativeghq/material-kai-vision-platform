@@ -1,0 +1,148 @@
+/**
+ * check-material-alerts
+ *
+ * Scheduled via pg_cron (e.g. daily at 08:00 UTC):
+ *   SELECT cron.schedule('check-material-alerts', '0 8 * * *',
+ *     $$SELECT net.http_post(url:='<SUPABASE_URL>/functions/v1/check-material-alerts',
+ *       headers:'{"Authorization":"Bearer <SERVICE_KEY>"}'::jsonb, body:'{}'::jsonb)$$);
+ *
+ * Can also be triggered manually (POST to the function URL).
+ *
+ * For each saved_search with is_active_for_recommendations=true,
+ * finds products created since last_recommendation_sent_at whose
+ * name or description matches the saved query. Inserts alert rows
+ * into material_alerts (deduped) and user_notifications for the bell.
+ */
+
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const admin       = createClient(supabaseUrl, serviceKey);
+
+    const now = new Date().toISOString();
+
+    // 1. Fetch all active saved searches
+    const { data: activeSavedSearches, error: ssErr } = await admin
+      .from('saved_searches')
+      .select('id, user_id, name, query, recommendation_frequency, last_recommendation_sent_at, workspace_id')
+      .eq('is_active_for_recommendations', true)
+      .neq('recommendation_frequency', 'never');
+
+    if (ssErr) throw new Error(`saved_searches query failed: ${ssErr.message}`);
+    if (!activeSavedSearches || activeSavedSearches.length === 0) {
+      return new Response(JSON.stringify({ processed: 0, message: 'No active saved searches' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let totalAlerts = 0;
+
+    for (const ss of activeSavedSearches) {
+      // Check frequency — skip if not yet due
+      if (ss.last_recommendation_sent_at) {
+        const lastSent = new Date(ss.last_recommendation_sent_at).getTime();
+        const hoursSince = (Date.now() - lastSent) / 3_600_000;
+        if (ss.recommendation_frequency === 'daily'  && hoursSince < 23)  continue;
+        if (ss.recommendation_frequency === 'weekly' && hoursSince < 167) continue;
+      }
+
+      const since = ss.last_recommendation_sent_at ?? new Date(0).toISOString();
+
+      // 2. Find new products matching the saved query
+      let productsQuery = admin
+        .from('products')
+        .select('id, name, description')
+        .gte('created_at', since)
+        .or(`name.ilike.%${ss.query}%,description.ilike.%${ss.query}%`)
+        .limit(20);
+
+      // Scope to workspace if available
+      if (ss.workspace_id) {
+        productsQuery = productsQuery.eq('workspace_id', ss.workspace_id);
+      }
+
+      const { data: matchedProducts, error: pErr } = await productsQuery;
+      if (pErr) {
+        console.error(`Products query failed for saved_search ${ss.id}:`, pErr.message);
+        continue;
+      }
+      if (!matchedProducts || matchedProducts.length === 0) continue;
+
+      // 3. Insert material_alerts rows (UNIQUE on saved_search_id + product_id → conflict ignored)
+      const alertRows = matchedProducts.map((p) => ({
+        user_id:        ss.user_id,
+        saved_search_id: ss.id,
+        product_id:     p.id,
+      }));
+
+      const { data: insertedAlerts, error: alertErr } = await admin
+        .from('material_alerts')
+        .insert(alertRows)
+        .select('id, product_id')
+        .onConflict('saved_search_id, product_id')
+        .ignore();
+
+      if (alertErr) {
+        console.error(`material_alerts insert failed for ${ss.id}:`, alertErr.message);
+        continue;
+      }
+
+      const newAlerts = insertedAlerts ?? [];
+
+      // 4. Create user_notification for each truly new alert
+      if (newAlerts.length > 0) {
+        const notifRows = newAlerts.map((a) => {
+          const product = matchedProducts.find((p) => p.id === a.product_id);
+          return {
+            user_id:    ss.user_id,
+            type:       'material_alert',
+            title:      `New match: "${product?.name ?? 'Material'}"`,
+            body:       `A new material matches your saved search "${ss.name}"`,
+            action_url: `/search?q=${encodeURIComponent(ss.query)}`,
+            is_read:    false,
+            metadata:   { saved_search_id: ss.id, product_id: a.product_id },
+          };
+        });
+
+        const { error: notifErr } = await admin
+          .from('user_notifications')
+          .insert(notifRows);
+
+        if (notifErr) {
+          console.error(`user_notifications insert failed for ${ss.id}:`, notifErr.message);
+        }
+
+        totalAlerts += newAlerts.length;
+      }
+
+      // 5. Update last_recommendation_sent_at
+      await admin
+        .from('saved_searches')
+        .update({ last_recommendation_sent_at: now, updated_at: now })
+        .eq('id', ss.id);
+    }
+
+    return new Response(
+      JSON.stringify({
+        processed: activeSavedSearches.length,
+        new_alerts: totalAlerts,
+        timestamp: now,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  } catch (err) {
+    console.error('check-material-alerts error:', err);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+});

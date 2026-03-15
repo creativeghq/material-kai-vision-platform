@@ -1,42 +1,70 @@
 /**
  * Email Template Builder Page
- * Build email templates using React Email components
+ * Visual drag-and-drop email builder powered by Unlayer
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Eye, Code } from 'lucide-react';
+import { ArrowLeft, Save, Monitor, Tablet, Smartphone, Send } from 'lucide-react';
+import EmailEditor, { EditorRef, EmailEditorProps } from 'react-email-editor';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Textarea } from '@/components/core/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+type DeviceView = 'desktop' | 'tablet' | 'mobile';
+
+const DEVICE_WIDTHS: Record<DeviceView, number> = {
+  desktop: 1200,
+  tablet: 768,
+  mobile: 375,
+};
 
 export const EmailTemplateBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const editorRef = useRef<EditorRef>(null);
+  const topBarRef = useRef<HTMLDivElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const [template, setTemplate] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    subject: '',
-    react_code: '',
-    variables: [] as string[],
-  });
+  const [subject, setSubject] = useState('');
+  const [previewText, setPreviewText] = useState('');
+  const [editorHeight, setEditorHeight] = useState(window.innerHeight - 57);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<DeviceView>('desktop');
+  const [showTestDialog, setShowTestDialog] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
-    if (id) {
-      loadTemplate();
-    }
+    if (id) loadTemplate();
   }, [id]);
+
+  useLayoutEffect(() => {
+    const updateHeight = () => {
+      const topBarH = topBarRef.current?.offsetHeight ?? 57;
+      setEditorHeight(window.innerHeight - topBarH);
+    };
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  // Once both the template data is loaded AND the editor iframe is ready, restore the design
+  useEffect(() => {
+    if (editorReady && template?.unlayer_design) {
+      editorRef.current?.editor?.loadDesign(template.unlayer_design);
+    }
+  }, [editorReady, template]);
 
   const loadTemplate = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('email_templates')
         .select('*')
@@ -44,267 +72,288 @@ export const EmailTemplateBuilder: React.FC = () => {
         .single();
 
       if (error) throw error;
-
       setTemplate(data);
-      setFormData({
-        subject: data.subject || '',
-        react_code: data.react_code || getDefaultReactTemplate(),
-        variables: data.variables || [],
-      });
-    } catch (error) {
-      console.error('Error loading template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load template',
-        variant: 'destructive',
-      });
+      setSubject(data.subject_template || '');
+      setPreviewText(data.preview_text || '');
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load template', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  const getDefaultReactTemplate = () => {
-    return `import { Html, Head, Body, Container, Heading, Text, Button, Hr } from '@react-email/components';
+  const onEditorReady: EmailEditorProps['onReady'] = useCallback(() => {
+    setEditorReady(true);
+  }, []);
 
-export default function EmailTemplate({ userName = 'User', actionUrl = '#', companyName = 'Material Kai' }) {
-  return (
-    <Html lang="en">
-      <Head />
-      <Body style={{ backgroundColor: '#f4f4f4', fontFamily: "'Open Sans', Arial, sans-serif" }}>
-        <Container style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: '#ffffff', padding: '20px' }}>
-          <Heading style={{ color: '#000000', fontSize: '24px', textAlign: 'center', marginBottom: '20px' }}>
-            {companyName}
-          </Heading>
-
-          <Hr style={{ borderColor: '#e0e0e0', margin: '20px 0' }} />
-
-          <Heading as="h2" style={{ color: '#333333', fontSize: '20px', marginBottom: '15px' }}>
-            Hello {userName}!
-          </Heading>
-
-          <Text style={{ color: '#666666', fontSize: '16px', lineHeight: '1.6', marginBottom: '20px' }}>
-            Welcome to our platform. We're excited to have you on board!
-          </Text>
-
-          <Button
-            href={actionUrl}
-            style={{
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              padding: '12px 24px',
-              borderRadius: '4px',
-              textDecoration: 'none',
-              display: 'inline-block',
-              fontWeight: 'bold',
-            }}
-          >
-            Get Started
-          </Button>
-
-          <Hr style={{ borderColor: '#e0e0e0', margin: '30px 0 20px 0' }} />
-
-          <Text style={{ color: '#999999', fontSize: '12px', textAlign: 'center' }}>
-            © 2024 {companyName}. All rights reserved.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
-  );
-}`;
+  // Injects the Gmail/Outlook preheader snippet right after <body>
+  const injectPreheader = (html: string, text: string): string => {
+    if (!text.trim()) return html;
+    // Pad with zero-width non-joiners to prevent body text leaking into the snippet
+    const padding = '&zwnj;&nbsp;'.repeat(90);
+    const snippet = `<span style="display:none;font-size:1px;color:#ffffff;max-height:0;overflow:hidden;mso-hide:all;">${text}${padding}</span>`;
+    return html.replace(/(<body[^>]*>)/i, `$1${snippet}`);
   };
 
-  const extractVariables = (code: string) => {
-    const match = code.match(/function\s+\w+\s*\(\s*\{([^}]+)\}/);
-    if (!match) return [];
+  const handleSave = () => {
+    if (!editorRef.current?.editor) return;
+    setSaving(true);
 
-    const propsString = match[1];
-    const vars = propsString
-      .split(',')
-      .map(prop => prop.trim().split('=')[0].trim())
-      .filter(v => v.length > 0);
+    editorRef.current.editor.exportHtml(async ({ design, html }) => {
+      try {
+        const finalHtml = injectPreheader(html, previewText);
+        const { error } = await supabase
+          .from('email_templates')
+          .update({
+            subject_template: subject,
+            preview_text: previewText,
+            html_template: finalHtml,
+            unlayer_design: design,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
 
-    return vars;
-  };
-
-  const handleCodeChange = (value: string) => {
-    setFormData({
-      ...formData,
-      react_code: value,
-      variables: extractVariables(value),
+        if (error) throw error;
+        toast({ title: 'Saved', description: 'Template saved successfully.' });
+      } catch {
+        toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
+      } finally {
+        setSaving(false);
+      }
     });
   };
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
+  const handleSendTest = () => {
+    if (!testEmail.trim() || !editorRef.current?.editor) return;
+    setSendingTest(true);
 
-      const { error } = await supabase
-        .from('email_templates')
-        .update({
-          subject: formData.subject,
-          react_code: formData.react_code,
-          variables: formData.variables,
-          is_active: true,
-        })
-        .eq('id', id);
+    editorRef.current.editor.exportHtml(async ({ html }) => {
+      try {
+        const finalHtml = injectPreheader(html, previewText);
+        const { data, error } = await supabase.functions.invoke('email-api', {
+          body: {
+            action: 'send',
+            to: testEmail.trim(),
+            subject: subject || `[Test] ${template.name}`,
+            html: finalHtml,
+            emailType: 'transactional',
+            tags: { test: 'true', template_id: id },
+          },
+        });
 
-      if (error) throw error;
+        if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to send');
+        toast({ title: 'Test email sent', description: `Delivered to ${testEmail}` });
+        setShowTestDialog(false);
+        setTestEmail('');
+      } catch (err: any) {
+        toast({ title: 'Send failed', description: err.message, variant: 'destructive' });
+      } finally {
+        setSendingTest(false);
+      }
+    });
+  };
 
-      toast({
-        title: 'Success',
-        description: 'Template saved successfully',
-      });
-    } catch (error) {
-      console.error('Error saving template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save template',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
+  const handlePreview = (device: DeviceView) => {
+    if (!editorRef.current?.editor) return;
+    setPreviewDevice(device);
+    editorRef.current.editor.exportHtml(({ html }) => {
+      setPreviewHtml(injectPreheader(html, previewText));
+    });
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">Loading template...</div>
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Loading template…</p>
       </div>
     );
   }
 
   if (!template) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">Template not found</div>
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Template not found.</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{template.name}</h1>
-            <p className="text-sm text-muted-foreground">{template.description}</p>
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Top bar — two rows */}
+      <div ref={topBarRef} className="border-b bg-background shrink-0">
+        {/* Row 1: nav + actions */}
+        <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+          <div className="flex items-center gap-3 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin?tab=email')}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <div>
+              <p className="font-semibold text-sm leading-tight">{template.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{template.category}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Device preview buttons */}
+            <div className="flex items-center border rounded-full overflow-hidden divide-x">
+              <button title="Desktop preview" disabled={!editorReady} onClick={() => handlePreview('desktop')}
+                className="px-2.5 py-1.5 hover:bg-muted disabled:opacity-40 transition-colors">
+                <Monitor className="h-4 w-4" />
+              </button>
+              <button title="Tablet preview" disabled={!editorReady} onClick={() => handlePreview('tablet')}
+                className="px-2.5 py-1.5 hover:bg-muted disabled:opacity-40 transition-colors">
+                <Tablet className="h-4 w-4" />
+              </button>
+              <button title="Mobile preview" disabled={!editorReady} onClick={() => handlePreview('mobile')}
+                className="px-2.5 py-1.5 hover:bg-muted disabled:opacity-40 transition-colors">
+                <Smartphone className="h-4 w-4" />
+              </button>
+            </div>
+
+            <Button variant="outline" size="sm" disabled={!editorReady} onClick={() => setShowTestDialog(true)}>
+              <Send className="h-4 w-4 mr-1" />
+              Send Test
+            </Button>
+
+            <Button size="sm" disabled={saving || !editorReady} onClick={handleSave}>
+              <Save className="h-4 w-4 mr-1" />
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Template'}
-          </Button>
+
+        {/* Row 2: subject + preview text */}
+        <div className="flex items-center gap-4 px-4 py-2 border-t bg-muted/30">
+          <div className="flex items-center gap-2 flex-1">
+            <Label htmlFor="subject" className="text-xs whitespace-nowrap text-muted-foreground w-20 shrink-0">
+              Subject
+            </Label>
+            <Input
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="e.g. Welcome, {{firstName}}!"
+              className="h-7 text-xs flex-1"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <Label htmlFor="preview-text" className="text-xs whitespace-nowrap text-muted-foreground w-20 shrink-0">
+              Preview text
+            </Label>
+            <Input
+              id="preview-text"
+              value={previewText}
+              onChange={(e) => setPreviewText(e.target.value)}
+              placeholder="Short teaser shown in Gmail, Outlook… (max ~90 chars)"
+              className="h-7 text-xs flex-1"
+              maxLength={150}
+            />
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="editor" className="w-full">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-          <TabsTrigger value="editor" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Code className="h-4 w-4 mr-2" />
-            React Code
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      {/* Unlayer editor — explicit pixel height so the iframe fills the viewport */}
+      <div style={{ height: editorHeight }} className="relative overflow-hidden">
+        {!editorReady && (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm bg-background z-10">
+            Loading editor…
+          </div>
+        )}
+        <EmailEditor
+          ref={editorRef}
+          onReady={onEditorReady}
+          style={{ height: editorHeight }}
+          options={{
+            appearance: { theme: 'light' },
+            features: { textEditor: { spellChecker: true } },
+          }}
+        />
+      </div>
 
-        <TabsContent value="editor" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>React Email Template</CardTitle>
-              <CardDescription>
-                Write your email template using React Email components. Available components: Html, Head, Body, Container, Heading, Text, Button, Hr, Img, Link, Section, Row, Column
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject Line</Label>
-                <Input
-                  id="subject"
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  placeholder="Welcome {{userName}}!"
+      {/* Send test email dialog */}
+      {showTestDialog && (
+        <Dialog open onOpenChange={(open) => { if (!open) { setShowTestDialog(false); setTestEmail(''); } }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Send Test Email</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Sends the current design (including preheader) to an email address so you can check it in a real inbox.
+            </p>
+            <div className="space-y-2 pt-1">
+              <Label htmlFor="test-email" className="text-xs">Recipient email</Label>
+              <Input
+                id="test-email"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="you@example.com"
+                onKeyDown={(e) => e.key === 'Enter' && handleSendTest()}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => { setShowTestDialog(false); setTestEmail(''); }}>
+                Cancel
+              </Button>
+              <Button size="sm" disabled={!testEmail.trim() || sendingTest} onClick={handleSendTest}>
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {sendingTest ? 'Sending…' : 'Send'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Responsive preview modal */}
+      {previewHtml && (
+        <Dialog open onOpenChange={() => setPreviewHtml(null)}>
+          <DialogContent
+            className="p-0 overflow-hidden flex flex-col"
+            style={{ maxWidth: 'calc(100vw - 48px)', width: DEVICE_WIDTHS[previewDevice] + 48, maxHeight: '92vh' }}
+          >
+            <DialogHeader className="px-4 py-3 border-b shrink-0">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-sm font-medium capitalize">
+                  {previewDevice} preview — {DEVICE_WIDTHS[previewDevice]}px
+                </DialogTitle>
+                {/* In-modal device switcher */}
+                <div className="flex items-center border rounded-full overflow-hidden divide-x">
+                  {(['desktop', 'tablet', 'mobile'] as DeviceView[]).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setPreviewDevice(d)}
+                      className={`px-2.5 py-1.5 transition-colors ${previewDevice === d ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                      title={`${d} preview`}
+                    >
+                      {d === 'desktop' && <Monitor className="h-3.5 w-3.5" />}
+                      {d === 'tablet' && <Tablet className="h-3.5 w-3.5" />}
+                      {d === 'mobile' && <Smartphone className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </DialogHeader>
+
+            {/* Scrollable preview area */}
+            <div className="flex-1 overflow-auto bg-muted/30 p-4 flex justify-center">
+              <div
+                style={{ width: DEVICE_WIDTHS[previewDevice], flexShrink: 0 }}
+                className="bg-white rounded shadow-sm overflow-hidden"
+              >
+                <iframe
+                  srcDoc={previewHtml}
+                  style={{ width: DEVICE_WIDTHS[previewDevice], height: 700 }}
+                  sandbox="allow-same-origin"
+                  title={`${previewDevice} email preview`}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="react-code">React Email Code</Label>
-                <Textarea
-                  id="react-code"
-                  value={formData.react_code}
-                  onChange={(e) => handleCodeChange(e.target.value)}
-                  rows={25}
-                  className="font-mono text-sm"
-                  placeholder="Write your React Email template here..."
-                />
-              </div>
-
-              {formData.variables.length > 0 && (
-                <div className="p-4 rounded-lg border bg-muted/50">
-                  <p className="text-sm font-medium mb-2">Detected Props/Variables:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.variables.map((variable) => (
-                      <code key={variable} className="px-2 py-1 rounded bg-background text-xs">
-                        {variable}
-                      </code>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    These props will be available when sending emails using this template
-                  </p>
-                </div>
-              )}
-
-              <div className="p-4 rounded-lg border bg-blue-50 dark:bg-blue-950">
-                <p className="text-sm font-medium mb-2">💡 Tips:</p>
-                <ul className="text-xs space-y-1 text-muted-foreground">
-                  <li>• Use inline styles for email compatibility</li>
-                  <li>• Define props with default values in the function signature</li>
-                  <li>• Import components from '@react-email/components'</li>
-                  <li>• Test your template by sending a test email</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Template Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Template Name</Label>
-                  <p className="text-sm text-muted-foreground">{template.name}</p>
-                </div>
-                <div>
-                  <Label>Slug</Label>
-                  <p className="text-sm text-muted-foreground">{template.slug}</p>
-                </div>
-                <div>
-                  <Label>Category</Label>
-                  <p className="text-sm text-muted-foreground capitalize">{template.category}</p>
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {template.is_active ? 'Active' : 'Inactive'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

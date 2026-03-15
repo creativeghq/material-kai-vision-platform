@@ -157,22 +157,9 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
     setLoading(false);
   }, [tiles, processingId]);
 
-  const loadCatalogMaterials = useCallback(async () => {
-    try {
-      // Note: materials_catalog table doesn't exist in current schema
-      // This is a placeholder for future implementation
-      console.log('Loading catalog materials - feature not yet implemented');
-      // Placeholder for catalog materials loading
-      console.log('Loading catalog materials...');
-    } catch (error) {
-      console.error('Error loading catalog materials:', error);
-    }
-  }, []);
-
   useEffect(() => {
     loadMaterials();
-    loadCatalogMaterials();
-  }, [loadMaterials, loadCatalogMaterials]);
+  }, [loadMaterials]);
 
   const saveMaterialToCatalog = async (material: DetectedMaterial) => {
     try {

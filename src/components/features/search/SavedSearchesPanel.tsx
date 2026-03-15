@@ -12,11 +12,14 @@ import {
   Lock,
   TrendingUp,
   Sparkles,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/core/ui/select';
 
 // Type for saved search records
 interface SavedSearch {
@@ -45,22 +55,60 @@ interface SavedSearch {
   relevance_score: number;
 }
 
-// Placeholder service - implement with MIVAA API calls
 const savedSearchesService = {
   getUserSavedSearches: async (_options: {
     sortBy: string;
     sortOrder: string;
   }): Promise<SavedSearch[]> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    return [];
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) return [];
+    const { data, error } = await supabase
+      .from('saved_searches')
+      .select('id, name, query, search_strategy, material_filters, is_public, tags, use_count, last_used_at, shared_with_users, is_active_for_recommendations, recommendation_frequency, relevance_score')
+      .eq('user_id', session.user.id)
+      .order('last_used_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as SavedSearch[];
   },
-  deleteSavedSearch: async (_id: string): Promise<void> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    console.log('Delete search not yet implemented');
+
+  deleteSavedSearch: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('saved_searches').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
-  executeSavedSearch: async (_id: string): Promise<void> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    console.log('Execute search not yet implemented');
+
+  executeSavedSearch: async (id: string): Promise<void> => {
+    const { data: existing, error: fetchErr } = await supabase
+      .from('saved_searches')
+      .select('use_count')
+      .eq('id', id)
+      .single();
+    if (fetchErr) throw new Error(fetchErr.message);
+    const { error } = await supabase
+      .from('saved_searches')
+      .update({
+        use_count: (existing?.use_count ?? 0) + 1,
+        last_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  toggleAlerts: async (id: string, active: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from('saved_searches')
+      .update({ is_active_for_recommendations: active, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  setFrequency: async (id: string, frequency: 'daily' | 'weekly' | 'never'): Promise<void> => {
+    const { error } = await supabase
+      .from('saved_searches')
+      .update({ recommendation_frequency: frequency, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
   },
 };
 
@@ -168,6 +216,42 @@ export const SavedSearchesPanel = ({
     setDeleteDialogOpen(true);
   };
 
+  const handleToggleAlerts = async (search: SavedSearch) => {
+    const newActive = !search.is_active_for_recommendations;
+    try {
+      await savedSearchesService.toggleAlerts(search.id, newActive);
+      setSearches((prev) =>
+        prev.map((s) =>
+          s.id === search.id ? { ...s, is_active_for_recommendations: newActive } : s,
+        ),
+      );
+      toast({
+        title: newActive ? 'Alerts Enabled' : 'Alerts Disabled',
+        description: newActive
+          ? `You'll be notified when new materials match "${search.name}"`
+          : `Alerts turned off for "${search.name}"`,
+      });
+    } catch (error) {
+      console.error('Error toggling alerts:', error);
+      toast({ title: 'Error', description: 'Failed to update alert settings', variant: 'destructive' });
+    }
+  };
+
+  const handleFrequencyChange = async (search: SavedSearch, frequency: 'daily' | 'weekly' | 'never') => {
+    try {
+      await savedSearchesService.setFrequency(search.id, frequency);
+      setSearches((prev) =>
+        prev.map((s) =>
+          s.id === search.id ? { ...s, recommendation_frequency: frequency } : s,
+        ),
+      );
+      toast({ title: 'Frequency Updated', description: `Alert frequency set to ${frequency}` });
+    } catch (error) {
+      console.error('Error setting frequency:', error);
+      toast({ title: 'Error', description: 'Failed to update frequency', variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -273,6 +357,29 @@ export const SavedSearchesPanel = ({
                         ))}
                       </div>
                     )}
+
+                    {/* Alert frequency picker — visible when alerts active */}
+                    {search.is_active_for_recommendations && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Bell className="h-3 w-3 text-primary" />
+                        <span className="text-xs text-muted-foreground">Notify:</span>
+                        <Select
+                          value={search.recommendation_frequency}
+                          onValueChange={(v) =>
+                            handleFrequencyChange(search, v as 'daily' | 'weekly' | 'never')
+                          }
+                        >
+                          <SelectTrigger className="h-6 w-24 text-xs px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="never">Never</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -292,6 +399,19 @@ export const SavedSearchesPanel = ({
                       title="Execute search"
                     >
                       <Play className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleAlerts(search)}
+                      title={search.is_active_for_recommendations ? 'Disable alerts' : 'Enable alerts'}
+                      className={search.is_active_for_recommendations ? 'text-primary' : ''}
+                    >
+                      {search.is_active_for_recommendations ? (
+                        <Bell className="h-4 w-4" />
+                      ) : (
+                        <BellOff className="h-4 w-4" />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"

@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Workflow,
   ChevronDown,
+  Tags,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -193,6 +194,22 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/background-agents',
         status: 'active',
         count: 'AI Agents',
+      },
+      {
+        title: 'Duplicate Detection',
+        description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
+        icon: AlertTriangle,
+        path: '/admin/duplicate-detection',
+        status: 'active',
+        count: 'AI Detection',
+      },
+      {
+        title: 'Batch AI Categorization',
+        description: 'Bulk re-categorize uncategorized products using Claude Haiku material classification',
+        icon: Tags,
+        path: '/admin/batch-categorization',
+        status: 'active',
+        count: 'AI Tagging',
       },
     ],
     'System Monitoring': [

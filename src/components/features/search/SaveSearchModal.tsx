@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { MaterialFilters } from './MaterialFiltersPanel';
 
 // Types for saved search functionality
@@ -47,28 +48,82 @@ type MergeSuggestion = {
   similarity_score: number;
 } | null;
 
-// Placeholder service - implement with MIVAA API calls
+async function getCurrentUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) throw new Error('Not authenticated');
+  return session.user.id;
+}
+
 const savedSearchesService = {
   checkForDuplicates: async (
-    _query: string,
+    query: string,
     _filters: Record<string, unknown>,
     _materialFilters: MaterialFilters | Record<string, unknown>
   ): Promise<MergeSuggestion> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    return null;
+    const user_id = await getCurrentUserId();
+    // Find saved searches with same user and very similar query text
+    const { data } = await supabase
+      .from('saved_searches')
+      .select('id, name')
+      .eq('user_id', user_id)
+      .ilike('query', `%${query.slice(0, 40)}%`)
+      .limit(1);
+    if (!data || data.length === 0) return null;
+    return {
+      existing_search: { id: data[0].id, name: data[0].name },
+      new_query: query,
+      similarity_score: 0.9,
+    };
   },
-  createSavedSearch: async (_data: CreateSavedSearchData): Promise<void> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    console.log('Save search not yet implemented');
+
+  createSavedSearch: async (data: CreateSavedSearchData): Promise<void> => {
+    const user_id = await getCurrentUserId();
+    const { error } = await supabase.from('saved_searches').insert({
+      user_id,
+      name: data.name,
+      description: data.description,
+      query: data.query,
+      search_strategy: data.search_strategy,
+      filters: data.filters,
+      material_filters: data.material_filters,
+      conversation_id: data.conversation_id,
+      moodboard_id: data.moodboard_id,
+      generation_3d_id: data.generation_3d_id,
+      spatial_context: data.spatial_context,
+      results_snapshot: data.results_snapshot,
+      is_public: data.is_public,
+      tags: data.tags,
+      recommendation_frequency: data.recommendation_frequency,
+      use_count: 0,
+      merge_count: 1,
+      is_active_for_recommendations: data.recommendation_frequency !== 'never',
+    });
+    if (error) throw new Error(error.message);
   },
+
   mergeIntoExisting: async (
-    _searchId: string,
-    _query: string,
+    searchId: string,
+    query: string,
     _filters: Record<string, unknown>,
     _materialFilters: MaterialFilters
   ): Promise<void> => {
-    // TODO: Implement with MIVAA API /api/saved-searches
-    console.log('Merge search not yet implemented');
+    const { data: existing, error: fetchErr } = await supabase
+      .from('saved_searches')
+      .select('merge_count, query')
+      .eq('id', searchId)
+      .single();
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    const { error } = await supabase
+      .from('saved_searches')
+      .update({
+        query: query.length > (existing?.query?.length ?? 0) ? query : existing?.query,
+        merge_count: (existing?.merge_count ?? 1) + 1,
+        last_merged_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', searchId);
+    if (error) throw new Error(error.message);
   },
 };
 import { MergeSearchModal } from './MergeSearchModal';

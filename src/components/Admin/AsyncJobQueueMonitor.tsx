@@ -287,6 +287,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<'all' | 'pdf_processing' | 'web_scraping' | 'xml_import'>('all');
   const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
   const [deleteJobId, setDeleteJobId] = useState('');
+  const [pipelineActionLoading, setPipelineActionLoading] = useState<string | null>(null);
+  const [pipelineValidationResult, setPipelineValidationResult] = useState<any | null>(null);
   const [showTempCleanupModal, setShowTempCleanupModal] = useState(false);
   const [productProgress, setProductProgress] = useState<ProductProgress[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -394,6 +396,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // Fetch job details with checkpoints
   const fetchJobDetails = async (job: BackgroundJob) => {
     console.log('fetchJobDetails called with job:', job);
+    setPipelineValidationResult(null);
     try {
       setLoadingCheckpoints(true);
 
@@ -1513,6 +1516,93 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       return 'N/A';
     } catch (error) {
       return 'N/A';
+    }
+  };
+
+  // ============================================================================
+  // PIPELINE ACTION HANDLERS
+  // ============================================================================
+
+  const MIVAA_API_URL = import.meta.env.VITE_MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
+
+  const callPipelineAction = async (action: string, body: Record<string, any>) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${MIVAA_API_URL}/api/internal/${action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  };
+
+  const handlePipelineReset = async (job: typeof selectedJob) => {
+    if (!job) return;
+    if (!confirm(`Reset job ${job.id.slice(0, 8)}... back to initialized state? This will clear the error and allow re-triggering.`)) return;
+    setPipelineActionLoading('reset');
+    try {
+      await callPipelineAction(`reset-job/${job.id}`, {});
+      toast.success('Job reset to initialized state');
+      await fetchQueueData();
+      setSelectedJob(prev => prev ? { ...prev, status: 'initialized', progress: 0, error: undefined } : null);
+    } catch (e: any) {
+      toast.error(`Reset failed: ${e.message}`);
+    } finally {
+      setPipelineActionLoading(null);
+    }
+  };
+
+  const handlePipelineValidate = async (job: typeof selectedJob) => {
+    if (!job) return;
+    setPipelineActionLoading('validate');
+    setPipelineValidationResult(null);
+    try {
+      const result = await callPipelineAction(`validate-pipeline/${job.id}`, {});
+      setPipelineValidationResult(result);
+    } catch (e: any) {
+      toast.error(`Validation failed: ${e.message}`);
+    } finally {
+      setPipelineActionLoading(null);
+    }
+  };
+
+  const handleQueueUnderstanding = async (job: typeof selectedJob) => {
+    if (!job?.document_id) return;
+    setPipelineActionLoading('understanding');
+    try {
+      const result = await callPipelineAction('queue-understanding-embeddings', {
+        document_id: job.document_id,
+        workspace_id: job.workspace_id,
+        priority: 'normal',
+      });
+      toast.success(`Phase 2 queued: job ${result.job_id?.slice(0, 8) || 'started'}`);
+    } catch (e: any) {
+      toast.error(`Queue failed: ${e.message}`);
+    } finally {
+      setPipelineActionLoading(null);
+    }
+  };
+
+  const handleRegenerateTextEmbeddings = async (job: typeof selectedJob) => {
+    if (!job?.document_id) return;
+    setPipelineActionLoading('text-embeddings');
+    try {
+      const result = await callPipelineAction('regenerate-text-embeddings', {
+        document_id: job.document_id,
+        workspace_id: job.workspace_id,
+        force_regenerate: false,
+      });
+      toast.success(`${result.embeddings_generated} text embeddings generated`);
+    } catch (e: any) {
+      toast.error(`Failed: ${e.message}`);
+    } finally {
+      setPipelineActionLoading(null);
     }
   };
 
@@ -2765,6 +2855,115 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     </div>
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Pipeline Actions — shown for failed, interrupted, completed, and initialized jobs */}
+              {selectedJob && ['failed', 'interrupted', 'completed', 'initialized', 'cancelled'].includes(selectedJob.status) && (
+                <div className="mt-4 p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Pipeline Actions</div>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Reset — only for failed/interrupted */}
+                    {['failed', 'interrupted'].includes(selectedJob.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handlePipelineReset(selectedJob)}
+                      >
+                        {pipelineActionLoading === 'reset' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1.5" />
+                        )}
+                        Reset Job
+                      </Button>
+                    )}
+                    {/* Validate — always when document_id exists */}
+                    {selectedJob.document_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handlePipelineValidate(selectedJob)}
+                      >
+                        {pipelineActionLoading === 'validate' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3 mr-1.5" />
+                        )}
+                        Validate Pipeline
+                      </Button>
+                    )}
+                    {/* Queue Phase 2 understanding embeddings */}
+                    {selectedJob.document_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handleQueueUnderstanding(selectedJob)}
+                      >
+                        {pipelineActionLoading === 'understanding' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <Zap className="h-3 w-3 mr-1.5" />
+                        )}
+                        Queue Understanding
+                      </Button>
+                    )}
+                    {/* Regenerate text embeddings */}
+                    {selectedJob.document_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handleRegenerateTextEmbeddings(selectedJob)}
+                      >
+                        {pipelineActionLoading === 'text-embeddings' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <Link className="h-3 w-3 mr-1.5" />
+                        )}
+                        Fill Text Embeddings
+                      </Button>
+                    )}
+                  </div>
+                  {/* Validation results */}
+                  {pipelineValidationResult && (
+                    <div className="mt-3 text-xs space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(pipelineValidationResult.stages_complete || {}).map(([k, v]) => (
+                          <span key={k} className="px-2 py-0.5 bg-white border border-slate-200 rounded font-mono">
+                            {k}: <strong>{String(v)}</strong>
+                          </span>
+                        ))}
+                      </div>
+                      {pipelineValidationResult.issues?.length > 0 && (
+                        <div className="space-y-1">
+                          {pipelineValidationResult.issues.map((issue: string, i: number) => (
+                            <div key={i} className="flex items-start gap-1.5 text-amber-700">
+                              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                              <span>{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {pipelineValidationResult.recommendations?.length > 0 && (
+                        <div className="space-y-1 text-slate-600">
+                          {pipelineValidationResult.recommendations.map((rec: string, i: number) => (
+                            <div key={i} className="flex items-start gap-1.5">
+                              <span className="text-primary font-bold shrink-0">→</span>
+                              <span>{rec}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Interrupted Job Actions */}

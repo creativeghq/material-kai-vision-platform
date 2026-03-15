@@ -88,6 +88,10 @@ const MessagingManagement = lazy(() => import('./components/Admin/MessagingManag
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
+const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
+const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
+const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
+const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 
 // ── Loading fallback ────────────────────────────────────────────────
 const PageLoader = () => (
@@ -122,6 +126,9 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>
+                {/* Public routes — no auth required */}
+                <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
+
                 <Route
                   path="/auth"
                   element={
@@ -405,6 +412,40 @@ const App = () => (
                       <Layout>
                         <MaterialsPage />
                       </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/compare"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <MaterialComparePage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/duplicate-detection"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <DuplicateDetectionPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/batch-categorization"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <BatchCategorizationPage />
+                        </Layout>
+                      </AdminGuard>
                     </AuthGuard>
                   }
                 />

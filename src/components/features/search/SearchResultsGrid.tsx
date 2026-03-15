@@ -10,7 +10,6 @@ interface SearchResultsGridProps {
   error?: string;
   onView?: (result: SearchResult) => void;
   onDownload?: (result: SearchResult) => void;
-  onFavorite?: (result: SearchResult) => void;
   onTagClick?: (tag: string) => void;
   onSelect?: (resultId: string, selected: boolean) => void;
   selectedResults?: Set<string>;
@@ -23,7 +22,6 @@ export const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({
   error,
   onView,
   onDownload,
-  onFavorite,
   onTagClick,
   onSelect,
   selectedResults = new Set(),
@@ -117,7 +115,6 @@ export const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({
             viewMode="card"
             onView={onView || (() => {})}
             onDownload={onDownload || (() => {})}
-            onFavorite={onFavorite || (() => {})}
             onTagClick={onTagClick || (() => {})}
             className={cn(
               'h-full transition-all duration-200 hover:shadow-lg hover:scale-[1.02]',

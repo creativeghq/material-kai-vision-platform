@@ -38,8 +38,8 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
   };
 
   const handleSuccess = (moodboardName: string) => {
-    // Track save interaction
-    RecommendationsService.trackSave(productId, {
+    // Track as click interaction (strong engagement signal)
+    RecommendationsService.trackClick(productId, {
       source: 'moodboard_button',
       moodboard_name: moodboardName,
     });

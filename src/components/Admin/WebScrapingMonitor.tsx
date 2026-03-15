@@ -52,10 +52,12 @@ export const WebScrapingMonitor: React.FC = () => {
           : { count: 0 };
 
         // Step 4: Fetch remaining data in parallel
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const [
           { count: totalScrapedPages },
           { count: totalScrapedImages },
           { data: sources },
+          { count: recentErrors },
         ] = await Promise.all([
           supabase
             .from('documents')
@@ -69,11 +71,16 @@ export const WebScrapingMonitor: React.FC = () => {
             .from('scraping_sources')
             .select('*')
             .eq('is_active', true),
+          supabase
+            .from('background_jobs')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'failed')
+            .gte('failed_at', since24h),
         ]);
 
-        // Calculate metrics
+        const recentScrapingErrors = recentErrors || 0;
         const scrapingSuccessRate = totalScrapedPages > 0
-          ? ((totalScrapedPages - 0) / totalScrapedPages) * 100
+          ? ((totalScrapedPages - recentScrapingErrors) / totalScrapedPages) * 100
           : 0;
         const averageProductsPerPage = totalScrapedPages > 0
           ? (totalScrapedProducts || 0) / totalScrapedPages
@@ -95,7 +102,7 @@ export const WebScrapingMonitor: React.FC = () => {
           averageProductsPerPage,
           averageImagesPerPage,
           averageChunksPerProduct,
-          recentScrapingErrors: 0, // TODO: Implement error tracking
+          recentScrapingErrors,
           activeSources: sources?.length || 0,
         });
       } catch (err) {
