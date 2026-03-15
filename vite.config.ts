@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
       // Excluding makes Vite serve spark.module.js as raw ESM and rewrite its bare "three"
       // specifier to the proper pre-bundled three URL, giving spark the full THREE namespace.
       exclude: ['@sparkjsdev/spark'],
+      // grapesjs-preset-newsletter is a UMD bundle — must be pre-bundled by Vite/esbuild
+      // so it is available as a proper ESM module in the dev server.
+      include: ['grapesjs', 'grapesjs-preset-newsletter'],
     },
     server: {
       port: 8080,

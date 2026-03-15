@@ -1,5 +1,7 @@
 /* Open Sans - Only weights actually used (300, 400, 500, 600). display=swap prevents FOIT. */
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap');
+/* GrapesJS editor styles — loaded globally so they are available when the lazy chunk mounts */
+@import 'grapesjs/dist/css/grapes.min.css';
 
 @tailwind base;
 @tailwind components;

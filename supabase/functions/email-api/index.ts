@@ -55,7 +55,8 @@ async function sendViaResend(payload: {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || `Resend API error: ${res.status}`);
+    console.error('Resend API error response:', JSON.stringify({ status: res.status, data }));
+    throw new Error(data.message || data.name || `Resend API error: ${res.status} - ${JSON.stringify(data)}`);
   }
 
   return data.id as string;
