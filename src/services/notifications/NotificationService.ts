@@ -439,7 +439,7 @@ export class NotificationService {
               ${payload.data?.action_url ? `<a href="${payload.data.action_url}" class="button">View Details</a>` : ''}
             </div>
             <div class="footer">
-              <p>Material KAI Vision Platform</p>
+              <p>Materials Hub</p>
               <p>You received this email because you have notifications enabled for this event type.</p>
             </div>
           </div>

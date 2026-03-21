@@ -4,8 +4,8 @@
 // type Database = Record<string, unknown>; // Currently unused
 type SupabaseClientType = any;
 
-// Material Kai API Key Data Interface
-export interface MaterialKaiKeyData {
+// Materials Hub API Key Data Interface
+export interface MaterialsHubKeyData {
   id: string;
   api_key: string;
   workspace_id: string;
@@ -22,9 +22,9 @@ export interface MaterialKaiKeyData {
 }
 
 // Validation Result Interface
-export interface MaterialKaiValidationResult {
+export interface MaterialsHubValidationResult {
   success: boolean;
-  keyData?: MaterialKaiKeyData;
+  keyData?: MaterialsHubKeyData;
   error?: {
     code: string;
     message: string;
@@ -41,17 +41,17 @@ export interface RateLimitInfo {
 }
 
 /**
- * Material Kai API Key Authentication Middleware
+ * Materials Hub API Key Authentication Middleware
  *
- * This middleware validates Material Kai API keys for secure access to the platform.
+ * This middleware validates Materials Hub API keys for secure access to the platform.
  * It supports both hardcoded keys (for immediate deployment) and database lookup
  * (when the migration is applied).
  */
-export class MaterialKaiAuthMiddleware {
+export class MaterialsHubAuthMiddleware {
   // private supabase: SupabaseClientType; // Currently unused
 
-  // Hardcoded Material Kai API keys for immediate deployment
-  private readonly HARDCODED_KEYS: Record<string, MaterialKaiKeyData> = {
+  // Hardcoded Materials Hub API keys for immediate deployment
+  private readonly HARDCODED_KEYS: Record<string, MaterialsHubKeyData> = {
     mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s:
       {
         id: 'hardcoded-key-1',
@@ -60,7 +60,7 @@ export class MaterialKaiAuthMiddleware {
         workspace_id: 'workspace_main_2024_basil_material_kai_vision',
         key_name: 'Main Development Key',
         description:
-          'Primary API key for Material Kai Vision Platform development',
+          'Primary API key for Materials Hub Vision Platform development',
         is_active: true,
         expires_at: '2025-12-31T23:59:59Z',
         created_at: '2024-08-14T00:00:00Z',
@@ -81,9 +81,9 @@ export class MaterialKaiAuthMiddleware {
   }
 
   /**
-   * Validates a Material Kai API key
+   * Validates a Materials Hub API key
    */
-  async validateApiKey(apiKey: string): Promise<MaterialKaiValidationResult> {
+  async validateApiKey(apiKey: string): Promise<MaterialsHubValidationResult> {
     try {
       // Validate API key format
       if (!this.isValidKeyFormat(apiKey)) {
@@ -91,7 +91,7 @@ export class MaterialKaiAuthMiddleware {
           success: false,
           error: {
             code: 'INVALID_MATERIAL_KAI_KEY_FORMAT',
-            message: 'Invalid Material Kai API key format',
+            message: 'Invalid Materials Hub API key format',
             statusCode: 400,
           },
         };
@@ -106,7 +106,7 @@ export class MaterialKaiAuthMiddleware {
             success: false,
             error: {
               code: 'MATERIAL_KAI_KEY_INACTIVE',
-              message: 'Material Kai API key is inactive',
+              message: 'Materials Hub API key is inactive',
               statusCode: 401,
             },
           };
@@ -121,14 +121,14 @@ export class MaterialKaiAuthMiddleware {
             success: false,
             error: {
               code: 'MATERIAL_KAI_KEY_EXPIRED',
-              message: 'Material Kai API key has expired',
+              message: 'Materials Hub API key has expired',
               statusCode: 401,
             },
           };
         }
 
         // Create a copy to avoid modifying the original
-        const keyData: MaterialKaiKeyData = {
+        const keyData: MaterialsHubKeyData = {
           ...hardcodedKey,
           usage_count: hardcodedKey.usage_count + 1,
           last_used_at: new Date().toISOString(),
@@ -145,12 +145,12 @@ export class MaterialKaiAuthMiddleware {
         success: false,
         error: {
           code: 'INVALID_MATERIAL_KAI_KEY',
-          message: 'Invalid Material Kai API key',
+          message: 'Invalid Materials Hub API key',
           statusCode: 401,
         },
       };
     } catch (error) {
-      console.error('Material Kai API key validation error:', error);
+      console.error('Materials Hub API key validation error:', error);
       return {
         success: false,
         error: {
@@ -163,10 +163,10 @@ export class MaterialKaiAuthMiddleware {
   }
 
   /**
-   * Validates the format of a Material Kai API key
+   * Validates the format of a Materials Hub API key
    */
   private isValidKeyFormat(apiKey: string): boolean {
-    // Material Kai API keys should start with 'mk_api_' and be 64+ characters
+    // Materials Hub API keys should start with 'mk_api_' and be 64+ characters
     const pattern = /^mk_api_[A-Za-z0-9_]{50,}$/;
     return pattern.test(apiKey);
   }
@@ -174,7 +174,7 @@ export class MaterialKaiAuthMiddleware {
   /**
    * Checks rate limiting for an API key
    */
-  async checkRateLimit(keyData: MaterialKaiKeyData): Promise<RateLimitInfo> {
+  async checkRateLimit(keyData: MaterialsHubKeyData): Promise<RateLimitInfo> {
     try {
       // For hardcoded keys, we'll implement a simple in-memory rate limiting
       // In production with database, this would query usage logs
@@ -204,7 +204,7 @@ export class MaterialKaiAuthMiddleware {
   /**
    * Validates CORS origin against allowed origins for the API key
    */
-  validateOrigin(keyData: MaterialKaiKeyData, origin: string | null): boolean {
+  validateOrigin(keyData: MaterialsHubKeyData, origin: string | null): boolean {
     // If no origin restrictions, allow all
     if (!keyData.allowed_origins || keyData.allowed_origins.length === 0) {
       return true;
@@ -261,12 +261,12 @@ export class MaterialKaiAuthMiddleware {
   }
 
   /**
-   * Main middleware function for validating Material Kai API keys
+   * Main middleware function for validating Materials Hub API keys
    */
   async authenticate(
     headers: Record<string, string | string[] | undefined>,
     origin?: string | null,
-  ): Promise<MaterialKaiValidationResult> {
+  ): Promise<MaterialsHubValidationResult> {
     try {
       // Extract API key from headers
       const apiKey = this.extractApiKey(headers);
@@ -276,7 +276,7 @@ export class MaterialKaiAuthMiddleware {
           success: false,
           error: {
             code: 'MISSING_MATERIAL_KAI_API_KEY',
-            message: 'Material Kai API key is required',
+            message: 'Materials Hub API key is required',
             statusCode: 401,
           },
         };
@@ -317,7 +317,7 @@ export class MaterialKaiAuthMiddleware {
 
       return validationResult;
     } catch (error) {
-      console.error('Material Kai authentication error:', error);
+      console.error('Materials Hub authentication error:', error);
       return {
         success: false,
         error: {
@@ -331,11 +331,11 @@ export class MaterialKaiAuthMiddleware {
 }
 
 // Export a factory function for creating the middleware
-export function createMaterialKaiAuthMiddleware(
+export function createMaterialsHubAuthMiddleware(
   supabase: SupabaseClientType,
-): MaterialKaiAuthMiddleware {
-  return new MaterialKaiAuthMiddleware(supabase);
+): MaterialsHubAuthMiddleware {
+  return new MaterialsHubAuthMiddleware(supabase);
 }
 
 // Export default instance creator
-export default createMaterialKaiAuthMiddleware;
+export default createMaterialsHubAuthMiddleware;

@@ -348,7 +348,17 @@ export class MessagingService {
       });
 
       if (error) throw error;
-      return data;
+      return {
+        totalSent: data?.totalSent ?? 0,
+        totalDelivered: data?.totalDelivered ?? 0,
+        totalRead: data?.totalRead ?? 0,
+        totalFailed: data?.totalFailed ?? 0,
+        totalCost: data?.totalCost ?? 0,
+        deliveryRate: data?.deliveryRate ?? 0,
+        readRate: data?.readRate ?? 0,
+        failureRate: data?.failureRate ?? 0,
+        dailyData: data?.dailyData ?? [],
+      };
     } catch (error) {
       console.error('Error getting analytics:', error);
       throw error;

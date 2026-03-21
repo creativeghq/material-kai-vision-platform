@@ -1,7 +1,7 @@
 /**
  * Unified Search Service
  *
- * Single service for ALL search operations across the Material Kai Vision Platform.
+ * Single service for ALL search operations across Materials Hub.
  * Replaces: EnhancedRAGService, MaterialSearchService, and other search wrappers.
  *
  * All searches go through Python MIVAA API backend with proper type safety.
@@ -10,6 +10,7 @@
 import { mivaaApi } from './mivaaApiClient';
 import { ErrorHandler } from '../utils/errorHandler';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { supabase } from '@/integrations/supabase/client';
 
 // ==================== TYPE DEFINITIONS ====================
 

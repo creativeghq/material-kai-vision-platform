@@ -6,6 +6,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { initials } from '@/lib/materialCategories';
 
 interface Comment {
   id: string;
@@ -74,14 +75,6 @@ export const MoodboardComments: React.FC<MoodboardCommentsProps> = ({
     await supabase.from('moodboard_comments').delete().eq('id', id);
     setComments((prev) => prev.filter((c) => c.id !== id));
   };
-
-  const initials = (name?: string) =>
-    (name || '?')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0].toUpperCase())
-      .join('');
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });

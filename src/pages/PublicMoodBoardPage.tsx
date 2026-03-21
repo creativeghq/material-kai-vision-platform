@@ -124,7 +124,7 @@ export default function PublicMoodBoardPage() {
         {/* Branding badge */}
         <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5">
           <Palette className="h-3.5 w-3.5 text-white/80" />
-          <span className="text-white/80 text-xs font-medium">Material KAI</span>
+          <span className="text-white/80 text-xs font-medium">Materials Hub</span>
         </div>
 
         {/* Sign up CTA */}
@@ -228,7 +228,7 @@ export default function PublicMoodBoardPage() {
         {/* Footer CTA */}
         <div className="text-center py-8 border-t border-border/40 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Create your own moodboards and discover materials on Material KAI
+            Create your own moodboards and discover materials on Materials Hub
           </p>
           <Button className="rounded-full gap-2" onClick={() => navigate('/auth')}>
             <Palette className="h-4 w-4" />

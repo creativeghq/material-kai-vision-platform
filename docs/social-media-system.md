@@ -135,11 +135,9 @@ Both registered in `supabase/functions/_shared/agents/registry.ts`.
 
 | Route | Component |
 |-------|-----------|
-| `/admin/social-media` | `SocialMediaDashboardPage` — stats, quick actions, recent posts |
-| `/admin/social-media/create` | `SocialMediaCreatePage` — 5-step wizard |
-| `/admin/social-media/calendar` | `SocialMediaCalendarPage` — weekly calendar |
-| `/admin/social-media/analytics` | `SocialMediaAnalyticsPage` — date range analytics |
-| `/admin/social-media/accounts` | `SocialMediaAccountsPage` — read-only workspace overview |
+| `/admin/social-media/accounts` | `SocialMediaAccountsPage` — read-only workspace overview of all connected accounts |
+
+> **Note:** The Dashboard, Create, Calendar, and Analytics pages were removed. Social content creation is handled via the KAI agent (`/kai`). Account connection is per-user via **My Profile → Social Accounts**.
 
 ## Per-User Account Connection
 

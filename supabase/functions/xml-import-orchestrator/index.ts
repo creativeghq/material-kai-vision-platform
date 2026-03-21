@@ -34,6 +34,19 @@ interface ProductData {
   description?: string;
   factory_name: string;
   factory_group_name?: string;
+  // Expanded factory fields
+  factory_address?: string;
+  factory_city?: string;
+  factory_country?: string;
+  factory_postal_code?: string;
+  factory_phone?: string;
+  factory_email?: string;
+  factory_website?: string;
+  factory_country_of_origin?: string;
+  factory_founded_year?: string;
+  factory_company_type?: string;
+  factory_linkedin_url?: string;
+  factory_employee_count?: string;
   material_category: string;
   images?: string[];
   metadata?: Record<string, any>;
@@ -190,7 +203,7 @@ function fallbackMappings(fieldSamples: Map<string, string[]>): Map<string, { ma
     'titulo': { mapping: 'name', confidence: 0.9 },
     'nom': { mapping: 'name', confidence: 0.95 },
 
-    // Factory variations
+    // Factory name variations
     'factory': { mapping: 'factory_name', confidence: 1.0 },
     'factory_name': { mapping: 'factory_name', confidence: 1.0 },
     'manufacturer': { mapping: 'factory_name', confidence: 1.0 },
@@ -198,6 +211,48 @@ function fallbackMappings(fieldSamples: Map<string, string[]>): Map<string, { ma
     'brand': { mapping: 'factory_name', confidence: 0.9 },
     'fabricante': { mapping: 'factory_name', confidence: 0.95 },
     'fabricant': { mapping: 'factory_name', confidence: 0.95 },
+    // Factory group
+    'factory_group': { mapping: 'factory_group_name', confidence: 1.0 },
+    'factory_group_name': { mapping: 'factory_group_name', confidence: 1.0 },
+    'group': { mapping: 'factory_group_name', confidence: 0.85 },
+    'brand_group': { mapping: 'factory_group_name', confidence: 0.9 },
+    // Factory address/location
+    'address': { mapping: 'factory_address', confidence: 0.9 },
+    'factory_address': { mapping: 'factory_address', confidence: 1.0 },
+    'manufacturer_address': { mapping: 'factory_address', confidence: 1.0 },
+    'city': { mapping: 'factory_city', confidence: 0.9 },
+    'factory_city': { mapping: 'factory_city', confidence: 1.0 },
+    'country': { mapping: 'factory_country', confidence: 0.9 },
+    'factory_country': { mapping: 'factory_country', confidence: 1.0 },
+    'manufacturer_country': { mapping: 'factory_country', confidence: 1.0 },
+    'postal_code': { mapping: 'factory_postal_code', confidence: 0.9 },
+    'zip': { mapping: 'factory_postal_code', confidence: 0.85 },
+    // Contact
+    'phone': { mapping: 'factory_phone', confidence: 0.9 },
+    'factory_phone': { mapping: 'factory_phone', confidence: 1.0 },
+    'manufacturer_phone': { mapping: 'factory_phone', confidence: 1.0 },
+    'tel': { mapping: 'factory_phone', confidence: 0.85 },
+    'telephone': { mapping: 'factory_phone', confidence: 0.9 },
+    'email': { mapping: 'factory_email', confidence: 0.9 },
+    'factory_email': { mapping: 'factory_email', confidence: 1.0 },
+    'manufacturer_email': { mapping: 'factory_email', confidence: 1.0 },
+    'website': { mapping: 'factory_website', confidence: 0.9 },
+    'factory_website': { mapping: 'factory_website', confidence: 1.0 },
+    'manufacturer_website': { mapping: 'factory_website', confidence: 1.0 },
+    'url': { mapping: 'factory_website', confidence: 0.8 },
+    'homepage': { mapping: 'factory_website', confidence: 0.85 },
+    // Origin
+    'country_of_origin': { mapping: 'factory_country_of_origin', confidence: 1.0 },
+    'origin': { mapping: 'factory_country_of_origin', confidence: 0.9 },
+    'made_in': { mapping: 'factory_country_of_origin', confidence: 0.95 },
+    // Company details
+    'founded': { mapping: 'factory_founded_year', confidence: 0.9 },
+    'founded_year': { mapping: 'factory_founded_year', confidence: 1.0 },
+    'established': { mapping: 'factory_founded_year', confidence: 0.85 },
+    'employees': { mapping: 'factory_employee_count', confidence: 0.9 },
+    'employee_count': { mapping: 'factory_employee_count', confidence: 1.0 },
+    'linkedin': { mapping: 'factory_linkedin_url', confidence: 0.9 },
+    'linkedin_url': { mapping: 'factory_linkedin_url', confidence: 1.0 },
 
     // Category variations
     'category': { mapping: 'material_category', confidence: 1.0 },
@@ -593,7 +648,20 @@ function extractProductData(element: Element): ProductData | null {
 
     // Extract optional fields
     const description = getElementText(element, 'description') || getElementText(element, 'desc');
-    const factory_group_name = getElementText(element, 'factory_group') || getElementText(element, 'group');
+    const factory_group_name = getElementText(element, 'factory_group') || getElementText(element, 'factory_group_name') || getElementText(element, 'group') || getElementText(element, 'brand_group');
+
+    // ── Expanded factory fields ───────────────────────────────────────────
+    const factory_address      = getElementText(element, 'factory_address')      || getElementText(element, 'manufacturer_address') || getElementText(element, 'address');
+    const factory_city         = getElementText(element, 'factory_city')         || getElementText(element, 'city');
+    const factory_country      = getElementText(element, 'factory_country')      || getElementText(element, 'manufacturer_country') || getElementText(element, 'country');
+    const factory_postal_code  = getElementText(element, 'factory_postal_code')  || getElementText(element, 'postal_code') || getElementText(element, 'zip');
+    const factory_phone        = getElementText(element, 'factory_phone')        || getElementText(element, 'manufacturer_phone') || getElementText(element, 'phone') || getElementText(element, 'tel');
+    const factory_email        = getElementText(element, 'factory_email')        || getElementText(element, 'manufacturer_email') || getElementText(element, 'email');
+    const factory_website      = getElementText(element, 'factory_website')      || getElementText(element, 'manufacturer_website') || getElementText(element, 'homepage');
+    const factory_country_of_origin = getElementText(element, 'country_of_origin') || getElementText(element, 'origin') || getElementText(element, 'made_in');
+    const factory_founded_year = getElementText(element, 'founded_year')         || getElementText(element, 'founded') || getElementText(element, 'established');
+    const factory_employee_count = getElementText(element, 'employee_count')     || getElementText(element, 'employees');
+    const factory_linkedin_url = getElementText(element, 'linkedin_url')         || getElementText(element, 'linkedin');
 
     // Extract images - handle both single and multiple image fields
     const images: string[] = [];
@@ -640,12 +708,36 @@ function extractProductData(element: Element): ProductData | null {
     }
 
     // Extract additional fields as metadata
-    const metadataFields = ['price', 'color', 'colors', 'dimensions', 'size', 'designer', 'collection', 'finish', 'material', 'link', 'url'];
+    const metadataFields = ['price', 'color', 'colors', 'dimensions', 'size', 'designer', 'collection', 'finish', 'material', 'link'];
     for (const field of metadataFields) {
       const value = getElementText(element, field);
       if (value) {
         metadata[field] = value;
       }
+    }
+
+    // ── Build canonical factory nested object in metadata ─────────────────
+    const factoryObj: Record<string, string> = {};
+    if (factory_name)              factoryObj.factory_name         = factory_name;
+    if (factory_group_name)        factoryObj.factory_group_name   = factory_group_name;
+    if (factory_address)           factoryObj.address              = factory_address;
+    if (factory_city)              factoryObj.city                 = factory_city;
+    if (factory_country)           factoryObj.country              = factory_country;
+    if (factory_postal_code)       factoryObj.postal_code          = factory_postal_code;
+    if (factory_phone)             factoryObj.phone                = factory_phone;
+    if (factory_email)             factoryObj.email                = factory_email;
+    if (factory_website)           factoryObj.website              = factory_website;
+    if (factory_country_of_origin) factoryObj.country_of_origin    = factory_country_of_origin;
+    if (factory_founded_year)      factoryObj.founded_year         = factory_founded_year;
+    if (factory_employee_count)    factoryObj.employee_count       = factory_employee_count;
+    if (factory_linkedin_url)      factoryObj.linkedin_url         = factory_linkedin_url;
+
+    if (Object.keys(factoryObj).length > 0) {
+      metadata.factory = factoryObj;
+      // Backward-compat flat fields
+      if (factory_name)           metadata.factory_name        = factory_name;
+      if (factory_group_name)     metadata.factory_group_name  = factory_group_name;
+      if (factory_country_of_origin) metadata.country_of_origin = factory_country_of_origin;
     }
 
     // Extract categories if present (for variant differentiation)
@@ -662,6 +754,17 @@ function extractProductData(element: Element): ProductData | null {
       description,
       factory_name,
       factory_group_name,
+      factory_address: factory_address || undefined,
+      factory_city: factory_city || undefined,
+      factory_country: factory_country || undefined,
+      factory_postal_code: factory_postal_code || undefined,
+      factory_phone: factory_phone || undefined,
+      factory_email: factory_email || undefined,
+      factory_website: factory_website || undefined,
+      factory_country_of_origin: factory_country_of_origin || undefined,
+      factory_founded_year: factory_founded_year || undefined,
+      factory_employee_count: factory_employee_count || undefined,
+      factory_linkedin_url: factory_linkedin_url || undefined,
       material_category,
       images,
       metadata,

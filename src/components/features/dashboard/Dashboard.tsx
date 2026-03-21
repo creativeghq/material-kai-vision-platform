@@ -21,7 +21,7 @@ export const Dashboard: React.FC = () => {
           <div>
             <h3 className="text-xl font-semibold mb-2">AI Insights</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              KAI is continuously learning from new catalogs and materials added to the platform.
+              JARVIS is continuously learning from new catalogs and materials added to the platform.
               Ask it anything about specs, suppliers, or design.
             </p>
           </div>

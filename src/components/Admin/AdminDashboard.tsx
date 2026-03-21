@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Workflow,
   ChevronDown,
+  Share2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -41,6 +42,184 @@ type SystemMetrics = {
   activeSessions: number;
 };
 
+// Static — no runtime dependencies, defined outside component to avoid recreation on every render
+const adminSections = {
+  'Core Systems': [
+    {
+      title: 'Knowledge Base & Documentation',
+      description:
+        'User-created guides, manuals, and documentation with AI embeddings',
+      icon: DatabaseIcon,
+      path: '/admin/knowledge-base',
+      status: 'active',
+      count: 'User Docs',
+    },
+    {
+      title: 'Materials Data',
+      description:
+        'View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources',
+      icon: DatabaseIcon,
+      path: '/admin/materials-data',
+      status: 'active',
+      count: 'All Sources',
+    },
+  ],
+  'Data Management': [
+    {
+      title: 'Material Processing',
+      description: 'Upload and process materials from PDFs, XML files, and web scraping',
+      icon: DatabaseIcon,
+      path: '/admin/data-import',
+      status: 'active',
+      count: 'Multi-source',
+    },
+    {
+      title: 'Metadata Management',
+      description: 'View and manage extracted metadata with scope detection and filtering',
+      icon: Settings,
+      path: '/admin/metadata',
+      status: 'active',
+      count: 'AI-powered',
+    },
+    {
+      title: 'Relevancy Management',
+      description: 'Manage entity relationships and relevance scoring algorithms',
+      icon: Link2,
+      path: '/admin/relevancy',
+      status: 'active',
+      count: '3 algorithms',
+    },
+    {
+      title: 'API Gateway Admin',
+      description: 'Manage API endpoints and gateway configuration',
+      icon: Settings,
+      path: '/admin/api-gateway',
+      status: 'active',
+      count: 'API management',
+    },
+    {
+      title: 'Background Agents',
+      description: 'Autonomous AI agents that run on schedules, events, or chains behind the scenes',
+      icon: Bot,
+      path: '/admin/background-agents',
+      status: 'active',
+      count: 'AI Agents',
+    },
+    {
+      title: 'Duplicate Detection',
+      description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
+      icon: AlertTriangle,
+      path: '/admin/duplicate-detection',
+      status: 'active',
+      count: 'AI Detection',
+    },
+  ],
+  'CRM & User Management': [
+    {
+      title: 'User Management',
+      description: 'Manage users, roles, subscriptions, and access control',
+      icon: Users,
+      path: '/admin/crm',
+      status: 'active',
+      count: 'CRM System',
+    },
+    {
+      title: 'Quote Requests',
+      description: 'View and manage customer quote requests with pricing',
+      icon: FileText,
+      path: '/admin/quote-requests',
+      status: 'active',
+      count: 'Quote System',
+    },
+  ],
+  'Communications': [
+    {
+      title: 'Email Management',
+      description: 'Manage email domains, templates, and monitor delivery analytics with Resend',
+      icon: Mail,
+      path: '/admin/emails',
+      status: 'active',
+      count: 'Resend',
+    },
+    {
+      title: 'Messaging (SMS/WhatsApp)',
+      description: 'Send SMS and WhatsApp campaigns with Twilio integration',
+      icon: MessageSquare,
+      path: '/admin/messaging',
+      status: 'active',
+      count: 'Twilio',
+    },
+    {
+      title: 'Flows',
+      description: 'Build visual workflow automations with triggers, conditions, and actions',
+      icon: Workflow,
+      path: '/admin/flows',
+      status: 'active',
+      count: 'Visual Builder',
+    },
+    {
+      title: 'Social Media Accounts',
+      description: 'View all workspace social accounts connected via Late.dev. Users connect their own accounts from their profile.',
+      icon: Share2,
+      path: '/admin/social-media/accounts',
+      status: 'active',
+      count: 'Late.dev',
+    },
+  ],
+  'System Monitoring': [
+    {
+      title: 'Async Job Queue Monitor',
+      description:
+        'Monitor image processing and AI analysis job queues in real-time',
+      icon: Activity,
+      path: '/admin/async-queue-monitor',
+      status: 'active',
+      count: 'Real-time',
+    },
+    {
+      title: 'Operations Management',
+      description: 'Monitor data processing, AI performance, and system health',
+      icon: BarChart3,
+      path: '/admin/operations',
+      status: 'active',
+      count: 'Real-time',
+    },
+    {
+      title: 'AI Configurations',
+      description: 'Manage all AI prompts: agents, extraction, templates, and search',
+      icon: Bot,
+      path: '/admin/ai-configs',
+      status: 'active',
+      count: 'All AI Prompts',
+    },
+    {
+      title: '3D Model Debugging',
+      description: 'Monitor and debug AI model performance for 3D generation',
+      icon: Microscope,
+      path: '/admin/3d-model-debugging',
+      status: 'active',
+      count: '7 models',
+    },
+    {
+      title: 'Packages Panel',
+      description: 'Monitor system packages and dependencies',
+      icon: Package,
+      path: '/admin/packages',
+      status: 'active',
+      count: 'Dependencies',
+    },
+    {
+      title: 'Application Logs',
+      description:
+        'View real-time application logs with filtering and search capabilities',
+      icon: ScrollText,
+      path: '/admin/logs',
+      status: 'active',
+      count: 'Real-time',
+    },
+  ],
+};
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
@@ -48,8 +227,8 @@ const AdminDashboard: React.FC = () => {
     knowledgeEntries: 0,
     activeSessions: 0,
   });
-  const [, setLoading] = useState(true);
-  const [, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -86,176 +265,6 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
-
-  // Organize admin sections by category
-  const adminSections = {
-    'Core Systems': [
-      {
-        title: 'Knowledge Base & Documentation',
-        description:
-          'User-created guides, manuals, and documentation with AI embeddings',
-        icon: DatabaseIcon,
-        path: '/admin/knowledge-base',
-        status: 'active',
-        count: 'User Docs',
-      },
-      {
-        title: 'Materials Data',
-        description:
-          'View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources',
-        icon: DatabaseIcon,
-        path: '/admin/materials-data',
-        status: 'active',
-        count: 'All Sources',
-      },
-    ],
-    'Data Management': [
-      {
-        title: 'Material Processing',
-        description: 'Upload and process materials from PDFs, XML files, and web scraping',
-        icon: DatabaseIcon,
-        path: '/admin/data-import',
-        status: 'active',
-        count: 'Multi-source',
-      },
-      {
-        title: 'Metadata Management',
-        description: 'View and manage extracted metadata with scope detection and filtering',
-        icon: Settings,
-        path: '/admin/metadata',
-        status: 'active',
-        count: 'AI-powered',
-      },
-      {
-        title: 'Relevancy Management',
-        description: 'Manage entity relationships and relevance scoring algorithms',
-        icon: Link2,
-        path: '/admin/relevancy',
-        status: 'active',
-        count: '3 algorithms',
-      },
-      {
-        title: 'API Gateway Admin',
-        description: 'Manage API endpoints and gateway configuration',
-        icon: Settings,
-        path: '/admin/api-gateway',
-        status: 'active',
-        count: 'API management',
-      },
-      {
-        title: 'Background Agents',
-        description: 'Autonomous AI agents that run on schedules, events, or chains behind the scenes',
-        icon: Bot,
-        path: '/admin/background-agents',
-        status: 'active',
-        count: 'AI Agents',
-      },
-      {
-        title: 'Duplicate Detection',
-        description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
-        icon: AlertTriangle,
-        path: '/admin/duplicate-detection',
-        status: 'active',
-        count: 'AI Detection',
-      },
-    ],
-    'CRM & User Management': [
-      {
-        title: 'User Management',
-        description: 'Manage users, roles, subscriptions, and access control',
-        icon: Users,
-        path: '/admin/crm',
-        status: 'active',
-        count: 'CRM System',
-      },
-      {
-        title: 'Quote Requests',
-        description: 'View and manage customer quote requests with pricing',
-        icon: FileText,
-        path: '/admin/quote-requests',
-        status: 'active',
-        count: 'Quote System',
-      },
-    ],
-    'Communications': [
-      {
-        title: 'Email Management',
-        description: 'Manage email domains, templates, and monitor delivery analytics with Resend',
-        icon: Mail,
-        path: '/admin/emails',
-        status: 'active',
-        count: 'Resend',
-      },
-      {
-        title: 'Messaging (SMS/WhatsApp)',
-        description: 'Send SMS and WhatsApp campaigns with Twilio integration',
-        icon: MessageSquare,
-        path: '/admin/messaging',
-        status: 'active',
-        count: 'Twilio',
-      },
-      {
-        title: 'Flows',
-        description: 'Build visual workflow automations with triggers, conditions, and actions',
-        icon: Workflow,
-        path: '/admin/flows',
-        status: 'active',
-        count: 'Visual Builder',
-      },
-    ],
-    'System Monitoring': [
-      {
-        title: 'Async Job Queue Monitor',
-        description:
-          'Monitor image processing and AI analysis job queues in real-time',
-        icon: Activity,
-        path: '/admin/async-queue-monitor',
-        status: 'active',
-        count: 'Real-time',
-      },
-      {
-        title: 'Operations Management',
-        description: 'Monitor data processing, AI performance, and system health',
-        icon: BarChart3,
-        path: '/admin/operations',
-        status: 'active',
-        count: 'Real-time',
-      },
-      {
-        title: 'AI Configurations',
-        description: 'Manage all AI prompts: agents, extraction, templates, and search',
-        icon: Bot,
-        path: '/admin/ai-configs',
-        status: 'active',
-        count: 'All AI Prompts',
-      },
-      {
-        title: '3D Model Debugging',
-        description: 'Monitor and debug AI model performance for 3D generation',
-        icon: Microscope,
-        path: '/admin/3d-model-debugging',
-        status: 'active',
-        count: '7 models',
-      },
-      {
-        title: 'Packages Panel',
-        description: 'Monitor system packages and dependencies',
-        icon: Package,
-        path: '/admin/packages',
-        status: 'active',
-        count: 'Dependencies',
-      },
-      {
-        title: 'Application Logs',
-        description:
-          'View real-time application logs with filtering and search capabilities',
-        icon: ScrollText,
-        path: '/admin/logs',
-        status: 'active',
-        count: 'Real-time',
-      },
-    ],
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -345,7 +354,21 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* System Status Section */}
+      {/* Loading / error states */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      )}
+      {error && !loading && (
+        <div className="mx-6 mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* System Status + Main Content (hidden while loading) */}
+      {!loading && (
+        <>
       <div className="px-6 pt-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="dashboard-card transition-all duration-200 hover:shadow-md">
@@ -490,8 +513,9 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
 
-
       </div>
+        </>
+      )}
     </div>
   );
 };

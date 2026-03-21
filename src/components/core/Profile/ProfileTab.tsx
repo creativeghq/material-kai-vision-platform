@@ -22,24 +22,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
 type ProfessionalType =
   | 'designer' | 'interior_designer' | 'architect' | 'manufacturer'
   | 'brand' | 'supplier' | 'sourcing_agent' | 'consultant' | 'other' | null;
-
-const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
-  designer: 'Designer',
-  interior_designer: 'Interior Designer',
-  architect: 'Architect',
-  manufacturer: 'Manufacturer',
-  brand: 'Brand',
-  supplier: 'Supplier',
-  sourcing_agent: 'Sourcing Agent',
-  consultant: 'Consultant',
-  other: 'Other',
-};
 
 // ─── Country codes ────────────────────────────────────────────────────────────
 const COUNTRY_CODES = [

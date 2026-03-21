@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+// @ts-ignore - QueryClient types are available at runtime (react-query version conflict with React 18 types)
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -86,11 +87,7 @@ const EmailTemplateBuilder = lazy(() => import('./pages/Admin/EmailTemplateBuild
 const MessagingManagement = lazy(() => import('./components/Admin/MessagingManagement').then(m => ({ default: m.MessagingManagement })));
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
-const SocialMediaDashboardPage = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaDashboardPage })));
 const SocialMediaAccountsPage  = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaAccountsPage })));
-const SocialMediaCreatePage    = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaCreatePage })));
-const SocialMediaCalendarPage  = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaCalendarPage })));
-const SocialMediaAnalyticsPage = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaAnalyticsPage })));
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
@@ -759,11 +756,7 @@ const App = () => (
                   }
                 />
                 {/* Social Media Routes */}
-                <Route path="/admin/social-media" element={<AuthGuard><AdminGuard><Layout><SocialMediaDashboardPage /></Layout></AdminGuard></AuthGuard>} />
                 <Route path="/admin/social-media/accounts" element={<AuthGuard><AdminGuard><Layout><SocialMediaAccountsPage /></Layout></AdminGuard></AuthGuard>} />
-                <Route path="/admin/social-media/create" element={<AuthGuard><AdminGuard><Layout><SocialMediaCreatePage /></Layout></AdminGuard></AuthGuard>} />
-                <Route path="/admin/social-media/calendar" element={<AuthGuard><AdminGuard><Layout><SocialMediaCalendarPage /></Layout></AdminGuard></AuthGuard>} />
-                <Route path="/admin/social-media/analytics" element={<AuthGuard><AdminGuard><Layout><SocialMediaAnalyticsPage /></Layout></AdminGuard></AuthGuard>} />
 
                 <Route
                   path="/admin/email-templates/:id/edit"

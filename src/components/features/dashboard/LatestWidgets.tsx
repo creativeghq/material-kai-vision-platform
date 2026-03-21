@@ -1,7 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, BookOpen, Users, Factory, ArrowRight, FileText, MapPin } from 'lucide-react';
+import { Package, BookOpen, Users, Factory, ArrowRight, FileText, Building2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Badge } from '@/components/core/ui/badge';
+import { ProfileModal } from '@/components/features/discover/ProfileModal';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import type { Product } from '@/components/features/products/types';
+import { CAT_COLORS, PROFESSIONAL_TYPE_LABELS as PROF_LABELS, detectCat, catLabel } from '@/lib/materialCategories';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LatestMaterial {
@@ -9,6 +15,9 @@ interface LatestMaterial {
   name: string;
   created_at: string;
   image_url?: string | null;
+  description?: string | null;
+  status?: string | null;
+  metadata?: Record<string, any>;
 }
 
 interface LatestDocument {
@@ -26,29 +35,42 @@ interface LatestProfile {
   avatar_url: string | null;
 }
 
-interface LatestFactory {
-  user_id: string;
-  full_name: string;
-  company: string | null;
-  professional_type: string | null;
-  location: string | null;
-  avatar_url: string | null;
+interface RawFactoryProduct {
+  id: string;
+  name: string;
+  metadata: Record<string, any>;
+  image_url?: string | null;
 }
 
-const PROF_LABELS: Record<string, string> = {
-  designer: 'Designer', interior_designer: 'Interior Designer', architect: 'Architect',
-  manufacturer: 'Manufacturer', brand: 'Brand', supplier: 'Supplier',
-  sourcing_agent: 'Sourcing Agent', consultant: 'Consultant', other: 'Other',
-};
+interface DerivedFactory {
+  name: string;
+  productCount: number;
+  categories: string[];
+}
+
+
+function toProduct(item: LatestMaterial): Product {
+  const meta = item.metadata ?? {};
+  const cat = detectCat(meta);
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description || '',
+    category: cat.charAt(0).toUpperCase() + cat.slice(1),
+    type: meta.material_category || '',
+    status: item.status || 'active',
+    images: item.image_url ? [{ url: item.image_url, alt: item.name, isPrimary: true }] : [],
+    metadata: meta,
+    pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+    stock: { quantity: 0, status: 'Unknown', unit: 'unit' },
+    tags: [],
+    sku: '',
+  };
+}
 
 // ── Widget shell ──────────────────────────────────────────────────────────────
 function Widget({
-  icon: Icon,
-  title,
-  viewAllLink,
-  loading,
-  empty,
-  children,
+  icon: Icon, title, viewAllLink, loading, empty, children,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
@@ -64,10 +86,7 @@ function Widget({
           <Icon className="h-4 w-4 text-primary" />
           {title}
         </h3>
-        <Link
-          to={viewAllLink}
-          className="flex items-center gap-1 text-xs text-primary hover:underline transition-colors"
-        >
+        <Link to={viewAllLink} className="flex items-center gap-1 text-xs text-primary hover:underline transition-colors">
           View all <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
@@ -118,11 +137,12 @@ function ImageThumb({ src, fallback }: { src?: string | null; fallback: string }
 function MaterialsWidget() {
   const [items, setItems] = useState<LatestMaterial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     supabase
       .from('products')
-      .select('id, name, created_at, image_product_associations(document_images(image_url))')
+      .select('id, name, created_at, description, status, metadata, image_product_associations(document_images(image_url))')
       .order('created_at', { ascending: false })
       .limit(6)
       .then(({ data }) => {
@@ -130,6 +150,9 @@ function MaterialsWidget() {
           id: p.id,
           name: p.name,
           created_at: p.created_at,
+          description: p.description,
+          status: p.status,
+          metadata: p.metadata ?? {},
           image_url: p.image_product_associations?.[0]?.document_images?.image_url ?? null,
         }));
         setItems(products);
@@ -138,17 +161,29 @@ function MaterialsWidget() {
   }, []);
 
   return (
-    <Widget icon={Package} title="Latest Materials" viewAllLink="/agent-hub?prompt=Show me the latest and newest materials recently added to the platform" loading={loading} empty={items.length === 0}>
-      {items.map((item) => (
-        <div key={item.id} className="flex items-center gap-2 min-w-0">
-          <ImageThumb src={item.image_url} fallback={item.name} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate leading-tight">{item.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-          </div>
-        </div>
-      ))}
-    </Widget>
+    <>
+      <Widget icon={Package} title="Latest Materials" viewAllLink="/discover" loading={loading} empty={items.length === 0}>
+        {items.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setSelectedProduct(toProduct(item))}
+            className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity text-left w-full"
+          >
+            <ImageThumb src={item.image_url} fallback={item.name} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate leading-tight">{item.name}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+            </div>
+          </button>
+        ))}
+      </Widget>
+
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
+    </>
   );
 }
 
@@ -191,6 +226,7 @@ function KnowledgeWidget() {
 function ProfilesWidget() {
   const [items, setItems] = useState<LatestProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -207,61 +243,237 @@ function ProfilesWidget() {
   }, []);
 
   return (
-    <Widget icon={Users} title="Latest Profiles" viewAllLink="/discover" loading={loading} empty={items.length === 0}>
-      {items.map((profile) => (
-        <Link key={profile.user_id} to={`/u/${profile.user_id}`} className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
-          <ImageThumb src={profile.avatar_url} fallback={profile.full_name || 'U'} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate leading-tight">{profile.full_name || 'Anonymous'}</p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {profile.professional_type ? (PROF_LABELS[profile.professional_type] ?? profile.professional_type) : ''}
-              {profile.location ? ` · ${profile.location}` : ''}
-            </p>
+    <>
+      <Widget icon={Users} title="Latest Profiles" viewAllLink="/discover" loading={loading} empty={items.length === 0}>
+        {items.map((profile) => (
+          <button
+            key={profile.user_id}
+            onClick={() => setSelectedUserId(profile.user_id)}
+            className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity text-left w-full"
+          >
+            <ImageThumb src={profile.avatar_url} fallback={profile.full_name || 'U'} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate leading-tight">{profile.full_name || 'Anonymous'}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {profile.professional_type ? (PROF_LABELS[profile.professional_type] ?? profile.professional_type) : ''}
+                {profile.location ? ` · ${profile.location}` : ''}
+              </p>
+            </div>
+          </button>
+        ))}
+      </Widget>
+
+      {selectedUserId && (
+        <ProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+      )}
+    </>
+  );
+}
+
+// ── Inline Factory Modal ──────────────────────────────────────────────────────
+function FactoryDetailModal({
+  factory,
+  products,
+  onClose,
+}: {
+  factory: DerivedFactory | null;
+  products: RawFactoryProduct[];
+  onClose: () => void;
+}) {
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  if (!factory) return null;
+
+  function openProduct(p: RawFactoryProduct) {
+    setSelectedProduct({
+      id: p.id,
+      name: p.name,
+      description: '',
+      category: detectCat(p.metadata).charAt(0).toUpperCase() + detectCat(p.metadata).slice(1),
+      type: p.metadata?.material_category || '',
+      status: 'active',
+      images: p.image_url ? [{ url: p.image_url, alt: p.name, isPrimary: true }] : [],
+      metadata: p.metadata,
+      pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+      stock: { quantity: 0, status: 'Unknown', unit: 'unit' },
+      tags: [],
+      sku: '',
+    });
+  }
+
+  return (
+    <>
+      <Dialog open={!!factory} onOpenChange={() => onClose()}>
+        <DialogContent hideClose className="max-w-2xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[85vh] flex flex-col">
+          {/* Banner */}
+          <div
+            className="h-24 sm:h-32 relative overflow-hidden shrink-0"
+            style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+          >
+            <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+            <div className="absolute top-3 right-3">
+              <button
+                onClick={onClose}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X className="h-3.5 w-3.5 text-white" />
+              </button>
+            </div>
           </div>
-        </Link>
-      ))}
-    </Widget>
+
+          {/* Header */}
+          <div className="bg-white shadow-sm shrink-0 relative z-10 px-6 pb-4">
+            <div className="flex items-start gap-4">
+              <div
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-8 sm:-mt-10"
+                style={{ background: 'linear-gradient(135deg, hsl(330,43%,22%) 0%, hsl(280,35%,38%) 100%)' }}
+              >
+                <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 pt-3">
+                <h2 className="text-lg font-semibold tracking-tight truncate">{factory.name}</h2>
+                <p className="text-sm text-muted-foreground">{factory.productCount} material{factory.productCount !== 1 ? 's' : ''}</p>
+                {factory.categories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {factory.categories.slice(0, 5).map((c) => (
+                      <Badge
+                        key={c}
+                        className="text-xs px-1.5 py-0"
+                        style={{
+                          backgroundColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}18`,
+                          color: CAT_COLORS[c] ?? CAT_COLORS.other,
+                          borderColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}40`,
+                        }}
+                      >
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Products grid */}
+          <div className="overflow-y-auto flex-1 p-6">
+            <p className="text-sm font-medium mb-3 text-muted-foreground">Materials — click to view details</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {products.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => openProduct(p)}
+                  className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-accent/30 hover:border-primary/30 transition-colors text-left w-full"
+                >
+                  <ImageThumb src={p.image_url} fallback={p.name} />
+                  <p className="text-xs font-medium truncate flex-1 min-w-0">{p.name}</p>
+                </button>
+              ))}
+            </div>
+            {products.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">No materials found.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product detail overlay — renders on top of the factory modal */}
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
+    </>
   );
 }
 
 // ── Widget: Latest Factories ──────────────────────────────────────────────────
 function FactoriesWidget() {
-  const [items, setItems] = useState<LatestFactory[]>([]);
+  const [allProducts, setAllProducts] = useState<RawFactoryProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFactory, setSelectedFactory] = useState<DerivedFactory | null>(null);
 
   useEffect(() => {
     supabase
-      .from('user_profiles')
-      .select('user_id, full_name, company, professional_type, location, avatar_url')
-      .in('professional_type', ['manufacturer', 'brand', 'supplier'])
-      .order('created_at', { ascending: false })
-      .limit(6)
+      .from('products')
+      .select('id, name, metadata, image_product_associations(document_images(image_url))')
+      .limit(500)
       .then(({ data }) => {
-        setItems((data ?? []) as LatestFactory[]);
+        const products = (data ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          metadata: p.metadata ?? {},
+          image_url: p.image_product_associations?.[0]?.document_images?.image_url ?? null,
+        }));
+        setAllProducts(products);
         setLoading(false);
       });
   }, []);
 
+  // Derive factories from product metadata (same logic as DiscoverPage)
+  const factories = useMemo<DerivedFactory[]>(() => {
+    const map = new Map<string, { count: number; cats: Set<string> }>();
+    allProducts.forEach((p) => {
+      const name = p.metadata?.factory_group_name;
+      if (!name || name === 'Unknown') return;
+      if (!map.has(name)) map.set(name, { count: 0, cats: new Set() });
+      const e = map.get(name)!;
+      e.count++;
+      const cat = detectCat(p.metadata);
+      if (cat !== 'other') e.cats.add(cat);
+    });
+    return Array.from(map.entries())
+      .map(([name, { count, cats }]) => ({ name, productCount: count, categories: Array.from(cats) }))
+      .sort((a, b) => b.productCount - a.productCount)
+      .slice(0, 6);
+  }, [allProducts]);
+
+  const factoryProducts = useMemo(() =>
+    selectedFactory
+      ? allProducts.filter((p) => p.metadata?.factory_group_name === selectedFactory.name)
+      : [],
+    [allProducts, selectedFactory]
+  );
+
   return (
-    <Widget icon={Factory} title="Latest Factories" viewAllLink="/agent-hub?prompt=Show me the latest manufacturers, brands and suppliers on the platform" loading={loading} empty={items.length === 0}>
-      {items.map((f) => (
-        <Link key={f.user_id} to={`/u/${f.user_id}`} className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
-          <ImageThumb src={f.avatar_url} fallback={f.company || f.full_name || 'F'} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate leading-tight">{f.company || f.full_name || 'Unknown'}</p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {f.professional_type ? (PROF_LABELS[f.professional_type] ?? f.professional_type) : ''}
-              {f.location ? ` · ${f.location}` : ''}
-            </p>
-          </div>
-        </Link>
-      ))}
-    </Widget>
+    <>
+      <Widget
+        icon={Factory}
+        title="Latest Factories"
+        viewAllLink="/discover"
+        loading={loading}
+        empty={factories.length === 0}
+      >
+        {factories.map((f) => (
+          <button
+            key={f.name}
+            onClick={() => setSelectedFactory(f)}
+            className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity text-left w-full"
+          >
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate leading-tight">{f.name}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {f.productCount} material{f.productCount !== 1 ? 's' : ''}
+                {f.categories.length > 0 ? ` · ${f.categories[0]}` : ''}
+              </p>
+            </div>
+          </button>
+        ))}
+      </Widget>
+
+      <FactoryDetailModal
+        factory={selectedFactory}
+        products={factoryProducts}
+        onClose={() => setSelectedFactory(null)}
+      />
+    </>
   );
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-export const LatestWidgets: React.FC = () => (
+const _LatestWidgets: React.FC = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
     <MaterialsWidget />
     <KnowledgeWidget />
@@ -269,3 +481,4 @@ export const LatestWidgets: React.FC = () => (
     <FactoriesWidget />
   </div>
 );
+export const LatestWidgets = React.memo(_LatestWidgets);

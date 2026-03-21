@@ -381,7 +381,7 @@ export const CategoryManager: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">🔒 Admin Only — restricted to admin panel</SelectItem>
-                  <SelectItem value="agent">🤖 Agent — admin panel + KAI agent search</SelectItem>
+                  <SelectItem value="agent">🤖 Agent — admin panel + JARVIS agent search</SelectItem>
                   <SelectItem value="public">🌍 Public — public pages + agent (always)</SelectItem>
                 </SelectContent>
               </Select>

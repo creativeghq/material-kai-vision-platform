@@ -120,7 +120,7 @@ export function BackgroundAgentsPage() {
           <div>
             <h1 className="text-xl font-semibold">Background Tasks</h1>
             <p className="text-sm text-muted-foreground">
-              Monitor AI tasks dispatched from KAI chat and other triggers
+              Monitor AI tasks dispatched from JARVIS chat and other triggers
             </p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export function BackgroundAgentsPage() {
           <Bot className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
           <p className="font-medium">No tasks yet</p>
           <p className="text-sm text-muted-foreground">
-            Tasks will appear here when dispatched from KAI chat or triggered automatically
+            Tasks will appear here when dispatched from JARVIS chat or triggered automatically
           </p>
         </div>
       ) : (

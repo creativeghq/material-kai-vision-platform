@@ -182,8 +182,8 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
                     <p className="text-xs text-muted-foreground">{m.calls} calls</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-emerald-600">${m.cost.toFixed(4)}</p>
-                    <p className="text-xs text-muted-foreground">{m.credits.toFixed(2)} credits</p>
+                    <p className="font-semibold text-emerald-600">${(m.cost ?? 0).toFixed(4)}</p>
+                    <p className="text-xs text-muted-foreground">{(m.credits ?? 0).toFixed(2)} credits</p>
                   </div>
                 </div>
               ))}

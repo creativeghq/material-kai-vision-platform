@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -112,6 +112,10 @@ export const ContactDetailPage: React.FC = () => {
   } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
   const [linking, setLinking] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFullName, setInviteFullName] = useState('');
+  const [inviting, setInviting] = useState(false);
   const [showAddCompanyDialog, setShowAddCompanyDialog] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [companyRole, setCompanyRole] = useState<string>('');
@@ -255,6 +259,33 @@ export const ContactDetailPage: React.FC = () => {
       });
     } finally {
       setLinking(false);
+    }
+  };
+
+  const openInviteDialog = () => {
+    setInviteEmail(contact?.email || '');
+    setInviteFullName(contact?.name || '');
+    setShowInviteDialog(true);
+  };
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail) {
+      toast({ title: 'Email required', description: 'Please enter an email address', variant: 'destructive' });
+      return;
+    }
+    try {
+      setInviting(true);
+      await usersAPI.inviteUser(inviteEmail, inviteFullName || undefined, id);
+      toast({
+        title: 'Invitation sent',
+        description: `An invite email has been sent to ${inviteEmail}. They can set their own password via the link.`,
+      });
+      setShowInviteDialog(false);
+      await loadContact(); // refresh to show linked user
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to invite user', variant: 'destructive' });
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -642,19 +673,47 @@ export const ContactDetailPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleUnlinkUser}
-                        disabled={linking}
+                        onClick={() => navigate(`/admin/quote-requests?user=${contact.user_id}`)}
                         className="w-full"
                       >
+                        <ClipboardList className="h-3 w-3 mr-2" />
+                        Create Quote
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUnlinkUser}
+                        disabled={linking}
+                        className="w-full text-muted-foreground"
+                      >
                         <Unlink className="h-3 w-3 mr-2" />
-                        {linking ? 'Unlinking...' : 'Unlink'}
+                        {linking ? 'Unlinking...' : 'Unlink User'}
                       </Button>
                     </>
                   ) : (
                     <>
                       <p className="text-sm text-muted-foreground">
-                        Link to a user account to track subscription and activity.
+                        Link to a user account or create a new one to assign quotes and track activity.
                       </p>
+                      <Button
+                        size="sm"
+                        onClick={openInviteDialog}
+                        className="w-full"
+                        disabled={!contact.email && !isNew}
+                      >
+                        <UserPlus className="h-3 w-3 mr-2" />
+                        Create &amp; Invite User
+                      </Button>
+                      {!contact.email && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          Add an email to the contact first
+                        </p>
+                      )}
+                      <div className="relative flex items-center gap-2">
+                        <div className="flex-1 border-t border-border" />
+                        <span className="text-xs text-muted-foreground">or link existing</span>
+                        <div className="flex-1 border-t border-border" />
+                      </div>
                       <div>
                         <Label className="text-sm">Search User</Label>
                         <div className="mt-1.5">
@@ -798,6 +857,48 @@ export const ContactDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Invite User Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create &amp; Invite User</DialogTitle>
+            <DialogDescription>
+              An invite email will be sent so they can set their own password and access the platform.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="invite-name">Full Name</Label>
+              <Input
+                id="invite-name"
+                value={inviteFullName}
+                onChange={(e) => setInviteFullName(e.target.value)}
+                placeholder="Jane Smith"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email *</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="jane@example.com"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleInviteUser} disabled={inviting || !inviteEmail}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              {inviting ? 'Sending invite...' : 'Send Invite'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Company Dialog */}
       <Dialog open={showAddCompanyDialog} onOpenChange={setShowAddCompanyDialog}>

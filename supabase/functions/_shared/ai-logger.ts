@@ -18,7 +18,7 @@ const AI_PRICING = {
   claude: {
     'claude-haiku-4-5': { input: 1.00, output: 5.00 },
     'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
-    'claude-4-5-haiku-20251001': { input: 1.00, output: 5.00 },
+    'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
     'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
     'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
     'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },

@@ -468,7 +468,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                 id="from_name"
                 value={formData.from_name}
                 onChange={(e) => setFormData({ ...formData, from_name: e.target.value })}
-                placeholder="Material Kai"
+                placeholder="Materials Hub"
               />
             </div>
 

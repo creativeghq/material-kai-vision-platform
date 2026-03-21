@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { generateWithClaude } from '../_shared/ai-client.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') || '',

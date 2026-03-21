@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatLabel } from '@/lib/labelUtils';
 
 // ── Color palette ──────────────────────────────────────────────
 export const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
@@ -21,7 +22,7 @@ export function getMomentum(lastRequested: string | null): string {
 }
 
 export function prettifyKey(k: string): string {
-  return k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim().replace(/^\w/, (c) => c.toUpperCase());
+  return formatLabel(k);
 }
 
 export function getLifecycle(firstRequested: string | null, lastRequested: string | null, mentionCount: number, growthPct?: number): string {

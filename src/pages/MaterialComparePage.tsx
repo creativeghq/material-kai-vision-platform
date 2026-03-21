@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { formatLabel } from '@/lib/labelUtils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
@@ -73,13 +74,7 @@ function flattenObject(obj: Record<string, unknown> | null, prefix = ''): Record
   return result;
 }
 
-function formatLabel(key: string): string {
-  return key
-    .split('.')
-    .pop()!
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+// formatLabel is imported from @/lib/labelUtils — handles snake_case, camelCase, acronyms
 
 function ScoreBar({ value, label }: { value: number | null; label: string }) {
   if (value === null) return <span className="text-muted-foreground text-sm">—</span>;

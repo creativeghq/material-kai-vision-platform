@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getMivaaActionCost } from '../_shared/mivaa-pricing.ts';
+import { corsHeaders } from '../_shared/cors.ts';
 
 // Environment variables
 // Try to use local API first (for server environment), fall back to external domain
@@ -11,13 +12,6 @@ const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_UR
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'your-mivaa-api-key';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
-};
 
 // Available MIVAA endpoints (COMPREHENSIVE - API Consolidation v2.3.0)
 const MIVAA_ENDPOINTS = {

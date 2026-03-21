@@ -273,7 +273,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               </div>
               <div className="flex-1">
                 <p className="font-medium text-sm">Have questions about this article?</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Chat with KAI and get instant answers based on this content.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Chat with JARVIS and get instant answers based on this content.</p>
               </div>
               <Button variant="outline" className="rounded-full gap-2 shrink-0" onClick={handleAskAI} disabled={askingAI}>
                 <Sparkles className="h-4 w-4" />

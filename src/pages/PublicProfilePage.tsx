@@ -33,18 +33,7 @@ import { FollowButton } from '@/components/features/social/FollowButton';
 import { MoodboardComments } from '@/components/features/social/MoodboardComments';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
-
-const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
-  designer: 'Designer',
-  interior_designer: 'Interior Designer',
-  architect: 'Architect',
-  manufacturer: 'Manufacturer',
-  brand: 'Brand',
-  supplier: 'Supplier',
-  sourcing_agent: 'Sourcing Agent',
-  consultant: 'Consultant',
-  other: 'Other',
-};
+import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
 interface PublicProfile {
   user_id: string;
@@ -356,10 +345,10 @@ export const PublicProfilePage: React.FC = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-sm ring-1 ring-amber-400/30">
-              <span className="text-primary-foreground font-light text-xs">K</span>
+              <span className="text-primary-foreground font-light text-xs">J</span>
             </div>
             <span className="font-light text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
-              KAI Platform
+              JARVIS
             </span>
           </Link>
           <div className="flex items-center gap-3 text-sm">

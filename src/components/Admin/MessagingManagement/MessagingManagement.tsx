@@ -56,7 +56,14 @@ export const MessagingManagement: React.FC = () => {
         messagingService.getChannels().catch(() => []),
       ]);
 
-      setAnalytics(analyticsData);
+      setAnalytics({
+        totalSent: analyticsData.totalSent ?? 0,
+        totalDelivered: analyticsData.totalDelivered ?? 0,
+        totalRead: analyticsData.totalRead ?? 0,
+        totalFailed: analyticsData.totalFailed ?? 0,
+        deliveryRate: analyticsData.deliveryRate ?? 0,
+        readRate: analyticsData.readRate ?? 0,
+      });
 
       // Count channels by type
       const counts = { sms: 0, whatsapp: 0 };

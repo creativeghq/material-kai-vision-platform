@@ -586,7 +586,7 @@ export const SystemSettingsPage: React.FC = () => {
                     id="company-name"
                     value={pdfConfig.company_name}
                     onChange={(e) => setPdfConfig(prev => ({ ...prev, company_name: e.target.value }))}
-                    placeholder="Material Kai"
+                    placeholder="Materials Hub"
                   />
                 </div>
                 <div className="space-y-2">

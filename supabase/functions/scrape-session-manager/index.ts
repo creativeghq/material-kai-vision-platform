@@ -113,6 +113,129 @@ Deno.serve(async (req) => {
   }
 });
 
+/**
+ * Launch a Firecrawl /v1/crawl job for the session's source URL.
+ * Returns the Firecrawl crawl_id on success, or null if unavailable.
+ */
+async function launchFirecrawlCrawl(
+  supabase: any,
+  sessionId: string,
+  session: any,
+): Promise<string | null> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!FIRECRAWL_API_KEY) {
+    console.warn('[scrape-session-manager] FIRECRAWL_API_KEY not set — falling back to page-by-page');
+    return null;
+  }
+
+  const sourceUrl = session.source_url || session.scraping_config?.url;
+  if (!sourceUrl) {
+    console.warn('[scrape-session-manager] No source URL on session — falling back to page-by-page');
+    return null;
+  }
+
+  const config = session.scraping_config || {};
+  const maxPages = config.max_pages ?? 100;
+
+  // Webhook URL Firecrawl will call when done
+  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/firecrawl-webhook?session_id=${sessionId}`;
+
+  const body: Record<string, unknown> = {
+    url:           sourceUrl,
+    maxDepth:      config.max_depth ?? 3,
+    limit:         maxPages,
+    webhook:       webhookUrl,
+    scrapeOptions: {
+      formats:         ['markdown', 'extract'],
+      onlyMainContent: true,
+      extract: {
+        schema: {
+          type: 'object',
+          properties: {
+            products: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name:                 { type: 'string' },
+                  description:          { type: 'string' },
+                  factory_name:         { type: 'string' },
+                  factory_group_name:   { type: 'string' },
+                  factory_address:      { type: 'string' },
+                  factory_city:         { type: 'string' },
+                  factory_country:      { type: 'string' },
+                  factory_postal_code:  { type: 'string' },
+                  factory_phone:        { type: 'string' },
+                  factory_email:        { type: 'string' },
+                  factory_website:      { type: 'string' },
+                  country_of_origin:    { type: 'string' },
+                  material_category:    { type: 'string' },
+                  price:                { type: 'string' },
+                  color:                { type: 'string' },
+                  images:               { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        prompt: 'Extract all product listings and manufacturer/factory information from this page.',
+      },
+    },
+  };
+
+  if (config.include_paths?.length) body.includePaths = config.include_paths;
+  if (config.exclude_paths?.length) body.excludePaths = config.exclude_paths;
+
+  try {
+    const resp = await fetch('https://api.firecrawl.dev/v1/crawl', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error(`[scrape-session-manager] Firecrawl /v1/crawl error ${resp.status}: ${err}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const crawlId = data.id as string | undefined;
+
+    if (!crawlId) {
+      console.error('[scrape-session-manager] No crawl ID returned by Firecrawl');
+      return null;
+    }
+
+    console.log(`[scrape-session-manager] Firecrawl crawl started: ${crawlId} for ${sourceUrl}`);
+
+    // Store crawl ID and update session status
+    await supabase
+      .from('scraping_sessions')
+      .update({
+        status:              'crawling',
+        firecrawl_crawl_id:  crawlId,
+        last_heartbeat_at:   new Date().toISOString(),
+        metadata: {
+          ...((session.metadata as any) ?? {}),
+          firecrawl_crawl_id:  crawlId,
+          firecrawl_url:       sourceUrl,
+          firecrawl_max_pages: maxPages,
+          firecrawl_started:   new Date().toISOString(),
+        },
+      })
+      .eq('id', sessionId);
+
+    return crawlId;
+  } catch (err: any) {
+    console.error('[scrape-session-manager] Error launching Firecrawl crawl:', err.message);
+    return null;
+  }
+}
+
 async function startProcessing(supabase: any, sessionId: string, req: Request) {
   console.log(`Starting processing for session: ${sessionId}`);
 
@@ -127,15 +250,6 @@ async function startProcessing(supabase: any, sessionId: string, req: Request) {
     throw new Error('Session not found');
   }
 
-  // Update session status and set initial heartbeat
-  await supabase
-    .from('scraping_sessions')
-    .update({
-      status: 'processing',
-      last_heartbeat_at: new Date().toISOString()
-    })
-    .eq('id', sessionId);
-
   // Update background_jobs status to 'processing' if it exists
   if (session.background_job_id) {
     await supabase
@@ -149,6 +263,27 @@ async function startProcessing(supabase: any, sessionId: string, req: Request) {
 
     console.log(`✅ Updated background_job ${session.background_job_id} to 'processing'`);
   }
+
+  // ── Try Firecrawl full-site crawl first ──────────────────────────────────
+  // Firecrawl handles the entire crawl asynchronously and calls our webhook
+  // when done — no need for the page-by-page polling loop in that case.
+  const crawlId = await launchFirecrawlCrawl(supabase, sessionId, session);
+
+  if (crawlId) {
+    // Firecrawl is running — our webhook will handle completion.
+    // Nothing more to do here.
+    console.log(`[scrape-session-manager] Delegated to Firecrawl crawl ${crawlId}`);
+    return;
+  }
+
+  // ── Fallback: update status and process pages one by one ─────────────────
+  await supabase
+    .from('scraping_sessions')
+    .update({
+      status: 'processing',
+      last_heartbeat_at: new Date().toISOString()
+    })
+    .eq('id', sessionId);
 
   // Start background processing
   EdgeRuntime.waitUntil(

@@ -1,6 +1,6 @@
 // Interfaces extracted from AsyncJobQueueMonitor
 
-interface ProductProgress {
+export interface ProductProgress {
   id: string;
   job_id: string;
   product_id: string | null;
@@ -36,12 +36,12 @@ interface ProductProgress {
   updated_at: string;
 }
 
-interface BackgroundJob {
+export interface BackgroundJob {
   id: string;
   workspace_id: string;
   document_id: string | null;
   job_type: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted' | 'initialized';
   progress: number;
   created_at: string;
   started_at: string | null;
@@ -75,7 +75,7 @@ interface BackgroundJob {
 }
 
 // XML Import Job from data_import_jobs table
-interface XMLImportJob {
+export interface XMLImportJob {
   id: string;
   workspace_id: string;
   import_type: string;
@@ -93,7 +93,7 @@ interface XMLImportJob {
   metadata: any;
 }
 
-interface JobCheckpoint {
+export interface JobCheckpoint {
   id: string;
   job_id: string;
   stage: string;
@@ -102,7 +102,7 @@ interface JobCheckpoint {
   created_at: string;
 }
 
-interface JobTypeMetrics {
+export interface JobTypeMetrics {
   pending: number;
   processing: number;
   completed: number;
@@ -115,7 +115,7 @@ interface JobTypeMetrics {
   avg_processing_time: number;
 }
 
-interface QueueMetrics {
+export interface QueueMetrics {
   pdf_processing: JobTypeMetrics;
   web_scraping: JobTypeMetrics;
   xml_import: JobTypeMetrics;

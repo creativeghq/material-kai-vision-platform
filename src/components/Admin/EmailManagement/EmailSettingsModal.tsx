@@ -187,7 +187,7 @@ export const EmailSettingsModal: React.FC<EmailSettingsModalProps> = ({
               <Input
                 id="from_name"
                 type="text"
-                placeholder="Material Kai"
+                placeholder="Materials Hub"
                 value={settings.default_from_name}
                 onChange={(e) =>
                   setSettings({ ...settings, default_from_name: e.target.value })

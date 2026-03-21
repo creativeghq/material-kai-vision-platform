@@ -16,9 +16,14 @@ interface PromptTemplate {
   is_active: boolean;
 }
 
+// Subcategories that make sense when the user has already uploaded an image
+const IMAGE_COMPATIBLE_SUBCATEGORIES = new Set(['floor-plan-3d', 'virtual-staging']);
+
 interface PromptLibraryProps {
   onSelectPrompt: (promptText: string) => void;
   onClose: () => void;
+  hasUploadedImage?: boolean;
+  onTriggerVirtualStaging?: () => void;
 }
 
 // Human-readable labels for subcategory filter chips
@@ -434,11 +439,26 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
   },
 ];
 
-export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, onClose }) => {
+export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, onClose, hasUploadedImage = false, onTriggerVirtualStaging }) => {
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(() =>
+    hasUploadedImage ? 'virtual-staging' : 'living-room',
+  );
+
+  // Snap to the right category whenever the image state changes
+  useEffect(() => {
+    if (hasUploadedImage) {
+      setSelectedCategory(prev =>
+        IMAGE_COMPATIBLE_SUBCATEGORIES.has(prev) ? prev : 'virtual-staging',
+      );
+    } else {
+      setSelectedCategory(prev =>
+        IMAGE_COMPATIBLE_SUBCATEGORIES.has(prev) ? 'living-room' : prev,
+      );
+    }
+  }, [hasUploadedImage]);
 
   useEffect(() => {
     loadPrompts();
@@ -495,16 +515,31 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
   const filteredPrompts = prompts.filter(prompt => {
     const matchesSearch = prompt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          (prompt.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || prompt.subcategory === selectedCategory;
+    const matchesCategory = prompt.subcategory === selectedCategory;
+    // Image uploaded → only show image-compatible prompts
+    // No image → hide image-requiring prompts
+    const subcategory = prompt.subcategory || '';
+    if (hasUploadedImage && !IMAGE_COMPATIBLE_SUBCATEGORIES.has(subcategory)) return false;
+    if (!hasUploadedImage && IMAGE_COMPATIBLE_SUBCATEGORIES.has(subcategory)) return false;
     return matchesSearch && matchesCategory;
   });
 
-  // Build ordered category list — fixed order so categories don't jump around
-  const CATEGORY_ORDER = ['all', 'living-room', 'bedroom', 'kitchen', 'bathroom', 'dining-room', 'office', 'outdoor', 'kids-room', 'floor-plan-3d', 'virtual-staging'];
+  // Build ordered category list — no "All", fixed order so categories don't jump around
+  const CATEGORY_ORDER = ['living-room', 'bedroom', 'kitchen', 'bathroom', 'dining-room', 'office', 'outdoor', 'kids-room', 'floor-plan-3d', 'virtual-staging'];
   const presentSubcats = new Set(prompts.map(p => p.subcategory).filter(Boolean));
-  const categories = CATEGORY_ORDER.filter(c => c === 'all' || presentSubcats.has(c));
+  const categories = CATEGORY_ORDER.filter(c => {
+    if (!presentSubcats.has(c)) return false;
+    if (hasUploadedImage && !IMAGE_COMPATIBLE_SUBCATEGORIES.has(c)) return false;
+    if (!hasUploadedImage && IMAGE_COMPATIBLE_SUBCATEGORIES.has(c)) return false;
+    return true;
+  });
 
   const handleSelectPrompt = (prompt: PromptTemplate) => {
+    if (prompt.subcategory === 'virtual-staging' && onTriggerVirtualStaging) {
+      onClose();
+      onTriggerVirtualStaging();
+      return;
+    }
     onSelectPrompt(prompt.prompt_text);
     onClose();
   };
@@ -532,6 +567,14 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
             </button>
           </div>
 
+          {/* Image mode banner */}
+          {hasUploadedImage && (
+            <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+              <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-emerald-600" />
+              <span>Showing prompts that work with your uploaded image — Floor Plan &amp; Virtual Staging only.</span>
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -547,12 +590,12 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
 
         {/* Category Filter */}
         <div className="px-6 py-4 border-b border-border bg-background">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
             {categories.map(category => (
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   selectedCategory === category
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -601,7 +644,11 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
                   {/* Hover indicator */}
                   <div className="mt-3 flex items-center gap-2 text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                     <Sparkles className="w-3 h-3" />
-                    <span className="font-medium">Click to use this prompt</span>
+                    <span className="font-medium">
+                      {prompt.subcategory === 'virtual-staging' && onTriggerVirtualStaging
+                        ? 'Opens staging wizard'
+                        : 'Click to use this prompt'}
+                    </span>
                   </div>
                 </button>
               ))}

@@ -159,25 +159,25 @@ export const MessagingAnalyticsTab: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Total Sent"
-              value={analytics.totalSent.toLocaleString()}
+              value={(analytics.totalSent ?? 0).toLocaleString()}
               icon={<Send className="h-5 w-5 text-primary" />}
             />
             <StatCard
               title="Delivered"
-              value={analytics.totalDelivered.toLocaleString()}
-              subtitle={`${analytics.deliveryRate}% delivery rate`}
+              value={(analytics.totalDelivered ?? 0).toLocaleString()}
+              subtitle={`${analytics.deliveryRate ?? 0}% delivery rate`}
               icon={<CheckCircle className="h-5 w-5 text-green-500" />}
             />
             <StatCard
               title="Read"
-              value={analytics.totalRead.toLocaleString()}
-              subtitle={`${analytics.readRate}% read rate`}
+              value={(analytics.totalRead ?? 0).toLocaleString()}
+              subtitle={`${analytics.readRate ?? 0}% read rate`}
               icon={<Eye className="h-5 w-5 text-blue-500" />}
             />
             <StatCard
               title="Failed"
-              value={analytics.totalFailed.toLocaleString()}
-              subtitle={`${analytics.failureRate}% failure rate`}
+              value={(analytics.totalFailed ?? 0).toLocaleString()}
+              subtitle={`${analytics.failureRate ?? 0}% failure rate`}
               icon={<XCircle className="h-5 w-5 text-red-500" />}
             />
           </div>
@@ -186,8 +186,8 @@ export const MessagingAnalyticsTab: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <StatCard
               title="Total Cost"
-              value={`${analytics.totalCost.toFixed(2)} USD`}
-              subtitle={`Average: ${(analytics.totalSent > 0 ? analytics.totalCost / analytics.totalSent : 0).toFixed(4)} USD/msg`}
+              value={`${(analytics.totalCost ?? 0).toFixed(2)} USD`}
+              subtitle={`Average: ${((analytics.totalSent ?? 0) > 0 ? (analytics.totalCost ?? 0) / (analytics.totalSent ?? 1) : 0).toFixed(4)} USD/msg`}
               icon={<DollarSign className="h-5 w-5 text-yellow-500" />}
             />
             {accountBalance && (

@@ -63,7 +63,7 @@ export const productionConfig: AppConfig = {
     },
     mivaaIntegration: {
       baseUrl: import.meta.env.VITE_MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
-      apiKey: import.meta.env.VITE_MIVAA_API_KEY,
+      apiKey: import.meta.env.VITE_MIVAA_API_KEY || '',
       timeout: 60000,
       retryAttempts: 5,
       retryDelay: 2000,

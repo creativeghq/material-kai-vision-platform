@@ -3,10 +3,10 @@
  *
  * Routes to the best AI image model based on content type:
  *   lifestyle / people  → xAI Aurora (grok-2-aurora)   10 credits
- *   product / interior  → Gemini Flash                   5 credits
+ *   product / interior  → Gemini Imagen                  5 credits
  *   artistic / textured → FLUX Dev (Replicate)           6 credits
  *
- * Full credit lifecycle: pre-check → debit → API call → refund on failure.
+ * Credits are debited upfront and are non-refundable.
  * Stores result in Supabase Storage and updates social_posts.
  */
 
@@ -27,7 +27,7 @@ type AspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
 
 const MODEL_SERVICE_KEYS: Record<Exclude<ImageModel, 'auto'>, string> = {
   aurora: 'xai-aurora',
-  gemini: 'xai-aurora', // uses same credit key shape; Gemini is handled via AI usage logs separately
+  gemini: 'flux-dev', // Gemini billed at cheapest rate; actual Gemini billing via AI usage logs
   flux:   'flux-dev',
 };
 
@@ -120,7 +120,6 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
     : aspectRatio === '4:5' ? '4:5'
     : '1:1';
 
-  // Create prediction
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-dev/predictions', {
     method: 'POST',
     headers: {
@@ -146,7 +145,6 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
   const prediction = await createRes.json() as { id: string; urls: { get: string } };
   const pollUrl = `https://api.replicate.com/v1/predictions/${prediction.id}`;
 
-  // Poll until complete (max 60s for images)
   const maxMs = 60_000;
   const start = Date.now();
   while (Date.now() - start < maxMs) {
@@ -170,13 +168,12 @@ async function storeImage(
   filename: string,
 ): Promise<string> {
   if (imageData.startsWith('http')) {
-    // Download then re-upload
     const imgRes = await fetch(imageData);
     const arrayBuffer = await imgRes.arrayBuffer();
     const { data, error } = await supabase.storage
       .from('generated-images')
       .upload(`social/${filename}`, arrayBuffer, { contentType: 'image/webp', upsert: true });
-    if (error) return imageData; // Fall back to original URL
+    if (error) return imageData;
     const { data: urlData } = supabase.storage.from('generated-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   }
@@ -217,14 +214,12 @@ Deno.serve(async (req) => {
 
   if (!prompt) return jsonResponse({ success: false, error: 'prompt is required' }, 400);
 
-  // Resolve model
   const resolvedModel: Exclude<ImageModel, 'auto'> = model === 'auto'
     ? autoSelectModel(image_type)
     : model as Exclude<ImageModel, 'auto'>;
 
   const creditCost = CREDIT_COSTS[resolvedModel];
-  const serviceKey = resolvedModel === 'gemini' ? 'flux-dev' : MODEL_SERVICE_KEYS[resolvedModel];
-  // Note: Gemini is billed at flux-dev rate (cheapest), actual Gemini billing via AI usage logs
+  const serviceKey = MODEL_SERVICE_KEYS[resolvedModel];
 
   // ① Pre-flight check
   const { sufficient, balance } = await checkCreditBalance(supabase, userId, serviceKey);
@@ -232,7 +227,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
   }
 
-  // ② Debit upfront
+  // ② Debit upfront — non-refundable
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, serviceKey, 'social_image_generation', 1,
     { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
@@ -284,11 +279,10 @@ Deno.serve(async (req) => {
           .eq('id', post_id);
       }
     } else if (workspace_id) {
-      // Create draft post with image
       await supabase.from('social_posts').insert({
         workspace_id,
         user_id: userId,
-        platform: 'instagram', // default; user can change
+        platform: 'instagram',
         post_type: 'image',
         image_urls: [storedUrl],
         status: 'draft',
@@ -309,13 +303,6 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    // Refund on failure
-    await supabase.rpc('debit_user_credits', {
-      p_user_id: userId,
-      p_amount: -debitResult.credits_debited,
-      p_operation_type: 'social_image_generation_refund',
-      p_description: `Refund: ${resolvedModel} image generation failed`,
-    });
     console.error('[generate-social-image] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }

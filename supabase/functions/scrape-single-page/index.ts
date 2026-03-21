@@ -200,20 +200,29 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
   const extractionSchema = options.schema || {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Material name or product title' },
+      name:        { type: 'string', description: 'Material name or product title' },
       description: { type: 'string', description: 'Material description' },
-      category: { type: 'string', description: 'Material category (tiles, stone, wood, etc.)' },
-      price: { type: 'string', description: 'Price with currency' },
+      category:    { type: 'string', description: 'Material category (tiles, stone, wood, etc.)' },
+      price:       { type: 'string', description: 'Price with currency' },
       images: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Array of image URLs'
+        description: 'Array of image URLs',
       },
       properties: {
         type: 'object',
-        description: 'Additional properties like dimensions, color, finish'
+        description: 'Additional properties like dimensions, color, finish',
       },
-      supplier: { type: 'string', description: 'Supplier or manufacturer name' },
+      // Factory / manufacturer fields — aligned with all 3 import pipelines
+      factory_name:        { type: 'string', description: 'Manufacturer or factory company name' },
+      factory_group_name:  { type: 'string', description: 'Parent group or holding company of the manufacturer' },
+      manufacturer_address:{ type: 'string', description: 'Full street address of the manufacturer' },
+      manufacturer_city:   { type: 'string', description: 'City where the manufacturer is located' },
+      manufacturer_country:{ type: 'string', description: 'Country where the manufacturer is located' },
+      manufacturer_phone:  { type: 'string', description: 'Phone number of the manufacturer' },
+      manufacturer_email:  { type: 'string', description: 'Email address of the manufacturer' },
+      manufacturer_website:{ type: 'string', description: 'Website URL of the manufacturer' },
+      country_of_origin:   { type: 'string', description: 'Country where the product is manufactured' },
     },
     required: ['name'],
   };
@@ -278,16 +287,36 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
 
     for (const item of extractedMaterials) {
       if (item && typeof item === 'object' && item.name) {
+        // Build canonical factory nested object for metadata
+        const factoryObj: Record<string, string> = {};
+        if (item.factory_name)          factoryObj.factory_name         = item.factory_name;
+        if (item.factory_group_name)    factoryObj.factory_group_name   = item.factory_group_name;
+        if (item.manufacturer_address)  factoryObj.address              = item.manufacturer_address;
+        if (item.manufacturer_city)     factoryObj.city                 = item.manufacturer_city;
+        if (item.manufacturer_country)  factoryObj.country              = item.manufacturer_country;
+        if (item.manufacturer_phone)    factoryObj.phone                = item.manufacturer_phone;
+        if (item.manufacturer_email)    factoryObj.email                = item.manufacturer_email;
+        if (item.manufacturer_website)  factoryObj.website              = item.manufacturer_website;
+        if (item.country_of_origin)     factoryObj.country_of_origin    = item.country_of_origin;
+
+        const enrichedProperties = {
+          ...(item.properties || {}),
+          ...(Object.keys(factoryObj).length > 0 ? { factory: factoryObj } : {}),
+          ...(item.factory_name       ? { factory_name:        item.factory_name }       : {}),
+          ...(item.factory_group_name ? { factory_group_name:  item.factory_group_name } : {}),
+          ...(item.country_of_origin  ? { country_of_origin:   item.country_of_origin }  : {}),
+        };
+
         materials.push({
-          name: item.name,
+          name:        item.name,
           description: item.description || '',
-          category: item.category || '',
-          price: item.price || '',
-          images: Array.isArray(item.images) ? item.images : [],
-          properties: item.properties || {},
-          sourceUrl: url,
-          supplier: item.supplier || '',
-          confidence: 0.9, // Higher confidence with structured extraction
+          category:    item.category    || '',
+          price:       item.price       || '',
+          images:      Array.isArray(item.images) ? item.images : [],
+          properties:  enrichedProperties,
+          sourceUrl:   url,
+          supplier:    item.factory_name || item.supplier || '',
+          confidence:  0.9,
         });
       }
     }

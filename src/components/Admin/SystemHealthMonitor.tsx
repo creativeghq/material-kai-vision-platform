@@ -97,7 +97,7 @@ interface ExternalServiceStatus {
   name: string;
   status: 'healthy' | 'unhealthy' | 'unknown';
   latency_ms?: number;
-  category: 'messaging' | 'b2b' | 'scraping' | 'vr' | 'payments';
+  category: 'messaging' | 'b2b' | 'scraping' | 'vr' | 'payments' | 'social';
   icon: string;
   last_checked: string;
 }
@@ -109,6 +109,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string
   scraping: { bg: 'from-orange-50 to-orange-100', border: 'border-orange-200', text: 'text-orange-900' },
   vr: { bg: 'from-teal-50 to-teal-100', border: 'border-teal-200', text: 'text-teal-900' },
   payments: { bg: 'from-indigo-50 to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-900' },
+  social: { bg: 'from-pink-50 to-pink-100', border: 'border-pink-200', text: 'text-pink-900' },
 };
 
 export const SystemHealthMonitor: React.FC = () => {
@@ -713,7 +714,7 @@ export const SystemHealthMonitor: React.FC = () => {
               <Activity className="h-4 w-4" />
               External Services Status
             </CardTitle>
-            <CardDescription>Uptime of third-party APIs (Messaging, B2B Research, Scraping, VR, Payments)</CardDescription>
+            <CardDescription>Uptime of third-party APIs (Messaging, B2B Research, Scraping, VR, Payments, Social)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">

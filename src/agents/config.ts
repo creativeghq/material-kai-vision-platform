@@ -1,6 +1,6 @@
 /**
  * Agent Configuration
- * Central configuration for all AI agents in the Material Kai Vision Platform
+ * Central configuration for all AI agents in Materials Hub
  *
  * NOTE: Agent execution now happens in Supabase Edge Functions using LangChain.js
  * This file only contains frontend configuration for UI, RBAC, and agent metadata
@@ -31,7 +31,7 @@ export interface AgentAccessConfig {
 export const agentAccessControl: Record<string, AgentAccessConfig> = {
   kai: {
     id: 'kai',
-    name: 'KAI Agent',
+    name: 'KAI',
     description: 'Material intelligence — search, insights, research, analytics, SEO, and B2B',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     isDefault: true,

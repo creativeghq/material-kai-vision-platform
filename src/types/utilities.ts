@@ -1,5 +1,5 @@
 /**
- * Core Utility Types Library for Material Kai Vision Platform
+ * Core Utility Types Library for Materials Hub
  *
  * This module provides foundational utility types that enhance TypeScript's built-in
  * utility types with better error messages, more precise constraints, and advanced
@@ -536,7 +536,7 @@ export type UncapitalizeString<S extends string> = Uncapitalize<S>;
 // =============================================================================
 
 /**
- * Common utility type combinations for Material Kai Vision Platform
+ * Common utility type combinations for Materials Hub
  */
 
 /** Represents a partial update to a material */

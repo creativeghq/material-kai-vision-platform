@@ -4,8 +4,7 @@
  * Generates platform-optimised captions and hashtags using Claude.
  * Returns 3 caption variants to let the user choose.
  *
- * Cost: 2 credits (social-caption service in credit-utils)
- * Refund: credited back if generation fails
+ * Cost: 2 credits (social-caption service in credit-utils). Non-refundable.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -67,7 +66,7 @@ Deno.serve(async (req) => {
 
   const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.instagram;
 
-  // ① Debit credits upfront
+  // ① Debit credits upfront — non-refundable
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, 'social-caption', 'social_content_generation', 1,
     { platform, topic: topic.substring(0, 100), workspace_id },
@@ -111,17 +110,10 @@ Return exactly this JSON structure:
     let parsed: { captions: Array<{ variant: number; caption: string; char_count: number }>; hashtags: string[]; best_time_hint: string };
 
     try {
-      // Strip markdown code fences if present
       const cleaned = rawText.replace(/^```json\s*/m, '').replace(/```\s*$/m, '').trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      // Refund on parse failure
-      await supabase.rpc('debit_user_credits', {
-        p_user_id: userId,
-        p_amount: -debitResult.credits_debited,
-        p_operation_type: 'social_content_generation_refund',
-        p_description: 'Refund: failed to parse Claude response',
-      });
+      console.error('[generate-social-content] Failed to parse Claude response:', rawText);
       return jsonResponse({ success: false, error: 'Failed to parse AI response' }, 500);
     }
 
@@ -153,7 +145,6 @@ Return exactly this JSON structure:
         .single();
       savedPostId = newPost?.id;
     } else if (post_id) {
-      // Update existing post's credits_breakdown
       const { data: existingPost } = await supabase
         .from('social_posts')
         .select('credits_used, credits_breakdown')
@@ -186,13 +177,6 @@ Return exactly this JSON structure:
     });
 
   } catch (err) {
-    // Refund on API failure
-    await supabase.rpc('debit_user_credits', {
-      p_user_id: userId,
-      p_amount: -debitResult.credits_debited,
-      p_operation_type: 'social_content_generation_refund',
-      p_description: `Refund: social content generation failed`,
-    });
     console.error('[generate-social-content] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }

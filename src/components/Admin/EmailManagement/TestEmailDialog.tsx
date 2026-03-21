@@ -22,7 +22,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
   const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({
     to: '',
-    subject: 'Test Email from Material Kai',
+    subject: 'Test Email from Materials Hub',
     message: 'This is a test email to verify your email configuration is working correctly.',
   });
   const { toast } = useToast();
@@ -51,7 +51,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
             </p>
             <hr style="border: none; border-top: 1px solid #e6ebf1; margin: 20px 0;" />
             <p style="color: #8898aa; font-size: 12px; margin: 0;">
-              This is an automated test email from Material Kai Vision Platform.
+              This is an automated test email from Materials Hub.
             </p>
           </div>
         `,
@@ -68,7 +68,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
       onOpenChange(false);
       setFormData({
         to: '',
-        subject: 'Test Email from Material Kai',
+        subject: 'Test Email from Materials Hub',
         message: 'This is a test email to verify your email configuration is working correctly.',
       });
     } catch (error: any) {

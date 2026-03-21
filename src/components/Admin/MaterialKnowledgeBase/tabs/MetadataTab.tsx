@@ -1,5 +1,6 @@
 import React from 'react';
 import { Hash, FileText, Image as ImageIcon, Package, Database, RefreshCw, ChevronRight } from 'lucide-react';
+import { formatLabel } from '@/lib/labelUtils';
 import {
   Card,
   CardContent,
@@ -124,7 +125,7 @@ export const MetadataTab: React.FC<MetadataTabProps> = ({
           <div className="flex flex-wrap gap-2">
             {metadataData.summary.metadata_fields.map((field: string) => (
               <Badge key={field} variant="secondary">
-                {field}
+                {formatLabel(field)}
               </Badge>
             ))}
           </div>

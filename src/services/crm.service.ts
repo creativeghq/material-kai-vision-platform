@@ -1,15 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Get Supabase URL — remove any trailing slashes to prevent double slashes in URLs
-const getSupabaseUrl = (): string => {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  if (!url) {
-    throw new Error('SUPABASE_URL is not defined');
-  }
-  return url.replace(/\/$/, '');
+// Get Supabase URL — lazy to avoid crash at module load time
+const getApiBase = (): string => {
+  const url = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  if (!url) throw new Error('SUPABASE_URL is not defined');
+  return url.replace(/\/$/, '') + '/functions/v1';
 };
 
-const API_BASE = `${getSupabaseUrl()}/functions/v1`;
+/** Returns the active session access token, or throws if unauthenticated. */
+async function getAuthToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  return session.access_token;
+}
 
 /**
  * CRM Service
@@ -20,10 +23,7 @@ const API_BASE = `${getSupabaseUrl()}/functions/v1`;
 
 export const usersAPI = {
   async listUsers(limit = 50, offset = 0, search?: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
     const params = new URLSearchParams({
       limit: limit.toString(),
@@ -31,9 +31,9 @@ export const usersAPI = {
       ...(search && { search }),
     });
 
-    const response = await fetch(`${API_BASE}/crm-users-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-users-api?${params}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -46,14 +46,11 @@ export const usersAPI = {
   },
 
   async getUser(userId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -66,15 +63,12 @@ export const usersAPI = {
   },
 
   async updateUser(userId: string, updates: any) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(updates),
@@ -89,15 +83,12 @@ export const usersAPI = {
   },
 
   async deleteUser(userId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -108,23 +99,40 @@ export const usersAPI = {
 
     return response.json();
   },
+
+  async inviteUser(email: string, fullName?: string, contactId?: string) {
+    const token = await getAuthToken();
+
+    const response = await fetch(`${getApiBase()}/crm-users-api`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, full_name: fullName, contact_id: contactId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to invite user');
+    }
+
+    return response.json();
+  },
 };
 
 // ============ Subscriptions & Credits ============
 
 export const stripeAPI = {
   async createCheckoutSession(planId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
     const response = await fetch(
-      `${API_BASE}/crm-stripe-api/subscriptions/create-checkout`,
+      `${getApiBase()}/crm-stripe-api/subscriptions/create-checkout`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ plan_id: planId }),
@@ -140,17 +148,14 @@ export const stripeAPI = {
   },
 
   async purchaseCredits(packageId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
     const response = await fetch(
-      `${API_BASE}/crm-stripe-api/credits/purchase`,
+      `${getApiBase()}/crm-stripe-api/credits/purchase`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ package_id: packageId }),
@@ -166,14 +171,11 @@ export const stripeAPI = {
   },
 
   async getSubscription() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-stripe-api/subscriptions`, {
+    const response = await fetch(`${getApiBase()}/crm-stripe-api/subscriptions`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -186,14 +188,11 @@ export const stripeAPI = {
   },
 
   async getCredits() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-stripe-api/credits`, {
+    const response = await fetch(`${getApiBase()}/crm-stripe-api/credits`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -210,15 +209,12 @@ export const stripeAPI = {
 
 export const contactsAPI = {
   async createContact(contact: any) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(contact),
@@ -233,19 +229,16 @@ export const contactsAPI = {
   },
 
   async listContacts(limit = 50, offset = 0) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
     });
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api?${params}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -258,14 +251,11 @@ export const contactsAPI = {
   },
 
   async getContact(contactId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -278,15 +268,12 @@ export const contactsAPI = {
   },
 
   async updateContact(contactId: string, updates: any) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(updates),
@@ -301,15 +288,12 @@ export const contactsAPI = {
   },
 
   async deleteContact(contactId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -324,15 +308,12 @@ export const contactsAPI = {
   // ============ User-Contact Linking ============
 
   async linkUserToContact(contactId: string, userId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}/link-user`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}/link-user`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ userId }),
@@ -347,15 +328,12 @@ export const contactsAPI = {
   },
 
   async unlinkUserFromContact(contactId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}/unlink-user`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}/unlink-user`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -368,14 +346,11 @@ export const contactsAPI = {
   },
 
   async getPotentialMatches() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/potential-matches`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/potential-matches`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -388,15 +363,12 @@ export const contactsAPI = {
   },
 
   async bulkLinkContacts(links: Array<{ contactId: string; userId: string }>) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/bulk-link`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/bulk-link`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ links }),
@@ -411,14 +383,11 @@ export const contactsAPI = {
   },
 
   async getContactByUserId(userId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-contacts-api/by-user/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-contacts-api/by-user/${userId}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -434,15 +403,12 @@ export const contactsAPI = {
 // Companies API
 export const companiesAPI = {
   async createCompany(company: any) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(company),
@@ -457,10 +423,7 @@ export const companiesAPI = {
   },
 
   async listCompanies(limit = 50, offset = 0, search?: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
     const params = new URLSearchParams({
       limit: limit.toString(),
@@ -468,9 +431,9 @@ export const companiesAPI = {
       ...(search && { search }),
     });
 
-    const response = await fetch(`${API_BASE}/crm-companies-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api?${params}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -483,14 +446,11 @@ export const companiesAPI = {
   },
 
   async getCompany(companyId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -503,15 +463,12 @@ export const companiesAPI = {
   },
 
   async updateCompany(companyId: string, updates: any) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(updates),
@@ -526,15 +483,12 @@ export const companiesAPI = {
   },
 
   async deleteCompany(companyId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -547,15 +501,12 @@ export const companiesAPI = {
   },
 
   async attachContact(companyId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}/contacts`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}/contacts`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -575,15 +526,12 @@ export const companiesAPI = {
   },
 
   async detachContact(companyId: string, relationshipId: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
+    const token = await getAuthToken();
 
-    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}/contacts/${relationshipId}`, {
+    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}/contacts/${relationshipId}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 

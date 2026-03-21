@@ -68,7 +68,7 @@ export const PushNotificationsTab: React.FC = () => {
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [testNotification, setTestNotification] = useState({
     title: 'Test Notification',
-    message: 'This is a test push notification from Material KAI Vision Platform',
+    message: 'This is a test push notification from Materials Hub',
   });
   const [sendingTest, setSendingTest] = useState(false);
   const [vapidConfig, setVapidConfig] = useState<{

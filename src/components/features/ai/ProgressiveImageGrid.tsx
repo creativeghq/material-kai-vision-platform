@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
 import { AddToQuoteModal } from '@/components/business/quotes/AddToQuoteModal';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
+import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
 
 interface ModelResult {
   model_id: string;
@@ -40,14 +43,16 @@ interface ProgressiveImageGridProps {
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   vrGenerating?: boolean;
   workspaceId?: string;
-  onAskKAI?: (segment: SegmentWithResults) => void;
+  onAskJARVIS?: (segment: SegmentWithResults) => void;
   onFindMaterial?: (segment: SegmentWithResults) => void;
   pendingReplacement?: { id: string; name: string; imageUrl?: string } | null;
   onZoneSelectedForReplacement?: (segment: SegmentWithResults) => void;
-  onGenerateVideo?: (imageUrl: string) => void;
+  onGenerateVideo?: (imageUrl: string, videoType: string, videoModel?: string) => void;
+  onGenerateMaterialsBoard?: (imageUrl: string, boardMode: 'presentation-board' | 'selection-board' | 'photorealistic-render') => void;
+  onGenerateVirtualStaging?: (imageUrl: string, params: VirtualStagingParams) => void;
 }
 
-export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
+const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   jobId,
   modelCount,
   models,
@@ -55,11 +60,13 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   onGenerateVR,
   vrGenerating,
   workspaceId = '',
-  onAskKAI,
+  onAskJARVIS,
   onFindMaterial,
   pendingReplacement,
   onZoneSelectedForReplacement,
   onGenerateVideo,
+  onGenerateMaterialsBoard,
+  onGenerateVirtualStaging,
 }) => {
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -68,6 +75,10 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   // Modal state
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string; model_id: string } | null>(null);
   const [modalActiveTab, setModalActiveTab] = useState<'image' | 'products'>('image');
+  // Pending overrides: when setSelectedImage and setEditMode/setModalActiveTab are called in the same
+  // event handler, the reset effect (below) fires after and would wipe them. Store them here first.
+  const pendingEditModeRef = useRef<'none' | 'zone-select' | 'freehand' | null>(null);
+  const pendingTabRef = useRef<'image' | 'products' | null>(null);
 
   // Per-image segmentation state (modal-scoped)
   const [modalSegments, setModalSegments] = useState<SegmentWithResults[]>([]);
@@ -84,6 +95,8 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   const [showMaskReview, setShowMaskReview] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const [pickerPreselectedMaterial, setPickerPreselectedMaterial] = useState<PickedMaterial | null>(null);
+  const [showVirtualStagingModal, setShowVirtualStagingModal] = useState(false);
+  const [virtualStagingGenerating, setVirtualStagingGenerating] = useState(false);
 
   // Freehand drawing canvas
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -91,6 +104,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(30);
   const [eraseMode, setEraseMode] = useState(false);
+
+  // Video model selection (persists within the open modal)
+  const [videoModel, setVideoModel] = useState<string>('auto');
 
   // ── Phase 6: Edited images ───────────────────────────────────────────────────
   const [editedImages, setEditedImages] = useState<EditedImageEntry[]>([]);
@@ -184,14 +200,18 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     };
   }, [jobId]);
 
-  // Reset modal segment state and edit state whenever the selected image changes
+  // Reset modal segment state and edit state whenever the selected image changes.
+  // Consume pendingEditModeRef / pendingTabRef when the caller wants a specific mode/tab
+  // right after switching images (avoids the ref being overwritten by this reset).
   useEffect(() => {
     setModalSegments([]);
     setModalSegmenting(false);
     setModalSegmentsLoaded(false);
     setModalSegmentError(null);
-    setModalActiveTab('image');
-    setEditMode('none');
+    setModalActiveTab(pendingTabRef.current ?? 'image');
+    setEditMode(pendingEditModeRef.current ?? 'none');
+    pendingTabRef.current = null;
+    pendingEditModeRef.current = null;
     setActiveMask(null);
     setActiveZone(null);
     setShowMaskReview(false);
@@ -688,8 +708,8 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                   <button
                     onClick={e => {
                       e.stopPropagation();
+                      pendingTabRef.current = 'products';
                       setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' });
-                      setModalActiveTab('products');
                     }}
                     className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium rounded transition-colors"
                   >
@@ -699,9 +719,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                   <button
                     onClick={e => {
                       e.stopPropagation();
+                      pendingEditModeRef.current = 'zone-select';
+                      pendingTabRef.current = 'products';
                       setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' });
-                      setEditMode('zone-select');
-                      setModalActiveTab('products');
                     }}
                     className="flex items-center gap-1 px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-medium rounded transition-colors"
                   >
@@ -922,7 +942,10 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                               <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
                                 <div className="bg-white rounded-xl px-5 py-3 flex items-center gap-3 shadow-lg">
                                   <Loader2 className="w-5 h-5 animate-spin text-violet-600" />
-                                  <span className="text-sm font-medium">Detecting zones…</span>
+                                  <div>
+                                    <span className="text-sm font-medium block">Detecting zones…</span>
+                                    <span className="text-xs text-muted-foreground">AI vision analysis — may take up to 90s</span>
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -987,15 +1010,53 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                 {/* Action bar — below image, always visible */}
                 {editMode === 'none' && (
                   <div className="flex flex-wrap items-center gap-2 pt-2">
-                    {onGenerateVideo && (
-                      <button
-                        onClick={() => onGenerateVideo(selectedImage!.url)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
-                        title="Generate video walkthrough with Veo (30 credits)"
-                      >
-                        <Video className="w-3.5 h-3.5" />
-                        Generate Video
-                      </button>
+                    {onGenerateVideo && selectedImage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm">
+                            <Video className="w-3.5 h-3.5" />
+                            Generate Video
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
+                          {[
+                            { value: 'auto',              label: 'Auto',           description: 'Best model selected automatically' },
+                            { value: 'veo-2',             label: 'Veo 2',          description: 'Google Veo 2 — high quality',        credits: 30 },
+                            { value: 'kling-1.6-pro',     label: 'Kling 1.6 Pro', description: 'Kling — fast & cinematic',            credits: 15 },
+                            { value: 'wan2.1-i2v',        label: 'Wan 2.1',        description: 'Wan2.1 — open-source quality',       credits: 10 },
+                            { value: 'runway-gen4-turbo', label: 'Runway Gen-4',   description: 'Runway Gen-4 — premium output',      credits: 40 },
+                          ].map(vm => (
+                            <DropdownMenuItem key={vm.value} onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }} className="gap-1.5">
+                              <Check className={cn('w-3 h-3 flex-shrink-0', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-xs">{vm.label}</div>
+                                <div className="text-[11px] text-muted-foreground">{vm.description}</div>
+                              </div>
+                              {'credits' in vm && <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">{vm.credits} cr</span>}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Video Style</DropdownMenuLabel>
+                          {[
+                            { value: 'walkthrough',          label: 'Walkthrough',          description: 'Cinematic camera walk through the space' },
+                            { value: 'product_spotlight',    label: 'Product Spotlight',    description: 'Zoom focus on a featured element' },
+                            { value: 'before_after',         label: 'Before / After',       description: 'Transition between original and new design' },
+                            { value: 'floorplan_flythrough', label: 'Floorplan Flythrough', description: 'Aerial perspective from floor plan' },
+                            { value: 'social_reel',          label: 'Social Reel 9:16',     description: 'Vertical clip for social media' },
+                          ].map(vt => (
+                            <DropdownMenuItem key={vt.value} onClick={() => onGenerateVideo(selectedImage.url, vt.value, videoModel)}>
+                              <Video className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-xs">{vt.label}</div>
+                                <div className="text-[11px] text-muted-foreground">{vt.description}</div>
+                              </div>
+                              <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">30 cr</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                     {onGenerateVR && (
                       <button
@@ -1007,6 +1068,54 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                         {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
                         {vrGenerating ? 'Generating VR World…' : 'Generate VR World'}
                       </button>
+                    )}
+                    {onGenerateVirtualStaging && selectedImage && (
+                      <button
+                        onClick={() => setShowVirtualStagingModal(true)}
+                        disabled={virtualStagingGenerating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 disabled:opacity-50 transition-colors shadow-sm"
+                        title="Virtually stage this room with AI-generated furniture (20 credits)"
+                      >
+                        {virtualStagingGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {virtualStagingGenerating ? 'Staging…' : 'Virtual Staging'}
+                      </button>
+                    )}
+                    {onGenerateMaterialsBoard && selectedImage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-700 transition-colors shadow-sm">
+                            <Layers className="w-3.5 h-3.5" />
+                            Materials Selection Board
+                            <ChevronDown className="w-3 h-3 ml-0.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'presentation-board')}>
+                            <LayoutTemplate className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Presentation Board</div>
+                              <div className="text-xs text-muted-foreground">Fitment selection + isometric drawing + material column</div>
+                            </div>
+                            <span className="ml-auto text-xs text-muted-foreground pl-4">15 cr</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'selection-board')}>
+                            <Layers className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Selection Board</div>
+                              <div className="text-xs text-muted-foreground">Cutaway view with material swatch callouts</div>
+                            </div>
+                            <span className="ml-auto text-xs text-muted-foreground pl-4">15 cr</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'photorealistic-render')}>
+                            <Camera className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Photorealistic Render</div>
+                              <div className="text-xs text-muted-foreground">Ultra-detailed magazine-quality room render</div>
+                            </div>
+                            <span className="ml-auto text-xs text-muted-foreground pl-4">15 cr</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                     {selectedImage && (
                       <MoodboardSavePopover
@@ -1064,7 +1173,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                       <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
                     </div>
                     <p className="font-medium text-sm">Detecting material zones…</p>
-                    <p className="text-xs text-muted-foreground">AI is analysing surfaces in the render</p>
+                    <p className="text-xs text-muted-foreground">AI vision analysis — may take up to 90 seconds on first run</p>
                   </div>
                 ) : modalSegmentError ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -1218,7 +1327,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                                 );
                               })}
 
-                              {(onAskKAI || onFindMaterial || onZoneSelectedForReplacement || editMode === 'zone-select') && (
+                              {(onAskJARVIS || onFindMaterial || onZoneSelectedForReplacement || editMode === 'zone-select') && (
                                 <div className="px-3 py-2 bg-gray-50/60 flex flex-col gap-1.5">
                                   {/* Edit mode: Replace Material button */}
                                   {editMode === 'zone-select' && (
@@ -1233,9 +1342,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                                       {generatingMask ? 'Generating mask…' : 'Replace Material'}
                                     </button>
                                   )}
-                                  {onAskKAI && (
+                                  {onAskJARVIS && (
                                     <button
-                                      onClick={() => onAskKAI(seg)}
+                                      onClick={() => onAskJARVIS(seg)}
                                       className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
                                     >
                                       <ExternalLink className="w-3 h-3" />
@@ -1279,9 +1388,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                                   </button>
                                 )}
                                 <div className="flex flex-wrap gap-1.5">
-                                  {onAskKAI && (
+                                  {onAskJARVIS && (
                                     <button
-                                      onClick={() => onAskKAI(seg)}
+                                      onClick={() => onAskJARVIS(seg)}
                                       className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors"
                                     >
                                       <ExternalLink className="w-3 h-3" />
@@ -1425,6 +1534,24 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         />
       )}
 
+      {/* Virtual Staging Modal */}
+      {onGenerateVirtualStaging && selectedImage && (
+        <VirtualStagingModal
+          isOpen={showVirtualStagingModal}
+          onClose={() => setShowVirtualStagingModal(false)}
+          generating={virtualStagingGenerating}
+          onGenerate={async (params) => {
+            setVirtualStagingGenerating(true);
+            try {
+              await onGenerateVirtualStaging(selectedImage.url, params);
+            } finally {
+              setVirtualStagingGenerating(false);
+              setShowVirtualStagingModal(false);
+            }
+          }}
+        />
+      )}
+
       {/* Lightbox — full-screen image viewer */}
       {lightboxUrl && (
         <div
@@ -1448,6 +1575,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     </>
   );
 };
+export const ProgressiveImageGrid = React.memo(_ProgressiveImageGrid);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

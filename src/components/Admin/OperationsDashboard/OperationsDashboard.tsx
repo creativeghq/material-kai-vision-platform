@@ -79,7 +79,7 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
-export const OperationsDashboard: React.FC = () => {
+const _OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
@@ -676,6 +676,8 @@ export const OperationsDashboard: React.FC = () => {
       'apollo-enrich', 'apollo-people-match',
       'hunter-email-finder', 'hunter-domain-search',
       'zerobounce-validate', 'firecrawl-scrape',
+      'late-publish', 'social-caption',
+      'xai-aurora', 'flux-dev',
     ];
     supabase
       .from('ai_usage_logs')
@@ -1004,7 +1006,7 @@ export const OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-1">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, and Firecrawl. For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
+                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, and Late.dev (social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
             </div>
 
@@ -1032,15 +1034,19 @@ export const OperationsDashboard: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {[
-                      { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',   raw: 0.0004, billed: null },
-                      { key: 'twilio-sms',            label: 'Twilio SMS',           category: 'Messaging',    unit: 'message', raw: 0.0079, billed: 0.01185 },
-                      { key: 'twilio-whatsapp',       label: 'Twilio WhatsApp',      category: 'Messaging',    unit: 'message', raw: 0.005,  billed: 0.0075 },
-                      { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact', raw: 0.05,   billed: 0.075 },
-                      { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',   raw: 0.02,   billed: 0.03 },
-                      { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',   raw: 0.01,   billed: 0.015 },
-                      { key: 'hunter-domain-search',  label: 'Hunter Domain Search', category: 'B2B Data',     unit: 'search',  raw: 0.01,   billed: 0.015 },
-                      { key: 'zerobounce-validate',   label: 'ZeroBounce Validate',  category: 'Email',        unit: 'email',   raw: 0.008,  billed: 0.012 },
-                      { key: 'firecrawl-scrape',      label: 'Firecrawl Scrape',     category: 'Web Scraping', unit: 'page',    raw: 0.001,  billed: 0.0015 },
+                      { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',      raw: 0.0004, billed: null },
+                      { key: 'twilio-sms',            label: 'Twilio SMS',           category: 'Messaging',    unit: 'message',    raw: 0.0079, billed: 0.01185 },
+                      { key: 'twilio-whatsapp',       label: 'Twilio WhatsApp',      category: 'Messaging',    unit: 'message',    raw: 0.005,  billed: 0.0075 },
+                      { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact',    raw: 0.05,   billed: 0.075 },
+                      { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',      raw: 0.02,   billed: 0.03 },
+                      { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',      raw: 0.01,   billed: 0.015 },
+                      { key: 'hunter-domain-search',  label: 'Hunter Domain Search', category: 'B2B Data',     unit: 'search',     raw: 0.01,   billed: 0.015 },
+                      { key: 'zerobounce-validate',   label: 'ZeroBounce Validate',  category: 'Email',        unit: 'email',      raw: 0.008,  billed: 0.012 },
+                      { key: 'firecrawl-scrape',      label: 'Firecrawl Scrape',     category: 'Web Scraping', unit: 'page',       raw: 0.001,  billed: 0.0015 },
+                      { key: 'late-publish',          label: 'Late.dev Publish',     category: 'Social',       unit: 'post',       raw: 0.0,    billed: null },
+                      { key: 'social-caption',        label: 'Social Caption Gen',   category: 'Social',       unit: 'generation', raw: 0.002,  billed: 0.003 },
+                      { key: 'xai-aurora',            label: 'xAI Aurora Image',     category: 'Social',       unit: 'image',      raw: 0.07,   billed: 0.105 },
+                      { key: 'flux-dev',              label: 'FLUX Dev Image',       category: 'Social',       unit: 'image',      raw: 0.04,   billed: 0.06 },
                     ].map((svc) => {
                       const allTime = svcAllTimeTotals[svc.key];
                       return (
@@ -2012,3 +2018,4 @@ export const OperationsDashboard: React.FC = () => {
     </div>
   );
 };
+export const OperationsDashboard = React.memo(_OperationsDashboard);

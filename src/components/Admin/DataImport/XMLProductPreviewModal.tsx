@@ -6,6 +6,7 @@
  */
 
 import React, { useState } from 'react';
+import { formatLabel } from '@/lib/labelUtils';
 import {
   Dialog,
   DialogContent,
@@ -240,8 +241,8 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                     .slice(0, 9)
                     .map(([key, value]) => (
                       <div key={key} className="bg-muted/50 rounded-lg p-2 border">
-                        <p className="text-xs font-medium text-muted-foreground capitalize">
-                          {key.replace(/_/g, ' ')}
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {formatLabel(key)}
                         </p>
                         <p className="text-sm font-semibold truncate" title={String(value)}>
                           {typeof value === 'object' ? JSON.stringify(value) : String(value)}

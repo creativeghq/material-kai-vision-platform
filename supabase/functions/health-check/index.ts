@@ -19,6 +19,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
 
 const ANTHROPIC_API_KEY   = Deno.env.get('ANTHROPIC_API_KEY')   || '';
 const OPENAI_API_KEY      = Deno.env.get('OPENAI_API_KEY')      || '';
@@ -27,11 +28,6 @@ const VOYAGE_API_KEY      = Deno.env.get('VOYAGE_API_KEY')      || '';
 const MIVAA_GATEWAY_URL   = Deno.env.get('MIVAA_GATEWAY_URL')   || 'https://v1api.materialshub.gr';
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')        || '';
 const SUPABASE_ANON_KEY   = Deno.env.get('SUPABASE_ANON_KEY')   || '';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 interface ServiceResult {
   status: 'healthy' | 'unhealthy';
@@ -144,6 +140,8 @@ const EXTERNAL_SERVICES = [
   { name: 'Firecrawl',   url: 'https://api.firecrawl.dev',     category: 'scraping',  icon: '🕷️' },
   { name: 'WorldLabs',   url: 'https://api.worldlabs.ai',      category: 'vr',        icon: '🌐' },
   { name: 'Stripe',      url: 'https://api.stripe.com/v1',     category: 'payments',  icon: '💳' },
+  { name: 'Late.dev',    url: 'https://api.getlate.dev',       category: 'social',    icon: '📲' },
+  { name: 'xAI Aurora',  url: 'https://api.x.ai',              category: 'social',    icon: '✨' },
 ];
 
 async function checkExternalService(url: string): Promise<ExternalResult> {

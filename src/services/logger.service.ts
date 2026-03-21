@@ -51,6 +51,8 @@ class LoggerService {
   private logBuffer: LogEntry[] = [];
   private maxBufferSize: number = 100;
   private config: LoggerConfig;
+  // Resolved once at init — avoids dynamic import on every error/warn call
+  private sentryModule: typeof import('@sentry/react') | null = null;
 
   constructor() {
     // Check both Vite and Node.js environment indicators
@@ -62,11 +64,20 @@ class LoggerService {
       minLevel: this.isDevelopment ? LogLevel.DEBUG : LogLevel.INFO,
       enableConsole: true,
       enableRemote: this.isProduction,
-      serviceName: 'MaterialKAI',
+      serviceName: 'MaterialsHub',
       bufferSize: 100,
     };
 
     this.maxBufferSize = this.config.bufferSize || 100;
+
+    // Pre-resolve Sentry once so sendToSentry doesn't dynamic-import on every call
+    if (this.isProduction) {
+      import('@sentry/react').then((mod) => {
+        this.sentryModule = mod;
+      }).catch(() => {
+        // Sentry not available — silently skip
+      });
+    }
   }
 
   /**
@@ -272,31 +283,22 @@ class LoggerService {
    */
   private sendToSentry(entry: LogEntry): void {
     try {
-      // Dynamically import Sentry to avoid bundling if not used
-      import('@sentry/react').then((Sentry) => {
-        if (entry.error) {
-          Sentry.captureException(entry.error, {
-            level: this.mapLogLevelToSentry(entry.level),
-            tags: {
-              source: 'frontend',
-              service: entry.service || 'unknown',
-            },
-            extra: entry.metadata,
-          });
-        } else {
-          Sentry.captureMessage(entry.message, {
-            level: this.mapLogLevelToSentry(entry.level),
-            tags: {
-              source: 'frontend',
-              service: entry.service || 'unknown',
-            },
-            extra: entry.metadata,
-          });
-        }
-      }).catch(() => {
-        // Sentry not available, silently fail
-      });
-    } catch (error) {
+      if (!this.sentryModule) return;
+      const Sentry = this.sentryModule;
+      if (entry.error) {
+        Sentry.captureException(entry.error, {
+          level: this.mapLogLevelToSentry(entry.level),
+          tags: { source: 'frontend', service: entry.service || 'unknown' },
+          extra: entry.metadata,
+        });
+      } else {
+        Sentry.captureMessage(entry.message, {
+          level: this.mapLogLevelToSentry(entry.level),
+          tags: { source: 'frontend', service: entry.service || 'unknown' },
+          extra: entry.metadata,
+        });
+      }
+    } catch {
       // Don't let logging errors break the app
     }
   }

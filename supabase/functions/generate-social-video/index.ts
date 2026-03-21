@@ -5,8 +5,8 @@
  *   kling-1.6-pro  → 15 credits (fast, great for reels)
  *   veo-2          → 30 credits (premium quality via existing generate-interior-video)
  *
- * Uses async polling pattern: returns prediction_id immediately if generation
- * takes > 55s (edge function limit). Frontend polls via generate_3d_status tool.
+ * Credits are debited upfront and are non-refundable.
+ * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -25,7 +25,6 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'veo-2':         30,
 };
 
-// Replicate model versions for social video
 const REPLICATE_MODELS: Record<string, string> = {
   'kling-1.6-pro': 'klingai/kling-1.6-pro',
 };
@@ -75,7 +74,7 @@ async function pollReplicate(
     if (data.status === 'succeeded' || data.status === 'failed') return data;
   }
 
-  return { status: 'processing' }; // Timed out — return processing for async handling
+  return { status: 'processing' };
 }
 
 Deno.serve(async (req) => {
@@ -109,7 +108,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
   }
 
-  // ② Debit upfront
+  // ② Debit upfront — non-refundable
   const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
     p_user_id: userId,
     p_amount: creditCost,
@@ -129,7 +128,6 @@ Deno.serve(async (req) => {
     let replicateModel: string;
 
     if (model === 'veo-2') {
-      // Route to existing generate-interior-video (handles Veo 2.0)
       const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video`, {
         method: 'POST',
         headers: {
@@ -169,13 +167,12 @@ Deno.serve(async (req) => {
     });
     predictionId = prediction.id;
 
-    // ④ Poll (up to 50s — leave 10s buffer for edge function overhead)
+    // ④ Poll (up to 50s)
     const pollResult = await pollReplicate(predictionId, 50_000);
 
     if (pollResult.status === 'succeeded') {
       const videoUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output;
 
-      // Update social_posts if provided
       if (post_id && videoUrl) {
         const { data: existingPost } = await supabase
           .from('social_posts')
@@ -192,7 +189,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Log to ai_usage_logs
       await supabase.from('ai_usage_logs').insert({
         user_id: userId,
         operation_type: 'social_video_generation',
@@ -200,7 +196,7 @@ Deno.serve(async (req) => {
         api_provider: 'replicate',
         input_tokens: 0, output_tokens: 0,
         input_cost_usd: 0, output_cost_usd: 0,
-        raw_cost_usd: creditCost * 0.01 / 1.5, // reverse markup to get raw
+        raw_cost_usd: creditCost * 0.01 / 1.5,
         markup_multiplier: 1.5,
         billed_cost_usd: creditCost * 0.01,
         total_cost_usd: creditCost * 0.01,
@@ -218,7 +214,7 @@ Deno.serve(async (req) => {
       });
 
     } else if (pollResult.status === 'processing') {
-      // Store prediction_id in generation_videos for async polling
+      // Store for async polling — credits already debited
       const { data: videoRecord } = await supabase.from('generation_videos').insert({
         user_id: userId,
         workspace_id,
@@ -245,24 +241,12 @@ Deno.serve(async (req) => {
       });
 
     } else {
-      // Failed — refund
-      await supabase.rpc('debit_user_credits', {
-        p_user_id: userId,
-        p_amount: -creditCost,
-        p_operation_type: 'social_video_generation_refund',
-        p_description: `Refund: ${model} video generation failed`,
-      });
+      // Replicate reported failure — credits already spent, log and return error
+      console.error('[generate-social-video] Replicate failure:', pollResult.error);
       return jsonResponse({ success: false, error: pollResult.error || 'Video generation failed' }, 500);
     }
 
   } catch (err) {
-    // Refund on exception
-    await supabase.rpc('debit_user_credits', {
-      p_user_id: userId,
-      p_amount: -creditCost,
-      p_operation_type: 'social_video_generation_refund',
-      p_description: `Refund: social video error`,
-    });
     console.error('[generate-social-video] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }

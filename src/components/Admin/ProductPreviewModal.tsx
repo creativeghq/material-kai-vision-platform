@@ -18,6 +18,7 @@ import {
   Tag,
 } from 'lucide-react';
 import type { Product } from '@/types/unified-material-api';
+import { formatLabel } from '@/lib/labelUtils';
 
 interface ProductPreviewModalProps {
   open: boolean;
@@ -90,7 +91,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                       Category
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {product.category}
+                      {formatLabel(product.category)}
                     </p>
                   </div>
                 )}
@@ -98,7 +99,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                   <div>
                     <p className="text-sm font-medium">Source Type</p>
                     <p className="text-sm text-muted-foreground">
-                      {productAny.created_from_type}
+                      {formatLabel(productAny.created_from_type)}
                     </p>
                   </div>
                 )}
@@ -137,8 +138,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(product.properties).map(([key, value]) => (
                     <div key={key} className="border rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">
-                        {key}
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {formatLabel(key)}
                       </p>
                       <p className="text-sm mt-1">{String(value)}</p>
                     </div>
@@ -188,8 +189,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(product.metadata).map(([key, value]) => (
                     <div key={key} className="border rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">
-                        {key}
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {formatLabel(key)}
                       </p>
                       <p className="text-sm mt-1">{String(value)}</p>
                     </div>

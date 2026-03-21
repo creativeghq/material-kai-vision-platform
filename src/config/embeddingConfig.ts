@@ -2,7 +2,7 @@
  * Unified Embedding Configuration
  *
  * This configuration ensures consistency across all services that generate
- * or use embeddings in the Material Kai Vision Platform.
+ * or use embeddings in Materials Hub.
  */
 
 export interface EmbeddingModelConfig {

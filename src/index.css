@@ -384,6 +384,12 @@ All colors MUST be HSL.
     border-color: rgba(255, 255, 255, 0.5);
   }
 
+  /* Tabs where item-level card lift should be suppressed */
+  .tab-no-card-lift .dashboard-card:hover {
+    transform: none;
+    box-shadow: var(--glass-shadow);
+  }
+
   /* Liquid Glass Utility */
   .glass-panel {
     @apply dashboard-card;

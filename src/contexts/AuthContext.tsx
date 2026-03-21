@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-// import type { User, Session, AuthError } from '@supabase/auth-helpers-nextjs'; // Module not found
 type User = any;
 type Session = any;
 type AuthError = any;

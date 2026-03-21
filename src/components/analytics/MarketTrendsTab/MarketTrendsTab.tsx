@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, Search, Target, Zap, Award, Globe, Layers, Activity,
-  Download, Calendar, ChevronUp, ChevronDown, Minus,
+  Download, Calendar, ChevronUp, ChevronDown, Minus, Package, Star, Eye, Users,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
@@ -435,7 +435,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           } else {
             setBuyerTypeData([]);
           }
-        } catch (e) { console.warn('Buyer type join failed (non-critical):', e); }
+        } catch (e) { console.error('Buyer type join failed:', e); }
 
         // VR/3D usage data
         try {
@@ -464,7 +464,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           (vrData ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'Other'); roomTypes.set(r, (roomTypes.get(r) ?? 0) + 1); });
           const topRoom = Array.from(roomTypes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
           setVrKpis({ totalGenerations: (vrData ?? []).length, uniqueMaterials: uniqueMats, topRoomType: topRoom });
-        } catch (e) { console.warn('VR data load failed:', e); }
+        } catch (e) { console.error('VR data load failed:', e); }
 
         // Zero-result demand signals
         try {
@@ -478,7 +478,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             count: d.frequency_count ?? 0,
             lastSeen: d.last_seen_at ? new Date(d.last_seen_at).toLocaleDateString() : '—',
           })));
-        } catch (e) { console.warn('Zero-result data load failed:', e); }
+        } catch (e) { console.error('Zero-result data load failed:', e); }
 
         // Quote basket analysis (co-quoted products)
         try {
@@ -514,7 +514,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
               });
             setQuoteBasketsData(pairs);
           }
-        } catch (e) { console.warn('Basket analysis failed:', e); }
+        } catch (e) { console.error('Basket analysis failed:', e); }
 
         // ── Engagement funnel (platform) ──────────────────────
         try {
@@ -535,7 +535,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             { stage: 'Quotes Accepted', count: funnelAccepted, rate: viewCount > 0 ? pct(funnelAccepted) : '—', color: 'bg-green-500' },
           ];
           setEngagementFunnel(funnelArr.filter(f => f.count > 0));
-        } catch (e) { console.warn('Engagement funnel load failed:', e); }
+        } catch (e) { console.error('Engagement funnel load failed:', e); }
 
         // ── Discovery channel per product (platform) ──────────
         const channelPerProduct = new Map<string, { name: string; search: number; agent: number; threeD: number; manual: number; page: number }>();
@@ -588,7 +588,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           const pSeg = new Map<string, number>(); (priorProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); pSeg.set(t, (pSeg.get(t) ?? 0) + 1); });
           const segArr = Array.from(rSeg.entries()).map(([type, tw]) => { const pw = pSeg.get(type) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { type, thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
           setSegmentGrowth(segArr);
-        } catch (e) { console.warn('Market direction load failed:', e); }
+        } catch (e) { console.error('Market direction load failed:', e); }
 
         // ── Seasonal trend: moodboard saves by month (24 months)
         try {
@@ -597,7 +597,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             .from('moodboard_items').select('created_at')
             .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
           setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
-        } catch (e) { console.warn('Seasonal load failed:', e); }
+        } catch (e) { console.error('Seasonal load failed:', e); }
 
         setIsDemoData(false);
         setKpis({
@@ -726,7 +726,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             topBuyerType = buyerArr[0] ? formatProfType(buyerArr[0].type) : '—';
           }
           setBuyerTypeData(buyerArr);
-        } catch (e) { console.warn('Factory buyer type join failed (non-critical):', e); }
+        } catch (e) { console.error('Factory buyer type join failed:', e); }
 
         // B4: Quote funnel
         let localFunnel: { stage: string; count: number }[] = [];
@@ -745,7 +745,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             ];
             setQuoteFunnelData(localFunnel);
           }
-        } catch (e) { console.warn('Quote funnel load failed (non-critical):', e); }
+        } catch (e) { console.error('Quote funnel load failed:', e); }
 
         // B5: Moodboard intelligence
         try {
@@ -771,7 +771,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             setMoodboardStats({ total: 0, public: 0 });
             setMoodboardPairings([]);
           }
-        } catch (e) { console.warn('Moodboard pairing load failed (non-critical):', e); }
+        } catch (e) { console.error('Moodboard pairing load failed:', e); }
 
         // B6: Catalog gaps
         const gaps = (demandData ?? []).filter((d: any) => !names.some((n) => {
@@ -835,7 +835,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           matched.forEach((g: any) => { const r = String(g.room_type ?? 'Other'); roomTypes.set(r, (roomTypes.get(r) ?? 0) + 1); });
           const topRoom = Array.from(roomTypes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
           setVrKpis({ totalGenerations: matched.length, uniqueMaterials: matCount.size, topRoomType: topRoom });
-        } catch (e) { console.warn('VR factory data failed:', e); }
+        } catch (e) { console.error('VR factory data failed:', e); }
 
         // Quote basket for factory products
         try {
@@ -881,7 +881,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
               setQuoteBasketsData([]);
             }
           }
-        } catch (e) { console.warn('Factory basket analysis failed:', e); }
+        } catch (e) { console.error('Factory basket analysis failed:', e); }
 
         // B7: Product velocity (last 4w vs prior 4w)
         const cut4w = weeksAgo(4);
@@ -933,7 +933,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             { stage: 'Quote Requests', count: fQuoted, rate: fViews > 0 ? fp(fQuoted) : '—', color: 'bg-cyan-500' },
             { stage: 'Quotes Accepted', count: fAccepted, rate: fViews > 0 ? fp(fAccepted) : '—', color: 'bg-green-500' },
           ].filter(f => f.count > 0));
-        } catch (e) { console.warn('Factory engagement funnel load failed:', e); }
+        } catch (e) { console.error('Factory engagement funnel load failed:', e); }
 
         // ── Discovery channel per product (factory) ────────────
         const factoryChannelPerProduct = new Map<string, { name: string; search: number; agent: number; threeD: number; manual: number; page: number }>();
@@ -985,7 +985,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           const pSeg = new Map<string, number>(); (priorProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); pSeg.set(t, (pSeg.get(t) ?? 0) + 1); });
           const segArr = Array.from(rSeg.entries()).map(([type, tw]) => { const pw = pSeg.get(type) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { type, thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
           setSegmentGrowth(segArr);
-        } catch (e) { console.warn('Factory market direction load failed:', e); }
+        } catch (e) { console.error('Factory market direction load failed:', e); }
 
         // ── Zero-result demand signals (factory scope) ──────────
         try {
@@ -999,7 +999,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             count: d.frequency_count ?? 0,
             lastSeen: d.last_seen_at ? new Date(d.last_seen_at).toLocaleDateString() : '—',
           })));
-        } catch (e) { console.warn('Factory zero-result load failed:', e); }
+        } catch (e) { console.error('Factory zero-result load failed:', e); }
 
         // ── Seasonal trend: factory product moodboard saves by month
         try {
@@ -1009,7 +1009,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             .in('material_id', effectiveIds)
             .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
           setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
-        } catch (e) { console.warn('Seasonal load failed:', e); }
+        } catch (e) { console.error('Seasonal load failed:', e); }
 
         setIsDemoData(false);
         setKpis({

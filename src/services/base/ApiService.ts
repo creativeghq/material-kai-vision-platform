@@ -126,7 +126,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     const envConfig = this.getEnvironmentConfig();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': `MaterialKaiVisionPlatform/1.0 (${this.apiName})`,
+      'User-Agent': `MaterialsHub/1.0 (${this.apiName})`,
     };
 
     // Add API key if available

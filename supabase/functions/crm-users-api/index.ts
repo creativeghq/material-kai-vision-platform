@@ -43,6 +43,59 @@ Deno.serve(async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
+    // POST / - Create (invite) a new user by email
+    if (method === 'POST' && path.length === 0) {
+      const body = await req.json();
+      const { email, full_name, contact_id } = body;
+
+      if (!email) {
+        return new Response(
+          JSON.stringify({ error: 'email is required' }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      // Invite user — sends a magic-link email, no password required
+      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+        email,
+        { data: { full_name: full_name || '' } },
+      );
+
+      if (inviteError) {
+        return new Response(
+          JSON.stringify({ error: inviteError.message }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      const newUserId = inviteData.user.id;
+
+      // Update the profile with full_name if provided
+      if (full_name) {
+        await supabase
+          .from('user_profiles')
+          .update({ full_name })
+          .eq('user_id', newUserId);
+      }
+
+      // Auto-link to contact if contact_id supplied
+      if (contact_id) {
+        await supabase
+          .from('crm_contacts')
+          .update({
+            user_id: newUserId,
+            linked_at: new Date().toISOString(),
+            linked_by: userId,
+          })
+          .eq('id', contact_id);
+      }
+
+      return new Response(
+        JSON.stringify({ data: { user_id: newUserId, email } }),
+        { status: 201, headers: corsHeaders },
+      );
+    }
+
     // GET /api/users - List all users
     if (method === 'GET' && path.length === 0) {
       const limit = parseInt(url.searchParams.get('limit') || '1000');

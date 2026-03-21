@@ -29,11 +29,15 @@ import {
   Layers,
   Camera,
   ChevronDown,
+  Check,
+  Globe,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { logger } from '@/config';
@@ -55,6 +59,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { PromptLibrary } from './PromptLibrary';
+import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
@@ -136,6 +141,7 @@ interface Message {
   timestamp: Date;
   agentId?: string;
   model?: string;
+  images?: string[]; // uploaded images attached to user messages
   demoData?: any; // Structured demo data for DemoAgent responses
   materialData?: {
     products: any[];
@@ -256,9 +262,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 }) => {
   const { toast } = useToast();
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
-  const [videoModel, setVideoModel] = useState<string>('auto');
-  const [videoType, setVideoType] = useState<string>('walkthrough');
-  // Initialize with KAI agent's default model
+  // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
     AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929'
   );
@@ -273,6 +277,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
@@ -344,7 +349,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     },
   });
 
-  // Get current user ID
+  // Get current user ID and workspace
   useEffect(() => {
     const fetchUserId = async () => {
       const {
@@ -352,7 +357,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        setWorkspaceId(user.user_metadata?.workspace_id);
+        // workspace_id lives in workspace_members, not user_metadata
+        const { data: memberRow } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single();
+        setWorkspaceId(memberRow?.workspace_id ?? user.user_metadata?.workspace_id);
       }
     };
     fetchUserId();
@@ -705,8 +719,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [currentConversationId, toast]);
 
-  // Generate Veo video walkthrough from a Gemini-generated image
-  const handleGenerateVideo = useCallback(async (imageUrl: string, sourceMessage: Message) => {
+  // Generate video from a Gemini-generated image
+  const handleGenerateVideo = useCallback(async (
+    imageUrl: string,
+    sourceMessage: Message,
+    videoType: string = 'walkthrough',
+    videoModel: string = 'auto',
+  ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -777,6 +796,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       toast({ title: 'Video generation failed', description: error.message, variant: 'destructive' });
     }
   }, [workspaceId, currentConversationId, toast]);
+
+  const VIDEO_TYPES = [
+    { value: 'walkthrough',        label: 'Walkthrough',        description: 'Cinematic camera walk through the space', credits: 30 },
+    { value: 'product_spotlight',  label: 'Product Spotlight',  description: 'Zoom focus on a featured material or element', credits: 30 },
+    { value: 'before_after',       label: 'Before / After',     description: 'Transition between original and new design', credits: 30 },
+    { value: 'floorplan_flythrough', label: 'Floorplan Flythrough', description: 'Aerial perspective from floor plan', credits: 30 },
+    { value: 'social_reel',        label: 'Social Reel 9:16',   description: 'Vertical clip optimized for social media', credits: 30 },
+  ] as const;
+
+  const VIDEO_MODELS = [
+    { value: 'auto',               label: 'Auto',               description: 'Best model selected automatically' },
+    { value: 'veo-2',              label: 'Veo 2',              description: 'Google Veo 2 — high quality',         credits: 30 },
+    { value: 'kling-1.6-pro',      label: 'Kling 1.6 Pro',      description: 'Kling — fast & cinematic',            credits: 15 },
+    { value: 'wan2.1-i2v',         label: 'Wan 2.1',            description: 'Wan2.1 — open-source quality',        credits: 10 },
+    { value: 'runway-gen4-turbo',  label: 'Runway Gen-4',       description: 'Runway Gen-4 — premium output',       credits: 40 },
+  ] as const;
+
+  const [videoModel, setVideoModel] = useState<string>('auto');
 
   // Generate a Materials Selection Board from a Gemini-generated image
   const handleGenerateMaterialsBoard = useCallback(async (
@@ -852,6 +889,73 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [workspaceId, currentConversationId, toast]);
 
+  // Generate virtual staging directly (bypasses AI chat — calls edge function with structured params)
+  const handleGenerateVirtualStaging = useCallback(async (
+    imageUrl: string,
+    params: VirtualStagingParams,
+  ) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+
+      toast({
+        title: 'Generating virtual staging…',
+        description: `${params.room} — ${params.style} style. This may take 30–60 seconds.`,
+      });
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/generate-virtual-staging`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_image_url: imageUrl,
+          room: params.room,
+          furniture_style: params.style,
+          furniture_items: params.furnitureItems,
+          workspace_id: workspaceId,
+        }),
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || 'Virtual staging failed');
+
+      const stagingMessage: Message = {
+        id: `staging-${Date.now()}`,
+        role: 'assistant',
+        content: `Virtual Staging complete — ${result.room} in ${result.furniture_style} style. ${result.credits_used} credits used.`,
+        timestamp: new Date(),
+        agentId: 'interior-designer',
+        virtualStagingData: {
+          image_url: result.image_url,
+          job_id: result.job_id,
+          room: result.room,
+          furniture_style: result.furniture_style,
+          credits_used: result.credits_used,
+        },
+      };
+
+      setMessages(prev => [...prev, stagingMessage]);
+
+      if (currentConversationId) {
+        await agentChatHistoryService.saveMessage({
+          conversationId: currentConversationId,
+          role: 'assistant',
+          content: stagingMessage.content,
+          metadata: { virtualStagingData: stagingMessage.virtualStagingData },
+        });
+      }
+
+      toast({ title: 'Virtual Staging ready!', description: `${result.credits_used} credits used.` });
+    } catch (error: any) {
+      console.error('Virtual staging error:', error);
+      toast({ title: 'Virtual staging failed', description: error.message, variant: 'destructive' });
+    }
+  }, [workspaceId, currentConversationId, toast]);
+
   // Use a product image as input for a 3D interior design scene
   const handleUseProductIn3DScene = useCallback((imageUrl: string, productName: string) => {
     setAttachedImages([imageUrl]);
@@ -880,6 +984,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       role: 'user',
       content: input,
       timestamp: new Date(),
+      images: attachedImages.length > 0 ? [...attachedImages] : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -993,8 +1098,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             },
             body: JSON.stringify(requestBody),
             signal: abortController.signal,
-            // Prevent browser from timing out the connection
-            keepalive: true,
           },
         );
 
@@ -1916,16 +2019,47 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               className="w-full rounded-xl border border-white/20 shadow-md"
                             />
                           ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              onClick={() => handleGenerateVideo(message.geminiImageData!.image_url, message)}
-                            >
-                              <Video className="h-4 w-4" />
-                              Generate Video Walkthrough
-                              <span className="text-muted-foreground text-xs ml-1">30 credits</span>
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="gap-2">
+                                  <Video className="h-4 w-4" />
+                                  Generate Video
+                                  <ChevronDown className="h-3 w-3 ml-1 text-muted-foreground" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-72">
+                                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
+                                {VIDEO_MODELS.map(vm => (
+                                  <DropdownMenuItem
+                                    key={vm.value}
+                                    onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }}
+                                    className="gap-2"
+                                  >
+                                    <Check className={cn('h-3.5 w-3.5 flex-shrink-0', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm">{vm.label}</div>
+                                      <div className="text-xs text-muted-foreground">{vm.description}</div>
+                                    </div>
+                                    {'credits' in vm && <span className="ml-2 text-xs text-muted-foreground flex-shrink-0">{vm.credits} cr</span>}
+                                  </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground pb-1">Video Style</DropdownMenuLabel>
+                                {VIDEO_TYPES.map(vt => (
+                                  <DropdownMenuItem
+                                    key={vt.value}
+                                    onClick={() => handleGenerateVideo(message.geminiImageData!.image_url, message, vt.value, videoModel)}
+                                  >
+                                    <Video className="h-4 w-4 mr-2 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium">{vt.label}</div>
+                                      <div className="text-xs text-muted-foreground">{vt.description}</div>
+                                    </div>
+                                    <span className="ml-2 text-xs text-muted-foreground flex-shrink-0">{vt.credits} cr</span>
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                           <Button
                             variant="outline"
@@ -2115,6 +2249,62 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <p className="text-sm whitespace-pre-wrap text-white">{normalizeContent(message.content)}</p>
                         )}
 
+                        {/* Uploaded images on user messages + Generate VR (interior agent only) */}
+                        {message.role === 'user' && message.images && message.images.length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex flex-wrap gap-2">
+                              {message.images.map((img, idx) => (
+                                <img
+                                  key={idx}
+                                  src={img}
+                                  alt={`Uploaded image ${idx + 1}`}
+                                  className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
+                                />
+                              ))}
+                            </div>
+                            {selectedAgent === 'interior-designer' && (
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  onClick={() => {
+                                    setAttachedImages([...message.images!]);
+                                    setInput(message.content
+                                      ? `Redesign this room based on my photo: ${message.content}`
+                                      : 'Redesign this room. Create a photorealistic 3D interior design using this photo as the base reference.'
+                                    );
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 transition-colors shadow-sm"
+                                  title="Use this image as reference for 2D interior design generation"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  Generate 2D Design from this
+                                </button>
+                                <button
+                                  onClick={() => handleGenerateVR(
+                                    message.images![0],
+                                    { prompt: message.content || 'Create an immersive 3D walkthrough of this interior space' },
+                                    message,
+                                  )}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors shadow-sm"
+                                  title="Generate explorable VR world from this uploaded image (50 credits)"
+                                >
+                                  <Globe className="w-3.5 h-3.5" />
+                                  Generate VR from this image
+                                  <span className="text-violet-400 text-xs">50 credits</span>
+                                </button>
+                                <button
+                                  onClick={() => setVirtualStagingImageUrl(message.images![0])}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-full text-xs font-medium text-teal-700 transition-colors shadow-sm"
+                                  title="Virtually stage this room with AI-generated furniture (20 credits)"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  Virtual Stage this
+                                  <span className="text-teal-400 text-xs">20 credits</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Show ProductStrip for messages with material data */}
                         {message.role === 'assistant' && message.materialData?.products && message.materialData.products.length > 0 && (
                           <ProductStrip
@@ -2144,8 +2334,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 console.log('🖼️ Image clicked:', url, name);
                               }}
                               onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                              onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                              onAskKAI={(segment) => {
+                              onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
+                              onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
+                              onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
+                              onAskJARVIS={(segment) => {
                                 const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
                                 setInput(prompt);
                                 setTimeout(async () => { await handleSendMessage(); }, 100);
@@ -2431,35 +2623,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </button>
               )}
 
-              {/* Video model picker (Interior Designer Agent only) */}
-              {selectedAgent === 'interior-designer' && (
-                <div className="flex items-center gap-1">
-                  <select
-                    value={videoType}
-                    onChange={e => setVideoType(e.target.value)}
-                    className="h-8 text-xs border rounded-lg px-2 bg-background text-foreground"
-                    title="Video type"
-                  >
-                    <option value="walkthrough">Walkthrough</option>
-                    <option value="product_spotlight">Product</option>
-                    <option value="before_after">Before/After</option>
-                    <option value="floorplan_flythrough">Floorplan</option>
-                    <option value="social_reel">Reel (9:16)</option>
-                  </select>
-                  <select
-                    value={videoModel}
-                    onChange={e => setVideoModel(e.target.value)}
-                    className="h-8 text-xs border rounded-lg px-2 bg-background text-foreground"
-                    title="Video model"
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="veo-2">Veo 2 (30cr)</option>
-                    <option value="kling-1.6-pro">Kling (15cr)</option>
-                    <option value="wan2.1-i2v">Wan2.1 (10cr)</option>
-                    <option value="runway-gen4-turbo">Runway (40cr)</option>
-                  </select>
-                </div>
-              )}
 
               <Button
                 variant="ghost"
@@ -2514,6 +2677,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             setInput(promptText);
           }}
           onClose={() => setShowPromptLibrary(false)}
+          hasUploadedImage={attachedImages.length > 0}
+          onTriggerVirtualStaging={() => {
+            // Resolve the most recent image URL from the conversation or attached images
+            let imageUrl: string | null = attachedImages[0] || null;
+            if (!imageUrl) {
+              // Walk messages in reverse to find the latest generated/staged/uploaded image
+              for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
+                if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
+                if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
+                if (m.images?.[0]) { imageUrl = m.images[0]; break; }
+              }
+            }
+            setVirtualStagingImageUrl(imageUrl || '');
+          }}
+        />
+      )}
+
+      {/* Virtual Staging Modal — for uploaded images + prompt library trigger */}
+      {virtualStagingImageUrl !== null && (
+        <VirtualStagingModal
+          isOpen={virtualStagingImageUrl !== null}
+          onClose={() => setVirtualStagingImageUrl(null)}
+          onGenerate={async (params) => {
+            const url = virtualStagingImageUrl;
+            setVirtualStagingImageUrl(null);
+            if (url) {
+              await handleGenerateVirtualStaging(url, params);
+            } else {
+              // No image yet — fall back to pre-filling the textarea so the AI handles it
+              setInput(`Stage this ${params.room} in ${params.style} style. Include: ${params.furnitureItems}`);
+            }
+          }}
         />
       )}
 

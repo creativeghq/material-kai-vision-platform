@@ -39,7 +39,7 @@ const TEMPLATE_TAGS = [
   { tag: '{{lastName}}',      label: 'Last Name',        example: 'Smith',                         note: 'Same as firstName — comes from the recipient record.' },
   { tag: '{{fullName}}',      label: 'Full Name',        example: 'Jane Smith',                    note: 'Concatenation of first + last. Falls back to email address if no name is available.' },
   { tag: '{{email}}',         label: 'Email Address',    example: 'jane@studio.com',               note: "The recipient's email address. Always available." },
-  { tag: '{{companyName}}',   label: 'Company Name',     example: 'Material KAI',                  note: 'Defaults to "Material KAI". Can be overridden per send.' },
+  { tag: '{{companyName}}',   label: 'Company Name',     example: 'Materials Hub',                  note: 'Defaults to "Materials Hub". Can be overridden per send.' },
   { tag: '{{currentYear}}',   label: 'Current Year',     example: '2026',                          note: 'Injected at send time. Useful in footer copyright lines.' },
   { tag: '{{platformUrl}}',   label: 'Platform URL',     example: 'https://materialkai.com',       note: 'The main platform URL. Set in Email Settings.' },
   { tag: '{{unsubscribeUrl}}',label: 'Unsubscribe Link', example: 'https://…/unsubscribe?token=…', note: 'Required for marketing emails. Automatically generated.' },

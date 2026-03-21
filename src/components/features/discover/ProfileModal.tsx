@@ -18,20 +18,7 @@ import { FollowButton } from '@/components/features/social/FollowButton';
 import { MoodboardComments } from '@/components/features/social/MoodboardComments';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
-  designer: 'Designer',
-  interior_designer: 'Interior Designer',
-  architect: 'Architect',
-  manufacturer: 'Manufacturer',
-  brand: 'Brand',
-  supplier: 'Supplier',
-  sourcing_agent: 'Sourcing Agent',
-  consultant: 'Consultant',
-  other: 'Other',
-};
+import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
 const CARD_COLORS = [
   'from-violet-100 to-indigo-100',
@@ -287,7 +274,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+        <DialogContent hideClose className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
 
           {/* ── Banner ──────────────────────────────────────────────────────── */}
           <div

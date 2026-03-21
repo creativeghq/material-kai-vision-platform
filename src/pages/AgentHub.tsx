@@ -1,6 +1,6 @@
 /**
  * AgentHub Page
- * Multi-agent AI interface for Material Kai Vision Platform
+ * Multi-agent AI interface for Materials Hub
  */
 
 import React, { useEffect, useState } from 'react';

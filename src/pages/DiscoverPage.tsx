@@ -23,61 +23,14 @@ import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodb
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
+import {
+  CAT_COLORS, MATERIAL_CATS, PROFESSIONAL_TYPE_LABELS,
+  detectCat, catLabel, initials,
+} from '@/lib/materialCategories';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
-  designer: 'Designer',
-  interior_designer: 'Interior Designer',
-  architect: 'Architect',
-  manufacturer: 'Manufacturer',
-  brand: 'Brand',
-  supplier: 'Supplier',
-  sourcing_agent: 'Sourcing Agent',
-  consultant: 'Consultant',
-  other: 'Other',
-};
-
-const MATERIAL_CATS = [
-  'tiles', 'wood', 'stone', 'paint', 'fabric', 'metal', 'glass', 'composite',
-] as const;
-
-const CAT_COLORS: Record<string, string> = {
-  tiles:     '#3b82f6',
-  wood:      '#92400e',
-  stone:     '#6b7280',
-  paint:     '#10b981',
-  fabric:    '#8b5cf6',
-  metal:     '#6366f1',
-  glass:     '#06b6d4',
-  composite: '#f59e0b',
-  other:     '#3E192A',
-};
-
 const PER_PAGE = 20;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function catLabel(c: string) {
-  return c.charAt(0).toUpperCase() + c.slice(1);
-}
-
-function detectCat(meta: Record<string, any>): string {
-  const raw = (meta?.material_category || '').toLowerCase();
-  if (raw.includes('tile') || raw.includes('ceramic') || raw.includes('porcelain') || raw === 'wall_tile' || raw === 'floor_tile') return 'tiles';
-  if (raw.includes('wood') || raw.includes('parquet') || raw.includes('laminate')) return 'wood';
-  if (raw.includes('stone') || raw.includes('marble') || raw.includes('granite')) return 'stone';
-  if (raw.includes('paint') || raw.includes('coating')) return 'paint';
-  if (raw.includes('fabric') || raw.includes('textile') || raw.includes('upholstery')) return 'fabric';
-  if (raw.includes('metal') || raw.includes('steel') || raw.includes('aluminum')) return 'metal';
-  if (raw.includes('glass')) return 'glass';
-  if (raw.includes('composite') || raw.includes('engineered')) return 'composite';
-  return raw || 'other';
-}
-
-function initials(name?: string) {
-  return (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
-}
 
 function toProduct(p: RawProduct): Product {
   return {
@@ -337,7 +290,7 @@ function FactoryModal({
 
   return (
     <Dialog open={!!factory} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+      <DialogContent hideClose className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
         {/* Banner */}
         <div
           className="h-28 sm:h-36 relative overflow-hidden shrink-0"
@@ -563,7 +516,7 @@ export const DiscoverPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="min-h-full w-full">
       <PageHeader
         icon={Layers}
         title="Discover"

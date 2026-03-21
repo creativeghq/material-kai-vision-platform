@@ -209,7 +209,7 @@ async function resolveClient(userId: string): Promise<QuoteDocumentClient> {
     .select('id, name, email, phone, company, address, city, postal_code, country')
     .eq('user_id', userId)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (contact) {
     empty.contact_name = contact.name;

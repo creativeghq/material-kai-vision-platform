@@ -25,11 +25,6 @@ if (!ANTHROPIC_API_KEY) {
   throw new Error('ANTHROPIC_API_KEY must be set');
 }
 
-  anthropicExists: !!ANTHROPIC_API_KEY,
-  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
-  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
-});
-
 // Polyfill process.env for npm packages
 (globalThis as any).process = {
   env: {
@@ -46,12 +41,12 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Tool factory imports — extracted from this file for maintainability
 import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool } from '../_shared/tools/search-tools.ts';
-import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool, EDIT_INTENT_PATTERNS, detectEditIntent } from '../_shared/tools/generation-tools.ts';
+import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } from '../_shared/tools/generation-tools.ts';
 import { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } from '../_shared/tools/ops-tools.ts';
-import { createCheckJobStatusTool, createQueryDatabaseTool, createGetStageDetailsTool, createGetRelationshipCountsTool, createGetDocumentEntitiesTool, createGetMetadataExtractionTool } from '../_shared/tools/database-tools.ts';
+import { createQueryDatabaseTool } from '../_shared/tools/database-tools.ts';
 import { createResearchAnalysisTool, createAnalyticsAnalysisTool, createBusinessAnalysisTool, createProductAnalysisTool } from '../_shared/tools/sub-agent-tools.ts';
-import { validateEmailWithZeroBounce, createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } from '../_shared/tools/b2b-tools.ts';
-import { callSEOFunction, createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } from '../_shared/tools/seo-tools.ts';
+import { createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } from '../_shared/tools/b2b-tools.ts';
+import { createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } from '../_shared/tools/seo-tools.ts';
 import { createDispatchBackgroundTaskTool } from '../_shared/tools/background-tools.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
