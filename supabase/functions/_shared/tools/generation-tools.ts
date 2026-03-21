@@ -18,10 +18,66 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
  * Calls MIVAA API to create generation job
  * Frontend polls database for real-time updates
  */
-export const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (chunk: any) => void) => {
+export const create3DGenerationTool = (
+  userId: string,
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+  userImages: string[] = [], // User-attached images from conversation (data URLs or public URLs)
+) => {
   return tool(
     async ({ prompt, roomType, style, referenceImageUrl, models }) => {
       try {
+
+        // Resolve the reference image:
+        // 1. Agent-provided URL takes priority (public HTTP URL)
+        // 2. Fall back to the user's first attached image
+        // 3. If it's a data URL, upload to Supabase storage to get a public URL
+        //    (Replicate models require a public HTTP URL, not a base64 data URL)
+        let resolvedImageUrl = referenceImageUrl || undefined;
+
+        if (!resolvedImageUrl && userImages.length > 0) {
+          const firstImage = userImages[0];
+          if (firstImage.startsWith('data:')) {
+            // Upload data URL to Supabase storage → get public URL for Replicate
+            try {
+              const commaIdx = firstImage.indexOf(',');
+              const header = firstImage.slice(0, commaIdx); // "data:image/jpeg;base64"
+              const base64Data = firstImage.slice(commaIdx + 1);
+              const mimeType = header.slice(5, header.indexOf(';')); // "image/jpeg"
+              const ext = mimeType.split('/')[1] || 'jpg';
+              const fileName = `interior-ref-${Date.now()}.${ext}`;
+
+              // Convert base64 to Uint8Array
+              const binaryStr = atob(base64Data);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) {
+                bytes[i] = binaryStr.charCodeAt(i);
+              }
+
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('designer-assets')
+                .upload(`reference-images/${fileName}`, bytes, {
+                  contentType: mimeType,
+                  upsert: false,
+                });
+
+              if (!uploadError && uploadData) {
+                const { data: urlData } = supabase.storage
+                  .from('designer-assets')
+                  .getPublicUrl(uploadData.path);
+                resolvedImageUrl = urlData.publicUrl;
+                console.log('✅ Uploaded reference image to storage:', resolvedImageUrl);
+              } else {
+                console.warn('⚠️ Failed to upload reference image, proceeding without it:', uploadError);
+              }
+            } catch (uploadErr) {
+              console.warn('⚠️ Image upload error, proceeding without reference:', uploadErr);
+            }
+          } else {
+            // Already a public URL
+            resolvedImageUrl = firstImage;
+          }
+        }
 
         // Call MIVAA API to create job
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
@@ -41,8 +97,8 @@ export const create3DGenerationTool = (userId: string, workspaceId: string, onCh
               prompt,
               room_type: roomType,
               style,
-              image: referenceImageUrl,
-              models: models || undefined, // undefined = all models
+              image: resolvedImageUrl, // triggers image-to-image mode (12 models) when set
+              models: models || undefined, // undefined = all models for the selected mode
               user_id: userId,
               workspace_id: workspaceId,
               width: 768,
@@ -69,7 +125,6 @@ export const create3DGenerationTool = (userId: string, workspaceId: string, onCh
           throw new Error(result.error || 'Generation failed');
         }
 
-
         // IMMEDIATELY send generation job info via streaming callback
         try {
           onChunk?.({
@@ -85,13 +140,14 @@ export const create3DGenerationTool = (userId: string, workspaceId: string, onCh
           console.error('Failed to send generation_job_created chunk:', e);
         }
 
-        // Return a conversational response - agent can continue talking
+        const modeLabel = resolvedImageUrl ? 'image-to-image' : 'text-to-image';
         return JSON.stringify({
           success: true,
           job_id: result.job_id,
           model_count: result.model_count,
           models: result.models,
-          message: `I've started generating ${result.model_count} interior design variations for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. The generation is running in the background - you can see the progress in the generation panel below. Feel free to continue our conversation or ask me anything else while it processes!`,
+          async_job: true,
+          message: `Started generating ${result.model_count} interior design variations (${modeLabel}) for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. Watch progress in the panel below.`,
         });
       } catch (error) {
         console.error('Interior design generation error:', error);
@@ -103,13 +159,16 @@ export const create3DGenerationTool = (userId: string, workspaceId: string, onCh
     },
     {
       name: 'generate_3d',
-      description: 'Generate interior design images using multiple AI models. Creates async job that frontend polls for updates. Supports text-to-image and image-to-image generation.',
+      description: `Generate multiple interior design variations in parallel using all available AI models. Creates an async job — results appear progressively in the generation panel.
+- WITHOUT an uploaded image: runs 4 text-to-image models
+- WITH an uploaded image: automatically runs 12 image-to-image models (all specialized interior remodeling models)
+ALWAYS use this tool (not generate_gemini) when the user wants multiple variations at once. When the user has uploaded a reference image, this tool automatically uses it for image-to-image generation across all 12 models — no need to specify referenceImageUrl.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
         style: z.string().optional().describe('Design style (modern, minimalist, industrial, scandinavian, traditional, etc.)'),
-        referenceImageUrl: z.string().optional().describe('Reference image URL for image-to-image generation'),
-        models: z.array(z.string()).optional().describe('Specific model IDs to use (e.g., ["flux-dev", "sdxl"]), or omit to use all 7 models'),
+        referenceImageUrl: z.string().optional().describe('Public HTTP URL of a reference image — only needed if NOT using the user uploaded image. Leave empty to use the uploaded image automatically.'),
+        models: z.array(z.string()).optional().describe('Specific model IDs to restrict generation to. Omit to use all models for the selected mode.'),
       }),
     }
   );
@@ -155,13 +214,37 @@ export const createGeminiGenerationTool = (
     async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm }) => {
       try {
 
+        // Helper: upload a data URL to Supabase storage, return public URL
+        const uploadDataUrl = async (dataUrl: string): Promise<string | undefined> => {
+          try {
+            const commaIdx = dataUrl.indexOf(',');
+            const header = dataUrl.slice(0, commaIdx);
+            const base64Data = dataUrl.slice(commaIdx + 1);
+            const mimeType = header.slice(5, header.indexOf(';'));
+            const ext = mimeType.split('/')[1] || 'jpg';
+            const fileName = `gemini-ref-${Date.now()}.${ext}`;
+            const binaryStr = atob(base64Data);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+            const { data: uploadData, error } = await supabase.storage
+              .from('designer-assets')
+              .upload(`reference-images/${fileName}`, bytes, { contentType: mimeType, upsert: false });
+            if (error || !uploadData) return undefined;
+            return supabase.storage.from('designer-assets').getPublicUrl(uploadData.path).data.publicUrl;
+          } catch {
+            return undefined;
+          }
+        };
+
         // Auto-detect edit intent if mode not specified
         let resolvedMode = mode;
         if (!resolvedMode) {
           const hasRecentGeneration = conversationImages.length > 0;
+          const hasUploadedImage = images.length > 0;
           if (detectEditIntent(prompt) && hasRecentGeneration) {
             resolvedMode = 'image-edit';
-          } else if (referenceImageUrl && !editInstruction) {
+          } else if ((referenceImageUrl || hasUploadedImage) && !editInstruction) {
+            // Uploaded image or explicit reference → render as floor plan / style reference
             resolvedMode = 'floor-plan-render';
           } else if (prompt?.toLowerCase().includes('floor plan') || sqm) {
             resolvedMode = 'floor-plan-text';
@@ -175,11 +258,18 @@ export const createGeminiGenerationTool = (
           referenceImageUrl ||
           (resolvedMode === 'image-edit' ? conversationImages[conversationImages.length - 1] : undefined);
 
-        // For floor-plan-render: use attached image if available
-        const floorPlanImageUrl =
-          resolvedMode === 'floor-plan-render'
-            ? (resolvedReferenceUrl || (images.length > 0 ? images[0] : undefined))
-            : resolvedReferenceUrl;
+        // For floor-plan-render: use attached image if available, upload data URL if needed
+        let floorPlanImageUrl: string | undefined;
+        if (resolvedMode === 'floor-plan-render') {
+          const candidateUrl = resolvedReferenceUrl || (images.length > 0 ? images[0] : undefined);
+          if (candidateUrl?.startsWith('data:')) {
+            floorPlanImageUrl = await uploadDataUrl(candidateUrl) ?? candidateUrl;
+          } else {
+            floorPlanImageUrl = candidateUrl;
+          }
+        } else {
+          floorPlanImageUrl = resolvedReferenceUrl;
+        }
 
         const body: Record<string, unknown> = {
           mode: resolvedMode,
@@ -258,16 +348,17 @@ export const createGeminiGenerationTool = (
       description: `Generate or edit interior design images using Gemini AI. Use this for:
 - Fast single image generation (text-to-image)
 - Editing an existing generated image ("change the floor", "make it darker", "swap the tiles")
-- Converting a 2D floor plan image to a photorealistic top-down render
-- Generating a floor plan from a text description (two-step)
+- Converting a 2D floor plan image into a photorealistic 3D interior render (mode: floor-plan-render). ALWAYS use this mode when the user uploads a floor plan or layout image and wants a 3D render from it. The uploaded image is automatically used as the floor plan reference — do NOT set referenceImageUrl, just set mode to 'floor-plan-render'.
+- Copying style/atmosphere from an uploaded photo (mode: floor-plan-render with the photo as reference). When user uploads an image and asks to "copy the style", "match the mood", or "use this as reference", use mode floor-plan-render — the uploaded image is used automatically.
+- Generating a floor plan from a text description (mode: floor-plan-text)
 - Generating a design using specific catalog materials as references
-Prefer this over generate_3d for single fast results and iterative editing.`,
+Prefer this over generate_3d for single fast results and iterative editing. When an image has been uploaded by the user, ALWAYS prefer generate_gemini over generate_3d.`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, etc.)'),
         style: z.string().optional().describe('Design style (modern, scandinavian, industrial, cabin, japandi, etc.)'),
-        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text']).optional().describe('Generation mode. Omit to auto-detect.'),
-        referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render'),
+        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text']).optional().describe('Generation mode. Use floor-plan-render when user uploads a floor plan or any reference image. Omit to auto-detect.'),
+        referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
         editInstruction: z.string().optional().describe('Specific edit instruction when mode=image-edit'),
         modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits)'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),

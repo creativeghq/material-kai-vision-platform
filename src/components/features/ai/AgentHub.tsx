@@ -1883,7 +1883,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           ) : (
             <>
-              {messages.map((message) => (
+              {messages.map((message, msgIdx) => (
                 <div
                   key={message.id}
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -2248,59 +2248,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <p className="text-sm whitespace-pre-wrap text-white">{normalizeContent(message.content)}</p>
                         )}
 
-                        {/* Uploaded images on user messages + Generate VR (interior agent only) */}
+                        {/* Uploaded images on user messages */}
                         {message.role === 'user' && message.images && message.images.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex flex-wrap gap-2">
-                              {message.images.map((img, idx) => (
-                                <img
-                                  key={idx}
-                                  src={img}
-                                  alt={`Uploaded image ${idx + 1}`}
-                                  className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
-                                />
-                              ))}
-                            </div>
-                            {selectedAgent === 'interior-designer' && (
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  onClick={() => {
-                                    setAttachedImages([...message.images!]);
-                                    setInput(message.content
-                                      ? `Redesign this room based on my photo: ${message.content}`
-                                      : 'Redesign this room. Create a photorealistic 3D interior design using this photo as the base reference.'
-                                    );
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 transition-colors shadow-sm"
-                                  title="Use this image as reference for 2D interior design generation"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                  Generate 2D Design from this
-                                </button>
-                                <button
-                                  onClick={() => handleGenerateVR(
-                                    message.images![0],
-                                    { prompt: message.content || 'Create an immersive 3D walkthrough of this interior space' },
-                                    message,
-                                  )}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors shadow-sm"
-                                  title="Generate explorable VR world from this uploaded image (50 credits)"
-                                >
-                                  <Globe className="w-3.5 h-3.5" />
-                                  Generate VR from this image
-                                  <span className="text-violet-400 text-xs">50 credits</span>
-                                </button>
-                                <button
-                                  onClick={() => setVirtualStagingImageUrl(message.images![0])}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-full text-xs font-medium text-teal-700 transition-colors shadow-sm"
-                                  title="Virtually stage this room with AI-generated furniture (20 credits)"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                  Virtual Stage this
-                                  <span className="text-teal-400 text-xs">20 credits</span>
-                                </button>
-                              </div>
-                            )}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {message.images.map((img, idx) => (
+                              <img
+                                key={idx}
+                                src={img}
+                                alt={`Uploaded image ${idx + 1}`}
+                                className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
+                              />
+                            ))}
                           </div>
                         )}
 
@@ -2360,6 +2318,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {message.role === 'assistant' && message.articleData && (
                           <SEOArticleViewer articleId={message.articleData.article_id} />
                         )}
+
                       </div>
                     )}
                     <div className="flex items-center justify-between mt-2">
@@ -2489,7 +2448,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
           {/* Attached Images */}
           {attachedImages.length > 0 && (
-            <div className="px-6 pt-3">
+            <div className="px-6 pt-3 space-y-2">
               <div className="flex gap-2">
                 {attachedImages.map((img, idx) => (
                   <div key={idx} className="relative w-16 h-16">
@@ -2509,6 +2468,35 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   </div>
                 ))}
               </div>
+              {/* Quick action chips — interior designer only */}
+              {selectedAgent === 'interior-designer' && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setInput('Convert this floor plan to a photorealistic 3D interior render. Use the uploaded image as the floor plan reference.')}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 transition-colors"
+                    title="Render uploaded floor plan as a 3D interior design"
+                  >
+                    <LayoutTemplate className="w-3 h-3" />
+                    Floor Plan → 3D Render
+                  </button>
+                  <button
+                    onClick={() => setInput('Design a new interior using the style and atmosphere of the uploaded image as reference. Match its color palette, materials, and mood.')}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-medium text-blue-700 transition-colors"
+                    title="Use uploaded image as style reference"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Copy Style
+                  </button>
+                  <button
+                    onClick={() => setInput('Redesign this room. Keep the same spatial layout but apply a fresh interior design with modern materials and furniture.')}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors"
+                    title="Redesign room keeping the same layout"
+                  >
+                    <Layers className="w-3 h-3" />
+                    Redesign Room
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

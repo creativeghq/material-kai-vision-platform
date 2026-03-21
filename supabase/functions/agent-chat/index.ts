@@ -859,7 +859,7 @@ async function executeAgent(
 
   // --- Interior Designer tools ---
   if (config.tools.includes('generate_3d')) {
-    tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
+    tools.push(create3DGenerationTool(userId, workspaceId, onChunk, images));
     tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk));
     tools.push(createGenerationStatusTool());
