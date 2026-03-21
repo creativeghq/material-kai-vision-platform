@@ -150,33 +150,18 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Auth: accept service role JWT (internal server-to-server) OR user JWT
+  // Auth: accept service role key (internal server-to-server) OR user JWT
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let userId: string;
 
-  // Decode JWT role claim directly (no crypto verification needed —
-  // Supabase gateway validates JWT signatures via project signing secret)
-  function decodeJwtRole(jwt: string): string | null {
-    try {
-      const parts = jwt.split('.');
-      if (parts.length !== 3) return null;
-      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      while (padded.length % 4 !== 0) padded += '=';
-      const payload = JSON.parse(atob(padded));
-      return payload?.role ?? null;
-    } catch { return null; }
-  }
-
-  if (decodeJwtRole(token) === 'service_role') {
+  if (token === supabaseServiceKey) {
     // Internal call from agent-chat edge function — user_id must be in body
     const rawBody = await req.json() as VirtualStagingRequest;
     if (!rawBody.user_id) {
       return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
     }
     userId = rawBody.user_id;
-
-    // Re-use parsed body
     return await handleRequest(supabase, rawBody, userId);
   }
 

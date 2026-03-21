@@ -174,29 +174,13 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
   }
 
-  // Auth: accept service role JWT (internal server-to-server) OR user JWT
+  // Auth: accept service role key (internal server-to-server) OR user JWT
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let resolvedUserId: string;
 
-  // Decode JWT payload to check role claim (no crypto verification needed —
-  // the Supabase gateway already rejects invalid JWTs via project signing secret)
-  function decodeJwtRole(jwt: string): string | null {
-    try {
-      const parts = jwt.split('.');
-      if (parts.length !== 3) return null;
-      // Convert base64url → base64 and add required padding for atob
-      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      while (padded.length % 4 !== 0) padded += '=';
-      const payload = JSON.parse(atob(padded));
-      return payload?.role ?? null;
-    } catch { return null; }
-  }
-
-  const jwtRole = decodeJwtRole(token);
-
-  if (jwtRole === 'service_role' && body.user_id) {
-    // Internal server-to-server call (Python backend, agent-chat, etc.)
+  if (token === supabaseServiceKey && body.user_id) {
+    // Internal server-to-server call (agent-chat, Python backend, etc.)
     resolvedUserId = body.user_id;
   } else {
     // User JWT validation

@@ -129,26 +129,14 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Auth: accept service role JWT (internal agent-chat call) OR user JWT
+  // Auth: accept service role key (internal agent-chat call) OR user JWT
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-  function decodeJwtRole(jwt: string): string | null {
-    try {
-      const parts = jwt.split('.');
-      if (parts.length !== 3) return null;
-      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      while (padded.length % 4 !== 0) padded += '=';
-      const payload = JSON.parse(atob(padded));
-      return payload?.role ?? null;
-    } catch { return null; }
-  }
-
   const body = await req.json();
-  const jwtRole = decodeJwtRole(token);
   let userId: string;
 
-  if (jwtRole === 'service_role' && body.user_id) {
+  if (token === supabaseServiceKey && body.user_id) {
     // Internal server-to-server call (from agent-chat edge function)
     userId = body.user_id;
   } else {
