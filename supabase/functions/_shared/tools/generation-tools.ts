@@ -107,8 +107,10 @@ export const create3DGenerationTool = (
               prompt,
               room_type: roomType,
               style,
-              image: resolvedImageUrl, // triggers image-to-image mode (12 models) when set
-              models: models || undefined, // undefined = all models for the selected mode
+              image: resolvedImageUrl, // triggers image-to-image mode when set
+              // Exclude gemini-interior: generate_gemini handles Gemini separately to avoid duplication
+              models: models || undefined,
+              exclude_models: ['gemini-interior'],
               user_id: userId,
               workspace_id: workspaceId,
               width: 768,
@@ -169,12 +171,17 @@ export const create3DGenerationTool = (
     },
     {
       name: 'generate_3d',
-      description: `Generate multiple interior design variations in parallel using all available AI models. Results appear progressively in the generation panel grid.
-- WITHOUT an uploaded image: runs 4 text-to-image models
-- WITH an uploaded image: automatically runs 12 image-to-image models across all specialized interior remodeling AI models
-The uploaded reference image is used automatically — no need to specify referenceImageUrl.
-ALWAYS call this tool when the user uploads an image. ALWAYS call generate_gemini alongside it in the same response — generate_3d fills the grid, generate_gemini gives an immediate result in chat.
-Do NOT call this for iterative edits on previously generated images — use generate_gemini alone for those.`,
+      description: `Generate multiple interior design style variations in parallel using Replicate AI models. Results appear progressively in the generation panel grid.
+ALWAYS call generate_gemini alongside this tool in the same response.
+
+Good for:
+- Text-to-image: user describes a room from scratch with no uploaded image
+- Free-form style redesign: user uploads a room photo and wants to see it in different styles (e.g. "make this Scandinavian", "redesign in industrial style")
+
+Do NOT call this tool when:
+- A chip mode was explicitly selected (floor-plan-render, image-edit, floor-plan-text) — those are Gemini-only precise operations. This is enforced server-side; do not call generate_3d in those cases.
+- Iterative edits on a previously generated image — use generate_gemini alone.
+- Floor plan requests — use generate_gemini alone with mode=floor-plan-text.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
@@ -221,6 +228,7 @@ export const createGeminiGenerationTool = (
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
   pinnedMaterialImages: string[] = [],
+  forcedMode?: string, // Explicit mode override from UI chip selection
 ) => {
   return tool(
     async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm, boardMode }) => {
@@ -249,7 +257,10 @@ export const createGeminiGenerationTool = (
         };
 
         // Auto-detect generation mode if not explicitly specified by the agent
-        let resolvedMode = mode;
+        // forcedMode (from UI chip) always wins over both agent-specified mode and auto-detection
+        // 'copy-style' is a UI-only alias — maps to floor-plan-render (style reference mode)
+        const normalizedForcedMode = forcedMode === 'copy-style' ? 'floor-plan-render' : forcedMode;
+        let resolvedMode = (normalizedForcedMode as any) || mode;
         if (!resolvedMode) {
           const hasRecentGeneration = conversationImages.length > 0;
           const hasUploadedImage = images.length > 0;
@@ -258,19 +269,21 @@ export const createGeminiGenerationTool = (
           if (detectEditIntent(prompt) && hasRecentGeneration) {
             resolvedMode = 'image-edit';
 
-          // Redesign / transform the uploaded room photo directly
-          } else if (hasUploadedImage && /redesign|remodel|transform|renovate|remake/i.test(prompt || '')) {
-            resolvedMode = 'image-edit';
-
           // Text-based floor plan generation (no image, mentions floor plan or has sqm)
-          } else if (!referenceImageUrl && !hasUploadedImage && (prompt?.toLowerCase().includes('floor plan') || sqm)) {
+          } else if (!referenceImageUrl && !hasUploadedImage && (/floor\s*plan|2d\s*plan|floor\s*map|room\s*layout.*diagram|draw.*layout|create.*plan|generate.*plan/i.test(prompt || '') || sqm)) {
             resolvedMode = 'floor-plan-text';
 
-          // Uploaded image or explicit reference → floor-plan-render
-          // (handles both actual floor plans AND style-reference "Copy Style" use-case;
-          //  buildFloorPlanRenderPrompt switches behaviour based on the user prompt text)
-          } else if (referenceImageUrl || hasUploadedImage) {
+          // Floor plan image → perspective render (explicit floor plan keyword)
+          } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan|render.*layout|convert.*plan/i.test(prompt || '')) {
             resolvedMode = 'floor-plan-render';
+
+          // Style reference (copy style / mood / palette from uploaded image)
+          } else if ((referenceImageUrl || hasUploadedImage) && /copy.*style|use.*style|style.*reference|match.*mood|inspired by|palette|atmosphere/i.test(prompt || '')) {
+            resolvedMode = 'floor-plan-render';
+
+          // Any uploaded image defaults to image-edit (edits ON TOP of the original photo)
+          } else if (referenceImageUrl || hasUploadedImage) {
+            resolvedMode = 'image-edit';
 
           } else {
             resolvedMode = 'text-to-image';
@@ -423,17 +436,18 @@ export const createGeminiGenerationTool = (
       description: `Generate or edit interior design images using Gemini AI. Provides an immediate single result in the chat.
 
 WHEN TO CALL ALONGSIDE generate_3d:
-- User uploads an image (any use case) → call BOTH this tool AND generate_3d in the same response. generate_3d fills the 12-model generation grid; this tool gives an immediate result in chat.
+- Text-to-image or free-form style redesign → call BOTH. generate_3d fills the variation grid; this tool gives an immediate Gemini result.
 
 WHEN TO call this tool ALONE (do NOT call generate_3d):
+- A chip mode is active (floor-plan-render, image-edit, floor-plan-text) — generate_3d is already excluded server-side for these modes
 - Iterative edit on a previously generated image ("change the floor", "make it warmer")
-- Text-only requests with no uploaded image
+- Floor plan requests — use mode=floor-plan-text
 - Materials board generation
 
 Mode routing (auto-detected if not set explicitly):
-- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render
-- User uploads a reference photo and says "copy the style / use as inspiration / match the mood" → floor-plan-render: creates a new interior design inspired by the photo's palette and materials
-- User uploads a room photo and says "redesign / transform / remodel this room" → image-edit: applies changes directly to the uploaded room photo
+- User uploads any room photo (default) → image-edit: edits DIRECTLY ON TOP of the uploaded photo, preserving spatial layout and element positions
+- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render from the floor plan
+- User uploads a reference photo and says "copy the style / palette / mood" → floor-plan-render: creates a new interior design inspired by the photo's aesthetic
 - User says "change the floor / swap the tiles / make it darker" on a previously generated image → image-edit: edits the most recent generated image
 - User asks for a new design from text only → text-to-image
 - User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: generates a clean 2D floor plan diagram (top-down architectural drawing)

@@ -271,6 +271,10 @@ const AgentStateAnnotation = Annotation.Root({
     reducer: (_, next) => next,
     default: () => null,
   }),
+  generationToolsCalled: Annotation<boolean>({
+    reducer: (prev, next) => prev || next,
+    default: () => false,
+  }),
 });
 
 type AgentState = typeof AgentStateAnnotation.State;
@@ -303,8 +307,13 @@ function createAgentGraph(
     }
 
     // Invoke model — force tool use only on the first iteration to avoid infinite tool loops
-    const modelWithTools = tools.length > 0
-      ? model.bindTools(tools, (forceToolCall && state.iteration === 0) ? { tool_choice: 'any' } : undefined)
+    // After generation tools have been called, remove them so the agent can only respond
+    const GENERATION_TOOLS = ['generate_3d', 'generate_gemini'];
+    const availableTools = state.generationToolsCalled
+      ? tools.filter((t: any) => !GENERATION_TOOLS.includes(t.name))
+      : tools;
+    const modelWithTools = availableTools.length > 0
+      ? model.bindTools(availableTools, (forceToolCall && state.iteration === 0) ? { tool_choice: 'any' } : undefined)
       : model;
     const invokeStartTime = Date.now();
 
@@ -509,11 +518,16 @@ function createAgentGraph(
       }
     }
 
+    const generationToolsCalled = toolCalls.some((tc: any) =>
+      ['generate_3d', 'generate_gemini'].includes(tc.name)
+    );
+
     return {
       messages: toolMessages,
       toolResults: newToolResults,
       collectedProducts: newProducts,
       generationJob: generationJob || state.generationJob,
+      generationToolsCalled,
     };
   }
 
@@ -719,6 +733,7 @@ async function executeAgent(
   userRole: string, // User's workspace role for RBAC tool gating
   onChunk?: (chunk: any) => void,
   pinnedMaterialImages: string[] = [], // Catalog product images pinned by user for Gemini multi-reference
+  generationMode?: string, // Explicit mode override from UI chip selection
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -872,8 +887,15 @@ async function executeAgent(
 
   // --- Interior Designer tools ---
   if (config.tools.includes('generate_3d')) {
-    tools.push(create3DGenerationTool(userId, workspaceId, onChunk, images, conversationImages));
-    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages));
+    // generate_3d (Replicate grid) is skipped when a chip mode is explicitly set.
+    // Chip modes (floor-plan-render, floor-plan-text, image-edit) are precise Gemini-only
+    // operations — Replicate models can't preserve furniture positions or follow exact
+    // edit instructions, so they'd just produce off-prompt full redesigns.
+    const GEMINI_ONLY_MODES = ['floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit'];
+    if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {
+      tools.push(create3DGenerationTool(userId, workspaceId, onChunk, images, conversationImages));
+    }
+    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages, generationMode));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk));
     tools.push(createGenerationStatusTool());
   }
@@ -1036,6 +1058,7 @@ async function executeAgent(
     turnCount: 0,
     finalResponse: null,
     generationJob: null,
+    generationToolsCalled: false,
   };
 
   try {
@@ -1311,7 +1334,7 @@ Deno.serve(async (req) => {
   try {
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [] } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null } = await req.json();
     // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
     // conversation_id: string | null — Supabase conversation ID, used to post background task results back
     // pinned_material_images: string[] — catalog product image URLs pinned by user for Gemini multi-reference generation
@@ -1446,6 +1469,7 @@ Deno.serve(async (req) => {
                 }
               },
               pinned_material_images, // Catalog product images pinned by user
+              generation_mode || undefined, // Explicit mode override from UI chip
             );
             if (finalResult) {
             }

@@ -203,7 +203,6 @@ interface Message {
   }; // SEO article pipeline data for SEOArticleViewer
   geminiImageData?: {
     image_url: string;
-    diagram_url?: string;
     mode: string;
     model: string;
     job_id: string;
@@ -270,6 +269,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -990,6 +990,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const userInput = input;
     setInput('');
     setAttachedImages([]);
+    setSelectedGenerationMode(null);
     setIsLoading(true);
     setReasoningSteps([]); // Clear reasoning steps for new message
     console.log('✅ State updated, starting try block');
@@ -1038,6 +1039,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const workspaceId = session.user?.user_metadata?.workspace_id;
       const canUseCache = attachedImages.length === 0 && selectedAgent === 'kai';
       let data: any = null;
+      let pendingGeminiData: Message['geminiImageData'] | null = null;
 
       if (canUseCache) {
         const cachedResponse = getCachedResponse(userInput, selectedAgent, workspaceId);
@@ -1066,6 +1068,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           model: selectedModel,
           images: attachedImages,
           conversation_id: currentConversationId,
+          ...(selectedGenerationMode ? { generation_mode: selectedGenerationMode } : {}),
           ...(pinnedMaterials.length > 0 && selectedAgent === 'interior-designer'
             ? { pinned_material_images: pinnedMaterials.filter(m => m.imageUrl).map(m => m.imageUrl!) }
             : {}),
@@ -1276,45 +1279,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     style: chunk.style,
                   },
                 };
-              // Handle gemini_image_ready — Gemini single-image generation result
+              // Handle gemini_image_ready — store data to merge into the final assistant message
               } else if (chunk.type === 'gemini_image_ready') {
-                const modeLabels: Record<string, string> = {
-                  'text-to-image': 'Design generated',
-                  'image-edit': 'Edit applied',
-                  'floor-plan-render': 'Floor plan rendered',
-                  'floor-plan-text': 'Floor plan created',
+                pendingGeminiData = {
+                  image_url: chunk.image_url,
+                  mode: chunk.mode,
+                  model: chunk.model,
+                  job_id: chunk.job_id,
+                  credits_used: chunk.credits_used,
                 };
-                const geminiMsg: Message = {
-                  id: `msg-gemini-${Date.now()}`,
-                  role: 'assistant',
-                  content: `✨ ${modeLabels[chunk.mode] || 'Image generated'} — ${chunk.credits_used} credits used`,
-                  timestamp: new Date(),
-                  agentId: selectedAgent,
-                  model: selectedModel,
-                  geminiImageData: {
-                    image_url: chunk.image_url,
-                    diagram_url: chunk.diagram_url,
-                    mode: chunk.mode,
-                    model: chunk.model,
-                    job_id: chunk.job_id,
-                    credits_used: chunk.credits_used,
-                  },
-                };
-                setMessages(prev => [...prev, geminiMsg]);
-                if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: geminiMsg.content,
-                    metadata: { agentId: selectedAgent, model: selectedModel, geminiImageData: geminiMsg.geminiImageData },
-                  });
-                }
-                finalResult = {
-                  type: 'final_result',
-                  text: geminiMsg.content,
-                  agentId: selectedAgent,
-                  model: selectedModel,
-                };
+                // Don't add a message here — it will be merged into the final assistant message
+                // so the agent's explanation text and the image appear in a single bubble.
               // Handle virtual_staging_ready — virtual staging result
               } else if (chunk.type === 'virtual_staging_ready') {
                 const stagingMsg: Message = {
@@ -1545,6 +1520,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const designData: Message['designData'] = undefined;
 
       // Add assistant response to messages
+      // If gemini generated an image during this turn, merge it into this single message
+      // so the agent's explanation text and the image appear together in one bubble.
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
         role: 'assistant',
@@ -1556,6 +1533,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         materialData,
         designData, // Include design data with spatial analysis
         generation_job: data.generation_job, // Async 3D generation job info
+        geminiImageData: pendingGeminiData ?? undefined,
       };
 
       // Track active generation job if present
@@ -1591,6 +1569,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             materialData, // Save material data for Search Agent
             designData, // Save design data for Interior Designer Agent (includes spatial analysis)
             generation_job: data.generation_job, // Save generation job info for async 3D generation
+            geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
           },
         });
       }
@@ -1626,18 +1605,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    const imageUrls: string[] = [];
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          imageUrls.push(event.target.result as string);
-          setAttachedImages((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
+    const fileArray = Array.from(files);
+    e.target.value = ''; // Reset now so the same file can be re-selected later
+
+    Promise.all(
+      fileArray.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              if (ev.target?.result) resolve(ev.target.result as string);
+              else reject(new Error('Failed to read file'));
+            };
+            reader.onerror = () => reject(new Error('FileReader error'));
+            reader.readAsDataURL(file);
+          }),
+      ),
+    ).then((urls) => {
+      setAttachedImages((prev) => [...prev, ...urls]);
     });
   }, []);
 
@@ -2025,21 +2012,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <img
                           src={message.geminiImageData.image_url}
                           alt="Gemini interior design"
                           className="w-full rounded-xl border border-white/20 shadow-md"
                           loading="lazy"
                         />
-                        {message.geminiImageData.diagram_url && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>Step 1 diagram:</span>
-                            <a href={message.geminiImageData.diagram_url} target="_blank" rel="noreferrer" className="underline hover:text-foreground">
-                              View floor plan
-                            </a>
-                          </div>
-                        )}
                         {/* Actions: Video + VR World */}
                         <div className="flex flex-wrap gap-2">
                           {message.videoData ? (
@@ -2051,92 +2030,91 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           ) : (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2">
-                                  <Video className="h-4 w-4" />
+                                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors">
+                                  <Video className="h-3.5 w-3.5" />
                                   Generate Video
-                                  <ChevronDown className="h-3 w-3 ml-1 text-muted-foreground" />
-                                </Button>
+                                  <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                                </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-72">
-                                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
+                              <DropdownMenuContent align="start" className="w-72 bg-violet-50 border-violet-200">
+                                <DropdownMenuLabel className="text-xs font-semibold text-violet-500 pb-1">Model</DropdownMenuLabel>
                                 {VIDEO_MODELS.map(vm => (
                                   <DropdownMenuItem
                                     key={vm.value}
                                     onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }}
-                                    className="gap-2"
+                                    className="gap-2 focus:bg-violet-100 focus:text-violet-900"
                                   >
-                                    <Check className={cn('h-3.5 w-3.5 flex-shrink-0', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
+                                    <Check className={cn('h-3.5 w-3.5 flex-shrink-0 text-violet-600', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
                                     <div className="flex-1 min-w-0">
                                       <div className="font-medium text-sm">{vm.label}</div>
-                                      <div className="text-xs text-muted-foreground">{vm.description}</div>
+                                      <div className="text-xs text-violet-400">{vm.description}</div>
                                     </div>
-                                    {'credits' in vm && <span className="ml-2 text-xs text-muted-foreground flex-shrink-0">{vm.credits} cr</span>}
+                                    {'credits' in vm && <span className="ml-2 text-xs text-violet-400 flex-shrink-0">{vm.credits} cr</span>}
                                   </DropdownMenuItem>
                                 ))}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground pb-1">Video Style</DropdownMenuLabel>
+                                <DropdownMenuSeparator className="bg-violet-200" />
+                                <DropdownMenuLabel className="text-xs font-semibold text-violet-500 pb-1">Video Style</DropdownMenuLabel>
                                 {VIDEO_TYPES.map(vt => (
                                   <DropdownMenuItem
                                     key={vt.value}
                                     onClick={() => handleGenerateVideo(message.geminiImageData!.image_url, message, vt.value, videoModel)}
+                                    className="focus:bg-violet-100 focus:text-violet-900"
                                   >
-                                    <Video className="h-4 w-4 mr-2 flex-shrink-0" />
+                                    <Video className="h-4 w-4 mr-2 flex-shrink-0 text-violet-500" />
                                     <div className="flex-1 min-w-0">
                                       <div className="font-medium">{vt.label}</div>
-                                      <div className="text-xs text-muted-foreground">{vt.description}</div>
+                                      <div className="text-xs text-violet-400">{vt.description}</div>
                                     </div>
-                                    <span className="ml-2 text-xs text-muted-foreground flex-shrink-0">{vt.credits} cr</span>
+                                    <span className="ml-2 text-xs text-violet-400 flex-shrink-0">{vt.credits} cr</span>
                                   </DropdownMenuItem>
                                 ))}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
+                          <button
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"
                             onClick={() => handleGenerateVR(
                               message.geminiImageData!.image_url,
                               { prompt: normalizeContent(message.content) },
                               message,
                             )}
                           >
-                            <Sparkles className="h-4 w-4" />
-                            Explore in VR World
-                            <span className="text-muted-foreground text-xs ml-1">50 credits</span>
-                          </Button>
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Explore in VR
+                            <span className="opacity-50 text-[10px] ml-0.5">50 cr</span>
+                          </button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" className="gap-2">
-                                <Layers className="h-4 w-4" />
-                                Materials Selection Board
-                                <ChevronDown className="h-3 w-3 ml-1 text-muted-foreground" />
-                              </Button>
+                              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-700 transition-colors">
+                                <Layers className="h-3.5 w-3.5" />
+                                Materials Board
+                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                              </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'presentation-board', message)}>
-                                <LayoutTemplate className="h-4 w-4 mr-2" />
+                            <DropdownMenuContent align="start" className="bg-amber-50 border-amber-200">
+                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'presentation-board', message)} className="focus:bg-amber-100 focus:text-amber-900">
+                                <LayoutTemplate className="h-4 w-4 mr-2 text-amber-600" />
                                 <div>
                                   <div className="font-medium">Presentation Board</div>
-                                  <div className="text-xs text-muted-foreground">Fitment selection + isometric drawing + material column</div>
+                                  <div className="text-xs text-amber-400">Fitment selection + isometric drawing + material column</div>
                                 </div>
-                                <span className="ml-auto text-xs text-muted-foreground">15 cr</span>
+                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'selection-board', message)}>
-                                <Layers className="h-4 w-4 mr-2" />
+                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'selection-board', message)} className="focus:bg-amber-100 focus:text-amber-900">
+                                <Layers className="h-4 w-4 mr-2 text-amber-600" />
                                 <div>
                                   <div className="font-medium">Selection Board</div>
-                                  <div className="text-xs text-muted-foreground">Cutaway view with material swatch callouts</div>
+                                  <div className="text-xs text-amber-400">Cutaway view with material swatch callouts</div>
                                 </div>
-                                <span className="ml-auto text-xs text-muted-foreground">15 cr</span>
+                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'photorealistic-render', message)}>
-                                <Camera className="h-4 w-4 mr-2" />
+                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'photorealistic-render', message)} className="focus:bg-amber-100 focus:text-amber-900">
+                                <Camera className="h-4 w-4 mr-2 text-amber-600" />
                                 <div>
                                   <div className="font-medium">Photorealistic Render</div>
-                                  <div className="text-xs text-muted-foreground">Ultra-detailed magazine-quality room render</div>
+                                  <div className="text-xs text-amber-400">Ultra-detailed magazine-quality room render</div>
                                 </div>
-                                <span className="ml-auto text-xs text-muted-foreground">15 cr</span>
+                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -2503,24 +2481,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {selectedAgent === 'interior-designer' && (
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => setInput('I have uploaded a floor plan. Render it as a photorealistic perspective interior — an eye-level view showing how the rooms would look from inside, with realistic materials and natural lighting.')}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 transition-colors"
+                    onClick={() => { setSelectedGenerationMode('floor-plan-render'); setInput('Render this floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting.'); }}
+                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
                     title="Convert uploaded floor plan to a photorealistic eye-level interior perspective"
                   >
                     <LayoutTemplate className="w-3 h-3" />
                     Floor Plan → 3D Render
                   </button>
                   <button
-                    onClick={() => setInput('I uploaded a style reference photo. Generate a completely new interior design inspired by its color palette, materials, atmosphere, and mood. Do not modify my photo — create a fresh new room design with this aesthetic.')}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-medium text-blue-700 transition-colors"
+                    onClick={() => { setSelectedGenerationMode('copy-style'); setInput('Use this uploaded image as a style and mood reference. Copy its color palette, materials, and atmosphere to create a completely new interior design.'); }}
+                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'copy-style' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'}`}
                     title="Use uploaded image as style reference for a brand new design"
                   >
                     <Sparkles className="w-3 h-3" />
                     Copy Style
                   </button>
                   <button
-                    onClick={() => setInput('Redesign and transform the room in my uploaded photo. Keep the same spatial layout and camera angle but completely replace the materials, finishes, colors, and furniture with a fresh modern interior design.')}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors"
+                    onClick={() => { setSelectedGenerationMode('image-edit'); setInput('Redesign this room. Keep all furniture, objects, and architectural elements in their exact positions. Only update the materials, colors, and finishes.'); }}
+                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
                     title="Transform the uploaded room photo with a new interior design"
                   >
                     <Layers className="w-3 h-3" />
@@ -2584,19 +2562,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
-          {/* Interior Designer quick-action chips (no image attached) */}
-          {selectedAgent === 'interior-designer' && attachedImages.length === 0 && (
-            <div className="px-4 pt-2 flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setInput('Generate a 2D floor plan diagram for a living room of 40sqm. Include dimensions, furniture placement, and room labels.')}
-                className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-600 transition-colors"
-                title="Describe a layout in text — AI generates a 2D floor plan diagram with dimensions and furniture"
-              >
-                <LayoutTemplate className="w-3 h-3" />
-                Floor Plan from Text
-              </button>
-            </div>
-          )}
 
           {/* Agent Selector */}
           <div className="px-4 pt-3 pb-1 flex items-center gap-2">
