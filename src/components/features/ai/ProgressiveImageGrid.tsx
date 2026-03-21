@@ -653,6 +653,15 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                     </svg>
                   </div>
                 )}
+                {/* "Edited" indicator — shown when a material replacement was applied to this image */}
+                {result.image_urls[0] && editedImages.some(e => e.sourceImageUrl === result.image_urls[0]) && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <Badge className="bg-violet-600 text-white text-[9px] px-1.5 py-0 shadow flex items-center gap-0.5">
+                      <Paintbrush className="w-2.5 h-2.5" />
+                      Edited
+                    </Badge>
+                  </div>
+                )}
               </div>
               {/* Model label below the image */}
               <p className="text-xs font-medium text-center text-foreground truncate px-1 leading-tight">{result.model_name}</p>

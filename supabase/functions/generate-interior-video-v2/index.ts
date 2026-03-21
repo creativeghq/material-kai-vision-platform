@@ -17,7 +17,6 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
 import { generateVideoWithVeo } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -126,15 +125,40 @@ async function pollReplicate(
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const auth = await authenticate(req);
-  if (!auth.user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-  const userId = auth.user.id;
-
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Auth: accept service role JWT (internal agent-chat call) OR user JWT
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  function decodeJwtRole(jwt: string): string | null {
+    try {
+      const parts = jwt.split('.');
+      if (parts.length !== 3) return null;
+      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (padded.length % 4 !== 0) padded += '=';
+      const payload = JSON.parse(atob(padded));
+      return payload?.role ?? null;
+    } catch { return null; }
+  }
+
   const body = await req.json();
+  const jwtRole = decodeJwtRole(token);
+  let userId: string;
+
+  if (jwtRole === 'service_role' && body.user_id) {
+    // Internal server-to-server call (from agent-chat edge function)
+    userId = body.user_id;
+  } else {
+    // User JWT validation
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
+    if (authError || !user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    userId = user.id;
+  }
+
   const {
     source_image_url,
     video_type = 'walkthrough' as VideoType,

@@ -185,7 +185,9 @@ Deno.serve(async (req) => {
     try {
       const parts = jwt.split('.');
       if (parts.length !== 3) return null;
-      const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      // Convert base64url → base64 and add required padding for atob
+      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (padded.length % 4 !== 0) padded += '=';
       const payload = JSON.parse(atob(padded));
       return payload?.role ?? null;
     } catch { return null; }
@@ -270,11 +272,11 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: 'reference_image_url required for floor-plan-render mode' }, 400);
       }
 
-      const renderPrompt = buildFloorPlanRenderPrompt(body.style);
+      const renderPrompt = buildFloorPlanRenderPrompt(body.style, body.prompt);
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
       const result = await generateImageWithGemini(
         { text: renderPrompt, images: [sourceBuffer] },
-        { model, aspectRatio: '1:1' }, // floor plans are square
+        { model, aspectRatio: '1:1' },
       );
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
     }
@@ -297,7 +299,7 @@ Deno.serve(async (req) => {
         supabase, diagramResult.base64, diagramResult.mimeType, jobId, '-diagram',
       );
 
-      // Step 2: Apply photorealistic render to generated diagram
+      // Step 2: Apply photorealistic perspective render to generated diagram (no user prompt — pure floor plan)
       const renderPrompt = buildFloorPlanRenderPrompt(body.style);
       const diagramBuffer = Uint8Array.from(atob(diagramResult.base64), (c) => c.charCodeAt(0));
       const renderResult = await generateImageWithGemini(

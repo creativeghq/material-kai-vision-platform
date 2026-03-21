@@ -23,6 +23,7 @@ export const create3DGenerationTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   userImages: string[] = [], // User-attached images from conversation (data URLs or public URLs)
+  conversationImages: string[] = [], // Previously generated image URLs (for edit intent detection)
 ) => {
   return tool(
     async ({ prompt, roomType, style, referenceImageUrl, models }) => {
@@ -31,7 +32,8 @@ export const create3DGenerationTool = (
         // Resolve the reference image:
         // 1. Agent-provided URL takes priority (public HTTP URL)
         // 2. Fall back to the user's first attached image
-        // 3. If it's a data URL, upload to Supabase storage to get a public URL
+        // 3. If edit intent detected and no other image, use most recent generated image
+        // 4. If it's a data URL, upload to Supabase storage to get a public URL
         //    (Replicate models require a public HTTP URL, not a base64 data URL)
         let resolvedImageUrl = referenceImageUrl || undefined;
 
@@ -55,20 +57,20 @@ export const create3DGenerationTool = (
               }
 
               const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('designer-assets')
+                .from('generation-images')
                 .upload(`reference-images/${fileName}`, bytes, {
                   contentType: mimeType,
-                  upsert: false,
+                  upsert: true,
                 });
 
               if (!uploadError && uploadData) {
                 const { data: urlData } = supabase.storage
-                  .from('designer-assets')
+                  .from('generation-images')
                   .getPublicUrl(uploadData.path);
                 resolvedImageUrl = urlData.publicUrl;
                 console.log('✅ Uploaded reference image to storage:', resolvedImageUrl);
               } else {
-                console.warn('⚠️ Failed to upload reference image, proceeding without it:', uploadError);
+                console.error('❌ Failed to upload reference image:', uploadError);
               }
             } catch (uploadErr) {
               console.warn('⚠️ Image upload error, proceeding without reference:', uploadErr);
@@ -77,6 +79,14 @@ export const create3DGenerationTool = (
             // Already a public URL
             resolvedImageUrl = firstImage;
           }
+        }
+
+        // Auto-detect edit intent: if user prompt signals an edit (e.g. "change the floor",
+        // "make it darker") and there are previously generated images, use the most recent one
+        // as a reference so image-to-image mode is triggered across all 12 models.
+        if (!resolvedImageUrl && conversationImages.length > 0 && detectEditIntent(prompt)) {
+          resolvedImageUrl = conversationImages[conversationImages.length - 1];
+          console.log('✅ Edit intent detected — using most recent generated image as reference:', resolvedImageUrl);
         }
 
         // Call MIVAA API to create job
@@ -159,10 +169,11 @@ export const create3DGenerationTool = (
     },
     {
       name: 'generate_3d',
-      description: `Generate multiple interior design variations in parallel using all available AI models. Creates an async job — results appear progressively in the generation panel.
+      description: `Generate multiple interior design variations in parallel using all available AI models. Results appear progressively in the generation panel grid.
 - WITHOUT an uploaded image: runs 4 text-to-image models
-- WITH an uploaded image: automatically runs 12 image-to-image models (all specialized interior remodeling models)
-ALWAYS use this tool (not generate_gemini) when the user wants multiple variations at once. When the user has uploaded a reference image, this tool automatically uses it for image-to-image generation across all 12 models — no need to specify referenceImageUrl.`,
+- WITH an uploaded image: automatically runs 12 image-to-image models across all specialized interior remodeling AI models
+The uploaded reference image is used automatically — no need to specify referenceImageUrl.
+ALWAYS call this tool when the user uploads an image — it populates the full generation grid with 12 variations. You may also call generate_gemini alongside it for an immediate single result in the chat.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
@@ -211,7 +222,7 @@ export const createGeminiGenerationTool = (
   pinnedMaterialImages: string[] = [],
 ) => {
   return tool(
-    async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm }) => {
+    async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm, boardMode }) => {
       try {
 
         // Helper: upload a data URL to Supabase storage, return public URL
@@ -227,36 +238,69 @@ export const createGeminiGenerationTool = (
             const bytes = new Uint8Array(binaryStr.length);
             for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
             const { data: uploadData, error } = await supabase.storage
-              .from('designer-assets')
-              .upload(`reference-images/${fileName}`, bytes, { contentType: mimeType, upsert: false });
+              .from('generation-images')
+              .upload(`reference-images/${fileName}`, bytes, { contentType: mimeType, upsert: true });
             if (error || !uploadData) return undefined;
-            return supabase.storage.from('designer-assets').getPublicUrl(uploadData.path).data.publicUrl;
+            return supabase.storage.from('generation-images').getPublicUrl(uploadData.path).data.publicUrl;
           } catch {
             return undefined;
           }
         };
 
-        // Auto-detect edit intent if mode not specified
+        // Auto-detect generation mode if not explicitly specified by the agent
         let resolvedMode = mode;
         if (!resolvedMode) {
           const hasRecentGeneration = conversationImages.length > 0;
           const hasUploadedImage = images.length > 0;
+
+          // Edit intent on a previously generated image (e.g. "change the floor")
           if (detectEditIntent(prompt) && hasRecentGeneration) {
             resolvedMode = 'image-edit';
-          } else if ((referenceImageUrl || hasUploadedImage) && !editInstruction) {
-            // Uploaded image or explicit reference → render as floor plan / style reference
-            resolvedMode = 'floor-plan-render';
-          } else if (prompt?.toLowerCase().includes('floor plan') || sqm) {
+
+          // Redesign / transform the uploaded room photo directly
+          } else if (hasUploadedImage && /redesign|remodel|transform|renovate|remake/i.test(prompt || '')) {
+            resolvedMode = 'image-edit';
+
+          // Text-based floor plan generation (no image, mentions floor plan or has sqm)
+          } else if (!referenceImageUrl && !hasUploadedImage && (prompt?.toLowerCase().includes('floor plan') || sqm)) {
             resolvedMode = 'floor-plan-text';
+
+          // Uploaded image or explicit reference → floor-plan-render
+          // (handles both actual floor plans AND style-reference "Copy Style" use-case;
+          //  buildFloorPlanRenderPrompt switches behaviour based on the user prompt text)
+          } else if (referenceImageUrl || hasUploadedImage) {
+            resolvedMode = 'floor-plan-render';
+
           } else {
             resolvedMode = 'text-to-image';
           }
         }
 
-        // For image-edit: use most recent generated image if no explicit reference
-        const resolvedReferenceUrl =
-          referenceImageUrl ||
-          (resolvedMode === 'image-edit' ? conversationImages[conversationImages.length - 1] : undefined);
+        // materials-selection-board: requires a reference image (most recent generated image or explicit URL)
+        if (resolvedMode === 'materials-selection-board' && !referenceImageUrl) {
+          const fallback = conversationImages[conversationImages.length - 1] || images[0];
+          if (!fallback) {
+            return JSON.stringify({
+              success: false,
+              error: 'A generated design image is required to create a materials selection board. Please generate a design first, then ask for a materials board.',
+            });
+          }
+        }
+
+        // For image-edit: prefer (1) explicit referenceImageUrl, (2) uploaded image, (3) most recent generated image
+        let resolvedReferenceUrl: string | undefined = referenceImageUrl;
+        if (!resolvedReferenceUrl && resolvedMode === 'image-edit') {
+          if (images.length > 0) {
+            const candidate = images[0];
+            if (candidate.startsWith('data:')) {
+              resolvedReferenceUrl = await uploadDataUrl(candidate);
+            } else {
+              resolvedReferenceUrl = candidate;
+            }
+          } else if (conversationImages.length > 0) {
+            resolvedReferenceUrl = conversationImages[conversationImages.length - 1];
+          }
+        }
 
         // For floor-plan-render: use attached image if available, upload data URL if needed
         let floorPlanImageUrl: string | undefined;
@@ -271,16 +315,35 @@ export const createGeminiGenerationTool = (
           floorPlanImageUrl = resolvedReferenceUrl;
         }
 
+        // For materials-selection-board: resolve reference from conversationImages or uploaded image
+        let materialsBoardRefUrl = floorPlanImageUrl;
+        if (resolvedMode === 'materials-selection-board' && !materialsBoardRefUrl) {
+          const candidate = referenceImageUrl || conversationImages[conversationImages.length - 1] || images[0];
+          if (candidate?.startsWith('data:')) {
+            materialsBoardRefUrl = await uploadDataUrl(candidate) ?? candidate;
+          } else {
+            materialsBoardRefUrl = candidate;
+          }
+        }
+
+        const resolvedBoardMode = boardMode || 'selection-board';
+
         const body: Record<string, unknown> = {
           mode: resolvedMode,
           prompt,
           room_type: roomType,
           style,
           sqm,
-          model_tier: modelTier ?? 'fast',
+          model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast'),
           user_id: userId,
           workspace_id: workspaceId,
-          ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}),
+          ...(resolvedMode === 'materials-selection-board'
+            ? {
+                reference_image_url: materialsBoardRefUrl,
+                board_mode: resolvedBoardMode,
+                aspect_ratio: resolvedBoardMode === 'photorealistic-render' ? '16:9' : '1:1',
+              }
+            : { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }),
           ...(editInstruction ? { edit_instruction: editInstruction } : {}),
           ...((() => {
             const merged = [...(materialImages || []), ...pinnedMaterialImages].slice(0, 14);
@@ -310,21 +373,32 @@ export const createGeminiGenerationTool = (
 
 
         // Emit image result via streaming
-        onChunk?.({
-          type: 'gemini_image_ready',
-          job_id: result.job_id,
-          image_url: result.image_url,
-          diagram_url: result.diagram_url,
-          mode: resolvedMode,
-          model: result.model,
-          credits_used: result.credits_used,
-        });
+        if (resolvedMode === 'materials-selection-board') {
+          onChunk?.({
+            type: 'materials_board_ready',
+            job_id: result.job_id,
+            image_url: result.image_url,
+            board_mode: resolvedBoardMode,
+            credits_used: result.credits_used,
+          });
+        } else {
+          onChunk?.({
+            type: 'gemini_image_ready',
+            job_id: result.job_id,
+            image_url: result.image_url,
+            diagram_url: result.diagram_url,
+            mode: resolvedMode,
+            model: result.model,
+            credits_used: result.credits_used,
+          });
+        }
 
         const modeLabels: Record<string, string> = {
           'text-to-image': 'generated a new design',
           'image-edit': 'applied your edit',
           'floor-plan-render': 'rendered your floor plan',
           'floor-plan-text': 'created your floor plan',
+          'materials-selection-board': 'created your materials board',
         };
 
         return JSON.stringify({
@@ -345,24 +419,29 @@ export const createGeminiGenerationTool = (
     },
     {
       name: 'generate_gemini',
-      description: `Generate or edit interior design images using Gemini AI. Use this for:
-- Fast single image generation (text-to-image)
-- Editing an existing generated image ("change the floor", "make it darker", "swap the tiles")
-- Converting a 2D floor plan image into a photorealistic 3D interior render (mode: floor-plan-render). ALWAYS use this mode when the user uploads a floor plan or layout image and wants a 3D render from it. The uploaded image is automatically used as the floor plan reference — do NOT set referenceImageUrl, just set mode to 'floor-plan-render'.
-- Copying style/atmosphere from an uploaded photo (mode: floor-plan-render with the photo as reference). When user uploads an image and asks to "copy the style", "match the mood", or "use this as reference", use mode floor-plan-render — the uploaded image is used automatically.
-- Generating a floor plan from a text description (mode: floor-plan-text)
-- Generating a design using specific catalog materials as references
-Prefer this over generate_3d for single fast results and iterative editing. When an image has been uploaded by the user, ALWAYS prefer generate_gemini over generate_3d.`,
+      description: `Generate or edit interior design images using Gemini AI. Use this for single results and iterative editing. Do NOT call alongside generate_3d for the same request — choose one.
+
+Mode routing (auto-detected if not set explicitly):
+- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render showing how the space looks from inside (NOT a top-down view)
+- User uploads a reference photo and says "copy the style / use as inspiration / match the mood" → floor-plan-render: creates a new interior design inspired by the photo's palette and materials
+- User uploads a room photo and says "redesign / transform / remodel this room" → image-edit: applies changes directly to the uploaded room photo
+- User says "change the floor / swap the tiles / make it darker" on a previously generated image → image-edit: edits the most recent generated image
+- User asks for a new design from text only → text-to-image
+- User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: 2-step pipeline (diagram then render)
+- User asks for a materials board / presentation board → materials-selection-board (requires a previously generated design)
+
+You may call this alongside generate_3d — generate_3d fills the generation grid while generate_gemini provides an immediate single result in the chat.`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, etc.)'),
         style: z.string().optional().describe('Design style (modern, scandinavian, industrial, cabin, japandi, etc.)'),
-        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text']).optional().describe('Generation mode. Use floor-plan-render when user uploads a floor plan or any reference image. Omit to auto-detect.'),
+        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. Use floor-plan-render when user uploads a floor plan or any reference image. Use materials-selection-board to generate a professional materials board from a generated design. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
         editInstruction: z.string().optional().describe('Specific edit instruction when mode=image-edit'),
-        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits)'),
+        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits). materials-selection-board always uses pro.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
-        sqm: z.number().optional().describe('Floor area in sqm for floor plan generation'),
+        sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
+        boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),
       }),
     }
   );

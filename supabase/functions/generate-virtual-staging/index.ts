@@ -161,7 +161,8 @@ Deno.serve(async (req) => {
     try {
       const parts = jwt.split('.');
       if (parts.length !== 3) return null;
-      const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      let padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (padded.length % 4 !== 0) padded += '=';
       const payload = JSON.parse(atob(padded));
       return payload?.role ?? null;
     } catch { return null; }

@@ -92,10 +92,15 @@ ${editContext}`.trim();
 }
 
 /**
- * Build the 2D floor plan → 3D photorealistic orthographic render prompt.
- * Used when a floor plan IMAGE is provided as input.
+ * Build the floor plan / reference image → photorealistic perspective interior render prompt.
+ *
+ * Two modes:
+ *  - userPrompt provided: use the uploaded image as a style/mood reference to generate a
+ *    brand new room design described by userPrompt (Copy Style use-case).
+ *  - userPrompt absent: treat the uploaded image as a 2D floor plan and generate a
+ *    photorealistic eye-level perspective interior render of that layout.
  */
-export function buildFloorPlanRenderPrompt(style?: string): string {
+export function buildFloorPlanRenderPrompt(style?: string, userPrompt?: string): string {
   const styleDescription = style
     ? (STYLE_DEFAULTS[style.toLowerCase()] ?? style)
     : STYLE_DEFAULTS['modern'];
@@ -104,10 +109,24 @@ export function buildFloorPlanRenderPrompt(style?: string): string {
     ? style.charAt(0).toUpperCase() + style.slice(1)
     : 'Modern Contemporary';
 
-  return `Analyze the provided floor plan and generate a photorealistic top-down (true 90° orthographic) rendering of the entire apartment, strictly preserving the exact dimensions, proportions, walls, doors, windows, and furniture placement as shown.
-Do not modify layout, scale, structure, or orientation.
-Style: ${styleName} — ${styleDescription}.
-Architectural visualization style, ultra-realistic materials, physically accurate lighting, no perspective distortion, no added or removed structural elements.`;
+  const styleTag = `Style: ${styleName} — ${styleDescription}.`;
+  const technicalTag = `Ultra-realistic physically accurate materials and lighting. Professional architectural photography quality. Shot with a 24mm architectural lens, corrected vertical lines, no fisheye distortion.`;
+
+  // Style-reference mode: generate a completely new room inspired by the reference image
+  if (userPrompt && !/floor\s*plan|convert.*plan|render.*layout|layout.*render/i.test(userPrompt)) {
+    return `${userPrompt}
+
+Use the provided reference image purely as a style and mood guide. Extract its color palette, material choices, lighting atmosphere, and overall aesthetic feel, then apply them to a fresh new interior design.
+${styleTag}
+${technicalTag}`;
+  }
+
+  // Floor plan mode: interpret the uploaded 2D plan and render a perspective view of the interior
+  return `Based on the provided floor plan, generate a photorealistic perspective interior render of this space as it would look in real life. Interpret the room layout, wall positions, windows, doors, openings, and furniture placement shown in the floor plan.
+
+Camera position: eye-level (150–160 cm height) standing inside the main living area, looking towards the most architecturally interesting wall or window. Do not produce a top-down view — this must be a standing perspective render as if photographed from inside the room.
+${styleTag}
+Warm natural daylight flooding through windows. ${technicalTag}`;
 }
 
 /**

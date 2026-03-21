@@ -1347,6 +1347,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                 };
+              // Handle materials_board_ready — agent-triggered materials selection board
+              } else if (chunk.type === 'materials_board_ready') {
+                const boardMsg: Message = {
+                  id: `msg-board-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Materials ${(chunk.board_mode as string || 'selection-board').replace(/-/g, ' ')} ready — ${chunk.credits_used} credits used.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  materialsBoardData: {
+                    image_url: chunk.image_url,
+                    job_id: chunk.job_id,
+                    board_mode: (chunk.board_mode || 'selection-board') as 'presentation-board' | 'selection-board' | 'photorealistic-render',
+                    credits_used: chunk.credits_used,
+                  },
+                };
+                setMessages(prev => [...prev, boardMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: boardMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, materialsBoardData: boardMsg.materialsBoardData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: boardMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
               // Handle article_generation_started - SEO pipeline async
               } else if (chunk.type === 'article_generation_started') {
                 logger.info(`SEO article pipeline started: ${chunk.article_id}`, {
@@ -2472,25 +2503,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {selectedAgent === 'interior-designer' && (
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => setInput('Convert this floor plan to a photorealistic 3D interior render. Use the uploaded image as the floor plan reference.')}
+                    onClick={() => setInput('I have uploaded a floor plan. Render it as a photorealistic perspective interior — an eye-level view showing how the rooms would look from inside, with realistic materials and natural lighting.')}
                     className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 transition-colors"
-                    title="Render uploaded floor plan as a 3D interior design"
+                    title="Convert uploaded floor plan to a photorealistic eye-level interior perspective"
                   >
                     <LayoutTemplate className="w-3 h-3" />
                     Floor Plan → 3D Render
                   </button>
                   <button
-                    onClick={() => setInput('Design a new interior using the style and atmosphere of the uploaded image as reference. Match its color palette, materials, and mood.')}
+                    onClick={() => setInput('I uploaded a style reference photo. Generate a completely new interior design inspired by its color palette, materials, atmosphere, and mood. Do not modify my photo — create a fresh new room design with this aesthetic.')}
                     className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-medium text-blue-700 transition-colors"
-                    title="Use uploaded image as style reference"
+                    title="Use uploaded image as style reference for a brand new design"
                   >
                     <Sparkles className="w-3 h-3" />
                     Copy Style
                   </button>
                   <button
-                    onClick={() => setInput('Redesign this room. Keep the same spatial layout but apply a fresh interior design with modern materials and furniture.')}
+                    onClick={() => setInput('Redesign and transform the room in my uploaded photo. Keep the same spatial layout and camera angle but completely replace the materials, finishes, colors, and furniture with a fresh modern interior design.')}
                     className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors"
-                    title="Redesign room keeping the same layout"
+                    title="Transform the uploaded room photo with a new interior design"
                   >
                     <Layers className="w-3 h-3" />
                     Redesign Room
@@ -2531,6 +2562,39 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   Clear all
                 </button>
               </div>
+              {/* Generate with pinned materials action */}
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setInput('Generate an interior design incorporating my pinned materials. Use their exact colors, textures, and finishes for the walls, floors, and surfaces.')}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-800 transition-colors"
+                  title="Generate a design using all pinned catalog materials"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Generate with these materials
+                </button>
+                <button
+                  onClick={() => setInput('Create a materials selection board showcasing all my pinned materials in a professional layout.')}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-800 transition-colors"
+                  title="Create a professional materials board from pinned catalog materials"
+                >
+                  <Layers className="w-3 h-3" />
+                  Materials Board
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Interior Designer quick-action chips (no image attached) */}
+          {selectedAgent === 'interior-designer' && attachedImages.length === 0 && (
+            <div className="px-4 pt-2 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setInput('Generate a floor plan for a living room of 40sqm. Include dimensions and furniture placement.')}
+                className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-600 transition-colors"
+                title="Describe a layout in text — AI draws the floor plan then renders a perspective interior"
+              >
+                <LayoutTemplate className="w-3 h-3" />
+                Floor Plan from Text
+              </button>
             </div>
           )}
 
