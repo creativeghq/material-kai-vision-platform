@@ -5,8 +5,8 @@
  * Handles four modes:
  *   1. text-to-image     — narrative prompt → new room render
  *   2. image-edit        — existing image + instruction → edited image
- *   3. floor-plan-render — floor plan image + style → photorealistic top-down render
- *   4. floor-plan-text   — text description → 2-step: diagram → photorealistic render
+ *   3. floor-plan-render — floor plan image + style → photorealistic perspective interior render
+ *   4. floor-plan-text   — text description → 2D floor plan diagram
  *
  * Models:
  *   - gemini-3.1-flash-image-preview (fast, 6 credits)
@@ -234,13 +234,17 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: 'reference_image_url required for image-edit mode' }, 400);
       }
 
-      const editText = await buildNarrativePrompt({
-        room_type: body.room_type,
-        style: body.style,
-        user_prompt: body.prompt,
-        is_edit: true,
-        edit_instruction: body.edit_instruction ?? body.prompt,
-      });
+      const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room';
+      const editText = `You are editing the reference interior photo. Apply ONLY the following change:
+
+"${instruction}"
+
+STRICT RULES — you MUST follow these exactly:
+- Keep ALL furniture, objects, and decorative elements in their EXACT positions. Do NOT add, remove, or relocate anything.
+- Keep ALL architectural features (walls, windows, doors, ceiling, floor layout) identical to the reference.
+- Only modify what the instruction explicitly asks for.
+- The result must look like the same room with ONLY the requested change applied.
+- Photorealistic, professional interior photography quality.`;
 
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
       const result = await generateImageWithGemini(
@@ -265,9 +269,8 @@ Deno.serve(async (req) => {
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
     }
 
-    // ── Mode 4: floor-plan-text (text → 2-step: diagram → render) ──────────
+    // ── Mode 4: floor-plan-text (text → 2D floor plan diagram) ─────────────
     else if (mode === 'floor-plan-text') {
-      // Step 1: Generate clean 2D diagram
       const diagramPrompt = buildFloorPlanDiagramPrompt({
         room_type: body.room_type,
         style: body.style,
@@ -279,55 +282,7 @@ Deno.serve(async (req) => {
         diagramPrompt,
         { model: 'gemini-3.1-flash-image-preview', aspectRatio: '1:1' },
       );
-      const diagramUrl = await uploadToStorage(
-        supabase, diagramResult.base64, diagramResult.mimeType, jobId, '-diagram',
-      );
-
-      // Step 2: Apply photorealistic perspective render to generated diagram (no user prompt — pure floor plan)
-      const renderPrompt = buildFloorPlanRenderPrompt(body.style);
-      const diagramBuffer = Uint8Array.from(atob(diagramResult.base64), (c) => c.charCodeAt(0));
-      const renderResult = await generateImageWithGemini(
-        { text: renderPrompt, images: [diagramBuffer] },
-        { model, aspectRatio: '1:1' },
-      );
-      imageUrl = await uploadToStorage(supabase, renderResult.base64, renderResult.mimeType, jobId);
-
-      // Deduct credits for 2 calls (step 1 always uses fast model = 6 credits)
-      await deductCredits(
-        supabase,
-        resolvedUserId,
-        credits + 6,
-        `Floor plan 2-step generation (${model})`,
-      );
-
-      // Persist to generation_3d
-      await supabase.from('generation_3d').insert({
-        id: jobId,
-        user_id: resolvedUserId,
-        workspace_id: body.workspace_id,
-        prompt: diagramPrompt,
-        room_type: body.room_type,
-        style: body.style,
-        generation_status: 'completed',
-        progress_percentage: 100,
-        request_type: 'floor_plan_text',
-        models_queue: [{ id: model, name: 'Gemini Floor Plan 2-Step', provider: 'google' }],
-        models_results: {
-          [model]: { success: true, image_url: imageUrl, diagram_url: diagramUrl },
-        },
-        workflow_status: 'completed',
-        completed_at: new Date().toISOString(),
-      });
-
-      return jsonResponse({
-        success: true,
-        job_id: jobId,
-        mode,
-        model,
-        image_url: imageUrl,
-        diagram_url: diagramUrl,
-        credits_used: credits + 6,
-      });
+      imageUrl = await uploadToStorage(supabase, diagramResult.base64, diagramResult.mimeType, jobId);
     }
 
     // ── Mode 5: materials-selection-board ──────────────────────────────────

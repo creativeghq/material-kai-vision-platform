@@ -173,7 +173,8 @@ export const create3DGenerationTool = (
 - WITHOUT an uploaded image: runs 4 text-to-image models
 - WITH an uploaded image: automatically runs 12 image-to-image models across all specialized interior remodeling AI models
 The uploaded reference image is used automatically — no need to specify referenceImageUrl.
-ALWAYS call this tool when the user uploads an image — it populates the full generation grid with 12 variations. You may also call generate_gemini alongside it for an immediate single result in the chat.`,
+ALWAYS call this tool when the user uploads an image. ALWAYS call generate_gemini alongside it in the same response — generate_3d fills the grid, generate_gemini gives an immediate result in chat.
+Do NOT call this for iterative edits on previously generated images — use generate_gemini alone for those.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
@@ -419,18 +420,24 @@ export const createGeminiGenerationTool = (
     },
     {
       name: 'generate_gemini',
-      description: `Generate or edit interior design images using Gemini AI. Use this for single results and iterative editing. Do NOT call alongside generate_3d for the same request — choose one.
+      description: `Generate or edit interior design images using Gemini AI. Provides an immediate single result in the chat.
+
+WHEN TO CALL ALONGSIDE generate_3d:
+- User uploads an image (any use case) → call BOTH this tool AND generate_3d in the same response. generate_3d fills the 12-model generation grid; this tool gives an immediate result in chat.
+
+WHEN TO call this tool ALONE (do NOT call generate_3d):
+- Iterative edit on a previously generated image ("change the floor", "make it warmer")
+- Text-only requests with no uploaded image
+- Materials board generation
 
 Mode routing (auto-detected if not set explicitly):
-- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render showing how the space looks from inside (NOT a top-down view)
+- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render
 - User uploads a reference photo and says "copy the style / use as inspiration / match the mood" → floor-plan-render: creates a new interior design inspired by the photo's palette and materials
 - User uploads a room photo and says "redesign / transform / remodel this room" → image-edit: applies changes directly to the uploaded room photo
 - User says "change the floor / swap the tiles / make it darker" on a previously generated image → image-edit: edits the most recent generated image
 - User asks for a new design from text only → text-to-image
-- User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: 2-step pipeline (diagram then render)
-- User asks for a materials board / presentation board → materials-selection-board (requires a previously generated design)
-
-You may call this alongside generate_3d — generate_3d fills the generation grid while generate_gemini provides an immediate single result in the chat.`,
+- User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: generates a clean 2D floor plan diagram (top-down architectural drawing)
+- User asks for a materials board / presentation board → materials-selection-board (requires a previously generated design)`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, etc.)'),

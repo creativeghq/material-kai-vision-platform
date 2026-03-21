@@ -2588,9 +2588,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           {selectedAgent === 'interior-designer' && attachedImages.length === 0 && (
             <div className="px-4 pt-2 flex flex-wrap gap-1.5">
               <button
-                onClick={() => setInput('Generate a floor plan for a living room of 40sqm. Include dimensions and furniture placement.')}
+                onClick={() => setInput('Generate a 2D floor plan diagram for a living room of 40sqm. Include dimensions, furniture placement, and room labels.')}
                 className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-600 transition-colors"
-                title="Describe a layout in text — AI draws the floor plan then renders a perspective interior"
+                title="Describe a layout in text — AI generates a 2D floor plan diagram with dimensions and furniture"
               >
                 <LayoutTemplate className="w-3 h-3" />
                 Floor Plan from Text
