@@ -981,11 +981,24 @@ async function executeAgent(
       if (idx === lastUserMsgIndex && images.length > 0) {
         const content: any[] = [{ type: 'text', text: msg.content || '' }];
         for (const img of images) {
-          // img is a data URL like "data:image/jpeg;base64,/9j/4AAQ..."
-          content.push({
-            type: 'image_url',
-            image_url: { url: img },
-          });
+          if (img.startsWith('data:')) {
+            // data URL: "data:image/jpeg;base64,/9j/4AAQ..."
+            // Convert to Anthropic native base64 block (required for @langchain/anthropic v1.x)
+            const commaIdx = img.indexOf(',');
+            const header = img.slice(0, commaIdx); // "data:image/jpeg;base64"
+            const data = img.slice(commaIdx + 1);  // raw base64 string
+            const mediaType = header.slice(5, header.indexOf(';')); // "image/jpeg"
+            content.push({
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data },
+            });
+          } else {
+            // HTTP URL — pass as url source
+            content.push({
+              type: 'image',
+              source: { type: 'url', url: img },
+            });
+          }
         }
         return new HumanMessage({ content });
       }
@@ -1112,39 +1125,6 @@ async function getUserWorkspaceId(userId: string): Promise<string | null> {
   }
 }
 
-/**
- * Save conversation to database
- */
-async function saveConversation(userId: string, agentId: string, messages: any[], response: string) {
-  try {
-    // Get the last user message for the title
-    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
-    const title = lastUserMessage?.content?.substring(0, 100) || 'New conversation';
-
-    // Add the assistant response to the messages array
-    const fullMessages = [
-      ...messages,
-      { role: 'assistant', content: response, timestamp: new Date().toISOString() }
-    ];
-
-    const { error } = await supabase.from('agent_chat_conversations').insert({
-      user_id: userId,
-      agent_id: agentId,
-      title: title,
-      messages: fullMessages,
-      message_count: fullMessages.length,
-      last_message_at: new Date().toISOString(),
-      is_archived: false,
-      created_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      console.error('Error saving conversation:', error);
-    }
-  } catch (error) {
-    console.error('Error saving conversation:', error);
-  }
-}
 
 /**
  * Extract and store important memories from conversation
@@ -1474,9 +1454,6 @@ Deno.serve(async (req) => {
             console.error('❌ executeAgent returned null or invalid result');
             throw new Error('Agent execution failed to return a valid result');
           }
-
-          // Save conversation
-          await saveConversation(userId, agentId, messages, finalResult.text);
 
           // 🧠 Extract and store memories from conversation (non-blocking)
           extractAndStoreMemories(userId, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)

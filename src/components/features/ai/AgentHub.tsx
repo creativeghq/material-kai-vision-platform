@@ -10,7 +10,6 @@ import {
   Package,
   Settings,
   Send,
-  Image as ImageIcon,
   Mic,
   Paperclip,
   MessageSquare,
@@ -990,6 +989,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setMessages((prev) => [...prev, userMessage]);
     const userInput = input;
     setInput('');
+    setAttachedImages([]);
     setIsLoading(true);
     setReasoningSteps([]); // Clear reasoning steps for new message
     console.log('✅ State updated, starting try block');
@@ -1575,7 +1575,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      setAttachedImages([]);
       // REMOVED: setAttachedPDF(null) - PDF processing moved to /admin/data-import page
     }
   }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
@@ -2594,7 +2593,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               />
               {/* REMOVED: PDF upload input and button - PDF processing moved to /admin/data-import page */}
 
-              {/* Image Upload Buttons */}
+              {/* Image Upload Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -2602,14 +2601,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 className="h-9 w-9"
               >
                 <Paperclip className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-9 w-9"
-              >
-                <ImageIcon className="h-4 w-4" />
               </Button>
 
               {/* Prompt Library Icon (Interior Designer Agent only) */}
