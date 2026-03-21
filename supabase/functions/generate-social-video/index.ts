@@ -3,7 +3,7 @@
  *
  * Generates short-form social media videos via Replicate:
  *   kling-1.6-pro  → 15 credits (fast, great for reels)
- *   veo-2          → 30 credits (premium quality via existing generate-interior-video)
+ *   veo-2          → 30 credits (premium quality via generate-interior-video-v2)
  *
  * Credits are debited upfront and are non-refundable.
  * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
@@ -102,45 +102,28 @@ Deno.serve(async (req) => {
 
   const creditCost = CREDIT_COSTS[model as VideoModel] ?? 15;
 
-  // ① Pre-flight check
-  const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-1.6-pro');
-  if (!sufficient) {
-    return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
-  }
-
-  // ② Debit upfront — non-refundable
-  const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
-    p_user_id: userId,
-    p_amount: creditCost,
-    p_operation_type: 'social_video_generation',
-    p_description: `Social video generation (${model}, ${duration_seconds}s)`,
-    p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
-  });
-
-  const debit = Array.isArray(debitData) ? debitData[0] : debitData;
-  if (debitError || !debit?.success) {
-    return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
-  }
-
   // ③ Create prediction
   try {
     let predictionId: string;
     let replicateModel: string;
 
+    // For veo-2: delegate entirely to generate-interior-video-v2 (it handles credit debit itself)
     if (model === 'veo-2') {
-      const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video`, {
+      const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video-v2`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${supabaseServiceKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          user_id: userId,
           source_image_url,
           prompt,
           aspect_ratio,
-          duration_s: Math.min(duration_seconds, 8),
+          duration_seconds: Math.min(duration_seconds, 8),
+          video_type: 'social_reel',
+          model: 'veo-2',
           workspace_id,
-          _skip_credit_debit: true, // Credits already debited above
         }),
       });
       const veoResult = await veoRes.json();
@@ -152,9 +135,29 @@ Deno.serve(async (req) => {
         video_url: veoResult.video_url,
         job_id: veoResult.job_id,
         model_used: 'veo-2',
-        credits_used: creditCost,
-        status: 'completed',
+        credits_used: veoResult.credits_used,
+        status: veoResult.status,
       });
+    }
+
+    // ① Pre-flight check (kling only — veo-2 handled above)
+    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-1.6-pro');
+    if (!sufficient) {
+      return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
+    }
+
+    // ② Debit upfront — non-refundable
+    const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
+      p_user_id: userId,
+      p_amount: creditCost,
+      p_operation_type: 'social_video_generation',
+      p_description: `Social video generation (${model}, ${duration_seconds}s)`,
+      p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
+    });
+
+    const debit = Array.isArray(debitData) ? debitData[0] : debitData;
+    if (debitError || !debit?.success) {
+      return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
     }
 
     replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-1.6-pro'];
