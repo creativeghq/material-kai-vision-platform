@@ -149,6 +149,37 @@ True orthographic top-down view, no perspective, black lines on white background
 Architectural drawing style, clean and precise.`.trim();
 }
 
+/**
+ * Build a dual-reference prompt for when the user uploads TWO images:
+ *   Image 1 = their room (layout / furniture to preserve)
+ *   Image 2 = style inspiration (palette, materials, atmosphere to copy)
+ *
+ * Used for Copy Style and Redesign Room chip modes when two images are attached.
+ */
+export function buildDualReferenceStylePrompt(style?: string, userPrompt?: string): string {
+  const styleDescription = style
+    ? (STYLE_DEFAULTS[style.toLowerCase()] ?? style)
+    : STYLE_DEFAULTS['modern'];
+  const styleName = style
+    ? style.charAt(0).toUpperCase() + style.slice(1)
+    : 'Modern Contemporary';
+
+  return `You are given TWO reference images:
+- IMAGE 1: The room to transform. Its spatial layout, furniture positions, fixtures, and architectural structure must be preserved EXACTLY.
+- IMAGE 2: The style inspiration. Extract its color palette, material finishes, surface textures, lighting mood, and overall aesthetic.
+
+TASK: Redesign the room from IMAGE 1 by applying the style, colors, and material treatments from IMAGE 2.
+
+STRICT RULES:
+- Preserve ALL furniture, fixtures, and objects in their EXACT positions from IMAGE 1. Do NOT add, remove, or relocate anything.
+- Preserve ALL architectural features (walls, windows, doors, ceiling height, floor layout) from IMAGE 1.
+- Only change: paint colors, material finishes, surface textures, and decorative treatments — to match the look of IMAGE 2.
+${userPrompt ? `- Additional instruction from user: ${userPrompt}` : ''}
+${style ? `- Target design style: ${styleName} — ${styleDescription}.` : ''}
+
+Photorealistic result with professional interior photography quality. Shot with a 24mm architectural lens, corrected vertical lines, no fisheye distortion, ultra-realistic materials and lighting.`;
+}
+
 function buildFallbackPrompt(params: DesignParams, styleCue: string, materialsLine: string): string {
   const room = params.room_type || 'living room';
   const style = params.style || 'modern';

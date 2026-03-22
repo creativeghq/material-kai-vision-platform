@@ -26,6 +26,7 @@ import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
   buildFloorPlanDiagramPrompt,
+  buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 
@@ -55,6 +56,8 @@ interface GenerateInteriorRequest {
   // Image edit / floor plan render
   reference_image_url?: string;
   edit_instruction?: string;
+  // Second uploaded image: style/mood reference for dual-image Copy Style and Redesign modes
+  style_reference_url?: string;
   // Materials Selection Board
   board_mode?: BoardMode;
   // User context
@@ -234,8 +237,20 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: 'reference_image_url required for image-edit mode' }, 400);
       }
 
-      const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room';
-      const editText = `You are editing the reference interior photo. Apply ONLY the following change:
+      const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
+
+      if (body.style_reference_url) {
+        // Dual-image redesign: Image 1 = room to transform, Image 2 = style reference
+        const styleBuffer = await fetchImageBuffer(body.style_reference_url);
+        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        const result = await generateImageWithGemini(
+          { text: dualPrompt, images: [sourceBuffer, styleBuffer] },
+          { model, aspectRatio },
+        );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      } else {
+        const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room';
+        const editText = `You are editing the reference interior photo. Apply ONLY the following change:
 
 "${instruction}"
 
@@ -246,12 +261,12 @@ STRICT RULES — you MUST follow these exactly:
 - The result must look like the same room with ONLY the requested change applied.
 - Photorealistic, professional interior photography quality.`;
 
-      const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
-      const result = await generateImageWithGemini(
-        { text: editText, images: [sourceBuffer] },
-        { model, aspectRatio },
-      );
-      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        const result = await generateImageWithGemini(
+          { text: editText, images: [sourceBuffer] },
+          { model, aspectRatio },
+        );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      }
     }
 
     // ── Mode 3: floor-plan-render (image input → photorealistic top-down) ──
@@ -260,13 +275,26 @@ STRICT RULES — you MUST follow these exactly:
         return jsonResponse({ success: false, error: 'reference_image_url required for floor-plan-render mode' }, 400);
       }
 
-      const renderPrompt = buildFloorPlanRenderPrompt(body.style, body.prompt);
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
-      const result = await generateImageWithGemini(
-        { text: renderPrompt, images: [sourceBuffer] },
-        { model, aspectRatio: '1:1' },
-      );
-      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+
+      if (body.style_reference_url) {
+        // Dual-image Copy Style: Image 1 = user's room, Image 2 = style inspiration
+        const styleBuffer = await fetchImageBuffer(body.style_reference_url);
+        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        const result = await generateImageWithGemini(
+          { text: dualPrompt, images: [sourceBuffer, styleBuffer] },
+          { model, aspectRatio: '1:1' },
+        );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      } else {
+        // Single image: floor plan → perspective render, or style reference → new design
+        const renderPrompt = buildFloorPlanRenderPrompt(body.style, body.prompt);
+        const result = await generateImageWithGemini(
+          { text: renderPrompt, images: [sourceBuffer] },
+          { model, aspectRatio: '1:1' },
+        );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      }
     }
 
     // ── Mode 4: floor-plan-text (text → 2D floor plan diagram) ─────────────

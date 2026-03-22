@@ -357,6 +357,22 @@ export const createGeminiGenerationTool = (
           }
         }
 
+        // Second uploaded image → style reference for dual-image Copy Style / Redesign Room.
+        // Only applicable when 2+ images are attached AND the mode works with reference images.
+        let styleReferenceUrl: string | undefined;
+        if (
+          images.length >= 2 &&
+          (resolvedMode === 'floor-plan-render' || resolvedMode === 'image-edit')
+        ) {
+          const second = images[1];
+          if (second.startsWith('data:')) {
+            console.warn('[generation-tools] second image is still a data URL — uploading');
+            styleReferenceUrl = await uploadDataUrl(second);
+          } else {
+            styleReferenceUrl = second;
+          }
+        }
+
         const resolvedBoardMode = boardMode || 'selection-board';
 
         const body: Record<string, unknown> = {
@@ -375,6 +391,8 @@ export const createGeminiGenerationTool = (
                 aspect_ratio: resolvedBoardMode === 'photorealistic-render' ? '16:9' : '1:1',
               }
             : { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }),
+          // Second image: style reference for dual-image generation
+          ...(styleReferenceUrl ? { style_reference_url: styleReferenceUrl } : {}),
           // For image-edit mode, the prompt IS the edit instruction — send it explicitly
           // so the edge function doesn't need to fallback-guess which field to use.
           ...(resolvedMode === 'image-edit' ? { edit_instruction: prompt } : {}),
