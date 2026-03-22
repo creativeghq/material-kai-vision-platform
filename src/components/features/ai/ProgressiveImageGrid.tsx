@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -50,6 +50,12 @@ interface ProgressiveImageGridProps {
   onGenerateVideo?: (imageUrl: string, videoType: string, videoModel?: string) => void;
   onGenerateMaterialsBoard?: (imageUrl: string, boardMode: 'presentation-board' | 'selection-board' | 'photorealistic-render') => void;
   onGenerateVirtualStaging?: (imageUrl: string, params: VirtualStagingParams) => void;
+  /** Opens the structured Gemini edit modal for targeted AI edits (colors, lighting, flooring…) */
+  onEditImage?: (imageUrl: string) => void;
+  /** When set, immediately opens the full modal for this image (no grid needed — used for Gemini single images) */
+  directImage?: { url: string; title?: string };
+  /** Called when the direct-image modal is closed */
+  onDirectImageClose?: () => void;
 }
 
 const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
@@ -67,6 +73,9 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   onGenerateVideo,
   onGenerateMaterialsBoard,
   onGenerateVirtualStaging,
+  onEditImage,
+  directImage,
+  onDirectImageClose,
 }) => {
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -219,21 +228,30 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     setPickerPreselectedMaterial(null);
   }, [selectedImage]);
 
+  // Auto-open modal when directImage is provided (single Gemini image — no grid)
+  useEffect(() => {
+    if (directImage?.url) {
+      setSelectedImage({ url: directImage.url, name: directImage.title ?? 'Generated Design', model_id: 'direct' });
+    }
+  }, [directImage?.url]);
+
   // Load segments on demand — called when user opens the Products tab
   const loadModalSegments = useCallback(async () => {
-    if (!selectedImage || !jobId || modalSegmentsLoaded || modalSegmenting) return;
+    if (!selectedImage || modalSegmentsLoaded || modalSegmenting) return;
 
     setModalSegmenting(true);
     setModalSegmentError(null);
 
     try {
-      // 1. Check DB for cached segments for this image
-      const { data: existing } = await supabase
+      // 1. Check DB for cached segments — skip for direct images (no jobId / model_id)
+      const isDirect = selectedImage.model_id === 'direct' || !jobId;
+      const existing = isDirect ? null : await supabase
         .from('generation_3d_segments')
         .select('*')
         .eq('generation_id', jobId)
         .eq('model_id', selectedImage.model_id)
-        .order('segment_index');
+        .order('segment_index')
+        .then(r => r.data);
 
       if (existing && existing.length > 0) {
         // Re-crop zones that have no stored URL — crop_data_url is transient and not persisted
@@ -583,7 +601,8 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
   return (
     <>
-      <div className="space-y-4">
+      {/* When used as a direct-image modal (no grid), render nothing except the modal below */}
+      <div className={directImage ? 'hidden' : 'space-y-4'}>
         {/* Progress bar — only while generating */}
         {status !== 'completed' && (
           <div className="space-y-2">
@@ -768,7 +787,7 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
       )}
 
       {/* Image Modal */}
-      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+      <Dialog open={!!selectedImage} onOpenChange={() => { if (selectedImage?.model_id === 'direct') onDirectImageClose?.(); setSelectedImage(null); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
           {/* Header */}
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -783,25 +802,36 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {selectedImage && (
-                  <button
-                    onClick={() => {
-                      if (editMode !== 'none') {
-                        setEditMode('none');
-                      } else {
-                        setEditMode('zone-select');
-                        // Don't auto-switch tab — avoid triggering AI segmentation automatically.
-                        // Zone Select button appears in the Materials tab; Draw Mask works on Image tab.
-                      }
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                      editMode !== 'none'
-                        ? 'bg-violet-600 text-white'
-                        : 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200'
-                    }`}
-                  >
-                    <Paintbrush className="w-3.5 h-3.5" />
-                    {editMode !== 'none' ? 'Editing' : 'Edit Mode'}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        if (editMode !== 'none') {
+                          setEditMode('none');
+                        } else {
+                          setEditMode('zone-select');
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        editMode !== 'none'
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200'
+                      }`}
+                    >
+                      <Paintbrush className="w-3.5 h-3.5" />
+                      {editMode !== 'none' ? 'Editing' : 'Edit Mode'}
+                    </button>
+                    {/* Image Editor — visible only while Edit Mode is active */}
+                    {editMode !== 'none' && onEditImage && (
+                      <button
+                        onClick={() => onEditImage(selectedImage.url)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 transition-colors"
+                        title="Change colors, lighting, flooring, style and more with AI"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Image Editor
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

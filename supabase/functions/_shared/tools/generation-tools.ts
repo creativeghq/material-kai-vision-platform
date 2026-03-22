@@ -263,8 +263,7 @@ export const createGeminiGenerationTool = (
 
         // Auto-detect generation mode if not explicitly specified by the agent
         // forcedMode (from UI chip) always wins over both agent-specified mode and auto-detection
-        // 'copy-style' is a UI-only alias — maps to floor-plan-render (style reference mode)
-        const normalizedForcedMode = forcedMode === 'copy-style' ? 'floor-plan-render' : forcedMode;
+        const normalizedForcedMode = forcedMode; // pass through as-is (redesign, copy-style, image-edit all handled)
         let resolvedMode = (normalizedForcedMode as any) || mode;
         if (!resolvedMode) {
           const hasRecentGeneration = conversationImages.length > 0;
@@ -282,13 +281,13 @@ export const createGeminiGenerationTool = (
           } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan|render.*layout|convert.*plan/i.test(prompt || '')) {
             resolvedMode = 'floor-plan-render';
 
-          // Style reference (copy style / mood / palette from uploaded image)
-          } else if ((referenceImageUrl || hasUploadedImage) && /copy.*style|use.*style|style.*reference|match.*mood|inspired by|palette|atmosphere/i.test(prompt || '')) {
-            resolvedMode = 'floor-plan-render';
+          // Copy style: 2 images uploaded (inspiration + room) — use Flux Depth Pro
+          } else if (hasUploadedImage && images.length >= 2) {
+            resolvedMode = 'copy-style';
 
-          // Any uploaded image defaults to image-edit (edits ON TOP of the original photo)
+          // Any uploaded image → full redesign via Flux Depth Pro
           } else if (referenceImageUrl || hasUploadedImage) {
-            resolvedMode = 'image-edit';
+            resolvedMode = 'redesign';
 
           } else {
             resolvedMode = 'text-to-image';
@@ -306,34 +305,56 @@ export const createGeminiGenerationTool = (
           }
         }
 
-        // For image-edit: prefer (1) explicit referenceImageUrl, (2) uploaded image (should already
-        // be a public URL after frontend pre-upload), (3) most recent generated image
+        // ── Resolve image URLs for each mode ──────────────────────────────────
+
+        const ensurePublicUrl = async (candidate: string): Promise<string | undefined> => {
+          if (!candidate) return undefined;
+          if (candidate.startsWith('data:')) {
+            console.warn('[generation-tools] image is still a data URL — uploading');
+            return uploadDataUrl(candidate);
+          }
+          return candidate;
+        };
+
+        // image-edit: images[0] = the image to edit (Gemini targeted edit)
         let resolvedReferenceUrl: string | undefined = referenceImageUrl;
         if (!resolvedReferenceUrl && resolvedMode === 'image-edit') {
-          if (images.length > 0) {
-            const candidate = images[0];
-            // Images should already be public URLs (uploaded by frontend).
-            // Fall back to uploadDataUrl only if still a data URL.
-            if (candidate.startsWith('data:')) {
-              console.warn('[generation-tools] image still a data URL — frontend upload may have failed, attempting re-upload');
-              resolvedReferenceUrl = await uploadDataUrl(candidate);
-            } else {
-              resolvedReferenceUrl = candidate;
-            }
-          } else if (conversationImages.length > 0) {
-            resolvedReferenceUrl = conversationImages[conversationImages.length - 1];
+          const candidate = images[0] ?? conversationImages[conversationImages.length - 1];
+          if (candidate) resolvedReferenceUrl = await ensurePublicUrl(candidate);
+        }
+        if (resolvedMode === 'image-edit' && !resolvedReferenceUrl) {
+          return JSON.stringify({ success: false, error: 'No reference image available for editing. Please attach an image or generate one first.' });
+        }
+
+        // redesign: images[0] = room to redesign (Flux Depth Pro)
+        let redesignReferenceUrl: string | undefined;
+        if (resolvedMode === 'redesign') {
+          const candidate = referenceImageUrl || images[0] || conversationImages[conversationImages.length - 1];
+          if (candidate) redesignReferenceUrl = await ensurePublicUrl(candidate);
+          if (!redesignReferenceUrl) {
+            return JSON.stringify({ success: false, error: 'No room image available for redesign. Please attach an image.' });
           }
         }
 
-        // Hard guard: image-edit with no reference image would generate a completely unrelated result
-        if (resolvedMode === 'image-edit' && !resolvedReferenceUrl) {
-          return JSON.stringify({
-            success: false,
-            error: 'No reference image available for editing. Please attach an image or generate one first.',
-          });
+        // copy-style: images[0] = Inspiration (style donor), images[1] = Your Room (layout donor)
+        // NOTE: this matches the drag-and-drop slot order in AgentHub (Slot 0 = Inspiration, Slot 1 = Your Room)
+        let copyStyleRoomUrl: string | undefined;
+        let copyStyleInspirationUrl: string | undefined;
+        if (resolvedMode === 'copy-style') {
+          if (images.length >= 2) {
+            copyStyleInspirationUrl = await ensurePublicUrl(images[0]); // Slot 0 = Inspiration
+            copyStyleRoomUrl = await ensurePublicUrl(images[1]);        // Slot 1 = Your Room
+          } else if (images.length === 1) {
+            copyStyleRoomUrl = await ensurePublicUrl(images[0]);
+          } else if (referenceImageUrl) {
+            copyStyleRoomUrl = referenceImageUrl;
+          }
+          if (!copyStyleRoomUrl) {
+            return JSON.stringify({ success: false, error: 'No room image available for copy-style. Please attach your room image.' });
+          }
         }
 
-        // For floor-plan-render: use attached image if available, upload data URL if needed
+        // floor-plan-render: use attached image
         let floorPlanImageUrl: string | undefined;
         if (resolvedMode === 'floor-plan-render') {
           const candidateUrl = resolvedReferenceUrl || (images.length > 0 ? images[0] : undefined);
@@ -346,7 +367,7 @@ export const createGeminiGenerationTool = (
           floorPlanImageUrl = resolvedReferenceUrl;
         }
 
-        // For materials-selection-board: resolve reference from conversationImages or uploaded image
+        // materials-selection-board: resolve reference from conversationImages or uploaded image
         let materialsBoardRefUrl = floorPlanImageUrl;
         if (resolvedMode === 'materials-selection-board' && !materialsBoardRefUrl) {
           const candidate = referenceImageUrl || conversationImages[conversationImages.length - 1] || images[0];
@@ -357,24 +378,16 @@ export const createGeminiGenerationTool = (
           }
         }
 
-        // Second uploaded image → style reference for dual-image Copy Style / Redesign Room.
-        // Only applicable when 2+ images are attached AND the mode works with reference images.
+        // Legacy: second image as style reference for floor-plan-render + image-edit
         let styleReferenceUrl: string | undefined;
-        if (
-          images.length >= 2 &&
-          (resolvedMode === 'floor-plan-render' || resolvedMode === 'image-edit')
-        ) {
+        if (images.length >= 2 && (resolvedMode === 'floor-plan-render' || resolvedMode === 'image-edit')) {
           const second = images[1];
-          if (second.startsWith('data:')) {
-            console.warn('[generation-tools] second image is still a data URL — uploading');
-            styleReferenceUrl = await uploadDataUrl(second);
-          } else {
-            styleReferenceUrl = second;
-          }
+          styleReferenceUrl = second.startsWith('data:') ? await uploadDataUrl(second) : second;
         }
 
         const resolvedBoardMode = boardMode || 'selection-board';
 
+        // ── Build request body ─────────────────────────────────────────────────
         const body: Record<string, unknown> = {
           mode: resolvedMode,
           prompt,
@@ -384,17 +397,28 @@ export const createGeminiGenerationTool = (
           model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast'),
           user_id: userId,
           workspace_id: workspaceId,
+          // Mode-specific image fields
+          ...(resolvedMode === 'redesign' && redesignReferenceUrl
+            ? { reference_image_url: redesignReferenceUrl }
+            : {}),
+          ...(resolvedMode === 'copy-style'
+            ? {
+                ...(copyStyleRoomUrl ? { reference_image_url: copyStyleRoomUrl } : {}),
+                ...(copyStyleInspirationUrl ? { style_reference_url: copyStyleInspirationUrl } : {}),
+              }
+            : {}),
           ...(resolvedMode === 'materials-selection-board'
             ? {
                 reference_image_url: materialsBoardRefUrl,
                 board_mode: resolvedBoardMode,
                 aspect_ratio: resolvedBoardMode === 'photorealistic-render' ? '16:9' : '1:1',
               }
-            : { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }),
-          // Second image: style reference for dual-image generation
+            : resolvedMode !== 'redesign' && resolvedMode !== 'copy-style'
+              ? { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }
+              : {}),
+          // Style reference (legacy: floor-plan-render / image-edit with 2 images)
           ...(styleReferenceUrl ? { style_reference_url: styleReferenceUrl } : {}),
-          // For image-edit mode, the prompt IS the edit instruction — send it explicitly
-          // so the edge function doesn't need to fallback-guess which field to use.
+          // For image-edit mode, the prompt IS the edit instruction
           ...(resolvedMode === 'image-edit' ? { edit_instruction: prompt } : {}),
           ...((() => {
             const merged = [...(materialImages || []), ...pinnedMaterialImages].slice(0, 14);
@@ -447,6 +471,8 @@ export const createGeminiGenerationTool = (
         const modeLabels: Record<string, string> = {
           'text-to-image': 'generated a new design',
           'image-edit': 'applied your edit',
+          'redesign': 'redesigned the room with structure preserved',
+          'copy-style': 'applied the inspiration style to your room',
           'floor-plan-render': 'rendered your floor plan',
           'floor-plan-text': 'created your floor plan',
           'materials-selection-board': 'created your materials board',
@@ -470,7 +496,7 @@ export const createGeminiGenerationTool = (
     },
     {
       name: 'generate_gemini',
-      description: `Generate or edit interior design images using Gemini AI. Provides an immediate single result in the chat.
+      description: `Generate or edit interior design images. Provides an immediate single result in the chat.
 
 PARAMETER EXTRACTION — always do this before calling:
 1. Extract roomType from user message (bedroom, living_room, kitchen, bathroom, dining_room, home_office, etc.)
@@ -481,28 +507,27 @@ WHEN TO CALL ALONGSIDE generate_3d:
 - Pure text-to-image (no uploaded images) → call BOTH for variations + immediate result.
 
 WHEN TO call this tool ALONE — do NOT call generate_3d in any of these cases:
-- User has uploaded one or more images (image-edit, copy-style, redesign) — call generate_gemini ONLY
-- A chip mode is active (floor-plan-render, image-edit, floor-plan-text, copy-style)
-- Iterative edit on a previously generated image ("change the floor", "make it warmer")
-- Floor plan requests — use mode=floor-plan-text
-- Any request mentioning "copy style", "redesign", "inspiration image", "my room"
+- User has uploaded one or more images — call generate_gemini ONLY
+- A chip mode is active (redesign, copy-style, image-edit, floor-plan-render, floor-plan-text)
+- Iterative targeted edit on a previously generated image ("change the floor", "make it warmer")
+- Floor plan requests
 - Materials board generation
 
 Mode routing (auto-detected if not set explicitly):
-- User uploads any room photo (default) → image-edit: edits DIRECTLY ON TOP of the uploaded photo, preserving spatial layout and element positions
-- User uploads a floor plan image → floor-plan-render: generates a photorealistic EYE-LEVEL PERSPECTIVE interior render from the floor plan
-- User uploads a reference photo and says "copy the style / palette / mood" → floor-plan-render: creates a new interior design inspired by the photo's aesthetic
-- User says "change the floor / swap the tiles / make it darker" on a previously generated image → image-edit: edits the most recent generated image
-- User asks for a new design from text only → text-to-image
-- User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: generates a clean 2D floor plan diagram (top-down architectural drawing)
-- User asks for a materials board / presentation board → materials-selection-board (requires a previously generated design)`,
+- redesign (1 image uploaded, "redesign"/"update style") → Flux Depth Pro locks room structure, applies new style. Positions NEVER change.
+- copy-style (2 images: Image 1=inspiration, Image 2=your room) → Gemini Vision extracts full design spec from inspiration → Flux Depth Pro applies it to the room. Zero spatial bleed.
+- image-edit (targeted change: "change floor to marble", "add a plant", "warmer lighting") → Gemini image editing on the uploaded or most recently generated image
+- floor-plan-render (floor plan image uploaded) → photorealistic eye-level perspective render
+- floor-plan-text (no image, user describes layout or provides sqm) → 2D floor plan diagram
+- text-to-image (no images, pure text description) → new room generation
+- materials-selection-board → professional materials board from a generated design`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
         roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
-        mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. Use floor-plan-render when user uploads a floor plan or any reference image. Use materials-selection-board to generate a professional materials board from a generated design. Omit to auto-detect.'),
+        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
-        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits). Use pro when user requests maximum quality or 4K. materials-selection-board always uses pro.'),
+        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=default quality (6-8 credits), pro=maximum quality (15 credits). Use pro when user requests maximum quality or 4K. materials-selection-board always uses pro.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
         sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
         boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),

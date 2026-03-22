@@ -31,6 +31,7 @@ import {
   Check,
   Globe,
   GripVertical,
+  Pencil,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -69,6 +70,7 @@ import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
+import { GeminiEditModal, GeminiEditParams } from './GeminiEditModal';
 
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
@@ -273,6 +275,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null);
   const imageDragIndexRef = useRef<number | null>(null);
+  const [geminiModalImage, setGeminiModalImage] = useState<string | null>(null);
+  const [showGeminiEditModal, setShowGeminiEditModal] = useState(false);
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -2051,117 +2055,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <img
-                          src={message.geminiImageData.image_url}
-                          alt="Gemini interior design"
-                          className="w-full rounded-xl border border-white/20 shadow-md"
-                          loading="lazy"
-                        />
-                        {/* Actions: Video + VR World */}
-                        <div className="flex flex-wrap gap-2">
-                          {message.videoData ? (
-                            <video
-                              src={message.videoData.video_url}
-                              controls
-                              className="w-full rounded-xl border border-white/20 shadow-md"
-                            />
-                          ) : (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 transition-colors">
-                                  <Video className="h-3.5 w-3.5" />
-                                  Generate Video
-                                  <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-72 bg-violet-50 border-violet-200">
-                                <DropdownMenuLabel className="text-xs font-semibold text-violet-500 pb-1">Model</DropdownMenuLabel>
-                                {VIDEO_MODELS.map(vm => (
-                                  <DropdownMenuItem
-                                    key={vm.value}
-                                    onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }}
-                                    className="gap-2 focus:bg-violet-100 focus:text-violet-900"
-                                  >
-                                    <Check className={cn('h-3.5 w-3.5 flex-shrink-0 text-violet-600', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-sm">{vm.label}</div>
-                                      <div className="text-xs text-violet-400">{vm.description}</div>
-                                    </div>
-                                    {'credits' in vm && <span className="ml-2 text-xs text-violet-400 flex-shrink-0">{vm.credits} cr</span>}
-                                  </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuSeparator className="bg-violet-200" />
-                                <DropdownMenuLabel className="text-xs font-semibold text-violet-500 pb-1">Video Style</DropdownMenuLabel>
-                                {VIDEO_TYPES.map(vt => (
-                                  <DropdownMenuItem
-                                    key={vt.value}
-                                    onClick={() => handleGenerateVideo(message.geminiImageData!.image_url, message, vt.value, videoModel)}
-                                    className="focus:bg-violet-100 focus:text-violet-900"
-                                  >
-                                    <Video className="h-4 w-4 mr-2 flex-shrink-0 text-violet-500" />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium">{vt.label}</div>
-                                      <div className="text-xs text-violet-400">{vt.description}</div>
-                                    </div>
-                                    <span className="ml-2 text-xs text-violet-400 flex-shrink-0">{vt.credits} cr</span>
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                          <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"
-                            onClick={() => handleGenerateVR(
-                              message.geminiImageData!.image_url,
-                              { prompt: normalizeContent(message.content) },
-                              message,
-                            )}
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            Explore in VR
-                            <span className="opacity-50 text-[10px] ml-0.5">50 cr</span>
-                          </button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-700 transition-colors">
-                                <Layers className="h-3.5 w-3.5" />
-                                Materials Board
-                                <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="bg-amber-50 border-amber-200">
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'presentation-board', message)} className="focus:bg-amber-100 focus:text-amber-900">
-                                <LayoutTemplate className="h-4 w-4 mr-2 text-amber-600" />
-                                <div>
-                                  <div className="font-medium">Presentation Board</div>
-                                  <div className="text-xs text-amber-400">Fitment selection + isometric drawing + material column</div>
-                                </div>
-                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'selection-board', message)} className="focus:bg-amber-100 focus:text-amber-900">
-                                <Layers className="h-4 w-4 mr-2 text-amber-600" />
-                                <div>
-                                  <div className="font-medium">Selection Board</div>
-                                  <div className="text-xs text-amber-400">Cutaway view with material swatch callouts</div>
-                                </div>
-                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleGenerateMaterialsBoard(message.geminiImageData!.image_url, 'photorealistic-render', message)} className="focus:bg-amber-100 focus:text-amber-900">
-                                <Camera className="h-4 w-4 mr-2 text-amber-600" />
-                                <div>
-                                  <div className="font-medium">Photorealistic Render</div>
-                                  <div className="text-xs text-amber-400">Ultra-detailed magazine-quality room render</div>
-                                </div>
-                                <span className="ml-auto text-xs text-amber-400">15 cr</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <MoodboardSavePopover
-                            mediaUrl={message.geminiImageData!.image_url}
-                            mediaType="image"
-                            mediaTitle="Generated Design"
+                        {message.videoData ? (
+                          <video
+                            src={message.videoData.video_url}
+                            controls
+                            className="w-full rounded-xl border border-white/20 shadow-md"
                           />
-                        </div>
+                        ) : (
+                          <div className="relative group cursor-pointer" onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}>
+                            <img
+                              src={message.geminiImageData.image_url}
+                              alt="Gemini interior design"
+                              className="w-full rounded-xl border border-white/20 shadow-md transition-opacity group-hover:opacity-90"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              <span className="bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
+                                Click to open
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : message.materialsBoardData ? (
                       <div className="space-y-3">
@@ -2341,6 +2255,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
                               onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
                               onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
+                              onEditImage={(imageUrl) => {
+                                setAttachedImages([imageUrl]);
+                                setSelectedGenerationMode('image-edit');
+                                setShowGeminiEditModal(true);
+                              }}
                               onAskJARVIS={(segment) => {
                                 const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
                                 setInput(prompt);
@@ -2597,6 +2516,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {/* Quick action chips — interior designer only */}
               {selectedAgent === 'interior-designer' && (
                 <div className="flex flex-wrap gap-1.5">
+                  {/* Floor Plan → 3D Render */}
                   <button
                     onClick={() => { setSelectedGenerationMode('floor-plan-render'); setInput('Render this floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting.'); }}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
@@ -2605,44 +2525,44 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <LayoutTemplate className="w-3 h-3" />
                     Floor Plan → 3D Render
                   </button>
+
+                  {/* Redesign Room (1 image) or Copy Style (2 images) — Flux Depth Pro */}
                   <button
                     onClick={() => {
                       if (attachedImages.length >= 2) {
-                        setSelectedGenerationMode('image-edit');
+                        setSelectedGenerationMode('copy-style');
                         setInput(
-                          'I have uploaded two images.\n\n' +
-                          'Image 1 is my design inspiration (style mood board) — extract all visual elements: floors, wall tiles, colors, finishes, fixtures style, hardware, lighting atmosphere.\n\n' +
-                          'Image 2 is my existing room — this is the room to edit. Every fixture stays on its exact wall and position: sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
-                          'Apply Image 1\'s visual design to Image 2\'s layout:\n' +
-                          '• Floors: Image 1\'s tile material, color, size, pattern, grout\n' +
-                          '• Walls: Image 1\'s tile/cladding color, format, dual-color zone splits\n' +
-                          '• Ceiling: Image 1\'s color, finish, coving details\n' +
-                          '• Fixtures: keep Image 2 positions exactly, apply Image 1\'s basin style, vanity finish, tap metal, mirror shape, shower glass type\n' +
-                          '• Hardware: Image 1\'s metal finish consistently throughout\n' +
-                          '• Lighting: Image 1\'s fixture types, color temperature, atmosphere\n' +
-                          '• Color palette: every color from Image 1 only\n\n' +
-                          'Result: Image 2\'s room layout with Image 1\'s complete visual design applied.'
+                          'I have two images uploaded.\n\n' +
+                          'Image 1 (Inspiration): extract the complete visual design — all floor materials, wall tiles/colors, ceiling finish, fixture aesthetics, hardware finish, lighting atmosphere, and color palette.\n\n' +
+                          'Image 2 (My Room): this is the room to redesign. Keep every fixture and element in its exact position — sink, vanity, toilet, shower, bath, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
+                          'Apply the full visual design of Image 1 onto the layout of Image 2. Photorealistic professional result.'
                         );
                       } else {
-                        setSelectedGenerationMode('image-edit');
+                        setSelectedGenerationMode('redesign');
                         setInput(
-                          'Redesign this room. All fixtures and architectural elements stay in their exact positions — sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
-                          'Update only the visual surfaces:\n' +
-                          '• Floors: new tile material, color, and pattern\n' +
-                          '• Walls: new tile/paint color, finish, and any dual-tone zone treatment\n' +
-                          '• Ceiling: updated color and finish\n' +
-                          '• Fixture aesthetics: updated basin style, vanity finish, tap metal, mirror frame\n' +
-                          '• Hardware: consistent metal finish throughout\n' +
-                          '• Lighting: updated fixtures and atmosphere\n\n' +
-                          'Make it look professionally designed, photorealistic, high-end.'
+                          'Redesign this room with a high-end contemporary style. Keep all fixtures and architectural elements in their exact positions — sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
+                          'Update all visual surfaces: floor material and pattern, wall tiles/finishes, ceiling finish, fixture aesthetics, hardware metal finish, and lighting. Make it look professionally designed and photorealistic.'
                         );
                       }
                     }}
-                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
-                    title={attachedImages.length >= 2 ? 'Image 1 = inspiration (style), Image 2 = your room (layout preserved)' : 'Redesign this room keeping the same layout'}
+                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${(selectedGenerationMode === 'redesign' || selectedGenerationMode === 'copy-style') ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700'}`}
+                    title={attachedImages.length >= 2 ? 'Image 1 = inspiration style, Image 2 = your room (layout preserved)' : 'Redesign room keeping exact layout — uses Flux Depth Pro'}
                   >
                     <Layers className="w-3 h-3" />
-                    {attachedImages.length >= 2 ? 'Redesign + Copy Style' : 'Redesign Room'}
+                    {attachedImages.length >= 2 ? 'Copy Style' : 'Redesign Room'}
+                  </button>
+
+                  {/* Edit Image — Gemini targeted edit (opens structured modal) */}
+                  <button
+                    onClick={() => {
+                      setSelectedGenerationMode('image-edit');
+                      setShowGeminiEditModal(true);
+                    }}
+                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
+                    title="Make targeted changes — change floor, lighting, plants, style, and more"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit Image
                   </button>
                 </div>
               )}
@@ -2866,6 +2786,49 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       )}
 
+      {/* Gemini single-image modal — reuses ProgressiveImageGrid's full modal (Edit Mode, zone select, Products tab, all actions) */}
+      {geminiModalImage && (
+        <ProgressiveImageGrid
+          jobId=""
+          modelCount={0}
+          models={[]}
+          directImage={{ url: geminiModalImage, title: 'Generated Design' }}
+          onDirectImageClose={() => setGeminiModalImage(null)}
+          workspaceId={workspaceId}
+          onGenerateVR={(imageUrl, context) => {
+            const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
+            handleGenerateVR(imageUrl, context, ownerMsg);
+          }}
+          onGenerateVideo={(imageUrl, videoType, vm) => {
+            const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
+            handleGenerateVideo(imageUrl, ownerMsg, videoType, vm ?? videoModel);
+          }}
+          onGenerateMaterialsBoard={(imageUrl, boardMode) => {
+            const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
+            handleGenerateMaterialsBoard(imageUrl, boardMode, ownerMsg);
+          }}
+          onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
+          onEditImage={(imageUrl) => {
+            setAttachedImages([imageUrl]);
+            setSelectedGenerationMode('image-edit');
+            setGeminiModalImage(null);
+            setShowGeminiEditModal(true);
+          }}
+          onAskJARVIS={(segment) => {
+            const prompt = `Find products similar to this material zone: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
+            setInput(prompt);
+            setGeminiModalImage(null);
+          }}
+          onFindMaterial={(segment) => {
+            const cropUrl = segment.crop_data_url || segment.crop_storage_url;
+            if (cropUrl) setAttachedImages([cropUrl]);
+            const prompt = `Find this exact material. Zone: ${segment.label} — ${segment.material_type}, ${segment.finish} finish, color: ${segment.dominant_color}.`;
+            setInput(prompt);
+            setGeminiModalImage(null);
+          }}
+        />
+      )}
+
       {/* Virtual Staging Modal — for uploaded images + prompt library trigger */}
       {virtualStagingImageUrl !== null && (
         <VirtualStagingModal
@@ -2883,6 +2846,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }}
         />
       )}
+
+      {/* Gemini Edit Modal — structured category-driven image edit prompt builder */}
+      <GeminiEditModal
+        isOpen={showGeminiEditModal}
+        onClose={() => setShowGeminiEditModal(false)}
+        onGenerate={(params: GeminiEditParams) => {
+          setInput(params.prompt);
+          // mode already set to 'image-edit' when the button was clicked
+        }}
+      />
 
       {/* Material Matching Modal */}
       {showMaterialModal && selectedMaterialsData && (

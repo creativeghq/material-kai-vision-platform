@@ -33,6 +33,7 @@ import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
+const REPLICATE_API_TOKEN = Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 /**
  * Safe chunked base64 encoder — avoids call-stack overflow on large images.
@@ -133,13 +134,127 @@ SELF-CHECK before finalising: confirm the toilet is on the same wall as in the o
 Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
 }
 
+// ── Flux Depth Pro (Replicate) ────────────────────────────────────────────────
+
+const STYLE_VOCAB: Record<string, string> = {
+  modern: 'clean lines, neutral palette, functional furniture, minimal clutter, recessed lighting',
+  minimalist: 'white surfaces, hidden storage, no ornamentation, single accent material, flooded with natural light',
+  scandinavian: 'light birch wood, linen textiles, hygge warmth, muted sage and white palette, indoor plants',
+  industrial: 'exposed brick, raw steel, polished concrete, Edison bulbs, dark moody palette',
+  luxury: 'marble surfaces, bespoke furniture, statement lighting, rich jewel tones, layered textures',
+  mediterranean: 'terracotta tiles, whitewashed plaster, wrought iron, arched openings, warm ochre tones',
+  japandi: 'dark stained oak, limewash walls, wabi-sabi textures, low-profile furniture, deep calm palette',
+  traditional: 'ornate mouldings, warm walnut wood, plush upholstery, Persian rugs, warm ambient lighting',
+  cabin: 'exposed timber beams, wide plank flooring, natural stone, cozy fireside, warm wood tones',
+  contemporary: 'bold geometric forms, mixed materials, statement art, dynamic lighting, open plan',
+};
+
+/**
+ * Build a Flux text prompt for single-image room redesign.
+ * No source image content — just the style direction we want applied.
+ */
+function buildFluxRedesignPrompt(style?: string, roomType?: string, instruction?: string): string {
+  const room = roomType || 'interior space';
+  const styleName = style || 'contemporary';
+  const styleVocab = STYLE_VOCAB[styleName.toLowerCase()] || styleName;
+  const base = `A photorealistic ${styleName} ${room}. ${styleVocab}. Premium materials, precise textures, professional interior photography quality.`;
+  const extra = instruction ? ` ${instruction}.` : '';
+  return `${base}${extra} Ultra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
+}
+
+/**
+ * Build a Flux text prompt that applies an extracted design spec to a room.
+ * Used for Copy Style — the spec was extracted from the inspiration image by Gemini Vision.
+ */
+function buildFluxCopyStylePrompt(designSpec: string, roomType?: string, userInstruction?: string): string {
+  const room = roomType || 'interior space';
+  return `Apply the following complete interior design aesthetic to this ${room}. Preserve every fixture position and the spatial layout exactly — nothing moves.\n\n${designSpec}\n${userInstruction ? `\nAdditional instruction: ${userInstruction}\n` : ''}\nUltra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
+}
+
+/**
+ * Call Flux Depth Pro on Replicate.
+ * Uses depth-map extraction from the control image to lock spatial structure,
+ * then applies the style prompt on top — positions are preserved by the model.
+ *
+ * @param controlImageUrl Public URL of the room image (structure donor)
+ * @param prompt          Style description to apply
+ * @param aspectRatio     Output aspect ratio
+ * @returns               Replicate output image URL (temporary)
+ */
+async function callFluxDepthPro(
+  controlImageUrl: string,
+  prompt: string,
+  aspectRatio: ImageAspectRatio = '16:9',
+): Promise<string> {
+  if (!REPLICATE_API_TOKEN) throw new Error('REPLICATE_API_TOKEN not set');
+
+  const createRes = await fetch(
+    'https://api.replicate.com/v1/models/black-forest-labs/flux-depth-pro/predictions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        'Content-Type': 'application/json',
+        Prefer: 'wait',
+      },
+      body: JSON.stringify({
+        input: {
+          control_image: controlImageUrl,
+          prompt,
+          guidance: 15,
+          num_inference_steps: 28,
+          output_format: 'webp',
+          aspect_ratio: aspectRatio,
+        },
+      }),
+    },
+  );
+
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    throw new Error(`Flux Depth Pro creation failed (${createRes.status}): ${err}`);
+  }
+
+  const prediction = await createRes.json();
+
+  if (prediction.status === 'succeeded') {
+    const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+    return out as string;
+  }
+  if (prediction.status === 'failed') {
+    throw new Error(`Flux Depth Pro failed: ${prediction.error}`);
+  }
+
+  // Poll until done (up to 3 min: 60 × 3s)
+  const predictionId = prediction.id;
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const statusRes = await fetch(
+      `https://api.replicate.com/v1/predictions/${predictionId}`,
+      { headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` } },
+    );
+    const status = await statusRes.json();
+    if (status.status === 'succeeded') {
+      const out = Array.isArray(status.output) ? status.output[0] : status.output;
+      return out as string;
+    }
+    if (status.status === 'failed') {
+      throw new Error(`Flux Depth Pro failed: ${status.error}`);
+    }
+  }
+
+  throw new Error('Flux Depth Pro timed out after 3 minutes');
+}
+
+// ── Credit costs ──────────────────────────────────────────────────────────────
+
 // Credit costs
 const CREDIT_COSTS: Record<GeminiImageModel, number> = {
   'gemini-3.1-flash-image-preview': 6,
   'gemini-3-pro-image-preview': 15,
 };
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
@@ -391,7 +506,55 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       }
     }
 
-    // ── Mode 3: floor-plan-render (image input → photorealistic top-down) ──
+    // ── Mode 3: redesign — Flux Depth Pro, single image ───────────────────
+    // Extracts depth map from room image → locks structure → applies style.
+    // Positions are mathematically preserved — no prompting trick required.
+    else if (mode === 'redesign') {
+      if (!body.reference_image_url) {
+        return jsonResponse({ success: false, error: 'reference_image_url required for redesign mode' }, 400);
+      }
+
+      const fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.edit_instruction ?? body.prompt);
+      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+
+      // Download from Replicate (temp URL) and persist to Supabase Storage
+      const imgBuffer = await fetchImageBuffer(replicateUrl);
+      const base64 = toBase64(imgBuffer);
+      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+    }
+
+    // ── Mode 4: copy-style — Gemini Vision spec + Flux Depth Pro ──────────
+    // Step 1: Gemini Vision reads inspiration image → structured text spec
+    // Step 2: Flux Depth Pro applies that spec to the room (depth-locked)
+    // The inspiration image NEVER reaches Flux → zero spatial bleed.
+    else if (mode === 'copy-style') {
+      if (!body.reference_image_url) {
+        return jsonResponse({ success: false, error: 'reference_image_url required for copy-style mode' }, 400);
+      }
+      if (!body.style_reference_url) {
+        return jsonResponse({ success: false, error: 'style_reference_url (inspiration image) required for copy-style mode' }, 400);
+      }
+
+      // Step 1 — extract design spec from inspiration image
+      const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
+      let fluxPrompt: string;
+      try {
+        const designSpec = await extractDesignSpec(inspirationBuffer, body.style);
+        console.log('[generate-interior-gemini] Copy-style spec extracted, length:', designSpec.length);
+        fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
+      } catch (specErr) {
+        console.warn('[generate-interior-gemini] Spec extraction failed for copy-style, using fallback:', specErr);
+        fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
+      }
+
+      // Step 2 — apply via Flux Depth Pro (structure locked to reference_image_url = Your Room)
+      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+      const imgBuffer = await fetchImageBuffer(replicateUrl);
+      const base64 = toBase64(imgBuffer);
+      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+    }
+
+    // ── Mode 5: floor-plan-render (image input → photorealistic top-down) ──
     else if (mode === 'floor-plan-render') {
       if (!body.reference_image_url) {
         return jsonResponse({ success: false, error: 'reference_image_url required for floor-plan-render mode' }, 400);
@@ -489,7 +652,9 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       generation_status: 'completed',
       progress_percentage: 100,
       request_type: mode === 'materials-selection-board' ? `materials_selection_board_${body.board_mode ?? 'selection-board'}` : mode,
-      models_queue: [{ id: model, name: `Gemini ${model}`, provider: 'google' }],
+      models_queue: (mode === 'redesign' || mode === 'copy-style')
+        ? [{ id: 'flux-depth-pro', name: 'Flux Depth Pro', provider: 'replicate' }]
+        : [{ id: model, name: `Gemini ${model}`, provider: 'google' }],
       models_results: {
         [model]: { success: true, image_url: imageUrl, board_mode: body.board_mode },
       },
