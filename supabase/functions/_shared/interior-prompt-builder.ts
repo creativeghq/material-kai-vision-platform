@@ -164,86 +164,61 @@ export function buildDualReferenceStylePrompt(style?: string, userPrompt?: strin
     ? style.charAt(0).toUpperCase() + style.slice(1)
     : null;
 
-  return `You are performing a COMPLETE VISUAL TRANSFORMATION. You have two reference images.
+  return `You are editing a room photo. You have two images.
 
-═══ IMAGE 1 — SPATIAL DONOR ═══
-Extract ONLY the spatial data from this image:
-  - Room shape, dimensions, and proportions
-  - Positions of all fixed elements: sink, toilet, shower/bath enclosure, vanity, doors, windows, niches
-  - Furniture and fixture placement coordinates
-  - Zone boundaries (wet zone, dry zone, double-height areas, alcoves)
-  - Camera angle and perspective from which to render the result
-NOTHING visual from Image 1 carries into the output. Not a single tile, color, or finish.
+IMAGE 1 = STYLE MOOD BOARD (visual reference only)
+IMAGE 2 = THE ROOM YOU ARE EDITING (the actual photo to modify)
 
-═══ IMAGE 2 — COMPLETE DESIGN DONOR ═══
-Every visual decision in the output must be copied from this image. Go element by element:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR TASK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Perform a cosmetic renovation of IMAGE 2. Every object stays exactly where it is. Only the surfaces, finishes, colors, and material aesthetics change — sourced from IMAGE 1.
 
-FLOORS:
-  - Exact tile/stone/material: color, size, format, finish (matte/gloss/honed/polished)
-  - Exact laying pattern (straight, diagonal, herringbone, brick bond, large format slab)
-  - Grout color and joint width
-  - Any transition strips or border treatments
+IMAGE 1 tells you WHAT to use visually. IMAGE 2 tells you WHERE everything stays. You are painting and re-finishing IMAGE 2, not rebuilding it.
 
-WALLS:
-  - Primary wall tile/cladding: color, size, format, texture, finish, laying pattern
-  - Secondary wall treatment where walls change material or color
-  - Exact zone where each treatment starts and ends (floor-to-ceiling, dado height, feature wall only)
-  - Double-color or dual-material zones: copy the exact split height and alignment
-  - Any niches, recesses, shelving: their position, depth, and interior surface treatment
-  - Grout color on wall tiles, joint width
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ABSOLUTE POSITION RULES — never break these
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every element in IMAGE 2 stays on its exact wall, at its exact height, in its exact position:
 
-CEILING:
-  - Color, finish, material
-  - Any coving, cornice, or shadow gap detail
-  - Recessed zones, soffits, or dropped sections
-  - Ceiling-mounted fixtures
+  ✗ DO NOT move the toilet — same wall, same corner, same distance from other elements
+  ✗ DO NOT move the sink or basin — same wall, same position
+  ✗ DO NOT move the vanity — same location, same footprint
+  ✗ DO NOT move the shower enclosure — same corner/wall, same dimensions
+  ✗ DO NOT move the bath — same position and orientation
+  ✗ DO NOT move doors or windows — same walls, same sizes
+  ✗ DO NOT move niches, recesses, or shelving
+  ✗ DO NOT move mirrors, towel rails, or accessories
+  ✗ DO NOT change the camera angle or perspective — render from the identical viewpoint as IMAGE 2
 
-SANITARY FIXTURES & VANITY:
-  - Sink/basin model style (under-mount, vessel, semi-recessed, wall-hung, integrated)
-  - Vanity unit: shape, color, material, door/drawer style, legs or floating
-  - Tap/faucet style: finish (chrome, brushed brass, matte black, etc.)
-  - Mirror: shape, size, framing style, any integrated LED strip
-  - Toilet style if visible: wall-hung or floor-standing, cistern type
-  - Any heated towel rail: shape, finish, position
+The spatial layout of IMAGE 1 is completely irrelevant. Do not use it. Do not let it influence where anything is placed.
 
-SHOWER / WET AREA ARCHITECTURE:
-  - Enclosure type: frameless glass, framed, walk-in open, wet room, bath-shower combo
-  - Glass thickness and any frosting/patterning
-  - Shower niche: position, size, tile treatment inside niche vs surrounding wall
-  - Shower head style: rain overhead, wall-mounted, handheld, combination
-  - Shower tray or wet floor: material, color, drain style
-  - Any step, threshold, or floor transition detail
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT TO CHANGE — extract from IMAGE 1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Apply these visual elements from IMAGE 1 to IMAGE 2's layout:
 
-STORAGE & BUILT-INS:
-  - All wall-mounted or recessed storage: doors, color, handle style
-  - Open shelving: bracket style, shelf material
-  - Any integrated lighting inside storage
+FLOORS: material, color, tile size, format, finish, laying pattern, grout color and width
+WALLS: tile/cladding color, size, format, texture, finish, laying pattern, grout; any dual-color zone splits — copy height and alignment from IMAGE 1
+CEILING: color, finish, any coving, shadow gap, or structural ceiling detail
+FIXTURES — keep IMAGE 2 positions, apply IMAGE 1 aesthetics:
+  - Basin style (under-mount, vessel, wall-hung) and finish
+  - Vanity door style, color, material, handles
+  - Tap/faucet style and metal finish
+  - Mirror shape, frame, any integrated LED
+  - Shower glass type, niche tile treatment, shower head style
+  - Towel rail style and finish
+HARDWARE: metal finish tone from IMAGE 1 applied consistently to all hardware
+LIGHTING: fixture types, color temperature, and atmosphere from IMAGE 1
+COLOR PALETTE: every color in the output comes from IMAGE 1 only
+${userPrompt ? `\nADDITIONAL INSTRUCTION: ${userPrompt}` : ''}${styleName ? `\nDESIGN STYLE: ${styleName}` : ''}
 
-LIGHTING:
-  - Every fixture type: recessed downlights, pendant, wall sconce, under-cabinet, mirror light, LED strip
-  - Light color temperature: warm/cool/neutral
-  - Any directional or accent lighting on features
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT CHECK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Before finalising: verify the toilet is on the same wall as in IMAGE 2. Verify the sink is on the same wall as in IMAGE 2. Verify the shower is in the same corner as in IMAGE 2. If anything moved, correct it.
 
-HARDWARE & ACCESSORIES:
-  - Towel bar / ring / hook: style and finish
-  - Toilet roll holder: style and finish
-  - All hardware finishes: copy the exact metal tone throughout
-
-COLOR PALETTE:
-  - Every color in the output comes exclusively from Image 2
-  - If Image 2 uses two tile colors in different zones, reproduce the same zones in the same colors
-  - If Image 2 has a dominant neutral with one accent, match that ratio exactly
-
-ATMOSPHERE & LIGHTING MOOD:
-  - Replicate the exact warmth or coolness of the light
-  - Copy shadow depth and contrast level
-  - Copy time-of-day feel (bright daylight, soft evening, etc.)
-${userPrompt ? `\nADDITIONAL INSTRUCTION FROM USER: ${userPrompt}` : ''}${styleName ? `\nDESIGN STYLE CONTEXT: ${styleName}` : ''}
-
-═══ OUTPUT REQUIREMENT ═══
-Someone who has seen Image 2 must immediately recognise every design choice in the output. The room from Image 1 should feel completely rebuilt in the aesthetic of Image 2 — not partially updated, not inspired by — fully transformed. Every surface, every fixture, every material must match.
-
-Photorealistic, professional architectural photography quality. 24mm lens, corrected verticals, no fisheye distortion, ultra-realistic material textures and lighting.`;
+Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
 }
 
 function buildFallbackPrompt(params: DesignParams, styleCue: string, materialsLine: string): string {

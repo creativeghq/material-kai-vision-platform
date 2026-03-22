@@ -240,11 +240,13 @@ Deno.serve(async (req) => {
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
 
       if (body.style_reference_url) {
-        // Dual-image redesign: Image 1 = room to transform, Image 2 = style reference
+        // Dual-image redesign:
+        //   images[0] = styleBuffer  (inspiration/mood board — sent FIRST so Gemini treats it as context)
+        //   images[1] = sourceBuffer (the room to edit   — sent LAST  so Gemini edits this one)
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
         const result = await generateImageWithGemini(
-          { text: dualPrompt, images: [sourceBuffer, styleBuffer] },
+          { text: dualPrompt, images: [styleBuffer, sourceBuffer] },
           { model, aspectRatio },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
@@ -285,11 +287,13 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
 
       if (body.style_reference_url) {
-        // Dual-image Copy Style: Image 1 = user's room, Image 2 = style inspiration
+        // Dual-image Copy Style:
+        //   images[0] = styleBuffer  (inspiration — sent FIRST as context/mood board)
+        //   images[1] = sourceBuffer (room to edit — sent LAST so Gemini edits this one)
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
         const result = await generateImageWithGemini(
-          { text: dualPrompt, images: [sourceBuffer, styleBuffer] },
+          { text: dualPrompt, images: [styleBuffer, sourceBuffer] },
           { model, aspectRatio: '1:1' },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);

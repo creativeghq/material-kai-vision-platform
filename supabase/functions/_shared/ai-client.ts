@@ -290,8 +290,8 @@ async function generateMultiImageWithGemini(
   // exactly which is the layout donor and which is the design donor.
   // Structure: label → image → label → image → instruction text
   const IMAGE_LABELS = [
-    'LAYOUT DONOR IMAGE (first image — preserve spatial layout only):',
-    'DESIGN DONOR IMAGE (second image — copy all visual design elements from this):',
+    'STYLE REFERENCE IMAGE (first image — mood board only, extract colors/materials/finishes, ignore its spatial layout entirely):',
+    'ROOM TO EDIT (second image — this is the room you are editing, all positions and fixtures stay exactly where they are):',
   ];
 
   const parts: any[] = [];

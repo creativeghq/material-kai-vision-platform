@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Check,
   Globe,
+  GripVertical,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -270,6 +271,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
+  const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null);
+  const imageDragIndexRef = useRef<number | null>(null);
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -2493,25 +2496,104 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           {/* Attached Images */}
           {attachedImages.length > 0 && (
             <div className="px-6 pt-3 space-y-2">
-              <div className="flex gap-2">
-                {attachedImages.map((img, idx) => (
-                  <div key={idx} className="relative w-16 h-16">
-                    <img
-                      src={img}
-                      alt="Attached"
-                      className="w-full h-full object-cover rounded"
-                    />
-                    <button
-                      onClick={() =>
-                        setAttachedImages((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                    >
-                      ×
-                    </button>
+
+              {/* 2-image drag-and-drop slots for interior designer */}
+              {attachedImages.length >= 2 && selectedAgent === 'interior-designer' ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Drag to set the correct role for each image:</p>
+                  <div className="flex gap-3">
+                    {[0, 1].map((slotIdx) => {
+                      const img = attachedImages[slotIdx];
+                      const isDragOver = imageDragOverIndex === slotIdx;
+                      const slotLabel = slotIdx === 0 ? 'Inspiration' : 'Your Room';
+                      const slotDesc = slotIdx === 0 ? 'Style & colors to copy' : 'Layout to preserve';
+                      const slotColor = slotIdx === 0
+                        ? 'border-blue-300 bg-blue-50/50'
+                        : 'border-violet-300 bg-violet-50/50';
+                      const labelColor = slotIdx === 0
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-violet-100 text-violet-700';
+
+                      return (
+                        <div
+                          key={slotIdx}
+                          className="flex flex-col items-center gap-1"
+                          onDragOver={(e) => { e.preventDefault(); setImageDragOverIndex(slotIdx); }}
+                          onDragLeave={() => setImageDragOverIndex(null)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = imageDragIndexRef.current;
+                            if (from !== null && from !== slotIdx) {
+                              setAttachedImages((prev) => {
+                                const next = [...prev];
+                                [next[from], next[slotIdx]] = [next[slotIdx], next[from]];
+                                return next;
+                              });
+                            }
+                            setImageDragOverIndex(null);
+                            imageDragIndexRef.current = null;
+                          }}
+                        >
+                          <div
+                            draggable
+                            onDragStart={() => { imageDragIndexRef.current = slotIdx; }}
+                            onDragEnd={() => { imageDragIndexRef.current = null; setImageDragOverIndex(null); }}
+                            className={cn(
+                              'relative w-28 h-28 rounded-xl overflow-hidden border-2 border-dashed cursor-grab active:cursor-grabbing transition-all duration-150',
+                              slotColor,
+                              isDragOver && 'scale-105 brightness-95'
+                            )}
+                          >
+                            <img
+                              src={img}
+                              alt={slotLabel}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Drag handle overlay */}
+                            <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <GripVertical className="w-5 h-5 text-white drop-shadow opacity-0 hover:opacity-100 transition-opacity" />
+                            </div>
+                            <button
+                              onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== slotIdx))}
+                              className="absolute top-1 right-1 bg-black/50 hover:bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', labelColor)}>
+                            {slotLabel}
+                          </span>
+                          <span className="text-xs text-muted-foreground/70">{slotDesc}</span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Extra images beyond slot 2 — plain thumbnails */}
+                    {attachedImages.slice(2).map((img, i) => (
+                      <div key={i + 2} className="relative w-14 h-14 self-start mt-1">
+                        <img src={img} alt="Attached" className="w-full h-full object-cover rounded-lg" />
+                        <button
+                          onClick={() => setAttachedImages((prev) => prev.filter((_, idx) => idx !== i + 2))}
+                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                        >×</button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                /* Default: plain thumbnails */
+                <div className="flex gap-2">
+                  {attachedImages.map((img, idx) => (
+                    <div key={idx} className="relative w-16 h-16">
+                      <img src={img} alt="Attached" className="w-full h-full object-cover rounded-lg" />
+                      <button
+                        onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Quick action chips — interior designer only */}
               {selectedAgent === 'interior-designer' && (
                 <div className="flex flex-wrap gap-1.5">
@@ -2527,14 +2609,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     onClick={() => {
                       if (attachedImages.length >= 2) {
                         setSelectedGenerationMode('image-edit');
-                        setInput('I have uploaded two images. Image 1 is my existing room — this is the layout to redesign. Image 2 is my design inspiration — copy every single design element from it into my room: the exact sink and vanity furniture, shower area architecture and enclosure, tile colors and patterns, double-color zone alignments, wall and floor treatments, ceiling details, lighting fixtures, mirrors, storage, hardware finishes, and the complete color palette. Every architectural and decorative decision from Image 2 must be reflected in the result.');
+                        setInput(
+                          'I have uploaded two images.\n\n' +
+                          'Image 1 is my design inspiration (style mood board) — extract all visual elements: floors, wall tiles, colors, finishes, fixtures style, hardware, lighting atmosphere.\n\n' +
+                          'Image 2 is my existing room — this is the room to edit. Every fixture stays on its exact wall and position: sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
+                          'Apply Image 1\'s visual design to Image 2\'s layout:\n' +
+                          '• Floors: Image 1\'s tile material, color, size, pattern, grout\n' +
+                          '• Walls: Image 1\'s tile/cladding color, format, dual-color zone splits\n' +
+                          '• Ceiling: Image 1\'s color, finish, coving details\n' +
+                          '• Fixtures: keep Image 2 positions exactly, apply Image 1\'s basin style, vanity finish, tap metal, mirror shape, shower glass type\n' +
+                          '• Hardware: Image 1\'s metal finish consistently throughout\n' +
+                          '• Lighting: Image 1\'s fixture types, color temperature, atmosphere\n' +
+                          '• Color palette: every color from Image 1 only\n\n' +
+                          'Result: Image 2\'s room layout with Image 1\'s complete visual design applied.'
+                        );
                       } else {
                         setSelectedGenerationMode('image-edit');
-                        setInput('Redesign this room. Keep all fixtures and architectural elements in their exact positions. Update the materials, tile colors and patterns, surface finishes, lighting, and overall style. Make it look professionally designed and photorealistic.');
+                        setInput(
+                          'Redesign this room. All fixtures and architectural elements stay in their exact positions — sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
+                          'Update only the visual surfaces:\n' +
+                          '• Floors: new tile material, color, and pattern\n' +
+                          '• Walls: new tile/paint color, finish, and any dual-tone zone treatment\n' +
+                          '• Ceiling: updated color and finish\n' +
+                          '• Fixture aesthetics: updated basin style, vanity finish, tap metal, mirror frame\n' +
+                          '• Hardware: consistent metal finish throughout\n' +
+                          '• Lighting: updated fixtures and atmosphere\n\n' +
+                          'Make it look professionally designed, photorealistic, high-end.'
+                        );
                       }
                     }}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
-                    title={attachedImages.length >= 2 ? 'Image 1 = your room, Image 2 = inspiration — copies every design element' : 'Redesign this room keeping the same layout'}
+                    title={attachedImages.length >= 2 ? 'Image 1 = inspiration (style), Image 2 = your room (layout preserved)' : 'Redesign this room keeping the same layout'}
                   >
                     <Layers className="w-3 h-3" />
                     {attachedImages.length >= 2 ? 'Redesign + Copy Style' : 'Redesign Room'}
@@ -2598,92 +2703,105 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           )}
 
 
-          {/* Agent Selector */}
-          <div className="px-4 pt-3 pb-1 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground/60 font-medium">Agent</span>
+          {/* Input Controls */}
+          <div className="px-4 pb-4 pt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+
+            {/* Unified input container */}
             <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-1 p-0.5 rounded-full bg-white/10 backdrop-blur-sm">
-                {availableAgents.map((agent) => {
-                  const Icon = agent.icon;
-                  const isActive = selectedAgent === agent.id;
-                  return (
-                    <Tooltip key={agent.id}>
+            <div className="border border-input rounded-xl bg-background shadow-sm">
+
+              {/* Agent row — full width on top */}
+                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-input">
+                  {availableAgents.map((agent) => {
+                    const Icon = agent.icon;
+                    const isActive = selectedAgent === agent.id;
+                    return (
+                      <Tooltip key={agent.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => setSelectedAgent(agent.id)}
+                            className={cn(
+                              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200',
+                              isActive
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                            )}
+                          >
+                            <Icon className={cn('h-3.5 w-3.5', !isActive && agent.color)} />
+                            <span>{agent.name}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px]">
+                          <p className="font-semibold">{agent.name}</p>
+                          <p className="text-xs text-muted-foreground">{agent.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+
+              {/* Main input row */}
+              <div className="flex items-stretch">
+
+                {/* Left panel: attach, voice, prompt library */}
+                <div className="flex flex-col items-center justify-around px-1.5 py-2 border-r border-input gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>Attach images</p></TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleVoiceInput}
+                        disabled={!isVoiceSupported}
+                        className={cn(
+                          'p-1.5 rounded-lg transition-colors',
+                          isRecording
+                            ? 'bg-red-500 text-white animate-pulse'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                          !isVoiceSupported && 'opacity-40 cursor-not-allowed'
+                        )}
+                      >
+                        <Mic className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>{isRecording ? 'Stop recording' : !isVoiceSupported ? 'Voice not supported' : 'Voice input'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {selectedAgent === 'interior-designer' && (
+                    <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => setSelectedAgent(agent.id)}
-                          className={cn(
-                            'p-2 rounded-full transition-all duration-200 ease-out',
-                            isActive
-                              ? 'bg-primary text-primary-foreground shadow-md scale-105 ring-1 ring-primary/30'
-                              : 'hover:bg-white/20 text-muted-foreground hover:text-foreground hover:scale-105'
-                          )}
+                          onClick={() => setShowPromptLibrary(true)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                         >
-                          <Icon className={cn('h-4 w-4', !isActive && agent.color)} />
+                          <Sparkles className="h-4 w-4" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[200px]">
-                        <p className="font-semibold">{agent.name}</p>
-                        <p className="text-xs text-muted-foreground">{agent.description}</p>
-                      </TooltipContent>
+                      <TooltipContent side="left"><p>Prompt library</p></TooltipContent>
                     </Tooltip>
-                  );
-                })}
-              </div>
-            </TooltipProvider>
-          </div>
+                  )}
+                </div>
 
-          {/* Input Controls */}
-          <div className="p-4">
-            <div className="flex items-end gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-              {/* REMOVED: PDF upload input and button - PDF processing moved to /admin/data-import page */}
-
-              {/* Image Upload Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-9 w-9"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-
-              {/* Prompt Library Icon (Interior Designer Agent only) */}
-              {selectedAgent === 'interior-designer' && (
-                <button
-                  onClick={() => setShowPromptLibrary(true)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Open Prompt Library"
-                >
-                  <Sparkles className="h-5 w-5" />
-                </button>
-              )}
-
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleVoiceInput}
-                className={`h-9 w-9 ${isRecording ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' : ''}`}
-                title={
-                  !isVoiceSupported
-                    ? 'Voice input not supported in this browser'
-                    : isRecording
-                      ? 'Stop recording'
-                      : 'Start voice input'
-                }
-                disabled={!isVoiceSupported}
-              >
-                <Mic className="h-4 w-4" />
-              </Button>
-              <div className="flex-1 relative">
+                {/* Textarea — resizable */}
                 <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -2694,19 +2812,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     }
                   }}
                   placeholder="Type your message... (Shift+Enter for new line)"
-                  className="min-h-[44px] max-h-[120px] resize-none pr-12"
+                  className="flex-1 min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent"
                 />
-                <Button
+
+                {/* Right panel: send button — full height */}
+                <button
                   onClick={handleSendMessage}
                   disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
-                  size="icon"
-                  className="absolute right-2 bottom-2 h-8 w-8 bg-primary hover:bg-primary/90"
+                  className={cn(
+                    'flex items-center justify-center px-4 border-l border-input rounded-r-xl transition-colors',
+                    isLoading || (!input.trim() && attachedImages.length === 0)
+                      ? 'text-muted-foreground/40 bg-muted/20 cursor-not-allowed'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  )}
                 >
                   <Send className="h-4 w-4" />
-                </Button>
+                </button>
+
               </div>
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">
+            </TooltipProvider>
+
+            <div className="mt-1.5 text-xs text-muted-foreground/60">
               Use ⌘ + K for shortcuts, or '/' for canned messages
             </div>
           </div>
