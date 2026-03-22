@@ -26,7 +26,6 @@ import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
   buildFloorPlanDiagramPrompt,
-  buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 
@@ -56,7 +55,7 @@ function toBase64(bytes: Uint8Array): string {
  */
 async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -188,6 +187,21 @@ async function callFluxDepthPro(
 ): Promise<string> {
   if (!REPLICATE_API_TOKEN) throw new Error('REPLICATE_API_TOKEN not set');
 
+  const requestBody = {
+    input: {
+      control_image: controlImageUrl,
+      prompt,
+      guidance: 15,
+      num_inference_steps: 28,
+      output_format: 'webp',
+      aspect_ratio: aspectRatio,
+    },
+  };
+
+  console.log('[flux-depth-pro] control_image:', controlImageUrl);
+  console.log('[flux-depth-pro] prompt length:', prompt.length);
+  console.log('[flux-depth-pro] aspect_ratio:', aspectRatio);
+
   const createRes = await fetch(
     'https://api.replicate.com/v1/models/black-forest-labs/flux-depth-pro/predictions',
     {
@@ -197,25 +211,18 @@ async function callFluxDepthPro(
         'Content-Type': 'application/json',
         Prefer: 'wait',
       },
-      body: JSON.stringify({
-        input: {
-          control_image: controlImageUrl,
-          prompt,
-          guidance: 15,
-          num_inference_steps: 28,
-          output_format: 'webp',
-          aspect_ratio: aspectRatio,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     },
   );
 
   if (!createRes.ok) {
     const err = await createRes.text();
+    console.error('[flux-depth-pro] API error:', createRes.status, err);
     throw new Error(`Flux Depth Pro creation failed (${createRes.status}): ${err}`);
   }
 
   const prediction = await createRes.json();
+  console.log('[flux-depth-pro] prediction status:', prediction.status, 'id:', prediction.id);
 
   if (prediction.status === 'succeeded') {
     const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
@@ -549,10 +556,22 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       }
 
       // Step 2 — apply via Flux Depth Pro (structure locked to reference_image_url = Your Room)
-      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
-      const imgBuffer = await fetchImageBuffer(replicateUrl);
-      const base64 = toBase64(imgBuffer);
-      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+      // Falls back to Gemini image-edit if Flux fails for any reason.
+      try {
+        const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+        const imgBuffer = await fetchImageBuffer(replicateUrl);
+        const base64 = toBase64(imgBuffer);
+        imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+      } catch (fluxErr) {
+        console.warn('[generate-interior-gemini] Flux failed for copy-style, falling back to Gemini:', fluxErr);
+        const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
+        const applyPrompt = buildApplySpecPrompt(fluxPrompt, body.prompt);
+        const result = await generateImageWithGemini(
+          { text: applyPrompt, images: [sourceBuffer] },
+          { model, aspectRatio },
+        );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      }
     }
 
     // ── Mode 5: floor-plan-render (image input → photorealistic top-down) ──
