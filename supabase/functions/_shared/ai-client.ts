@@ -224,11 +224,12 @@ export async function generateImageWithGemini(
 ): Promise<GeminiImageResult> {
   const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image-preview';
 
-  // Multi-image case (dual-reference generation): use generateText with IMAGE response modality.
-  // The generateImage SDK function is designed for text→image and doesn't reliably pass
-  // multiple image buffers — it may silently drop the second image. generateText with
-  // responseModalities is the correct path for Gemini's multimodal image editing API.
-  if (typeof prompt === 'object' && prompt.images.length > 1) {
+  // Any prompt with images must go through the raw Gemini generateContent API.
+  // The Vercel AI SDK generateImage() is text-to-image only — it does not support
+  // passing source images for editing and will silently ignore them, regenerating
+  // the room from scratch (causing positions to change). Route ALL image-containing
+  // prompts through generateMultiImageWithGemini which uses responseModalities correctly.
+  if (typeof prompt === 'object' && prompt.images.length >= 1) {
     return generateMultiImageWithGemini(prompt, { model: modelId });
   }
 
@@ -288,11 +289,16 @@ async function generateMultiImageWithGemini(
 
   // Build content parts with explicit labels before each image so Gemini knows
   // exactly which is the layout donor and which is the design donor.
-  // Structure: label → image → label → image → instruction text
-  const IMAGE_LABELS = [
-    'STYLE REFERENCE IMAGE (first image — mood board only, extract colors/materials/finishes, ignore its spatial layout entirely):',
-    'ROOM TO EDIT (second image — this is the room you are editing, all positions and fixtures stay exactly where they are):',
-  ];
+  // Structure: label → image → [label → image] → instruction text
+  const isSingleImage = prompt.images.length === 1;
+  const IMAGE_LABELS = isSingleImage
+    ? [
+        'ROOM TO EDIT (this is the room photo you are editing — all fixture positions, walls, doors, windows stay exactly where they are):',
+      ]
+    : [
+        'STYLE REFERENCE IMAGE (first image — mood board only, extract colors/materials/finishes, ignore its spatial layout entirely):',
+        'ROOM TO EDIT (second image — this is the room you are editing, all positions and fixtures stay exactly where they are):',
+      ];
 
   const parts: any[] = [];
   for (let i = 0; i < prompt.images.length; i++) {

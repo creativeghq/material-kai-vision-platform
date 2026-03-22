@@ -439,10 +439,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [selectedAgent]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages or reasoning steps arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, reasoningSteps]);
 
   // Timer for thinking duration
   useEffect(() => {
