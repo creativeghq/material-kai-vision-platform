@@ -32,6 +32,106 @@ import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
+
+/**
+ * Safe chunked base64 encoder — avoids call-stack overflow on large images.
+ */
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Step 1 of the two-step style-transfer pipeline.
+ * Sends the inspiration image to Gemini Vision and returns a structured text
+ * design specification covering every visible surface, material, and finish.
+ * This spec is then used in Step 2 to edit the room — the inspiration image
+ * never reaches the image generator, eliminating spatial bleed entirely.
+ */
+async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
+            { text: `You are an interior design analyst. Study this room photo carefully and produce a precise, exhaustive design specification. This spec will be used to replicate the exact visual look in a different room — not the layout, only the aesthetics.
+
+Output a structured specification. Be specific about every color (e.g. "warm white", "charcoal dark grey", "terracotta"), every material, every pattern, and every finish.
+
+FLOORS: [exact material — tile/stone/marble/wood/concrete, precise color and tone, tile size and format e.g. "600x600mm large format", laying pattern — straight/diagonal/herringbone/chevron, finish — matte/gloss/honed/polished, grout color and approximate joint width]
+
+WALLS - PRIMARY SURFACE: [tile or paint or cladding material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width]
+
+WALLS - SECONDARY ZONES (if walls have two different treatments or a dual-color split): [describe each zone: material, color, exactly where the split occurs — e.g. "lower third in dark tile, upper two thirds in white plaster"]
+
+WALL NICHES / RECESSES: [if present: tile treatment inside niche, color contrast vs surrounding wall]
+
+CEILING: [color, finish — matte/gloss, any coving/cornice/shadow-gap/cove lighting details]
+
+BASIN / SINK: [type — undermount/vessel/wall-hung/integrated, shape — rectangular/round/oval, color/material]
+
+VANITY UNIT: [color, material — wood/lacquer/stone, door style — flat/shaker/handleless, handle style if present]
+
+TAPS & FITTINGS: [metal finish — chrome/brushed nickel/brushed brass/matte black/gunmetal/rose gold, style — deck-mounted/wall-mounted/freestanding]
+
+MIRROR: [shape — rectangular/round/arch/irregular, framed or frameless, any integrated LED backlight or front strip]
+
+SHOWER AREA: [enclosure type — frameless walk-in/framed/wet-room open, glass type — clear/fluted/smoked, any shower niche: position and tile treatment inside vs outside, shower head style — overhead rain/wall-mounted/handheld]
+
+TOWEL RAILS & ACCESSORIES: [style — ladder/bar/ring, metal finish — must match taps or note if different]
+
+LIGHTING: [fixture types visible — recessed downlights/LED strips/sconces/pendant/mirror light, color temperature — warm/neutral/cool, overall mood — bright clinical / warm intimate / soft natural]
+
+FULL COLOR PALETTE: [list every distinct color in the room: e.g. "off-white walls", "warm grey large floor tile", "brushed brass hardware", "deep charcoal accent shelf", "sage green towel"]
+${style ? `\nDESIGN STYLE: ${style}` : ''}
+
+Be thorough. Every detail you miss will not appear in the renovation.` },
+          ],
+        }],
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Design spec extraction failed (${response.status}): ${await response.text()}`);
+  }
+
+  const result = await response.json();
+  const text = result.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+  if (!text) throw new Error('Gemini returned no design spec');
+  return text;
+}
+
+/**
+ * Step 2 prompt: applies an extracted text design spec to a room image.
+ * The inspiration image is NOT passed here — only text + room photo.
+ */
+function buildApplySpecPrompt(designSpec: string, userInstruction?: string): string {
+  return `You are performing a cosmetic renovation of the room in this photograph.
+
+CRITICAL — POSITIONS ARE LOCKED:
+Every fixture and architectural element stays on its exact wall in its exact position. Do not move the toilet, sink, vanity, shower, bath, doors, windows, niches, mirrors, or towel rails. The camera angle is unchanged.
+
+RENOVATION SPECIFICATION — apply every item below:
+${designSpec}
+${userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : ''}
+
+You are ONLY changing surfaces, finishes, colors, and material aesthetics. Nothing is added, removed, or relocated.
+
+SELF-CHECK before finalising: confirm the toilet is on the same wall as in the original. Confirm the sink is in the same position. Confirm the shower is in the same corner. If anything moved, correct it.
+
+Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
+}
 
 // Credit costs
 const CREDIT_COSTS: Record<GeminiImageModel, number> = {
@@ -240,13 +340,16 @@ Deno.serve(async (req) => {
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
 
       if (body.style_reference_url) {
-        // Dual-image redesign:
-        //   images[0] = styleBuffer  (inspiration/mood board — sent FIRST so Gemini treats it as context)
-        //   images[1] = sourceBuffer (the room to edit   — sent LAST  so Gemini edits this one)
+        // Two-step style-transfer pipeline:
+        //   Step 1 — Vision: send inspiration image to Gemini text model → extract precise design spec (text)
+        //   Step 2 — Edit:   send room image + text spec to image model → cosmetic renovation
+        // The inspiration image never reaches the image generator → zero spatial bleed.
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
-        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        const designSpec = await extractDesignSpec(styleBuffer, body.style);
+        console.log('[generate-interior-gemini] Design spec extracted, length:', designSpec.length);
+        const applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
         const result = await generateImageWithGemini(
-          { text: dualPrompt, images: [styleBuffer, sourceBuffer] },
+          { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
@@ -287,13 +390,14 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
 
       if (body.style_reference_url) {
-        // Dual-image Copy Style:
-        //   images[0] = styleBuffer  (inspiration — sent FIRST as context/mood board)
-        //   images[1] = sourceBuffer (room to edit — sent LAST so Gemini edits this one)
+        // Two-step style-transfer pipeline (same as image-edit mode):
+        // Step 1: extract text design spec from inspiration
+        // Step 2: apply spec to room as single-image edit
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
-        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        const designSpec = await extractDesignSpec(styleBuffer, body.style);
+        const applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
         const result = await generateImageWithGemini(
-          { text: dualPrompt, images: [styleBuffer, sourceBuffer] },
+          { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio: '1:1' },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);

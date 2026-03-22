@@ -172,7 +172,7 @@ export const create3DGenerationTool = (
     {
       name: 'generate_3d',
       description: `Generate multiple interior design style variations in parallel using Replicate AI models. Results appear progressively in the generation panel grid.
-ALWAYS call generate_gemini alongside this tool in the same response.
+Call generate_gemini alongside this tool ONLY for free-form text-to-image requests. Do NOT call both tools when editing an existing image.
 
 Good for:
 - Text-to-image: user describes a room from scratch with no uploaded image
@@ -478,12 +478,14 @@ PARAMETER EXTRACTION — always do this before calling:
 3. Set prompt to the user's full design description or edit instruction verbatim
 
 WHEN TO CALL ALONGSIDE generate_3d:
-- Text-to-image or free-form style redesign → call BOTH. generate_3d fills the variation grid; this tool gives an immediate Gemini result.
+- Pure text-to-image (no uploaded images) → call BOTH for variations + immediate result.
 
-WHEN TO call this tool ALONE (do NOT call generate_3d):
-- A chip mode is active (floor-plan-render, image-edit, floor-plan-text) — generate_3d is already excluded server-side for these modes
+WHEN TO call this tool ALONE — do NOT call generate_3d in any of these cases:
+- User has uploaded one or more images (image-edit, copy-style, redesign) — call generate_gemini ONLY
+- A chip mode is active (floor-plan-render, image-edit, floor-plan-text, copy-style)
 - Iterative edit on a previously generated image ("change the floor", "make it warmer")
 - Floor plan requests — use mode=floor-plan-text
+- Any request mentioning "copy style", "redesign", "inspiration image", "my room"
 - Materials board generation
 
 Mode routing (auto-detected if not set explicitly):
