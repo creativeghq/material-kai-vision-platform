@@ -231,7 +231,7 @@ export const createGeminiGenerationTool = (
   forcedMode?: string, // Explicit mode override from UI chip selection
 ) => {
   return tool(
-    async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm, boardMode }) => {
+    async ({ prompt, roomType, style, mode, referenceImageUrl, modelTier, materialImages, sqm, boardMode }) => {
       try {
 
         // Helper: upload a data URL to Supabase storage, return public URL.
@@ -375,7 +375,9 @@ export const createGeminiGenerationTool = (
                 aspect_ratio: resolvedBoardMode === 'photorealistic-render' ? '16:9' : '1:1',
               }
             : { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }),
-          ...(editInstruction ? { edit_instruction: editInstruction } : {}),
+          // For image-edit mode, the prompt IS the edit instruction — send it explicitly
+          // so the edge function doesn't need to fallback-guess which field to use.
+          ...(resolvedMode === 'image-edit' ? { edit_instruction: prompt } : {}),
           ...((() => {
             const merged = [...(materialImages || []), ...pinnedMaterialImages].slice(0, 14);
             return merged.length > 0 ? { material_images: merged } : {};
@@ -452,6 +454,11 @@ export const createGeminiGenerationTool = (
       name: 'generate_gemini',
       description: `Generate or edit interior design images using Gemini AI. Provides an immediate single result in the chat.
 
+PARAMETER EXTRACTION — always do this before calling:
+1. Extract roomType from user message (bedroom, living_room, kitchen, bathroom, dining_room, home_office, etc.)
+2. Extract style from user message (modern, scandinavian, minimalist, industrial, japandi, luxury, etc.)
+3. Set prompt to the user's full design description or edit instruction verbatim
+
 WHEN TO CALL ALONGSIDE generate_3d:
 - Text-to-image or free-form style redesign → call BOTH. generate_3d fills the variation grid; this tool gives an immediate Gemini result.
 
@@ -470,13 +477,12 @@ Mode routing (auto-detected if not set explicitly):
 - User mentions "floor plan" with dimensions or sqm, no image → floor-plan-text: generates a clean 2D floor plan diagram (top-down architectural drawing)
 - User asks for a materials board / presentation board → materials-selection-board (requires a previously generated design)`,
       schema: z.object({
-        prompt: z.string().describe('Design description or edit instruction'),
-        roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, etc.)'),
-        style: z.string().optional().describe('Design style (modern, scandinavian, industrial, cabin, japandi, etc.)'),
+        prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
+        roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),
+        style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
         mode: z.enum(['text-to-image', 'image-edit', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. Use floor-plan-render when user uploads a floor plan or any reference image. Use materials-selection-board to generate a professional materials board from a generated design. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
-        editInstruction: z.string().optional().describe('Specific edit instruction when mode=image-edit'),
-        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits). materials-selection-board always uses pro.'),
+        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=Gemini 3.1 Flash (6 credits), pro=Gemini 3 Pro 4K (15 credits). Use pro when user requests maximum quality or 4K. materials-selection-board always uses pro.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
         sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
         boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),

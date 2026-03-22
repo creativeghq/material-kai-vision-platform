@@ -280,7 +280,7 @@ STRICT RULES — you MUST follow these exactly:
 
       const diagramResult = await generateImageWithGemini(
         diagramPrompt,
-        { model: 'gemini-3.1-flash-image-preview', aspectRatio: '1:1' },
+        { model, aspectRatio: '1:1' },
       );
       imageUrl = await uploadToStorage(supabase, diagramResult.base64, diagramResult.mimeType, jobId);
     }
@@ -355,8 +355,9 @@ STRICT RULES — you MUST follow these exactly:
 });
 
 function detectMode(body: GenerateInteriorRequest): GenerationMode {
-  if (body.reference_image_url && body.edit_instruction) return 'image-edit';
-  if (body.reference_image_url && !body.edit_instruction) return 'floor-plan-render';
+  // With a reference image, default to image-edit regardless of edit_instruction presence.
+  // Callers that want floor-plan-render or copy-style MUST pass mode explicitly.
+  if (body.reference_image_url) return 'image-edit';
   if (!body.reference_image_url && (body.prompt?.toLowerCase().includes('floor plan') || body.sqm)) {
     return 'floor-plan-text';
   }
