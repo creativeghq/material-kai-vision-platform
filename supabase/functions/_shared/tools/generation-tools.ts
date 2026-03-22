@@ -234,7 +234,8 @@ export const createGeminiGenerationTool = (
     async ({ prompt, roomType, style, mode, referenceImageUrl, editInstruction, modelTier, materialImages, sqm, boardMode }) => {
       try {
 
-        // Helper: upload a data URL to Supabase storage, return public URL
+        // Helper: upload a data URL to Supabase storage, return public URL.
+        // Images should already be uploaded by the frontend — this is a last-resort fallback.
         const uploadDataUrl = async (dataUrl: string): Promise<string | undefined> => {
           try {
             const commaIdx = dataUrl.indexOf(',');
@@ -249,9 +250,13 @@ export const createGeminiGenerationTool = (
             const { data: uploadData, error } = await supabase.storage
               .from('generation-images')
               .upload(`reference-images/${fileName}`, bytes, { contentType: mimeType, upsert: true });
-            if (error || !uploadData) return undefined;
+            if (error || !uploadData) {
+              console.error('[generation-tools] Storage upload failed:', error?.message);
+              return undefined;
+            }
             return supabase.storage.from('generation-images').getPublicUrl(uploadData.path).data.publicUrl;
-          } catch {
+          } catch (e) {
+            console.error('[generation-tools] uploadDataUrl error:', e);
             return undefined;
           }
         };
@@ -301,12 +306,16 @@ export const createGeminiGenerationTool = (
           }
         }
 
-        // For image-edit: prefer (1) explicit referenceImageUrl, (2) uploaded image, (3) most recent generated image
+        // For image-edit: prefer (1) explicit referenceImageUrl, (2) uploaded image (should already
+        // be a public URL after frontend pre-upload), (3) most recent generated image
         let resolvedReferenceUrl: string | undefined = referenceImageUrl;
         if (!resolvedReferenceUrl && resolvedMode === 'image-edit') {
           if (images.length > 0) {
             const candidate = images[0];
+            // Images should already be public URLs (uploaded by frontend).
+            // Fall back to uploadDataUrl only if still a data URL.
             if (candidate.startsWith('data:')) {
+              console.warn('[generation-tools] image still a data URL — frontend upload may have failed, attempting re-upload');
               resolvedReferenceUrl = await uploadDataUrl(candidate);
             } else {
               resolvedReferenceUrl = candidate;
@@ -314,6 +323,14 @@ export const createGeminiGenerationTool = (
           } else if (conversationImages.length > 0) {
             resolvedReferenceUrl = conversationImages[conversationImages.length - 1];
           }
+        }
+
+        // Hard guard: image-edit with no reference image would generate a completely unrelated result
+        if (resolvedMode === 'image-edit' && !resolvedReferenceUrl) {
+          return JSON.stringify({
+            success: false,
+            error: 'No reference image available for editing. Please attach an image or generate one first.',
+          });
         }
 
         // For floor-plan-render: use attached image if available, upload data URL if needed

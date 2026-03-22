@@ -1056,6 +1056,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // If no cache hit, make API call
       if (!data) {
+        // Upload any attached images to Supabase Storage BEFORE calling agent-chat.
+        // Sending base64 data URLs in the request body risks hitting the edge function
+        // body size limit (a single phone photo can be 4-8 MB as base64).
+        // Uploading first gives us small public URLs that pass through safely.
+        let resolvedImageUrls: string[] = [];
+        if (attachedImages.length > 0) {
+          resolvedImageUrls = await Promise.all(
+            attachedImages.map(async (img, idx) => {
+              if (!img.startsWith('data:')) return img; // already a URL
+              try {
+                const commaIdx = img.indexOf(',');
+                const mimeType = img.slice(5, img.indexOf(';'));
+                const ext = mimeType.split('/')[1] || 'jpg';
+                const base64Data = img.slice(commaIdx + 1);
+                const binaryStr = atob(base64Data);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                const fileName = `user-uploads/${Date.now()}-${idx}.${ext}`;
+                const { data: up, error } = await supabase.storage
+                  .from('generation-images')
+                  .upload(fileName, bytes, { contentType: mimeType, upsert: true });
+                if (error || !up) {
+                  console.error('Image upload failed, falling back to data URL:', error);
+                  return img; // fallback — better than nothing
+                }
+                return supabase.storage.from('generation-images').getPublicUrl(up.path).data.publicUrl;
+              } catch (e) {
+                console.error('Image upload error:', e);
+                return img;
+              }
+            })
+          );
+        }
+
         // Prepare request body
         const requestBody: any = {
           messages: messages.concat({
@@ -1066,7 +1100,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }),
           agentId: selectedAgent,
           model: selectedModel,
-          images: attachedImages,
+          images: resolvedImageUrls,
           conversation_id: currentConversationId,
           ...(selectedGenerationMode ? { generation_mode: selectedGenerationMode } : {}),
           ...(pinnedMaterials.length > 0 && selectedAgent === 'interior-designer'
