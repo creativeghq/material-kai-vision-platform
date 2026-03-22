@@ -55,7 +55,7 @@ function toBase64(bytes: Uint8Array): string {
  */
 async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -345,9 +345,19 @@ Deno.serve(async (req) => {
         //   Step 2 — Edit:   send room image + text spec to image model → cosmetic renovation
         // The inspiration image never reaches the image generator → zero spatial bleed.
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
-        const designSpec = await extractDesignSpec(styleBuffer, body.style);
-        console.log('[generate-interior-gemini] Design spec extracted, length:', designSpec.length);
-        const applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+        let applyPrompt: string;
+        try {
+          const designSpec = await extractDesignSpec(styleBuffer, body.style);
+          console.log('[generate-interior-gemini] Design spec extracted, length:', designSpec.length);
+          applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+        } catch (specErr) {
+          // Fallback: use user instruction directly without spec extraction
+          console.warn('[generate-interior-gemini] Spec extraction failed, using fallback:', specErr);
+          applyPrompt = buildApplySpecPrompt(
+            `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
+            body.prompt,
+          );
+        }
         const result = await generateImageWithGemini(
           { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio },
@@ -390,12 +400,19 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
 
       if (body.style_reference_url) {
-        // Two-step style-transfer pipeline (same as image-edit mode):
-        // Step 1: extract text design spec from inspiration
-        // Step 2: apply spec to room as single-image edit
+        // Two-step style-transfer pipeline (same as image-edit mode)
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
-        const designSpec = await extractDesignSpec(styleBuffer, body.style);
-        const applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+        let applyPrompt: string;
+        try {
+          const designSpec = await extractDesignSpec(styleBuffer, body.style);
+          applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+        } catch (specErr) {
+          console.warn('[generate-interior-gemini] Spec extraction failed (floor-plan-render), using fallback:', specErr);
+          applyPrompt = buildApplySpecPrompt(
+            `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
+            body.prompt,
+          );
+        }
         const result = await generateImageWithGemini(
           { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio: '1:1' },
