@@ -56,7 +56,7 @@ function toBase64(bytes: Uint8Array): string {
  */
 async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -249,9 +249,10 @@ async function callFluxDepthPro(
 // ── Credit costs ──────────────────────────────────────────────────────────────
 
 // Credit costs
-const CREDIT_COSTS: Record<GeminiImageModel, number> = {
+const CREDIT_COSTS: Record<string, number> = {
   'gemini-3.1-flash-image-preview': 6,
   'gemini-3-pro-image-preview': 15,
+  'flux-depth-pro': 20,
 };
 
 type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board';
@@ -303,7 +304,7 @@ async function uploadToStorage(
   jobId: string,
   suffix = '',
 ): Promise<string> {
-  const ext = mimeType.includes('png') ? 'png' : 'jpg';
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
   const path = `gemini/${jobId}${suffix}.${ext}`;
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
@@ -415,11 +416,11 @@ Deno.serve(async (req) => {
     body.model_tier === 'pro'
       ? 'gemini-3-pro-image-preview'
       : 'gemini-3.1-flash-image-preview';
-  const credits = CREDIT_COSTS[model];
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
-
-  // Detect mode
   const mode: GenerationMode = body.mode ?? detectMode(body);
+  const isFluxMode = mode === 'redesign' || mode === 'copy-style';
+  const credits = isFluxMode ? CREDIT_COSTS['flux-depth-pro'] : CREDIT_COSTS[model];
+  const modelLabel = isFluxMode ? 'flux-depth-pro' : model;
 
   try {
     let imageUrl: string;
@@ -656,7 +657,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         ? [{ id: 'flux-depth-pro', name: 'Flux Depth Pro', provider: 'replicate' }]
         : [{ id: model, name: `Gemini ${model}`, provider: 'google' }],
       models_results: {
-        [model]: { success: true, image_url: imageUrl, board_mode: body.board_mode },
+        [modelLabel]: { success: true, image_url: imageUrl, board_mode: body.board_mode },
       },
       workflow_status: 'completed',
       completed_at: new Date().toISOString(),
