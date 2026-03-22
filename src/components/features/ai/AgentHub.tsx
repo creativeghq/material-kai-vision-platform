@@ -1692,6 +1692,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           materialData: msg.metadata?.materialData as any | undefined,
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
+          geminiImageData: msg.metadata?.geminiImageData as any | undefined, // Restore Gemini-generated design image
           worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
           videoData: msg.metadata?.videoData as any | undefined, // Restore video data
           articleData: msg.metadata?.articleData as any | undefined, // Restore SEO article data
@@ -2523,20 +2524,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     Floor Plan → 3D Render
                   </button>
                   <button
-                    onClick={() => { setSelectedGenerationMode('copy-style'); setInput('Use this uploaded image as a style and mood reference. Copy its color palette, materials, and atmosphere to create a completely new interior design.'); }}
-                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'copy-style' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'}`}
-                    title="Use uploaded image as style reference for a brand new design"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Copy Style
-                  </button>
-                  <button
-                    onClick={() => { setSelectedGenerationMode('image-edit'); setInput('Redesign this room. Keep all furniture, objects, and architectural elements in their exact positions. Only update the materials, colors, and finishes.'); }}
+                    onClick={() => {
+                      if (attachedImages.length >= 2) {
+                        setSelectedGenerationMode('image-edit');
+                        setInput('I have uploaded two images. Image 1 is my existing room — this is the layout to redesign. Image 2 is my design inspiration — copy every single design element from it into my room: the exact sink and vanity furniture, shower area architecture and enclosure, tile colors and patterns, double-color zone alignments, wall and floor treatments, ceiling details, lighting fixtures, mirrors, storage, hardware finishes, and the complete color palette. Every architectural and decorative decision from Image 2 must be reflected in the result.');
+                      } else {
+                        setSelectedGenerationMode('image-edit');
+                        setInput('Redesign this room. Keep all fixtures and architectural elements in their exact positions. Update the materials, tile colors and patterns, surface finishes, lighting, and overall style. Make it look professionally designed and photorealistic.');
+                      }
+                    }}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
-                    title="Transform the uploaded room photo with a new interior design"
+                    title={attachedImages.length >= 2 ? 'Image 1 = your room, Image 2 = inspiration — copies every design element' : 'Redesign this room keeping the same layout'}
                   >
                     <Layers className="w-3 h-3" />
-                    Redesign Room
+                    {attachedImages.length >= 2 ? 'Redesign + Copy Style' : 'Redesign Room'}
                   </button>
                 </div>
               )}

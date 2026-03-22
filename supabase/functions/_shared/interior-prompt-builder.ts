@@ -151,33 +151,99 @@ Architectural drawing style, clean and precise.`.trim();
 
 /**
  * Build a dual-reference prompt for when the user uploads TWO images:
- *   Image 1 = their room (layout / furniture to preserve)
- *   Image 2 = style inspiration (palette, materials, atmosphere to copy)
+ *   Image 1 = their room (spatial layout and furniture positions to preserve)
+ *   Image 2 = design inspiration (copy EVERYTHING visual from this image)
  *
  * Used for Copy Style and Redesign Room chip modes when two images are attached.
+ *
+ * NOTE: The images are sent with labeled text separators in generateMultiImageWithGemini
+ * so Gemini knows exactly which image is the layout donor and which is the design donor.
  */
 export function buildDualReferenceStylePrompt(style?: string, userPrompt?: string): string {
-  const styleDescription = style
-    ? (STYLE_DEFAULTS[style.toLowerCase()] ?? style)
-    : STYLE_DEFAULTS['modern'];
   const styleName = style
     ? style.charAt(0).toUpperCase() + style.slice(1)
-    : 'Modern Contemporary';
+    : null;
 
-  return `You are given TWO reference images:
-- IMAGE 1: The room to transform. Its spatial layout, furniture positions, fixtures, and architectural structure must be preserved EXACTLY.
-- IMAGE 2: The style inspiration. Extract its color palette, material finishes, surface textures, lighting mood, and overall aesthetic.
+  return `You are performing a COMPLETE VISUAL TRANSFORMATION. You have two reference images.
 
-TASK: Redesign the room from IMAGE 1 by applying the style, colors, and material treatments from IMAGE 2.
+═══ IMAGE 1 — SPATIAL DONOR ═══
+Extract ONLY the spatial data from this image:
+  - Room shape, dimensions, and proportions
+  - Positions of all fixed elements: sink, toilet, shower/bath enclosure, vanity, doors, windows, niches
+  - Furniture and fixture placement coordinates
+  - Zone boundaries (wet zone, dry zone, double-height areas, alcoves)
+  - Camera angle and perspective from which to render the result
+NOTHING visual from Image 1 carries into the output. Not a single tile, color, or finish.
 
-STRICT RULES:
-- Preserve ALL furniture, fixtures, and objects in their EXACT positions from IMAGE 1. Do NOT add, remove, or relocate anything.
-- Preserve ALL architectural features (walls, windows, doors, ceiling height, floor layout) from IMAGE 1.
-- Only change: paint colors, material finishes, surface textures, and decorative treatments — to match the look of IMAGE 2.
-${userPrompt ? `- Additional instruction from user: ${userPrompt}` : ''}
-${style ? `- Target design style: ${styleName} — ${styleDescription}.` : ''}
+═══ IMAGE 2 — COMPLETE DESIGN DONOR ═══
+Every visual decision in the output must be copied from this image. Go element by element:
 
-Photorealistic result with professional interior photography quality. Shot with a 24mm architectural lens, corrected vertical lines, no fisheye distortion, ultra-realistic materials and lighting.`;
+FLOORS:
+  - Exact tile/stone/material: color, size, format, finish (matte/gloss/honed/polished)
+  - Exact laying pattern (straight, diagonal, herringbone, brick bond, large format slab)
+  - Grout color and joint width
+  - Any transition strips or border treatments
+
+WALLS:
+  - Primary wall tile/cladding: color, size, format, texture, finish, laying pattern
+  - Secondary wall treatment where walls change material or color
+  - Exact zone where each treatment starts and ends (floor-to-ceiling, dado height, feature wall only)
+  - Double-color or dual-material zones: copy the exact split height and alignment
+  - Any niches, recesses, shelving: their position, depth, and interior surface treatment
+  - Grout color on wall tiles, joint width
+
+CEILING:
+  - Color, finish, material
+  - Any coving, cornice, or shadow gap detail
+  - Recessed zones, soffits, or dropped sections
+  - Ceiling-mounted fixtures
+
+SANITARY FIXTURES & VANITY:
+  - Sink/basin model style (under-mount, vessel, semi-recessed, wall-hung, integrated)
+  - Vanity unit: shape, color, material, door/drawer style, legs or floating
+  - Tap/faucet style: finish (chrome, brushed brass, matte black, etc.)
+  - Mirror: shape, size, framing style, any integrated LED strip
+  - Toilet style if visible: wall-hung or floor-standing, cistern type
+  - Any heated towel rail: shape, finish, position
+
+SHOWER / WET AREA ARCHITECTURE:
+  - Enclosure type: frameless glass, framed, walk-in open, wet room, bath-shower combo
+  - Glass thickness and any frosting/patterning
+  - Shower niche: position, size, tile treatment inside niche vs surrounding wall
+  - Shower head style: rain overhead, wall-mounted, handheld, combination
+  - Shower tray or wet floor: material, color, drain style
+  - Any step, threshold, or floor transition detail
+
+STORAGE & BUILT-INS:
+  - All wall-mounted or recessed storage: doors, color, handle style
+  - Open shelving: bracket style, shelf material
+  - Any integrated lighting inside storage
+
+LIGHTING:
+  - Every fixture type: recessed downlights, pendant, wall sconce, under-cabinet, mirror light, LED strip
+  - Light color temperature: warm/cool/neutral
+  - Any directional or accent lighting on features
+
+HARDWARE & ACCESSORIES:
+  - Towel bar / ring / hook: style and finish
+  - Toilet roll holder: style and finish
+  - All hardware finishes: copy the exact metal tone throughout
+
+COLOR PALETTE:
+  - Every color in the output comes exclusively from Image 2
+  - If Image 2 uses two tile colors in different zones, reproduce the same zones in the same colors
+  - If Image 2 has a dominant neutral with one accent, match that ratio exactly
+
+ATMOSPHERE & LIGHTING MOOD:
+  - Replicate the exact warmth or coolness of the light
+  - Copy shadow depth and contrast level
+  - Copy time-of-day feel (bright daylight, soft evening, etc.)
+${userPrompt ? `\nADDITIONAL INSTRUCTION FROM USER: ${userPrompt}` : ''}${styleName ? `\nDESIGN STYLE CONTEXT: ${styleName}` : ''}
+
+═══ OUTPUT REQUIREMENT ═══
+Someone who has seen Image 2 must immediately recognise every design choice in the output. The room from Image 1 should feel completely rebuilt in the aesthetic of Image 2 — not partially updated, not inspired by — fully transformed. Every surface, every fixture, every material must match.
+
+Photorealistic, professional architectural photography quality. 24mm lens, corrected verticals, no fisheye distortion, ultra-realistic material textures and lighting.`;
 }
 
 function buildFallbackPrompt(params: DesignParams, styleCue: string, materialsLine: string): string {

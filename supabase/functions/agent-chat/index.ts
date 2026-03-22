@@ -765,17 +765,25 @@ async function executeAgent(
     config = AGENT_CONFIGS[agentId];
   }
 
-  // Extract previously generated image URLs from assistant messages (for edit mode)
+  // Extract previously generated image URLs from assistant messages (for edit mode).
+  // Sources checked in priority order:
+  //   1. geminiImageData.image_url — Gemini single-image result (restored from DB on page revisit)
+  //   2. tool_results[].image_url  — inline tool result image URLs (live session only)
   const conversationImages: string[] = messages
     .filter((m: any) => m.role === 'assistant')
     .flatMap((m: any) => {
-      // Check tool_calls / tool_results for gemini_image_ready or generation_job image URLs
-      if (Array.isArray(m.tool_results)) {
-        return m.tool_results
-          .filter((tr: any) => tr.image_url)
-          .map((tr: any) => tr.image_url as string);
+      const urls: string[] = [];
+      // Gemini image result (present in restored messages loaded from DB)
+      if (m.geminiImageData?.image_url) {
+        urls.push(m.geminiImageData.image_url as string);
       }
-      return [];
+      // Tool results (present during live sessions)
+      if (Array.isArray(m.tool_results)) {
+        for (const tr of m.tool_results) {
+          if (tr.image_url) urls.push(tr.image_url as string);
+        }
+      }
+      return urls;
     });
 
   // Collect material results from search tool calls

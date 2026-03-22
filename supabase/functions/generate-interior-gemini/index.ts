@@ -249,17 +249,24 @@ Deno.serve(async (req) => {
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
       } else {
-        const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room';
-        const editText = `You are editing the reference interior photo. Apply ONLY the following change:
+        const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room with updated materials and finishes';
+        const editText = `You are redesigning the interior shown in the reference photo.
 
-"${instruction}"
+INSTRUCTION: "${instruction}"
 
-STRICT RULES — you MUST follow these exactly:
-- Keep ALL furniture, objects, and decorative elements in their EXACT positions. Do NOT add, remove, or relocate anything.
-- Keep ALL architectural features (walls, windows, doors, ceiling, floor layout) identical to the reference.
-- Only modify what the instruction explicitly asks for.
-- The result must look like the same room with ONLY the requested change applied.
-- Photorealistic, professional interior photography quality.`;
+SPATIAL RULES (never break these):
+- Every fixed element stays in its exact position: sink, vanity, toilet, shower, bath, doors, windows, niches, alcoves, built-ins.
+- Room dimensions, wall positions, ceiling height, and all architectural structure are unchanged.
+- Camera angle and perspective match the reference photo exactly.
+
+DESIGN CHANGES to apply:
+- Update all surface materials as described: floor tiles (color, size, pattern, grout), wall tiles (color, size, format, zone splits, grout), ceiling finish.
+- Update all fixture finishes: taps, towel rails, shower heads, handles, mirrors — keep their style/position, change their finish as instructed.
+- Update furniture and vanity: keep placement, update color/material/finish as instructed.
+- Update lighting: keep fixture positions, change style or color temperature as instructed.
+- If no specific material is mentioned, make an intelligent high-end upgrade consistent with the instruction's style direction.
+
+OUTPUT: Photorealistic professional interior photography. Ultra-realistic material textures, accurate reflections, natural lighting. 24mm architectural lens, corrected verticals, no fisheye.`;
 
         const result = await generateImageWithGemini(
           { text: editText, images: [sourceBuffer] },

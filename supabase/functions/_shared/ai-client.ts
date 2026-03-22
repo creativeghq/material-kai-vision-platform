@@ -224,6 +224,14 @@ export async function generateImageWithGemini(
 ): Promise<GeminiImageResult> {
   const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image-preview';
 
+  // Multi-image case (dual-reference generation): use generateText with IMAGE response modality.
+  // The generateImage SDK function is designed for text→image and doesn't reliably pass
+  // multiple image buffers — it may silently drop the second image. generateText with
+  // responseModalities is the correct path for Gemini's multimodal image editing API.
+  if (typeof prompt === 'object' && prompt.images.length > 1) {
+    return generateMultiImageWithGemini(prompt, { model: modelId });
+  }
+
   const { image } = await generateImage({
     model: google.image(modelId),
     prompt: prompt as any,
@@ -234,6 +242,96 @@ export async function generateImageWithGemini(
     base64: image.base64,
     mimeType: image.mimeType ?? 'image/png',
     model: modelId,
+  };
+}
+
+/**
+ * Multi-image generation via Gemini's generateContent API with IMAGE response modality.
+ * Used when two or more reference images are needed (e.g. dual-reference Copy Style).
+ *
+ * Sends all images as ordered content parts — the text prompt can reference them by
+ * position ("IMAGE 1", "IMAGE 2"). Gemini processes them in the order provided.
+ */
+async function generateMultiImageWithGemini(
+  prompt: { text: string; images: (Uint8Array | string)[] },
+  config: { model: GeminiImageModel },
+): Promise<GeminiImageResult> {
+  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+
+  /** Safe base64 encoder that doesn't blow the call stack on large Uint8Arrays */
+  const toBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  };
+
+  /** Convert any image input to an inlineData part */
+  const toInlinePart = async (img: Uint8Array | string): Promise<any> => {
+    if (img instanceof Uint8Array) {
+      return { inlineData: { mimeType: 'image/jpeg', data: toBase64(img) } };
+    }
+    if (img.startsWith('data:')) {
+      const commaIdx = img.indexOf(',');
+      const mimeType = img.slice(5, img.indexOf(';'));
+      const base64 = img.slice(commaIdx + 1);
+      return { inlineData: { mimeType, data: base64 } };
+    }
+    // URL — fetch and inline
+    const res = await fetch(img);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const mimeType = res.headers.get('content-type') || 'image/jpeg';
+    return { inlineData: { mimeType, data: toBase64(buf) } };
+  };
+
+  // Build content parts with explicit labels before each image so Gemini knows
+  // exactly which is the layout donor and which is the design donor.
+  // Structure: label → image → label → image → instruction text
+  const IMAGE_LABELS = [
+    'LAYOUT DONOR IMAGE (first image — preserve spatial layout only):',
+    'DESIGN DONOR IMAGE (second image — copy all visual design elements from this):',
+  ];
+
+  const parts: any[] = [];
+  for (let i = 0; i < prompt.images.length; i++) {
+    parts.push({ text: IMAGE_LABELS[i] ?? `IMAGE ${i + 1}:` });
+    parts.push(await toInlinePart(prompt.images[i]));
+  }
+  // Instruction comes last so Gemini processes both images before reading the task
+  parts.push({ text: prompt.text });
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${GOOGLE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Gemini multi-image generation failed: ${err}`);
+  }
+
+  const result = await response.json();
+  const imagePart = result.candidates?.[0]?.content?.parts?.find(
+    (p: any) => p.inlineData?.mimeType?.startsWith('image/'),
+  );
+
+  if (!imagePart?.inlineData) {
+    throw new Error('Gemini multi-image: no image in response');
+  }
+
+  return {
+    base64: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType,
+    model: config.model,
   };
 }
 
