@@ -214,9 +214,20 @@ COLOR PALETTE: every color in the output comes from IMAGE 1 only
 ${userPrompt ? `\nADDITIONAL INSTRUCTION: ${userPrompt}` : ''}${styleName ? `\nDESIGN STYLE: ${styleName}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIXTURE PRESENCE RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If a fixture type is completely absent from IMAGE 1, REMOVE it from the output entirely. Do not preserve fixtures from IMAGE 2 that do not appear at all in IMAGE 1.
+
+Examples:
+  - If IMAGE 1 has NO bathtub → remove the bathtub from IMAGE 2's output entirely
+  - If IMAGE 1 has NO freestanding bath → no bath appears in the result
+  - If IMAGE 1 has NO towel rail → remove towel rails from the result
+  - Fixtures present in IMAGE 1 (regardless of position) are kept in IMAGE 2 at their IMAGE 2 positions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT CHECK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Before finalising: verify the toilet is on the same wall as in IMAGE 2. Verify the sink is on the same wall as in IMAGE 2. Verify the shower is in the same corner as in IMAGE 2. If anything moved, correct it.
+Before finalising: verify the toilet is on the same wall as in IMAGE 2. Verify the sink is on the same wall as in IMAGE 2. Verify the shower is in the same corner as in IMAGE 2. If anything moved, correct it. Verify any fixture absent from IMAGE 1 has been removed.
 
 Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
 }

@@ -26,6 +26,7 @@ import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
   buildFloorPlanDiagramPrompt,
+  buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 
@@ -64,38 +65,38 @@ async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promi
           role: 'user',
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
-            { text: `You are an interior design analyst. Study this room photo carefully and produce a precise, exhaustive design specification. This spec will be used to replicate the exact visual look in a different room — not the layout, only the aesthetics.
+            { text: `You are an interior design aesthetic analyst. Study this photo and produce a precise specification of VISUAL AESTHETICS ONLY.
 
-Output a structured specification. Be specific about every color (e.g. "warm white", "charcoal dark grey", "terracotta"), every material, every pattern, and every finish.
+CRITICAL: Do NOT describe where elements are located, which wall they are on, or their spatial position. Only describe visual appearance — colors, materials, textures, finishes, and styles. Position information will cause fixtures to move in the wrong room.
 
-FLOORS: [exact material — tile/stone/marble/wood/concrete, precise color and tone, tile size and format e.g. "600x600mm large format", laying pattern — straight/diagonal/herringbone/chevron, finish — matte/gloss/honed/polished, grout color and approximate joint width]
+FIXTURES PRESENT (list only the fixture types visibly present — e.g. freestanding bath, walk-in shower, wall-hung basin, toilet, vanity unit, towel rail, mirror):
 
-WALLS - PRIMARY SURFACE: [tile or paint or cladding material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width]
+FLOORS: [material, exact color/tone, tile size/format if applicable, laying pattern — straight/herringbone/chevron/diagonal, finish — matte/gloss/honed/polished, grout color and joint width]
 
-WALLS - SECONDARY ZONES (if walls have two different treatments or a dual-color split): [describe each zone: material, color, exactly where the split occurs — e.g. "lower third in dark tile, upper two thirds in white plaster"]
+WALLS - PRIMARY SURFACE: [material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width]
 
-WALL NICHES / RECESSES: [if present: tile treatment inside niche, color contrast vs surrounding wall]
+WALLS - SECONDARY (if dual treatment): [material, color, approximate vertical proportion — e.g. "lower ~40% dark tile, upper portion white plaster"]
 
-CEILING: [color, finish — matte/gloss, any coving/cornice/shadow-gap/cove lighting details]
+CEILING: [color, finish — matte/gloss, any shadow-gap or cove lighting]
 
-BASIN / SINK: [type — undermount/vessel/wall-hung/integrated, shape — rectangular/round/oval, color/material]
+BASIN/SINK STYLE: [shape, material/color, style — undermount/vessel/wall-hung — visual only, no location]
 
-VANITY UNIT: [color, material — wood/lacquer/stone, door style — flat/shaker/handleless, handle style if present]
+VANITY UNIT: [color, material, door style — flat/shaker/handleless, handle metal finish]
 
-TAPS & FITTINGS: [metal finish — chrome/brushed nickel/brushed brass/matte black/gunmetal/rose gold, style — deck-mounted/wall-mounted/freestanding]
+TAPS & FITTINGS: [metal finish — chrome/brushed nickel/brushed brass/matte black/gunmetal/rose gold]
 
-MIRROR: [shape — rectangular/round/arch/irregular, framed or frameless, any integrated LED backlight or front strip]
+MIRROR: [shape — rectangular/round/arch/irregular, framed or frameless, any integrated LED]
 
-SHOWER AREA: [enclosure type — frameless walk-in/framed/wet-room open, glass type — clear/fluted/smoked, any shower niche: position and tile treatment inside vs outside, shower head style — overhead rain/wall-mounted/handheld]
+SHOWER: [glass type — clear/fluted/smoked, shower head style — rain/wall-mounted/handheld, any niche tile treatment]
 
-TOWEL RAILS & ACCESSORIES: [style — ladder/bar/ring, metal finish — must match taps or note if different]
+BATHTUB (if present): [freestanding or built-in, shape, material/finish color]
 
-LIGHTING: [fixture types visible — recessed downlights/LED strips/sconces/pendant/mirror light, color temperature — warm/neutral/cool, overall mood — bright clinical / warm intimate / soft natural]
+TOWEL RAILS: [style — ladder/bar/ring, metal finish]
 
-FULL COLOR PALETTE: [list every distinct color in the room: e.g. "off-white walls", "warm grey large floor tile", "brushed brass hardware", "deep charcoal accent shelf", "sage green towel"]
-${style ? `\nDESIGN STYLE: ${style}` : ''}
+LIGHTING: [fixture types, color temperature — warm/neutral/cool, overall mood]
 
-Be thorough. Every detail you miss will not appear in the renovation.` },
+FULL COLOR PALETTE: [every distinct color — be specific: "warm white", "charcoal grey", "brushed brass"]
+${style ? `\nDESIGN STYLE: ${style}` : ''}` },
           ],
         }],
       }),
@@ -563,11 +564,12 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         const base64 = toBase64(imgBuffer);
         imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
       } catch (fluxErr) {
-        console.warn('[generate-interior-gemini] Flux failed for copy-style, falling back to Gemini:', fluxErr);
+        console.warn('[generate-interior-gemini] Flux failed for copy-style, falling back to Gemini dual-image:', fluxErr);
         const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
-        const applyPrompt = buildApplySpecPrompt(fluxPrompt, body.prompt);
+        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        // Pass inspiration image first (style reference), then room image (to edit)
         const result = await generateImageWithGemini(
-          { text: applyPrompt, images: [sourceBuffer] },
+          { text: dualPrompt, images: [inspirationBuffer, sourceBuffer] },
           { model, aspectRatio },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);

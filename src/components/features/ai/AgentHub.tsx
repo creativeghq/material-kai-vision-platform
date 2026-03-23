@@ -2054,7 +2054,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        <MarkdownRenderer content={normalizeContent(message.content).replace(/!\[.*?\]\(https?:\/\/[^)]+\)/g, '').trim()} className="text-sm" />
                         {message.videoData ? (
                           <video
                             src={message.videoData.video_url}
