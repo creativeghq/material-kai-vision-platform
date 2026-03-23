@@ -2533,9 +2533,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         setSelectedGenerationMode('copy-style');
                         setInput(
                           'I have two images uploaded.\n\n' +
-                          'Image 1 (Inspiration): extract the complete visual design — all floor materials, wall tiles/colors, ceiling finish, fixture aesthetics, hardware finish, lighting atmosphere, and color palette.\n\n' +
-                          'Image 2 (My Room): this is the room to redesign. Keep every fixture and element in its exact position — sink, vanity, toilet, shower, bath, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
-                          'Apply the full visual design of Image 1 onto the layout of Image 2. Photorealistic professional result.'
+                          'Image 1 (Inspiration): Extract the complete visual design — all floor materials, wall treatments/colors/textures, ceiling finish, furniture style and silhouettes, upholstery fabrics and patterns, hardware and fixture finishes, lighting atmosphere, decorative objects, and full color palette.\n\n' +
+                          'Image 2 (My Room): This is the room to redesign.\n\n' +
+                          'STRUCTURAL LOCK (never changes): wall positions, room dimensions, door and window openings, camera angle, perspective. These are the only things that are preserved from Image 2.\n\n' +
+                          'EVERYTHING ELSE follows Image 1 completely — surfaces, fixtures, furniture, and fittings are ALL determined by Image 1, not by Image 2.\n\n' +
+                          'FIXTURE REPLACEMENT RULES:\n' +
+                          '- For each element in Image 2, look at what Image 1 shows in the equivalent functional zone.\n' +
+                          '- If Image 1 shows the SAME type of element (e.g. both have a bathtub): keep it, but fully restyle its shape, finish, and material to exactly match Image 1.\n' +
+                          '- If Image 1 shows a DIFFERENT element in that zone (e.g. Image 2 has bathtub, Image 1 has walk-in shower): completely erase the Image 2 element and replace it with exactly what Image 1 shows — same geometry, proportions, materials, finish. No remnant of the original shape.\n' +
+                          '- If Image 1 shows NO element in that zone (e.g. Image 2 has a towel rack but Image 1 has empty wall): remove the element and apply the wall finish from Image 1.\n' +
+                          '- Apply this same logic to every element in every room type — fixtures, furniture, fittings, decor, anything.\n\n' +
+                          'SURFACE RULES: Every surface — floor, all walls, ceiling, tiles, cladding, niches — must exactly replicate the materials, colors, pattern, and texture from Image 1. No surface from Image 2 survives.\n\n' +
+                          'Photorealistic professional render. No partial replacements, no hybrid shapes, no remnants of the original. Every element is either fully replaced by Image 1 or (if Image 1 has no equivalent) rendered in the closest matching style to Image 1.'
                         );
                       } else {
                         setSelectedGenerationMode('redesign');

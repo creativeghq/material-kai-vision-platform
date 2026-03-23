@@ -1045,13 +1045,13 @@ async function executeAgent(
         }
         return new HumanMessage({ content });
       }
-      return new HumanMessage(msg.content);
+      return new HumanMessage(msg.content || ' ');
     } else if (msg.role === 'assistant') {
-      return new AIMessage(msg.content);
+      return new AIMessage(msg.content || ' ');
     } else if (msg.role === 'system') {
       return new SystemMessage(msg.content);
     }
-    return new HumanMessage(msg.content);
+    return new HumanMessage(msg.content || ' ');
   });
 
   // Initial state
