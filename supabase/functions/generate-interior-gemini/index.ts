@@ -55,17 +55,22 @@ function toBase64(bytes: Uint8Array): string {
  * never reaches the image generator, eliminating spatial bleed entirely.
  */
 async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
-            { text: `You are an interior design aesthetic analyst. Study this photo and produce a precise specification of VISUAL AESTHETICS ONLY.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s hard timeout
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
+              { text: `You are an interior design aesthetic analyst. Study this photo and produce a precise specification of VISUAL AESTHETICS ONLY.
 
 CRITICAL: Do NOT describe where elements are located, which wall they are on, or their spatial position. Only describe visual appearance — colors, materials, textures, finishes, and styles. Position information will cause fixtures to move in the wrong room.
 
@@ -97,20 +102,23 @@ LIGHTING: [fixture types, color temperature — warm/neutral/cool, overall mood]
 
 FULL COLOR PALETTE: [every distinct color — be specific: "warm white", "charcoal grey", "brushed brass"]
 ${style ? `\nDESIGN STYLE: ${style}` : ''}` },
-          ],
-        }],
-      }),
-    },
-  );
+            ],
+          }],
+        }),
+      },
+    );
 
-  if (!response.ok) {
-    throw new Error(`Design spec extraction failed (${response.status}): ${await response.text()}`);
+    if (!response.ok) {
+      throw new Error(`Design spec extraction failed (${response.status}): ${await response.text()}`);
+    }
+
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+    if (!text) throw new Error('Gemini returned no design spec');
+    return text;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const result = await response.json();
-  const text = result.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
-  if (!text) throw new Error('Gemini returned no design spec');
-  return text;
 }
 
 /**
