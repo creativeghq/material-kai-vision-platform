@@ -369,8 +369,8 @@ const AdminDashboard: React.FC = () => {
       {/* System Status + Main Content (hidden while loading) */}
       {!loading && (
         <>
-      <div className="px-6 pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="px-3 sm:px-6 pt-4 sm:pt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           <div className="dashboard-card transition-all duration-200 hover:shadow-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -449,15 +449,15 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Admin Sections by Category */}
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
               {Object.entries(adminSections).map(([category, sections]) => (
                 <div key={category}>
-                  <h2 className="text-2xl font-bold mb-4 text-gray-800">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-800">
                     {category}
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                     {sections.map((section) => {
                       const Icon = section.icon;
                       return (

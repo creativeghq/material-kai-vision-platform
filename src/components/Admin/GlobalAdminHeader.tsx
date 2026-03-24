@@ -21,17 +21,17 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className="px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+    <div className="px-3 sm:px-6 py-3 sm:py-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => navigate('/')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
               className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
             >
               <Brain className="h-4 w-4" />
-              Back to Main
+              <span className="hidden xs:inline">Back to Main</span>
             </Button>
             <Button
               onClick={() => navigate('/admin')}
@@ -39,19 +39,19 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
               className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
             >
               <Activity className="h-4 w-4" />
-              Back to Admin
+              <span className="hidden xs:inline">Back to Admin</span>
             </Button>
           </div>
-          <div className="h-6 w-px bg-border" />
+          <div className="hidden sm:block h-6 w-px bg-border" />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight">{title}</h1>
             {description && (
-              <div className="text-sm text-muted-foreground">{description}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{description}</div>
             )}
           </div>
         </div>
         {badge && (
-          <Badge className="text-sm px-2 py-1" style={{ background: 'hsl(var(--primary))' }}>
+          <Badge className="text-sm px-2 py-1 self-start sm:self-auto" style={{ background: 'hsl(var(--primary))' }}>
             {badge}
           </Badge>
         )}

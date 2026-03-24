@@ -244,10 +244,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] p-0 gap-0">
+      <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] p-0 gap-0">
         {/* Header */}
         <div
-          className="px-6 py-4 rounded-t-lg"
+          className="px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg"
           style={{
             background: 'var(--glass-bg)',
             backdropFilter: 'var(--glass-blur)',
@@ -414,7 +414,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
             {/* Footer Actions */}
             <div
-              className="px-6 py-4 border-t flex justify-end gap-2"
+              className="px-3 sm:px-6 py-3 sm:py-4 border-t flex justify-end gap-2"
               style={{
                 background: 'var(--glass-bg)',
                 backdropFilter: 'var(--glass-blur)',

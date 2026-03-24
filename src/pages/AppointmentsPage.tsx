@@ -266,7 +266,7 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
   appointments.forEach((a) => { counts[a.status] = (counts[a.status] ?? 0) + 1; });
 
   return (
-    <div className={embedded ? 'space-y-6' : 'p-6 max-w-4xl mx-auto space-y-6'}>
+    <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 max-w-4xl mx-auto space-y-6'}>
       {!embedded && (
         <div>
           <h1 className="text-2xl font-light tracking-tight">Appointments</h1>

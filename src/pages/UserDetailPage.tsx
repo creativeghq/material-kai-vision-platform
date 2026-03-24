@@ -477,14 +477,14 @@ export const UserDetailPage: React.FC = () => {
         badge="CRM"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleResetPassword}>
               <Key className="h-4 w-4 mr-2" />
               Reset Password
@@ -516,20 +516,20 @@ export const UserDetailPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="bg-muted">
-            <TabsTrigger value="overview">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="subscription">
+            <TabsTrigger value="subscription" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CreditCard className="h-4 w-4 mr-2" />
               Subscription & Credits
             </TabsTrigger>
-            <TabsTrigger value="activity">
+            <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2" />
               Activity
             </TabsTrigger>
-            <TabsTrigger value="ai-usage">
+            <TabsTrigger value="ai-usage" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               AI Usage
             </TabsTrigger>

@@ -99,7 +99,7 @@ export const SocialMediaAccountsPage: React.FC = () => {
         subtitle="Overview of all social accounts connected by team members"
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
         {/* Info banner */}
         <div className="dashboard-card flex items-start gap-3 text-sm">

@@ -822,6 +822,11 @@ async function executeAgent(
     // Continue without memories - not critical
   }
 
+  // If there are previously generated images in the conversation, remind the agent to use them for follow-up edits
+  if (conversationImages.length > 0) {
+    systemPrompt += `\n\n[CONTEXT] There are ${conversationImages.length} previously generated image(s) in this conversation. The most recent is: ${conversationImages[conversationImages.length - 1]}. If the user asks to modify, adjust, change, or refine the design in any way — even without uploading a new image — call generate_gemini with mode=image-edit using this image as the reference. Do not respond with text only when the user is clearly asking for a visual change.`;
+  }
+
   // Special handling for Demo Agent - return structured command
   if (agentId === 'demo') {
     const lowerInput = userInput.toLowerCase();

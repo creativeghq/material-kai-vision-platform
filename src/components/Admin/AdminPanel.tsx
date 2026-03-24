@@ -203,7 +203,7 @@ export const AdminPanel: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-6 space-y-6">
+      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button
@@ -266,7 +266,8 @@ export const AdminPanel: React.FC = () => {
               <CardHeader>
                 <CardTitle>Recent AI Analysis Events</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -338,6 +339,7 @@ export const AdminPanel: React.FC = () => {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

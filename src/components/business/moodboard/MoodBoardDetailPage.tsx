@@ -309,7 +309,7 @@ export const MoodBoardDetailPage: React.FC = () => {
       />
 
       {/* ── Hero Section ─────────────────────────────────────────────────── */}
-      <div className="mt-4 mx-4 relative rounded-2xl h-[380px] overflow-hidden">
+      <div className="mt-4 mx-2 sm:mx-4 relative rounded-2xl h-[240px] sm:h-[380px] overflow-hidden">
         {/* Background image */}
         {heroImage ? (
           <img
@@ -371,9 +371,9 @@ export const MoodBoardDetailPage: React.FC = () => {
         </div>
 
         {/* Hero content — bottom aligned */}
-        <div className="absolute bottom-0 left-0 right-0 px-8 pb-7">
+        <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 pb-4 sm:pb-7">
           {/* Title + description */}
-          <h1 className="text-4xl font-light text-white mb-1 tracking-tight drop-shadow-lg">
+          <h1 className="text-2xl sm:text-4xl font-light text-white mb-1 tracking-tight drop-shadow-lg">
             {moodboard.title}
           </h1>
           {moodboard.description && (
@@ -458,7 +458,7 @@ export const MoodBoardDetailPage: React.FC = () => {
       </div>
 
       {/* ── Products Grid ─────────────────────────────────────────────────── */}
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {items.length === 0 ? (
           <div className="dashboard-card rounded-2xl p-12 text-center">
             <p className="text-muted-foreground mb-4">No products in this moodboard yet</p>

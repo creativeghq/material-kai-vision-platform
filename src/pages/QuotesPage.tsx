@@ -192,7 +192,7 @@ export const QuotesPage: React.FC = () => {
         </div>
 
         {/* Quotes Table */}
-        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-3 sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -235,7 +235,7 @@ export const QuotesPage: React.FC = () => {
               </PopoverContent>
             </Popover>
           </div>
-          <div className="overflow-hidden -mx-6 -mb-6 mt-2">
+          <div className="overflow-hidden -mx-3 sm:-mx-6 -mb-6 mt-2">
             {filteredQuotes.length === 0 ? (
               <div className="px-6 pb-6 text-center py-12 text-muted-foreground">
                 {quotes.length === 0 ? (
@@ -252,6 +252,7 @@ export const QuotesPage: React.FC = () => {
                 )}
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                   <tr className="text-xs font-semibold text-muted-foreground">
@@ -299,6 +300,7 @@ export const QuotesPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

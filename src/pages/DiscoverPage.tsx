@@ -180,13 +180,12 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
 
   return (
     <div
-      className="grid items-center px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group"
-      style={{ gridTemplateColumns: '1fr 130px 120px' }}
+      className="flex items-center px-3 sm:px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group gap-2 sm:gap-3"
       onClick={() => onView(product)}
     >
       {/* Thumbnail + name */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-10 h-10 flex-shrink-0 rounded-md flex items-center justify-center">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-md flex items-center justify-center">
           <Package className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
         </div>
         <div className="min-w-0">
@@ -200,7 +199,7 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
       </div>
 
       {/* Category */}
-      <div>
+      <div className="hidden xs:block shrink-0">
         <Badge
           variant="outline"
           className="text-[10px] px-1.5 py-0 h-4 rounded font-normal capitalize"
@@ -211,7 +210,7 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-end gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
         <AddToMoodboardButton
           productId={product.id}
           productName={product.name}
@@ -290,7 +289,7 @@ function FactoryModal({
 
   return (
     <Dialog open={!!factory} onOpenChange={() => onClose()}>
-      <DialogContent hideClose className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+      <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
         {/* Banner */}
         <div
           className="h-28 sm:h-36 relative overflow-hidden shrink-0"
@@ -311,7 +310,7 @@ function FactoryModal({
         </div>
 
         {/* Info header — outside overflow-y so icon isn't clipped by scroll container */}
-        <div className="bg-white shadow-sm shrink-0 relative z-10 px-6 pb-4">
+        <div className="bg-white shadow-sm shrink-0 relative z-10 px-3 sm:px-6 pb-4">
           <div className="flex items-start gap-4">
             {/* Factory icon pulled up over banner */}
             <div
@@ -345,7 +344,7 @@ function FactoryModal({
           </div>
 
           {/* Stats row */}
-          <div className="flex items-center gap-8 mt-4 pt-4 border-t">
+          <div className="flex items-center gap-4 sm:gap-8 mt-4 pt-4 border-t">
             <div className="text-center">
               <p className="text-lg font-semibold tabular-nums">{factory.productCount}</p>
               <p className="text-xs text-muted-foreground">Materials</p>
@@ -360,7 +359,7 @@ function FactoryModal({
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 bg-[#f7f6f4]">
           {/* Products list */}
-          <div className="p-6 space-y-3">
+          <div className="p-3 sm:p-6 space-y-3">
             <p className="text-sm font-medium text-muted-foreground">
               All Materials <span className="text-xs">({products.length})</span>
             </p>
@@ -523,7 +522,7 @@ export const DiscoverPage: React.FC = () => {
         subtitle="Explore profiles, factories, and materials from the community."
       />
 
-      <div className="px-6 py-8 space-y-6">
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <Tabs defaultValue="profiles">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="profiles" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

@@ -247,6 +247,23 @@ export class AgentChatHistoryService {
   }
 
   /**
+   * Rename a conversation
+   */
+  async renameConversation(conversationId: string, title: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('agent_chat_conversations')
+        .update({ title: title.trim(), updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error renaming conversation:', error);
+      return false;
+    }
+  }
+
+  /**
    * Delete a conversation and all its messages
    */
   async deleteConversation(conversationId: string): Promise<boolean> {

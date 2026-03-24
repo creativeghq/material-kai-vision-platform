@@ -9,7 +9,7 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
       <div className="grid grid-cols-12 gap-6">
         {/* Hero Section */}
         <div className="col-span-12 lg:col-span-8 overflow-hidden">

@@ -274,7 +274,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent hideClose className="max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+        <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
 
           {/* ── Banner ──────────────────────────────────────────────────────── */}
           <div
@@ -318,7 +318,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
           <Tabs defaultValue="about" className="flex flex-col flex-1 min-h-0">
             {/* ── White profile header — outside overflow-y so avatar isn't clipped ── */}
             <div className="bg-white shadow-sm shrink-0 relative z-10">
-              <div className="px-6">
+              <div className="px-3 sm:px-6">
                 {/* Avatar + name row */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -371,7 +371,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                 </div>
 
                 {/* Stats row */}
-                <div className="flex items-center gap-8 py-4 border-t mt-4">
+                <div className="flex items-center gap-4 sm:gap-8 py-4 border-t mt-4">
                   <div className="text-center cursor-default">
                     <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
                     <p className="text-xs text-muted-foreground">Followers</p>
@@ -422,7 +422,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
 
             {/* ── Scrollable tab content ────────────────────────────────────── */}
             <div className="overflow-y-auto flex-1 bg-[#f7f6f4]">
-              <div className="px-6 py-4">
+              <div className="px-3 sm:px-6 py-4">
                 {/* ── About ──────────────────────────────────────────── */}
                 <TabsContent value="about" className="mt-0 space-y-4 pb-6">
                         {profile.bio && (
@@ -565,7 +565,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                         ) : (
                           <Card className="rounded-2xl border-0 shadow-sm">
                             <CardContent className="p-5">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-4">
                                 {profile.skill_tags.map((tag, i) => {
                                   const width = 45 + ((i * 17 + 31) % 50);
                                   return (

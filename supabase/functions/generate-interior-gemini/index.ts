@@ -607,6 +607,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
     // Step 1: Gemini Vision reads inspiration image → structured text spec
     // Step 2: Flux Depth Pro applies that spec to the room (depth-locked)
     // The inspiration image NEVER reaches Flux → zero spatial bleed.
+    // Fallback: If Flux fails, apply spec via Gemini image-edit (single image, no spatial bleed).
     else if (mode === 'copy-style') {
       if (!body.reference_image_url) {
         return jsonResponse({ success: false, error: 'reference_image_url required for copy-style mode' }, 400);
@@ -615,73 +616,49 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         return jsonResponse({ success: false, error: 'style_reference_url (inspiration image) required for copy-style mode' }, 400);
       }
 
-      // ── 3-step copy-style pipeline ──────────────────────────────────────
-      // Step 1: Gemini Vision reads inspiration → structured design spec (text)
-      // Step 2: Gemini Image Edit replaces fixtures in the room → intermediate image
-      //         (Flux cannot remove structural shapes like a bathtub via depth conditioning)
-      // Step 3: Flux Depth Pro depth-conditions on the intermediate image → final result
-      //         (depth map now reflects the correct fixtures, not the originals)
-      // Cleanup: intermediate image deleted from storage after step 3 succeeds.
-
+      // Step 1 — extract design spec from inspiration image
+      // Keep designSpec in outer scope so the Flux fallback can reuse it
       const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
-      const roomBuffer = await fetchImageBuffer(body.reference_image_url);
-
-      // Step 1 — extract design spec from inspiration
-      let designSpec: string;
+      let fluxPrompt: string;
+      let designSpec: string | null = null;
       try {
         designSpec = await extractDesignSpec(inspirationBuffer, body.style);
-        console.log('[copy-style] Step 1 complete — spec length:', designSpec.length);
+        console.log('[generate-interior-gemini] Copy-style spec extracted, length:', designSpec.length);
+        fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
       } catch (specErr) {
-        console.warn('[copy-style] Spec extraction failed, using fallback:', specErr);
-        designSpec = `Apply a complete visual transformation matching the style: ${body.style ?? 'high-end contemporary'}. Replace all surfaces, tiles, fixtures, and furniture to match the inspiration aesthetic.`;
+        console.warn('[generate-interior-gemini] Spec extraction failed for copy-style, using fallback:', specErr);
+        fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
       }
 
-      // Step 2 — Gemini replaces fixture shapes only (surfaces unchanged)
-      let intermediateUrl: string;
+      // Step 2 — apply via Flux Depth Pro (structure locked to reference_image_url = Your Room)
+      // Falls back to Gemini image-edit if Flux fails.
       try {
-        const fixturePrompt = buildFixtureReplacementPrompt(designSpec);
-        const intermediateResult = await generateImageWithGemini(
-          { text: fixturePrompt, images: [roomBuffer] },
-          { model, aspectRatio },
-        );
-        intermediateUrl = await uploadToStorage(supabase, intermediateResult.base64, intermediateResult.mimeType, jobId, '-intermediate');
-        console.log('[copy-style] Step 2 complete — intermediate image:', intermediateUrl);
-      } catch (geminiErr) {
-        // If fixture replacement fails, fall back to original room image for step 3
-        console.warn('[copy-style] Step 2 (fixture replacement) failed, proceeding with original room:', geminiErr);
-        intermediateUrl = body.reference_image_url;
-      }
-
-      // Step 3 — Flux Depth Pro applies full style, depth-locked to intermediate
-      const fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
-      try {
-        const replicateUrl = await callFluxDepthPro(intermediateUrl, fluxPrompt, aspectRatio);
+        const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
         const imgBuffer = await fetchImageBuffer(replicateUrl);
         const base64 = toBase64(imgBuffer);
         imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
-        console.log('[copy-style] Step 3 complete — final image stored');
       } catch (fluxErr) {
-        // Flux failed — use intermediate as final result if it exists, else Gemini dual-image fallback
-        console.warn('[copy-style] Step 3 (Flux) failed:', fluxErr);
-        if (intermediateUrl !== body.reference_image_url) {
-          // We already have a fixture-replaced image from step 2 — use it
-          imageUrl = intermediateUrl;
-          console.log('[copy-style] Using step 2 intermediate as final result');
-        } else {
-          const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+        console.warn('[generate-interior-gemini] Flux failed for copy-style, falling back to Gemini:', fluxErr);
+        const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
+
+        // Prefer spec-based single-image edit (no spatial bleed from inspiration layout).
+        // Fall back to dual-image only if spec extraction also failed.
+        if (designSpec) {
+          console.log('[generate-interior-gemini] Using spec-based Gemini fallback');
+          const applyPrompt = buildCopyStyleApplyPrompt(designSpec, body.prompt);
           const result = await generateImageWithGemini(
-            { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
+            { text: applyPrompt, images: [sourceBuffer] },
             { model, aspectRatio },
           );
           imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
-          console.log('[copy-style] Gemini dual-image fallback used');
-        }
-      } finally {
-        // Clean up intermediate image if it was stored (regardless of step 3 outcome)
-        if (intermediateUrl && intermediateUrl !== body.reference_image_url && intermediateUrl !== imageUrl) {
-          const intermediatePath = storagePathFromUrl(intermediateUrl);
-          await deleteFromStorage(supabase, intermediatePath);
-          console.log('[copy-style] Intermediate image deleted:', intermediatePath);
+        } else {
+          console.log('[generate-interior-gemini] Using dual-image Gemini fallback (no spec available)');
+          const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+          const result = await generateImageWithGemini(
+            { text: dualPrompt, images: [inspirationBuffer, sourceBuffer] },
+            { model, aspectRatio },
+          );
+          imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
         }
       }
     }

@@ -209,7 +209,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto flex items-center gap-3 px-6 h-14">
+          <div className="max-w-6xl mx-auto flex items-center gap-3 px-3 sm:px-6 h-14">
             <button
               onClick={() => { setSelectedDoc(null); setSelectedCatId(null); }}
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -234,7 +234,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           </div>
         </header>
 
-        <div className="max-w-6xl mx-auto flex gap-10 px-6 py-10">
+        <div className="max-w-6xl mx-auto flex gap-6 lg:gap-10 px-3 sm:px-6 py-6 sm:py-10">
           <article className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4 mb-4">
               <h1 className="text-3xl font-light tracking-tight leading-tight">{selectedDoc.title}</h1>

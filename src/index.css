@@ -345,11 +345,22 @@ All colors MUST be HSL.
   }
 }
 
+/* Mobile layout variable overrides */
+@media (max-width: 639px) {
+  :root {
+    --page-padding-x: 0.75rem;   /* 12px on mobile instead of 32px */
+    --grid-gap: 1rem;            /* 16px on mobile instead of 24px */
+    --card-padding: 1rem;        /* 16px on mobile instead of 24px */
+    --section-spacing: 1rem;     /* 16px on mobile */
+    --hero-padding-x: 1rem;      /* 16px on mobile */
+    --hero-padding-y: 1.5rem;    /* 24px on mobile */
+  }
+}
+
 @layer components {
   /* Page wrapper - Consistent layout system */
   .page-wrapper {
     background: hsl(var(--page-background));
-    min-height: 100vh;
   }
 
   /* Page container - ONLY left/right padding, NO top/bottom */

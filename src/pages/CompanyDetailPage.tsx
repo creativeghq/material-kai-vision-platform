@@ -264,9 +264,9 @@ export const CompanyDetailPage: React.FC = () => {
         badge="CRM"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
@@ -300,20 +300,20 @@ export const CompanyDetailPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="contacts">
+            <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" />
               Contacts ({company.contacts?.length || 0})
             </TabsTrigger>
-            <TabsTrigger value="social">
+            <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Globe className="h-4 w-4 mr-2" />
               Social & Web
             </TabsTrigger>
-            <TabsTrigger value="notes">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               Notes
             </TabsTrigger>
@@ -542,6 +542,7 @@ export const CompanyDetailPage: React.FC = () => {
                     </Button>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -607,6 +608,7 @@ export const CompanyDetailPage: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

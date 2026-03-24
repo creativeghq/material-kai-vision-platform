@@ -39,7 +39,7 @@ export default function FactoryAnalyticsPage() {
         title="Factory Analytics"
         subtitle={isAdmin ? 'Full platform + factory analytics view' : 'Your factory performance and market trends'}
       />
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {isFactory && (

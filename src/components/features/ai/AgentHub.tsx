@@ -53,6 +53,8 @@ import {
 } from '@/components/core/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/core/ui/sheet';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
@@ -262,6 +264,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   initialConversationId,
 }) => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [mobileConvOpen, setMobileConvOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
@@ -280,6 +284,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [editingConvoId, setEditingConvoId] = useState<string | null>(null);
+  const [editingConvoTitle, setEditingConvoTitle] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
@@ -1760,6 +1766,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [currentConversationId, toast]);
 
+  const handleStartRename = useCallback((e: React.MouseEvent, convo: ChatConversation) => {
+    e.stopPropagation();
+    setEditingConvoId(convo.id);
+    setEditingConvoTitle(convo.title);
+  }, []);
+
+  const handleConfirmRename = useCallback(async (conversationId: string) => {
+    if (!editingConvoTitle.trim()) { setEditingConvoId(null); return; }
+    const success = await agentChatHistoryService.renameConversation(conversationId, editingConvoTitle);
+    if (success) {
+      setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, title: editingConvoTitle.trim() } : c));
+    }
+    setEditingConvoId(null);
+  }, [editingConvoTitle]);
+
   const handleExportConversation = useCallback(async () => {
     if (!currentConversationId) {
       toast({
@@ -1839,9 +1860,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const AgentIcon = currentAgent?.icon || Bot;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      {/* Middle Panel - Conversation List */}
-      <div className="w-80 flex flex-col m-4 rounded-3xl glass-panel bg-white/40 border-white/20">
+    <div className="flex flex-1 min-h-0">
+      {/* Middle Panel - Conversation List (desktop only) */}
+      <div className="hidden md:flex w-80 flex-col m-4 rounded-3xl glass-panel bg-white/40 border-white/20 overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3 mb-4">
@@ -1866,7 +1887,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
           {conversations.length === 0 ? (
             <div className="p-6 text-center">
               <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
@@ -1883,24 +1904,45 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       ? 'bg-primary/10 border-l-2 border-primary'
                       : 'hover:bg-accent'
                   }`}
-                  onClick={() => handleLoadConversation(convo.id)}
+                  onClick={() => editingConvoId !== convo.id && handleLoadConversation(convo.id)}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                     <MessageSquare className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 text-left min-w-0">
-                    <div className="font-medium text-sm truncate">{convo.title}</div>
+                    {editingConvoId === convo.id ? (
+                      <input
+                        autoFocus
+                        value={editingConvoTitle}
+                        onChange={(e) => setEditingConvoTitle(e.target.value)}
+                        onBlur={() => handleConfirmRename(convo.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-sm font-medium bg-white/80 border border-primary/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    ) : (
+                      <div className="font-medium text-sm truncate">{convo.title}</div>
+                    )}
                     <div className="text-xs text-muted-foreground truncate">
                       {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteConversation(e, convo.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0"
-                    title="Delete conversation"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                    <button
+                      onClick={(e) => handleStartRename(e, convo)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                      title="Rename conversation"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteConversation(e, convo.id)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                      title="Delete conversation"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1923,8 +1965,118 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       {/* Main Chat Area */}
       <div className="flex-1 min-h-0 flex flex-col">
+        {/* Mobile conversation header */}
+        {isMobile && (
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-border/50 shrink-0">
+            <Sheet open={mobileConvOpen} onOpenChange={setMobileConvOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80 p-0 glass-panel">
+                <div className="flex flex-col h-full">
+                  <div className="p-5 border-b border-white/10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
+                        <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold tracking-tight leading-tight">{currentAgent?.name}</h3>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search conversations..."
+                        className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        style={{ background: 'rgba(255, 255, 255, 0.1)', borderColor: 'var(--glass-border)' }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                    {conversations.length === 0 ? (
+                      <div className="p-6 text-center">
+                        <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground">No conversations yet</p>
+                        <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
+                      </div>
+                    ) : (
+                      <div className="p-2 space-y-1">
+                        {conversations.map((convo) => (
+                          <div
+                            key={convo.id}
+                            className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
+                              currentConversationId === convo.id
+                                ? 'bg-primary/10 border-l-2 border-primary'
+                                : 'hover:bg-accent'
+                            }`}
+                            onClick={() => { if (editingConvoId !== convo.id) { handleLoadConversation(convo.id); setMobileConvOpen(false); } }}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                              <MessageSquare className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              {editingConvoId === convo.id ? (
+                                <input
+                                  autoFocus
+                                  value={editingConvoTitle}
+                                  onChange={(e) => setEditingConvoTitle(e.target.value)}
+                                  onBlur={() => handleConfirmRename(convo.id)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full text-sm font-medium bg-white/80 border border-primary/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                              ) : (
+                                <div className="font-medium text-sm truncate">{convo.title}</div>
+                              )}
+                              <div className="text-xs text-muted-foreground truncate">
+                                {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                              <button
+                                onClick={(e) => handleStartRename(e, convo)}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                                title="Rename conversation"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteConversation(e, convo.id)}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                title="Delete conversation"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 border-t border-white/10">
+                    <Button
+                      variant="outline"
+                      className="w-full hover:bg-white/10"
+                      onClick={() => { handleNewConversation(); setMobileConvOpen(false); }}
+                      style={{ borderColor: 'var(--glass-border)' }}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      New Conversation
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <span className="text-sm font-medium truncate flex-1">
+              {currentAgent?.name}
+            </span>
+          </div>
+        )}
         {/* Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4">

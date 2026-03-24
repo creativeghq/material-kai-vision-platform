@@ -382,9 +382,9 @@ export const ContactDetailPage: React.FC = () => {
         badge="CRM"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
@@ -418,16 +418,16 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="bg-muted">
-            <TabsTrigger value="overview">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="companies">
+            <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" />
               Companies
             </TabsTrigger>
-            <TabsTrigger value="notes">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
@@ -770,6 +770,7 @@ export const ContactDetailPage: React.FC = () => {
                     </Button>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -826,6 +827,7 @@ export const ContactDetailPage: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

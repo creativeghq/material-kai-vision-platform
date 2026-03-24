@@ -75,7 +75,7 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
 
   return (
     <section
-      className="relative overflow-hidden mx-4 rounded-[2rem] px-6 py-5"
+      className="relative overflow-hidden mx-2 sm:mx-4 rounded-[2rem] px-3 sm:px-6 py-4 sm:py-5"
       style={{
         background: 'linear-gradient(135deg, hsl(330,43%,13%) 0%, hsl(315,38%,22%) 50%, hsl(290,28%,32%) 100%)',
       }}
@@ -98,10 +98,10 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
             <Icon className="h-5 w-5 text-white" />
           </div>
-          <div>
-            <h1 className="text-xl font-light text-white tracking-tight">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-light text-white tracking-tight">{title}</h1>
             {subtitle && (
-              <p className="text-xs text-white/65 mt-0.5">{subtitle}</p>
+              <p className="text-xs text-white/65 mt-0.5 hidden sm:block">{subtitle}</p>
             )}
           </div>
         </div>

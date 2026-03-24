@@ -66,7 +66,7 @@ const AgentHubPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Agent Hub Component - Full Screen */}
       <AgentHubComponent
         userRole={userRole}

@@ -32,7 +32,7 @@ export const UserProfilePage: React.FC = () => {
         subtitle="Manage your account, credits, and billing"
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

@@ -168,17 +168,17 @@ export const MaterialsPage: React.FC = () => {
       {/* Page Header */}
       <div className="bg-card py-6">
         <div className="page-container">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Package className="h-8 w-8 text-primary" />
+              <Package className="h-8 w-8 text-primary shrink-0" />
               <div>
-                <h1 className="text-3xl font-bold">Materials Catalog</h1>
-                <p className="text-muted-foreground">
+                <h1 className="text-2xl sm:text-3xl font-bold">Materials Catalog</h1>
+                <p className="text-muted-foreground text-sm sm:text-base">
                   Browse and search through our comprehensive materials database
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className="text-lg px-4 py-2">
+            <Badge variant="outline" className="text-sm sm:text-lg px-3 sm:px-4 py-1.5 sm:py-2 self-start sm:self-auto">
               {materials.length} Materials
             </Badge>
           </div>
