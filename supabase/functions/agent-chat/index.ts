@@ -1022,7 +1022,8 @@ async function executeAgent(
     if (msg.role === 'user') {
       // For the last user message, attach images as multimodal content blocks
       if (idx === lastUserMsgIndex && images.length > 0) {
-        const content: any[] = [{ type: 'text', text: msg.content || '' }];
+        const content: any[] = [];
+        if (msg.content?.trim()) content.push({ type: 'text', text: msg.content });
         for (const img of images) {
           if (img.startsWith('data:')) {
             // data URL: "data:image/jpeg;base64,/9j/4AAQ..."
@@ -1045,18 +1046,21 @@ async function executeAgent(
         }
         return new HumanMessage({ content });
       }
-      return new HumanMessage(msg.content || ' ');
+      if (msg.content?.trim()) return new HumanMessage(msg.content);
+      return null;
     } else if (msg.role === 'assistant') {
-      return new AIMessage(msg.content || ' ');
+      if (msg.content?.trim()) return new AIMessage(msg.content);
+      return null;
     } else if (msg.role === 'system') {
       return new SystemMessage(msg.content);
     }
-    return new HumanMessage(msg.content || ' ');
+    if (msg.content?.trim()) return new HumanMessage(msg.content);
+    return null;
   });
 
   // Initial state
   const initialState = {
-    messages: langchainMessages,
+    messages: langchainMessages.filter(Boolean),
     systemPrompt,
     toolResults: [],
     collectedProducts: [],
