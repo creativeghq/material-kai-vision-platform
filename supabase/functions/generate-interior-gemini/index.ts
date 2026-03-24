@@ -115,6 +115,7 @@ ${style ? `\nDESIGN STYLE: ${style}` : ''}` },
 
 /**
  * Step 2 prompt: applies an extracted text design spec to a room image.
+ * Used for image-edit mode with a style reference — cosmetic changes only, no fixture replacement.
  * The inspiration image is NOT passed here — only text + room photo.
  */
 function buildApplySpecPrompt(designSpec: string, userInstruction?: string): string {
@@ -130,6 +131,34 @@ ${userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : ''}
 You are ONLY changing surfaces, finishes, colors, and material aesthetics. Nothing is added, removed, or relocated.
 
 SELF-CHECK before finalising: confirm the toilet is on the same wall as in the original. Confirm the sink is in the same position. Confirm the shower is in the same corner. If anything moved, correct it.
+
+Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
+}
+
+/**
+ * Step 2 prompt for copy-style mode.
+ * Like buildApplySpecPrompt but allows fixture replacement — if the design spec describes
+ * a different fixture type (e.g. walk-in shower where a bathtub exists), replace it fully.
+ */
+function buildCopyStyleApplyPrompt(designSpec: string, userInstruction?: string): string {
+  return `You are redesigning this room to fully match the following design specification extracted from an inspiration image.
+
+STRUCTURAL LOCK — these never change:
+Wall positions, room dimensions, door and window openings, camera angle, and perspective are frozen. Every functional zone stays on the same side of the room (sink zone, toilet zone, bathing zone, seating area, etc.).
+
+FIXTURE REPLACEMENT RULES:
+- For each fixture or furniture piece in the room, check what the design spec describes for the equivalent functional zone.
+- If the spec describes the SAME type (e.g. both have a bathtub): keep it but fully restyle its shape, finish, and material to match the spec exactly.
+- If the spec describes a DIFFERENT type (e.g. spec says walk-in shower, room has bathtub): completely replace the fixture with what the spec describes. Erase the old shape entirely — no remnant. The replacement must match the spec's geometry, proportions, materials, and finish.
+- If the spec describes NO fixture for that zone: remove the fixture and apply the wall finish from the spec.
+
+DESIGN SPECIFICATION — apply every item below to ALL surfaces and fixtures:
+${designSpec}
+${userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : ''}
+
+SURFACE RULES: Every surface — floor, all walls, ceiling, tiles, cladding — must match the spec exactly. No original surface survives.
+
+SELF-CHECK before finalising: every surface matches the spec. Every fixture either matches the spec type or has been replaced. Nothing moved to a different zone. Camera angle unchanged.
 
 Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
 }
@@ -160,6 +189,32 @@ function buildFluxRedesignPrompt(style?: string, roomType?: string, instruction?
   const base = `A photorealistic ${styleName} ${room}. ${styleVocab}. Premium materials, precise textures, professional interior photography quality.`;
   const extra = instruction ? ` ${instruction}.` : '';
   return `${base}${extra} Ultra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
+}
+
+/**
+ * Step 2 of the 3-step copy-style pipeline.
+ * Gemini replaces ONLY the fixtures that differ from the design spec — keeping surfaces and
+ * colors unchanged. The resulting intermediate image is then fed into Flux Depth Pro (step 3)
+ * so its depth map reflects the correct fixtures rather than the originals.
+ */
+function buildFixtureReplacementPrompt(designSpec: string): string {
+  return `You are preparing a room photo for a style pipeline. Your ONLY job in this step is fixture replacement — do NOT change any colors, tiles, surfaces, or finishes yet.
+
+WHAT TO DO:
+Look at the design specification below. For each fixture or furniture piece described, compare it to what is currently in the room photo.
+- If the spec describes a DIFFERENT type of fixture (e.g. spec says walk-in shower, photo has a bathtub): fully replace the fixture with the type described in the spec. Match the general shape and proportions from the spec. Erase the original completely — no remnant of the old shape.
+- If the spec describes the SAME type: leave it completely unchanged.
+- If the spec describes NO fixture for a zone: remove it and leave a plain wall/floor.
+
+WHAT NOT TO DO:
+Do NOT change wall colors, tile patterns, floor materials, paint, hardware finishes, or any surface. Only the physical fixture shapes change in this step.
+
+STRUCTURAL LOCK: wall positions, room dimensions, camera angle, and all fixture positions/zones stay exactly as in the photo.
+
+DESIGN SPECIFICATION (use only to identify fixture types):
+${designSpec}
+
+Output a photorealistic photo of the room with only the fixture shapes updated as described above. Everything else is pixel-identical to the input.`;
 }
 
 /**
@@ -324,6 +379,22 @@ async function uploadToStorage(
 
   const { data } = supabase.storage.from('generation-images').getPublicUrl(path);
   return data.publicUrl;
+}
+
+/** Delete a file from Supabase Storage by its storage path (e.g. "gemini/job123-intermediate.webp") */
+async function deleteFromStorage(
+  supabase: ReturnType<typeof createClient>,
+  path: string,
+): Promise<void> {
+  const { error } = await supabase.storage.from('generation-images').remove([path]);
+  if (error) console.warn(`[storage] Failed to delete ${path}:`, error.message);
+}
+
+/** Extract storage path from a public URL (e.g. ".../generation-images/gemini/x.webp" → "gemini/x.webp") */
+function storagePathFromUrl(publicUrl: string): string {
+  const marker = '/generation-images/';
+  const idx = publicUrl.indexOf(marker);
+  return idx >= 0 ? publicUrl.slice(idx + marker.length) : publicUrl;
 }
 
 /** Deduct credits from user balance */
@@ -544,35 +615,74 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         return jsonResponse({ success: false, error: 'style_reference_url (inspiration image) required for copy-style mode' }, 400);
       }
 
-      // Step 1 — extract design spec from inspiration image
+      // ── 3-step copy-style pipeline ──────────────────────────────────────
+      // Step 1: Gemini Vision reads inspiration → structured design spec (text)
+      // Step 2: Gemini Image Edit replaces fixtures in the room → intermediate image
+      //         (Flux cannot remove structural shapes like a bathtub via depth conditioning)
+      // Step 3: Flux Depth Pro depth-conditions on the intermediate image → final result
+      //         (depth map now reflects the correct fixtures, not the originals)
+      // Cleanup: intermediate image deleted from storage after step 3 succeeds.
+
       const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
-      let fluxPrompt: string;
+      const roomBuffer = await fetchImageBuffer(body.reference_image_url);
+
+      // Step 1 — extract design spec from inspiration
+      let designSpec: string;
       try {
-        const designSpec = await extractDesignSpec(inspirationBuffer, body.style);
-        console.log('[generate-interior-gemini] Copy-style spec extracted, length:', designSpec.length);
-        fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
+        designSpec = await extractDesignSpec(inspirationBuffer, body.style);
+        console.log('[copy-style] Step 1 complete — spec length:', designSpec.length);
       } catch (specErr) {
-        console.warn('[generate-interior-gemini] Spec extraction failed for copy-style, using fallback:', specErr);
-        fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
+        console.warn('[copy-style] Spec extraction failed, using fallback:', specErr);
+        designSpec = `Apply a complete visual transformation matching the style: ${body.style ?? 'high-end contemporary'}. Replace all surfaces, tiles, fixtures, and furniture to match the inspiration aesthetic.`;
       }
 
-      // Step 2 — apply via Flux Depth Pro (structure locked to reference_image_url = Your Room)
-      // Falls back to Gemini image-edit if Flux fails for any reason.
+      // Step 2 — Gemini replaces fixture shapes only (surfaces unchanged)
+      let intermediateUrl: string;
       try {
-        const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+        const fixturePrompt = buildFixtureReplacementPrompt(designSpec);
+        const intermediateResult = await generateImageWithGemini(
+          { text: fixturePrompt, images: [roomBuffer] },
+          { model, aspectRatio },
+        );
+        intermediateUrl = await uploadToStorage(supabase, intermediateResult.base64, intermediateResult.mimeType, jobId, '-intermediate');
+        console.log('[copy-style] Step 2 complete — intermediate image:', intermediateUrl);
+      } catch (geminiErr) {
+        // If fixture replacement fails, fall back to original room image for step 3
+        console.warn('[copy-style] Step 2 (fixture replacement) failed, proceeding with original room:', geminiErr);
+        intermediateUrl = body.reference_image_url;
+      }
+
+      // Step 3 — Flux Depth Pro applies full style, depth-locked to intermediate
+      const fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
+      try {
+        const replicateUrl = await callFluxDepthPro(intermediateUrl, fluxPrompt, aspectRatio);
         const imgBuffer = await fetchImageBuffer(replicateUrl);
         const base64 = toBase64(imgBuffer);
         imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+        console.log('[copy-style] Step 3 complete — final image stored');
       } catch (fluxErr) {
-        console.warn('[generate-interior-gemini] Flux failed for copy-style, falling back to Gemini dual-image:', fluxErr);
-        const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
-        const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
-        // Pass inspiration image first (style reference), then room image (to edit)
-        const result = await generateImageWithGemini(
-          { text: dualPrompt, images: [inspirationBuffer, sourceBuffer] },
-          { model, aspectRatio },
-        );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        // Flux failed — use intermediate as final result if it exists, else Gemini dual-image fallback
+        console.warn('[copy-style] Step 3 (Flux) failed:', fluxErr);
+        if (intermediateUrl !== body.reference_image_url) {
+          // We already have a fixture-replaced image from step 2 — use it
+          imageUrl = intermediateUrl;
+          console.log('[copy-style] Using step 2 intermediate as final result');
+        } else {
+          const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+          const result = await generateImageWithGemini(
+            { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
+            { model, aspectRatio },
+          );
+          imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+          console.log('[copy-style] Gemini dual-image fallback used');
+        }
+      } finally {
+        // Clean up intermediate image if it was stored (regardless of step 3 outcome)
+        if (intermediateUrl && intermediateUrl !== body.reference_image_url && intermediateUrl !== imageUrl) {
+          const intermediatePath = storagePathFromUrl(intermediateUrl);
+          await deleteFromStorage(supabase, intermediatePath);
+          console.log('[copy-style] Intermediate image deleted:', intermediatePath);
+        }
       }
     }
 
