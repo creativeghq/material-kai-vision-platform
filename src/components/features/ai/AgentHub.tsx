@@ -992,16 +992,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
 
     console.log('✅ Validation passed, creating user message');
+    const userInput = input;
+    const userAttachedImages = [...attachedImages];
+
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content: input,
+      content: userInput,
       timestamp: new Date(),
-      images: attachedImages.length > 0 ? [...attachedImages] : undefined,
+      images: userAttachedImages.length > 0 ? userAttachedImages : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    const userInput = input;
     setInput('');
     setAttachedImages([]);
     setSelectedGenerationMode(null);
@@ -1020,9 +1022,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       let conversationId = currentConversationId;
       // Upload images first so URLs are available for both the API call and DB persistence
       let resolvedImageUrls: string[] = [];
-      if (attachedImages.length > 0) {
+      if (userAttachedImages.length > 0) {
         resolvedImageUrls = await Promise.all(
-          attachedImages.map(async (img, idx) => {
+          userAttachedImages.map(async (img, idx) => {
             if (!img.startsWith('data:')) return img;
             try {
               const commaIdx = img.indexOf(',');
@@ -1079,7 +1081,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Check cache for similar queries (only for search-type queries without images)
       const workspaceId = session.user?.user_metadata?.workspace_id;
-      const canUseCache = attachedImages.length === 0 && selectedAgent === 'kai';
+      const canUseCache = userAttachedImages.length === 0 && selectedAgent === 'kai';
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
 
