@@ -15,6 +15,8 @@
 // ── Environment setup (MUST run before npm imports) ──
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+const KLINGAI_ACCESS_KEY = Deno.env.get('KLINGAI_ACCESS_KEY') || '';
+const KLINGAI_SECRET_KEY = Deno.env.get('KLINGAI_SECRET_KEY') || '';
 
 // Polyfill process.env for npm packages that read it
 (globalThis as any).process = {
@@ -23,6 +25,8 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
     ...((globalThis as any).process?.env || {}),
     GOOGLE_GENERATIVE_AI_API_KEY: GOOGLE_API_KEY,
     ANTHROPIC_API_KEY: ANTHROPIC_API_KEY,
+    KLINGAI_ACCESS_KEY,
+    KLINGAI_SECRET_KEY,
   },
 };
 
@@ -30,11 +34,13 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 import { generateText, generateImage, experimental_generateVideo as generateVideo, Output } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
+import { createKlingAI } from 'npm:@ai-sdk/klingai';
 import { z, type ZodType } from 'npm:zod@3';
 
 // ── Provider instances ──
 const google = createGoogleGenerativeAI({ apiKey: GOOGLE_API_KEY });
 const anthropic = createAnthropic({ apiKey: ANTHROPIC_API_KEY });
+const klingai = createKlingAI({ accessKeyId: KLINGAI_ACCESS_KEY, secretAccessKey: KLINGAI_SECRET_KEY });
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
@@ -375,6 +381,53 @@ export async function generateVideoWithVeo(
     durationSeconds: config?.durationSeconds ?? 8,
     resolution: config?.resolution ?? '1280x720',
     pollTimeoutMs: 600000, // 10 min max
+  } as any);
+
+  return {
+    base64: (video as any).base64,
+    mimeType: (video as any).mimeType ?? 'video/mp4',
+    model: modelId,
+  };
+}
+
+// ── Kling AI: Video generation ──
+export interface KlingVideoResult {
+  base64: string;
+  mimeType: string;
+  model: string;
+}
+
+export async function generateVideoWithKling(
+  prompt: string,
+  config?: {
+    /** Default: 'kling-v3.0-i2v' */
+    model?: string;
+    /** Source image URL for image-to-video */
+    imageUrl?: string;
+    /** 5 or 10 seconds. Default: 5 */
+    durationSeconds?: 5 | 10;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    /** 'std' or 'pro'. Default: 'pro' */
+    mode?: 'std' | 'pro';
+  },
+): Promise<KlingVideoResult> {
+  const modelId = config?.model ?? 'kling-v3.0-i2v';
+
+  const visionPrompt: any = config?.imageUrl
+    ? { image: config.imageUrl, text: prompt }
+    : prompt;
+
+  const { video } = await generateVideo({
+    model: klingai(modelId),
+    prompt: visionPrompt,
+    durationSeconds: config?.durationSeconds ?? 5,
+    aspectRatio: config?.aspectRatio ?? '16:9',
+    providerOptions: {
+      klingai: {
+        mode: config?.mode ?? 'pro',
+      },
+    },
+    pollTimeoutMs: 600_000,
   } as any);
 
   return {

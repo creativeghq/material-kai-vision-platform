@@ -17,36 +17,35 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { generateVideoWithVeo } from '../_shared/ai-client.ts';
+import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
 
-type VideoModel = 'veo-2' | 'kling-1.6-pro' | 'wan2.1-i2v' | 'runway-gen4-turbo';
+type VideoModel = 'veo-2' | 'kling-v3.0' | 'wan2.1-i2v-720p' | 'runway-gen4-turbo';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
 const CREDIT_COSTS: Record<VideoModel, number> = {
-  'veo-2':             30,
-  'kling-1.6-pro':     15,
-  'wan2.1-i2v':        10,
-  'runway-gen4-turbo': 40,
+  'veo-2':              30,
+  'kling-v3.0':         20,
+  'wan2.1-i2v-720p':    12,
+  'runway-gen4-turbo':  40,
 };
 
 // Auto-select model by video type
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
   walkthrough:          'veo-2',
   floorplan_flythrough: 'veo-2',
-  product_spotlight:    'kling-1.6-pro',
-  before_after:         'kling-1.6-pro',
-  social_reel:          'kling-1.6-pro',
+  product_spotlight:    'kling-v3.0',
+  before_after:         'kling-v3.0',
+  social_reel:          'kling-v3.0',
 };
 
-// Replicate model identifiers
+// Replicate model identifiers (Kling now uses native SDK, not Replicate)
 const REPLICATE_MODELS: Record<string, string> = {
-  'kling-1.6-pro':     'klingai/kling-1.6-pro',
-  'wan2.1-i2v':        'wan-video/wan2.1-i2v-480p',
+  'wan2.1-i2v-720p':   'wan-video/wan2.1-i2v-720p',
   'runway-gen4-turbo': 'runwayml/gen4-turbo',
 };
 
@@ -221,14 +220,47 @@ Deno.serve(async (req) => {
         ? 'Aerial cinematic flythrough of the floorplan, smooth overhead camera movement'
         : 'Professional interior design showcase video, smooth camera movement';
 
-      const veoResult = await generateVideoWithVeo({
-        sourceImageUrl: source_image_url,
-        prompt: prompt || defaultPrompt,
-        aspectRatio: aspect_ratio as '16:9' | '9:16',
-        durationSeconds: Math.min(duration_seconds, 8),
+      const veoResult = await generateVideoWithVeo(
+        prompt || defaultPrompt,
+        {
+          imageUrl: source_image_url,
+          aspectRatio: aspect_ratio as '16:9' | '9:16',
+          durationSeconds: Math.min(duration_seconds, 8),
+        },
+      );
+
+      const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true);
+
+      await supabase.from('generation_videos').update({
+        status: 'completed',
+        video_url: videoUrl,
+        completed_at: new Date().toISOString(),
+      }).eq('id', jobId);
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        video_url: videoUrl,
+        model_used: resolvedModel,
+        credits_used: creditCost,
+        video_type,
+        status: 'completed',
       });
 
-      const videoUrl = await uploadVideoToStorage(supabase, veoResult.videoBase64, jobId, true);
+    } else if (resolvedModel === 'kling-v3.0') {
+      // Kling v3.0 via native @ai-sdk/klingai
+      const klingPrompt = prompt || 'Professional cinematic interior design video, smooth camera movement';
+      const klingDuration = duration_seconds >= 10 ? 10 : 5;
+
+      const klingResult = await generateVideoWithKling(klingPrompt, {
+        model: 'kling-v3.0-i2v',
+        imageUrl: source_image_url,
+        durationSeconds: klingDuration as 5 | 10,
+        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        mode: 'pro',
+      });
+
+      const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true);
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -247,9 +279,9 @@ Deno.serve(async (req) => {
       });
 
     } else {
-      // Replicate models
+      // Replicate models (Wan 720p, Runway Gen-4)
       const replicateModel = REPLICATE_MODELS[resolvedModel];
-      if (!replicateModel) throw new Error(`Unknown Replicate model: ${resolvedModel}`);
+      if (!replicateModel) throw new Error(`Unknown model: ${resolvedModel}`);
 
       // Build model-specific input
       const replicateInput: Record<string, unknown> = {
@@ -260,14 +292,11 @@ Deno.serve(async (req) => {
       };
 
       // Model-specific params
-      if (resolvedModel === 'kling-1.6-pro') {
-        replicateInput.cfg_scale = 0.5;
-        replicateInput.negative_prompt = 'blurry, distorted, shaky camera, poor quality';
-      } else if (resolvedModel === 'before_after' && before_image_url) {
-        replicateInput.image_end = before_image_url;
-      } else if (resolvedModel === 'runway-gen4-turbo') {
+      if (resolvedModel === 'runway-gen4-turbo') {
         replicateInput.ratio = aspect_ratio;
         replicateInput.image_as_end_frame = false;
+      } else if (video_type === 'before_after' && before_image_url) {
+        replicateInput.image_end = before_image_url;
       }
 
       const prediction = await createReplicatePrediction(replicateModel, replicateInput);

@@ -747,11 +747,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       const resolvedVideoType = videoType || 'walkthrough';
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
-      const isAsyncModel = resolvedModel && ['kling-1.6-pro', 'wan2.1-i2v', 'runway-gen4-turbo'].includes(resolvedModel);
+      const isAsyncModel = resolvedModel && ['wan2.1-i2v-720p', 'runway-gen4-turbo'].includes(resolvedModel);
 
       const modelLabels: Record<string, string> = {
-        'veo-2': 'Veo 2.0', 'kling-1.6-pro': 'Kling 1.6 Pro',
-        'wan2.1-i2v': 'Wan2.1', 'runway-gen4-turbo': 'Runway Gen-4',
+        'veo-2': 'Veo 2.0', 'kling-v3.0': 'Kling v3.0 Pro',
+        'wan2.1-i2v-720p': 'Wan2.1 720p', 'runway-gen4-turbo': 'Runway Gen-4',
       };
       const modelLabel = resolvedModel ? modelLabels[resolvedModel] : 'auto-selected model';
       toast({
@@ -821,8 +821,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const VIDEO_MODELS = [
     { value: 'auto',               label: 'Auto',               description: 'Best model selected automatically' },
     { value: 'veo-2',              label: 'Veo 2',              description: 'Google Veo 2 — high quality',         credits: 30 },
-    { value: 'kling-1.6-pro',      label: 'Kling 1.6 Pro',      description: 'Kling — fast & cinematic',            credits: 15 },
-    { value: 'wan2.1-i2v',         label: 'Wan 2.1',            description: 'Wan2.1 — open-source quality',        credits: 10 },
+    { value: 'kling-v3.0',         label: 'Kling v3.0 Pro',     description: 'Kling v3.0 — latest & cinematic',     credits: 20 },
+    { value: 'wan2.1-i2v-720p',    label: 'Wan 2.1 720p',       description: 'Wan2.1 720p — open-source quality',   credits: 12 },
     { value: 'runway-gen4-turbo',  label: 'Runway Gen-4',       description: 'Runway Gen-4 — premium output',       credits: 40 },
   ] as const;
 

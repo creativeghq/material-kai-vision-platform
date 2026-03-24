@@ -78,9 +78,9 @@ FIXTURES PRESENT (list only the fixture types visibly present — e.g. freestand
 
 FLOORS: [material, exact color/tone, tile size/format if applicable, laying pattern — straight/herringbone/chevron/diagonal, finish — matte/gloss/honed/polished, grout color and joint width]
 
-WALLS - PRIMARY SURFACE: [material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width]
+WALLS - PRIMARY SURFACE: [material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width — this material covers 100% of every wall surface unless a secondary zone is specified below]
 
-WALLS - SECONDARY (if dual treatment): [material, color, approximate vertical proportion — e.g. "lower ~40% dark tile, upper portion white plaster"]
+WALLS - SECONDARY ZONE (only if the inspiration clearly shows a dual-treatment split): [material, color, exact vertical split height as a percentage — e.g. "lower 40% dark charcoal tile, upper 60% white plaster". If no clear split exists, leave blank — do not invent a split.]
 
 CEILING: [color, finish — matte/gloss, any shadow-gap or cove lighting]
 
@@ -231,7 +231,14 @@ Output a photorealistic photo of the room with only the fixture shapes updated a
  */
 function buildFluxCopyStylePrompt(designSpec: string, roomType?: string, userInstruction?: string): string {
   const room = roomType || 'interior space';
-  return `Apply the following complete interior design aesthetic to this ${room}. Preserve every fixture position and the spatial layout exactly — nothing moves.\n\n${designSpec}\n${userInstruction ? `\nAdditional instruction: ${userInstruction}\n` : ''}\nUltra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
+  return `Apply the following complete interior design aesthetic to this ${room}. Preserve every fixture position and the spatial layout exactly — nothing moves.
+
+FULL SURFACE COVERAGE — CRITICAL:
+Every wall surface must be covered floor-to-ceiling and edge-to-edge with the specified wall material. No partial application — the tile, cladding, or paint must extend to every corner, behind every fixture, above and below every element, all the way to the ceiling and floor junction. Zero original wall finish should remain visible anywhere. Same rule applies to floors — the specified floor material covers the entire floor plane without gaps.
+
+${designSpec}
+${userInstruction ? `\nAdditional instruction: ${userInstruction}\n` : ''}
+Ultra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
 }
 
 /**
