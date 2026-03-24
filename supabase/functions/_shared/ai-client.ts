@@ -466,8 +466,14 @@ async function generateVideoWithVeoRaw(
     if (opData.error) throw new Error(`Veo generation failed: ${opData.error.message}`);
 
     if (opData.done) {
-      const sample = opData.response?.generateVideoResponse?.generatedSamples?.[0];
-      if (!sample?.video) throw new Error('Veo: no video in response');
+      // Try both response shapes Google has used
+      const generateVideoResponse =
+        (opData.response as any)?.generateVideoResponse ??
+        (opData.response as any);
+      const sample = generateVideoResponse?.generatedSamples?.[0];
+      if (!sample?.video) {
+        throw new Error(`Veo: no video in response. Response: ${JSON.stringify(opData.response).slice(0, 500)}`);
+      }
 
       // Prefer inline base64, fall back to downloading from URI
       if (sample.video.encodedVideo) {
@@ -475,8 +481,12 @@ async function generateVideoWithVeoRaw(
       }
 
       if (sample.video.uri) {
-        const vidRes = await fetch(sample.video.uri);
-        if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status})`);
+        // The URI is a generativelanguage.googleapis.com endpoint — requires API key
+        const videoFetchUrl = sample.video.uri.includes('?')
+          ? `${sample.video.uri}&key=${GOOGLE_API_KEY}`
+          : `${sample.video.uri}?key=${GOOGLE_API_KEY}`;
+        const vidRes = await fetch(videoFetchUrl);
+        if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status}): ${await vidRes.text()}`);
         const vidBytes = new Uint8Array(await vidRes.arrayBuffer());
         let vidBinary = '';
         for (let i = 0; i < vidBytes.length; i += chunk) {
