@@ -369,18 +369,20 @@ export async function generateVideoWithVeo(
 ): Promise<VeoVideoResult> {
   const modelId: VeoModel = config?.model ?? 'veo-2.0-generate-001';
 
-  // Use image-to-video when a source image is provided
-  const veoPrompt: any = config?.imageUrl
-    ? { image: config.imageUrl, text: prompt }
-    : prompt;
+  // Image-to-video: use raw Google API (the AI SDK experimental_generateVideo
+  // does not support image conditioning — it silently does text-to-video only).
+  if (config?.imageUrl) {
+    return generateVideoWithVeoRaw(prompt, config.imageUrl, modelId, config);
+  }
 
+  // Text-to-video via AI SDK
   const { video } = await generateVideo({
     model: google.video(modelId),
-    prompt: veoPrompt,
+    prompt,
     aspectRatio: config?.aspectRatio ?? '16:9',
     durationSeconds: config?.durationSeconds ?? 8,
     resolution: config?.resolution ?? '1280x720',
-    pollTimeoutMs: 600000, // 10 min max
+    pollTimeoutMs: 600000,
   } as any);
 
   return {
@@ -388,6 +390,106 @@ export async function generateVideoWithVeo(
     mimeType: (video as any).mimeType ?? 'video/mp4',
     model: modelId,
   };
+}
+
+/**
+ * Image-to-video via the Google Generative Language API directly.
+ * Fetches the source image, submits as a long-running operation, polls until
+ * done, then downloads and returns the video as base64.
+ */
+async function generateVideoWithVeoRaw(
+  prompt: string,
+  imageUrl: string,
+  modelId: VeoModel,
+  config?: { aspectRatio?: string; durationSeconds?: number; resolution?: string },
+): Promise<VeoVideoResult> {
+  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+
+  // Fetch source image → base64
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error(`Failed to fetch source image: ${imgRes.status}`);
+  const imgBytes = new Uint8Array(await imgRes.arrayBuffer());
+  const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+
+  // Safe base64 encoder (avoids call-stack overflow on large images)
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < imgBytes.length; i += chunk) {
+    binary += String.fromCharCode(...imgBytes.subarray(i, i + chunk));
+  }
+  const imageBase64 = btoa(binary);
+
+  // Submit long-running operation
+  const submitRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predictLongRunning?key=${GOOGLE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{
+          prompt,
+          image: { bytesBase64Encoded: imageBase64, mimeType },
+        }],
+        parameters: {
+          aspectRatio: config?.aspectRatio ?? '16:9',
+          durationSeconds: config?.durationSeconds ?? 8,
+        },
+      }),
+    },
+  );
+
+  if (!submitRes.ok) {
+    const err = await submitRes.text();
+    throw new Error(`Veo submit failed (${submitRes.status}): ${err}`);
+  }
+
+  const operation = await submitRes.json() as { name: string; done?: boolean };
+  const opName = operation.name;
+  if (!opName) throw new Error('Veo: no operation name returned');
+
+  // Poll until done (10 min max, 10s intervals)
+  const deadline = Date.now() + 600_000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 10_000));
+
+    const pollRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${opName}?key=${GOOGLE_API_KEY}`,
+    );
+    if (!pollRes.ok) continue;
+
+    const opData = await pollRes.json() as {
+      done?: boolean;
+      error?: { message: string };
+      response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string; encodedVideo?: string; mimeType?: string } }> } };
+    };
+
+    if (opData.error) throw new Error(`Veo generation failed: ${opData.error.message}`);
+
+    if (opData.done) {
+      const sample = opData.response?.generateVideoResponse?.generatedSamples?.[0];
+      if (!sample?.video) throw new Error('Veo: no video in response');
+
+      // Prefer inline base64, fall back to downloading from URI
+      if (sample.video.encodedVideo) {
+        return { base64: sample.video.encodedVideo, mimeType: sample.video.mimeType ?? 'video/mp4', model: modelId };
+      }
+
+      if (sample.video.uri) {
+        const vidRes = await fetch(sample.video.uri);
+        if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status})`);
+        const vidBytes = new Uint8Array(await vidRes.arrayBuffer());
+        let vidBinary = '';
+        for (let i = 0; i < vidBytes.length; i += chunk) {
+          vidBinary += String.fromCharCode(...vidBytes.subarray(i, i + chunk));
+        }
+        return { base64: btoa(vidBinary), mimeType: 'video/mp4', model: modelId };
+      }
+
+      throw new Error('Veo: video has neither encodedVideo nor uri');
+    }
+  }
+
+  throw new Error('Veo: timed out waiting for video generation');
 }
 
 // ── Kling AI: Video generation ──
