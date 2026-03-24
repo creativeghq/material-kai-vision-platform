@@ -327,7 +327,7 @@ export const ApiGatewayAdmin: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <Tabs defaultValue="endpoints" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="endpoints" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

@@ -458,7 +458,7 @@ export const MetadataManagement: React.FC = () => {
         badge="Admin"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <Tabs defaultValue="metadata">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="metadata" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

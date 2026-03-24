@@ -189,7 +189,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   if (!quote) {
     return (
-      <div className="min-h-screen p-6">
+      <div className="min-h-screen p-3 sm:p-6">
         <Button variant="ghost" onClick={() => navigate('/quotes')} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Quotes

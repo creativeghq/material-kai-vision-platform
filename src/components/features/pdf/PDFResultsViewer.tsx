@@ -410,12 +410,12 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({
 
       {/* Main Content */}
       <Tabs defaultValue="materials" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="materials">Materials Catalog</TabsTrigger>
-          <TabsTrigger value="images">Extracted Images</TabsTrigger>
-          <TabsTrigger value="tiles">Tile Analysis</TabsTrigger>
-          <TabsTrigger value="review">Review & Workflow</TabsTrigger>
-          <TabsTrigger value="metadata">Document Info</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="materials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Materials Catalog</TabsTrigger>
+          <TabsTrigger value="images" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Extracted Images</TabsTrigger>
+          <TabsTrigger value="tiles" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Tile Analysis</TabsTrigger>
+          <TabsTrigger value="review" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Review & Workflow</TabsTrigger>
+          <TabsTrigger value="metadata" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Document Info</TabsTrigger>
         </TabsList>
 
         <TabsContent value="materials" className="space-y-4">

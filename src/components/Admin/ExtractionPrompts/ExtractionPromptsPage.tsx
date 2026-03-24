@@ -247,7 +247,7 @@ export const ExtractionPromptsPage: React.FC = () => {
         badge="AI Prompts"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end">
           <Button

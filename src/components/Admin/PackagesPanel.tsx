@@ -468,7 +468,7 @@ const PackagesPanel: React.FC = () => {
           { label: 'Packages' },
         ]}
       />
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
           <div className="flex items-center justify-end">
             <Button
               onClick={checkPackageStatus}

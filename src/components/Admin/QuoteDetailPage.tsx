@@ -453,7 +453,7 @@ export const QuoteDetailPage: React.FC = () => {
     return (
       <div className="min-h-screen">
         <GlobalAdminHeader title="Quote Not Found" badge="Admin" />
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           <Button onClick={() => navigate('/admin/quote-requests')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Quotes
@@ -489,7 +489,7 @@ export const QuoteDetailPage: React.FC = () => {
         badge="Quote Details"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Back Button & Status Row */}
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate('/admin/quote-requests')}>
@@ -795,7 +795,7 @@ export const QuoteDetailPage: React.FC = () => {
                 ) : (
                   <>
                     {/* Pricing Table */}
-                    <div className="border rounded-lg overflow-hidden">
+                    <div className="border rounded-lg overflow-x-auto">
                       <table className="w-full">
                         <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                           <tr>

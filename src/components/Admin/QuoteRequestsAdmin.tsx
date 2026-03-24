@@ -253,7 +253,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
         badge="Admin"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Compact Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <div className="dashboard-card">
@@ -354,7 +354,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
         </div>
 
         {/* Quote Requests Table */}
-        <div className="dashboard-card">
+        <div className="dashboard-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

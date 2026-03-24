@@ -113,7 +113,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
         ]}
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">

@@ -437,7 +437,7 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
         badge="Admin"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>

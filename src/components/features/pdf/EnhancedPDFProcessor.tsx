@@ -652,7 +652,7 @@ export function EnhancedPDFProcessor() {
       </div>
 
       <Tabs defaultValue="upload" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="upload">Upload & Process</TabsTrigger>
           <TabsTrigger value="search">Search Documents</TabsTrigger>
           <TabsTrigger value="results">View Results</TabsTrigger>

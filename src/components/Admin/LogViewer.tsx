@@ -303,7 +303,7 @@ export function LogViewer() {
         badge="Monitoring"
       />
 
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-4">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">

@@ -286,12 +286,12 @@ export const AgentConfigsPage: React.FC = () => {
 
         {/* Main Tabs */}
         <Tabs defaultValue="prompts" className="mt-6">
-          <TabsList className="mb-6">
-            <TabsTrigger value="prompts" className="flex items-center gap-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
+            <TabsTrigger value="prompts" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bot className="h-4 w-4" />
               AI Prompts
             </TabsTrigger>
-            <TabsTrigger value="pricing" className="flex items-center gap-2">
+            <TabsTrigger value="pricing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <DollarSign className="h-4 w-4" />
               Model Pricing
             </TabsTrigger>

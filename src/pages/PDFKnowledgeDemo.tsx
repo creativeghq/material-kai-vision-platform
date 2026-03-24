@@ -150,10 +150,10 @@ export const PDFKnowledgeDemo: React.FC = () => {
       </Card>
 
       <Tabs defaultValue="demo" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="demo">Demo Results</TabsTrigger>
-          <TabsTrigger value="add">Add Knowledge</TabsTrigger>
-          <TabsTrigger value="search">Search Interface</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="demo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Demo Results</TabsTrigger>
+          <TabsTrigger value="add" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Add Knowledge</TabsTrigger>
+          <TabsTrigger value="search" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Search Interface</TabsTrigger>
         </TabsList>
 
         {/* Demo Results Tab */}

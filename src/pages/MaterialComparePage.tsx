@@ -181,7 +181,7 @@ export default function MaterialComparePage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(ids.length || 2)].map((_, i) => <Skeleton key={i} className="h-64" />)}

@@ -493,8 +493,8 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         </div>
 
         {/* Field Mappings Table */}
-        <div className="border rounded-lg overflow-hidden">
-          <div className="bg-muted px-4 py-3 grid grid-cols-12 gap-4 font-semibold text-sm">
+        <div className="border rounded-lg overflow-x-auto">
+          <div className="bg-muted px-4 py-3 grid grid-cols-12 gap-4 font-semibold text-sm min-w-[600px]">
             <div className="col-span-3">XML Field</div>
             <div className="col-span-3">Sample Values</div>
             <div className="col-span-4">Map To</div>
@@ -503,7 +503,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
           <div className="divide-y">
             {detectedFields.map((field) => (
-              <div key={field.xml_field} className="px-4 py-3 grid grid-cols-12 gap-4 items-center bg-background hover:bg-muted/50 transition-colors">
+              <div key={field.xml_field} className="px-4 py-3 grid grid-cols-12 gap-4 items-center bg-background hover:bg-muted/50 transition-colors min-w-[600px]">
                 <div className="col-span-3">
                   <code className="text-sm text-primary font-mono">{field.xml_field}</code>
                 </div>

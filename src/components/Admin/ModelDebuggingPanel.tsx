@@ -298,7 +298,7 @@ const ModelDebuggingPanel: React.FC = () => {
           { label: '3D Model Debugging' },
         ]}
       />
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end">
           <Button

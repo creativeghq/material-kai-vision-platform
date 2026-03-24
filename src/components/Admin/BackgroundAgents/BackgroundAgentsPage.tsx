@@ -112,7 +112,7 @@ export function BackgroundAgentsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -147,12 +147,12 @@ export function BackgroundAgentsPage() {
 
       {/* Filter tabs */}
       <Tabs value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-        <TabsList>
-          <TabsTrigger value="all">All ({runs.length})</TabsTrigger>
-          <TabsTrigger value="processing">Running ({stats.running})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({stats.completed})</TabsTrigger>
-          <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">All ({runs.length})</TabsTrigger>
+          <TabsTrigger value="processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Running ({stats.running})</TabsTrigger>
+          <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Completed ({stats.completed})</TabsTrigger>
+          <TabsTrigger value="failed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Failed ({stats.failed})</TabsTrigger>
+          <TabsTrigger value="cancelled" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Cancelled</TabsTrigger>
         </TabsList>
       </Tabs>
 

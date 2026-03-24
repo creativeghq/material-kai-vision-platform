@@ -106,7 +106,7 @@ export const MessagingManagement: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end gap-2">
           {accountBalance && (

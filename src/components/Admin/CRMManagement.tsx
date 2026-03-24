@@ -364,7 +364,7 @@ export const CRMManagement: React.FC = () => {
         badge="Admin"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <AdminStatCard
@@ -442,7 +442,7 @@ export const CRMManagement: React.FC = () => {
               </div>
 
               {/* Users Table */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -569,7 +569,7 @@ export const CRMManagement: React.FC = () => {
               </div>
 
               {/* Contacts Table */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -686,7 +686,7 @@ export const CRMManagement: React.FC = () => {
               </div>
 
               {/* Companies Table */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

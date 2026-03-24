@@ -198,7 +198,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
   if (!document) {
     return (
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         <div className="text-center">
           <p className="text-muted-foreground">Document not found</p>
           <Button
@@ -214,7 +214,7 @@ export const PDFDocumentDetails: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

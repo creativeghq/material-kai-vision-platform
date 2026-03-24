@@ -220,7 +220,7 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
         ) : (
           <>
             {/* Statistics Cards */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <p className="text-xs text-gray-600 mb-1">Current</p>
                 <p className="text-lg font-bold text-gray-900">

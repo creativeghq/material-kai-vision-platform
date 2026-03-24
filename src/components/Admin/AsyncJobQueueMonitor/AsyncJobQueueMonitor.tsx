@@ -1422,7 +1422,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         badge="Admin"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Info Banner when coming from data-import */}
         {fromDataImport && (
           <Alert className="border-blue-300 bg-blue-50">

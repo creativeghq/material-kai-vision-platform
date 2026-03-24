@@ -437,7 +437,7 @@ export const SystemPerformance: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button

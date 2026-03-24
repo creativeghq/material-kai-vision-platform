@@ -350,12 +350,12 @@ export const MivaaPDFProcessor: React.FC = () => {
                   </div>
 
                   <Tabs defaultValue="content" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="content">Content</TabsTrigger>
-                      <TabsTrigger value="images">
+                    <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                      <TabsTrigger value="content" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Content</TabsTrigger>
+                      <TabsTrigger value="images" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                         Images ({result.extractedImages.length})
                       </TabsTrigger>
-                      <TabsTrigger value="tables">
+                      <TabsTrigger value="tables" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                         Tables ({result.extractedTables.length})
                       </TabsTrigger>
                     </TabsList>

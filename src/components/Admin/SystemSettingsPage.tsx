@@ -322,7 +322,7 @@ export const SystemSettingsPage: React.FC = () => {
       />
 
       {/* Settings Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
           <div className="dashboard-card space-y-6">
             {/* Quote Expiration Setting */}
             <div className="space-y-4">

@@ -725,30 +725,30 @@ const _OperationsDashboard: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <Tabs defaultValue="system-health" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="system-health">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="system-health" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2" />
               System Health
             </TabsTrigger>
-            <TabsTrigger value="data-processing">
+            <TabsTrigger value="data-processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Database className="h-4 w-4 mr-2" />
               Data Processing
             </TabsTrigger>
-            <TabsTrigger value="ai-performance">
+            <TabsTrigger value="ai-performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bot className="h-4 w-4 mr-2" />
               AI Performance
             </TabsTrigger>
-            <TabsTrigger value="agent-chat">
+            <TabsTrigger value="agent-chat" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
-            <TabsTrigger value="services-billing">
+            <TabsTrigger value="services-billing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Globe className="h-4 w-4 mr-2" />
               Services & Billing
             </TabsTrigger>
-            <TabsTrigger value="platform-overview">
+            <TabsTrigger value="platform-overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Platform Overview
             </TabsTrigger>

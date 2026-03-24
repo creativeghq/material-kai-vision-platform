@@ -232,7 +232,7 @@ export const CompanyDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-6">
+      <div className="min-h-screen p-3 sm:p-6">
         <div className="text-center py-12">Loading company details...</div>
       </div>
     );

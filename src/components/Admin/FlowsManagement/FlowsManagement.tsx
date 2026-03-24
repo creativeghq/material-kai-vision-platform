@@ -95,7 +95,7 @@ export const FlowsManagement: React.FC = () => {
         badge="Automation"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statCards.map((card) => (
@@ -115,16 +115,16 @@ export const FlowsManagement: React.FC = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="my-flows" className="gap-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="my-flows" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Workflow className="h-4 w-4" />
               My Flows
             </TabsTrigger>
-            <TabsTrigger value="builder" className="gap-2">
+            <TabsTrigger value="builder" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="h-4 w-4" />
               Flow Builder
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Clock className="h-4 w-4" />
               Run History
             </TabsTrigger>

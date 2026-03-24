@@ -624,7 +624,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="knowledge" className="w-full">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
                 <TabsTrigger
                   value="knowledge"
                   className="flex items-center gap-2"

@@ -374,10 +374,10 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         </CardContent>
       </Card>
       <Tabs defaultValue="review" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="review">Review Materials</TabsTrigger>
-          <TabsTrigger value="workflow">Configure Workflow</TabsTrigger>
-          <TabsTrigger value="execute">Execute Pipeline</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="review" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Review Materials</TabsTrigger>
+          <TabsTrigger value="workflow" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configure Workflow</TabsTrigger>
+          <TabsTrigger value="execute" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Execute Pipeline</TabsTrigger>
         </TabsList>
 
         <TabsContent value="review" className="space-y-4">
