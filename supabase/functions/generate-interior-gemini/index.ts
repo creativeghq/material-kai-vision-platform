@@ -646,11 +646,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
         if (!replicateUrl) throw new Error('Flux returned empty output URL');
         console.log('[copy-style] Flux succeeded, downloading from:', replicateUrl);
-        const res = await fetch(replicateUrl, {
-          headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
-        });
-        if (!res.ok) throw new Error(`Flux output download failed (${res.status})`);
-        const imgBuffer = new Uint8Array(await res.arrayBuffer());
+        const imgBuffer = await fetchImageBuffer(replicateUrl);
         imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
         console.log('[copy-style] Flux primary succeeded.');
       } catch (fluxErr) {

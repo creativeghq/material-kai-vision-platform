@@ -437,7 +437,8 @@ export const createGeminiGenerationTool = (
         });
 
         if (!response.ok) {
-          throw new Error(`Gemini generation error: ${response.statusText}`);
+          const errBody = await response.json().catch(() => null);
+          throw new Error(errBody?.error || `Gemini generation error: ${response.statusText}`);
         }
 
         const result = await response.json();
