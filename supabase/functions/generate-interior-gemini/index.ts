@@ -405,6 +405,23 @@ function storagePathFromUrl(publicUrl: string): string {
   return idx >= 0 ? publicUrl.slice(idx + marker.length) : publicUrl;
 }
 
+/** Check user has enough credits before starting generation (fail fast, no wasted API calls) */
+async function checkCredits(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  required: number,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('user_credits')
+    .select('balance')
+    .eq('user_id', userId)
+    .single();
+  if (error) throw new Error(`Credit check failed: ${error.message}`);
+  if (!data || (data.balance ?? 0) < required) {
+    throw new Error(`Insufficient credits. Required: ${required}, Available: ${data?.balance ?? 0}`);
+  }
+}
+
 /** Deduct credits from user balance */
 async function deductCredits(
   supabase: ReturnType<typeof createClient>,
@@ -510,6 +527,9 @@ Deno.serve(async (req) => {
   const modelLabel = isFluxMode ? 'flux-depth-pro' : model;
 
   try {
+    // Fail fast before spending 20-30s on generation
+    await checkCredits(supabase, resolvedUserId, credits);
+
     let imageUrl: string;
 
     // ── Mode 1: text-to-image ──────────────────────────────────────────────

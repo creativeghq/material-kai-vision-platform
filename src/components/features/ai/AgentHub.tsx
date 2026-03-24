@@ -146,6 +146,7 @@ interface Message {
   agentId?: string;
   model?: string;
   images?: string[]; // uploaded images attached to user messages
+  insufficientCredits?: boolean; // true when generation failed due to credit exhaustion
   demoData?: any; // Structured demo data for DemoAgent responses
   materialData?: {
     products: any[];
@@ -1017,6 +1018,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Create or get conversation
       let conversationId = currentConversationId;
+      // Upload images first so URLs are available for both the API call and DB persistence
+      let resolvedImageUrls: string[] = [];
+      if (attachedImages.length > 0) {
+        resolvedImageUrls = await Promise.all(
+          attachedImages.map(async (img, idx) => {
+            if (!img.startsWith('data:')) return img;
+            try {
+              const commaIdx = img.indexOf(',');
+              const mimeType = img.slice(5, img.indexOf(';'));
+              const ext = mimeType.split('/')[1] || 'jpg';
+              const base64Data = img.slice(commaIdx + 1);
+              const binaryStr = atob(base64Data);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              const fileName = `user-uploads/${Date.now()}-${idx}.${ext}`;
+              const { data: up, error } = await supabase.storage
+                .from('generation-images')
+                .upload(fileName, bytes, { contentType: mimeType, upsert: true });
+              if (error || !up) return img;
+              return supabase.storage.from('generation-images').getPublicUrl(up.path).data.publicUrl;
+            } catch {
+              return img;
+            }
+          })
+        );
+      }
+
       let newConversation: ChatConversation | null = null;
       if (!conversationId) {
         const conversation = await agentChatHistoryService.createConversation({
@@ -1031,12 +1059,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
-      // Save user message to database
+      // Save user message to database, including image URLs so they survive page refresh
       if (conversationId) {
         await agentChatHistoryService.saveMessage({
           conversationId,
           role: 'user',
           content: userInput,
+          metadata: resolvedImageUrls.length > 0 ? { attachedImages: resolvedImageUrls } : undefined,
         });
         // Add to sidebar only after message is saved (messageCount > 0 in DB)
         // This prevents empty conversations from appearing in history on page load
@@ -1069,40 +1098,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // If no cache hit, make API call
       if (!data) {
-        // Upload any attached images to Supabase Storage BEFORE calling agent-chat.
-        // Sending base64 data URLs in the request body risks hitting the edge function
-        // body size limit (a single phone photo can be 4-8 MB as base64).
-        // Uploading first gives us small public URLs that pass through safely.
-        let resolvedImageUrls: string[] = [];
-        if (attachedImages.length > 0) {
-          resolvedImageUrls = await Promise.all(
-            attachedImages.map(async (img, idx) => {
-              if (!img.startsWith('data:')) return img; // already a URL
-              try {
-                const commaIdx = img.indexOf(',');
-                const mimeType = img.slice(5, img.indexOf(';'));
-                const ext = mimeType.split('/')[1] || 'jpg';
-                const base64Data = img.slice(commaIdx + 1);
-                const binaryStr = atob(base64Data);
-                const bytes = new Uint8Array(binaryStr.length);
-                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                const fileName = `user-uploads/${Date.now()}-${idx}.${ext}`;
-                const { data: up, error } = await supabase.storage
-                  .from('generation-images')
-                  .upload(fileName, bytes, { contentType: mimeType, upsert: true });
-                if (error || !up) {
-                  console.error('Image upload failed, falling back to data URL:', error);
-                  return img; // fallback — better than nothing
-                }
-                return supabase.storage.from('generation-images').getPublicUrl(up.path).data.publicUrl;
-              } catch (e) {
-                console.error('Image upload error:', e);
-                return img;
-              }
-            })
-          );
-        }
-
         // Prepare request body
         const requestBody: any = {
           messages: messages.concat({
@@ -1622,12 +1617,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
     } catch (error) {
       console.error('Error executing agent:', error);
+      const errText = error instanceof Error ? error.message : 'Unknown error';
+      const isCreditsError = /insufficient credits/i.test(errText);
       const errorMessage: Message = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: isCreditsError ? errText : `Error: ${errText}`,
         timestamp: new Date(),
         agentId: selectedAgent,
+        insufficientCredits: isCreditsError,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -1701,16 +1699,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           timestamp: new Date(msg.createdAt),
           agentId: msg.metadata?.agentId as string,
           model: msg.metadata?.model as string,
+          images: msg.metadata?.attachedImages as string[] | undefined,
           demoData: msg.metadata?.demoData as any | undefined,
           materialData: msg.metadata?.materialData as any | undefined,
-          designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
-          generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
-          geminiImageData: msg.metadata?.geminiImageData as any | undefined, // Restore Gemini-generated design image
-          worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
-          videoData: msg.metadata?.videoData as any | undefined, // Restore video data
-          articleData: msg.metadata?.articleData as any | undefined, // Restore SEO article data
-          virtualStagingData: msg.metadata?.virtualStagingData as any | undefined, // Restore virtual staging data
-          materialsBoardData: msg.metadata?.materialsBoardData as any | undefined, // Restore materials selection board data
+          designData: msg.metadata?.designData as any | undefined,
+          generation_job: msg.metadata?.generation_job as any | undefined,
+          geminiImageData: msg.metadata?.geminiImageData as any | undefined,
+          worldData: msg.metadata?.worldData as any | undefined,
+          videoData: msg.metadata?.videoData as any | undefined,
+          articleData: msg.metadata?.articleData as any | undefined,
+          virtualStagingData: msg.metadata?.virtualStagingData as any | undefined,
+          materialsBoardData: msg.metadata?.materialsBoardData as any | undefined,
         })),
       );
     },
@@ -2354,8 +2353,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {/* Render markdown content for assistant messages */}
-                        {message.role === 'assistant' ? (
+                        {/* Credit exhaustion error — prompt user to top up */}
+                        {message.insufficientCredits ? (
+                          <div className="flex flex-col gap-3">
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/15 border border-amber-400/30">
+                              <span className="text-amber-400 text-lg leading-none mt-0.5">⚡</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-amber-300 mb-0.5">Not enough credits</p>
+                                <p className="text-xs text-amber-200/80">
+                                  This generation requires more credits than your current balance.
+                                  Top up to continue generating designs.
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => window.location.href = '/billing/credits'}
+                              className="self-start flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold transition-colors shadow-md"
+                            >
+                              Buy Credits
+                            </button>
+                          </div>
+                        ) : message.role === 'assistant' ? (
                           <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         ) : (
                           <p className="text-sm whitespace-pre-wrap text-white">{normalizeContent(message.content)}</p>
