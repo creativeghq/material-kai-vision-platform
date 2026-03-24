@@ -60,7 +60,7 @@ async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promi
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -638,70 +638,43 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
       }
 
-      // Fetch room image buffer now (needed for both Gemini primary and Flux)
-      console.log('[copy-style] Fetching room image buffer...');
-      const roomBuffer = await fetchImageBuffer(body.reference_image_url);
-      console.log('[copy-style] Room buffer size:', roomBuffer.length);
-
-      // Step 2a — Try Gemini image-edit with spec (primary path, reliable)
-      // This is the same as image-edit mode which is known to work.
-      if (designSpec) {
-        console.log('[copy-style] Trying Gemini spec-based edit (primary)...');
-        try {
+      // Step 2 — Flux Depth Pro (primary): depth-locks room structure, applies spec as text prompt.
+      // Flux uses the public room image URL directly — no buffer transfer needed.
+      // This path completes in ~15-25s total (spec extraction + Flux), well within any timeout.
+      console.log('[copy-style] Calling Flux Depth Pro (primary)...');
+      try {
+        const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+        if (!replicateUrl) throw new Error('Flux returned empty output URL');
+        console.log('[copy-style] Flux succeeded, downloading from:', replicateUrl);
+        const res = await fetch(replicateUrl, {
+          headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
+        });
+        if (!res.ok) throw new Error(`Flux output download failed (${res.status})`);
+        const imgBuffer = new Uint8Array(await res.arrayBuffer());
+        imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
+        console.log('[copy-style] Flux primary succeeded.');
+      } catch (fluxErr) {
+        // Flux failed — fall back to Gemini single-image spec edit
+        console.warn('[copy-style] Flux failed:', String(fluxErr));
+        console.log('[copy-style] Falling back to Gemini spec-based edit...');
+        const roomBuffer = await fetchImageBuffer(body.reference_image_url);
+        if (designSpec) {
           const applyPrompt = buildCopyStyleApplyPrompt(designSpec, body.prompt);
           const result = await generateImageWithGemini(
             { text: applyPrompt, images: [roomBuffer] },
             { model, aspectRatio },
           );
           imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
-          console.log('[copy-style] Gemini primary succeeded.');
-        } catch (geminiErr) {
-          console.warn('[copy-style] Gemini primary failed:', String(geminiErr));
-
-          // Step 2b — Flux Depth Pro fallback (structure-locked, better quality when available)
-          console.log('[copy-style] Trying Flux Depth Pro fallback...');
-          try {
-            const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
-            if (!replicateUrl) throw new Error('Flux returned empty output URL');
-            console.log('[copy-style] Flux succeeded, downloading output from:', replicateUrl);
-            const res = await fetch(replicateUrl, {
-              headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
-            });
-            if (!res.ok) throw new Error(`Flux output download failed (${res.status})`);
-            const imgBuffer = new Uint8Array(await res.arrayBuffer());
-            const base64 = toBase64(imgBuffer);
-            imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
-            console.log('[copy-style] Flux fallback succeeded.');
-          } catch (fluxErr) {
-            console.error('[copy-style] Both Gemini and Flux failed.');
-            console.error('[copy-style] Gemini error:', String(geminiErr));
-            console.error('[copy-style] Flux error:', String(fluxErr));
-            throw new Error(`Copy-style generation failed. Gemini: ${String(geminiErr)} | Flux: ${String(fluxErr)}`);
-          }
-        }
-      } else {
-        // No spec — go straight to Flux, fall back to dual-image Gemini
-        console.log('[copy-style] No spec available, trying Flux first...');
-        try {
-          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
-          if (!replicateUrl) throw new Error('Flux returned empty output URL');
-          const res = await fetch(replicateUrl, {
-            headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
-          });
-          if (!res.ok) throw new Error(`Flux output download failed (${res.status})`);
-          const imgBuffer = new Uint8Array(await res.arrayBuffer());
-          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
-          console.log('[copy-style] Flux (no-spec path) succeeded.');
-        } catch (fluxErr) {
-          console.warn('[copy-style] Flux failed (no-spec path):', String(fluxErr));
-          console.log('[copy-style] Falling back to dual-image Gemini...');
+          console.log('[copy-style] Gemini spec fallback succeeded.');
+        } else {
+          // No spec and no Flux — dual-image Gemini last resort
           const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
           const result = await generateImageWithGemini(
             { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
             { model, aspectRatio },
           );
           imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
-          console.log('[copy-style] Dual-image Gemini fallback succeeded.');
+          console.log('[copy-style] Dual-image Gemini last-resort succeeded.');
         }
       }
     }
