@@ -72,7 +72,8 @@ import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
-import { GeminiEditModal, GeminiEditParams } from './GeminiEditModal';
+import { GeminiEditModal } from './GeminiEditModal';
+import { RegionEditCanvas, type RegionEditResult } from './RegionEditCanvas';
 
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
@@ -282,6 +283,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const imageDragIndexRef = useRef<number | null>(null);
   const [geminiModalImage, setGeminiModalImage] = useState<string | null>(null);
   const [showGeminiEditModal, setShowGeminiEditModal] = useState(false);
+  const [regionEditImageUrl, setRegionEditImageUrl] = useState<string | null>(null);
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -978,12 +980,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, []);
 
   const handleSendMessage = useCallback(async () => {
-    console.log('🎯 handleSendMessage CALLED');
-    console.log('Input:', input);
-    console.log('UserId:', userId);
-
     if (!input.trim() && attachedImages.length === 0) {
-      console.log('❌ No input or images, returning');
       return;
     }
     if (!userId) {
@@ -1088,7 +1085,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       if (canUseCache) {
         const cachedResponse = getCachedResponse(userInput, selectedAgent, workspaceId);
         if (cachedResponse) {
-          console.log('🎯 Cache hit for query:', userInput);
           data = {
             text: cachedResponse.text,
             agentId: cachedResponse.agentId,
@@ -1128,9 +1124,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-
-        console.log('🚀 STARTING FETCH TO:', `${supabaseUrl}/functions/v1/agent-chat`);
-        console.log('🚀 REQUEST BODY:', requestBody);
 
         // Create AbortController to prevent premature cancellation
         const abortController = new AbortController();
@@ -3028,15 +3021,98 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       )}
 
-      {/* Gemini Edit Modal — structured category-driven image edit prompt builder */}
+      {/* Gemini Edit Modal — 3-step structured image edit */}
       <GeminiEditModal
         isOpen={showGeminiEditModal}
         onClose={() => setShowGeminiEditModal(false)}
-        onGenerate={(params: GeminiEditParams) => {
-          setInput(params.prompt);
-          // mode already set to 'image-edit' when the button was clicked
+        onApply={(params) => {
+          if (params.regionEdit) {
+            // Use the image the user clicked Edit on, falling back to last generated then attached
+            const lastGenerated = [...messages].reverse().find(m => m.geminiImageData?.image_url)?.geminiImageData?.image_url ?? null;
+            const targetImage = geminiModalImage ?? lastGenerated ?? attachedImages[0] ?? null;
+            if (!targetImage) {
+              toast({ title: 'No image to edit', description: 'Generate or attach a room image first, then use Region Edit.' });
+              return;
+            }
+            setRegionEditImageUrl(targetImage);
+            return;
+          }
+          // Direct submit: set input + modelTier indicator, then auto-send
+          setSelectedGenerationMode('image-edit');
+          // Encode model tier as a prefix the agent strips — generation-tools reads forcedMode from UI chip
+          const tierPrefix = params.modelTier !== 'fast' ? `[model:${params.modelTier}] ` : '';
+          setInput(tierPrefix + params.prompt);
+          // Auto-submit after React state settles
+          setTimeout(() => { handleSendMessageRef.current(); }, 100);
         }}
       />
+
+      {/* Region Edit Canvas — full-screen mask painter */}
+      {regionEditImageUrl && (
+        <RegionEditCanvas
+          imageUrl={regionEditImageUrl}
+          onClose={() => setRegionEditImageUrl(null)}
+          onApply={async (result: RegionEditResult) => {
+            // Canvas stays open (applying=true) until this Promise resolves
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              toast({ title: 'Not authenticated', variant: 'destructive' });
+              return;
+            }
+            const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+
+            try {
+              const res = await fetch(`${supabaseUrl}/functions/v1/generate-region-edit`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  image_url: result.imageUrl,
+                  mask_data_url: result.maskDataUrl,
+                  prompt: result.prompt,
+                  workspace_id: session.user?.user_metadata?.workspace_id,
+                }),
+              });
+
+              const data = await res.json();
+              if (!data.success) {
+                // Keep canvas open so user can retry or adjust
+                toast({
+                  title: data.insufficient_credits ? 'Insufficient credits' : 'Region edit failed',
+                  description: data.insufficient_credits
+                    ? 'Not enough credits — 20 required.'
+                    : data.error ?? 'Unknown error',
+                  variant: 'destructive',
+                });
+                return;
+              }
+
+              // Success — close canvas and emit result into chat
+              setRegionEditImageUrl(null);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `msg-${Date.now()}`,
+                  role: 'assistant' as const,
+                  content: 'Region edit applied.',
+                  timestamp: new Date(),
+                  geminiImageData: {
+                    image_url: data.image_url,
+                    mode: 'image-edit',
+                    model: data.model,
+                    job_id: data.job_id,
+                    credits_used: data.credits_used,
+                  },
+                },
+              ]);
+            } catch (err) {
+              toast({ title: 'Region edit failed', description: String(err), variant: 'destructive' });
+            }
+          }}
+        />
+      )}
 
       {/* Material Matching Modal */}
       {showMaterialModal && selectedMaterialsData && (

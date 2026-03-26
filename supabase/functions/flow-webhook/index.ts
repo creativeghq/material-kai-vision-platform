@@ -22,6 +22,23 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', crypto.getRandomValues(new Uint8Array(32)),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const [sigA, sigB] = await Promise.all([
+    crypto.subtle.sign('HMAC', key, enc.encode(a)),
+    crypto.subtle.sign('HMAC', key, enc.encode(b)),
+  ]);
+  const arrA = new Uint8Array(sigA);
+  const arrB = new Uint8Array(sigB);
+  let diff = 0;
+  for (let i = 0; i < arrA.length; i++) diff |= arrA[i] ^ arrB[i];
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -70,7 +87,7 @@ Deno.serve(async (req) => {
     const configSecret = (flow.trigger_config as Record<string, unknown>)?.secret;
     if (configSecret) {
       const headerSecret = req.headers.get('X-Webhook-Secret') || req.headers.get('x-webhook-secret');
-      if (headerSecret !== configSecret) {
+      if (!headerSecret || !await timingSafeEqual(headerSecret, configSecret as string)) {
         return jsonResponse({ success: false, error: 'Invalid webhook secret' }, 401);
       }
     }

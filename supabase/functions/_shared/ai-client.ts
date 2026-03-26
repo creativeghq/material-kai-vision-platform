@@ -17,6 +17,7 @@ const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 const KLINGAI_ACCESS_KEY = Deno.env.get('KLINGAI_ACCESS_KEY') || '';
 const KLINGAI_SECRET_KEY = Deno.env.get('KLINGAI_SECRET_KEY') || '';
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY') || '';
 
 // Polyfill process.env for npm packages that read it
 (globalThis as any).process = {
@@ -27,6 +28,7 @@ const KLINGAI_SECRET_KEY = Deno.env.get('KLINGAI_SECRET_KEY') || '';
     ANTHROPIC_API_KEY: ANTHROPIC_API_KEY,
     KLINGAI_ACCESS_KEY,
     KLINGAI_SECRET_KEY,
+    XAI_API_KEY,
   },
 };
 
@@ -547,6 +549,105 @@ export async function generateVideoWithKling(
     mimeType: (video as any).mimeType ?? 'video/mp4',
     model: modelId,
   };
+}
+
+// ── Grok (xAI Aurora): Image generation + editing ──────────────────────────
+
+export const GROK_IMAGE_MODEL = 'grok-2-image-1212';
+
+export interface GrokImageResult {
+  base64: string;
+  mimeType: string;
+  model: string;
+}
+
+/**
+ * Generate an image from a text prompt using xAI's Aurora model.
+ * Uses the OpenAI-compatible /v1/images/generations endpoint.
+ */
+export async function generateImageWithGrok(
+  prompt: string,
+  config?: { model?: string },
+): Promise<GrokImageResult> {
+  if (!XAI_API_KEY) throw new Error('XAI_API_KEY not set');
+
+  const modelId = config?.model ?? GROK_IMAGE_MODEL;
+
+  const response = await fetch('https://api.x.ai/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${XAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      prompt,
+      n: 1,
+      response_format: 'b64_json',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Grok image generation failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('Grok: no image in generation response');
+
+  return { base64: b64, mimeType: 'image/png', model: modelId };
+}
+
+/**
+ * Edit an existing image using xAI's Aurora model.
+ * Supports optional binary mask for region-specific inpainting:
+ *   - maskBytes: PNG where white pixels (255) = regenerate, black (0) = keep
+ * Without a mask, Aurora edits the full image guided by the prompt.
+ * Uses multipart/form-data as required by /v1/images/edits.
+ */
+export async function editImageWithGrok(
+  prompt: string,
+  imageBytes: Uint8Array,
+  config?: {
+    model?: string;
+    /** Binary PNG mask: white = change, black = keep unchanged */
+    maskBytes?: Uint8Array;
+    imageMimeType?: string;
+  },
+): Promise<GrokImageResult> {
+  if (!XAI_API_KEY) throw new Error('XAI_API_KEY not set');
+
+  const modelId = config?.model ?? GROK_IMAGE_MODEL;
+  const mimeType = config?.imageMimeType ?? 'image/jpeg';
+
+  const form = new FormData();
+  form.append('model', modelId);
+  form.append('prompt', prompt);
+  form.append('n', '1');
+  form.append('response_format', 'b64_json');
+  form.append('image', new Blob([imageBytes], { type: mimeType }), 'image.jpg');
+
+  if (config?.maskBytes) {
+    form.append('mask', new Blob([config.maskBytes], { type: 'image/png' }), 'mask.png');
+  }
+
+  const response = await fetch('https://api.x.ai/v1/images/edits', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${XAI_API_KEY}` },
+    body: form,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Grok image edit failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('Grok: no image in edit response');
+
+  return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
 // ── Re-exports for convenience ──

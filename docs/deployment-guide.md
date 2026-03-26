@@ -47,6 +47,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VITE_WS_URL` | Public | Production, Preview | WebSocket URL for real-time features | `wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1` |
 | `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
 | `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Public | Production, Preview | Stripe price ID for Enterprise subscription | `price_...` |
+| `VITE_MIVAA_API_KEY` | **Secret** | Production, Preview | MIVAA API authentication key for frontend requests | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `NODE_ENV` | Public | Production | Node environment | `production` |
 | `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
 
@@ -95,18 +96,46 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `CHANDRA_MAX_RESUME_RETRIES` | Public | Server ENV | Maximum retry attempts for resuming endpoint | `3` (default) |
 | `CHANDRA_RESUME_TIMEOUT` | Public | Server ENV | Timeout in seconds for endpoint resume operation | `300` (default, 5 minutes) |
 | `CHANDRA_INFERENCE_TIMEOUT` | Public | Server ENV | Timeout in seconds for OCR inference calls | `30` (default) |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | HuggingFace token used by the backend deployment workflow — same value as `HF_TOKEN`, set in GitHub repo secrets | `hf_xxxxxxxxxxxxxxxx` |
+| `REDIS_URL` | Public | Server ENV | Redis connection URL for embedding cache (optional — disables cache if not set) | `redis://localhost:6379` or `redis://your-redis-host:6379` |
+| `ADMIN_RESTART_TOKEN` | **Secret** | Server ENV | Auth token for the `/api/admin/restart` endpoint — required to authenticate server restart requests from the agent | `your-secure-restart-token` |
+
+### **YOLO DocParser Inference Endpoint**
+
+| Secret Name | Type | Where Set | Description | Default |
+|------------|------|-----------|-------------|---------|
+| `YOLO_ENABLED` | Public | Server ENV | Enable YOLO document layout parser | `false` |
+| `YOLO_ENDPOINT_URL` | Public | Server ENV | YOLO HuggingFace Inference Endpoint URL | *(required if YOLO_ENABLED=true)* |
+| `YOLO_ENDPOINT_NAME` | Public | Server ENV | YOLO endpoint service name for pause/resume | *(required if YOLO_ENABLED=true)* |
+| `YOLO_NAMESPACE` | Public | Server ENV | HuggingFace namespace for YOLO endpoint | `basiliskan` |
+| `YOLO_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for layout detection | `0.5` |
+| `YOLO_AUTO_PAUSE_TIMEOUT` | Public | Server ENV | Seconds idle before auto-pausing endpoint | `60` |
+| `YOLO_MAX_RESUME_RETRIES` | Public | Server ENV | Max retry attempts for resuming endpoint | `3` |
+| `YOLO_RESUME_TIMEOUT` | Public | Server ENV | Timeout for resume operation (seconds) | `300` |
+| `YOLO_INFERENCE_TIMEOUT` | Public | Server ENV | Timeout for inference calls (seconds) | `30` |
+| `YOLO_WARMUP_TIMEOUT` | Public | Server ENV | Timeout for initial endpoint warmup (seconds) | `60` |
 
 ### **AI Service API Keys**
 
 | Service | Secret Name | Where Used | How to Get | Pricing |
 |---------|------------|------------|------------|---------|
-| **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
+| **OpenAI** | `OPENAI_API_KEY` | Backend, Edge Functions | https://platform.openai.com/api-keys | Pay-per-use |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Backend, Edge Functions | https://console.anthropic.com/ | Pay-per-use |
-| **Google Gemini** | `GOOGLE_GENERATIVE_AI_API_KEY` | Edge Functions (SEO pipeline) | https://aistudio.google.com/apikey | Pay-per-use |
-| **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
+| **Google Gemini (AI SDK)** | `GOOGLE_GENERATIVE_AI_API_KEY` | Edge Functions (SEO, interior design, floor plan) | https://aistudio.google.com/apikey | Pay-per-use |
+| **Google Imagen 3 (REST)** | `GEMINI_API_KEY` | Edge Functions (`generate-social-image`) | https://aistudio.google.com/apikey | Pay-per-use — same key, different env var name for REST API calls |
+| **Voyage AI** | `VOYAGE_API_KEY` | Backend, Edge Functions | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
 | **DataForSEO** | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Edge Functions (SEO pipeline) | https://app.dataforseo.com/ → API Settings | Pay-per-task |
-| **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
-| **HuggingFace** | `QWEN_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Inference Endpoints (auto-pause enabled) |
+| **Replicate** | `REPLICATE_API_TOKEN` | Edge Functions (`generate-interior-gemini`) | https://replicate.com/account/api-tokens | Pay-per-use |
+| **Replicate** | `REPLICATE_API_KEY` | Edge Functions (`generate-interior-video-v2`, `generate-social-image`, `generate-social-video`) | https://replicate.com/account/api-tokens | Same token as `REPLICATE_API_TOKEN` — set both to the same value |
+| **xAI / Aurora** | `XAI_API_KEY` | Edge Functions (`generate-social-image`) | https://console.x.ai/ | Pay-per-use — for Aurora image generation |
+| **Kling AI** | `KLINGAI_ACCESS_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
+| **Kling AI** | `KLINGAI_SECRET_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
+| **Later.com** | `LATE_API_KEY` | Edge Functions (`late-analytics`, `late-oauth`, `late-publish`, social background agents) | https://app.later.com/ → Settings → API | Social media scheduling |
+| **Later.com** | `LATE_WEBHOOK_SECRET` | Edge Functions (`late-webhook-handler`) | Later.com webhook settings | HMAC-SHA256 signature verification |
+| **HuggingFace** | `HF_TOKEN` | Backend (Chandra, YOLO endpoint management) | https://huggingface.co/settings/tokens — needs **write** permission | Inference Endpoints pause/resume — auto-pause enabled |
+| **HuggingFace** | `QWEN_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Can be same token as `HF_TOKEN` |
+| **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | Set as GitHub repo secret — same value as `HF_TOKEN` |
+| **HuggingFace** | `HUGGINGFACE_API_KEY` | Edge Functions (`health-check`) | https://huggingface.co/settings/tokens | Health status checks — same token, different name |
 
 ### **HuggingFace Inference Endpoints Configuration**
 
@@ -246,7 +275,10 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 | `STRIPE_ENTERPRISE_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Enterprise subscription | `price_...` |
 | `MIVAA_GATEWAY_URL` | Public | `agent-chat`, `_shared/embedding-utils.ts` | MIVAA gateway URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
 | `MIVAA_SERVICE_URL` | Public | `agent-chat`, `scrape-session-manager` | MIVAA service URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
+| `MIVAA_LOCAL_URL` | Public | `mivaa-gateway` | Local MIVAA service URL used by the gateway proxy (default: `http://127.0.0.1:8000`) | `http://127.0.0.1:8000` |
 | `MIVAA_API_KEY` | **Secret** | `scrape-session-manager`, `agent-chat`, `_shared/config.ts`, `_shared/embedding-utils.ts` | MIVAA API authentication | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `APP_URL` | Public | `crm-stripe-api` | Frontend app URL used for Stripe checkout redirect URLs | `https://app.materialkai.com` |
+| `OPENAI_API_KEY` | **Secret** | `ai-rerank` and other edge functions | OpenAI API key (also needed in some edge functions, not just backend) | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `SENTRY_AUTH_TOKEN` | **Secret** | `_shared/sentry.ts` | Sentry API token for error queries | `sntrys_xxxxxxxxxxxxxxxx` |
 
 #### **Email & Messaging Secrets**
@@ -295,11 +327,37 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 - Auto-fix: 5 credits per iteration (Gemini 3 Flash: ~10K in/8K out ~$0.03 raw)
 - **Total per article: 42 credits (no fix) — 57 credits (max 3 fixes)**
 
+#### **Video & Image Generation**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `REPLICATE_API_TOKEN` | **Secret** | `generate-interior-gemini` | Replicate API token for image generation models | `r8_xxxxxxxxxxxxxxxx` |
+| `REPLICATE_API_KEY` | **Secret** | `generate-interior-video-v2`, `generate-social-image`, `generate-social-video` | Replicate API key (same value as `REPLICATE_API_TOKEN` — set both identically) | `r8_xxxxxxxxxxxxxxxx` |
+| `KLINGAI_ACCESS_KEY` | **Secret** | `_shared/ai-client.ts` (video generation) | Kling AI native SDK access key for kling-v3.0 video model | Obtained from https://platform.kling.ai/ |
+| `KLINGAI_SECRET_KEY` | **Secret** | `_shared/ai-client.ts` (video generation) | Kling AI native SDK secret key | Obtained from https://platform.kling.ai/ |
+| `XAI_API_KEY` | **Secret** | `generate-social-image` | xAI Aurora image generation API key | Obtained from https://console.x.ai/ |
+| `GEMINI_API_KEY` | **Secret** | `generate-social-image` | Google Imagen 3 via REST API (`v1beta` endpoint) — same Google AI key as `GOOGLE_GENERATIVE_AI_API_KEY`, set both identically | `AIzaSyxxxxxxxxxxxxxxxx` |
+
+> **Note on Replicate key naming**: `REPLICATE_API_TOKEN` and `REPLICATE_API_KEY` refer to the same Replicate account token. Different edge functions use different variable names due to historical reasons — set both to the same value.
+
 #### **VR World Generation**
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
 | `WORLDLABS_API_KEY` | **Secret** | `generate-vr-world` | WorldLabs Marble API key for 3D Gaussian Splat world generation | `wl_xxxxxxxxxxxxxxxx` |
+
+#### **Social Media (Later.com)**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `LATE_API_KEY` | **Secret** | `late-analytics`, `late-oauth`, `late-publish`, social background agents | Later.com API key for social media scheduling & analytics | Obtained from https://app.later.com/ → Settings → API |
+| `LATE_WEBHOOK_SECRET` | **Secret** | `late-webhook-handler` | Later.com webhook signing secret for HMAC-SHA256 verification | Set in Later.com webhook configuration |
+
+#### **HuggingFace (Edge Functions)**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `HUGGINGFACE_API_KEY` | **Secret** | `health-check` | HuggingFace API token used to check endpoint health status | `hf_xxxxxxxxxxxxxxxx` — same token as backend `HF_TOKEN`, set both identically |
 
 #### **Push Notifications (Web Push)**
 

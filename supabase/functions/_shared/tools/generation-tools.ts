@@ -231,8 +231,17 @@ export const createGeminiGenerationTool = (
   forcedMode?: string, // Explicit mode override from UI chip selection
 ) => {
   return tool(
-    async ({ prompt, roomType, style, mode, referenceImageUrl, modelTier, materialImages, sqm, boardMode }) => {
+    async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, modelTier: agentModelTier, materialImages, sqm, boardMode }) => {
       try {
+        // Strip [model:grok] or [model:pro] prefix injected by the edit modal for auto-submit
+        // The prefix encodes the model tier chosen by the user without going through the agent.
+        let prompt = rawPrompt;
+        let modelTier = agentModelTier;
+        const modelPrefixMatch = rawPrompt?.match(/^\[model:(fast|pro|grok)\]\s*/);
+        if (modelPrefixMatch) {
+          modelTier = modelPrefixMatch[1] as 'fast' | 'pro' | 'grok';
+          prompt = rawPrompt.slice(modelPrefixMatch[0].length);
+        }
 
         // Helper: upload a data URL to Supabase storage, return public URL.
         // Images should already be uploaded by the frontend — this is a last-resort fallback.
@@ -394,7 +403,7 @@ export const createGeminiGenerationTool = (
           room_type: roomType,
           style,
           sqm,
-          model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast'),
+          model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok',
           user_id: userId,
           workspace_id: workspaceId,
           // Mode-specific image fields
@@ -528,7 +537,7 @@ Mode routing (auto-detected if not set explicitly):
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
         mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
-        modelTier: z.enum(['fast', 'pro']).optional().describe('fast=default quality (6-8 credits), pro=maximum quality (15 credits). Use pro when user requests maximum quality or 4K. materials-selection-board always uses pro.'),
+        modelTier: z.enum(['fast', 'pro', 'grok']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
         sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
         boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),

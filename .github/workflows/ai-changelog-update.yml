@@ -16,13 +16,13 @@ jobs:
     
     steps:
       - name: 🔍 Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
 
       - name: 📋 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '18'
 
@@ -45,25 +45,30 @@ jobs:
           node .github/scripts/ai-pr-analyzer.js
 
       - name: 📝 Commit changelog updates
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "Material Kai Vision Platform Bot"
-          
+
           if git diff --quiet docs/changes-log.md; then
             echo "ℹ️ No changes to commit to changelog"
           else
             git add docs/changes-log.md
-            git commit -m "🤖 AI-generated changelog update for PR #${{ github.event.pull_request.number }}
+            git commit -m "🤖 AI-generated changelog update for PR #${PR_NUMBER}
 
             Automatically analyzed and categorized changes using OpenAI
-            
+
             📋 PR Details:
-            - Title: ${{ github.event.pull_request.title }}
-            - Author: ${{ github.event.pull_request.user.login }}
-            - URL: ${{ github.event.pull_request.html_url }}
-            
+            - Title: ${PR_TITLE}
+            - Author: ${PR_AUTHOR}
+            - URL: ${PR_URL}
+
             [skip ci]"
             git push
-            
+
             echo "✅ Changelog updated successfully"
           fi

@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -973,7 +974,7 @@ function ArticleContent({ markdown, html }: { markdown: string | null; html: str
       {html ? (
         <div
           className="prose prose-sm dark:prose-invert max-w-none border rounded-lg p-4 max-h-[600px] overflow-y-auto"
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
         />
       ) : (
         <pre className="text-sm whitespace-pre-wrap border rounded-lg p-4 max-h-[600px] overflow-y-auto bg-muted/30">

@@ -19,6 +19,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   generateImageWithGemini,
+  editImageWithGrok,
   type GeminiImageModel,
   type ImageAspectRatio,
 } from '../_shared/ai-client.ts';
@@ -331,6 +332,7 @@ const CREDIT_COSTS: Record<string, number> = {
   'gemini-3.1-flash-image-preview': 6,
   'gemini-3-pro-image-preview': 15,
   'flux-depth-pro': 20,
+  'grok-aurora': 15,
 };
 
 type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board';
@@ -344,7 +346,7 @@ interface GenerateInteriorRequest {
   style?: string;
   sqm?: number;
   aspect_ratio?: ImageAspectRatio;
-  model_tier?: 'fast' | 'pro';
+  model_tier?: 'fast' | 'pro' | 'grok';
   // Material references (multi-reference generation)
   material_images?: string[]; // up to 14 catalog product image URLs
   // Image edit / floor plan render
@@ -523,15 +525,20 @@ Deno.serve(async (req) => {
   }
 
   const jobId = crypto.randomUUID();
+  const useGrok = body.model_tier === 'grok';
   const model: GeminiImageModel =
     body.model_tier === 'pro'
       ? 'gemini-3-pro-image-preview'
       : 'gemini-3.1-flash-image-preview';
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
-  const isFluxMode = mode === 'redesign' || mode === 'copy-style';
-  const credits = isFluxMode ? CREDIT_COSTS['flux-depth-pro'] : CREDIT_COSTS[model];
-  const modelLabel = isFluxMode ? 'flux-depth-pro' : model;
+  const isFluxMode = (mode === 'redesign') || (mode === 'copy-style' && !useGrok);
+  const credits = isFluxMode
+    ? CREDIT_COSTS['flux-depth-pro']
+    : useGrok
+    ? CREDIT_COSTS['grok-aurora']
+    : CREDIT_COSTS[model];
+  const modelLabel = isFluxMode ? 'flux-depth-pro' : useGrok ? 'grok-aurora' : model;
 
   try {
     // Fail fast before spending 20-30s on generation
@@ -568,20 +575,39 @@ Deno.serve(async (req) => {
       }
 
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
+      const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room with updated materials and finishes';
 
-      if (body.style_reference_url) {
-        // Two-step style-transfer pipeline:
-        //   Step 1 — Vision: send inspiration image to Gemini text model → extract precise design spec (text)
-        //   Step 2 — Edit:   send room image + text spec to image model → cosmetic renovation
-        // The inspiration image never reaches the image generator → zero spatial bleed.
+      if (useGrok) {
+        // Grok Aurora edit — sends image directly, superior spatial accuracy
+        const grokPrompt = `You are making a targeted edit to this interior design photo.
+
+INSTRUCTION: "${instruction}"
+
+SPATIAL RULES — never break these:
+- Every fixed element stays in its exact position: sink, vanity, toilet, shower, bath, doors, windows, niches, alcoves, built-ins.
+- Room dimensions, wall positions, ceiling height, and all architectural structure are unchanged.
+- Camera angle and perspective match the reference photo exactly.
+
+DESIGN CHANGES to apply exactly as instructed:
+- Update all surface materials as described (floor, walls, ceiling).
+- Update fixture finishes: taps, rails, handles, mirrors — keep position, change finish as instructed.
+- Update furniture and vanity: keep placement, update color/material/finish.
+- Update lighting: keep fixture positions, change style or temperature as instructed.
+
+OUTPUT: Photorealistic professional interior photography. Ultra-realistic textures, accurate reflections. 24mm architectural lens, corrected verticals, no fisheye.`;
+
+        const result = await editImageWithGrok(grokPrompt, sourceBuffer);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      } else if (body.style_reference_url) {
+        // Two-step style-transfer (Gemini):
+        //   Step 1 — Vision: send inspiration to Gemini text model → extract design spec
+        //   Step 2 — Edit: send room image + text spec → cosmetic renovation, zero spatial bleed
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         let applyPrompt: string;
         try {
           const designSpec = await extractDesignSpec(styleBuffer, body.style);
-          console.log('[generate-interior-gemini] Design spec extracted, length:', designSpec.length);
           applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
         } catch (specErr) {
-          // Fallback: use user instruction directly without spec extraction
           console.warn('[generate-interior-gemini] Spec extraction failed, using fallback:', specErr);
           applyPrompt = buildApplySpecPrompt(
             `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
@@ -594,7 +620,7 @@ Deno.serve(async (req) => {
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
       } else {
-        const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room with updated materials and finishes';
+        // Gemini direct edit
         const editText = `You are redesigning the interior shown in the reference photo.
 
 INSTRUCTION: "${instruction}"
@@ -638,11 +664,12 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
     }
 
-    // ── Mode 4: copy-style — Gemini Vision spec + Flux Depth Pro ──────────
-    // Step 1: Gemini Vision reads inspiration image → structured text spec
-    // Step 2: Flux Depth Pro applies that spec to the room (depth-locked)
-    // The inspiration image NEVER reaches Flux → zero spatial bleed.
-    // Fallback: If Flux fails, apply spec via Gemini image-edit (single image, no spatial bleed).
+    // ── Mode 4: copy-style ─────────────────────────────────────────────────
+    // Grok path (1-step): both images sent directly — Aurora natively understands
+    //   "take the style from image 1, apply it to the room in image 2".
+    //   Eliminates spec extraction delay and hallucination risk.
+    // Gemini+Flux path (2-step): Gemini Vision extracts spec → Flux Depth Pro applies
+    //   it depth-locked to the room. Inspiration never reaches Flux → zero spatial bleed.
     else if (mode === 'copy-style') {
       if (!body.reference_image_url) {
         return jsonResponse({ success: false, error: 'reference_image_url required for copy-style mode' }, 400);
@@ -651,53 +678,74 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
         return jsonResponse({ success: false, error: 'style_reference_url (inspiration image) required for copy-style mode' }, 400);
       }
 
-      // Step 1 — extract design spec from inspiration image
-      // Keep designSpec in outer scope so the Flux fallback can reuse it
-      const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
-      let fluxPrompt: string;
-      let designSpec: string | null = null;
-      try {
-        designSpec = await extractDesignSpec(inspirationBuffer, body.style);
-        console.log('[generate-interior-gemini] Copy-style spec extracted, length:', designSpec.length);
-        fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
-      } catch (specErr) {
-        console.warn('[generate-interior-gemini] Spec extraction failed for copy-style, using fallback:', specErr);
-        fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
-      }
-
-      // Step 2 — Flux Depth Pro (primary): depth-locks room structure, applies spec as text prompt.
-      // Flux uses the public room image URL directly — no buffer transfer needed.
-      // This path completes in ~15-25s total (spec extraction + Flux), well within any timeout.
-      console.log('[copy-style] Calling Flux Depth Pro (primary)...');
-      try {
-        const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
-        if (!replicateUrl) throw new Error('Flux returned empty output URL');
-        console.log('[copy-style] Flux succeeded, downloading from:', replicateUrl);
-        const imgBuffer = await fetchImageBuffer(replicateUrl);
-        imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
-        console.log('[copy-style] Flux primary succeeded.');
-      } catch (fluxErr) {
-        // Flux failed — fall back to Gemini single-image spec edit
-        console.warn('[copy-style] Flux failed:', String(fluxErr));
-        console.log('[copy-style] Falling back to Gemini spec-based edit...');
+      if (useGrok) {
+        // Grok 1-step: inspiration + room → apply style directly
+        // Aurora handles multi-image context natively via the edits endpoint
         const roomBuffer = await fetchImageBuffer(body.reference_image_url);
-        if (designSpec) {
-          const applyPrompt = buildCopyStyleApplyPrompt(designSpec, body.prompt);
-          const result = await generateImageWithGemini(
-            { text: applyPrompt, images: [roomBuffer] },
-            { model, aspectRatio },
-          );
-          imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
-          console.log('[copy-style] Gemini spec fallback succeeded.');
-        } else {
-          // No spec and no Flux — dual-image Gemini last resort
-          const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
-          const result = await generateImageWithGemini(
-            { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
-            { model, aspectRatio },
-          );
-          imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
-          console.log('[copy-style] Dual-image Gemini last-resort succeeded.');
+        const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
+
+        // Encode inspiration as base64 data URL for embedding in the prompt
+        const inspirationB64 = toBase64(inspirationBuffer);
+        const grokCopyStylePrompt = `You are performing a style transfer on an interior room.
+
+The INSPIRATION IMAGE (provided as context below) shows a reference interior design aesthetic.
+The ROOM IMAGE (attached) is the room to redesign.
+
+TASK: Apply the complete aesthetic from the inspiration image to the room:
+- Extract: wall finish, color, tile pattern and size, floor material, fixture style, hardware finishes, lighting mood, color palette.
+- Apply ALL of these to the room image exactly. Every surface must be updated.
+
+STRUCTURAL LOCK — never change:
+- Room dimensions, wall positions, door and window openings, camera angle, perspective.
+- All fixture positions stay in their zones (sink zone, toilet zone, bathing/seating area).
+
+SURFACE COVERAGE — critical:
+- Every wall surface covered floor-to-ceiling, edge-to-edge with the specified wall material. Zero original wall visible.
+- Floor material covers the entire floor plane without gaps.
+${body.prompt ? `\nADDITIONAL INSTRUCTION: ${body.prompt}` : ''}
+
+INSPIRATION IMAGE (base64): data:image/jpeg;base64,${inspirationB64}
+
+OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected verticals, ultra-realistic textures.`;
+
+        const result = await editImageWithGrok(grokCopyStylePrompt, roomBuffer);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      } else {
+        // Gemini + Flux 2-step pipeline (primary for non-grok)
+        const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
+        let fluxPrompt: string;
+        let designSpec: string | null = null;
+        try {
+          designSpec = await extractDesignSpec(inspirationBuffer, body.style);
+          fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
+        } catch (specErr) {
+          console.warn('[copy-style] Spec extraction failed, using fallback:', specErr);
+          fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
+        }
+
+        try {
+          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+          if (!replicateUrl) throw new Error('Flux returned empty output URL');
+          const imgBuffer = await fetchImageBuffer(replicateUrl);
+          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
+        } catch (fluxErr) {
+          console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
+          const roomBuffer = await fetchImageBuffer(body.reference_image_url);
+          if (designSpec) {
+            const applyPrompt = buildCopyStyleApplyPrompt(designSpec, body.prompt);
+            const result = await generateImageWithGemini(
+              { text: applyPrompt, images: [roomBuffer] },
+              { model, aspectRatio },
+            );
+            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+          } else {
+            const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+            const result = await generateImageWithGemini(
+              { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
+              { model, aspectRatio },
+            );
+            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+          }
         }
       }
     }
