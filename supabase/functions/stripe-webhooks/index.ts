@@ -3,11 +3,16 @@ import Stripe from 'https://esm.sh/stripe@14.10.0';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
-const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
+
+// These must be set — fail loud at startup rather than silently accepting
+// unsigned webhooks (which would allow anyone to forge payment events).
+const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+if (!stripeSecretKey)    throw new Error('STRIPE_SECRET_KEY env var is required');
+if (!stripeWebhookSecret) throw new Error('STRIPE_WEBHOOK_SECRET env var is required');
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const stripe = new Stripe(stripeSecretKey, {
+const stripe = new Stripe(stripeSecretKey!, {
   apiVersion: '2023-10-16',
   httpClient: Stripe.createFetchHttpClient(),
 });

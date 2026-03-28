@@ -96,13 +96,84 @@ Scheduled price monitoring from competitor sources.
 - **Features:** Automated price checks, alerts, history tracking
 - **Access:** Cron secret (scheduled)
 
+#### [Flow Engine API](./flow-engine-api.md)
+Visual workflow automation — execute, test, and event-trigger flows.
+- **Function:** `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
+- **Features:** Execute/test flows, cron scheduling, webhook triggers, template variable resolution
+- **Access:** Authenticated users
+
+### AI Generation APIs
+
+#### [Interior Video Generation API](./generate-interior-video-v2-api.md)
+Multi-model AI video generation for interior design.
+- **Function:** `generate-interior-video-v2`, `generate-social-video`
+- **Features:** Veo-2, Kling v3.0, Wan 2.1, Runway Gen4 — auto-routed by video type, async polling
+- **Credits:** 12–40 per video
+- **Access:** Authenticated users
+
+#### [Virtual Staging API](./generate-virtual-staging-api.md)
+Transform empty room photos into furnished renders.
+- **Function:** `generate-virtual-staging`
+- **Features:** 8 room types, 8 furniture styles, Replicate proplabs model
+- **Credits:** 20 per generation
+- **Access:** Authenticated users
+
+#### [Gemini Interior Generation API](./generate-interior-gemini-api.md)
+Gemini-powered interior image generation with 4 modes.
+- **Function:** `generate-interior-gemini`
+- **Features:** text-to-image, image-edit, floor-plan-render, floor-plan-text; two-step style-transfer pipeline
+- **Credits:** 6 (flash) or 15 (pro) per generation
+- **Access:** Authenticated users
+
+#### [Region Edit API](./generate-region-edit-api.md)
+Masked inpainting — regenerate a painted zone in a room image.
+- **Function:** `generate-region-edit`
+- **Features:** Grok Aurora inpainting with binary mask, SAM 2 mask generation, Pillow fallback
+- **Credits:** 20 per call
+- **Access:** Authenticated users
+
+#### [AI Re-rank API](./ai-rerank-api.md)
+Claude-powered search result re-ordering for improved relevance.
+- **Function:** `ai-rerank`
+- **Features:** Semantic re-ranking, optional explanations, sonnet/haiku model choice
+- **Access:** Authenticated users
+
+### Social Media APIs
+
+#### [Late.dev Social API](./late-social-api.md)
+Social media OAuth, publishing, analytics, and content generation.
+- **Functions:** `late-oauth`, `late-publish`, `late-analytics`, `generate-social-content`, `generate-social-image`, `generate-social-video`
+- **Features:** 8 platforms, publish/schedule, engagement sync, AI caption/image/video generation
+- **Credits:** 2–30 per generation; publishing uses Late.dev subscription
+- **Access:** Authenticated users
+
 ### Payment APIs
+
+#### [CRM Stripe API](./crm-stripe-api.md)
+Subscriptions and credit purchases via Stripe.
+- **Functions:** `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`
+- **Features:** Subscription checkout, credit packages, customer portal, balance queries
+- **Access:** Authenticated users
 
 #### [Stripe Webhooks API](./stripe-webhooks-api.md)
 Stripe webhook event handling for subscriptions and payments.
 - **Function:** `stripe-webhooks`
 - **Features:** Subscription management, payment processing, user tier updates
 - **Access:** Stripe signature verification
+
+### Background Processing APIs
+
+#### Background Agent Runner
+Universal executor for all background agent types.
+- **Function:** `background-agent-runner`
+- **Features:** Run agents by `agent_id`, catalog endpoint, chain/event/cron/manual triggers
+- **Access:** Authenticated users or service-role key
+- **Documentation:** [background-agents.md](../background-agents.md)
+
+#### SLIG Inference
+SigLIP2 visual embedding generation.
+- **Function:** See [slig-inference.md](./slig-inference.md)
+- **Access:** Internal / service-role
 
 ## Authentication
 

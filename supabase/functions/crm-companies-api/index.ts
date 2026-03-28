@@ -121,9 +121,10 @@ Deno.serve(async (req) => {
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
 
-      // Add search filter if provided
+      // Add search filter if provided — escape % and _ to prevent wildcard injection
       if (search) {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,website.ilike.%${search}%`);
+        const safeSearch = search.replace(/[%_\\]/g, '\\$&');
+        query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,website.ilike.%${safeSearch}%`);
       }
 
       const { data, error, count } = await query;

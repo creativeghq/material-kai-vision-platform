@@ -34,25 +34,25 @@ export const getConfig = (): EdgeFunctionConfig => {
   return {
     mivaaBaseUrl: Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr',
     mivaaApiKey: Deno.env.get('MIVAA_API_KEY'),
-    pdfProcessingTimeout: parseInt(Deno.env.get('PDF_PROCESSING_TIMEOUT') || '300000'), // 5 minutes
+    pdfProcessingTimeout: parseInt(Deno.env.get('PDF_PROCESSING_TIMEOUT') || '300000', 10), // 5 minutes
 
     rateLimits: {
-      healthCheck: parseInt(Deno.env.get('RATE_LIMIT_HEALTH_CHECK') || '60'),
-      pdfExtract: parseInt(Deno.env.get('RATE_LIMIT_PDF_EXTRACT') || '10'),
-      batchProcess: parseInt(Deno.env.get('RATE_LIMIT_BATCH_PROCESS') || '5'),
+      healthCheck: parseInt(Deno.env.get('RATE_LIMIT_HEALTH_CHECK') || '60', 10),
+      pdfExtract: parseInt(Deno.env.get('RATE_LIMIT_PDF_EXTRACT') || '10', 10),
+      batchProcess: parseInt(Deno.env.get('RATE_LIMIT_BATCH_PROCESS') || '5', 10),
     },
 
     processingLimits: {
-      maxBatchSize: parseInt(Deno.env.get('MAX_BATCH_SIZE') || '100'),
-      maxConcurrentProcessing: parseInt(Deno.env.get('MAX_CONCURRENT_PROCESSING') || '10'),
-      maxChunkSize: parseInt(Deno.env.get('MAX_CHUNK_SIZE') || '10000'),
-      maxOverlapSize: parseInt(Deno.env.get('MAX_OVERLAP_SIZE') || '1000'),
-      maxFileSize: parseInt(Deno.env.get('MAX_FILE_SIZE') || '104857600'), // 100MB
+      maxBatchSize: parseInt(Deno.env.get('MAX_BATCH_SIZE') || '100', 10),
+      maxConcurrentProcessing: parseInt(Deno.env.get('MAX_CONCURRENT_PROCESSING') || '10', 10),
+      maxChunkSize: parseInt(Deno.env.get('MAX_CHUNK_SIZE') || '10000', 10),
+      maxOverlapSize: parseInt(Deno.env.get('MAX_OVERLAP_SIZE') || '1000', 10),
+      maxFileSize: parseInt(Deno.env.get('MAX_FILE_SIZE') || '104857600', 10), // 100MB
     },
 
     database: {
-      connectionTimeout: parseInt(Deno.env.get('DB_CONNECTION_TIMEOUT') || '10000'),
-      queryTimeout: parseInt(Deno.env.get('DB_QUERY_TIMEOUT') || '30000'),
+      connectionTimeout: parseInt(Deno.env.get('DB_CONNECTION_TIMEOUT') || '10000', 10),
+      queryTimeout: parseInt(Deno.env.get('DB_QUERY_TIMEOUT') || '30000', 10),
     },
   };
 };

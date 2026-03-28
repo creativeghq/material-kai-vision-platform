@@ -40,70 +40,77 @@ export const useVoiceInput = (options: UseVoiceInputOptions = {}): UseVoiceInput
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Check if Web Speech API is supported
+  // Keep stable refs to callbacks so they can be called from event handlers
+  // without adding them to the effect dependency array.  Adding function props
+  // to the dep array would recreate the entire SpeechRecognition instance on
+  // every parent render (extremely expensive and breaks in-progress recordings).
+  const onTranscriptRef = useRef(onTranscript);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
+  // Instantiate (or re-instantiate) the recognition engine only when the
+  // configuration options change — not when callbacks change.
   useEffect(() => {
-    const SpeechRecognition =
+    const SpeechRecognitionCtor =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognition);
+    setIsSupported(!!SpeechRecognitionCtor);
 
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = continuous;
-      recognition.interimResults = interimResults;
-      recognition.lang = language;
+    if (!SpeechRecognitionCtor) return;
 
-      recognition.onstart = () => {
-        setIsRecording(true);
-        setError(null);
-      };
+    const recognition: SpeechRecognition = new SpeechRecognitionCtor();
+    recognition.continuous = continuous;
+    recognition.interimResults = interimResults;
+    recognition.lang = language;
 
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
+    recognition.onstart = () => {
+      setIsRecording(true);
+      setError(null);
+    };
 
-      recognition.onresult = (event: any) => {
-        let finalTranscript = '';
-        let interimText = '';
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          } else {
-            interimText += result[0].transcript;
-          }
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = '';
+      let interimText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        } else {
+          interimText += result[0].transcript;
         }
+      }
 
-        if (finalTranscript) {
-          setTranscript((prev) => prev + finalTranscript);
-          if (onTranscript) {
-            onTranscript(finalTranscript);
-          }
-        }
+      if (finalTranscript) {
+        setTranscript((prev) => prev + finalTranscript);
+        onTranscriptRef.current?.(finalTranscript);
+      }
 
-        setInterimTranscript(interimText);
-      };
+      setInterimTranscript(interimText);
+    };
 
-      recognition.onerror = (event: any) => {
-        const errorMessage = `Speech recognition error: ${event.error}`;
-        setError(errorMessage);
-        setIsRecording(false);
-        if (onError) {
-          onError(errorMessage);
-        }
-      };
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      const errorMessage = `Speech recognition error: ${event.error}`;
+      setError(errorMessage);
+      setIsRecording(false);
+      onErrorRef.current?.(errorMessage);
+    };
 
-      recognitionRef.current = recognition;
-    }
+    recognitionRef.current = recognition;
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      // abort() immediately stops recognition AND discards pending results,
+      // ensuring the engine is fully terminated before re-initialisation.
+      recognition.abort();
+      recognitionRef.current = null;
     };
-  }, [continuous, interimResults, language, onTranscript, onError]);
+  }, [continuous, interimResults, language]); // callbacks intentionally excluded — tracked via refs above
 
   const startRecording = useCallback(() => {
     if (!isSupported) {

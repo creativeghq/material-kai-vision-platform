@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Globe,
@@ -183,18 +183,21 @@ export const PublicProfilePage: React.FC = () => {
   const [hireMeOpen, setHireMeOpen] = useState(false);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | undefined>();
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  const loadIdRef = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
-    loadProfile();
-  }, [userId]);
+    const currentLoad = ++loadIdRef.current;
+    loadProfile(currentLoad);
+    // If userId changes mid-flight, the stale load will see currentLoad !== loadIdRef.current and bail
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openHireModal = (serviceId?: string) => {
     setPreselectedServiceId(serviceId);
     setHireMeOpen(true);
   };
 
-  const loadProfile = async () => {
+  const loadProfile = async (loadId: number) => {
     setLoading(true);
     try {
       const { data: profileData, error: profileError } = await supabase
@@ -295,13 +298,14 @@ export const PublicProfilePage: React.FC = () => {
             return { ...mb, preview_url };
           })
         );
-        setMoodboards(enriched);
+        // Discard result if a newer load has started (userId changed mid-flight)
+        if (loadId === loadIdRef.current) setMoodboards(enriched);
       }
     } catch (err) {
       console.error('Error loading public profile:', err);
-      setNotFound(true);
+      if (loadId === loadIdRef.current) setNotFound(true);
     } finally {
-      setLoading(false);
+      if (loadId === loadIdRef.current) setLoading(false);
     }
   };
 

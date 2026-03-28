@@ -158,15 +158,19 @@ export class AgentChatHistoryService {
 
       // Update conversation's message count and last_message_at
       // First get current message count
-      const { data: convo } = await supabase
+      const { data: convo, error: convoErr } = await supabase
         .from('agent_chat_conversations')
         .select('message_count')
         .eq('id', options.conversationId)
         .single();
 
-      const currentCount = convo?.message_count || 0;
+      if (convoErr) {
+        console.warn('Could not fetch conversation message_count, defaulting to 0:', convoErr.message);
+      }
 
-      await supabase
+      const currentCount = convo?.message_count ?? 0;
+
+      const { error: updateErr } = await supabase
         .from('agent_chat_conversations')
         .update({
           message_count: currentCount + 1,
@@ -174,6 +178,10 @@ export class AgentChatHistoryService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', options.conversationId);
+
+      if (updateErr) {
+        console.warn('Could not update conversation metadata:', updateErr.message);
+      }
 
       return this.mapMessageFromDB(data);
     } catch (error) {

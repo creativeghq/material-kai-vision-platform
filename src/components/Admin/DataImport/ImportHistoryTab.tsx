@@ -106,6 +106,8 @@ const ImportHistoryTab: React.FC = () => {
         .subscribe();
 
       return () => {
+        importJobsChannel.unsubscribe();
+        backgroundJobsChannel.unsubscribe();
         supabase.removeChannel(importJobsChannel);
         supabase.removeChannel(backgroundJobsChannel);
       };
@@ -164,6 +166,7 @@ const ImportHistoryTab: React.FC = () => {
       setJobs(allJobs);
     } catch (error) {
       console.error('Error loading import history:', error);
+      toast({ title: 'Error', description: 'Failed to load import history', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }

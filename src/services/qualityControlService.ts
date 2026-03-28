@@ -338,18 +338,20 @@ export class QualityControlService {
         throw new Error(`Failed to fetch image: ${imageError?.message}`);
       }
 
-      // ✅ REMOVED: image_validations table no longer exists
-      // Quality metrics are now stored in document_images.metadata
+      // image_validations table was removed — format/dimension validity is now
+      // inferred from the presence of embeddings rather than a separate table.
+      // If the image has been processed (has embeddings), we treat it as valid.
 
       // Calculate quality metrics from image metadata
       const metadata = image.metadata || {};
+      const hasBeenProcessed = this.calculateImageEmbeddingCoverage(image) > 0 ? 1 : 0;
       const qualityMetrics = {
         quality_score: metadata.quality_score || 0,
         relevance_score: metadata.relevance_score || 0,
         ocr_confidence: metadata.ocr_confidence || 0,
         embedding_coverage: this.calculateImageEmbeddingCoverage(image),
-        format_valid: validation?.format_valid ? 1 : 0,
-        dimensions_valid: validation?.dimensions_valid ? 1 : 0,
+        format_valid: hasBeenProcessed,
+        dimensions_valid: hasBeenProcessed,
       };
 
       // Calculate overall score
@@ -463,29 +465,28 @@ export class QualityControlService {
               throw new Error(`Unknown entity type: ${entity.type}`);
           }
 
-          if (assessment.passesThresholds) {
-            passed++;
-          } else if (assessment.needsHumanReview) {
-            needsReview++;
-          } else {
-            failed++;
-          }
-
-          return assessment;
+          // Return the outcome alongside the assessment so counters are
+          // accumulated after Promise.all resolves — not inside the concurrent
+          // callbacks where multiple increments could interleave.
+          return { assessment, outcome: assessment.passesThresholds ? 'passed' : assessment.needsHumanReview ? 'review' : 'failed' } as const;
         } catch (error) {
           console.error(
             `❌ Failed to assess ${entity.type} ${entity.id}:`,
             error,
           );
-          failed++;
-          return null;
+          return { assessment: null, outcome: 'failed' } as const;
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
-      assessments.push(
-        ...(batchResults.filter(Boolean) as QualityAssessment[]),
-      );
+
+      // Accumulate counters sequentially after all concurrent work completes
+      for (const { assessment, outcome } of batchResults) {
+        if (outcome === 'passed') passed++;
+        else if (outcome === 'review') needsReview++;
+        else failed++;
+        if (assessment) assessments.push(assessment);
+      }
 
       // Add delay between batches to prevent rate limiting
       if (i + batchSize < entities.length) {

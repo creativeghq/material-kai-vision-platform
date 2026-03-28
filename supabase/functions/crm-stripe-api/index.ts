@@ -110,6 +110,13 @@ Deno.serve(async (req) => {
         cancel_url: `${Deno.env.get('APP_URL') || 'https://app.example.com'}/billing?cancelled=1`,
       });
 
+      if (!session.url) {
+        return new Response(
+          JSON.stringify({ error: 'Stripe checkout session created but URL was missing' }),
+          { status: 502, headers: corsHeaders },
+        );
+      }
+
       return new Response(
         JSON.stringify({ url: session.url }),
         { status: 200, headers: corsHeaders },

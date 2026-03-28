@@ -51,9 +51,17 @@ Deno.serve(async (req) => {
 
   const startTime = Date.now();
 
+  let requestData: ReRankRequest;
   try {
-    // Parse request
-    const requestData: ReRankRequest = await req.json();
+    requestData = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'Invalid JSON body' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  try {
     const { query, results, maxResults, includeExplanations = false, model = 'claude-sonnet-4-5' } = requestData;
 
     // Validate input
@@ -110,7 +118,16 @@ Response format:
     });
 
     // Parse response
-    const parsed = JSON.parse(aiResult.text);
+    let parsed: { rankedIndices?: number[]; explanations?: Record<string, string> };
+    try {
+      parsed = JSON.parse(aiResult.text);
+    } catch {
+      console.error('ai-rerank: Claude returned non-JSON response:', aiResult.text?.slice(0, 200));
+      return new Response(
+        JSON.stringify({ error: 'AI returned an invalid response. Please retry.' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
     const rankedIndices = parsed.rankedIndices || [];
     const explanations = parsed.explanations || {};
 

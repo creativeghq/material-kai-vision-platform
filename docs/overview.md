@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 12+ AI models across 5 providers.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 20+ AI models across 8 providers.
 
 ---
 
@@ -13,11 +13,12 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **12+ AI models** across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
-- **150+ API endpoints** across 16 categories
+- **20+ AI models** across 8 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs, Replicate, Google Gemini, xAI)
+- **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
 - **7 embedding types** for multi-modal search (text, visual, understanding, color, texture, style, material)
+- **60+ Supabase Edge Functions**
 - **95%+ product detection accuracy**
 - **85%+ search relevance**
 - **90%+ material recognition accuracy**
@@ -25,11 +26,19 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **New Capabilities (2026):**
 - 🌐 **Web Scraping**: Automatic product discovery from websites
 - 💰 **Price Monitoring**: Competitive price tracking across sources
-- 🎨 **Interior Design**: 14 AI models for design generation
-- 🔍 **Smart Search Management**: AI-powered search deduplication
+- 🎨 **Interior Design**: 20+ AI generation modes (image, video, VR, staging, region edit)
+- 🔍 **Smart Search Management**: AI-powered search deduplication + re-ranking
 - 🥽 **VR World Generation**: WorldLabs Marble 3D Gaussian Splat worlds from interior images
-- 🤖 **Unified Jarvis Agent**: Merged Search + Insights + SEO into one intelligent agent
+- 🤖 **Unified KAI Agent**: Merged Search + Insights + SEO into one intelligent agent
 - 🔍 **B2B Manufacturer Search**: Claude built-in web search (no separate API key)
+- ⚡ **Flow Engine**: Visual drag-and-drop workflow automation (triggers, conditions, actions)
+- 🎬 **Interior Video Generation**: 4 AI models — Veo-2, Kling, Wan, Runway Gen4
+- 🛋️ **Virtual Staging**: AI-furnished room renders from empty photos (Replicate, 20cr)
+- ✏️ **Region Editing**: Pixel-precise inpainting with SAM 2 masks + Grok Aurora
+- 📱 **Social Media Suite**: Generate captions, images, videos + publish via Late.dev
+- 🤖 **Background Agents**: Scheduled autonomous agents with chain triggers + auto-recovery
+- 💳 **Billing & Credits**: Stripe subscriptions + credit packages
+- 📊 **CRM System**: Contacts, companies, user management
 
 ---
 
@@ -61,8 +70,12 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - Voyage AI (voyage-3.5, primary text/understanding embeddings, 1024D)
 - HuggingFace Endpoint (Qwen3-VL 32B Vision)
 - SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
-- Replicate (14 interior design generation models)
+- Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
+- Google Gemini (gemini-3.1-flash-image-preview, gemini-3-pro-image-preview — interior generation)
+- xAI Aurora (grok-2-aurora — region edit inpainting, social image generation)
+- Kling (kling-v3.0, kling-1.6-pro — interior and social video generation)
+- Late.dev (social media OAuth broker + publishing platform)
 
 ### System Flow
 
@@ -81,7 +94,7 @@ MIVAA API (FastAPI) → Creates background job
   4. Text Embeddings (Voyage AI voyage-3.5, 1024D)
   5. Image Extraction
   6. Image Analysis (Qwen3-VL 32B → understanding embeddings via Voyage AI)
-  7-10. Multi-Vector SigLIP2 Embeddings (768D: visual, color, texture, style, material)
+  7-10. Multi-Vector SigLIP2 Embeddings (768D halfvec: visual, color, texture, style, material)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
   13. Quality Enhancement (async)
@@ -119,12 +132,12 @@ Real-time updates → Frontend displays results
 - **Performance**: High accuracy, multimodal capabilities
 - **Pipeline Stages**: Product Discovery (alternative to Claude)
 
-**text-embedding-3-small**:
+**text-embedding-3-small** (legacy fallback):
 - **Use Cases**: Text chunk embeddings, semantic search
 - **Dimensions**: 1536
 - **Performance**: 62.3% MTEB score
 - **Cost**: $0.02 per 1M tokens
-- **Pipeline Stages**: Text Embedding Generation (Stage 5)
+- **Note**: Primary embeddings now use Voyage AI voyage-3.5 (1024D, stored as halfvec)
 
 #### 3. HuggingFace Endpoint - Qwen3-VL 32B Vision
 
@@ -208,7 +221,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - **Checkpoint**: CHUNKS_CREATED
 
 **Stage 7: Text Embedding Generation (AI)**
-- OpenAI text-embedding-3-small: Generate 1536D embeddings
+- Voyage AI voyage-3.5: Generate 1024D embeddings (stored as halfvec)
 - Store in pgvector for similarity search
 - Link embeddings to chunks
 - **Checkpoint**: TEXT_EMBEDDINGS_GENERATED
@@ -398,27 +411,39 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ## API Ecosystem
 
-### 108 REST API Endpoints (Consolidated from 113)
+### 170+ API Endpoints
 
-**Categories** (14 total):
-1. RAG & Document Processing (27 endpoints - includes metadata management, PDF extraction consolidated)
-2. Search APIs (6 endpoints - semantic, vector, hybrid, visual, material, multi-vector)
-3. Admin Routes (18 endpoints - job management, system monitoring, metadata management)
-4. Document Entities (5 endpoints - certificates, logos, specifications)
-5. Products API (3 endpoints - product management)
-6. Images API (6 endpoints - image analysis, processing, and re-classification)
-7. Embeddings APIs (3 endpoints - embedding generation)
-8. AI Services (10 endpoints - AI model integration)
-9. Background Jobs (7 endpoints - async job tracking)
-10. Anthropic APIs (3 endpoints - Claude integration)
-11. HuggingFace Endpoint APIs (3 endpoints - Qwen integration)
-12. Monitoring Routes (3 endpoints - health checks, metrics)
-13. AI Metrics Routes (2 endpoints - AI performance tracking)
+**Python REST API Categories** (18+ total):
+1. RAG & Document Processing (27 endpoints — metadata management, PDF extraction consolidated)
+2. Search APIs (6 endpoints — semantic, vector, hybrid, visual, material, multi-vector)
+3. Admin Routes (18 endpoints — job management, system monitoring, metadata management)
+4. Document Entities (5 endpoints — certificates, logos, specifications)
+5. Products API (3 endpoints — product management)
+6. Images API (6 endpoints — image analysis, processing, re-classification)
+7. Embeddings APIs (3 endpoints — embedding generation)
+8. AI Services (10 endpoints — AI model integration)
+9. Background Jobs (7 endpoints — async job tracking)
+10. Anthropic APIs (3 endpoints — Claude integration)
+11. HuggingFace Endpoint APIs (3 endpoints — Qwen integration)
+12. Monitoring Routes (3 endpoints — health checks, metrics)
+13. AI Metrics Routes (2 endpoints — AI performance tracking)
+14. Duplicate Detection (7 endpoints — factory-based duplicate detection + merging)
+15. Data Import (4 endpoints — XML, web scraping, batch processing)
+16. Job Health (3 endpoints — stuck job detection, recovery)
+17. Segmentation (2 endpoints — SAM 2 mask generation, inpainting)
+18. User Feedback (3 endpoints — feedback submission + sentiment analysis)
 
-**Consolidation Summary**:
-- ✅ PDF Extraction: `/api/pdf/extract/*` (3 endpoints) → `/api/rag/documents/upload`
-- ✅ Document Management: `/api/documents/*` (18 endpoints) → `/api/rag/*` (27 endpoints)
-- ✅ Health Checks: 10+ individual endpoints → Single `/health` endpoint
+**Supabase Edge Functions** (60+ total):
+- Agent & AI: `agent-chat`, `ai-rerank`, `background-agent-runner`, `mivaa-gateway`
+- Interior Design: `generate-interior-gemini`, `generate-interior-video-v2`, `generate-region-edit`, `generate-virtual-staging`, `generate-vr-world`, `generate-quote-pdf`, `generate-social-content`, `generate-social-image`, `generate-social-video`
+- Social: `late-oauth`, `late-publish`, `late-analytics`, `late-webhook-handler`
+- CRM & Billing: `crm-companies-api`, `crm-contacts-api`, `crm-users-api`, `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks`
+- Automation: `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
+- Messaging: `email-api`, `messaging-api`, `notification-dispatcher`
+- Scraping & Import: `scrape-session-manager`, `scrape-single-page`, `scrape-preview`, `parse-sitemap`, `xml-import-orchestrator`, `scheduled-import-runner`, `pdf-batch-process`
+- Monitoring: `price-monitoring`, `price-monitoring-cron`, `check-material-alerts`, `ai-pricing-updater`, `auto-recovery-cron`, `job-cleanup-cron`, `health-check`
+- Recommendations: `recommendations-api`
+- SEO: `seo-analyze`, `seo-pipeline`, `seo-plan`, `seo-research`, `seo-write`
 
 **Documentation**:
 - Swagger UI: `https://v1api.materialshub.gr/docs`
@@ -497,19 +522,26 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ---
 
-**Last Updated**: March 1, 2026
-**Version**: 3.2.0
+**Last Updated**: March 2026
+**Version**: 3.5.0
 **Status**: Production
 **Users**: 5,000+
 **Uptime**: 99.5%+
 
 **Recent Enhancements**:
-- ✨ Unified Jarvis Agent — Search + Insights + SEO merged into one agent (2026-02-19)
+- ✨ Flow Engine — Visual workflow automation with triggers, conditions, actions (2026-03)
+- ✨ Interior Video Generation — 4 AI models: Veo-2, Kling v3, Wan 2.1, Runway Gen4 (2026-03)
+- ✨ Virtual Staging — AI-furnished room renders via Replicate proplabs (2026-03)
+- ✨ Region Editing — Pixel-precise masked inpainting with Grok Aurora + SAM 2 (2026-03)
+- ✨ Social Media Suite — Content/image/video generation + Late.dev publishing (2026-03)
+- ✨ Background Agents — Autonomous scheduled agents with chain triggers + auto-recovery (2026-03)
+- ✨ Gemini Interior Generation — 4 modes: text-to-image, image-edit, floor plan render/diagram (2026-03)
+- ✨ AI Re-ranking — Claude-powered post-retrieval result re-ordering (2026-03)
+- ✨ Billing & Credits — Stripe subscriptions + credit packages (2026-03)
+- ✨ CRM System — Contacts, companies, user management (2026-02)
+- ✨ Unified KAI Agent — Search + Insights + SEO merged into one agent (2026-02-19)
 - ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles
 - ✨ Understanding embeddings — Qwen3-VL analysis → Voyage AI 1024D embedding
-- ✨ B2B web search powered by Anthropic built-in web_search tool (no Perplexity key)
-- ✨ Real-time PDF Processing Monitor with auto-refresh
-- ✨ Enhanced Analytics Dashboard with 4 comprehensive tabs
-- ✨ Sentry integration for all pipeline stages
+- ✨ B2B web search powered by Anthropic built-in web_search tool

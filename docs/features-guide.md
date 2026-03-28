@@ -576,6 +576,208 @@ Complete reference of all platform features and capabilities.
 
 ---
 
-**Last Updated**: March 1, 2026
-**Version**: 3.2.0
+---
+
+### 18. Flow Engine — Workflow Automation
+
+**Purpose**: Visual drag-and-drop automation builder for multi-step workflows
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [flow-engine.md](flow-engine.md)
+
+- ✅ xyflow graph-based visual editor at `/admin/flows`
+- ✅ 3 node types: trigger, condition, action
+- ✅ Trigger types: manual, cron schedule, webhook, platform event
+- ✅ Condition types: if_else, switch, filter, delay
+- ✅ Action types: send_sms, send_email, http_request, create_notification, send_quote
+- ✅ `{{template}}` variable resolution from execution context
+- ✅ Dry-run / test mode (no actions fire)
+- ✅ Scheduled execution via `flow-scheduler-cron` (pg_cron, every minute)
+- ✅ External webhook triggers via `flow-webhook`
+- ✅ Execution logs in `flow_runs` table
+
+---
+
+### 19. Background Agents
+
+**Purpose**: Autonomous scheduled or event-driven agents running workspace tasks
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [background-agents.md](background-agents.md)
+
+**Agent Types:**
+- ✅ `kai-task` — Runs arbitrary KAI tool calls autonomously
+- ✅ `product-enrichment` — Fills missing product metadata via Claude + web search
+- ✅ `material-tagger` — Auto-classifies products with material tags
+- ✅ `social-analytics-sync` — Syncs engagement metrics from Late.dev
+- ✅ `social-insights-sync` — Syncs account-level insights from Late.dev
+- ✅ `factory-enrichment` — Enriches factory records via Apollo/Firecrawl/Hunter.io
+
+**Infrastructure:**
+- ✅ `background-agent-runner` edge function (universal executor)
+- ✅ `agent-scheduler-cron` (pg_cron every minute)
+- ✅ `auto-recovery-cron` (stuck run detection every 5 minutes, up to 3 retries)
+- ✅ Chain triggers (child agents auto-dispatch on parent completion)
+- ✅ Delegation to Python backend for tasks >25s (`DelegateToMivaaError`)
+- ✅ Real-time logs via `agent_run_logs` Supabase subscription
+- ✅ Admin UI at `/admin/background-agents`
+
+---
+
+### 20. Interior Video Generation
+
+**Purpose**: AI-generated interior design videos for walkthroughs, product spotlights, and social content
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [interior-video-generation.md](interior-video-generation.md)
+
+| Model | Credits | Best For |
+|---|---|---|
+| Veo-2 (Google) | 30 | Cinematic walkthroughs, floorplan flythroughs |
+| Kling v3.0 | 20 | Product spotlights, before/after, social reels |
+| Wan 2.1 i2v 720p | 12 | Budget general-purpose |
+| Runway Gen4 Turbo | 40 | Premium quality |
+
+- ✅ Auto model selection by `video_type`
+- ✅ Async polling pattern for long renders (>55s → returns `job_id`)
+- ✅ Aspect ratios: 16:9, 9:16, 1:1
+- ✅ Separate `generate-social-video` wrapper for social-specific flow
+
+---
+
+### 21. Virtual Staging
+
+**Purpose**: Transform empty room photos into furnished interior renders
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [virtual-staging.md](virtual-staging.md)
+
+- ✅ Replicate `proplabs/virtual-staging` model (~56s)
+- ✅ 20 credits per generation
+- ✅ Room types: living_room, bedroom, dining_room, kitchen, bathroom, home_office, kids_room, outdoor
+- ✅ Styles: modern, scandinavian, industrial, traditional, bohemian, minimalist, luxury, rustic
+- ✅ Optional free-text `furniture_items` override
+- ✅ Accessible as KAI agent tool
+
+---
+
+### 22. Region Editing (Inpainting)
+
+**Purpose**: Paint a zone on a room image and replace it with AI-generated content
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [segmentation-inpainting.md](segmentation-inpainting.md)
+
+- ✅ `RegionEditCanvas.tsx` — brush paint / erase mask tool
+- ✅ `generate-region-edit` edge function — Grok Aurora masked inpainting (20cr)
+- ✅ SAM 2 via Replicate for pixel-perfect mask generation (`/api/segment/mask`)
+- ✅ Pillow bbox/ellipse fallback (instant, zero cost)
+- ✅ AnyDoor for reference-image product placement
+- ✅ FLUX Fill Pro for text-guided replacement
+
+---
+
+### 23. Gemini Interior Generation
+
+**Purpose**: Gemini-powered interior image generation with four distinct modes
+
+**Status:** ✅ Complete (Production Ready)
+
+**API Docs**: [api/generate-interior-gemini-api.md](api/generate-interior-gemini-api.md)
+
+| Mode | Description | Credits |
+|---|---|---|
+| `text-to-image` | Prompt → new room render | 6/15 |
+| `image-edit` | Image + instruction → edited image | 6/15 |
+| `floor-plan-render` | Floor plan → photorealistic perspective | 6/15 |
+| `floor-plan-text` | Text description → 2D floor plan | 6/15 |
+
+- ✅ Two-step style-transfer pipeline (inspiration → design spec → edit)
+- ✅ Models: gemini-3.1-flash-image-preview (6cr) and gemini-3-pro-image-preview (15cr)
+
+---
+
+### 24. Social Media Suite
+
+**Purpose**: Generate, schedule, and publish social media content across 8 platforms via Late.dev
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [social-media-system.md](social-media-system.md) | **API**: [api/late-social-api.md](api/late-social-api.md)
+
+**Content Generation:**
+- ✅ Caption generation (3 variants) for Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads — 2 credits
+- ✅ Image generation: xAI Aurora (10cr), Gemini Imagen (5cr), FLUX Dev (6cr) — auto-routed by image type
+- ✅ Video generation: Kling 1.6 Pro (15cr), Veo-2 (30cr)
+
+**Publishing (Late.dev):**
+- ✅ OAuth account connect/disconnect for all 8 platforms
+- ✅ Publish immediately or schedule for a future datetime
+- ✅ No credit cost — uses workspace's Late.dev subscription
+- ✅ Analytics sync: post engagement + account insights
+- ✅ Best posting time recommendations
+
+**Admin UI:** `/admin/social-media/accounts`
+
+---
+
+### 25. Billing & Credits System
+
+**Purpose**: Stripe-powered subscription plans and credit purchases
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [billing-credits-system.md](billing-credits-system.md) | **API**: [api/crm-stripe-api.md](api/crm-stripe-api.md)
+
+- ✅ Subscription plans with monthly/annual billing (`subscription_plans` table)
+- ✅ Credit packages for top-up purchases (`credit_packages` table)
+- ✅ Stripe Checkout sessions for both subscriptions and credit purchases
+- ✅ Stripe Customer Portal for self-service plan/payment changes
+- ✅ Webhook processing for payment events (`stripe-webhooks`)
+- ✅ Per-workspace credit balance tracking
+- ✅ Upfront credit deduction before AI calls
+- ✅ Frontend: `/billing/credits` and `/billing/subscriptions`
+
+---
+
+### 26. CRM System
+
+**Purpose**: Customer relationship management — contacts, companies, platform users
+
+**Status:** ✅ Complete (Production Ready)
+
+**Documentation**: [crm-system.md](crm-system.md)
+
+- ✅ Contact management: CRUD, tagging, notes, activity log
+- ✅ Company management: CRUD, contact associations
+- ✅ User management: role changes, workspace membership
+- ✅ Contact ↔ platform user linking (`linked_user_id`)
+- ✅ Integration with messaging campaigns
+- ✅ Integration with quotes system
+- ✅ Role-based access: admin/owner = full CRUD, manager = read+write, factory = read own
+- ✅ Admin UI: `/admin/crm`, `/admin/crm/companies/:id`, `/admin/crm/contacts/:id`
+
+---
+
+### 27. AI Pricing Auto-Updater
+
+**Purpose**: Keep AI model pricing data current with automated weekly syncs
+
+**Status:** ✅ Complete (Production Ready)
+
+- ✅ Weekly cron via `ai-pricing-updater` edge function
+- ✅ Per-model `auto_update_enabled` flag
+- ✅ Fallback prices embedded for Anthropic, OpenAI, Voyage AI
+- ✅ Full audit log of all price changes
+- ✅ Manual trigger via POST request
+
+---
+
+**Last Updated**: March 2026
+**Version**: 3.5.0
 **Status**: Production

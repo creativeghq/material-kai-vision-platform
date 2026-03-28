@@ -71,6 +71,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
       .subscribe();
 
     return () => {
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);

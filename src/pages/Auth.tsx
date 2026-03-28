@@ -24,6 +24,15 @@ export const Auth: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('signup');
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    // Clear form state when switching tabs so sign-in fields don't bleed into sign-up
+    setEmail('');
+    setPassword('');
+    setDisplayName('');
+    setShowPassword(false);
+  };
   const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
 
@@ -92,7 +101,7 @@ export const Auth: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="hidden">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -141,7 +150,7 @@ export const Auth: React.FC = () => {
                     <Input
                       id="signin-email"
                       type="email"
-                      placeholder="amelielaurent7622@gmail.com"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -209,7 +218,7 @@ export const Auth: React.FC = () => {
                     <span className="text-muted-foreground">Don't have an account? </span>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('signup')}
+                      onClick={() => handleTabChange('signup')}
                       className="text-foreground underline hover:text-primary font-medium"
                     >
                       Sign up

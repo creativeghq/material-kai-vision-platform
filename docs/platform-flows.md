@@ -264,9 +264,77 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 | Knowledge Base | Create doc | OpenAI | <1 sec | Searchable docs |
 | Agent Chat | Send message | Claude | 1-3 sec | AI responses |
 | **VR World** ✨ | **Generate VR button** | **WorldLabs Marble** | **30s-5min** | **Explorable 3D world** |
+| **Flow Automation** ✨ | **Admin flow canvas** | **Claude (actions)** | **Real-time** | **Automated actions** |
+| **Interior Video** ✨ | **Video type + image** | **Veo-2/Kling/Wan/Runway** | **1-5 min** | **MP4 video** |
+| **Virtual Staging** ✨ | **Empty room image** | **Replicate proplabs** | **~56s** | **Furnished render** |
+| **Social Publish** ✨ | **Post content + account** | **Claude + Late.dev** | **<5s** | **Published post** |
+| **Background Agent** ✨ | **Cron / event / manual** | **Claude + MIVAA API** | **Varies** | **Enriched data** |
 
 ---
 
-**Last Updated:** December 3, 2025
-**Version:** 2.4.0
+## 9. Flow Automation Flow
+
+**Purpose:** Execute multi-step automated workflows in response to triggers
+
+**User Journey (Cron-triggered flow):**
+1. Admin builds flow on xyflow canvas at `/admin/flows`
+   ↓
+2. Flow saved to `flows` table (nodes + edges JSON)
+   ↓
+3. `flow-scheduler-cron` (every minute) detects flow is due
+   ↓
+4. Invokes `flow-engine` with `action: 'execute-flow'`
+   ↓
+5. Engine walks the graph:
+   - Trigger node: extracts input data
+   - Condition nodes: evaluate if_else / switch / filter
+   - Action nodes: send SMS, send email, HTTP call, create notification
+   ↓
+6. Execution result written to `flow_runs`
+
+**User Journey (Webhook-triggered flow):**
+1. External system POSTs to `flow-webhook?flow_id=<uuid>`
+   ↓
+2. Payload passed as `trigger.data` to `flow-engine`
+   ↓
+3. Same graph execution as above
+
+**Edge Functions:** `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
+**Frontend Component:** Flow canvas at `/admin/flows`
+**Documentation:** [flow-engine.md](flow-engine.md)
+
+---
+
+## 10. Social Media Publishing Flow
+
+**Purpose:** Generate and publish AI content to social platforms
+
+**User Journey:**
+1. User connects social account at `/profile` (Social Accounts tab)
+   ↓
+2. `late-oauth` redirects to Late.dev OAuth → returns `late_account_id`
+   ↓
+3. Account stored in `social_accounts`
+   ↓
+4. User (or KAI agent) generates content:
+   - Caption: `generate-social-content` (2cr) → 3 variants
+   - Image: `generate-social-image` (5-10cr) → stored in Supabase Storage
+   - Video: `generate-social-video` (15-30cr) → stored in Supabase Storage
+   ↓
+5. User selects caption variant + media → clicks Publish or Schedule
+   ↓
+6. `late-publish` action: `publish_now` or `schedule` with `scheduled_at`
+   ↓
+7. Late.dev publishes to connected platform
+   ↓
+8. `late-analytics` syncs engagement metrics back to `social_post_analytics`
+
+**Edge Functions:** `late-oauth`, `generate-social-content`, `generate-social-image`, `generate-social-video`, `late-publish`, `late-analytics`
+**Admin UI:** `/admin/social-media/accounts`
+**Documentation:** [social-media-system.md](social-media-system.md)
+
+---
+
+**Last Updated:** March 2026
+**Version:** 3.5.0
 **Status:** Production

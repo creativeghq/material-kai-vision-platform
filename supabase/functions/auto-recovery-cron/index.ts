@@ -253,7 +253,7 @@ async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
 
     if (success) {
       console.log(`[AutoRecoveryCron] ✅ Successfully recovered ${job.type} job ${job.id}`);
-      await incrementRecoveryAttempts(supabase, job);
+      // Do NOT increment recovery_attempts on success — only on failure
       return { jobId: job.id, type: job.type, success: true };
     } else {
       throw new Error('Recovery failed');
@@ -301,8 +301,8 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
 
   if (error) return false;
 
-  // Re-dispatch to runner (fire-and-forget)
-  fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+  // Re-dispatch to runner
+  const res = await fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
     method:  'POST',
     headers: {
       'Authorization': `Bearer ${supabaseServiceKey}`,
@@ -313,7 +313,12 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
       run_id:       job.id,
       triggered_by: 'recovery',
     }),
-  }).catch(e => console.error('[AutoRecoveryCron] Failed to re-dispatch agent run:', e));
+  }).catch(e => { console.error('[AutoRecoveryCron] Failed to re-dispatch agent run:', e); return null; });
+
+  if (res && !res.ok) {
+    const body = await res.text().catch(() => '(no body)');
+    console.error(`[AutoRecoveryCron] Runner returned HTTP ${res.status}: ${body}`);
+  }
 
   return true;
 }

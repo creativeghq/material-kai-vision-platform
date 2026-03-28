@@ -40,13 +40,16 @@ Complete documentation for Material Kai Vision Platform.
 - Security features
 - Analytics & reporting
 
-**[platform-flows.md](platform-flows.md)** - User workflows & feature flows ✨ NEW
+**[platform-flows.md](platform-flows.md)** - User workflows & feature flows ✨ UPDATED
 - PDF Processing Flow
 - Search & Discovery Flow
 - Data Import Flow
 - 3D Generation Flow
 - Knowledge Base Flow
 - Agent Chat Flow
+- VR World Generation Flow
+- Flow Automation Flow ✨ NEW
+- Social Media Publishing Flow ✨ NEW
 
 **[duplicate-detection-merging.md](duplicate-detection-merging.md)** - Duplicate detection system
 - Factory-based duplicate detection
@@ -100,7 +103,7 @@ Complete documentation for Material Kai Vision Platform.
 - Database schema (2 tables with indexes and RLS)
 - Cosine similarity and matrix factorization algorithms
 
-**[social-media-system.md](social-media-system.md)** - Social media creation & monitoring system ✨ NEW
+**[social-media-system.md](social-media-system.md)** - Social media creation & monitoring system
 - KAI agent tools for social content (captions, images, videos)
 - Late.dev OAuth integration for per-user platform connections
 - Publishing, scheduling, analytics via Late.dev API
@@ -109,6 +112,51 @@ Complete documentation for Material Kai Vision Platform.
 - Background agents for analytics sync
 - Admin panel at /admin/social-media/*
 - Deployment checklist + required secrets
+
+**[flow-engine.md](flow-engine.md)** - Workflow Automation System ✨ NEW
+- Visual drag-and-drop flow builder at `/admin/flows`
+- Trigger types: cron, webhook, event, manual
+- Condition nodes: if_else, switch, filter, delay
+- Action nodes: send_sms, send_email, http_request, notification, quote
+- Template variable resolution `{{trigger.data.field}}`
+- Dry-run / test mode, execution logs
+
+**[background-agents.md](background-agents.md)** - Background Agent Framework ✨ NEW
+- 6 registered agent types (kai-task, product-enrichment, material-tagger, social sync, factory-enrichment)
+- Trigger types: cron, event, manual, chain
+- Auto-recovery cron (every 5 min, up to 3 retries)
+- Delegation to Python backend for long tasks
+- Admin UI at `/admin/background-agents`
+
+**[virtual-staging.md](virtual-staging.md)** - Virtual Staging ✨ NEW
+- Replicate proplabs model, 20 credits, ~56s
+- 8 room types, 8 furniture styles
+
+**[interior-video-generation.md](interior-video-generation.md)** - Interior Video Generation ✨ NEW
+- 4 models: Veo-2 (30cr), Kling v3.0 (20cr), Wan 2.1 (12cr), Runway Gen4 (40cr)
+- 5 video types with auto model routing
+- Async polling pattern for long renders
+
+**[segmentation-inpainting.md](segmentation-inpainting.md)** - Segmentation & Inpainting ✨ NEW
+- SAM 2 pixel-perfect masks + Pillow fallback
+- Grok Aurora region edit (20cr), AnyDoor product placement, FLUX Fill Pro
+- `/api/segment/mask` and `generate-region-edit` edge function
+
+**[billing-credits-system.md](billing-credits-system.md)** - Billing & Credits System ✨ NEW
+- Stripe subscription plans + credit packages
+- stripe-checkout, stripe-customer-portal, crm-stripe-api
+- Per-workspace credit balance tracking
+- Frontend: `/billing/credits` and `/billing/subscriptions`
+
+**[ai-reranking.md](ai-reranking.md)** - AI Search Re-ranking ✨ NEW
+- Claude-powered post-retrieval result re-ordering
+- Optional per-result explanations
+- sonnet or haiku model choice
+
+**[crm-system.md](crm-system.md)** - CRM System ✨ NEW
+- Contacts, companies, platform user management
+- Integration with messaging and quotes
+- Role-based access control
 
 **[campaign-system.md](campaign-system.md)** - Email campaign management system ✨ NEW
 - Campaign creation and management
@@ -443,11 +491,13 @@ Complete documentation for Material Kai Vision Platform.
 
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **12+** AI models across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
+- **20+** AI models across 8 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs, Replicate, Google Gemini, xAI)
 - **14** processing pipeline stages
-- **150+** API endpoints (16 categories)
+- **170+** API endpoints (20 categories)
+- **60+** Supabase Edge Functions
 - **7** embedding types with dynamic weight profiles (halfvec float16 storage)
-- **3** active agents: Jarvis (unified), Interior Designer, Demo
+- **3** active agents: KAI (unified), Interior Designer, Demo
+- **6** background agent types
 - **200+** metafield types
 - **95%+** product detection accuracy
 - **85%+** search relevance
@@ -458,7 +508,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-3.5), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble
+**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-3.5), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 
@@ -508,25 +558,26 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: March 1, 2026
-**Version**: 3.2.0
+**Last Updated**: March 2026
+**Version**: 3.5.0
 **Status**: Production
 **Maintainer**: Development Team
 
-**Recent Changes:**
-- ✨ **UPDATED** (2026-02-19): Unified Jarvis Agent — Search + Insights + SEO merged; legacy aliases preserved; RBAC tool gating; multimodal image support
-- ✨ **NEW** (2026-02-10): VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer; `vr-world-generation.md` created
-- ✨ **UPDATED** (2026-02-07): halfvec migration — all vector columns now float16; 50% storage savings; embedding dict key `text_1024`
-- ✨ **UPDATED** (2026-02-25): B2B search now uses Anthropic built-in `web_search_20250305` tool (Perplexity removed)
-- ✨ **NEW**: Understanding embeddings — Qwen3-VL analysis → Voyage AI 1024D embedding (spec-based search)
-- ✨ **NEW**: Query-Adaptive Weight Profiles — 7 profiles dynamically selected per query intent
-- ✨ **NEW**: Frontend Code Splitting — React.lazy() on 60+ routes, main chunk 221KB (-92%)
-- ✨ **NEW**: Web Scraping Integration — Complete Firecrawl integration with AI product discovery
-- ✨ **NEW**: Price Monitoring System — Competitive price tracking with alerts
-- ✨ **NEW**: Saved Searches Deduplication — AI-powered search management
-- ✨ **NEW**: Interior Design Generation — 14 AI models for interior design
-- ✨ **NEW**: Internal Credit System — Credit-based billing for AI operations
-- Previous: Campaign system, multi-vector search, monitoring & analytics
+**Recent Changes (2026-03):**
+- ✨ **NEW**: Flow Engine — Visual workflow automation with triggers, conditions, actions (`flow-engine.md`)
+- ✨ **NEW**: Interior Video Generation — 4 AI models: Veo-2, Kling v3, Wan 2.1, Runway Gen4 (`interior-video-generation.md`)
+- ✨ **NEW**: Virtual Staging — Replicate proplabs room staging (`virtual-staging.md`)
+- ✨ **NEW**: Region Editing — Grok Aurora masked inpainting + SAM 2 (`segmentation-inpainting.md`)
+- ✨ **NEW**: Social Media Suite — Content/image/video + Late.dev publishing (see `social-media-system.md`)
+- ✨ **NEW**: Background Agents — Scheduled autonomous agents with chain triggers (`background-agents.md`)
+- ✨ **NEW**: Gemini Interior Generation — 4 modes including floor plan rendering
+- ✨ **NEW**: AI Re-ranking — Claude post-retrieval result re-ordering (`ai-reranking.md`)
+- ✨ **NEW**: Billing & Credits — Stripe subscriptions + credit packages (`billing-credits-system.md`)
+- ✨ **NEW**: CRM System — Contacts, companies, users (`crm-system.md`)
+- ✨ **UPDATED** (2026-02-19): Unified KAI Agent — Search + Insights + SEO merged
+- ✨ **NEW** (2026-02-10): VR World Generation — WorldLabs Marble + Spark.js
+- ✨ **UPDATED** (2026-02-07): halfvec migration — all vector columns float16
+- ✨ **NEW**: Understanding embeddings, query-adaptive weight profiles, B2B web search
 
 ---
 
@@ -540,17 +591,16 @@ For questions or issues:
 
 ---
 
-**Total Documentation**: 40 comprehensive guides
-**Total Lines**: 13,000+
-**Coverage**: 100% of platform features
-**Planning Documents**: 10 files in /planning directory
+**Total Documentation**: 55+ comprehensive guides
+**Coverage**: All platform features
+**Planning Documents**: /planning directory
 
 **Documentation Categories**:
-- 🎯 Getting Started: 8 guides
+- 🎯 Getting Started: 18 guides (incl. new feature docs)
 - 🏗️ Architecture & Design: 8 guides
 - 🤖 AI & Processing: 9 guides
-- 🔌 API Reference: 3 guides
+- 🔌 API Reference: 12 guides (incl. new API docs)
 - 🚀 Deployment & Operations: 3 guides
 - 📊 Monitoring & Analytics: 3 guides
-- 💼 Business Features: 6 guides (Email System, Campaign System, Quotes System)
+- 💼 Business Features: 10 guides
 

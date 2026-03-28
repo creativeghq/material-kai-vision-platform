@@ -47,6 +47,10 @@ export function useSegmentation({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasRunRef = useRef(false);
+  // Stable ref to the latest `run` callback so the trigger effect below does
+  // not need `run` in its dependency array (which would cause a re-trigger
+  // every time completedImages changes, potentially double-processing).
+  const runRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   // ── Load existing segments from DB ──────────────────────────────────────
   useEffect(() => {
@@ -58,9 +62,13 @@ export function useSegmentation({
       .eq('generation_id', generationId)
       .order('segment_index')
       .then(({ data, error: dbErr }) => {
-        if (dbErr || !data) return;
+        if (dbErr) {
+          console.error('[useSegmentation] Failed to load existing segments:', dbErr.message);
+          return;
+        }
+        if (!data) return;
         if (data.length > 0) {
-          hasRunRef.current = true; // already processed
+          hasRunRef.current = true; // already processed — skip re-run
           setSegments(
             data.map((row) => ({
               id: row.id,
@@ -80,6 +88,9 @@ export function useSegmentation({
             })),
           );
         }
+      })
+      .catch((err) => {
+        console.error('[useSegmentation] Unexpected error loading segments:', err);
       });
   }, [generationId]);
 
@@ -173,11 +184,12 @@ export function useSegmentation({
           .insert(rows)
           .select('id, segment_index');
 
-        // Attach DB ids
+        // Attach DB ids — build a lookup map to avoid O(n²) nested scan
         if (inserted) {
+          const idByIndex = new Map(inserted.map((r) => [r.segment_index, r.id]));
           for (const s of allSegments) {
-            const match = inserted.find((r) => r.segment_index === s.segment_index);
-            if (match) s.id = match.id;
+            const dbId = idByIndex.get(s.segment_index);
+            if (dbId) s.id = dbId;
           }
         }
       }
@@ -192,11 +204,16 @@ export function useSegmentation({
     }
   }, [generationId, workspaceId, completedImages, enabled]);
 
+  // Keep runRef in sync with the latest `run` so the trigger effect below is stable
+  runRef.current = run;
+
   useEffect(() => {
+    // Only use runRef.current here — not `run` directly — to avoid this effect
+    // firing again whenever `run` is recreated (which happens on every completedImages change).
     if (completedImages.length > 0 && !hasRunRef.current) {
-      run();
+      runRef.current();
     }
-  }, [completedImages, run]);
+  }, [completedImages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { segments, loading, error };
 }

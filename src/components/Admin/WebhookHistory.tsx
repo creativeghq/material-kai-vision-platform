@@ -79,6 +79,7 @@ export const WebhookHistory: React.FC<WebhookHistoryProps> = ({
       .subscribe();
 
     return () => {
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [jobId, jobType]);

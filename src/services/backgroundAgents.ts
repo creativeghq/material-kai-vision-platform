@@ -127,7 +127,7 @@ export function subscribeToLogs(
       (payload) => onLog(payload.new as AgentRunLog),
     )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

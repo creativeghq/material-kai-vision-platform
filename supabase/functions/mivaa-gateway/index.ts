@@ -9,7 +9,10 @@ import { corsHeaders } from '../_shared/cors.ts';
 const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
 const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
 const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_URL;
-const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'your-mivaa-api-key';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+if (!MIVAA_API_KEY) {
+  throw new Error('MIVAA_API_KEY environment variable is required but not set');
+}
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -575,7 +578,7 @@ serve(async (req) => {
     }
 
     console.log(`🔗 Fetching from: ${mivaaUrl}`);
-    console.log(`🔐 Authorization header: Bearer ${MIVAA_API_KEY ? MIVAA_API_KEY.substring(0, 10) + '...' : 'NOT SET'}`);
+    // Never log API keys — even truncated prefixes aid enumeration attacks
 
     const response = await fetch(mivaaUrl, fetchOptions);
 

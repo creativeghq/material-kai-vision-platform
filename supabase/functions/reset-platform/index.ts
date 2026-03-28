@@ -23,6 +23,16 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - crm_contact_relationships← CRM relationships
 //   - profiles / auth.users    ← user accounts
 //
+//   ── Credits & Billing (DO NOT TOUCH) ──
+//   - user_credits             ← per-user credit balances
+//   - credit_transactions      ← full credit debit/top-up history
+//   - credit_packages          ← available credit package catalogue
+//
+//   ── Prompts (DO NOT TOUCH) ──
+//   - prompts                  ← saved agent/system prompts (admin-managed)
+//   - extraction_prompts       ← PDF extraction prompt configurations
+//   - prompt_history           ← per-user prompt history
+//
 // Storage Buckets:
 //   - quote-templates          ← cover.png / backcover.png / items-background.png uploaded via system settings
 //   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
@@ -136,27 +146,36 @@ const BUCKETS_TO_CLEAR = ['pdf-tiles', 'material-images', 'moodboard-images', '3
 /**
  * Recursively list every file path in a bucket folder (handles subdirectories).
  * Returns a flat array of full file paths suitable for storage.remove().
+ *
+ * Paginates using offset so buckets with >1000 files are fully enumerated.
  */
 async function listAllFiles(bucketName: string, folderPath = ''): Promise<string[]> {
-  const { data: items, error } = await supabase.storage
-    .from(bucketName)
-    .list(folderPath || undefined, { limit: 1000 });
-
-  if (error || !items) return [];
-
+  const PAGE_SIZE = 1000;
   const filePaths: string[] = [];
+  let offset = 0;
 
-  for (const item of items) {
-    const itemPath = folderPath ? `${folderPath}/${item.name}` : item.name;
+  while (true) {
+    const { data: items, error } = await supabase.storage
+      .from(bucketName)
+      .list(folderPath || undefined, { limit: PAGE_SIZE, offset });
 
-    if (item.metadata == null) {
-      // item.metadata is null for folders — recurse
-      const nested = await listAllFiles(bucketName, itemPath);
-      filePaths.push(...nested);
-    } else {
-      // it's a file
-      filePaths.push(itemPath);
+    if (error || !items || items.length === 0) break;
+
+    for (const item of items) {
+      const itemPath = folderPath ? `${folderPath}/${item.name}` : item.name;
+
+      if (item.metadata == null) {
+        // item.metadata is null for folders — recurse (folders are never paginated)
+        const nested = await listAllFiles(bucketName, itemPath);
+        filePaths.push(...nested);
+      } else {
+        filePaths.push(itemPath);
+      }
     }
+
+    // If fewer than PAGE_SIZE were returned we've reached the end
+    if (items.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
   }
 
   return filePaths;
@@ -167,7 +186,10 @@ async function listAllFiles(bucketName: string, folderPath = ''): Promise<string
  * Clears all user-generated data while preserving system configuration.
  *
  * PRESERVED: system_settings, upsells, timeline_steps, kb_* tables,
- *            crm_companies, crm_contacts, quote-templates bucket, pdf-documents bucket
+ *            crm_companies, crm_contacts, profiles/auth.users,
+ *            user_credits, credit_transactions, credit_packages,
+ *            prompts, extraction_prompts, prompt_history,
+ *            quote-templates bucket, pdf-documents bucket, profile-avatars bucket
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -189,7 +211,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
     if (!body.confirm) {
       return new Response(
         JSON.stringify({ error: 'Confirmation required' }),
@@ -340,12 +370,14 @@ Deno.serve(async (req) => {
     }
 
     const totalVecsDeleted = results.vecs.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
-    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows, Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings`);
+    const successfulTables = results.tables.filter((r: any) => !r.error).length;
+    const failedTables = results.tables.filter((r: any) => r.error).length;
+    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        summary: `Deleted ${totalDeleted} rows from ${TABLES_TO_CLEAR.length} tables, ${totalStorageDeleted} files from storage, and ${totalVecsDeleted} embeddings from VECS`,
+        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), ${totalStorageDeleted} files from storage, and ${totalVecsDeleted} embeddings from VECS`,
         results,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

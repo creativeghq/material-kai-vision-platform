@@ -23,7 +23,8 @@ import { authenticate } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const LATE_API_KEY = Deno.env.get('LATE_API_KEY') || '';
+const LATE_API_KEY = Deno.env.get('LATE_API_KEY');
+if (!LATE_API_KEY) throw new Error('LATE_API_KEY environment variable is required but not set');
 const LATE_BASE_URL = 'https://api.late.dev/v1';
 
 // Supported platforms and their Late.dev identifiers

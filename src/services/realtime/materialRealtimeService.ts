@@ -128,6 +128,7 @@ export class MaterialRealtimeService {
 
       // Remove existing channels
       this.channels.forEach((channel) => {
+        channel.unsubscribe();
         this.supabase.removeChannel(channel);
       });
       this.channels.clear();

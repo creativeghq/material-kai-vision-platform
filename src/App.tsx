@@ -556,9 +556,11 @@ const App = () => (
                   path="/admin/crm"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <CRMManagement />
-                      </Layout>
+                      <AdminGuard>
+                        <Layout>
+                          <CRMManagement />
+                        </Layout>
+                      </AdminGuard>
                     </AuthGuard>
                   }
                 />

@@ -40,7 +40,8 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
       .maybeSingle()
       .then(({ data }) => {
         if (data?.avatar_url) setAvatarUrl(data.avatar_url);
-      });
+      })
+      .catch((err) => console.warn('[PageHeader] Failed to load avatar:', err));
   }, [user]);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
       }, fetchUnread)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
   }, [user]);
 
   const getInitials = (name: string) =>

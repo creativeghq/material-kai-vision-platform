@@ -89,6 +89,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       .subscribe();
 
     return () => {
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [sessionId]);

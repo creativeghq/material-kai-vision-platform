@@ -47,6 +47,13 @@ export function QuotePreviewPage() {
       img.addEventListener('load', onLoad, { once: true });
       img.addEventListener('error', onLoad, { once: true });
     });
+
+    return () => {
+      pending.forEach(img => {
+        img.removeEventListener('load', onLoad);
+        img.removeEventListener('error', onLoad);
+      });
+    };
   }, [autoPrint, loading, data]);
 
   return (

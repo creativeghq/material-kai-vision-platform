@@ -41,7 +41,7 @@ export async function emitAgentEvent(
       .eq('enabled', true);
 
     for (const agent of agents || []) {
-      fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+      await fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
         method:  'POST',
         headers: {
           'Authorization': `Bearer ${supabaseServiceKey}`,
@@ -53,6 +53,8 @@ export async function emitAgentEvent(
           trigger_event_type: eventType,
           input_data:         data,
         }),
+      }).then(res => {
+        if (!res.ok) res.text().then(body => console.error(`[flow-events] Agent ${agent.id} returned HTTP ${res.status}: ${body}`)).catch(() => null);
       }).catch(e => console.error(`[flow-events] Failed to trigger agent ${agent.id}:`, e));
     }
   } catch (err) {

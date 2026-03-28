@@ -45,7 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
       .maybeSingle()
       .then(({ data }) => {
         if (data?.avatar_url) setAvatarUrl(data.avatar_url);
-      });
+      })
+      .catch((err) => console.warn('[Header] Failed to load avatar:', err));
   }, [user]);
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
       }, () => { fetchUnread(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
   }, [user]);
 
   const handleSignOut = async () => {

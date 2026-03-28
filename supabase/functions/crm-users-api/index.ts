@@ -98,8 +98,8 @@ Deno.serve(async (req) => {
 
     // GET /api/users - List all users
     if (method === 'GET' && path.length === 0) {
-      const limit = parseInt(url.searchParams.get('limit') || '1000');
-      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '100', 10), 1), 1000);
+      const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
 
       // Fetch all auth users using admin API
       const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
@@ -333,6 +333,13 @@ Deno.serve(async (req) => {
         .from('user_credits')
         .delete()
         .eq('user_id', userId);
+
+      // Delete the auth user so it doesn't remain orphaned
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+      if (authDeleteError) {
+        console.error(`[crm-users-api] Failed to delete auth user ${userId}:`, authDeleteError.message);
+        // Non-fatal: profile already deleted; log and continue
+      }
 
       return new Response(
         JSON.stringify({ message: 'User deleted successfully' }),

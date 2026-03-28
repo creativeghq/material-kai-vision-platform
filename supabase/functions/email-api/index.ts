@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
 
         const status = url.searchParams.get('status');
         const emailType = url.searchParams.get('emailType');
-        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10), 1), 1000);
 
         let query = supabaseClient
           .from('email_logs')

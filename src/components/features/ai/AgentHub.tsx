@@ -514,7 +514,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
   }, [currentConversationId]);
 
   /**
@@ -984,11 +984,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return;
     }
     if (!userId) {
-      console.log('❌ No userId, returning');
       return;
     }
 
-    console.log('✅ Validation passed, creating user message');
     const userInput = input;
     const userAttachedImages = [...attachedImages];
 
@@ -1006,7 +1004,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setSelectedGenerationMode(null);
     setIsLoading(true);
     setReasoningSteps([]); // Clear reasoning steps for new message
-    console.log('✅ State updated, starting try block');
 
     try {
       // Get current user session
@@ -1141,12 +1138,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           },
         );
 
-        console.log('⏳ WAITING FOR RESPONSE...');
         const response = await fetchPromise;
-        console.log('✅ GOT RESPONSE!');
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -1162,7 +1154,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           throw new Error('No response body');
         }
 
-        console.log('Starting to read stream...');
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -1171,19 +1162,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         let lastChunkTime = Date.now();
 
         while (true) {
-          console.log('📖 Waiting for next chunk...');
           const { done, value } = await reader.read();
-          const now = Date.now();
-          console.log(`⏱️ Time since last chunk: ${now - lastChunkTime}ms`);
-          lastChunkTime = now;
+          lastChunkTime = Date.now();
 
           if (done) {
-            console.log('✅ Stream ended. Total chunks:', chunkCount);
             break;
           }
 
           const decoded = decoder.decode(value, { stream: true });
-          console.log('📦 Raw chunk received:', decoded.substring(0, 200));
           buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -1194,7 +1180,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             try {
               const chunk = JSON.parse(line);
               chunkCount++;
-              console.log(`Chunk #${chunkCount}:`, chunk.type);
 
               // Capture reasoning steps for Jarvis-style display
               if (chunk.type === 'status') {
@@ -1469,7 +1454,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               model: data.model,
               products: data.materialResults?.products,
             }, workspaceId);
-            console.log('💾 Cached response for query:', userInput);
           }
         } // End of streaming response handling
 
@@ -1575,7 +1559,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Track active generation job if present
       if (data.generation_job) {
-        console.log('🎨 Generation job detected:', data.generation_job);
         setActiveGenerationJobs((prev) => {
           const updated = new Map(prev);
           updated.set(data.generation_job.job_id, {
@@ -1665,6 +1648,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       ),
     ).then((urls) => {
       setAttachedImages((prev) => [...prev, ...urls]);
+    }).catch((err) => {
+      console.error('[AgentHub] Failed to read uploaded image(s):', err);
+      toast({
+        title: 'Image Upload Failed',
+        description: 'One or more images could not be read. Please try again.',
+        variant: 'destructive',
+      });
     });
   }, []);
 
@@ -2155,8 +2145,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           processingTimeMs={message.designData.processingTimeMs}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                           onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                          onMaterialClick={(materialId) => {
-                            console.log('Material clicked:', materialId);
+                          onMaterialClick={(_materialId) => {
+                            // TODO: open material detail panel
                           }}
                           onFindMaterials={async (imageUrl) => {
                             const findMaterialsPrompt = `Find materials and products that match this interior design image: ${imageUrl}`;
@@ -2180,8 +2170,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <div className="bg-blue-50 rounded-lg p-4 text-gray-900">
                             <h4 className="font-semibold mb-2">Cost Estimate</h4>
                             <div className="space-y-2">
-                              {message.designData.costEstimate.materials.map((material: any, idx: number) => (
-                                <div key={idx} className="flex justify-between text-sm">
+                              {message.designData.costEstimate.materials.map((material: any) => (
+                                <div key={material.name} className="flex justify-between text-sm">
                                   <span>{material.name}</span>
                                   <span className="font-medium">
                                     ${material.subtotal.toFixed(2)}
@@ -2379,7 +2369,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <div className="flex flex-wrap gap-2 pt-1">
                             {message.images.map((img, idx) => (
                               <img
-                                key={idx}
+                                key={img}
                                 src={img}
                                 alt={`Uploaded image ${idx + 1}`}
                                 className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
@@ -2413,8 +2403,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               modelCount={message.generation_job.model_count}
                               models={message.generation_job.models}
                               workspaceId={workspaceId}
-                              onImageClick={(url, name) => {
-                                console.log('🖼️ Image clicked:', url, name);
+                              onImageClick={(_url, _name) => {
+                                // TODO: open image lightbox
                               }}
                               onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                               onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
@@ -2668,7 +2658,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 /* Default: plain thumbnails */
                 <div className="flex gap-2">
                   {attachedImages.map((img, idx) => (
-                    <div key={idx} className="relative w-16 h-16">
+                    <div key={img} className="relative w-16 h-16">
                       <img src={img} alt="Attached" className="w-full h-full object-cover rounded-lg" />
                       <button
                         onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
@@ -3126,14 +3116,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             setSelectedMaterialsData(null);
           }}
           onExportToMoodboard={(materials) => {
-            console.log('Export to moodboard:', materials);
             toast({
               title: 'Materials Exported',
               description: `${materials.length} materials added to moodboard`,
             });
           }}
-          onEstimateCost={(materialIds) => {
-            console.log('Estimate cost for:', materialIds);
+          onEstimateCost={(_materialIds) => {
             toast({
               title: 'Cost Estimation',
               description: 'Calculating cost estimate...',

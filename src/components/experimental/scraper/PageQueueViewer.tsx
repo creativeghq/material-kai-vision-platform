@@ -67,6 +67,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({
       .subscribe();
 
     return () => {
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [sessionId]);

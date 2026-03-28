@@ -1,13 +1,13 @@
 # Material KAI Vision Platform — Full Business & Product Overview
 
 **Confidential | For Investor & Partner Use**
-*Version 3.2 — March 2026*
+*Version 3.5 — March 2026*
 
 ---
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by 12+ AI models across 6 providers.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by 20+ AI models across 8 providers.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -80,13 +80,13 @@ Every step — ingestion, search, design, visualization, procurement — runs on
 - Frontend served via Vercel global edge — zero latency regardless of user geography
 - Backend handles unlimited async job queue with checkpoint-based recovery
 - Database uses connection pooling and optimized halfvec (float16) vector indexes
-- 150+ API endpoints, 16 categories, fully documented via OpenAPI/Swagger
+- 170+ API endpoints, 20 categories, 60+ Supabase Edge Functions, fully documented via OpenAPI/Swagger
 
 ---
 
 ## AI & Intelligence Layer
 
-The platform's core differentiator is not a single AI model — it is the orchestration of **12+ AI models** deeply embedded into every layer: ingestion, enrichment, search, agent interactions, design generation, and analytics.
+The platform's core differentiator is not a single AI model — it is the orchestration of **20+ AI models** deeply embedded into every layer: ingestion, enrichment, search, agent interactions, design generation, and analytics.
 
 ### Full AI Model Stack
 
@@ -101,7 +101,13 @@ The platform's core differentiator is not a single AI model — it is the orches
 | HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
+| Replicate | proplabs/virtual-staging | AI room staging from empty photos | 20 credits/run |
+| Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
+| Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
 | WorldLabs | Marble mini + plus | 3D Gaussian Splat VR world generation | 50/200 credits per world |
+| Google Gemini | gemini-3.1-flash-image-preview, gemini-3-pro-image-preview | Interior image generation (4 modes) | 6/15 credits |
+| xAI (Grok) | grok-2-aurora | Masked inpainting for region editing, social images | 10–20 credits |
+| Kling | kling-v3.0, kling-1.6-pro | Interior + social video generation | 15–20 credits |
 
 ### 7-Vector Embedding Fusion — The Search Backbone
 
@@ -213,39 +219,61 @@ Model: Claude Haiku 4.5 | Platform showcases and sales demonstrations. Admin-onl
 
 ---
 
-### Feature 4 — 3D Interior Design Generation
+### Feature 4 — Interior Design Generation Suite
 
-The Interior Designer agent generates photorealistic interior design images using **14 AI models** via Replicate:
+The Interior Designer agent generates photorealistic interior design images and videos through **four distinct AI generation systems**:
 
-**Text-to-Image Mode** (text prompt only — all 7 models run in parallel, 7 variations output):
+---
 
-| Model | Strength |
-|-------|---------|
-| FLUX.1-dev | High detail, photorealistic interiors |
-| FLUX.1-schnell | Fastest — good for iteration |
-| SDXL | Versatile, strong style adherence |
-| Stable Diffusion 3 | Excellent lighting and spatial depth |
-| Playground v2.5 | Strong architectural rendering |
-| Kandinsky 2.2 | Unique aesthetic styles |
-| Proteus v0.2 | High-resolution output |
+**A. Replicate Text-to-Image (14 models, run in parallel)**
 
-**Image-to-Image Mode** (reference photo + prompt — 3 working models, 3 transformations output):
+| Mode | Models |
+|------|--------|
+| Text-to-Image | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 (7 variations output simultaneously) |
+| Image-to-Image | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others |
 
-| Model | Strength |
-|-------|---------|
-| ComfyUI Interior Remodel | Best room layout preservation |
-| Interiorly Gen1 Dev | Realistic style transformation |
-| Designer Architecture | Architectural precision |
+**B. Gemini Interior Generation (4 modes)**
 
-**Generation workflow:**
-1. User describes room style or uploads a reference photo via Interior Designer agent
-2. Platform runs models in parallel (3 concurrent jobs, multiple variations)
+| Mode | Description | Credits |
+|------|-------------|---------|
+| Text-to-Image | Narrative prompt → photorealistic room render | 6 (flash) / 15 (4K pro) |
+| Image Edit | Existing room + instruction → transformed image | 6 / 15 |
+| Floor Plan Render | 2D floor plan → photorealistic perspective interior | 6 / 15 |
+| Floor Plan Diagram | Text description → 2D floor plan layout | 6 / 15 |
+
+The Gemini system uses a two-step style-transfer pipeline — an inspiration image is analyzed by Gemini Vision into a structured design specification, which is then used to edit the target room. This prevents spatial "bleed" (the inspiration image never directly influences the generated geometry) and produces far more accurate style transfers than naive image-to-image approaches.
+
+**C. Virtual Staging**
+
+Empty room photos → furnished renders via Replicate `proplabs/virtual-staging` (~56 seconds). 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a KAI agent tool.
+
+**D. Region Editing (Masked Inpainting)**
+
+Users paint a zone over any room image using the `RegionEditCanvas` tool. SAM 2 (Replicate `meta/sam-2`) generates a pixel-perfect binary mask from drawn hints. Grok Aurora then regenerates only the painted area based on a text prompt (20 credits). For product-specific placement, AnyDoor (`ali-vilab/anydoor`) places a real product photo into the masked zone with accurate lighting adaptation.
+
+---
+
+**Generation workflow (full):**
+1. User describes room style or uploads reference via Interior Designer agent
+2. Platform runs parallel generation (multiple models, multiple variations)
 3. All outputs permanently stored in Supabase Storage
-4. Agent automatically runs 7-vector material matching on the generated image — finding real catalog materials that match what was generated
-5. Agent presents cost estimates based on matched materials and project dimensions
-6. User can generate a VR world from any output image with one click
-7. User can save any design to their Moodboard
-8. All generations are credit-billed per image
+4. Agent runs 7-vector material matching on generated image — surfacing real catalog products that match
+5. Agent presents cost estimates based on matched materials and room dimensions
+6. User can: generate VR world, create video walkthrough, stage an empty room, or region-edit any element
+7. All generations are credit-billed per operation
+
+**E. Interior Video Generation**
+
+Any design image can become a video via four AI models:
+
+| Model | Credits | Best For |
+|-------|---------|----------|
+| Veo-2 (Google) | 30 | Cinematic walkthroughs, floor-plan flythroughs |
+| Kling v3.0 | 20 | Product spotlights, before/after reveals, social reels |
+| Wan 2.1 i2v 720p | 12 | Budget general-purpose |
+| Runway Gen4 Turbo | 40 | Premium quality |
+
+Video type auto-selects the optimal model. Supports 16:9, 9:16, 1:1 aspect ratios. Async polling for long renders (Veo, Runway) with `job_id` polling pattern.
 
 ---
 
@@ -430,7 +458,29 @@ Actions: send email (Amazon SES), Slack notification, call webhook, trigger AI a
 
 ---
 
-### Feature 12 — Email System & Campaigns
+### Feature 12 — Social Media Suite
+
+AI-powered social media content generation and cross-platform publishing via Late.dev:
+
+**Content Generation:**
+- **Captions**: Claude generates 3 variants per platform (Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads), each respecting character limits, hashtag conventions, and platform tone. 2 credits.
+- **Images**: Auto-routed by content type — xAI Aurora for lifestyle/people (10cr), Gemini Imagen for product/interior (5cr), FLUX Dev for artistic/textured (6cr). 1:1, 4:5, 9:16, 16:9 aspect ratios.
+- **Videos**: Kling 1.6 Pro (15cr, fast) or Veo-2 (30cr, premium) for short-form social videos. Async polling for longer renders.
+
+**Publishing (Late.dev):**
+- Users connect Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, or Threads via OAuth at their profile settings page
+- Accounts are per-user (not per workspace — each professional manages their own presence)
+- Publish immediately or schedule for a future datetime
+- No credit cost for publishing — uses the workspace's Late.dev subscription
+- Engagement metrics (likes, comments, shares, reach) synced back to local database via `late-analytics`
+- Best posting time recommendations per platform
+
+**Business value for the platform:**
+Professionals using Material KAI to design rooms and source materials can publish their work directly to social media without leaving the platform. Every post is a word-of-mouth marketing event for the platform, driving organic discovery. The social suite also creates a natural upsell moment — from free content generation into higher-tier credit packages.
+
+---
+
+### Feature 13 — Email System & Campaigns
 
 Full transactional and campaign email infrastructure via Amazon SES:
 - Domain verification and management
@@ -442,7 +492,7 @@ Full transactional and campaign email infrastructure via Amazon SES:
 
 ---
 
-### Feature 13 — CRM (Companies & Contacts)
+### Feature 14 — CRM (Companies & Contacts)
 
 Built-in CRM for managing supplier and manufacturer relationships:
 - Company records: name, website, industry, country, Apollo.io enrichment data
@@ -452,7 +502,7 @@ Built-in CRM for managing supplier and manufacturer relationships:
 
 ---
 
-### Feature 14 — Admin Dashboard
+### Feature 15 — Admin Dashboard
 
 Full platform operations suite at `/admin`:
 
@@ -559,7 +609,15 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Qwen3-VL image analysis (per image) | ~$0.02–0.05 | 2–5 credits | Variable |
 | VR World — mini | $0.50 WorldLabs | 50 credits ($0.50) | Pass-through + platform overhead |
 | VR World — plus | $2.00 WorldLabs | 200 credits ($2.00) | Pass-through + platform overhead |
-| Interior design generation | Replicate variable | Credits per image | Variable |
+| Interior design (Replicate) | Replicate variable | Credits per image | Variable |
+| Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |
+| Gemini interior (pro/4K) | ~$0.06 | 15 credits | 2.5x markup |
+| Virtual staging | ~$0.16 Replicate | 20 credits ($0.20) | 1.25x + overhead |
+| Interior video (Kling v3.0) | ~$0.12 | 20 credits ($0.20) | 1.7x markup |
+| Interior video (Veo-2) | ~$0.25 | 30 credits ($0.30) | 1.2x + overhead |
+| Region edit (Grok Aurora) | ~$0.08 xAI | 20 credits ($0.20) | 2.5x markup |
+| Social image (Aurora) | ~$0.04 | 10 credits | 2.5x markup |
+| Social caption (Claude) | ~$0.002 | 2 credits | 10x+ markup |
 | Web scraping (per Firecrawl credit) | ~$0.001 | ~0.1 platform credits | Variable |
 
 **Blended gross margin target on AI costs: 60–70%.** Highest margin on high-frequency, low-cost operations (query parsing, embeddings). Thinner margins on high-cost generation (VR, image gen) where pass-through pricing builds user trust.
@@ -616,10 +674,10 @@ This analytics layer is a significant standalone upsell — providing market int
 | Image classification accuracy | 88%+ |
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
-| API endpoints | 150+ |
-| AI models integrated | 12+ across 6 providers |
-| Edge functions deployed | 30+ |
-| Database tables | 30+ |
+| API endpoints | 170+ |
+| AI models integrated | 20+ across 8 providers |
+| Edge functions deployed | 60+ |
+| Database tables | 40+ |
 
 ---
 
@@ -642,6 +700,12 @@ All 7 embedding types stored as float16 via pgvector. Halves vector storage cost
 
 **6. Real-Time Automation + Background Agents**
 Event-driven flows and autonomous background agents keep improving product data and automating connections without human intervention. Compounds value over time.
+
+**7. Social-to-Platform Flywheel**
+Every interior design created on the platform can be published directly to Instagram, LinkedIn, TikTok, etc. via the built-in social media suite. This turns users into organic distributors of platform-created content, each post pointing back to a professional profile on materialshub.gr. No competitor offers this closed loop from design → social publication.
+
+**8. Full Vertical Integration of the Design Workflow**
+No competitor currently offers: ingestion → AI search → agent interaction → 3D generation → virtual staging → region editing → interior video → VR walkthrough → social publication → quote → project tracking — all in one product. Each feature layer increases switching costs. A user who has cataloged products, built moodboards, generated designs, and tracked a project on this platform has strong reasons to stay.
 
 ---
 
@@ -666,25 +730,33 @@ Event-driven flows and autonomous background agents keep improving product data 
 ### Live in Production (March 2026)
 - 7-vector fusion search with query-adaptive weight profiles
 - Understanding embeddings (spec-based search via Qwen3-VL + Voyage AI)
+- AI search re-ranking (Claude post-retrieval re-ordering with explanations)
 - PDF ingestion pipeline (14 stages, 9 checkpoints, YOLO layout detection)
 - Web scraping ingestion (Firecrawl)
 - XML import with AI field mapping
-- Jarvis unified agent (material search, KB RAG, visual search, B2B research, SEO)
+- KAI unified agent (material search, KB RAG, visual search, B2B research, SEO)
 - Interior Designer agent (room analysis, 3D generation, material matching, cost estimation)
-- 14 AI generation models (7 text-to-image, 7 image-to-image)
+- 14 Replicate generation models (7 text-to-image, 7 image-to-image)
+- Gemini interior generation (4 modes: text-to-image, image-edit, floor-plan-render, floor-plan-text)
+- Virtual staging (AI-furnished rooms from empty photos — Replicate proplabs, 20cr)
+- Region editing / masked inpainting (SAM 2 + Grok Aurora, 20cr)
+- Interior video generation (4 models: Veo-2 30cr, Kling v3.0 20cr, Wan 2.1 12cr, Runway 40cr)
+- Social media suite (caption/image/video generation + Late.dev publishing across 8 platforms)
 - VR world generation (WorldLabs Marble + Spark.js, orbit + first-person walk navigation)
 - Professional marketplace (profiles, services, Hire Me, Discover directory)
 - Moodboards (private + public, comments, featured board)
 - Quotes system (buyer + supplier workflow, upsells, project timeline)
 - Price monitoring (multi-source, alerts, trends)
 - Knowledge Base & RAG
-- Flow builder & background agent framework (product enrichment, material tagging)
-- Factory Analytics dashboard
-- Full admin dashboard (analytics, monitoring, prompt management, CRM, campaigns)
+- Flow builder & automation engine (cron, webhook, event triggers; SMS/email/HTTP actions)
+- Background agent framework (6 types: product enrichment, material tagging, social analytics, factory enrichment + auto-recovery)
+- Factory Analytics dashboard (own data + market trends + platform-wide for admins)
+- Full admin dashboard (analytics, monitoring, prompt management, CRM, campaigns, background agents, flows)
 - Email system (Amazon SES, React Email, campaign management)
-- Credit system (Stripe, volume discounts, all usage logged)
-- Duplicate detection & product merging
+- Billing & credits (Stripe subscriptions + credit packages, customer portal)
+- Duplicate detection & product merging (factory-scoped, undo capability)
 - Collaborative filtering recommendations
+- CRM (contacts, companies, users with role management)
 
 ### Near-Term
 - Sourcing Agent elevated B2B tools (without requiring full admin role)
@@ -711,7 +783,7 @@ Event-driven flows and autonomous background agents keep improving product data 
 **API:** v1api.materialshub.gr/docs
 **Repository:** github.com/creativeghq/material-kai-vision-platform
 **Status:** Production — 5,000+ active users, 99.5%+ uptime
-**Version:** 3.2.0 — March 2026
+**Version:** 3.5.0 — March 2026
 
 ---
 

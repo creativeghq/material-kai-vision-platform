@@ -371,18 +371,26 @@ async function triggerChainedAgents(
       .eq('enabled', true);
 
     for (const child of chainedAgents || []) {
-      fetch(`${SUPABASE_URL}/functions/v1/background-agent-runner`, {
-        method: 'POST',
-        headers: {
-          'Authorization':  `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type':   'application/json',
-        },
-        body: JSON.stringify({
-          agent_id:     child.id,
-          triggered_by: 'chain',
-          input_data:   { ...output, parent_run_id: parentRunId },
-        }),
-      }).catch(e => console.error('[chain-trigger] Failed to trigger child agent:', e));
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/background-agent-runner`, {
+          method: 'POST',
+          headers: {
+            'Authorization':  `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type':   'application/json',
+          },
+          body: JSON.stringify({
+            agent_id:     child.id,
+            triggered_by: 'chain',
+            input_data:   { ...output, parent_run_id: parentRunId },
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '(no body)');
+          console.error(`[chain-trigger] Child agent ${child.id} returned HTTP ${res.status}: ${body}`);
+        }
+      } catch (e) {
+        console.error('[chain-trigger] Failed to trigger child agent:', e);
+      }
     }
   } catch (err) {
     console.error('[chain-trigger] Error querying chained agents:', err);

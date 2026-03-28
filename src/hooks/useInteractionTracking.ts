@@ -23,6 +23,10 @@ export const useInteractionTracking = ({
 }: UseInteractionTrackingOptions) => {
   const elementRef = useRef<HTMLElement | null>(null);
   const hasTrackedView = useRef(false);
+  // Keep metadata in a ref so callbacks always use the latest value without
+  // causing the observer/callbacks to be recreated on every render.
+  const metadataRef = useRef(metadata);
+  useEffect(() => { metadataRef.current = metadata; });
 
   // Track view when element becomes visible
   useEffect(() => {
@@ -35,7 +39,7 @@ export const useInteractionTracking = ({
             hasTrackedView.current = true;
             RecommendationsService.trackView(materialId, {
               source,
-              ...metadata,
+              ...metadataRef.current,
             });
           }
         });
@@ -51,31 +55,31 @@ export const useInteractionTracking = ({
     return () => {
       observer.disconnect();
     };
-  }, [materialId, source, metadata, trackView, viewThreshold]);
+  }, [materialId, source, trackView, viewThreshold]); // metadata intentionally excluded — tracked via ref
 
   // Track click
   const trackClick = useCallback(() => {
     RecommendationsService.trackClick(materialId, {
       source,
-      ...metadata,
+      ...metadataRef.current,
     });
-  }, [materialId, source, metadata]);
+  }, [materialId, source]);
 
   // Track rating
   const trackRating = useCallback((rating: number) => {
     RecommendationsService.trackRating(materialId, rating, {
       source,
-      ...metadata,
+      ...metadataRef.current,
     });
-  }, [materialId, source, metadata]);
+  }, [materialId, source]);
 
   // Track add to quote
   const trackAddToQuote = useCallback(() => {
     RecommendationsService.trackAddToQuote(materialId, {
       source,
-      ...metadata,
+      ...metadataRef.current,
     });
-  }, [materialId, source, metadata]);
+  }, [materialId, source]);
 
   return {
     elementRef,
@@ -93,12 +97,14 @@ export const useClickTracking = (
   source: string,
   metadata?: Record<string, any>,
 ) => {
+  const metadataRef = useRef(metadata);
+  useEffect(() => { metadataRef.current = metadata; });
   return useCallback(() => {
     RecommendationsService.trackClick(materialId, {
       source,
-      ...metadata,
+      ...metadataRef.current,
     });
-  }, [materialId, source, metadata]);
+  }, [materialId, source]);
 };
 
 /**
@@ -111,6 +117,8 @@ export const useViewTracking = (
 ) => {
   const elementRef = useRef<HTMLElement | null>(null);
   const hasTrackedView = useRef(false);
+  const metadataRef = useRef(metadata);
+  useEffect(() => { metadataRef.current = metadata; });
 
   useEffect(() => {
     if (!elementRef.current || hasTrackedView.current) return;
@@ -122,7 +130,7 @@ export const useViewTracking = (
             hasTrackedView.current = true;
             RecommendationsService.trackView(materialId, {
               source,
-              ...metadata,
+              ...metadataRef.current,
             });
           }
         });
@@ -137,8 +145,7 @@ export const useViewTracking = (
     return () => {
       observer.disconnect();
     };
-  }, [materialId, source, metadata]);
+  }, [materialId, source]); // metadata intentionally excluded — tracked via ref
 
   return elementRef;
 };
-

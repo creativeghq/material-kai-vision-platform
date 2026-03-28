@@ -61,6 +61,18 @@ export function useWebSocket(
     isConnected: false,
   });
 
+  // Keep callback refs stable so the WebSocket manager isn't recreated on every render
+  const onMessageRef = useRef(onMessage);
+  const onStateChangeRef = useRef(onStateChange);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
+  useEffect(() => { onStateChangeRef.current = onStateChange; }, [onStateChange]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
+  // Track current state in a ref so the polling interval doesn't need to re-create itself
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   // Initialize WebSocket manager
   useEffect(() => {
     if (!url) return;
@@ -79,9 +91,7 @@ export function useWebSocket(
       },
       onMessage: (message: WebSocketMessage) => {
         setLastMessage(message);
-        if (onMessage) {
-          onMessage(message);
-        }
+        onMessageRef.current?.(message);
         updateStats();
       },
       onClose: () => {
@@ -89,9 +99,7 @@ export function useWebSocket(
       },
       onError: (event: Event) => {
         setError('WebSocket connection error');
-        if (onError) {
-          onError(event);
-        }
+        onErrorRef.current?.(event);
         updateStats();
       },
       onReconnect: (attempt: number) => {
@@ -118,25 +126,23 @@ export function useWebSocket(
         wsManagerRef.current.disconnect();
       }
     };
-  }, [url, autoConnect, onMessage, onError]);
+  }, [url, autoConnect]); // callbacks intentionally excluded — tracked via refs
 
-  // Update state when WebSocket state changes
+  // Poll for state changes; uses stateRef to avoid recreating the interval on every state update
   useEffect(() => {
     const interval = setInterval(() => {
       if (wsManagerRef.current) {
         const currentState = wsManagerRef.current.getState();
-        if (currentState !== state) {
+        if (currentState !== stateRef.current) {
           setState(currentState);
-          if (onStateChange) {
-            onStateChange(currentState);
-          }
+          onStateChangeRef.current?.(currentState);
         }
         updateStats();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state, onStateChange]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateStats = useCallback(() => {
     if (wsManagerRef.current) {

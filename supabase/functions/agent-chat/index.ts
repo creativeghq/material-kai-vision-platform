@@ -20,17 +20,19 @@ const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { extractTextContent } from '../_shared/langgraph-core.ts';
 
 if (!ANTHROPIC_API_KEY) {
   throw new Error('ANTHROPIC_API_KEY must be set');
 }
 
-// Polyfill process.env for npm packages
-(globalThis as any).process = {
-  env: {
-    ANTHROPIC_API_KEY: ANTHROPIC_API_KEY
-  }
-};
+// Polyfill process.env for npm packages that expect a Node.js environment.
+// Merge into the existing object rather than replacing it — other edge functions
+// running in the same Deno isolate may have already set keys we shouldn't wipe.
+if (!(globalThis as any).process) {
+  (globalThis as any).process = { env: {} };
+}
+(globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
 
 
 // NOW import dependencies (after polyfill is set up)
@@ -287,9 +289,9 @@ function createAgentGraph(
   model: any,
   tools: any[],
   onChunk?: (chunk: any) => void,
-  forceToolCall?: boolean
+  forceToolCall?: boolean,
+  maxIterations = 10,
 ) {
-  const maxIterations = 10;
 
   // Agent node: calls the model
   async function agentNode(state: AgentState): Promise<Partial<AgentState>> {
@@ -323,58 +325,29 @@ function createAgentGraph(
 
     const invokeElapsed = Date.now() - invokeStartTime;
 
-    // Track token usage
+    // Track token usage (use ?? not || so a legitimate 0 isn't treated as missing)
     const usage = response.response_metadata?.usage;
-    const inputTokens = usage?.input_tokens || 0;
-    const outputTokens = usage?.output_tokens || 0;
+    const inputTokens = usage?.input_tokens ?? 0;
+    const outputTokens = usage?.output_tokens ?? 0;
 
-    // Send thinking status — extract plain text from Claude API content (may be string or content-block array)
+    // Send thinking status
     try {
-      let thinkingText: string;
-      if (typeof response.content === 'string') {
-        thinkingText = response.content;
-      } else if (Array.isArray(response.content)) {
-        thinkingText = response.content
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
-          .join('\n');
-      } else if (response.content && typeof response.content === 'object' && 'text' in (response.content as any)) {
-        thinkingText = (response.content as any).text;
-      } else {
-        thinkingText = '';
-      }
       onChunk?.({
         type: 'assistant_thinking',
-        content: thinkingText,
+        content: extractTextContent(response.content),
         hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
       });
-    } catch (e) {}
+    } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
     // Check if done (no tool calls)
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      let textContent: string;
-      if (typeof response.content === 'string') {
-        textContent = response.content;
-      } else if (Array.isArray(response.content)) {
-        textContent = response.content
-          .map((block: any) => {
-            if (typeof block === 'string') return block;
-            if (block.type === 'text') return block.text;
-            return '';
-          })
-          .filter(Boolean)
-          .join('\n');
-      } else {
-        textContent = String(response.content);
-      }
-
       return {
         messages: [response],
         iteration,
         inputTokens,
         outputTokens,
         turnCount: 1,
-        finalResponse: textContent,
+        finalResponse: extractTextContent(response.content),
       };
     }
 
@@ -412,7 +385,7 @@ function createAgentGraph(
           args: toolCall.args,
           message: `Calling ${toolCall.name}...`
         });
-      } catch (e) {}
+      } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
       try {
         const tool = tools.find((t: any) => t.name === toolCall.name);
@@ -421,7 +394,14 @@ function createAgentGraph(
         }
 
         const toolStartTime = Date.now();
-        const toolResult = await tool.invoke(toolCall.args);
+        // 90-second per-tool cap prevents a single tool from blocking the whole agent run
+        const TOOL_TIMEOUT_MS = 90_000;
+        const toolResult = await Promise.race([
+          tool.invoke(toolCall.args),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Tool '${toolCall.name}' timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
+          ),
+        ]);
         const toolElapsed = Date.now() - toolStartTime;
 
         // Send tool result
@@ -432,7 +412,7 @@ function createAgentGraph(
             result: toolResult,
             message: `${toolCall.name} completed`
           });
-        } catch (e) {}
+        } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
         // Parse and collect results
         try {
@@ -507,7 +487,7 @@ function createAgentGraph(
             tool: toolCall.name,
             error: error instanceof Error ? error.message : 'Unknown error',
           });
-        } catch (e) {}
+        } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
         toolMessages.push({
           role: 'tool',
@@ -633,10 +613,10 @@ function getModelForAgent(agentId: string): ChatAnthropic {
   return modelSonnet;
 }
 
-// Get model name for logging/tracking
+// Get model name for logging/tracking — must stay in sync with model instances above
 function getModelNameForAgent(agentId: string): string {
   if (agentId === 'demo') {
-    return 'claude-3-5-haiku-20241022';
+    return 'claude-haiku-4-5-20251001';
   }
   return 'claude-sonnet-4-5-20250929';
 }

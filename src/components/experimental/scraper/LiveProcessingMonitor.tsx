@@ -172,6 +172,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({
     return () => {
       clearInterval(timer);
       clearInterval(statsRefresh);
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [sessionId, startTime, loadProcessingStats]); // Added loadProcessingStats dependency

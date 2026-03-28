@@ -4,8 +4,8 @@
  * Provides error tracking and monitoring for Supabase Edge Functions
  */
 
-// Sentry DSN for Edge Functions (same project as frontend)
-const SENTRY_DSN = 'https://3f930a475eb29d63b5e78b1ebabaef78@o4509716458045440.ingest.de.sentry.io/4510301517316176';
+// Sentry DSN for Edge Functions — read from env so it can be rotated without a code change
+const SENTRY_DSN = Deno.env.get('SENTRY_DSN') || 'https://3f930a475eb29d63b5e78b1ebabaef78@o4509716458045440.ingest.de.sentry.io/4510301517316176';
 
 interface SentryEvent {
   message?: string;
