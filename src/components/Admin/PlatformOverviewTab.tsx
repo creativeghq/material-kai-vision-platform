@@ -6,7 +6,7 @@ import {
 import {
   Building2, LayoutDashboard, Star, Users, Eye, Package, Loader2,
   Search, Target, Zap, Award, Globe, Layers, DollarSign, Cpu,
-  Database, FileText, Clock, TrendingUp,
+  Database, FileText, Clock, TrendingUp, Bell, Mail, MessageSquare, Monitor,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -149,6 +149,10 @@ export function PlatformOverviewTab() {
   const [importThroughput, setImportThroughput] = useState<{ week: string; records: number }[]>([]);
   const [enrichmentStatus, setEnrichmentStatus] = useState<{ name: string; value: number }[]>([]);
   const [pipelineKpis, setPipelineKpis] = useState({ totalPdfJobs: 0, pdfSuccessRate: '—', totalImports: 0 });
+
+  // ── Notifications & Messaging ─────────────────────────────────
+  const [notifKpis, setNotifKpis] = useState({ totalSent: 0, email: 0, sms: 0, webPush: 0, inApp: 0 });
+  const [notifTrend, setNotifTrend] = useState<{ week: string; email: number; sms: number; web: number; inapp: number }[]>([]);
 
   useEffect(() => { load(); }, []);
 
@@ -710,6 +714,44 @@ export function PlatformOverviewTab() {
         setFactoryPipeline(Array.from(statusCount.entries()).map(([status, count]) => ({ status, count })));
         setRecentRequests((regs ?? []).slice(0, 8).map((r: any) => ({ name: r.company_name ?? 'Unknown', type: r.type ?? '—', status: r.status ?? '—', date: new Date(r.created_at).toLocaleDateString() })));
       }
+
+      // ── Notifications & Messaging ──────────────────────────────
+      const [notifRes, msgLogRes, emailLogRes, inAppRes] = await Promise.allSettled([
+        supabase.from('notifications').select('channel_type, status, created_at').gte('created_at', ago12.toISOString()),
+        supabase.from('messaging_logs').select('channel_type, status, created_at').gte('created_at', ago12.toISOString()),
+        supabase.from('email_logs').select('status, created_at').gte('created_at', ago12.toISOString()),
+        supabase.from('user_notifications').select('created_at', { count: 'exact', head: true }),
+      ]);
+
+      const nWkMap = new Map<string, { email: number; sms: number; web: number; inapp: number }>(wks12.map(w => [w, { email: 0, sms: 0, web: 0, inapp: 0 }]));
+      let nEmail = 0; let nSms = 0; let nWeb = 0; let nInApp = 0;
+
+      if (notifRes.status === 'fulfilled' && notifRes.value.data) {
+        notifRes.value.data.forEach((r: any) => {
+          const l = weekLabel(new Date(r.created_at));
+          const ch: string = r.channel_type || 'unknown';
+          if (ch === 'email') { nEmail++; if (nWkMap.has(l)) nWkMap.get(l)!.email++; }
+          else if (ch === 'sms' || ch === 'whatsapp') { nSms++; if (nWkMap.has(l)) nWkMap.get(l)!.sms++; }
+          else if (ch === 'web') { nWeb++; if (nWkMap.has(l)) nWkMap.get(l)!.web++; }
+        });
+      }
+      if (msgLogRes.status === 'fulfilled' && msgLogRes.value.data) {
+        msgLogRes.value.data.forEach((r: any) => {
+          const l = weekLabel(new Date(r.created_at));
+          nSms++; if (nWkMap.has(l)) nWkMap.get(l)!.sms++;
+        });
+      }
+      if (emailLogRes.status === 'fulfilled' && emailLogRes.value.data) {
+        emailLogRes.value.data.forEach((r: any) => {
+          const l = weekLabel(new Date(r.created_at));
+          nEmail++; if (nWkMap.has(l)) nWkMap.get(l)!.email++;
+        });
+      }
+      if (inAppRes.status === 'fulfilled') {
+        nInApp = (inAppRes.value as any).count ?? 0;
+      }
+      setNotifKpis({ totalSent: nEmail + nSms + nWeb + nInApp, email: nEmail, sms: nSms, webPush: nWeb, inApp: nInApp });
+      setNotifTrend(Array.from(nWkMap.entries()).map(([week, d]) => ({ week, ...d })));
 
       setIsDemoData(false);
     } catch (err) {
@@ -1510,7 +1552,45 @@ export function PlatformOverviewTab() {
         </Card>
       )}
 
-      {/* ─── 10. Factory Registration Pipeline ──────────────────── */}
+      {/* ─── 10. Notifications & Messaging ──────────────────────── */}
+      <SectionHeader title="Notifications & Messaging" desc="All-time sends across Email, SMS, Web Push, and In-App notification channels" icon={Bell} />
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <KpiCard label="Total Sent (12w)" value={notifKpis.totalSent.toLocaleString()} icon={Bell} />
+        <KpiCard label="Email" value={notifKpis.email.toLocaleString()} icon={Mail} color="text-blue-600" />
+        <KpiCard label="SMS / WhatsApp" value={notifKpis.sms.toLocaleString()} icon={MessageSquare} color="text-green-600" />
+        <KpiCard label="Web Push" value={notifKpis.webPush.toLocaleString()} icon={Monitor} color="text-violet-600" />
+        <KpiCard label="In-App" value={notifKpis.inApp.toLocaleString()} icon={Bell} color="text-amber-500" />
+      </div>
+      {notifTrend.some(w => w.email + w.sms + w.web + w.inapp > 0) ? (
+        <Card className="rounded-2xl">
+          <CardHeader><CardTitle className="text-sm">Weekly Notification Sends by Channel (12w)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={notifTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="email" name="Email" fill={COLORS[1]} stackId="a" radius={[0,0,0,0]} />
+                <Bar dataKey="sms" name="SMS" fill={COLORS[2]} stackId="a" radius={[0,0,0,0]} />
+                <Bar dataKey="web" name="Web Push" fill={COLORS[5]} stackId="a" radius={[0,0,0,0]} />
+                <Bar dataKey="inapp" name="In-App" fill={COLORS[4]} stackId="a" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="rounded-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+            <Bell className="h-10 w-10 mb-3 opacity-20" />
+            <p className="text-sm font-medium">No notifications sent in the last 12 weeks</p>
+            <p className="text-xs mt-1">Channels will populate as Email, SMS, Web Push and In-App messages are sent.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── 11. Factory Registration Pipeline ──────────────────── */}
       {factoryPipeline.length > 0 && (
         <Card className="mt-8">
           <CardHeader><CardTitle className="text-sm font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Factory Registration Pipeline</CardTitle></CardHeader>

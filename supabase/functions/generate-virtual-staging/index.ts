@@ -213,6 +213,16 @@ async function handleRequest(
       `Virtual staging (${room}, ${furnitureStyle})`,
     );
 
+    supabase.from('user_notifications').insert({
+      user_id: userId,
+      type: 'staging_ready',
+      title: 'Virtual staging complete!',
+      body: `Your ${room} has been virtually staged and is ready to view.`,
+      action_url: null,
+      is_read: false,
+      metadata: { job_id: jobId, room },
+    }).then(() => {});
+
     return jsonResponse({
       success: true,
       job_id: jobId,

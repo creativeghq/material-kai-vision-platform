@@ -182,6 +182,17 @@ Deno.serve(async (req) => {
       user_id: userId,
     }).catch(() => {});
 
+    // Notify user their VR world is ready
+    supabase.from('user_notifications').insert({
+      user_id: userId,
+      type: 'vr_world_ready',
+      title: 'Your VR world is ready!',
+      body: 'Your 3D environment has been generated and is ready to explore.',
+      action_url: null,
+      is_read: false,
+      metadata: { vr_world_id: vrWorldId },
+    }).then(() => {});
+
     // Return the completed record
     const { data: completedWorld } = await supabase
       .from('vr_worlds')
@@ -207,6 +218,19 @@ Deno.serve(async (req) => {
           .eq('id', vrWorldId);
       } catch (updateError) {
         console.error('[generate-vr-world] Failed to update status:', updateError);
+      }
+
+      // Notify user of failure
+      if (userId) {
+        supabase.from('user_notifications').insert({
+          user_id: userId,
+          type: 'vr_world_failed',
+          title: 'VR world generation failed',
+          body: 'Something went wrong generating your 3D world. Any credits used have been refunded.',
+          action_url: null,
+          is_read: false,
+          metadata: { vr_world_id: vrWorldId },
+        }).then(() => {});
       }
 
       // Refund credits (always runs even if status update fails)

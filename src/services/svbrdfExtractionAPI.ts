@@ -66,6 +66,16 @@ export class SVBRDFExtractionAPI {
         throw new Error(response.error || 'SVBRDF extraction failed');
       }
 
+      supabase.from('user_notifications').insert({
+        user_id: user.id,
+        type: 'svbrdf_ready',
+        title: 'Material maps ready',
+        body: 'Your SVBRDF material maps have been extracted and are ready to use.',
+        action_url: null,
+        is_read: false,
+        metadata: { extraction_id: (response.data as SVBRDFExtractionResult).extraction_id },
+      }).then(() => {});
+
       return response.data as SVBRDFExtractionResult;
     } catch (error) {
       console.error('Error starting SVBRDF extraction:', error);

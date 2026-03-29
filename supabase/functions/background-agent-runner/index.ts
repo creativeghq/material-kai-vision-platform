@@ -220,6 +220,28 @@ Deno.serve(async (req: Request) => {
       outputTokens: result.outputTokens,
     });
 
+    // Notify workspace owner/admin that agent run completed
+    if (agentConfig.workspace_id) {
+      const { data: ownerMember } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', agentConfig.workspace_id)
+        .in('role', ['owner', 'admin'])
+        .limit(1)
+        .maybeSingle();
+      if (ownerMember?.user_id) {
+        supabase.from('user_notifications').insert({
+          user_id: ownerMember.user_id,
+          type: 'agent_run_done',
+          title: `Agent "${agentConfig.name}" completed`,
+          body: 'Background agent run finished successfully.',
+          action_url: '/admin/background-agents',
+          is_read: false,
+          metadata: { agent_id, run_id: run.id },
+        }).then(() => {});
+      }
+    }
+
     // Post result back to the originating KAI chat conversation (if dispatched from chat)
     const conversationId = (run.input_data as any)?.conversation_id as string | null;
     if (conversationId && result.success) {
@@ -294,6 +316,28 @@ Deno.serve(async (req: Request) => {
         last_run_status: 'failed',
       })
       .eq('id', agent_id);
+
+    // Notify workspace owner/admin that agent run failed
+    if (agentConfig.workspace_id) {
+      const { data: ownerMember } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', agentConfig.workspace_id)
+        .in('role', ['owner', 'admin'])
+        .limit(1)
+        .maybeSingle();
+      if (ownerMember?.user_id) {
+        supabase.from('user_notifications').insert({
+          user_id: ownerMember.user_id,
+          type: 'agent_run_failed',
+          title: `Agent "${agentConfig.name}" failed`,
+          body: errMsg,
+          action_url: '/admin/background-agents',
+          is_read: false,
+          metadata: { agent_id, run_id: run.id },
+        }).then(() => {});
+      }
+    }
 
     return new Response(JSON.stringify({
       success:     false,

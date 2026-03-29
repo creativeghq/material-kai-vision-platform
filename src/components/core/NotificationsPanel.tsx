@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles, FileText, Building2,
+  Globe, Video, Layers, Cpu, Download, CreditCard, XCircle, UserPlus, CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +30,22 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   material_alert:         <Sparkles className="h-4 w-4 text-primary" />,
   quote_updated:          <FileText className="h-4 w-4 text-violet-500" />,
   preferred_factory:      <Building2 className="h-4 w-4 text-blue-500" />,
+  vr_world_ready:         <Globe className="h-4 w-4 text-emerald-500" />,
+  vr_world_failed:        <Globe className="h-4 w-4 text-destructive" />,
+  video_ready:            <Video className="h-4 w-4 text-emerald-500" />,
+  video_failed:           <Video className="h-4 w-4 text-destructive" />,
+  staging_ready:          <Layers className="h-4 w-4 text-emerald-500" />,
+  agent_run_done:         <Cpu className="h-4 w-4 text-emerald-500" />,
+  agent_run_failed:       <Cpu className="h-4 w-4 text-destructive" />,
+  pdf_ready:              <Download className="h-4 w-4 text-violet-500" />,
+  svbrdf_ready:           <Sparkles className="h-4 w-4 text-emerald-500" />,
+  factory_approved:       <CheckCircle className="h-4 w-4 text-green-500" />,
+  factory_rejected:       <XCircle className="h-4 w-4 text-destructive" />,
+  quote_accepted:         <FileText className="h-4 w-4 text-green-500" />,
+  quote_rejected:         <FileText className="h-4 w-4 text-destructive" />,
+  new_follower:           <UserPlus className="h-4 w-4 text-blue-500" />,
+  payment_success:        <CreditCard className="h-4 w-4 text-green-500" />,
+  payment_failed:         <CreditCard className="h-4 w-4 text-destructive" />,
 };
 
 function timeAgo(iso: string) {

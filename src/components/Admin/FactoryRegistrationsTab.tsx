@@ -56,6 +56,15 @@ export const FactoryRegistrationsTab: React.FC = () => {
       setRequests((prev) =>
         prev.map((r) => r.id === req.id ? { ...r, status: 'approved' } : r),
       );
+      supabase.from('user_notifications').insert({
+        user_id: req.user_id,
+        type: 'factory_approved',
+        title: 'Factory registration approved!',
+        body: `Your registration for ${req.company_name} has been approved. You are now a verified factory.`,
+        action_url: '/profile',
+        is_read: false,
+        metadata: { request_id: req.id, company_name: req.company_name },
+      }).then(() => {});
       toast({ title: 'Approved', description: `${req.company_name} is now a verified factory.` });
     } catch {
       toast({ title: 'Error', description: 'Could not approve request.', variant: 'destructive' });
@@ -77,6 +86,15 @@ export const FactoryRegistrationsTab: React.FC = () => {
       setRequests((prev) =>
         prev.map((r) => r.id === req.id ? { ...r, status: 'rejected', rejection_reason: rejectReason.trim() || null } : r),
       );
+      supabase.from('user_notifications').insert({
+        user_id: req.user_id,
+        type: 'factory_rejected',
+        title: 'Factory registration not approved',
+        body: rejectReason.trim() || `Your registration for ${req.company_name} was not approved at this time.`,
+        action_url: null,
+        is_read: false,
+        metadata: { request_id: req.id, company_name: req.company_name },
+      }).then(() => {});
       setRejectingId(null);
       setRejectReason('');
       toast({ title: 'Rejected', description: 'Request has been rejected.' });

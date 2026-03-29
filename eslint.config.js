@@ -4,8 +4,6 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
-import nextPlugin from '@next/eslint-plugin-next';
-
 export default [
   // Base configuration for all files
   {
@@ -71,7 +69,6 @@ export default [
       'react-hooks': reactHooks,
       'jsx-a11y': jsxA11y,
       import: importPlugin,
-      '@next/next': nextPlugin,
     },
     rules: {
       // Basic JavaScript rules

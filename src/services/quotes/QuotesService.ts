@@ -336,11 +336,57 @@ export class QuotesService {
         quote_id: quote.id,
         user_id: quote.user_id,
       });
+      // Notify workspace admins
+      if (quote.workspace_id) {
+        supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', quote.workspace_id)
+          .in('role', ['owner', 'admin'])
+          .then(({ data: admins }) => {
+            if (admins?.length) {
+              supabase.from('user_notifications').insert(
+                admins.map((m) => ({
+                  user_id: m.user_id,
+                  type: 'quote_accepted',
+                  title: `Quote ${quote.quote_number || quote.id.slice(0, 8)} accepted`,
+                  body: 'A client has accepted the quote.',
+                  action_url: `/admin/quotes/${quote.id}`,
+                  is_read: false,
+                  metadata: { quote_id: quote.id },
+                })),
+              ).then(() => {});
+            }
+          });
+      }
     } else if (data.status === 'rejected') {
       flowEventService.emit('quote_rejected', {
         quote_id: quote.id,
         user_id: quote.user_id,
       });
+      // Notify workspace admins
+      if (quote.workspace_id) {
+        supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', quote.workspace_id)
+          .in('role', ['owner', 'admin'])
+          .then(({ data: admins }) => {
+            if (admins?.length) {
+              supabase.from('user_notifications').insert(
+                admins.map((m) => ({
+                  user_id: m.user_id,
+                  type: 'quote_rejected',
+                  title: `Quote ${quote.quote_number || quote.id.slice(0, 8)} declined`,
+                  body: 'A client has declined the quote.',
+                  action_url: `/admin/quotes/${quote.id}`,
+                  is_read: false,
+                  metadata: { quote_id: quote.id },
+                })),
+              ).then(() => {});
+            }
+          });
+      }
     }
 
     return quote;

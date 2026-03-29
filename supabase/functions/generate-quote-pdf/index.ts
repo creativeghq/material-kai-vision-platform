@@ -130,6 +130,24 @@ Deno.serve(async (req) => {
       })
       .eq('id', quoteId);
 
+    // Notify quote owner that PDF is ready
+    const { data: quoteRecord } = await supabase
+      .from('quotes')
+      .select('user_id')
+      .eq('id', quoteId)
+      .single();
+    if (quoteRecord?.user_id) {
+      supabase.from('user_notifications').insert({
+        user_id: quoteRecord.user_id,
+        type: 'pdf_ready',
+        title: 'Your quote PDF is ready',
+        body: `Quote ${quoteData.quote_number || ''} PDF has been generated and is ready to download.`,
+        action_url: `/quotes/${quoteId}`,
+        is_read: false,
+        metadata: { quote_id: quoteId },
+      }).then(() => {});
+    }
+
     const response: QuotePDFResponse = {
       success: true,
       quote_number: quoteData.quote_number || undefined,

@@ -30,10 +30,43 @@ export interface AgentChatMessage {
     productsCount?: number;
     cachedResponse?: boolean;
     rating?: 'up' | 'down' | null;
+    ratedAt?: string;
+    worldData?: {
+      vrWorldId?: string;
+      status?: string;
+      splatUrl100k?: string;
+      splatUrl500k?: string;
+      splatUrlFull?: string;
+      sourceImageUrl?: string;
+      caption?: string;
+      prompt?: string;
+    };
+    videoData?: {
+      job_id?: string;
+      status?: string;
+      video_url?: string;
+    };
+    materialsBoardData?: {
+      job_id?: string;
+      image_url?: string;
+      board_mode?: string;
+      credits_used?: number;
+    };
+    geminiImageData?: Record<string, unknown>;
+    generation_job?: Record<string, unknown>;
   } | null;
   created_at: string;
   user_email?: string;
   user_id?: string;
+}
+
+export interface NotificationChannelStats {
+  channel: string;
+  label: string;
+  total: number;
+  sent: number;
+  failed: number;
+  read: number;
 }
 
 export interface SearchAnalytic {

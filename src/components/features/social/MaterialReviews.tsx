@@ -111,6 +111,25 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
           rating: form.rating,
           has_text: !!form.text.trim(),
         });
+        // Notify the product owner
+        supabase
+          .from('products')
+          .select('user_id')
+          .eq('id', productId)
+          .maybeSingle()
+          .then(({ data: product }) => {
+            if (product?.user_id && product.user_id !== currentUserId) {
+              supabase.from('user_notifications').insert({
+                user_id: product.user_id,
+                type: 'review_received',
+                title: 'New review on your material',
+                body: form.text.trim() ? `"${form.text.trim().slice(0, 80)}"` : `${form.rating} star review received.`,
+                action_url: `/products/${productId}`,
+                is_read: false,
+                metadata: { product_id: productId, reviewer_id: currentUserId, rating: form.rating },
+              }).then(() => {});
+            }
+          });
       }
     }
     setSubmitting(false);

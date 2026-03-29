@@ -74,6 +74,7 @@ import type {
   ModelUsage,
   ExternalServiceUsageData,
   ResendEmailStats,
+  NotificationChannelStats,
 } from './types';
 import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
@@ -120,7 +121,28 @@ const OperationsDashboardInner: React.FC = () => {
   const [svcAllTimeTotals, setSvcAllTimeTotals] = useState<Record<string, { operations: number; cost_usd: number }>>({});
   const [resendEmailStats, setResendEmailStats] = useState<ResendEmailStats | null>(null);
   const [resendEmailLoading, setResendEmailLoading] = useState(false);
+  const [notifChannelStats, setNotifChannelStats] = useState<NotificationChannelStats[]>([]);
   const { toast } = useToast();
+
+  // Detect feature type from agent chat metadata
+  const getFeatureType = (metadata: AgentChatMessage['metadata']): string => {
+    if (!metadata) return 'Text Chat';
+    if (metadata.worldData) return 'VR World';
+    if (metadata.videoData) return 'Video Walkthrough';
+    if (metadata.materialsBoardData) return 'Materials Board';
+    if (metadata.geminiImageData) return 'AI Image';
+    if (metadata.generation_job) return 'Interior Design';
+    return 'Text Chat';
+  };
+
+  const FEATURE_COLORS: Record<string, string> = {
+    'VR World':       'bg-purple-100 text-purple-700 border-purple-200',
+    'Video Walkthrough': 'bg-blue-100 text-blue-700 border-blue-200',
+    'Interior Design': 'bg-amber-100 text-amber-700 border-amber-200',
+    'Materials Board': 'bg-green-100 text-green-700 border-green-200',
+    'AI Image':       'bg-pink-100 text-pink-700 border-pink-200',
+    'Text Chat':      'bg-gray-100 text-gray-600 border-gray-200',
+  };
 
 
   const fetchAnalyticsData = useCallback(async () => {
@@ -587,6 +609,35 @@ const OperationsDashboardInner: React.FC = () => {
 
       console.log('✅ Data Processing Stats:', processingStats);
       setDataProcessingStats(processingStats);
+
+      // Fetch notification channel stats
+      const [{ data: notifData }, { data: msgData }] = await Promise.all([
+        supabase.from('notifications').select('channel_type, status'),
+        supabase.from('messaging_logs').select('channel_type, status'),
+      ]);
+
+      const channelMap = new Map<string, { total: number; sent: number; failed: number; read: number }>();
+      const addToChannel = (channel: string, status: string) => {
+        if (!channelMap.has(channel)) channelMap.set(channel, { total: 0, sent: 0, failed: 0, read: 0 });
+        const e = channelMap.get(channel)!;
+        e.total++;
+        if (['delivered', 'sent', 'opened'].includes(status)) e.sent++;
+        else if (['failed', 'bounced'].includes(status)) e.failed++;
+        if (status === 'read' || status === 'opened') e.read++;
+      };
+      (notifData || []).forEach((r: any) => addToChannel(r.channel_type || 'unknown', r.status || ''));
+      (msgData || []).forEach((r: any) => addToChannel(r.channel_type || 'sms', r.status || ''));
+
+      const CHANNEL_LABELS: Record<string, string> = {
+        email: 'Email', sms: 'SMS', web: 'Web Push', whatsapp: 'WhatsApp', inapp: 'In-App', unknown: 'Unknown',
+      };
+      setNotifChannelStats(
+        Array.from(channelMap.entries()).map(([channel, d]) => ({
+          channel,
+          label: CHANNEL_LABELS[channel] || channel,
+          ...d,
+        })).sort((a, b) => b.total - a.total)
+      );
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -805,68 +856,125 @@ const OperationsDashboardInner: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {/* Summary Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
-                    <div className="text-sm text-slate-600">Total Chats</div>
-                    <div className="text-2xl font-bold text-slate-900">{agentChats.length}</div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
-                    <div className="text-sm text-slate-600">Avg Response Time</div>
-                    <div className="text-2xl font-bold text-slate-900">
-                      {agentChats.length > 0
-                        ? `${Math.round(
-                            agentChats
-                              .filter((c) => c.metadata?.responseTimeMs)
-                              .reduce((sum, c) => sum + (c.metadata?.responseTimeMs || 0), 0) /
-                              Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs).length, 1),
-                          )}ms`
-                        : '0ms'}
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
-                    <div className="text-sm text-green-700 flex items-center gap-1">
-                      <ThumbsUp className="h-3.5 w-3.5" /> Positive Ratings
-                    </div>
-                    <div className="text-2xl font-bold text-green-600">
-                      {agentChats.filter((c) => c.metadata?.rating === 'up').length}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {agentChats.filter((c) => c.metadata?.rating).length > 0
-                        ? `${Math.round(agentChats.filter((c) => c.metadata?.rating === 'up').length / agentChats.filter((c) => c.metadata?.rating).length * 100)}% approval`
-                        : 'No ratings yet'}
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-red-200 shadow-sm">
-                    <div className="text-sm text-red-700 flex items-center gap-1">
-                      <ThumbsDown className="h-3.5 w-3.5" /> Negative Ratings
-                    </div>
-                    <div className="text-2xl font-bold text-red-600">
-                      {agentChats.filter((c) => c.metadata?.rating === 'down').length}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Needs improvement
-                    </div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
-                    <div className="text-sm text-blue-700">Est. Total Cost</div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      ${agentChats
-                        .reduce((sum, chat) => {
-                          const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
-                          const inputTokens = estimateTokens(chat.content);
-                          const outputTokens = estimateTokens(chat.content);
-                          return sum + calculateCost(model, inputTokens, outputTokens).total;
-                        }, 0)
-                        .toFixed(4)}
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  const ratedChats = agentChats.filter((c) => c.metadata?.rating);
+                  const upCount = agentChats.filter((c) => c.metadata?.rating === 'up').length;
+                  const downCount = agentChats.filter((c) => c.metadata?.rating === 'down').length;
+                  const approvalPct = ratedChats.length > 0 ? Math.round((upCount / ratedChats.length) * 100) : null;
+                  const avgResponseMs = agentChats.length > 0
+                    ? Math.round(
+                        agentChats.filter((c) => c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0)
+                          .reduce((sum, c) => sum + (c.metadata?.responseTimeMs || 0), 0) /
+                        Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0).length, 1),
+                      )
+                    : 0;
+                  const featureCounts: Record<string, number> = {};
+                  const featureResponseTimes: Record<string, number[]> = {};
+                  agentChats.forEach((c) => {
+                    const ft = getFeatureType(c.metadata);
+                    featureCounts[ft] = (featureCounts[ft] || 0) + 1;
+                    if (c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0) {
+                      if (!featureResponseTimes[ft]) featureResponseTimes[ft] = [];
+                      featureResponseTimes[ft].push(c.metadata.responseTimeMs);
+                    }
+                  });
+                  return (
+                    <>
+                      {/* Row 1: core metrics */}
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
+                          <div className="text-sm text-slate-600">Total Chats</div>
+                          <div className="text-2xl font-bold text-slate-900">{agentChats.length}</div>
+                        </div>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
+                          <div className="text-sm text-slate-600">Avg Response Time</div>
+                          <div className="text-2xl font-bold text-slate-900">{avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(1)}s` : '—'}</div>
+                          <div className="text-xs text-muted-foreground mt-1">across all feature types</div>
+                        </div>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
+                          <div className="text-sm text-green-700 flex items-center gap-1">
+                            <ThumbsUp className="h-3.5 w-3.5" /> Positive Ratings
+                          </div>
+                          <div className="text-2xl font-bold text-green-600">{upCount}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {approvalPct !== null ? `${approvalPct}% approval rate` : 'No ratings yet'}
+                          </div>
+                        </div>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-red-200 shadow-sm">
+                          <div className="text-sm text-red-700 flex items-center gap-1">
+                            <ThumbsDown className="h-3.5 w-3.5" /> Negative Ratings
+                          </div>
+                          <div className="text-2xl font-bold text-red-600">{downCount}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {ratedChats.length > 0 ? `${ratedChats.length} total rated` : 'No ratings yet'}
+                          </div>
+                        </div>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
+                          <div className="text-sm text-blue-700">Est. Total Cost</div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            ${agentChats.reduce((sum, chat) => {
+                              const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
+                              const inputTokens = estimateTokens(chat.content);
+                              const outputTokens = estimateTokens(chat.content);
+                              return sum + calculateCost(model, inputTokens, outputTokens).total;
+                            }, 0).toFixed(4)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Ratings approval bar */}
+                      {ratedChats.length > 0 && (
+                        <div className="mb-4 bg-white/80 rounded-lg border border-slate-200 p-4 shadow-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-slate-700">Rating Breakdown</span>
+                            <span className="text-xs text-muted-foreground">{ratedChats.length} / {agentChats.length} responses rated</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <ThumbsUp className="h-4 w-4 text-green-600 shrink-0" />
+                            <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 rounded-full transition-all"
+                                style={{ width: `${approvalPct ?? 0}%` }}
+                              />
+                            </div>
+                            <ThumbsDown className="h-4 w-4 text-red-500 shrink-0" />
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                            <span className="text-green-600 font-medium">{upCount} positive</span>
+                            <span className="font-semibold">{approvalPct}% approval</span>
+                            <span className="text-red-500 font-medium">{downCount} negative</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Row 3: Feature type breakdown */}
+                      {Object.keys(featureCounts).length > 0 && (
+                        <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                          {Object.entries(featureCounts).sort((a, b) => b[1] - a[1]).map(([ft, count]) => {
+                            const times = featureResponseTimes[ft] || [];
+                            const avgMs = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+                            return (
+                              <div key={ft} className={`rounded-lg border px-3 py-2.5 text-center ${FEATURE_COLORS[ft] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                <div className="text-xs font-medium truncate">{ft}</div>
+                                <div className="text-xl font-bold mt-0.5">{count}</div>
+                                {avgMs !== null && (
+                                  <div className="text-xs opacity-70 mt-0.5">{(avgMs / 1000).toFixed(1)}s avg</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Agent Chat Table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[300px]">Query / Response</TableHead>
+                      <TableHead className="w-[240px]">Response Preview</TableHead>
+                      <TableHead>Feature</TableHead>
                       <TableHead>Agent</TableHead>
                       <TableHead>Model</TableHead>
                       <TableHead>Response Time</TableHead>
@@ -882,12 +990,29 @@ const OperationsDashboardInner: React.FC = () => {
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
+                      const featureType = getFeatureType(chat.metadata);
+                      const featureColorClass = FEATURE_COLORS[featureType] || 'bg-gray-100 text-gray-600 border-gray-200';
+                      // Extra detail for specific features
+                      const genStatus = chat.metadata?.worldData?.status || chat.metadata?.videoData?.status;
+                      const boardMode = chat.metadata?.materialsBoardData?.board_mode;
 
                       return (
                         <TableRow key={chat.id}>
-                          <TableCell className="font-medium max-w-[300px]">
+                          <TableCell className="font-medium max-w-[240px]">
                             <div className="truncate text-sm" title={chat.content}>
-                              {chat.content.slice(0, 80)}...
+                              {chat.content.slice(0, 70)}…
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${featureColorClass}`}>
+                                {featureType}
+                              </span>
+                              {(genStatus || boardMode) && (
+                                <span className="text-xs text-muted-foreground">
+                                  {boardMode ? boardMode.replace(/-/g, ' ') : genStatus}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -901,17 +1026,27 @@ const OperationsDashboardInner: React.FC = () => {
                             </code>
                           </TableCell>
                           <TableCell>
-                            <span className={chat.metadata?.responseTimeMs && chat.metadata.responseTimeMs > 10000 ? 'text-red-600' : ''}>
-                              {chat.metadata?.responseTimeMs ? `${(chat.metadata.responseTimeMs / 1000).toFixed(1)}s` : '-'}
-                            </span>
+                            {chat.metadata?.responseTimeMs && chat.metadata.responseTimeMs > 0 ? (
+                              <span className={chat.metadata.responseTimeMs > 30000 ? 'text-red-600 font-medium' : chat.metadata.responseTimeMs > 10000 ? 'text-amber-600' : ''}>
+                                {(chat.metadata.responseTimeMs / 1000).toFixed(1)}s
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {chat.metadata?.rating === 'up' ? (
-                              <ThumbsUp className="h-4 w-4 text-green-600" />
+                              <div className="flex items-center gap-1">
+                                <ThumbsUp className="h-4 w-4 text-green-600" />
+                                <span className="text-xs text-green-600">Good</span>
+                              </div>
                             ) : chat.metadata?.rating === 'down' ? (
-                              <ThumbsDown className="h-4 w-4 text-red-600" />
+                              <div className="flex items-center gap-1">
+                                <ThumbsDown className="h-4 w-4 text-red-600" />
+                                <span className="text-xs text-red-600">Poor</span>
+                              </div>
                             ) : (
-                              <span className="text-gray-400">-</span>
+                              <span className="text-gray-300 text-xs">—</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -1140,6 +1275,76 @@ const OperationsDashboardInner: React.FC = () => {
                   <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
                     <Mail className="h-8 w-8 mb-2 opacity-30" />
                     <p className="text-sm">No emails sent in this period</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Notification Channels Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Send className="h-4 w-4" />
+                  Notification Channels
+                </CardTitle>
+                <CardDescription>
+                  All-time sends across Email (Resend), SMS/WhatsApp (Twilio), Web Push, and In-App notifications.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {notifChannelStats.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
+                    <Send className="h-8 w-8 mb-2 opacity-30" />
+                    <p className="text-sm font-medium">No notifications sent yet</p>
+                    <p className="text-xs mt-1">Email, SMS, Web Push, and In-App channels will appear here once active.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                    {notifChannelStats.map((ch) => (
+                      <div key={ch.channel} className="space-y-1 rounded-lg border border-border/50 p-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{ch.label}</p>
+                        <p className="text-2xl font-bold">{ch.total.toLocaleString()}</p>
+                        <div className="flex gap-3 text-xs">
+                          <span className="text-green-600">{ch.sent} sent</span>
+                          {ch.failed > 0 && <span className="text-red-500">{ch.failed} failed</span>}
+                          {ch.read > 0 && <span className="text-blue-500">{ch.read} opened</span>}
+                        </div>
+                        {ch.total > 0 && (
+                          <div className="mt-1">
+                            <div className="bg-gray-100 rounded-full h-1.5">
+                              <div
+                                className="bg-green-500 h-1.5 rounded-full"
+                                style={{ width: `${Math.round((ch.sent / ch.total) * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{Math.round((ch.sent / ch.total) * 100)}% delivery rate</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {/* Always show Email row from email_logs */}
+                    {resendEmailStats && !notifChannelStats.find(c => c.channel === 'email') && (
+                      <div className="space-y-1 rounded-lg border border-border/50 p-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email (Resend)</p>
+                        <p className="text-2xl font-bold">{resendEmailStats.total.toLocaleString()}</p>
+                        <div className="flex gap-3 text-xs">
+                          <span className="text-green-600">{resendEmailStats.delivered} delivered</span>
+                          {resendEmailStats.bounced > 0 && <span className="text-red-500">{resendEmailStats.bounced} bounced</span>}
+                          {resendEmailStats.opened > 0 && <span className="text-blue-500">{resendEmailStats.opened} opened</span>}
+                        </div>
+                        {resendEmailStats.total > 0 && (
+                          <div className="mt-1">
+                            <div className="bg-gray-100 rounded-full h-1.5">
+                              <div
+                                className="bg-green-500 h-1.5 rounded-full"
+                                style={{ width: `${resendEmailStats.deliveryRate.toFixed(0)}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{resendEmailStats.deliveryRate.toFixed(1)}% delivery rate</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

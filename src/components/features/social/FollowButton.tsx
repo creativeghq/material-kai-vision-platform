@@ -56,6 +56,15 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
         .insert({ follower_id: currentUserId, following_id: targetUserId });
       setFollowing(true);
       onToggle?.(true);
+      supabase.from('user_notifications').insert({
+        user_id: targetUserId,
+        type: 'new_follower',
+        title: 'You have a new follower',
+        body: null,
+        action_url: '/profile?tab=followers',
+        is_read: false,
+        metadata: { follower_id: currentUserId },
+      }).then(() => {});
       flowEventService.emit('profile_followed', {
         follower_id: currentUserId,
         following_id: targetUserId,

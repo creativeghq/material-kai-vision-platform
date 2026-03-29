@@ -222,13 +222,41 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       console.error('Error granting credits:', error);
     } else {
       console.log(`Granted ${creditAmount} credits to user ${profile.user_id}`);
+      supabase.from('user_notifications').insert({
+        user_id: profile.user_id,
+        type: 'payment_success',
+        title: 'Credits added to your account',
+        body: `${creditAmount} credits have been added to your account.`,
+        action_url: '/settings/billing',
+        is_read: false,
+        metadata: { credit_amount: parseFloat(creditAmount), payment_intent_id: paymentIntent.id },
+      }).then(() => {});
     }
   }
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   console.log(`Payment failed: ${paymentIntent.id}`);
-  // Could send notification to user
+  const customerId = paymentIntent.customer as string;
+  if (!customerId) return;
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('user_id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (!profile) return;
+
+  supabase.from('user_notifications').insert({
+    user_id: profile.user_id,
+    type: 'payment_failed',
+    title: 'Payment failed',
+    body: 'Your payment could not be processed. Please update your payment details.',
+    action_url: '/settings/billing',
+    is_read: false,
+    metadata: { payment_intent_id: paymentIntent.id },
+  }).then(() => {});
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
