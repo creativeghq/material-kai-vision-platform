@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const AgentHubPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialPrompt = searchParams.get('prompt') ?? undefined;
   const initialConversationId = searchParams.get('conversation') ?? undefined;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
@@ -49,6 +49,10 @@ const AgentHubPage: React.FC = () => {
     fetchUserRole();
   }, [navigate]);
 
+  const handleConversationChange = (conversationId: string | null) => {
+    setSearchParams(conversationId ? { conversation: conversationId } : {}, { replace: true });
+  };
+
   const handleMaterialSelect = (materialId: string) => {
     console.log('Material selected:', materialId);
     navigate(`/catalog?material=${materialId}`);
@@ -73,6 +77,7 @@ const AgentHubPage: React.FC = () => {
         onMaterialSelect={handleMaterialSelect}
         initialPrompt={initialPrompt}
         initialConversationId={initialConversationId}
+        onConversationChange={handleConversationChange}
       />
     </div>
   );

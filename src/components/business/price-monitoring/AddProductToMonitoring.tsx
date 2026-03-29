@@ -139,7 +139,7 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
           next_check_at: nextCheckAt,
           status: 'active',
         }, {
-          onConflict: 'product_id,user_id'
+          onConflict: 'product_id,user_id',
         });
 
       if (error) throw error;

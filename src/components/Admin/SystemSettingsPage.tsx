@@ -194,7 +194,7 @@ export const SystemSettingsPage: React.FC = () => {
     file: File,
     targetPath: string,
     previewSetter: (url: string | null) => void,
-    configKey?: keyof PDFTemplateConfig
+    configKey?: keyof PDFTemplateConfig,
   ) => {
     const allowedTypes = ['image/png', 'image/jpeg'];
     if (!allowedTypes.includes(file.type)) {
@@ -246,7 +246,7 @@ export const SystemSettingsPage: React.FC = () => {
   const handleImageDelete = async (
     storagePath: string,
     previewSetter: (url: string | null) => void,
-    configKey?: keyof PDFTemplateConfig
+    configKey?: keyof PDFTemplateConfig,
   ) => {
     try {
       setUploadingImage(storagePath);

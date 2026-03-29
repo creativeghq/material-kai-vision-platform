@@ -384,7 +384,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       toast({
         title: 'Search Completed',
-        description: `Found ${unifiedResults.length} results using ${actualSearchType} search`,
+        description: `Found ${unifiedResults.length} results using ${searchType} search`,
       });
     } catch (error) {
       console.error('Search error:', error);

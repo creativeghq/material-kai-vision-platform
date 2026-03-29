@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles,
+  Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles, FileText, Building2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +27,8 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   review_received:        <Star className="h-4 w-4 text-amber-400" />,
   agent_completed:        <Bot className="h-4 w-4 text-primary" />,
   material_alert:         <Sparkles className="h-4 w-4 text-primary" />,
+  quote_updated:          <FileText className="h-4 w-4 text-violet-500" />,
+  preferred_factory:      <Building2 className="h-4 w-4 text-blue-500" />,
 };
 
 function timeAgo(iso: string) {
@@ -52,15 +55,18 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inPanel = panelRef.current?.contains(target);
+      const inTrigger = triggerRef.current?.contains(target);
+      if (!inPanel && !inTrigger) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -101,7 +107,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
         .update({ is_read: true })
         .eq('id', n.id);
       setNotifications((prev) =>
-        prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x)
+        prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x),
       );
       onCountChange(Math.max(0, unreadCount - 1));
     }
@@ -116,14 +122,25 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
     onCountChange(Math.max(0, unreadCount - 1));
   };
 
+  const handleToggle = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPanelPos({
+        top: rect.bottom + window.scrollY + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen((v) => !v);
+  };
+
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative" ref={triggerRef}>
       {/* Bell trigger */}
       <Button
         variant="ghost"
         size="icon"
         className="h-10 w-10 hover:bg-white/10 relative"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleToggle}
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
@@ -134,8 +151,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
       </Button>
 
       {/* Panel */}
-      {open && (
-        <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border bg-card shadow-xl overflow-hidden">
+      {open && panelPos && createPortal(
+        <div ref={panelRef} style={{ position: 'absolute', top: panelPos.top, right: panelPos.right, zIndex: 99999 }} className="w-80 rounded-2xl border bg-card shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-card/80 backdrop-blur-sm">
             <span className="text-sm font-semibold">Notifications</span>
@@ -217,7 +234,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

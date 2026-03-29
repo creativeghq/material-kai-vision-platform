@@ -5,7 +5,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import {
-  TrendingUp, Search, Target, Zap, Award, Globe, Layers, Activity,
+  TrendingUp, Search, Target, Zap, Award, Globe, Layers, Activity, Building2,
   Download, Calendar, ChevronUp, ChevronDown, Minus, Package, Star, Eye, Users,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -18,6 +18,7 @@ import {
 } from '../shared/AnalyticsUIComponents';
 import {
   buildWeeks, weeksAgo, buildMonthlyTrend, forecastWeeks, downloadCSV,
+  convRate, CHART_MARGINS, GRID_PROPS,
 } from '../shared/analyticsUtils';
 
 export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boolean }> = ({ factoryName, isFactory }) => {
@@ -51,13 +52,18 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
   const [quoteBasketsData, setQuoteBasketsData] = useState<{ product1: string; product2: string; count: number }[]>([]);
   const [lifecycleKpi, setLifecycleKpi] = useState<{ avgDaysToQuote: number; saveToQuoteRate: number }>({ avgDaysToQuote: 0, saveToQuoteRate: 0 });
 
-  // ── Factory scope only
+  // ── Factory overlay (loaded on top of platform data when viewScope === 'factory')
   const [quoteFunnelData, setQuoteFunnelData] = useState<{ stage: string; count: number }[]>([]);
   const [moodboardPairings, setMoodboardPairings] = useState<{ name: string; category: string; count: number }[]>([]);
   const [moodboardStats, setMoodboardStats] = useState<{ total: number; public: number }>({ total: 0, public: 0 });
   const [catalogGaps, setCatalogGaps] = useState<{ name: string; mentions: number }[]>([]);
   const [productVelocity, setProductVelocity] = useState<{ name: string; saves: number; quotes: number; trend: string }[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
+  const [factoryProductNames, setFactoryProductNames] = useState<Set<string>>(new Set());
+  const [factoryKpis, setFactoryKpis] = useState<{ saves: number; quotes: number; convRate: string; platformConvRate: string } | null>(null);
+  const [factoryBuyerTypeData, setFactoryBuyerTypeData] = useState<{ type: string; saves: number; quotes: number }[]>([]);
+  const [factoryEngagementFunnel, setFactoryEngagementFunnel] = useState<{ stage: string; count: number; rate: string; color: string }[]>([]);
+  const [platformTotals, setPlatformTotals] = useState<{ saves: number; quotes: number }>({ saves: 0, quotes: 0 });
 
   // ── New analytics sections
   const [engagementFunnel, setEngagementFunnel] = useState<{ stage: string; count: number; rate: string; color: string }[]>([]);
@@ -213,9 +219,35 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         'Interior Designers are your #1 buyer type — 42% of all moodboard saves',
         'Your Stone materials are gaining traction this period',
         'Catalog gap: "Recycled Oak Panel" has 52 demand signals not served by your catalog',
+        'Your save-to-quote conversion: 33% (platform avg: 15%) — +18% above average',
         'Your materials appear in 12 public moodboards — strong organic visibility',
-        'Quote acceptance rate: 68% — above platform average of ~61%',
       ]);
+      setFactoryProductNames(new Set(['marble bianco', 'marble bianco 60x60', 'natural stone tile', 'travertine silver', 'limestone classic', 'calacatta gold']));
+      setFactoryKpis({ saves: 382, quotes: 127, convRate: '33%', platformConvRate: '15%' });
+      setFactoryBuyerTypeData([
+        { type: 'interior_designer', saves: 160, quotes: 55 },
+        { type: 'architect', saves: 98, quotes: 38 },
+        { type: 'designer', saves: 72, quotes: 21 },
+        { type: 'sourcing_agent', saves: 35, quotes: 9 },
+        { type: 'other', saves: 17, quotes: 4 },
+      ]);
+      setFactoryEngagementFunnel([
+        { stage: 'Material Views', count: 1240, rate: '100%', color: 'bg-violet-500' },
+        { stage: 'Moodboard Saves', count: 382, rate: '30.8%', color: 'bg-blue-500' },
+        { stage: 'Quote Requests', count: 127, rate: '10.2%', color: 'bg-cyan-500' },
+        { stage: 'Quotes Accepted', count: 48, rate: '3.9%', color: 'bg-green-500' },
+      ]);
+    } else {
+      setFactoryProductNames(new Set());
+      setFactoryKpis(null);
+      setFactoryBuyerTypeData([]);
+      setFactoryEngagementFunnel([]);
+      setProductVelocity([]);
+      setQuoteFunnelData([]);
+      setMoodboardStats({ total: 0, public: 0 });
+      setMoodboardPairings([]);
+      setCatalogGaps([]);
+      setInsights([]);
     }
     setVrUsageData([
       { name: 'Marble Bianco 60x60', count: 28, roomType: 'Living Room' },
@@ -246,22 +278,14 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { product1: 'Rattan Chair', product2: 'Concrete Finish', count: 7 },
     ]);
     setLifecycleKpi({ avgDaysToQuote: 8, saveToQuoteRate: 34 });
-    // Engagement funnel demo
-    if (viewScope === 'factory') {
-      setEngagementFunnel([
-        { stage: 'Demand Signals', count: 1240, rate: '100%', color: 'bg-violet-500' },
-        { stage: 'Moodboard Saves', count: 382, rate: '30.8%', color: 'bg-blue-500' },
-        { stage: 'Quote Requests', count: 127, rate: '10.2%', color: 'bg-cyan-500' },
-        { stage: 'Quotes Accepted', count: 48, rate: '3.9%', color: 'bg-green-500' },
-      ]);
-    } else {
-      setEngagementFunnel([
-        { stage: 'Demand Signals', count: 14820, rate: '100%', color: 'bg-violet-500' },
-        { stage: 'Moodboard Saves', count: 3847, rate: '26.0%', color: 'bg-blue-500' },
-        { stage: 'Quote Requests', count: 592, rate: '4.0%', color: 'bg-cyan-500' },
-        { stage: 'Quotes Accepted', count: 312, rate: '2.1%', color: 'bg-green-500' },
-      ]);
-    }
+    // Engagement funnel demo — always platform-wide
+    setEngagementFunnel([
+      { stage: 'Material Views', count: 14820, rate: '100%', color: 'bg-violet-500' },
+      { stage: 'Moodboard Saves', count: 3847, rate: '26.0%', color: 'bg-blue-500' },
+      { stage: 'Quote Requests', count: 592, rate: '4.0%', color: 'bg-cyan-500' },
+      { stage: 'Quotes Accepted', count: 312, rate: '2.1%', color: 'bg-green-500' },
+    ]);
+    setPlatformTotals({ saves: 3847, quotes: 592 });
     // Discovery per product demo (both modes)
     setDiscoveryByProduct([
       { name: 'Marble Bianco 60x60', search: 62, agent: 18, threeD: 12, manual: 5, page: 3 },
@@ -311,8 +335,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
     try {
       const ago = weeksAgo(timeRange);
 
-      if (viewScope === 'platform' || !factoryName) {
-        // ── PLATFORM BRANCH ──────────────────────────────────
+      {
+        // ── PLATFORM BRANCH (always runs) ─────────────────────
         const [
           { data: popularSearches },
           { data: demandData },
@@ -326,7 +350,11 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         ]);
 
         const hasRealData = (popularSearches ?? []).length > 0 || (demandData ?? []).length > 0;
-        if (!hasRealData) return;
+        if (!hasRealData) {
+          // No platform data — skip platform population but still run factory overlay
+          if (viewScope === 'factory' && factoryName) await loadFactoryOverlay(ago);
+          return;
+        }
 
         // Apply category filter in-memory
         const catFilter = (item: any) => {
@@ -607,10 +635,34 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           totalCategorySaves: filteredMbItems.length,
           topBuyerType,
         });
+        setPlatformTotals({ saves: filteredMbItems.length, quotes: filteredQItems.length });
+      } // ─── end platform branch ────────────────────────────────
 
+      // ── FACTORY OVERLAY ──────────────────────────────────────
+      if (viewScope === 'factory' && factoryName) {
+        await loadFactoryOverlay(ago);
       } else {
-        // ── FACTORY BRANCH ────────────────────────────────────
-        // B1: Load factory products
+        setFactoryProductNames(new Set());
+        setFactoryKpis(null);
+        setFactoryBuyerTypeData([]);
+        setFactoryEngagementFunnel([]);
+        setProductVelocity([]);
+        setQuoteFunnelData([]);
+        setMoodboardStats({ total: 0, public: 0 });
+        setMoodboardPairings([]);
+        setCatalogGaps([]);
+        setInsights([]);
+      }
+
+    } catch (err) {
+      console.error('MarketTrendsTab load error:', err);
+    }
+  };
+
+  // ── Factory overlay loader — runs after platform data is loaded ─────────
+  const loadFactoryOverlay = async (ago: Date) => {
+    try {
+      // B1: Load factory products
         const { data: factoryProducts } = await supabase.from('products').select('id, name, metadata').contains('metadata', { factory_name: factoryName });
         const ids = (factoryProducts ?? []).map((p) => p.id);
         const names = (factoryProducts ?? []).map((p) => String(p.name ?? '').toLowerCase());
@@ -642,39 +694,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         const hasRealData = (mbItemsRaw ?? []).length > 0 || (qItemsRaw ?? []).length > 0;
         if (!hasRealData) return;
 
-        // Attribute picker from factory product metadata
-        const skipKeys = new Set(['factory_name', 'created_at', 'updated_at', 'id', 'image_url', 'url', 'description', 'category', 'name']);
-        const keyMap = new Map<string, Map<string, number>>();
-        (mbItemsRaw ?? []).forEach((item: any) => {
-          const meta = ((item.products as any)?.metadata ?? {}) as Record<string, unknown>;
-          Object.entries(meta).forEach(([key, val]) => {
-            if (skipKeys.has(key) || val == null || val === '') return;
-            if (!keyMap.has(key)) keyMap.set(key, new Map());
-            const vals: string[] = Array.isArray(val) ? val.map(String) : [String(val)];
-            vals.forEach((v) => {
-              const k = v.slice(0, 40);
-              keyMap.get(key)!.set(k, (keyMap.get(key)!.get(k) ?? 0) + 1);
-            });
-          });
-        });
-        const newKeys = Array.from(keyMap.keys()).sort();
-        setAttrSourceKeys(newKeys);
-        setAttrSource(prev => (prev === '' || prev === 'intent' || !newKeys.includes(prev)) ? (newKeys[0] ?? '') : prev);
-        const newMetaByKey = new Map<string, { attribute: string; count: number }[]>();
-        keyMap.forEach((valMap, key) => {
-          newMetaByKey.set(key, Array.from(valMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([attribute, count]) => ({ attribute, count })));
-        });
-        setMetadataByKey(newMetaByKey);
-
-        // Trending attributes
-        const attrCount = new Map<string, number>();
-        (popularSearches ?? []).forEach((ps: any) => {
-          const mentions: string[] = ps.all_material_mentions ?? [];
-          mentions.forEach((m: string) => { if (m) attrCount.set(m, (attrCount.get(m) ?? 0) + (ps.search_count ?? 1)); });
-        });
-        setTrendingAttributes(Array.from(attrCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([attribute, count]) => ({ attribute, count })));
-
-        // Factory demand ranking (match by name)
+        // Factory demand ranking (match by name) — used for insights only; platform topDemands unchanged
         const factoryDemands = (demandData ?? []).filter((d: any) => names.some((n) => {
           const dn = String(d.material_name ?? '').toLowerCase();
           return n.includes(dn.split(' ')[0]) || dn.includes(n.split(' ')[0]);
@@ -695,16 +715,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           .filter((id) => { const n = (pNameMap.get(id) ?? '').toLowerCase(); return !demandNames.has(n) && ((mbCount.get(id) ?? 0) + (qCount.get(id) ?? 0)) > 0; })
           .map((id) => ({ name: pNameMap.get(id) ?? id, mentions: 0, saves: mbCount.get(id) ?? 0, in3d: 0, momentum: 'cool' }))
           .sort((a, b) => b.saves - a.saves).slice(0, 5);
-        setTopDemands([...factoryDemands, ...notInDemand]);
-
-        // Discovery channels (factory-scoped)
-        const channelMap = new Map<string, number>();
-        (qItemsRaw ?? []).forEach((qi: any) => { const ch = qi.added_from ?? 'manual'; channelMap.set(ch, (channelMap.get(ch) ?? 0) + 1); });
-        const channelLabels: Record<string, string> = { search: 'Search', agent: 'AI Agent', '3d_generation': '3D Generation', manual: 'Manual', product_page: 'Product Page', moodboard: 'Moodboard' };
-        setDiscoveryChannels(Array.from(channelMap.entries()).map(([k, v]) => ({ name: channelLabels[k] ?? k, value: v })));
-
-        // B3: Buyer type (3-step)
-        let topBuyerType = '—';
+        // B3: Buyer type (factory-scoped → factoryBuyerTypeData)
         let buyerArr: { type: string; saves: number; quotes: number }[] = [];
         try {
           const mbIdSet = [...new Set((mbItemsRaw ?? []).map((i: any) => i.moodboard_id).filter(Boolean))];
@@ -723,9 +734,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
               savesByType.set(pt, (savesByType.get(pt) ?? 0) + 1);
             });
             buyerArr = Array.from(savesByType.entries()).map(([type, saves]) => ({ type, saves, quotes: 0 })).sort((a, b) => b.saves - a.saves);
-            topBuyerType = buyerArr[0] ? formatProfType(buyerArr[0].type) : '—';
           }
-          setBuyerTypeData(buyerArr);
+          setFactoryBuyerTypeData(buyerArr);
         } catch (e) { console.error('Factory buyer type join failed:', e); }
 
         // B4: Quote funnel
@@ -780,109 +790,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         })).slice(0, 5).map((d: any) => ({ name: String(d.material_name ?? '').slice(0, 35), mentions: d.mention_count ?? 0 }));
         setCatalogGaps(gaps);
 
-        // Top moodboard items (factory scope)
-        const mbProdCount = new Map<string, { name: string; category: string; count: number }>();
-        (mbItemsRaw ?? []).forEach((item: any) => {
-          const p = item.products as any;
-          if (!p?.name) return;
-          const key = String((item as any).material_id ?? p.name);
-          const entry = mbProdCount.get(key) ?? { name: String(p.name).slice(0, 40), category: String(p.metadata?.material_category ?? 'Other'), count: 0 };
-          entry.count++;
-          mbProdCount.set(key, entry);
-        });
-        setTopMoodboardItems(Array.from(mbProdCount.values()).sort((a, b) => b.count - a.count).slice(0, 15).map(v => ({ name: v.name, category: v.category, boardCount: v.count })));
-
-        // Top quoted items (factory scope)
-        const qProdCount = new Map<string, { name: string; category: string; count: number; addedFrom: string }>();
-        (qItemsRaw ?? []).forEach((qi: any) => {
-          const p = qi.products as any;
-          if (!p?.name) return;
-          const key = String((qi as any).product_id ?? p.name);
-          const entry = qProdCount.get(key) ?? { name: String(p.name).slice(0, 40), category: String(p.metadata?.material_category ?? 'Other'), count: 0, addedFrom: qi.added_from ?? 'manual' };
-          entry.count++;
-          qProdCount.set(key, entry);
-        });
-        setTopQuotedItems(Array.from(qProdCount.values()).sort((a, b) => b.count - a.count).slice(0, 15).map(v => ({ name: v.name, category: v.category, quoteCount: v.count, addedFrom: v.addedFrom })));
-
-        // VR/3D usage for factory products
-        try {
-          const { data: vrData } = await supabase
-            .from('generation_3d')
-            .select('material_ids, materials_used, room_type, created_at')
-            .eq('generation_status', 'completed')
-            .gte('created_at', ago.toISOString())
-            .limit(500);
-          const factoryIdSet = new Set(effectiveIds);
-          const matched = (vrData ?? []).filter((g: any) => {
-            const mids: string[] = g.material_ids ?? [];
-            return mids.some((id: string) => factoryIdSet.has(id));
-          });
-          const pNameLookup = new Map<string, string>((factoryProducts ?? []).map((p: any) => [String(p.id), String(p.name ?? '').slice(0, 40)]));
-          const matCount = new Map<string, { count: number; roomType: string }>();
-          matched.forEach((gen: any) => {
-            const mids: string[] = (gen.material_ids ?? []).filter((id: string) => factoryIdSet.has(id));
-            mids.forEach((id: string) => {
-              const name: string = pNameLookup.get(id) ?? id;
-              const entry = matCount.get(name) ?? { count: 0, roomType: String(gen.room_type ?? 'Other') };
-              entry.count++;
-              matCount.set(name, entry);
-            });
-          });
-          const vrArr = Array.from(matCount.entries()).sort((a, b) => b[1].count - a[1].count).slice(0, 10)
-            .map(([name, d]) => ({ name, count: d.count, roomType: d.roomType }));
-          setVrUsageData(vrArr);
-          const roomTypes = new Map<string, number>();
-          matched.forEach((g: any) => { const r = String(g.room_type ?? 'Other'); roomTypes.set(r, (roomTypes.get(r) ?? 0) + 1); });
-          const topRoom = Array.from(roomTypes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
-          setVrKpis({ totalGenerations: matched.length, uniqueMaterials: matCount.size, topRoomType: topRoom });
-        } catch (e) { console.error('VR factory data failed:', e); }
-
-        // Quote basket for factory products
-        try {
-          const { data: basketItems } = await supabase
-            .from('quote_items')
-            .select('quote_id, product_id, products(name)')
-            .in('product_id', effectiveIds)
-            .gte('created_at', ago.toISOString())
-            .limit(500);
-          {
-            // Get all quote_ids that include factory products
-            const factoryQuoteIds = [...new Set((basketItems ?? []).map((qi: any) => qi.quote_id))];
-            if (factoryQuoteIds.length > 0) {
-              const { data: allQuoteItems } = await supabase
-                .from('quote_items')
-                .select('quote_id, products(name)')
-                .in('quote_id', factoryQuoteIds.slice(0, 200))
-                .limit(800);
-              const quoteMap = new Map<string, string[]>();
-              (allQuoteItems ?? []).forEach((qi: any) => {
-                const name = String((qi.products as any)?.name ?? '').slice(0, 40);
-                if (!name) return;
-                const existing = quoteMap.get(qi.quote_id) ?? [];
-                existing.push(name);
-                quoteMap.set(qi.quote_id, existing);
-              });
-              const pairCount = new Map<string, number>();
-              quoteMap.forEach((names) => {
-                for (let i = 0; i < names.length; i++) {
-                  for (let j = i + 1; j < names.length; j++) {
-                    const key = [names[i], names[j]].sort().join(' || ');
-                    pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
-                  }
-                }
-              });
-              const pairs = Array.from(pairCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
-                .map(([key, count]) => {
-                  const [p1, p2] = key.split(' || ');
-                  return { product1: p1 ?? '', product2: p2 ?? '', count };
-                });
-              setQuoteBasketsData(pairs);
-            } else {
-              setQuoteBasketsData([]);
-            }
-          }
-        } catch (e) { console.error('Factory basket analysis failed:', e); }
-
         // B7: Product velocity (last 4w vs prior 4w)
         const cut4w = weeksAgo(4);
         const cut8w = weeksAgo(8);
@@ -927,7 +834,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           const fAccepted = localAccepted;
           const fTop = Math.max(fViews, fSaves, 1);
           const fp = (n: number) => `${Math.round((n / fTop) * 100)}%`;
-          setEngagementFunnel([
+          setFactoryEngagementFunnel([
             ...(fViews > 0 ? [{ stage: 'Material Views', count: fViews, rate: '100%', color: 'bg-violet-500' }] : []),
             { stage: 'Moodboard Saves', count: fSaves, rate: fViews > 0 ? fp(fSaves) : '—', color: 'bg-blue-500' },
             { stage: 'Quote Requests', count: fQuoted, rate: fViews > 0 ? fp(fQuoted) : '—', color: 'bg-cyan-500' },
@@ -957,73 +864,23 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           .map(({ total: _, ...rest }) => rest);
         setDiscoveryByProduct(factoryDiscArr);
 
-        // ── Market direction for factory mode (platform-wide signals) ──
-        try {
-          const cut4w = weeksAgo(4);
-          const cut8w = weeksAgo(8);
-          const [{ data: recentMb }, { data: priorMb }, { data: recentGen }, { data: priorGen }, { data: recentProf }, { data: priorProf }] = await Promise.all([
-            supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut4w.toISOString()).limit(2000),
-            supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(2000),
-            supabase.from('generation_3d').select('room_type').gte('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
-            supabase.from('generation_3d').select('room_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
-            supabase.from('user_profiles').select('professional_type').gte('created_at', cut4w.toISOString()).limit(500),
-            supabase.from('user_profiles').select('professional_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(500),
-          ]);
-          const rMat = new Map<string, { name: string; count: number }>();
-          (recentMb ?? []).forEach((i: any) => { const id = String(i.material_id); const n = String((i.products as any)?.name ?? '').slice(0, 35); if (n) rMat.set(id, { name: n, count: (rMat.get(id)?.count ?? 0) + 1 }); });
-          const pMat = new Map<string, number>();
-          (priorMb ?? []).forEach((i: any) => { const id = String(i.material_id); pMat.set(id, (pMat.get(id) ?? 0) + 1); });
-          const growthArr = Array.from(rMat.entries())
-            .map(([id, { name, count: tw }]) => { const pw = pMat.get(id) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { name, thisWeek: tw, priorWeek: pw, growthPct: g, lifecycle: getLifecycle(null, null, tw, g) }; })
-            .sort((a, b) => b.growthPct - a.growthPct).slice(0, 12);
-          setMaterialGrowthRates(growthArr);
-          const rRoom = new Map<string, number>(); (recentGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); rRoom.set(r, (rRoom.get(r) ?? 0) + 1); });
-          const pRoom = new Map<string, number>(); (priorGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); pRoom.set(r, (pRoom.get(r) ?? 0) + 1); });
-          const roomArr = Array.from(rRoom.entries()).map(([rt, tw]) => { const pw = pRoom.get(rt) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { roomType: rt.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
-          setRoomTypeTrends(roomArr);
-          const rSeg = new Map<string, number>(); (recentProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); rSeg.set(t, (rSeg.get(t) ?? 0) + 1); });
-          const pSeg = new Map<string, number>(); (priorProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); pSeg.set(t, (pSeg.get(t) ?? 0) + 1); });
-          const segArr = Array.from(rSeg.entries()).map(([type, tw]) => { const pw = pSeg.get(type) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { type, thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
-          setSegmentGrowth(segArr);
-        } catch (e) { console.error('Factory market direction load failed:', e); }
-
-        // ── Zero-result demand signals (factory scope) ──────────
-        try {
-          const { data: unmatchedData } = await supabase
-            .from('unmatched_term_frequency')
-            .select('term, frequency_count, last_seen_at')
-            .order('frequency_count', { ascending: false })
-            .limit(15);
-          setZeroResultDemands((unmatchedData ?? []).map((d: any) => ({
-            term: String(d.term ?? '').slice(0, 50),
-            count: d.frequency_count ?? 0,
-            lastSeen: d.last_seen_at ? new Date(d.last_seen_at).toLocaleDateString() : '—',
-          })));
-        } catch (e) { console.error('Factory zero-result load failed:', e); }
-
-        // ── Seasonal trend: factory product moodboard saves by month
-        try {
-          const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-          const { data: monthData } = await supabase
-            .from('moodboard_items').select('created_at')
-            .in('material_id', effectiveIds)
-            .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
-          setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
-        } catch (e) { console.error('Seasonal load failed:', e); }
-
-        setIsDemoData(false);
-        setKpis({
-          activeDemandSignals: factoryDemands.length,
-          topDemandedMaterial: factoryDemands[0]?.name ?? (velocity[0]?.name ?? '—'),
-          topCategory: '—',
-          totalCategorySaves: (mbItemsRaw ?? []).length,
-          topBuyerType,
+        // Set factory overlay KPIs (benchmarked against platform)
+        setFactoryProductNames(new Set(names));
+        setFactoryKpis({
+          saves: (mbItemsRaw ?? []).length,
+          quotes: (qItemsRaw ?? []).length,
+          convRate: convRate((qItemsRaw ?? []).length, (mbItemsRaw ?? []).length),
+          platformConvRate: convRate(platformTotals.quotes, platformTotals.saves),
         });
-      }
+        setIsDemoData(false);
     } catch (err) {
-      console.error('MarketTrendsTab load error:', err);
+      console.error('loadFactoryOverlay error:', err);
     }
   };
+
+  // ── Helpers ────────────────────────────────────────────────
+  const isMyProduct = (name: string) =>
+    viewScope === 'factory' && factoryProductNames.size > 0 && factoryProductNames.has(String(name).toLowerCase().trim());
 
   // ── JSX ────────────────────────────────────────────────────
   return (
@@ -1115,6 +972,14 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <KpiCard label="Total Category Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
             <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
           </>
+        ) : factoryKpis ? (
+          <>
+            <KpiCard label="Your Moodboard Saves" value={factoryKpis.saves} sub={`Platform total: ${platformTotals.saves.toLocaleString()}`} icon={Star} color="text-violet-600" />
+            <KpiCard label="Your Quote Requests" value={factoryKpis.quotes} sub={`Platform total: ${platformTotals.quotes.toLocaleString()}`} icon={Target} color="text-cyan-600" />
+            <KpiCard label="Your Conv. Rate" value={factoryKpis.convRate} sub={`Platform avg: ${factoryKpis.platformConvRate}`} icon={TrendingUp} color="text-green-600" />
+            <KpiCard label="Platform Top Category" value={kpis.topCategory} icon={Package} color="text-amber-500" />
+            <KpiCard label="Platform #1 Buyer" value={kpis.topBuyerType} icon={Users} />
+          </>
         ) : (
           <>
             <KpiCard label="Products in Demand" value={kpis.activeDemandSignals} icon={Package} color="text-violet-600" />
@@ -1125,6 +990,93 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           </>
         )}
       </div>
+
+      {/* ── Your Factory Position ── */}
+      {viewScope === 'factory' && factoryKpis && (
+        <>
+          <SectionHeader
+            title="Your Factory Position"
+            desc="How your performance benchmarks against the full platform — funnel comparison and buyer composition"
+            icon={Building2}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Funnel side-by-side */}
+            {factoryEngagementFunnel.length > 0 && engagementFunnel.length > 0 && (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Your Funnel vs Platform</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold text-primary mb-2">Your Factory</p>
+                    <div className="space-y-2">
+                      {factoryEngagementFunnel.map((stage, i) => {
+                        const maxCount = factoryEngagementFunnel[0]?.count || 1;
+                        return (
+                          <div key={i} className="space-y-0.5">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
+                              <span className="font-semibold tabular-nums shrink-0">{stage.count.toLocaleString()}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                              <div className={`h-1.5 rounded-full ${stage.color} opacity-80`} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Platform Avg</p>
+                    <div className="space-y-2">
+                      {engagementFunnel.map((stage, i) => {
+                        const maxCount = engagementFunnel[0]?.count || 1;
+                        return (
+                          <div key={i} className="space-y-0.5">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
+                              <span className="tabular-nums shrink-0 text-muted-foreground">{stage.count.toLocaleString()}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                              <div className={`h-1.5 rounded-full bg-muted-foreground/40`} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Factory buyer type breakdown */}
+            {factoryBuyerTypeData.length > 0 && (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-1"><Users className="h-4 w-4" /> Your Buyers by Type</h3>
+                <p className="text-xs text-muted-foreground mb-4">Who is saving and quoting your specific materials</p>
+                <div className="overflow-auto max-h-[240px]">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                      <tr className="text-xs font-semibold text-muted-foreground">
+                        <th className="text-left py-2 pr-3 font-medium">Buyer Type</th>
+                        <th className="text-right py-2 pr-3 font-medium">Saves</th>
+                        <th className="text-right py-2 font-medium">Conv.%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {factoryBuyerTypeData.map((row, i) => (
+                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 text-xs">
+                          <td className="py-1.5 pr-3 font-medium">{formatProfType(row.type)}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{row.saves}</td>
+                          <td className="py-1.5 text-right tabular-nums text-green-500">{convRate(row.quotes, row.saves)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ──── Where the Market is Going ──────────────────────── */}
       {materialGrowthRates.length > 0 && (
@@ -1230,7 +1182,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <div>
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <Package className="h-4 w-4" />
-                {viewScope === 'factory' ? "Your Products — Market Demand Ranking" : 'Top 15 Demanded Materials'}
+                {viewScope === 'factory' ? 'Your Products — Market Demand Ranking' : 'Top 15 Demanded Materials'}
               </h3>
               {viewScope === 'factory' && topDemands.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -1263,7 +1215,12 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                       <tr key={i} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2">
-                          <div className="font-medium">{row.name}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {row.name}
+                            {isMyProduct(row.name) && (
+                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
+                            )}
+                          </div>
                           {row.mentions > 0 && (
                             <div className="mt-0.5 h-0.5 rounded-full bg-border/40 w-24">
                               <div className="h-0.5 rounded-full bg-primary/50" style={{ width: `${pct}%` }} />
@@ -1324,7 +1281,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <EmptyState message={attrSourceKeys.length === 0 ? 'No attribute data recorded yet — attributes appear once products are saved to moodboards' : `No products with "${metadataFieldLabels.get(attrSource) ?? prettifyKey(attrSource)}" attribute found`} />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={displayedAttributes} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+              <BarChart data={displayedAttributes} layout="vertical" margin={CHART_MARGINS.barH}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border)/0.4)" />
                 <XAxis type="number" tick={{ fontSize: 10, fontFamily: 'monospace' }} allowDecimals={false} />
                 <YAxis type="category" dataKey="attribute" width={150} tick={{ fontSize: 10, fontFamily: 'monospace' }} />
@@ -1426,9 +1383,16 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                 </thead>
                 <tbody>
                   {topMoodboardItems.map((row, i) => (
-                    <tr key={i} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${isMyProduct(row.name) ? 'bg-primary/5' : ''}`}>
                       <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
-                      <td className="px-3 py-2 font-medium">{row.name}</td>
+                      <td className="px-3 py-2 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          {row.name}
+                          {isMyProduct(row.name) && (
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
                       <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-violet-500">{row.boardCount}</td>
                     </tr>
@@ -1470,9 +1434,16 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                   </thead>
                   <tbody>
                     {topQuotedItems.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                      <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${isMyProduct(row.name) ? 'bg-primary/5' : ''}`}>
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
-                        <td className="px-3 py-2 font-medium">{row.name}</td>
+                        <td className="px-3 py-2 font-medium">
+                          <div className="flex items-center gap-1.5">
+                            {row.name}
+                            {isMyProduct(row.name) && (
+                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
                         <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-primary">{row.quoteCount}</td>
                       </tr>
@@ -1535,7 +1506,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
           <div className="mb-4">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Activity by Professional Type</h3>
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Activity by Professional Type</h3>
           </div>
           <div>
             {buyerTypeData.length === 0 ? <EmptyState /> : (
@@ -1543,9 +1514,9 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                 <BarChart
                   data={buyerTypeData.map((b) => ({ ...b, typeLabel: formatProfType(b.type) }))}
                   layout="vertical"
-                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                  margin={CHART_MARGINS.barH}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid {...GRID_PROPS} />
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                   <YAxis type="category" dataKey="typeLabel" width={130} tick={{ fontSize: 11 }} />
                   <Tooltip /><Legend />
@@ -1559,12 +1530,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
 
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
           <div className="mb-4">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Buyer Segment Breakdown & Conversion</h3>
-            {viewScope === 'factory' && buyerTypeData[0] && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Your #1 segment is <span className="text-primary font-medium">{formatProfType(buyerTypeData[0].type)}</span> — focus your catalog on their preferred styles
-              </p>
-            )}
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Buyer Segment Breakdown</h3>
           </div>
           <div>
             {buyerTypeData.length === 0 ? <EmptyState /> : (
@@ -1585,7 +1551,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                         <td className="py-2 pr-3 text-right font-mono tabular-nums">{row.saves}</td>
                         <td className="py-2 pr-3 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
                         <td className="py-2 text-right font-mono tabular-nums text-green-500">
-                          {row.saves > 0 ? `${Math.round((row.quotes / row.saves) * 100)}%` : '—'}
+                          {convRate(row.quotes, row.saves)}
                         </td>
                       </tr>
                     ))}

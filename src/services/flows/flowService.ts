@@ -205,7 +205,7 @@ class FlowService {
     name: string,
     description: string | null,
     triggerType: TriggerType,
-    graph: FlowGraphDefinition
+    graph: FlowGraphDefinition,
   ): Promise<Flow> {
     const { data: { user } } = await supabase.auth.getUser();
 

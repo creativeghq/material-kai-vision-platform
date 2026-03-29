@@ -654,36 +654,26 @@ export const MaterialAgentSearchInterface: React.FC<
         hybridConfig.fallback
       ) {
         // REMOVED: HybridAIService deleted during cleanup
-        // Fallback to standard API integration
+        // Fallback to standard API integration via agent-chat Edge Function
         console.log('⚠️ Hybrid AI Service removed - using standard API integration');
         try {
-          const response = await apiService.callSupabaseFunction(
-            'mivaa-gateway',
+          const { data: mivaaData, error: mivaaError } = await supabase.functions.invoke(
+            'agent-chat',
             {
-              action: 'agent_chat',
-              payload: {
-                message: input,
-                model: hybridConfig.primary,
+              body: {
+                messages: [{ role: 'user', content: input }],
+                context: enhancedContext,
               },
             },
           );
 
-          if (response.success) {
+          if (!mivaaError && mivaaData) {
             // Convert response to standard format
             data = {
-              success: true,
-              response: response.data?.response || 'Processed using MIVAA API',
-              coordination_summary: 'Processed using MIVAA API',
-              coordinated_result: {
-                content: response.data?.response || 'Processed using MIVAA API',
-                recommendations: [],
-                materials: [],
-              },
-              task_id: crypto.randomUUID(),
-              total_processing_time_ms:
-                hybridResponse.total_processing_time_ms || 0,
-              overall_confidence: hybridResponse.final_score || 0.7,
-              agent_executions: hybridResponse.attempts || [],
+              ...(mivaaData as any),
+              total_processing_time_ms: 0,
+              overall_confidence: 0.7,
+              agent_executions: [],
             };
             error = null;
           } else {

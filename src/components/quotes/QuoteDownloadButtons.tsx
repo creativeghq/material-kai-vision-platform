@@ -74,7 +74,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
           .map(img => new Promise<void>(resolve => {
             img.addEventListener('load', () => resolve(), { once: true });
             img.addEventListener('error', () => resolve(), { once: true });
-          }))
+          })),
       );
 
       // A3 landscape: 420 × 297 mm

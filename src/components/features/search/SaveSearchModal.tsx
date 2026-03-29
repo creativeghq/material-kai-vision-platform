@@ -58,7 +58,7 @@ const savedSearchesService = {
   checkForDuplicates: async (
     query: string,
     _filters: Record<string, unknown>,
-    _materialFilters: MaterialFilters | Record<string, unknown>
+    _materialFilters: MaterialFilters | Record<string, unknown>,
   ): Promise<MergeSuggestion> => {
     const user_id = await getCurrentUserId();
     // Find saved searches with same user and very similar query text
@@ -105,7 +105,7 @@ const savedSearchesService = {
     searchId: string,
     query: string,
     _filters: Record<string, unknown>,
-    _materialFilters: MaterialFilters
+    _materialFilters: MaterialFilters,
   ): Promise<void> => {
     const { data: existing, error: fetchErr } = await supabase
       .from('saved_searches')

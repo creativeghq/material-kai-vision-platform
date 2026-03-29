@@ -232,7 +232,7 @@ export const SystemHealthMonitor: React.FC = () => {
             category: svc.category,
             icon: svc.icon,
             last_checked: edgeResults.timestamp,
-          }))
+          })),
         );
       }
     } catch (err) {

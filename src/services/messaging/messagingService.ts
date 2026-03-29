@@ -336,7 +336,7 @@ export class MessagingService {
    */
   async getAnalytics(
     channelType?: MessagingChannelType,
-    dateRange?: { start: string; end: string }
+    dateRange?: { start: string; end: string },
   ): Promise<MessagingAnalyticsResponse> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
@@ -458,7 +458,7 @@ export class MessagingService {
     phoneNumber: string,
     channelType: MessagingChannelType | 'all',
     reason?: string,
-    source: 'keyword' | 'manual' | 'api' | 'complaint' = 'manual'
+    source: 'keyword' | 'manual' | 'api' | 'complaint' = 'manual',
   ): Promise<void> {
     const { error } = await supabase
       .from('messaging_optouts')

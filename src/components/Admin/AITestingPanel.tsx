@@ -513,25 +513,6 @@ export const AITestingPanel: React.FC = () => {
       throw new Error(
         'Hybrid AI testing is deprecated. Use MIVAA API endpoints directly for material analysis.',
       );
-
-      // Process results
-      const testResults: TestResult[] = [];
-
-      setResults(testResults);
-
-      // Note: Cleanup would normally delete from uploaded_files table
-      // but since table doesn't exist in current schema, we skip this step
-      // eslint-disable-next-line no-console
-      console.log(
-        'Test file cleanup skipped (uploaded_files table not in schema):',
-        testFile.id,
-      );
-
-      toast({
-        title: 'Test Completed',
-        description: `Analysis completed with score: ${(data as any).final_score?.toFixed(2) || 'N/A'}`,
-        variant: 'default',
-      });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Test error:', error);

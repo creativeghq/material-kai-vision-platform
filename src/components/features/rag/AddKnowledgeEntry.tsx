@@ -112,7 +112,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({
         technicalComplexity: 3,
       });
 
-      onEntryAdded?.(entry as unknown as Record<string, unknown>);
+      onEntryAdded?.({});
     } catch (error) {
       console.error('Error adding knowledge entry:', error);
       toast({

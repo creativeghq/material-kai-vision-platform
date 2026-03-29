@@ -83,11 +83,36 @@ function resolveAllTemplates(
   for (const [key, value] of Object.entries(config)) {
     if (typeof value === 'string') {
       resolved[key] = resolveTemplate(value, context);
+    } else if (Array.isArray(value)) {
+      resolved[key] = value.map((item) =>
+        typeof item === 'string'
+          ? resolveTemplate(item, context)
+          : typeof item === 'object' && item !== null
+          ? resolveAllTemplates(item as Record<string, unknown>, context)
+          : item,
+      );
+    } else if (typeof value === 'object' && value !== null) {
+      resolved[key] = resolveAllTemplates(value as Record<string, unknown>, context);
     } else {
       resolved[key] = value;
     }
   }
   return resolved;
+}
+
+// Only debit credits for real authenticated users, never for 'system' or internal triggers
+const isRealUserId = (id?: string): boolean =>
+  !!id && id !== 'system' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+// Retry wrapper for transient external API failures (non-mutating operations only)
+async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 600): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries <= 0) throw err;
+    await new Promise((r) => setTimeout(r, delayMs));
+    return withRetry(fn, retries - 1, delayMs * 2);
+  }
 }
 
 // =====================================================
@@ -160,8 +185,9 @@ function executeCondition(
     case 'delay': {
       const { duration, unit } = config as { duration: number; unit: string };
       const ms = duration * ({ seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 }[unit] || 60000);
-      // In edge functions we cap delay at 30 seconds to avoid timeout
-      const cappedMs = Math.min(ms, 30000);
+      // Cap at 25s to stay within edge function timeout budget
+      const cappedMs = Math.min(ms, 25000);
+      await new Promise((resolve) => setTimeout(resolve, cappedMs));
       return { output: { delayed: true, requested_ms: ms, actual_ms: cappedMs }, branch: 'output' };
     }
 
@@ -210,7 +236,7 @@ async function executeAction(
         },
       });
       if (error) throw new Error(`SMS failed: ${error.message}`);
-      if (userId) await debitExternalServiceCredits(supabase, userId, 'twilio-sms', 'flow_send_sms', 1, { to: resolved.to });
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'twilio-sms', 'flow_send_sms', 1, { to: resolved.to });
       return { output: { sent: true, ...(data || {}) } };
     }
 
@@ -232,44 +258,51 @@ async function executeAction(
     case 'http_request': {
       const method = String(resolved.method || 'POST');
       const timeoutMs = Number(resolved.timeout_ms) || 30000;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (config.headers && typeof config.headers === 'object') {
-          Object.assign(headers, config.headers);
-        }
-
-        const response = await fetch(String(resolved.url), {
-          method,
-          headers,
-          body: method !== 'GET' ? String(resolved.body || '{}') : undefined,
-          signal: controller.signal,
-        });
-
-        let body: unknown;
+      const doRequest = async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          body = await response.json();
-        } catch {
-          body = await response.text();
-        }
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          // Use resolved headers so template variables in header values are substituted
+          if (resolved.headers && typeof resolved.headers === 'object') {
+            Object.assign(headers, resolved.headers);
+          }
 
-        return {
-          output: { status: response.status, ok: response.ok, body },
-        };
-      } finally {
-        clearTimeout(timer);
-      }
+          const response = await fetch(String(resolved.url), {
+            method,
+            headers,
+            body: method !== 'GET' ? String(resolved.body || '{}') : undefined,
+            signal: controller.signal,
+          });
+
+          let responseBody: unknown;
+          try {
+            responseBody = await response.json();
+          } catch {
+            responseBody = await response.text();
+          }
+
+          return { status: response.status, ok: response.ok, body: responseBody };
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      // Retry once on network-level failures (abort/connection errors), not on HTTP error codes
+      const result = await withRetry(doRequest);
+      return { output: result };
     }
 
     case 'create_notification': {
-      const { error } = await supabase.from('notifications').insert({
+      const { error } = await supabase.from('user_notifications').insert({
         user_id: resolved.user_id,
         title: resolved.title,
         body: resolved.body,
         type: resolved.type || 'info',
-        read: false,
+        action_url: resolved.action_url || null,
+        metadata: resolved.metadata || {},
+        is_read: false,
       });
       if (error) throw new Error(`Notification failed: ${error.message}`);
       return { output: { created: true } };
@@ -289,8 +322,22 @@ async function executeAction(
     }
 
     case 'build_quote': {
+      // Look up the user's workspace_id so the quote isn't orphaned
+      let workspaceId: string | null = null;
+      if (resolved.user_id) {
+        const { data: member } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', resolved.user_id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        workspaceId = member?.workspace_id ?? null;
+      }
+
       const { data, error } = await supabase.from('quotes').insert({
         user_id: resolved.user_id,
+        workspace_id: workspaceId,
         name: resolved.name || 'Auto-generated Quote',
         status: 'draft',
       }).select().single();
@@ -311,7 +358,22 @@ async function executeAction(
           .limit(1);
         conversationId = convos?.[0]?.id || '';
       }
-      if (!conversationId) throw new Error('No conversation found');
+      // If still no conversation, create one rather than failing the entire flow
+      if (!conversationId && resolved.target_user_id) {
+        const { data: newConvo, error: convoErr } = await supabase
+          .from('agent_chat_conversations')
+          .insert({
+            user_id: resolved.target_user_id,
+            agent_type: resolved.agent_type || 'kai',
+            title: 'Flow-initiated conversation',
+            last_message_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+        if (convoErr) throw new Error(`Failed to create conversation: ${convoErr.message}`);
+        conversationId = newConvo.id;
+      }
+      if (!conversationId) throw new Error('No conversation found and no target_user_id provided to create one');
 
       // Insert message
       const { error: msgError } = await supabase.from('agent_chat_messages').insert({
@@ -382,32 +444,33 @@ async function executeAction(
 
       const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors) with their own manufacturing facilities. For each company provide: name, website URL, city/country, main products. Return up to ${limit} results as a structured list.`;
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'web-search-2025-03-05',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 4096,
-          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-          messages: [{ role: 'user', content: query }],
-        }),
+      const { textContent } = await withRetry(async () => {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-beta': 'web-search-2025-03-05',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 4096,
+            tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+            messages: [{ role: 'user', content: query }],
+          }),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Web search failed: ${response.status} - ${errText}`);
+        }
+        const data = await response.json();
+        const textContent = (data.content as any[])
+          ?.filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('\n') || '';
+        return { textContent };
       });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Web search failed: ${response.status} - ${errText}`);
-      }
-
-      const data = await response.json();
-      const textContent = (data.content as any[])
-        ?.filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text)
-        .join('\n') || '';
 
       return {
         output: {
@@ -426,47 +489,41 @@ async function executeAction(
       const url = String(resolved.url || '');
       if (!url) throw new Error('URL is required');
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000);
-
-      try {
-        const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url,
-            formats: ['markdown'],
-            onlyMainContent: true,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Firecrawl API error ${response.status}: ${errText}`);
+      const { markdown, metadata } = await withRetry(async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        try {
+          const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Firecrawl API error ${response.status}: ${errText}`);
+          }
+          const data = await response.json();
+          return { markdown: data.data?.markdown || '', metadata: data.data?.metadata || {} };
+        } finally {
+          clearTimeout(timer);
         }
+      });
 
-        const data = await response.json();
-        const markdown = data.data?.markdown || '';
-        const metadata = data.data?.metadata || {};
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'firecrawl-scrape', 'flow_firecrawl_scrape', 1, { url });
 
-        if (userId) await debitExternalServiceCredits(supabase, userId, 'firecrawl-scrape', 'flow_firecrawl_scrape', 1, { url });
-
-        return {
-          output: {
-            success: true,
-            url,
-            content: markdown.slice(0, 10000),
-            title: metadata.title || '',
-            description: metadata.description || '',
-          },
-        };
-      } finally {
-        clearTimeout(timer);
-      }
+      return {
+        output: {
+          success: true,
+          url,
+          content: markdown.slice(0, 10000),
+          title: metadata.title || '',
+          description: metadata.description || '',
+        },
+      };
     }
 
     case 'apollo_enrich': {
@@ -488,60 +545,55 @@ async function executeAction(
         body.organization_domains = [String(resolved.domain)];
       }
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-
-      try {
-        const response = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
-          method: 'POST',
-          headers: {
-            'X-Api-Key': APOLLO_API_KEY,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Apollo API error ${response.status}: ${errText}`);
-        }
-
-        const data = await response.json();
-        const org = data.organizations?.[0] || data.accounts?.[0];
-
-        if (userId) await debitExternalServiceCredits(supabase, userId, 'apollo-enrich', 'flow_apollo_enrich', 1, { company_name: companyName });
-
-        if (!org) {
-          return { output: { success: true, found: false, company_name: companyName } };
-        }
-
-        return {
-          output: {
-            success: true,
-            found: true,
-            company: {
-              name: org.name,
-              domain: org.primary_domain || org.website_url,
-              industry: org.industry,
-              employee_count: org.estimated_num_employees,
-              founded_year: org.founded_year,
-              linkedin_url: org.linkedin_url,
-              headquarters: {
-                city: org.city,
-                state: org.state,
-                country: org.country,
-              },
-              phone: org.phone,
-              keywords: org.keywords || [],
-              annual_revenue: org.annual_revenue_printed,
+      const apolloResult = await withRetry(async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        try {
+          const response = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+            method: 'POST',
+            headers: {
+              'X-Api-Key': APOLLO_API_KEY,
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
             },
-          },
-        };
-      } finally {
-        clearTimeout(timer);
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Apollo API error ${response.status}: ${errText}`);
+          }
+          return await response.json();
+        } finally {
+          clearTimeout(timer);
+        }
+      });
+
+      const org = apolloResult.organizations?.[0] || apolloResult.accounts?.[0];
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'apollo-enrich', 'flow_apollo_enrich', 1, { company_name: companyName });
+
+      if (!org) {
+        return { output: { success: true, found: false, company_name: companyName } };
       }
+
+      return {
+        output: {
+          success: true,
+          found: true,
+          company: {
+            name: org.name,
+            domain: org.primary_domain || org.website_url,
+            industry: org.industry,
+            employee_count: org.estimated_num_employees,
+            founded_year: org.founded_year,
+            linkedin_url: org.linkedin_url,
+            headquarters: { city: org.city, state: org.state, country: org.country },
+            phone: org.phone,
+            keywords: org.keywords || [],
+            annual_revenue: org.annual_revenue_printed,
+          },
+        },
+      };
     }
 
     case 'hunter_find_contacts': {
@@ -555,85 +607,80 @@ async function executeAction(
 
       if (!domain && !companyName) throw new Error('Domain or company name is required');
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-
-      try {
-        // Person-specific search
-        if (firstName || lastName) {
-          const params = new URLSearchParams({ api_key: HUNTER_API_KEY });
-          if (domain) params.set('domain', domain);
-          if (companyName) params.set('company', companyName);
-          if (firstName) params.set('first_name', firstName);
-          if (lastName) params.set('last_name', lastName);
-
-          const response = await fetch(
-            `https://api.hunter.io/v2/email-finder?${params}`,
-            { signal: controller.signal },
-          );
-          const data = await response.json();
-
-          if (userId) await debitExternalServiceCredits(supabase, userId, 'hunter-email-finder', 'flow_hunter_find_contacts', 1, { domain, person: `${firstName} ${lastName}`.trim() });
-
-          return {
-            output: {
-              success: true,
-              mode: 'person',
-              email: data.data?.email || null,
-              score: data.data?.score || 0,
-              position: data.data?.position || '',
-            },
-          };
-        }
-
-        // Domain-wide search
-        const params = new URLSearchParams({
-          api_key: HUNTER_API_KEY,
-          domain: domain || companyName,
-          limit: '10',
+      // Person-specific search
+      if (firstName || lastName) {
+        const personData = await withRetry(async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 20000);
+          try {
+            const params = new URLSearchParams({ api_key: HUNTER_API_KEY });
+            if (domain) params.set('domain', domain);
+            if (companyName) params.set('company', companyName);
+            if (firstName) params.set('first_name', firstName);
+            if (lastName) params.set('last_name', lastName);
+            const response = await fetch(`https://api.hunter.io/v2/email-finder?${params}`, { signal: controller.signal });
+            return await response.json();
+          } finally {
+            clearTimeout(timer);
+          }
         });
 
-        const response = await fetch(
-          `https://api.hunter.io/v2/domain-search?${params}`,
-          { signal: controller.signal },
-        );
-        const data = await response.json();
-        const emails = (data.data?.emails || []).map((e: Record<string, unknown>) => ({
-          name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
-          email: e.value,
-          position: e.position,
-          department: e.department,
-          confidence: e.confidence,
-        }));
-
-        // Sort by role priority if roles specified
-        const rolesStr = String(resolved.roles || '');
-        if (rolesStr && emails.length > 0) {
-          const priorityRoles = rolesStr.split(',').map((r: string) => r.trim().toLowerCase());
-          emails.sort((a: { position?: string }, b: { position?: string }) => {
-            const aIdx = priorityRoles.findIndex((r: string) => (a.position || '').toLowerCase().includes(r));
-            const bIdx = priorityRoles.findIndex((r: string) => (b.position || '').toLowerCase().includes(r));
-            const aScore = aIdx >= 0 ? aIdx : 999;
-            const bScore = bIdx >= 0 ? bIdx : 999;
-            return aScore - bScore;
-          });
-        }
-
-        if (userId) await debitExternalServiceCredits(supabase, userId, 'hunter-domain-search', 'flow_hunter_find_contacts', 1, { domain });
+        if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'hunter-email-finder', 'flow_hunter_find_contacts', 1, { domain, person: `${firstName} ${lastName}`.trim() });
 
         return {
           output: {
             success: true,
-            mode: 'domain',
-            organization: data.data?.organization || '',
-            pattern: data.data?.pattern || '',
-            contacts: emails,
-            total: emails.length,
+            mode: 'person',
+            email: personData.data?.email || null,
+            score: personData.data?.score || 0,
+            position: personData.data?.position || '',
           },
         };
-      } finally {
-        clearTimeout(timer);
       }
+
+      // Domain-wide search
+      const domainData = await withRetry(async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        try {
+          const params = new URLSearchParams({ api_key: HUNTER_API_KEY, domain: domain || companyName, limit: '10' });
+          const response = await fetch(`https://api.hunter.io/v2/domain-search?${params}`, { signal: controller.signal });
+          return await response.json();
+        } finally {
+          clearTimeout(timer);
+        }
+      });
+
+      const emails = (domainData.data?.emails || []).map((e: Record<string, unknown>) => ({
+        name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+        email: e.value,
+        position: e.position,
+        department: e.department,
+        confidence: e.confidence,
+      }));
+
+      const rolesStr = String(resolved.roles || '');
+      if (rolesStr && emails.length > 0) {
+        const priorityRoles = rolesStr.split(',').map((r: string) => r.trim().toLowerCase());
+        emails.sort((a: { position?: string }, b: { position?: string }) => {
+          const aIdx = priorityRoles.findIndex((r: string) => (a.position || '').toLowerCase().includes(r));
+          const bIdx = priorityRoles.findIndex((r: string) => (b.position || '').toLowerCase().includes(r));
+          return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
+        });
+      }
+
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'hunter-domain-search', 'flow_hunter_find_contacts', 1, { domain });
+
+      return {
+        output: {
+          success: true,
+          mode: 'domain',
+          organization: domainData.data?.organization || '',
+          pattern: domainData.data?.pattern || '',
+          contacts: emails,
+          total: emails.length,
+        },
+      };
     }
 
     case 'zerobounce_validate': {
@@ -643,45 +690,37 @@ async function executeAction(
       const email = String(resolved.email || '');
       if (!email) throw new Error('Email is required');
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        const params = new URLSearchParams({
-          api_key: ZEROBOUNCE_API_KEY,
-          email,
-        });
-
-        const response = await fetch(
-          `https://api.zerobounce.net/v2/validate?${params}`,
-          { signal: controller.signal },
-        );
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`ZeroBounce API error ${response.status}: ${errText}`);
+      const zbData = await withRetry(async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        try {
+          const params = new URLSearchParams({ api_key: ZEROBOUNCE_API_KEY, email });
+          const response = await fetch(`https://api.zerobounce.net/v2/validate?${params}`, { signal: controller.signal });
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`ZeroBounce API error ${response.status}: ${errText}`);
+          }
+          return await response.json();
+        } finally {
+          clearTimeout(timer);
         }
+      });
 
-        const data = await response.json();
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'zerobounce-validate', 'flow_zerobounce_validate', 1, { email });
 
-        if (userId) await debitExternalServiceCredits(supabase, userId, 'zerobounce-validate', 'flow_zerobounce_validate', 1, { email });
-
-        return {
-          output: {
-            success: true,
-            email,
-            status: data.status || 'unknown',
-            sub_status: data.sub_status || '',
-            valid: data.status === 'valid',
-            free_email: data.free_email === 'true' || data.free_email === true,
-            mx_found: data.mx_found === 'true' || data.mx_found === true,
-            firstname: data.firstname || '',
-            lastname: data.lastname || '',
-          },
-        };
-      } finally {
-        clearTimeout(timer);
-      }
+      return {
+        output: {
+          success: true,
+          email,
+          status: zbData.status || 'unknown',
+          sub_status: zbData.sub_status || '',
+          valid: zbData.status === 'valid',
+          free_email: zbData.free_email === 'true' || zbData.free_email === true,
+          mx_found: zbData.mx_found === 'true' || zbData.mx_found === true,
+          firstname: zbData.firstname || '',
+          lastname: zbData.lastname || '',
+        },
+      };
     }
 
     default:
@@ -822,7 +861,7 @@ async function executeFlowGraph(
         })
         .eq('id', step.id);
 
-      // Update run as failed
+      // Update run as failed (single authoritative write — outer handler will skip its own write)
       await supabase
         .from('flow_runs')
         .update({
@@ -834,6 +873,8 @@ async function executeFlowGraph(
         })
         .eq('id', runId);
 
+      // Tag the error so the outer handler knows the run record is already updated
+      (error as any).__runAlreadyFailed = true;
       throw error;
     }
   }
@@ -911,14 +952,8 @@ async function handleExecuteFlow(
       })
       .eq('id', run.id);
 
-    // Update flow stats
-    await supabase
-      .from('flows')
-      .update({
-        last_run_at: new Date().toISOString(),
-        run_count: flow.run_count + 1,
-      })
-      .eq('id', flow_id);
+    // Atomic increment — avoids race condition when concurrent runs update run_count
+    await supabase.rpc('increment_flow_run_stats', { p_flow_id: flow_id });
 
     // Return the run with steps
     const { data: steps } = await supabase
@@ -940,16 +975,18 @@ async function handleExecuteFlow(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const durationMs = Date.now() - runStartTime;
 
-    // Run may already be marked as failed by the graph walker
-    await supabase
-      .from('flow_runs')
-      .update({
-        status: 'failed',
-        error_message: errorMessage,
-        completed_at: new Date().toISOString(),
-        duration_ms: durationMs,
-      })
-      .eq('id', run.id);
+    // Only write failure if the graph walker hasn't already done so (avoids double-write)
+    if (!(error as any).__runAlreadyFailed) {
+      await supabase
+        .from('flow_runs')
+        .update({
+          status: 'failed',
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+          duration_ms: durationMs,
+        })
+        .eq('id', run.id);
+    }
 
     return jsonResponse({
       success: false,

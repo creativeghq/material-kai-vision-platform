@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar, Clock, User, Mail, MessageSquare, CheckCircle2,
+  Calendar, Clock, Loader2, User, Mail, MessageSquare, CheckCircle2,
   XCircle, ChevronRight, Inbox, StickyNote,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -93,6 +93,24 @@ function AppointmentDetailDrawer({
       appointment_id: appt.id,
       professional_user_id: appt.professional_user_id,
     });
+
+    // Notify the client directly if they are a registered user
+    if (appt.client_user_id && (status === 'confirmed' || status === 'cancelled')) {
+      const notifType = status === 'confirmed' ? 'appointment_confirmed' : 'appointment_cancelled';
+      const title = status === 'confirmed'
+        ? `Your appointment on ${formatDate(appt.appointment_date)} has been confirmed`
+        : `Your appointment on ${formatDate(appt.appointment_date)} was cancelled`;
+      supabase.from('user_notifications').insert({
+        user_id: appt.client_user_id,
+        type: notifType,
+        title,
+        body: appt.service_name ? `Service: ${appt.service_name}` : null,
+        action_url: null,
+        is_read: false,
+        metadata: { appointment_id: appt.id },
+      }).then(() => {});
+    }
+
     toast({ title: `Appointment ${status}` });
     onUpdated();
   };

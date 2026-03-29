@@ -5,6 +5,23 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+// SpeechRecognition is a Web API not yet in TypeScript's standard DOM lib
+declare class SpeechRecognition extends EventTarget {
+  continuous: boolean; interimResults: boolean; lang: string;
+  start(): void; stop(): void; abort(): void;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+}
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+
 interface UseVoiceInputOptions {
   onTranscript?: (transcript: string) => void;
   onError?: (error: string) => void;

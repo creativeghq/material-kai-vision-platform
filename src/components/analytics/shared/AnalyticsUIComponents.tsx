@@ -41,6 +41,57 @@ export function getLifecycle(firstRequested: string | null, lastRequested: strin
   return 'established';
 }
 
+// ── Analytics Table ───────────────────────────────────────────
+/**
+ * Column definition for AnalyticsTable.
+ * `thClass` defaults to `'text-left pr-4'`.
+ * `tdClass` defaults to `'pr-4'`.
+ * The component always adds `py-2 font-medium` to th and `py-2` to td.
+ */
+export interface AnalyticsCol<T> {
+  header: string;
+  thClass?: string;
+  tdClass?: string;
+  render: (row: T, index: number) => React.ReactNode;
+}
+
+export function AnalyticsTable<T>({
+  columns,
+  rows,
+  maxH = 320,
+}: {
+  columns: AnalyticsCol<T>[];
+  rows: T[];
+  maxH?: number;
+}) {
+  return (
+    <div className="overflow-auto" style={{ maxHeight: maxH }}>
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+          <tr className="border-b text-xs text-muted-foreground">
+            {columns.map((col, i) => (
+              <th key={i} className={`py-2 font-medium ${col.thClass ?? 'text-left pr-4'}`}>
+                {col.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+              {columns.map((col, j) => (
+                <td key={j} className={`py-2 ${col.tdClass ?? 'pr-4'}`}>
+                  {col.render(row, i)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── KPI Card ──────────────────────────────────────────────────
 export function KpiCard({ label, value, sub, icon: Icon, color = 'text-primary' }: {
   label: string; value: React.ReactNode; sub?: string;

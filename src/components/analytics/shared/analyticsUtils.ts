@@ -1,5 +1,26 @@
 // ── Pure utility functions (no React, no components) ──────────
 
+/** Formats a quotes-to-saves ratio as a percentage string, or '—' when no saves. */
+export function convRate(quotes: number, saves: number): string {
+  return saves > 0 ? `${Math.round((quotes / saves) * 100)}%` : '—';
+}
+
+/** Standard Recharts margin presets shared across both analytics tabs. */
+export const CHART_MARGINS = {
+  /** Line/area charts: trims left axis label space */
+  line: { top: 5, right: 20, left: -20, bottom: 5 },
+  /** Bar charts: tighter right side */
+  bar: { top: 5, right: 10, left: -20, bottom: 5 },
+  /** Horizontal bar charts: room for category labels on left */
+  barH: { top: 5, right: 30, left: 10, bottom: 5 },
+} as const;
+
+/** CartesianGrid props shared across all charts. */
+export const GRID_PROPS = {
+  strokeDasharray: '3 3',
+  stroke: 'hsl(var(--border))',
+} as const;
+
 export function getWeekNum(d: Date): number {
   const start = new Date(d.getFullYear(), 0, 1);
   return Math.ceil(((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);

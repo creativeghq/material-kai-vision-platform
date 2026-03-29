@@ -77,6 +77,17 @@ export const BookingModal: React.FC<{
       service_name: selectedService?.name ?? null,
     });
 
+    // Direct notification to the professional
+    supabase.from('user_notifications').insert({
+      user_id: professionalUserId,
+      type: 'appointment_booked',
+      title: `New appointment request from ${name.trim()}`,
+      body: `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatSlot(timeSlot)}${selectedService ? ` · ${selectedService.name}` : ''}`,
+      action_url: '/appointments',
+      is_read: false,
+      metadata: { appointment_id: data.id, client_name: name.trim(), client_email: email.trim() },
+    }).then(() => {});
+
     toast({ title: 'Appointment requested', description: `${professionalName} will confirm your booking.` });
     onBooked();
   };

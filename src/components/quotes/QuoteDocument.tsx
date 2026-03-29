@@ -285,7 +285,7 @@ const ItemsPage: React.FC<{
           <div style={{
             marginTop: 80,
             paddingTop: 60,
-            borderTop: `6px solid rgba(0,0,0,0.15)`,
+            borderTop: '6px solid rgba(0,0,0,0.15)',
             display: 'flex',
             justifyContent: 'flex-end',
           }}>
@@ -376,7 +376,7 @@ export const QuoteDocument = forwardRef<HTMLDivElement, QuoteDocumentProps>(
         <BackCoverPage bgUrl={template.last_page_url} />
       </div>
     );
-  }
+  },
 );
 
 QuoteDocument.displayName = 'QuoteDocument';

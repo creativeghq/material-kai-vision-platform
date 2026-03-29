@@ -573,20 +573,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         if (checkpoints) {
           setJobCheckpoints(prev => {
             if (JSON.stringify(prev) === JSON.stringify(checkpoints)) {
-              return prev; 
+              return prev;
             }
             return checkpoints;
           });
         }
 
-        // 🚀 PROACTIVE PRODUCT REFRESH: 
+        // 🚀 PROACTIVE PRODUCT REFRESH:
         // Fetch products if:
         // 1. Job status is processing AND (products were just discovered OR it's been a while)
         // 2. Job status just changed to completed
         // 3. We have counts in metadata but none in our local state
-        const isPdfJob = typedJobData.job_type === 'pdf_processing' || 
+        const isPdfJob = typedJobData.job_type === 'pdf_processing' ||
                          typedJobData.job_type === 'product_discovery_upload';
-        
+
         const shouldFetchProducts = isPdfJob && (
           (typedJobData.status === 'processing' && (productsDiscoveredCount > 0 || jobCheckpoints.some(cp => cp.stage === 'products_detected'))) ||
           (typedJobData.status === 'completed' && productProgress.length === 0) ||
@@ -1133,7 +1133,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               .update({
                 status: 'interrupted',
                 interrupted_at: new Date().toISOString(),
-                error: 'Job interrupted by user via Clear Queue'
+                error: 'Job interrupted by user via Clear Queue',
               })
               .eq('id', job.id);
 
@@ -2524,19 +2524,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   if (chunksCreated > 0) {
                     statusText = `Currently Processing ${embeddingsGenerated}/${chunksCreated} embeddings with Voyage AI (voyage-3.5)`;
                   } else {
-                    statusText = `Currently Processing embeddings with Voyage AI (voyage-3.5)`;
+                    statusText = 'Currently Processing embeddings with Voyage AI (voyage-3.5)';
                   }
                 } else if (currentStage.includes('discovery') || currentStage.includes('Discovery')) {
                   if (productsDiscovered > 0) {
                     statusText = `Discovered ${productsDiscovered} products - analyzing with Claude Vision`;
                   } else {
-                    statusText = `Currently discovering products with Claude Vision`;
+                    statusText = 'Currently discovering products with Claude Vision';
                   }
                 } else if (currentStage.includes('chunk') || currentStage.includes('Chunk')) {
                   if (chunksCreated > 0) {
                     statusText = `Created ${chunksCreated} semantic chunks for RAG retrieval`;
                   } else {
-                    statusText = `Currently creating semantic chunks`;
+                    statusText = 'Currently creating semantic chunks';
                   }
                 } else {
                   statusText = `Currently Processing: ${currentStage}`;
@@ -2790,7 +2790,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           stage.id.includes('scrape') ? '🌐' :
                           stage.id.includes('discover') ? '🔍' :
                           stage.id.includes('warmup') ? '🔥' :
-                          '⚙️'
+                          '⚙️',
                   }));
 
                   // Get completed checkpoints
@@ -3334,8 +3334,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 title: 'HuggingFace Endpoint Warm-up Started',
                                 details: [
                                   { label: 'Endpoints', value: data.endpoints_to_warmup?.join(', ') || 'N/A' },
-                                  { label: 'Total', value: data.total_endpoints }
-                                ]
+                                  { label: 'Total', value: data.total_endpoints },
+                                ],
                               };
                             case 'warmup_complete':
                               return {
@@ -3343,8 +3343,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 details: [
                                   { label: 'Ready', value: `${data.total_ready} endpoints` },
                                   { label: 'Models', value: data.endpoint_names?.join(', ') || 'N/A' },
-                                  { label: 'Failed', value: meta.warmup_summary?.failed_count || 0 }
-                                ]
+                                  { label: 'Failed', value: meta.warmup_summary?.failed_count || 0 },
+                                ],
                               };
                             case 'initialized':
                               return {
@@ -3352,8 +3352,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 details: [
                                   { label: 'File', value: data.filename },
                                   { label: 'Size', value: data.file_size ? `${(data.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A' },
-                                  { label: 'Discovery Model', value: meta.discovery_model || 'claude-vision' }
-                                ]
+                                  { label: 'Discovery Model', value: meta.discovery_model || 'claude-vision' },
+                                ],
                               };
                             case 'products_detected':
                               return {
@@ -3364,8 +3364,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Pages', value: data.total_pages },
                                   { label: 'Confidence', value: meta.confidence_score ? `${(meta.confidence_score * 100).toFixed(0)}%` : 'N/A' },
                                   { label: 'Model', value: meta.discovery_model || 'claude-vision' },
-                                  { label: 'Processing Time', value: meta.processing_time_ms ? `${(meta.processing_time_ms / 1000).toFixed(1)}s` : 'N/A' }
-                                ]
+                                  { label: 'Processing Time', value: meta.processing_time_ms ? `${(meta.processing_time_ms / 1000).toFixed(1)}s` : 'N/A' },
+                                ],
                               };
                             case 'completed':
                               return {
@@ -3375,8 +3375,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Chunks Created', value: data.chunks_created },
                                   { label: 'Images Processed', value: data.images_processed },
                                   { label: 'Total Time', value: meta.processing_time ? `${meta.processing_time.toFixed(1)}s` : 'N/A' },
-                                  { label: 'Pages Processed', value: meta.pages_processed }
-                                ]
+                                  { label: 'Pages Processed', value: meta.pages_processed },
+                                ],
                               };
                             // Stage 1: PDF Extraction
                             case 'pdf_extracted':
@@ -3388,16 +3388,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Pages', value: data.pages_extracted },
                                   { label: 'Physical Pages', value: data.physical_pages?.join(', ') || 'N/A' },
                                   { label: 'Layout Regions', value: meta.layout_regions_detected || 0 },
-                                  { label: 'Spread Layout', value: meta.has_spread_layout ? 'Yes' : 'No' }
-                                ]
+                                  { label: 'Spread Layout', value: meta.has_spread_layout ? 'Yes' : 'No' },
+                                ],
                               };
                             case 'pdf_pages_numbered':
                               return {
                                 title: 'PDF Pages Numbered',
                                 details: [
                                   { label: 'Total Pages', value: data.total_pages },
-                                  { label: 'Pages Numbered', value: data.pages_numbered || data.total_pages }
-                                ]
+                                  { label: 'Pages Numbered', value: data.pages_numbered || data.total_pages },
+                                ],
                               };
                             // Stage 2: Chunking & Embeddings
                             case 'chunks_created':
@@ -3408,8 +3408,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'Chunks', value: data.chunks_created },
                                   { label: 'Text Embeddings', value: meta.text_embeddings_generated || 0 },
-                                  { label: 'Layout-Aware', value: meta.layout_aware ? 'Yes' : 'No' }
-                                ]
+                                  { label: 'Layout-Aware', value: meta.layout_aware ? 'Yes' : 'No' },
+                                ],
                               };
                             case 'text_embeddings_generated':
                               return {
@@ -3418,8 +3418,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product', value: data.product_name || 'N/A' },
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'Embeddings', value: data.text_embeddings_generated },
-                                  { label: 'Chunks', value: meta.chunks_created || 0 }
-                                ]
+                                  { label: 'Chunks', value: meta.chunks_created || 0 },
+                                ],
                               };
                             // Stage 3: Images & CLIP
                             case 'images_extracted':
@@ -3430,8 +3430,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'Images', value: data.images_processed },
                                   { label: 'Material', value: meta.images_material || 0 },
-                                  { label: 'Non-Material', value: meta.images_non_material || 0 }
-                                ]
+                                  { label: 'Non-Material', value: meta.images_non_material || 0 },
+                                ],
                               };
                             case 'image_embeddings_generated':
                               return {
@@ -3440,8 +3440,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product', value: data.product_name || 'N/A' },
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'CLIP Embeddings', value: data.clip_embeddings_generated },
-                                  { label: 'Images', value: meta.images_processed || 0 }
-                                ]
+                                  { label: 'Images', value: meta.images_processed || 0 },
+                                ],
                               };
                             // Stage 4: Product Creation
                             case 'products_created':
@@ -3452,8 +3452,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'DB ID', value: data.product_db_id?.slice(0, 8) || 'N/A' },
                                   { label: 'Layout Regions', value: meta.layout_regions_stored || 0 },
-                                  { label: 'Tables', value: meta.tables_extracted || 0 }
-                                ]
+                                  { label: 'Tables', value: meta.tables_extracted || 0 },
+                                ],
                               };
                             // Stage 5: Relationships
                             case 'relationships_created':
@@ -3464,8 +3464,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Product #', value: data.product_index },
                                   { label: 'Relationships', value: data.relationships_created },
                                   { label: 'Chunks Linked', value: meta.chunks_linked || 0 },
-                                  { label: 'Images Linked', value: meta.images_linked || 0 }
-                                ]
+                                  { label: 'Images Linked', value: meta.images_linked || 0 },
+                                ],
                               };
                             // Other stages
                             case 'metadata_extracted':
@@ -3475,25 +3475,25 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Fields', value: Object.keys(data).length },
                                   ...Object.entries(data).slice(0, 4).map(([k, v]) => ({
                                     label: k.replace(/_/g, ' '),
-                                    value: typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v)
-                                  }))
-                                ]
+                                    value: typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v),
+                                  })),
+                                ],
                               };
                             case 'document_entities_created':
                               return {
                                 title: 'Document Entities Created',
                                 details: [
                                   { label: 'Entities', value: data.entities_created || 0 },
-                                  { label: 'Types', value: data.entity_types?.join(', ') || 'N/A' }
-                                ]
+                                  { label: 'Types', value: data.entity_types?.join(', ') || 'N/A' },
+                                ],
                               };
                             default:
                               return {
                                 title: cp.stage.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
                                 details: Object.entries(data).slice(0, 5).map(([k, v]) => ({
                                   label: k.replace(/_/g, ' '),
-                                  value: typeof v === 'object' ? JSON.stringify(v).slice(0, 50) : String(v)
-                                }))
+                                  value: typeof v === 'object' ? JSON.stringify(v).slice(0, 50) : String(v),
+                                })),
                               };
                           }
                         };
@@ -3572,8 +3572,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           product_id: p.product_id,
                           error: p.error_message,
                           error_stage: p.error_stage,
-                          failed_at: p.updated_at
-                        }))
+                          failed_at: p.updated_at,
+                        })),
                       };
 
                       const data = {
@@ -3581,7 +3581,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           generated_at: new Date().toISOString(),
                           job_id: selectedJob?.id,
                           status: selectedJob?.status,
-                          filename: selectedJob?.metadata?.filename
+                          filename: selectedJob?.metadata?.filename,
                         },
                         failure_diagnostics: failureReport,
                         job_metadata: selectedJob?.metadata,
@@ -3590,9 +3590,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           timestamp: cp.created_at,
                           stage: cp.stage,
                           details: cp.checkpoint_data?.message || cp.checkpoint_data?.status || 'Operation successful',
-                          metadata: cp.metadata
+                          metadata: cp.metadata,
                         })),
-                        raw_job_data: selectedJob
+                        raw_job_data: selectedJob,
                       };
                       navigator.clipboard.writeText(JSON.stringify(data, null, 2));
                       toast.success('Enhanced Diagnostic JSON copied to clipboard');
@@ -3737,7 +3737,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens: productsCreated * 500, // ~500 tokens per product
                       gpuSeconds,
                       cost: (gpuSeconds / 3600) * 0.60,
-                      description: `Product discovery: ${productsCreated} products from ${totalPages} pages`
+                      description: `Product discovery: ${productsCreated} products from ${totalPages} pages`,
                     };
                   }
 
@@ -3752,7 +3752,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens: 0,
                       gpuSeconds,
                       cost: (gpuSeconds / 3600) * 0.45,
-                      description: `Visual embeddings: ${clipEmbeddings} images → 768D vectors`
+                      description: `Visual embeddings: ${clipEmbeddings} images → 768D vectors`,
                     };
                   }
 
@@ -3768,7 +3768,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens: 0,
                       gpuSeconds,
                       cost: (gpuSeconds / 3600) * 0.60,
-                      description: `Layout detection: ${layoutRegions || 'N/A'} regions on ${pagesWithLayout} pages`
+                      description: `Layout detection: ${layoutRegions || 'N/A'} regions on ${pagesWithLayout} pages`,
                     };
                   }
 
@@ -3784,7 +3784,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens,
                       gpuSeconds: 0,
                       cost: (inputTokens / 1000000) * 3.00 + (outputTokens / 1000000) * 15.00,
-                      description: `Metadata extraction: ${productsCreated} products analyzed`
+                      description: `Metadata extraction: ${productsCreated} products analyzed`,
                     };
                   }
 
@@ -3799,7 +3799,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens: 0,
                       gpuSeconds: 0,
                       cost: (inputTokens / 1000000) * 0.02,
-                      description: `Text embeddings: ${chunksCreated} chunks → 1536D vectors`
+                      description: `Text embeddings: ${chunksCreated} chunks → 1536D vectors`,
                     };
                   }
 

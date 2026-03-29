@@ -38,8 +38,8 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // https://openai.com/api/pricing/
     fallback_prices: {
       'gpt-5': { input: 5.00, output: 15.00 },
-      'gpt-4o': { input: 2.50, output: 10.00 },
-      'gpt-4o-mini': { input: 0.15, output: 0.60 },
+      'gpt-5.2': { input: 7.00, output: 21.00 },
+      'gpt-5.2-mini': { input: 1.00, output: 3.00 },
       'text-embedding-3-small': { input: 0.02, output: 0.00 },
       'text-embedding-3-large': { input: 0.13, output: 0.00 },
     },

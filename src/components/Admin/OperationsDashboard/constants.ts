@@ -13,8 +13,8 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'claude-opus-4-5': { input: 15.00, output: 75.00 },
 
   // OpenAI Models
-  'gpt-4o': { input: 2.50, output: 10.00 },
-  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'gpt-5.2': { input: 7.00, output: 21.00 },
+  'gpt-5.2-mini': { input: 1.00, output: 3.00 },
   'text-embedding-3-small': { input: 0.02, output: 0.00 },
   'text-embedding-3-large': { input: 0.13, output: 0.00 },
 
@@ -36,7 +36,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
 
   // OpenAI Models
   { id: 'gpt-5', name: 'GPT-5', provider: 'openai', model: 'gpt-5', inputCostPer1M: 5.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['High Accuracy Tasks', 'Discovery'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'gpt-5.2', name: 'GPT-5.2', provider: 'openai', model: 'gpt-5.2', inputCostPer1M: 7.00, outputCostPer1M: 21.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
   // Qwen Vision Models (HuggingFace Endpoint - 32B only)

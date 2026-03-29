@@ -168,10 +168,10 @@ export default function MaterialComparePage() {
 
   // Collect all property + spec keys across all products
   const allPropKeys = Array.from(
-    new Set(products.flatMap((p) => Object.keys(flattenObject(p.properties as Record<string, unknown>))))
+    new Set(products.flatMap((p) => Object.keys(flattenObject(p.properties as Record<string, unknown>)))),
   );
   const allSpecKeys = Array.from(
-    new Set(products.flatMap((p) => Object.keys(flattenObject(p.specifications as Record<string, unknown>))))
+    new Set(products.flatMap((p) => Object.keys(flattenObject(p.specifications as Record<string, unknown>)))),
   );
 
   const getValues = (products: Product[], key: string, section: 'properties' | 'specifications') =>

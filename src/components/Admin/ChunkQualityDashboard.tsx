@@ -169,7 +169,7 @@ export const ChunkQualityDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Chunk Quality Dashboard</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2"><CheckCircle className="h-6 w-6" />Chunk Quality Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             Monitor chunk quality, deduplication, and validation metrics
           </p>

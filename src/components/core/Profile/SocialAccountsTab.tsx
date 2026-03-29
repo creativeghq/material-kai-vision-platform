@@ -56,9 +56,17 @@ export const SocialAccountsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) loadAccounts();
+    if (!user) return;
+    supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => setWorkspaceId(data?.workspace_id ?? null));
+    loadAccounts();
   }, [user]);
 
   const loadAccounts = async () => {
@@ -80,6 +88,10 @@ export const SocialAccountsTab: React.FC = () => {
 
   const handleConnect = async (platform: string) => {
     if (!user) return;
+    if (!workspaceId) {
+      toast({ title: 'Workspace not found', description: 'Could not determine your workspace. Please refresh.', variant: 'destructive' });
+      return;
+    }
     setConnecting(platform);
 
     try {
@@ -95,7 +107,7 @@ export const SocialAccountsTab: React.FC = () => {
         body: JSON.stringify({
           action: 'connect',
           platform,
-          workspace_id: (user as any).user_metadata?.workspace_id,
+          workspace_id: workspaceId,
         }),
       });
 

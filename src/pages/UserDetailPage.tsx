@@ -99,7 +99,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
             headers: {
               Authorization: `Bearer ${session.access_token}`,
             },
-          }
+          },
         );
 
         if (response.ok) {
@@ -449,7 +449,7 @@ export const UserDetailPage: React.FC = () => {
       <div className="min-h-screen">
         <GlobalAdminHeader
           title="User Not Found"
-          description={error || "The requested user could not be found"}
+          description={error || 'The requested user could not be found'}
           badge="CRM"
         />
         <div className="p-6">

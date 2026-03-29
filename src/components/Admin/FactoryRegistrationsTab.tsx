@@ -54,7 +54,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
       });
       if (error) throw error;
       setRequests((prev) =>
-        prev.map((r) => r.id === req.id ? { ...r, status: 'approved' } : r)
+        prev.map((r) => r.id === req.id ? { ...r, status: 'approved' } : r),
       );
       toast({ title: 'Approved', description: `${req.company_name} is now a verified factory.` });
     } catch {
@@ -75,7 +75,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
       });
       if (error) throw error;
       setRequests((prev) =>
-        prev.map((r) => r.id === req.id ? { ...r, status: 'rejected', rejection_reason: rejectReason.trim() || null } : r)
+        prev.map((r) => r.id === req.id ? { ...r, status: 'rejected', rejection_reason: rejectReason.trim() || null } : r),
       );
       setRejectingId(null);
       setRejectReason('');

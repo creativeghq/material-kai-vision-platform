@@ -189,7 +189,7 @@ function buildPrompt(
       return `Restyle this entire room in ${style} design — ${intensity}. Update floors, walls, ceiling, fixtures, furniture, lighting, and decor to perfectly match the style. Room spatial layout and fixed architecture stay intact.`;
     }
     case 'furniture': {
-      return custom || `Update the furniture in this room. Keep the room proportions and architecture unchanged.`;
+      return custom || 'Update the furniture in this room. Keep the room proportions and architecture unchanged.';
     }
     case 'region':
     case 'custom':

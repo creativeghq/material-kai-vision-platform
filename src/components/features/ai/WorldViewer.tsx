@@ -245,7 +245,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       ([entry]) => {
         isVisibleRef.current = entry.isIntersecting;
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
     observer.observe(container);
     return () => observer.disconnect();

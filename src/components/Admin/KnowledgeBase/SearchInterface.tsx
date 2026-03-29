@@ -123,7 +123,7 @@ export const SearchInterface: React.FC = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               Found {results.length} results in {searchTime}ms
-              <Badge variant="outline">{getSearchTypeBadge(searchType)}</Badge>
+              <Badge variant="outline">multi_vector</Badge>
             </div>
           )}
         </CardContent>

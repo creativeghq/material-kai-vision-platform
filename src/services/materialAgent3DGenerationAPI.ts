@@ -151,7 +151,7 @@ export class MaterialAgent3DGenerationAPI {
         },
         output_data: {
           image_urls: imageUrls,
-          spatial_analysis: spatialAnalysis, // Store spatial analysis in output_data
+          spatial_analysis: null,
         },
         processing_time_ms: processingTime,
         file_urls: imageUrls,
@@ -181,7 +181,7 @@ export class MaterialAgent3DGenerationAPI {
           feedback: `Generated using ${result.data.successful_models}/${result.data.total_models} AI models`,
         },
         processing_time_ms: processingTime,
-        spatial_analysis: spatialAnalysis, // Include spatial analysis in response
+        spatial_analysis: null,
       };
     } catch (error) {
       console.error('❌ 3D generation error:', error);

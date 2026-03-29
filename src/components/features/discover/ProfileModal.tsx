@@ -250,7 +250,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
               preview_url = (rel as any)?.document_images?.image_url;
             }
             return { ...mb, preview_url };
-          })
+          }),
         );
         setMoodboards(enriched);
       }

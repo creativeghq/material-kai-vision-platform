@@ -81,7 +81,7 @@ export const MessagingAnalyticsTab: React.FC = () => {
       setLoading(true);
       const data = await messagingService.getAnalytics(
         filterChannel !== 'all' ? filterChannel as MessagingChannelType : undefined,
-        getDateRange()
+        getDateRange(),
       );
       setAnalytics(data);
     } catch (error) {

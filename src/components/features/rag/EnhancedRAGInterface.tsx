@@ -17,6 +17,7 @@ import {
   Star,
 } from 'lucide-react';
 
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';

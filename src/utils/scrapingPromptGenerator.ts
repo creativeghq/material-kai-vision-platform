@@ -23,15 +23,15 @@ export async function fetchScrapingPromptTemplate(
   if (error) {
     console.error('CRITICAL: Scraping prompt not found in database:', error);
     throw new Error(
-      `Scraping prompt not found in database. Please add it via /admin/ai-configs. ` +
-      `Required: prompt_type='extraction', stage='scraping', category='materials'. ` +
-      `Error: ${error.message}`
+      'Scraping prompt not found in database. Please add it via /admin/ai-configs. ' +
+      'Required: prompt_type=\'extraction\', stage=\'scraping\', category=\'materials\'. ' +
+      `Error: ${error.message}`,
     );
   }
 
   if (!data?.prompt_text) {
     throw new Error(
-      'Scraping prompt exists but has empty prompt_text. Please update it via /admin/ai-configs.'
+      'Scraping prompt exists but has empty prompt_text. Please update it via /admin/ai-configs.',
     );
   }
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getToolPrompt } from './prompt-utils.ts';
 
 /**
@@ -106,9 +107,50 @@ function validateConfig(): void {
  * @returns Promise<number[]> - The embedding vector
  * @throws Error if embedding generation fails
  */
+/**
+ * Fire-and-forget write to ai_usage_logs for embedding calls.
+ * Estimates tokens from text length (1 token ≈ 4 chars).
+ */
+async function _logEmbeddingUsage(
+  text: string,
+  latencyMs: number,
+  operationType: string,
+  jobId?: string,
+): Promise<void> {
+  try {
+    const supabaseUrl = getEnv('SUPABASE_URL');
+    const serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceKey) return;
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+    const estimatedTokens = Math.ceil(text.length / 4);
+    const costPer1M = 0.06; // voyage-3.5
+    const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
+    const billedCost = rawCost * 1.5; // platform markup
+
+    await supabase.from('ai_usage_logs').insert({
+      operation_type: operationType,
+      model_name: 'voyage-3.5',
+      input_tokens: estimatedTokens,
+      output_tokens: 0,
+      input_cost_usd: rawCost,
+      output_cost_usd: 0,
+      total_cost_usd: rawCost,
+      raw_cost_usd: rawCost,
+      markup_multiplier: 1.5,
+      billed_cost_usd: billedCost,
+      job_id: jobId || null,
+      metadata: { latency_ms: latencyMs, source: 'edge_function' },
+    });
+  } catch {
+    // best-effort — never block the embedding result
+  }
+}
+
 export async function generateStandardEmbedding(
   text: string,
-  inputType: 'document' | 'query' = 'document'
+  inputType: 'document' | 'query' = 'document',
+  logCtx?: { operationType?: string; jobId?: string },
 ): Promise<number[]> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');
@@ -118,6 +160,7 @@ export async function generateStandardEmbedding(
   const truncatedText = text.length > 8000 ? text.substring(0, 8000) : text;
 
   let lastError: Error | null = null;
+  const startTime = Date.now();
 
   // Retry logic
   for (let attempt = 1; attempt <= EMBEDDING_CONFIG.maxRetries; attempt++) {
@@ -166,6 +209,16 @@ export async function generateStandardEmbedding(
       }
 
       console.log(`✅ Embedding generated via MIVAA successfully: ${embedding.length} dimensions`);
+
+      // Fire-and-forget usage logging — never blocks the caller
+      const elapsedMs = Date.now() - startTime;
+      _logEmbeddingUsage(
+        truncatedText,
+        elapsedMs,
+        logCtx?.operationType ?? `embedding:${inputType}`,
+        logCtx?.jobId,
+      ).catch(() => {});
+
       return embedding;
 
     } catch (error) {

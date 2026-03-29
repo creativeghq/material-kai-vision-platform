@@ -328,7 +328,7 @@ export class AgentChatHistoryService {
           id: msg.id,
           role: msg.role,
           content: msg.content,
-          attachmentIds: msg.attachmentIds,
+          attachments: msg.attachments,
           metadata: msg.metadata,
           createdAt: msg.createdAt,
         })),

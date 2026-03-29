@@ -58,7 +58,7 @@ interface ProgressiveImageGridProps {
   onDirectImageClose?: () => void;
 }
 
-const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
+const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   jobId,
   modelCount,
   models,
@@ -369,7 +369,7 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
       // 3. Enrich search results with product image URLs (from image_product_associations → document_images)
       const allProductIds = [...new Set(
-        allSegments.flatMap(s => (s.search_results ?? []).map((r: any) => r.id))
+        allSegments.flatMap(s => (s.search_results ?? []).map((r: any) => r.id)),
       )].filter(Boolean);
 
       if (allProductIds.length > 0) {
@@ -1614,7 +1614,7 @@ const _ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     </>
   );
 };
-export const ProgressiveImageGrid = React.memo(_ProgressiveImageGrid);
+export const ProgressiveImageGrid = React.memo(ProgressiveImageGridInner);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

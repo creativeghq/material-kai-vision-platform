@@ -90,7 +90,7 @@ function extractDominantColor(metadata: Record<string, any>): string | null {
  */
 function suggestGroutColorForProduct(
   productColor: string | null,
-  metadata: Record<string, any>
+  metadata: Record<string, any>,
 ): GroutColor[] {
   const suggestions: GroutColor[] = [];
 
@@ -116,31 +116,31 @@ function suggestGroutColorForProduct(
       // For light tiles, suggest light grays or matching tones
       suggestions.push(
         STANDARD_GROUT_COLORS.find((c) => c.name === 'Light Gray')!,
-        STANDARD_GROUT_COLORS.find((c) => c.name === 'Silver')!
+        STANDARD_GROUT_COLORS.find((c) => c.name === 'Silver')!,
       );
     } else if (closestColor.category === 'dark') {
       // For dark tiles, suggest dark grays
       suggestions.push(
         STANDARD_GROUT_COLORS.find((c) => c.name === 'Anthracite')!,
-        STANDARD_GROUT_COLORS.find((c) => c.name === 'Charcoal')!
+        STANDARD_GROUT_COLORS.find((c) => c.name === 'Charcoal')!,
       );
     } else if (closestColor.category === 'warm') {
       // For warm tiles, suggest warm tones
       suggestions.push(
         STANDARD_GROUT_COLORS.find((c) => c.name === 'Sand')!,
-        STANDARD_GROUT_COLORS.find((c) => c.name === 'Beige')!
+        STANDARD_GROUT_COLORS.find((c) => c.name === 'Beige')!,
       );
     } else {
       // Neutral suggestions
       suggestions.push(
         STANDARD_GROUT_COLORS.find((c) => c.name === 'Gray')!,
-        STANDARD_GROUT_COLORS.find((c) => c.name === 'Cement Gray')!
+        STANDARD_GROUT_COLORS.find((c) => c.name === 'Cement Gray')!,
       );
     }
   } else {
     // Fallback: suggest based on color name
     const matchingColor = STANDARD_GROUT_COLORS.find(
-      (c) => c.name.toLowerCase() === productColor.toLowerCase()
+      (c) => c.name.toLowerCase() === productColor.toLowerCase(),
     );
     if (matchingColor) {
       suggestions.push(matchingColor);
@@ -150,7 +150,7 @@ function suggestGroutColorForProduct(
   // Remove duplicates and limit to 3
   const uniqueSuggestions = suggestions.filter(
     (color, index, self) =>
-      index === self.findIndex((c) => c.name === color.name)
+      index === self.findIndex((c) => c.name === color.name),
   );
 
   return uniqueSuggestions.slice(0, 3);
@@ -160,7 +160,7 @@ function suggestGroutColorForProduct(
  * Generate grout recommendations for all brands
  */
 export function generateGroutRecommendations(
-  metadata: Record<string, any>
+  metadata: Record<string, any>,
 ): GroutRecommendations {
   const dominantColor = extractDominantColor(metadata);
   const suggestedColors = suggestGroutColorForProduct(dominantColor, metadata);
@@ -202,7 +202,7 @@ export function generateGroutRecommendations(
  * Get standard product name for each brand
  */
 function getProductNameForBrand(
-  brand: 'mapei' | 'kerakoll' | 'isomat' | 'technica'
+  brand: 'mapei' | 'kerakoll' | 'isomat' | 'technica',
 ): string {
   const productNames = {
     mapei: 'ULTRACOLOR PLUS',

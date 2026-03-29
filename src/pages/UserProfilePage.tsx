@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
@@ -16,8 +16,12 @@ import { useAuth } from '@/contexts/AuthContext';
 export const UserProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const initialTab = searchParams.get('tab') ?? 'profile';
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') ?? 'profile');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') ?? 'profile';
+    setActiveTab(tab);
+  }, [searchParams]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);

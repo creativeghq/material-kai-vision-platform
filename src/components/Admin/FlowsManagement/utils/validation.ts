@@ -34,7 +34,7 @@ export function validateGraph(graph: FlowGraphDefinition): ValidationResult {
   }
 
   const orphans = nodes.filter(n =>
-    n.type !== 'triggerNode' && !connectedNodeIds.has(n.id)
+    n.type !== 'triggerNode' && !connectedNodeIds.has(n.id),
   );
   if (orphans.length > 0) {
     warnings.push(`${orphans.length} node(s) are not connected to the flow`);

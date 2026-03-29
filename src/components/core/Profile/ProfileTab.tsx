@@ -3,7 +3,8 @@ import {
   User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2,
   Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag,
   ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink,
-  ChevronLeft, ChevronRight, CalendarDays,
+  ChevronLeft, ChevronRight, CalendarDays, BarChart2, Users, Calendar, Grid3x3,
+  Mail, MessageCircle, FileText, Sparkles, Layers,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -104,7 +105,7 @@ function PhoneInput({ value, onChange }: { value: string; onChange: (v: string) 
   const filtered = search
     ? COUNTRY_CODES.filter(c =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.code.includes(search)
+        c.code.includes(search),
       )
     : COUNTRY_CODES;
 
@@ -184,7 +185,7 @@ function LocationAutocomplete({ value, onChange }: { value: string; onChange: (v
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6&featuretype=city`,
-          { headers: { 'Accept-Language': 'en' } }
+          { headers: { 'Accept-Language': 'en' } },
         );
         const data: NominatimResult[] = await res.json();
         // Simplify to "City, Country" format
@@ -505,6 +506,27 @@ export const ProfileTab: React.FC = () => {
   const [featuredMoodboardId, setFeaturedMoodboardId] = useState<string | null>(null);
   const [profileViews, setProfileViews] = useState(0);
 
+  // Analytics
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analytics, setAnalytics] = useState({
+    followers: 0,
+    totalMoodboardViews: 0,
+    featuredMoodboardViews: 0,
+    hireRequestsTotal: 0,
+    hireRequestsUnread: 0,
+    appointmentsTotal: 0,
+    appointmentsPending: 0,
+    appointmentsConfirmed: 0,
+    appointmentsCompleted: 0,
+    moodboardQuoteRequests: 0,
+    reviewsCount: 0,
+    reviewsAvg: 0,
+    quotesCreated: 0,
+    vrWorldsCreated: 0,
+    designerProjects: 0,
+    moodboardComments: 0,
+  });
+
   const [addingService, setAddingService] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [addingFactory, setAddingFactory] = useState(false);
@@ -530,7 +552,7 @@ export const ProfileTab: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([loadProfile(), loadMoodboards(), loadFactoryOptions(), loadRegistrationRequest()]);
+    Promise.all([loadProfile(), loadMoodboards(), loadFactoryOptions(), loadRegistrationRequest(), loadAnalytics()]);
   }, [user]);
 
   const loadProfile = async () => {
@@ -540,7 +562,7 @@ export const ProfileTab: React.FC = () => {
       .select(
         'full_name, company, phone, address, bio, avatar_url, location, website_url, professional_type,' +
         'is_public, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views,' +
-        'factory_verified, factory_claimed_name'
+        'factory_verified, factory_claimed_name',
       )
       .eq('user_id', user.id)
       .maybeSingle();
@@ -586,6 +608,89 @@ export const ProfileTab: React.FC = () => {
   const loadFactoryOptions = async () => {
     const { data } = await supabase.rpc('get_distinct_factory_names');
     if (data) setFactoryOptions(data as FactoryOption[]);
+  };
+
+  const loadAnalytics = async () => {
+    if (!user) return;
+    setAnalyticsLoading(true);
+    try {
+      const [
+        { count: fwrCount },
+        { data: profileData },
+        { data: mbData },
+        { data: hireData },
+        { data: apptData },
+        { data: reviewData },
+        { count: mqrCount },
+        { count: quotesCount },
+        { count: vrCount },
+        { count: dpCount },
+      ] = await Promise.all([
+        supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
+        supabase.from('user_profiles').select('featured_moodboard_id').eq('user_id', user.id).maybeSingle(),
+        supabase.from('moodboards').select('id, view_count').eq('user_id', user.id),
+        supabase.from('profile_contact_requests').select('is_read').eq('to_user_id', user.id),
+        supabase.from('appointments').select('status').eq('professional_user_id', user.id),
+        supabase.from('profile_reviews').select('overall_rating').eq('to_user_id', user.id),
+        supabase.from('moodboard_quote_requests').select('*', { count: 'exact', head: true }).eq('moodboard_creator_id', user.id),
+        supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('vr_worlds').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
+        supabase.from('designer_projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      ]);
+
+      // Moodboard views
+      const mbRows = (mbData ?? []) as { id: string; view_count: number }[];
+      const totalMbViews = mbRows.reduce((s, m) => s + (m.view_count ?? 0), 0);
+      const featuredId = profileData?.featured_moodboard_id;
+      const featuredViews = featuredId ? (mbRows.find((m) => m.id === featuredId)?.view_count ?? 0) : 0;
+
+      // Moodboard comments (depends on moodboard IDs)
+      let mbComments = 0;
+      if (mbRows.length > 0) {
+        const mbIds = mbRows.map((m) => m.id);
+        const { count: cmtCount } = await supabase
+          .from('moodboard_comments').select('*', { count: 'exact', head: true }).in('moodboard_id', mbIds);
+        mbComments = cmtCount ?? 0;
+      }
+
+      // Hire requests
+      const hireRows = (hireData ?? []) as { is_read: boolean }[];
+      const hireTotal = hireRows.length;
+      const hireUnread = hireRows.filter((r) => !r.is_read).length;
+
+      // Appointments breakdown
+      const apptRows = (apptData ?? []) as { status: string }[];
+      const apptTotal = apptRows.length;
+      const apptPending = apptRows.filter((r) => r.status === 'pending').length;
+      const apptConfirmed = apptRows.filter((r) => r.status === 'confirmed').length;
+      const apptCompleted = apptRows.filter((r) => r.status === 'completed').length;
+
+      // Reviews
+      const revRows = (reviewData ?? []) as { overall_rating: number }[];
+      const revCount = revRows.length;
+      const revAvg = revCount > 0 ? revRows.reduce((s, r) => s + r.overall_rating, 0) / revCount : 0;
+
+      setAnalytics({
+        followers: fwrCount ?? 0,
+        totalMoodboardViews: totalMbViews,
+        featuredMoodboardViews: featuredViews,
+        hireRequestsTotal: hireTotal,
+        hireRequestsUnread: hireUnread,
+        appointmentsTotal: apptTotal,
+        appointmentsPending: apptPending,
+        appointmentsConfirmed: apptConfirmed,
+        appointmentsCompleted: apptCompleted,
+        moodboardQuoteRequests: mqrCount ?? 0,
+        reviewsCount: revCount,
+        reviewsAvg: revAvg,
+        quotesCreated: quotesCount ?? 0,
+        vrWorldsCreated: vrCount ?? 0,
+        designerProjects: dpCount ?? 0,
+        moodboardComments: mbComments,
+      });
+    } finally {
+      setAnalyticsLoading(false);
+    }
   };
 
   const patch = async (fields: Record<string, unknown>) => {
@@ -698,6 +803,27 @@ export const ProfileTab: React.FC = () => {
         factory_name: factoryToAdd,
         added_at: new Date().toISOString(),
       });
+
+      // Notify the factory user if we can find them by their claimed factory name
+      supabase
+        .from('user_profiles')
+        .select('user_id, full_name')
+        .eq('factory_claimed_name', factoryToAdd)
+        .eq('factory_verified', true)
+        .maybeSingle()
+        .then(({ data: factoryProfile }) => {
+          if (factoryProfile?.user_id) {
+            supabase.from('user_notifications').insert({
+              user_id: factoryProfile.user_id,
+              type: 'preferred_factory',
+              title: 'A user added your factory as a preferred factory',
+              body: null,
+              action_url: '/analytics/factory',
+              is_read: false,
+              metadata: { added_by_user_id: user.id, factory_name: factoryToAdd },
+            }).then(() => {});
+          }
+        });
     }
   };
 
@@ -916,7 +1042,7 @@ export const ProfileTab: React.FC = () => {
                 onEdit={() => { setEditingServiceId(svc.id); setAddingService(false); }}
                 onDelete={() => deleteService(svc.id)}
               />
-            )
+            ),
           )}
           {addingService && (
             <ServiceForm
@@ -1134,41 +1260,118 @@ export const ProfileTab: React.FC = () => {
       {/* Appointment Availability */}
       <AvailabilitySettings />
 
-      {/* Featured Moodboard */}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary" />Featured Moodboard</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setEditingFeatured((v) => !v)}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />{featuredMoodboardId ? 'Change' : 'Set'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">Pin one moodboard to the top of your public profile.</p>
-          {!editingFeatured ? (
-            <p className="text-sm font-medium">
-              {featuredMoodboardId ? moodboards.find((m) => m.id === featuredMoodboardId)?.title ?? 'Pinned board' : '—'}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              <SearchCombobox options={moodboardOptions} value={featuredMoodboardId ?? ''}
-                onSelect={(v) => saveFeatured(v || null)} placeholder="Select a moodboard…" />
-              <Button size="sm" variant="ghost" onClick={() => setEditingFeatured(false)}>Cancel</Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Featured Moodboard + Profile Analytics — side by side */}
+      <div className="grid grid-cols-2 gap-3">
 
-      {/* Profile stats */}
-      {isPublic && (
-        <Card className="rounded-2xl bg-muted/30">
-          <CardContent className="pt-5 pb-5 text-center">
-            <p className="text-2xl font-bold">{profileViews}</p>
-            <p className="text-xs text-muted-foreground">Profile views</p>
+        {/* Featured Moodboard */}
+        <Card className="rounded-2xl h-full">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary" />Featured Moodboard</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setEditingFeatured((v) => !v)}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />{featuredMoodboardId ? 'Change' : 'Set'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 flex flex-col flex-1">
+            <p className="text-xs text-muted-foreground">Pin one moodboard to the top of your public profile.</p>
+            {!editingFeatured ? (
+              <p className="text-sm font-medium">
+                {featuredMoodboardId ? moodboards.find((m) => m.id === featuredMoodboardId)?.title ?? 'Pinned board' : '—'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <SearchCombobox options={moodboardOptions} value={featuredMoodboardId ?? ''}
+                  onSelect={(v) => saveFeatured(v || null)} placeholder="Select a moodboard…" />
+                <Button size="sm" variant="ghost" onClick={() => setEditingFeatured(false)}>Cancel</Button>
+              </div>
+            )}
+            <div className="flex-1" />
+            {featuredMoodboardId && isPublic && (
+              <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
+                <Eye className="h-3 w-3 text-muted-foreground/50" />
+                <span className="text-xs font-semibold tabular-nums text-primary">{analytics.featuredMoodboardViews.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">visits</span>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* Profile Analytics */}
+        {isPublic && (
+        <Card className="rounded-2xl h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary" />Profile Analytics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Visibility</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { icon: Eye,     label: 'Profile visits', value: profileViews },
+                    { icon: Users,   label: 'Followers',      value: analytics.followers },
+                    { icon: Grid3x3, label: 'Board visits',   value: analytics.totalMoodboardViews },
+                  ].map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
+                      <div className="flex items-center justify-center gap-1 leading-none">
+                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Inbound</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { icon: Mail,     label: 'Hire reqs',  value: analytics.hireRequestsTotal,      badge: analytics.hireRequestsUnread > 0 ? analytics.hireRequestsUnread : null,   badgeClass: 'bg-primary text-primary-foreground' },
+                    { icon: Calendar, label: 'Appts',      value: analytics.appointmentsTotal,      badge: analytics.appointmentsPending > 0 ? analytics.appointmentsPending : null, badgeClass: 'bg-amber-100 text-amber-700' },
+                    { icon: FileText, label: 'Quote reqs', value: analytics.moodboardQuoteRequests, badge: null, badgeClass: '' },
+                    { icon: Star,     label: `Reviews${analytics.reviewsCount > 0 ? ` ${analytics.reviewsAvg.toFixed(1)}★` : ''}`, value: analytics.reviewsCount, badge: null, badgeClass: '' },
+                  ].map(({ icon: Icon, label, value, badge, badgeClass }) => (
+                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
+                      <div className="flex items-center justify-center gap-1 leading-none">
+                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                        {badge !== null && (
+                          <span className={`text-[8px] font-medium rounded-full px-1 leading-[14px] ${badgeClass}`}>{badge}</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Content</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { icon: FileText,      label: 'Quotes',    value: analytics.quotesCreated },
+                    { icon: Sparkles,      label: 'VR worlds', value: analytics.vrWorldsCreated },
+                    { icon: Layers,        label: 'Projects',  value: analytics.designerProjects },
+                    { icon: MessageCircle, label: 'Comments',  value: analytics.moodboardComments },
+                  ].map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
+                      <div className="flex items-center justify-center gap-1 leading-none">
+                        <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        )}
+
+      </div>
     </div>
   );
 };
@@ -1239,7 +1442,7 @@ function AvailabilitySettings() {
     if (entries.length > 0) {
       await supabase.from('appointment_availability').upsert(
         entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges })),
-        { onConflict: 'user_id,available_date' }
+        { onConflict: 'user_id,available_date' },
       );
     }
     // Delete removed dates (fetch existing and diff)

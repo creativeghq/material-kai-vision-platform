@@ -128,7 +128,7 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
   const pages = Array.from({ length: total }, (_, i) => i + 1);
   // Show at most 7 page buttons: first, last, current ±2, with ellipsis
   const visible = pages.filter((n) =>
-    n === 1 || n === total || Math.abs(n - page) <= 2
+    n === 1 || n === total || Math.abs(n - page) <= 2,
   );
 
   const buttons: (number | '…')[] = [];
@@ -157,7 +157,7 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
           >
             {b}
           </button>
-        )
+        ),
       )}
       <button
         disabled={page === total}
@@ -473,7 +473,7 @@ export const DiscoverPage: React.FC = () => {
         c.company?.toLowerCase().includes(q) ||
         c.bio?.toLowerCase().includes(q) ||
         c.location?.toLowerCase().includes(q) ||
-        c.services.some((s) => s.toLowerCase().includes(q))
+        c.services.some((s) => s.toLowerCase().includes(q)),
       );
     }
     if (profileType !== 'all') r = r.filter((c) => c.professional_type === profileType);
@@ -497,7 +497,7 @@ export const DiscoverPage: React.FC = () => {
       r = r.filter((p) =>
         p.name?.toLowerCase().includes(q) ||
         p.description?.toLowerCase().includes(q) ||
-        p.factoryName?.toLowerCase().includes(q)
+        p.factoryName?.toLowerCase().includes(q),
       );
     }
     if (productCat !== 'all') r = r.filter((p) => p.detectedCat === productCat);
@@ -506,12 +506,12 @@ export const DiscoverPage: React.FC = () => {
 
   const factoryModalProducts = useMemo(() =>
     selectedFactory ? products.filter((p) => p.factoryName === selectedFactory.name) : [],
-    [products, selectedFactory]
+    [products, selectedFactory],
   );
 
   const availableTypes = useMemo(() =>
     Array.from(new Set(creators.filter((c) => c.professional_type).map((c) => c.professional_type!))),
-    [creators]
+    [creators],
   );
 
   return (

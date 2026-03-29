@@ -68,14 +68,14 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
           {checkpoints.map((checkpoint, index) => {
             const isLast = index === checkpoints.length - 1;
             const stageName = STAGE_LABELS[checkpoint.stage] || checkpoint.stage;
-            
+
             return (
               <div key={checkpoint.id} className="relative">
                 {/* Timeline Line */}
                 {!isLast && (
                   <div className="absolute left-[11px] top-8 bottom-0 w-0.5 bg-slate-100" />
                 )}
-                
+
                 {/* Checkpoint Item */}
                 <div className="flex gap-4">
                   {/* Icon */}
@@ -84,7 +84,7 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
                       <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                     </div>
                   </div>
-                  
+
                   {/* Content */}
                   <div className="flex-1 pb-6">
                     <div className="flex items-start justify-between gap-2">
@@ -98,20 +98,20 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
                         {checkpoint.stage}
                       </Badge>
                     </div>
-                    
+
                     {/* Checkpoint Metadata */}
                     {checkpoint.metadata && Object.keys(checkpoint.metadata).length > 0 && (
                       <div className="mt-2 p-3 bg-slate-50/80 border border-slate-100 rounded-lg text-xs space-y-1.5 shadow-sm">
                         {Object.entries(checkpoint.metadata).map(([key, value]) => {
                           const isSuccess = key.includes('success') && value === true;
                           const isCount = key.includes('count') || key.includes('total');
-                          
+
                           return (
                             <div key={key} className="flex justify-between items-center group">
                               <span className="text-muted-foreground capitalize text-[10px] font-medium">{key.replace(/_/g, ' ')}</span>
                               <span className={`font-bold transition-all duration-200 ${
-                                isSuccess ? 'text-green-600' : 
-                                isCount ? 'text-primary' : 
+                                isSuccess ? 'text-green-600' :
+                                isCount ? 'text-primary' :
                                 'text-slate-700'
                               }`}>
                                 {typeof value === 'object' ? JSON.stringify(value) : String(value)}
@@ -126,7 +126,7 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
               </div>
             );
           })}
-          
+
           {/* Current Status Indicator */}
           {jobStatus === 'processing' && (
             <div className="relative">

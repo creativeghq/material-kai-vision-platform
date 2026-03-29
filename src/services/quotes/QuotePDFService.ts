@@ -81,7 +81,7 @@ class QuotePDFService {
   async saveItemPrices(
     quoteId: string,
     items: { id: string; unit_price: number; line_total: number }[],
-    vatRate: number
+    vatRate: number,
   ): Promise<{ success: boolean; error?: string }> {
     // Update each item's pricing
     for (const item of items) {

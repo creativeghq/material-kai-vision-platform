@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import { quotePDFService } from '@/services/quotes/QuotePDFService';
 import { QuoteDownloadButtons } from '@/components/quotes/QuoteDownloadButtons';
@@ -23,6 +24,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+
+const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
+  supabase.from('user_notifications').insert({
+    user_id: userId,
+    type: 'quote_updated',
+    title,
+    body: null,
+    action_url: `/quotes/${quoteId}`,
+    is_read: false,
+    metadata: { quote_id: quoteId },
+  }).then(() => {});
+};
 
 export const QuoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -213,6 +226,10 @@ export const QuoteDetailPage: React.FC = () => {
     try {
       setAddingTimeline(true);
       await quotesService.addTimelineStepToQuote(id, selectedTimelineStepId, timelineNote || undefined);
+      if (quote?.user_id) {
+        const stepLabel = timelineSteps.find((s) => s.id === selectedTimelineStepId)?.name ?? 'a step';
+        sendQuoteNotification(quote.user_id, `Your quote "${quote?.name || 'Quote'}" has a new update: ${stepLabel}`, id);
+      }
       toast({
         title: 'Success',
         description: 'Timeline step added',
@@ -356,6 +373,9 @@ export const QuoteDetailPage: React.FC = () => {
       if (result.success) {
         toast({ title: 'Prices saved', description: 'Item prices and totals updated.' });
         await loadQuoteDetails();
+        if (quote?.user_id) {
+          sendQuoteNotification(quote.user_id, `Your quote "${quote.name || 'Quote'}" has been priced and is ready to review`, quote.id);
+        }
       } else {
         toast({ title: 'Error', description: result.error || 'Failed to save prices', variant: 'destructive' });
       }
@@ -411,6 +431,10 @@ export const QuoteDetailPage: React.FC = () => {
       // '__none__' is the sentinel value for clearing the tag
       await quotesService.updateQuoteStatusTag(quote.id, tagId === '__none__' ? null : tagId);
       await loadQuoteDetails();
+      if (quote.user_id) {
+        const tagLabel = tagId === '__none__' ? 'updated' : (statusTags.find((t) => t.id === tagId)?.name ?? 'updated');
+        sendQuoteNotification(quote.user_id, `Your quote "${quote.name || 'Quote'}" status changed to: ${tagLabel}`, quote.id);
+      }
       toast({
         title: 'Success',
         description: 'Status tag updated successfully',

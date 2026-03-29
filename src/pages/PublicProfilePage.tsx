@@ -184,6 +184,7 @@ export const PublicProfilePage: React.FC = () => {
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | undefined>();
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
   const loadIdRef = useRef(0);
+  const trackedMoodboardsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!userId) return;
@@ -203,7 +204,7 @@ export const PublicProfilePage: React.FC = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select(
-          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public'
+          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public',
         )
         .eq('user_id', userId)
         .eq('is_public', true)
@@ -296,7 +297,7 @@ export const PublicProfilePage: React.FC = () => {
               preview_url = (rel as any)?.document_images?.image_url;
             }
             return { ...mb, preview_url };
-          })
+          }),
         );
         // Discard result if a newer load has started (userId changed mid-flight)
         if (loadId === loadIdRef.current) setMoodboards(enriched);
@@ -607,7 +608,15 @@ export const PublicProfilePage: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {moodboards.map((mb, i) => (
-                    <div key={mb.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+                    <div key={mb.id}
+                      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                      onClick={() => {
+                        if (!trackedMoodboardsRef.current.has(mb.id)) {
+                          trackedMoodboardsRef.current.add(mb.id);
+                          supabase.rpc('increment_moodboard_views', { p_moodboard_id: mb.id }).then(() => {});
+                        }
+                      }}
+                    >
                       <div className={`aspect-[4/3] overflow-hidden relative ${!mb.preview_url ? `bg-gradient-to-br ${CARD_COLORS[i % CARD_COLORS.length]}` : ''}`}>
                         {mb.preview_url ? (
                           <img

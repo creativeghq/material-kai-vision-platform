@@ -400,7 +400,7 @@ function buildInpaintingPrompt(zone: SegmentWithResults | null, material: Picked
         `Photorealistic ${zoneLabel} replacement in an interior scene.`,
         `Replace with ${name}: ${matType} material,`,
         `${finish} finish${color ? `, ${color}` : ''},`,
-        `high-resolution surface texture, seamless edges, natural interior lighting,`,
+        'high-resolution surface texture, seamless edges, natural interior lighting,',
         `correct perspective for ${zoneLabel}, professional architectural photography quality.`,
       ].join(' ');
     }

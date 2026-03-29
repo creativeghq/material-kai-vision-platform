@@ -34,9 +34,9 @@ const sampleMaterials: Material[] = [
       application: 'countertop',
       brand: 'Venetian Stone Co.',
       additionalProperties: {
-        extractionMethod: 'gpt-4o-vision',
+        extractionMethod: 'gpt-5.2-vision',
         extractionConfidence: 0.92,
-        modelVersion: 'gpt-4o-2024-05-13',
+        modelVersion: 'gpt-5.2-2025-12-11',
         r11: 'R11-2.5',
       },
     },

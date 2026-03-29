@@ -119,7 +119,7 @@ class MessagingCampaignService {
    */
   async addRecipients(
     campaignId: string,
-    recipients: Array<{ phoneNumber: string; contactId?: string; contactName?: string; variables?: Record<string, any> }>
+    recipients: Array<{ phoneNumber: string; contactId?: string; contactName?: string; variables?: Record<string, any> }>,
   ): Promise<void> {
     const recipientRecords = recipients.map(r => ({
       campaign_id: campaignId,
@@ -223,7 +223,7 @@ class MessagingCampaignService {
     campaignId: string,
     csvData: Array<Record<string, string>>,
     phoneColumnName: string = 'phone',
-    nameColumnName?: string
+    nameColumnName?: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     const recipients: Array<{ phoneNumber: string; contactName?: string; variables: Record<string, any> }> = [];
     const errors: string[] = [];

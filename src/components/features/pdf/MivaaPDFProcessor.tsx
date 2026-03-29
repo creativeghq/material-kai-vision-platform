@@ -112,7 +112,7 @@ export const MivaaPDFProcessor: React.FC = () => {
                   onClick: () => window.open(`/admin/async-queue-monitor?jobId=${data.job_id}`, '_blank'),
                 },
                 duration: 8000,
-              }
+              },
             );
             continue;
           }

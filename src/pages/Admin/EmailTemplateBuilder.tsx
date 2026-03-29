@@ -49,17 +49,17 @@ const TEMPLATE_TAGS = [
 function cardHtml(imageUrl: string, title: string, subtitle: string, linkUrl = '#') {
   const img = imageUrl
     ? `<img src="${imageUrl}" width="100%" style="display:block;max-height:160px;object-fit:cover;border-radius:8px 8px 0 0;" alt="${title}" />`
-    : `<div style="height:120px;background:#e8e0d8;border-radius:8px 8px 0 0;text-align:center;padding:40px 0;font-size:28px;">🧱</div>`;
+    : '<div style="height:120px;background:#e8e0d8;border-radius:8px 8px 0 0;text-align:center;padding:40px 0;font-size:28px;">🧱</div>';
   return (
-    `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #eee;">` +
+    '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #eee;">' +
       `<tr><td>${img}</td></tr>` +
-      `<tr><td style="padding:12px;">` +
+      '<tr><td style="padding:12px;">' +
         `<a href="${linkUrl}" style="text-decoration:none;">` +
           `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;margin-bottom:4px;">${title}</div>` +
           `<div style="font-family:${BRAND.font};font-size:12px;color:#888;">${subtitle}</div>` +
-        `</a>` +
-      `</td></tr>` +
-    `</table>`
+        '</a>' +
+      '</td></tr>' +
+    '</table>'
   );
 }
 
@@ -68,7 +68,7 @@ function gridHtml(items: { image: string; title: string; subtitle: string; url?:
   const rows: string[] = [];
   for (let i = 0; i < items.length; i += cols) {
     const cells = items.slice(i, i + cols).map(it =>
-      `<td width="${pct}%" style="padding:6px;vertical-align:top;">${cardHtml(it.image, it.title, it.subtitle, it.url)}</td>`
+      `<td width="${pct}%" style="padding:6px;vertical-align:top;">${cardHtml(it.image, it.title, it.subtitle, it.url)}</td>`,
     );
     while (cells.length < cols) cells.push(`<td width="${pct}%" style="padding:6px;"></td>`);
     rows.push(`<tr>${cells.join('')}</tr>`);
@@ -80,19 +80,19 @@ function listHtml(items: { image: string; title: string; subtitle: string; url?:
   const rows = items.map(it => {
     const img = it.image
       ? `<img src="${it.image}" width="80" height="64" style="display:block;object-fit:cover;border-radius:6px;" alt="${it.title}" />`
-      : `<div style="width:80px;height:64px;background:#e8e0d8;border-radius:6px;"></div>`;
+      : '<div style="width:80px;height:64px;background:#e8e0d8;border-radius:6px;"></div>';
     return (
-      `<tr><td style="padding:8px 0;border-bottom:1px solid #f0eae6;">` +
-        `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+      '<tr><td style="padding:8px 0;border-bottom:1px solid #f0eae6;">' +
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
           `<td width="88" style="vertical-align:top;">${img}</td>` +
-          `<td style="padding-left:12px;vertical-align:top;">` +
+          '<td style="padding-left:12px;vertical-align:top;">' +
             `<a href="${it.url || '#'}" style="text-decoration:none;">` +
               `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;">${it.title}</div>` +
               `<div style="font-family:${BRAND.font};font-size:12px;color:#888;margin-top:3px;">${it.subtitle}</div>` +
-            `</a>` +
-          `</td>` +
-        `</tr></table>` +
-      `</td></tr>`
+            '</a>' +
+          '</td>' +
+        '</tr></table>' +
+      '</td></tr>'
     );
   });
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join('')}</table>`;
@@ -142,7 +142,7 @@ async function renderKaiBlock(
       const { data: boards } = await supabase.from('moodboards')
         .select('id, title, description, moodboard_items(media_url, position)')
         .eq('is_public', true).order('created_at', { ascending: false }).limit(count);
-      if (!boards?.length) return `<!-- KAI block: no public moodboards found -->`;
+      if (!boards?.length) return '<!-- KAI block: no public moodboards found -->';
       const items = boards.map((b: any) => {
         const sorted = (b.moodboard_items || []).sort((a: any, z: any) => a.position - z.position);
         return { image: sorted.find((mi: any) => mi.media_url)?.media_url || '', title: b.title || 'Untitled Moodboard', subtitle: b.description || 'Curated collection', url: '#' };
@@ -154,7 +154,7 @@ async function renderKaiBlock(
       const { data: worlds } = await supabase.from('vr_worlds')
         .select('id, status, panorama_url, thumbnail_url').eq('status', 'completed')
         .order('created_at', { ascending: false }).limit(count);
-      if (!worlds?.length) return `<!-- KAI block: no completed 3D worlds found -->`;
+      if (!worlds?.length) return '<!-- KAI block: no completed 3D worlds found -->';
       const items = worlds.map(w => ({ image: w.panorama_url || w.thumbnail_url || '', title: 'Material World', subtitle: 'Explore in 3D', url: '#' }));
       return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 3)));
     }
@@ -198,25 +198,25 @@ async function addMhBlocks(editor: GrapesEditor) {
 
   // SVG line icon helper — matches GrapesJS panel style
   const svgIcon = (paths: string) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
-    `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ` +
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ' +
     `style="display:block;margin:auto;width:22px;height:22px;">${paths}</svg>`;
 
   // Inline canvas preview SVG (larger, coloured for the block placeholder)
   const previewSvg = (paths: string) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3E192A" ` +
-    `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ` +
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3E192A" ' +
+    'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ' +
     `style="width:28px;height:28px;">${paths}</svg>`;
 
   // ── SVG icon paths ────────────────────────────────────────────────────────
   const ICONS = {
-    grid:     `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>`,
-    trending: `<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>`,
-    calendar: `<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>`,
-    image:    `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>`,
-    cube:     `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>`,
-    header:   `<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><rect x="4" y="14" width="16" height="6" rx="1"/>`,
-    button:   `<rect x="2" y="8" width="20" height="8" rx="4"/><line x1="8" y1="12" x2="16" y2="12"/><polyline points="13 9 16 12 13 15"/>`,
+    grid:     '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    trending: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    image:    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    cube:     '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    header:   '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><rect x="4" y="14" width="16" height="6" rx="1"/>',
+    button:   '<rect x="2" y="8" width="20" height="8" rx="4"/><line x1="8" y1="12" x2="16" y2="12"/><polyline points="13 9 16 12 13 15"/>',
   };
 
   // ── Category groups ───────────────────────────────────────────────────────
@@ -244,11 +244,11 @@ async function addMhBlocks(editor: GrapesEditor) {
     category: CAT_BRAND,
     media: svgIcon(ICONS.header),
     content:
-      `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">` +
-      `<tr><td align="center" style="padding:28px 24px;">` +
-        `<div style="font-family:'Open Sans',Arial,sans-serif;color:#ffffff;font-size:28px;font-weight:300;letter-spacing:3px;">MATERIAL KAI</div>` +
-        `<div style="font-family:'Open Sans',Arial,sans-serif;color:#ffffff;opacity:0.75;font-size:13px;margin-top:8px;letter-spacing:1px;">Your Weekly Materials Update</div>` +
-      `</td></tr></table>`,
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">' +
+      '<tr><td align="center" style="padding:28px 24px;">' +
+        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;font-size:28px;font-weight:300;letter-spacing:3px;">MATERIAL KAI</div>' +
+        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;opacity:0.75;font-size:13px;margin-top:8px;letter-spacing:1px;">Your Weekly Materials Update</div>' +
+      '</td></tr></table>',
   });
 
   editor.BlockManager.add('mh-cta-button', {
@@ -256,13 +256,13 @@ async function addMhBlocks(editor: GrapesEditor) {
     category: CAT_BRAND,
     media: svgIcon(ICONS.button),
     content:
-      `<table width="100%" cellpadding="0" cellspacing="0" border="0">` +
-      `<tr><td align="center" style="padding:24px;">` +
-        `<a href="https://materialkai.com" style="background:#3E192A;color:#ffffff;` +
-        `font-family:'Open Sans',Arial,sans-serif;font-size:15px;font-weight:600;` +
-        `text-decoration:none;padding:14px 40px;border-radius:50px;display:inline-block;">` +
-          `Explore Materials` +
-        `</a></td></tr></table>`,
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0">' +
+      '<tr><td align="center" style="padding:24px;">' +
+        '<a href="https://materialkai.com" style="background:#3E192A;color:#ffffff;' +
+        'font-family:\'Open Sans\',Arial,sans-serif;font-size:15px;font-weight:600;' +
+        'text-decoration:none;padding:14px 40px;border-radius:50px;display:inline-block;">' +
+          'Explore Materials' +
+        '</a></td></tr></table>',
   });
 
   // ── Shared layout traits (used by top_week, top_month, moodboard, vr3d) ──
@@ -422,9 +422,9 @@ async function addMhBlocks(editor: GrapesEditor) {
             `<div style="pointer-events:none;margin-bottom:2px;">${previewSvg(iconPaths)}</div>` +
             `<div style="pointer-events:none;color:#3E192A;font-size:13px;font-weight:600;">${label}</div>` +
             `<div style="pointer-events:none;color:#888;font-size:11px;">${detailLine}</div>` +
-            `<div style="pointer-events:none;color:#bbb;font-size:10px;margin-top:2px;">` +
-              `Click to configure — live data on Save / Send` +
-            `</div>`;
+            '<div style="pointer-events:none;color:#bbb;font-size:10px;margin-top:2px;">' +
+              'Click to configure — live data on Save / Send' +
+            '</div>';
         },
       } as any,
     });

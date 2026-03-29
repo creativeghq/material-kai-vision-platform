@@ -279,17 +279,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                           <ExternalLink className="h-4 w-4 text-blue-500" />
                         </Button>
                       )}
-                      {doc.embedding_status !== 'success' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Retry embedding generation"
-                          disabled={retryingIds.has(doc.id)}
-                          onClick={() => retryEmbedding(doc)}
-                        >
-                          <RefreshCw className={`h-4 w-4 text-amber-500 ${retryingIds.has(doc.id) ? 'animate-spin' : ''}`} />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title={doc.embedding_status === 'success' ? 'Re-generate embedding (force refresh)' : 'Generate embedding'}
+                        disabled={retryingIds.has(doc.id)}
+                        onClick={() => retryEmbedding(doc)}
+                      >
+                        <RefreshCw className={`h-4 w-4 ${doc.embedding_status === 'success' ? 'text-muted-foreground' : 'text-amber-500'} ${retryingIds.has(doc.id) ? 'animate-spin' : ''}`} />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

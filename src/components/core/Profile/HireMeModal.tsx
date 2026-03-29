@@ -39,7 +39,7 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [selectedServices, setSelectedServices] = useState<string[]>(
-    preselectedServiceId ? [preselectedServiceId] : []
+    preselectedServiceId ? [preselectedServiceId] : [],
   );
 
   // Sync preselectedServiceId when it changes (e.g. clicking different service buttons)
@@ -51,7 +51,7 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
 
   const toggleService = (id: string) => {
     setSelectedServices((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     );
   };
 
@@ -80,6 +80,18 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         title: 'Message sent!',
         description: `Your message has been sent to ${toUserName}.`,
       });
+
+      // Direct notification to the recipient
+      supabase.from('user_notifications').insert({
+        user_id: toUserId,
+        type: 'hire_me',
+        title: `New hire request from ${form.name.trim()}`,
+        body: selectedNames.length > 0 ? `Interested in: ${selectedNames.join(', ')}` : form.message.trim().slice(0, 100),
+        action_url: '/profile?tab=inbox',
+        is_read: false,
+        metadata: { from_name: form.name.trim(), from_email: form.email.trim(), services_requested: selectedNames },
+      }).then(() => {});
+
       flowEventService.emit('hire_me_received', {
         to_user_id: toUserId,
         from_name: form.name.trim(),

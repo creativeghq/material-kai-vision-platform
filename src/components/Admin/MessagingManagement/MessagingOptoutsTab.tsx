@@ -44,7 +44,7 @@ export const MessagingOptoutsTab: React.FC = () => {
     try {
       setLoading(true);
       const data = await messagingService.getOptOuts(
-        filterChannel !== 'all' ? filterChannel as MessagingChannelType | 'all' : undefined
+        filterChannel !== 'all' ? filterChannel as MessagingChannelType | 'all' : undefined,
       );
       setOptouts(data);
     } catch (error) {

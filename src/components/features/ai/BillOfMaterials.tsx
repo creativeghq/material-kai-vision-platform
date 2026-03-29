@@ -85,7 +85,7 @@ export const BillOfMaterials: React.FC<BillOfMaterialsProps> = ({
 
   const handleCopyText = async () => {
     const text = rows.map(r =>
-      `${r.zone_label}: ${r.product_name}${r.colorOverride ? ` (${r.colorOverride})` : ''} — €${r.unitPrice}/unit, ~${r.area}m², est. €${r.estCost?.toFixed(0) ?? 'N/A'}`
+      `${r.zone_label}: ${r.product_name}${r.colorOverride ? ` (${r.colorOverride})` : ''} — €${r.unitPrice}/unit, ~${r.area}m², est. €${r.estCost?.toFixed(0) ?? 'N/A'}`,
     ).join('\n');
     await navigator.clipboard.writeText(text);
   };

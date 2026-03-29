@@ -240,6 +240,7 @@ interface AgentHubProps {
   onMaterialSelect?: (materialId: string) => void;
   initialPrompt?: string;
   initialConversationId?: string;
+  onConversationChange?: (conversationId: string | null) => void;
 }
 
 
@@ -264,6 +265,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   onMaterialSelect,
   initialPrompt,
   initialConversationId,
+  onConversationChange,
 }) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -271,7 +273,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929'
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
@@ -523,7 +525,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    */
   const toJarvisStyle = (
     type: 'thinking' | 'tool_call' | 'tool_result' | 'iteration',
-    data: { tool?: string; content?: string; result?: any; iteration?: number }
+    data: { tool?: string; content?: string; result?: any; iteration?: number },
   ): string => {
     // Tool-specific Jarvis commentary
     const toolMessages: Record<string, string[]> = {
@@ -692,7 +694,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const vrMessage: Message = {
         id: `vr-${Date.now()}`,
         role: 'assistant',
-        content: `Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.`,
+        content: 'Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.',
         timestamp: new Date(),
         agentId: 'interior-designer',
         worldData: {
@@ -722,7 +724,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       toast({
         title: 'VR World Ready',
-        description: `Your 3D world has been generated successfully.`,
+        description: 'Your 3D world has been generated successfully.',
       });
     } catch (error: any) {
       console.error('VR generation error:', error);
@@ -1037,7 +1039,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             } catch {
               return img;
             }
-          })
+          }),
         );
       }
 
@@ -1051,6 +1053,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (conversation) {
           conversationId = conversation.id;
           setCurrentConversationId(conversationId);
+          onConversationChange?.(conversationId);
           newConversation = conversation;
         }
       }
@@ -1675,6 +1678,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleLoadConversation = useCallback(
     async (conversationId: string) => {
       setCurrentConversationId(conversationId);
+      onConversationChange?.(conversationId);
       const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
       setMessages(
         msgs.map((msg) => ({
@@ -1713,7 +1717,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
     setMessages([]);
-  }, []);
+    onConversationChange?.(null);
+  }, [onConversationChange]);
 
   const handleDeleteConversation = useCallback(async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation(); // Prevent loading the conversation when clicking delete
@@ -2512,7 +2517,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           {formatElapsedTime(elapsedTime)}
                         </span>
                       </div>
-                      
+
                       {/* Real Reasoning Steps - Jarvis Style */}
                       <ul className="space-y-2 text-sm border-l-2 border-primary/20 pl-4 ml-1">
                         {reasoningSteps.length === 0 ? (
@@ -2530,7 +2535,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 step.type === 'tool_call' && 'text-blue-600 dark:text-blue-400',
                                 step.type === 'tool_result' && 'text-green-600 dark:text-green-400',
                                 step.type === 'thinking' && 'text-amber-600 dark:text-amber-400 italic',
-                                step.type === 'iteration' && 'text-muted-foreground/80'
+                                step.type === 'iteration' && 'text-muted-foreground/80',
                               )}
                             >
                               <span className="flex-shrink-0 mt-0.5">
@@ -2615,7 +2620,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             className={cn(
                               'relative w-28 h-28 rounded-xl overflow-hidden border-2 border-dashed cursor-grab active:cursor-grabbing transition-all duration-150',
                               slotColor,
-                              isDragOver && 'scale-105 brightness-95'
+                              isDragOver && 'scale-105 brightness-95',
                             )}
                           >
                             <img
@@ -2699,13 +2704,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           '- If Image 1 shows NO element in that zone (e.g. Image 2 has a towel rack but Image 1 has empty wall): remove the element and apply the wall finish from Image 1.\n' +
                           '- Apply this same logic to every element in every room type — fixtures, furniture, fittings, decor, anything.\n\n' +
                           'SURFACE RULES: Every surface — floor, all walls, ceiling, tiles, cladding, niches — must exactly replicate the materials, colors, pattern, and texture from Image 1. No surface from Image 2 survives.\n\n' +
-                          'Photorealistic professional render. No partial replacements, no hybrid shapes, no remnants of the original. Every element is either fully replaced by Image 1 or (if Image 1 has no equivalent) rendered in the closest matching style to Image 1.'
+                          'Photorealistic professional render. No partial replacements, no hybrid shapes, no remnants of the original. Every element is either fully replaced by Image 1 or (if Image 1 has no equivalent) rendered in the closest matching style to Image 1.',
                         );
                       } else {
                         setSelectedGenerationMode('redesign');
                         setInput(
                           'Redesign this room with a high-end contemporary style. Keep all fixtures and architectural elements in their exact positions — sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
-                          'Update all visual surfaces: floor material and pattern, wall tiles/finishes, ceiling finish, fixture aesthetics, hardware metal finish, and lighting. Make it look professionally designed and photorealistic.'
+                          'Update all visual surfaces: floor material and pattern, wall tiles/finishes, ceiling finish, fixture aesthetics, hardware metal finish, and lighting. Make it look professionally designed and photorealistic.',
                         );
                       }
                     }}
@@ -2816,7 +2821,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200',
                               isActive
                                 ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                             )}
                           >
                             <Icon className={cn('h-3.5 w-3.5', !isActive && agent.color)} />
@@ -2859,7 +2864,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           isRecording
                             ? 'bg-red-500 text-white animate-pulse'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
-                          !isVoiceSupported && 'opacity-40 cursor-not-allowed'
+                          !isVoiceSupported && 'opacity-40 cursor-not-allowed',
                         )}
                       >
                         <Mic className="h-4 w-4" />
@@ -2907,7 +2912,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     'flex items-center justify-center px-4 border-l border-input rounded-r-xl transition-colors',
                     isLoading || (!input.trim() && attachedImages.length === 0)
                       ? 'text-muted-foreground/40 bg-muted/20 cursor-not-allowed'
-                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90',
                   )}
                 >
                   <Send className="h-4 w-4" />

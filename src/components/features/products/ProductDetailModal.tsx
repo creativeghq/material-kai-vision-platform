@@ -456,7 +456,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         if (productLines && typeof productLines === 'object') {
           const lineKey = Object.keys(productLines).find(k =>
             normalizeMatch(k) === productNameNorm ||
-            normalizeMatch(k).includes(productNameNorm)
+            normalizeMatch(k).includes(productNameNorm),
           );
           if (lineKey) {
             const lineData = (productLines as Record<string, unknown>)[lineKey] as Record<string, unknown>;
@@ -519,7 +519,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         t.product && (
           normalizeMatch(t.product) === productNameNorm ||
           normalizeMatch(t.product).includes(productNameNorm)
-        )
+        ),
       );
       if (match) {
         const inch = match.thickness_inch && match.thickness_inch !== 'Not specified' ? ` (${match.thickness_inch}")` : '';
@@ -790,7 +790,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const productName = parts.filter(p =>
             !colorKeywords.includes(p) &&
             !patternKeywords.includes(p) &&
-            !p.match(/\d+x\d+/)
+            !p.match(/\d+x\d+/),
           ).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
           const variantName = [productName, pattern, color].filter(Boolean).join(' ').trim();
@@ -988,7 +988,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               variant.color.toLowerCase() === 'grey' || variant.color.toLowerCase() === 'gray' ? '#9e9e9e' :
                               variant.color.toLowerCase() === 'taupe' ? '#8b8589' :
                               variant.color.toLowerCase() === 'clay' ? '#b5651d' :
-                              '#e0e0e0'
+                              '#e0e0e0',
                           }}
                         />
                         {variant.color}

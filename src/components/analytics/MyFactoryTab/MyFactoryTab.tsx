@@ -6,13 +6,13 @@ import {
 } from 'recharts';
 import {
   Building2, TrendingUp, Star, Users, MessageSquare, Eye,
-  Package, Loader2, Search, Target, Globe, Layers, Activity,
+  Package, Loader2, Search, Target, Globe, Layers, Activity, Heart,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { buildWeeks, weeksAgo, weekLabel } from '../shared/analyticsUtils';
-import { COLORS, KpiCard, SectionHeader, EmptyState } from '../shared/AnalyticsUIComponents';
+import { buildWeeks, weeksAgo, weekLabel, convRate, CHART_MARGINS, GRID_PROPS } from '../shared/analyticsUtils';
+import { COLORS, KpiCard, SectionHeader, EmptyState, AnalyticsTable, AnalyticsCol } from '../shared/AnalyticsUIComponents';
 
 // ─────────────────────────────────────────────────────────────
 // My Factory Tab — Enhanced
@@ -26,7 +26,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
   const [followerTrend, setFollowerTrend] = useState<{ week: string; follows: number }[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; saves: number; quotes: number }[]>([]);
   const [ratingDist, setRatingDist] = useState<{ rating: string; count: number }[]>([]);
-  const [kpis, setKpis] = useState({ totalSaves: 0, totalQuotes: 0, avgRating: 0, hireTotal: 0, followers: 0, profileViews: 0 });
+  const [kpis, setKpis] = useState({ totalSaves: 0, totalQuotes: 0, avgRating: 0, hireTotal: 0, followers: 0, profileViews: 0, preferredCount: 0 });
   const [quoteByStatus, setQuoteByStatus] = useState<{ status: string; count: number }[]>([]);
   const [platformConv, setPlatformConv] = useState<string>('—');
 
@@ -67,7 +67,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
       Array.from(valMap.entries())
         .sort((a, b) => (b[1].saves + b[1].quotes) - (a[1].saves + a[1].quotes))
         .slice(0, 20)
-        .map(([value, d]) => ({ value, ...d }))
+        .map(([value, d]) => ({ value, ...d })),
     );
   }, [attributeKey, allProductsMeta, productActivity]);
 
@@ -115,7 +115,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
       setFactorySearchCount((searchRows ?? []).length);
       setFactorySearches(
         Array.from(termMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10)
-          .map(([term, count]) => ({ term, count }))
+          .map(([term, count]) => ({ term, count })),
       );
 
       let localTotalSaves = 0, localTotalQuotes = 0, localAvgRating = 0, localVrCount = 0;
@@ -165,7 +165,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         });
         setMoodboardByCategory(
           Array.from(catMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
-            .map(([name, value]) => ({ name, value }))
+            .map(([name, value]) => ({ name, value })),
         );
 
         // Per-product activity (for attribute explorer)
@@ -199,8 +199,8 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
             .concat(
               Array.from(qStatusMap.entries())
                 .filter(([s]) => !statusOrder.includes(s))
-                .map(([status, count]) => ({ status, count }))
-            )
+                .map(([status, count]) => ({ status, count })),
+            ),
         );
 
         // Platform-wide benchmark
@@ -230,7 +230,16 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
       (hireData ?? []).forEach((h) => { const l = weekLabel(new Date(h.created_at)); if (hireByWeek.has(l)) hireByWeek.set(l, (hireByWeek.get(l) ?? 0) + 1); });
       setHireRequests(Array.from(hireByWeek.entries()).map(([week, hires]) => ({ week, hires })));
 
-      // 8. Followers + profile views
+      // 8. Preferred factory count — how many users have added this factory to their preferred list
+      const { data: allProfiles } = await supabase
+        .from('user_profiles')
+        .select('preferred_factories');
+      const preferredCount = (allProfiles ?? []).filter((p) => {
+        const pf = p.preferred_factories as { name: string }[] | null;
+        return Array.isArray(pf) && pf.some((f) => f.name === factoryName);
+      }).length;
+
+      // 9. Followers + profile views
       const { count: followers } = await supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', userId);
       const { data: followsRows } = await supabase.from('user_follows').select('created_at').eq('following_id', userId).gte('created_at', ago12.toISOString());
       const followByWeek = new Map<string, number>(weeks8.map((w) => [w, 0]));
@@ -243,6 +252,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         totalSaves: localTotalSaves, totalQuotes: localTotalQuotes,
         avgRating: localAvgRating, hireTotal: (hireData ?? []).length,
         followers: followers ?? 0, profileViews: profileData?.profile_views ?? 0,
+        preferredCount,
       });
     } finally {
       setLoading(false);
@@ -260,6 +270,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
     saves: Math.max(kpis.totalSaves, 1), quotes: Math.max(kpis.totalQuotes, 1),
     rating: 5, hires: Math.max(kpis.hireTotal, 1),
     followers: Math.max(kpis.followers, 1), views: Math.max(kpis.profileViews, 1),
+    preferred: Math.max(kpis.preferredCount, 1),
   };
   const radarData = [
     { axis: 'Moodboard Saves', value: normalize(kpis.totalSaves, radarMax.saves) },
@@ -268,6 +279,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
     { axis: 'Hire Requests', value: normalize(kpis.hireTotal, radarMax.hires) },
     { axis: 'Followers', value: normalize(kpis.followers, radarMax.followers) },
     { axis: 'Profile Views', value: normalize(kpis.profileViews, radarMax.views) },
+    { axis: 'Preferred by Users', value: normalize(kpis.preferredCount, radarMax.preferred) },
   ];
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -281,12 +293,12 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         <KpiCard label="Moodboard Saves" value={kpis.totalSaves} icon={Package} />
         <KpiCard label="Quote Inclusions" value={kpis.totalQuotes} icon={TrendingUp} />
         <KpiCard
           label="Your Conv. Rate"
-          value={kpis.totalSaves > 0 ? `${Math.round((kpis.totalQuotes / kpis.totalSaves) * 100)}%` : '—'}
+          value={convRate(kpis.totalQuotes, kpis.totalSaves)}
           icon={Target}
           color="text-green-600"
         />
@@ -294,6 +306,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         <KpiCard label="Avg Rating" value={kpis.avgRating > 0 ? `${kpis.avgRating.toFixed(1)}★` : '—'} icon={Star} color="text-amber-500" />
         <KpiCard label="Hire Requests" value={kpis.hireTotal} icon={MessageSquare} />
         <KpiCard label="Followers" value={kpis.followers} icon={Users} />
+        <KpiCard label="Preferred by Users" value={kpis.preferredCount} icon={Heart} color="text-pink-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -317,8 +330,8 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Star className="h-4 w-4" /> Rating Distribution</h3>
           <div>
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={ratingDist} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <BarChart data={ratingDist} margin={CHART_MARGINS.bar}>
+                <CartesianGrid {...GRID_PROPS} />
                 <XAxis dataKey="rating" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip />
@@ -334,8 +347,8 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Activity Over Time (last 8 weeks)</h3>
         <div>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={activityData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <LineChart data={activityData} margin={CHART_MARGINS.line}>
+              <CartesianGrid {...GRID_PROPS} />
               <XAxis dataKey="week" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip /><Legend />
@@ -351,34 +364,17 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
       {topProducts.length > 0 && (
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Package className="h-4 w-4" /> Top Products by Activity</h3>
-          <div>
-            <div className="overflow-auto max-h-[320px]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-medium">#</th>
-                    <th className="text-left py-2 pr-4 font-medium">Product</th>
-                    <th className="text-right py-2 pr-4 font-medium">Saves</th>
-                    <th className="text-right py-2 pr-4 font-medium">Quotes</th>
-                    <th className="text-right py-2 font-medium">Conv.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topProducts.map((row, i) => (
-                    <tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td>
-                      <td className="py-2 pr-4 font-medium">{row.name}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{row.saves}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums text-primary">{row.quotes}</td>
-                      <td className="py-2 text-right tabular-nums text-green-600 text-xs">
-                        {row.saves > 0 ? `${Math.round((row.quotes / row.saves) * 100)}%` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <AnalyticsTable<{ name: string; saves: number; quotes: number }>
+            maxH={320}
+            rows={topProducts}
+            columns={[
+              { header: '#',      thClass: 'text-left pr-4', tdClass: 'pr-4 text-xs text-muted-foreground', render: (_, i) => i + 1 },
+              { header: 'Product',                           tdClass: 'pr-4 font-medium',                   render: (r) => r.name },
+              { header: 'Saves',  thClass: 'text-right pr-4', tdClass: 'pr-4 text-right tabular-nums',     render: (r) => r.saves },
+              { header: 'Quotes', thClass: 'text-right pr-4', tdClass: 'pr-4 text-right tabular-nums text-primary', render: (r) => r.quotes },
+              { header: 'Conv.',  thClass: 'text-right',      tdClass: 'text-right tabular-nums text-green-600 text-xs', render: (r) => convRate(r.quotes, r.saves) },
+            ] as AnalyticsCol<{ name: string; saves: number; quotes: number }>[]}
+          />
         </div>
       )}
 
@@ -390,8 +386,8 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
             <div>
               <p className="text-xs text-muted-foreground mb-3">Quote request statuses across all quotes including your products</p>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={quoteByStatus} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <BarChart data={quoteByStatus} layout="vertical" margin={CHART_MARGINS.barH}>
+                  <CartesianGrid {...GRID_PROPS} />
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                   <YAxis type="category" dataKey="status" width={75} tick={{ fontSize: 11 }} />
                   <Tooltip />
@@ -460,26 +456,15 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
             {factorySearches.length === 0 ? (
               <EmptyState message="No factory-name searches recorded in this period" />
             ) : (
-              <div className="overflow-auto max-h-[280px]">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="border-b text-xs text-muted-foreground">
-                      <th className="text-left py-2 pr-4 font-medium">#</th>
-                      <th className="text-left py-2 pr-4 font-medium">Search Query</th>
-                      <th className="text-right py-2 font-medium">Times</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {factorySearches.map((row, i) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                        <td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td>
-                        <td className="py-2 pr-4 font-medium">{row.term}</td>
-                        <td className="py-2 text-right tabular-nums text-primary font-semibold">{row.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <AnalyticsTable<{ term: string; count: number }>
+                maxH={280}
+                rows={factorySearches}
+                columns={[
+                  { header: '#',            thClass: 'text-left pr-4', tdClass: 'pr-4 text-xs text-muted-foreground', render: (_, i) => i + 1 },
+                  { header: 'Search Query',                             tdClass: 'pr-4 font-medium',                   render: (r) => r.term },
+                  { header: 'Times',        thClass: 'text-right',     tdClass: 'text-right tabular-nums text-primary font-semibold', render: (r) => r.count },
+                ] as AnalyticsCol<{ term: string; count: number }>[]}
+              />
             )}
           </div>
         </div>
@@ -513,8 +498,8 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Users className="h-4 w-4" /> New Followers Per Week (last 8 weeks)</h3>
         <div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={followerTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <BarChart data={followerTrend} margin={CHART_MARGINS.bar}>
+              <CartesianGrid {...GRID_PROPS} />
               <XAxis dataKey="week" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
@@ -555,28 +540,16 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
           ) : attributeData.length === 0 ? (
             <EmptyState message={`No products with "${attributeKey}" attribute`} />
           ) : (
-            <div className="overflow-auto max-h-[360px]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-medium">#</th>
-                    <th className="text-left py-2 pr-4 font-medium capitalize">{attributeKey.replace(/_/g, ' ')}</th>
-                    <th className="text-right py-2 pr-4 font-medium">Moodboard Saves</th>
-                    <th className="text-right py-2 font-medium">Quote Inclusions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attributeData.map((row, i) => (
-                    <tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td>
-                      <td className="py-2 pr-4 font-medium">{row.value}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{row.saves}</td>
-                      <td className="py-2 text-right tabular-nums text-primary font-semibold">{row.quotes}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <AnalyticsTable<{ value: string; saves: number; quotes: number }>
+              maxH={360}
+              rows={attributeData}
+              columns={[
+                { header: '#',                                             thClass: 'text-left pr-4', tdClass: 'pr-4 text-xs text-muted-foreground', render: (_, i) => i + 1 },
+                { header: attributeKey.replace(/_/g, ' '), thClass: 'text-left pr-4 capitalize',     tdClass: 'pr-4 font-medium',                   render: (r) => r.value },
+                { header: 'Moodboard Saves',                               thClass: 'text-right pr-4', tdClass: 'pr-4 text-right tabular-nums',      render: (r) => r.saves },
+                { header: 'Quote Inclusions',                              thClass: 'text-right',      tdClass: 'text-right tabular-nums text-primary font-semibold', render: (r) => r.quotes },
+              ] as AnalyticsCol<{ value: string; saves: number; quotes: number }>[]}
+            />
           )}
         </div>
       </div>

@@ -145,7 +145,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     if (!search.trim()) return [];
     const q = search.toLowerCase();
     return allDocs.filter((d) =>
-      d.title.toLowerCase().includes(q) || (d.summary || '').toLowerCase().includes(q)
+      d.title.toLowerCase().includes(q) || (d.summary || '').toLowerCase().includes(q),
     );
   }, [search, allDocs]);
 

@@ -66,31 +66,31 @@ export const PRODUCT_STAGES = [
     id: 'extraction',
     name: 'Page Extraction',
     icon: FileText,
-    description: 'Map catalog pages to PDF pages + YOLO layout detection'
+    description: 'Map catalog pages to PDF pages + YOLO layout detection',
   },
   {
     id: 'chunking',
     name: 'Text Chunking',
     icon: FileText,
-    description: 'Create semantic chunks + embeddings'
+    description: 'Create semantic chunks + embeddings',
   },
   {
     id: 'images',
     name: 'Image Processing',
     icon: ImageIcon,
-    description: '4-layer extraction + Vision classification'
+    description: '4-layer extraction + Vision classification',
   },
   {
     id: 'creation',
     name: 'Product Creation',
     icon: Package,
-    description: 'Create product record + metadata'
+    description: 'Create product record + metadata',
   },
   {
     id: 'relationships',
     name: 'Relationships',
     icon: Link,
-    description: 'Link entities + create relations'
+    description: 'Link entities + create relations',
   },
 ];
 

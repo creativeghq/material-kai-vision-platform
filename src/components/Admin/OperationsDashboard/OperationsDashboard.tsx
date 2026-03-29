@@ -79,7 +79,7 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
-const _OperationsDashboard: React.FC = () => {
+const OperationsDashboardInner: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
@@ -1376,7 +1376,7 @@ const _OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP-SO400M, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5.2, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP-SO400M, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
@@ -1591,7 +1591,7 @@ const _OperationsDashboard: React.FC = () => {
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">GPT-4o</span>
+                                <span className="text-gray-600">GPT-5.2</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
@@ -1607,7 +1607,7 @@ const _OperationsDashboard: React.FC = () => {
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">GPT-4o-mini</span>
+                                <span className="text-gray-600">GPT-5.2-mini</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
@@ -1718,7 +1718,7 @@ const _OperationsDashboard: React.FC = () => {
                           </TableRow>
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                              No AI usage data yet. All models (GPT-5, GPT-4o, GPT-4o-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Qwen3-VL-8B, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
+                              No AI usage data yet. All models (GPT-5.2, GPT-5.2-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Qwen3-VL-8B, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
                             </TableCell>
                           </TableRow>
                         </>
@@ -1730,17 +1730,8 @@ const _OperationsDashboard: React.FC = () => {
             </Card>
 
             {/* Chunk Quality Dashboard - Consolidated from /admin/chunk-quality */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Chunk Quality Metrics
-                </CardTitle>
-                <CardDescription>
-                  Monitor chunk quality, deduplication, and flagged content
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Card style={{ background: 'none', backdropFilter: 'none', boxShadow: 'none' }}>
+              <CardContent className="p-0">
                 <ChunkQualityDashboard />
               </CardContent>
             </Card>
@@ -2018,4 +2009,4 @@ const _OperationsDashboard: React.FC = () => {
     </div>
   );
 };
-export const OperationsDashboard = React.memo(_OperationsDashboard);
+export const OperationsDashboard = React.memo(OperationsDashboardInner);

@@ -383,7 +383,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
-                <Button onClick={editingUpsell ? handleUpdateUpsell : handleCreateUpsell} disabled={saving || !upsellName.trim() || !upsellPrice}>
+                <Button onClick={handleCreateUpsell} disabled={saving || !upsellName.trim() || !upsellPrice}>
                   {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : editingUpsell ? 'Save Changes' : 'Create Upsell'}
                 </Button>
               </div>

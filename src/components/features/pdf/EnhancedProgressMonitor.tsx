@@ -5,7 +5,7 @@
  * step-by-step tracking, and live updates via WebSocket
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CheckCircle,
   Clock,
@@ -278,6 +278,75 @@ export const EnhancedProgressMonitor: React.FC<
     }
   }, []);
 
+  // Memoize status badge to prevent re-renders
+  const statusBadge = useMemo(() => {
+    if (!progress) return null;
+    return (
+      <Badge variant={progress.status === 'completed' ? 'default' : 'secondary'}>
+        {progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+      </Badge>
+    );
+  }, [progress?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Memoize header content to prevent re-renders
+  const headerContent = useMemo(() => {
+    if (!progress) return null;
+    return (
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          {getStatusIcon(progress.status)}
+          <div>
+            <CardTitle className="text-lg">{progress.fileName}</CardTitle>
+            <CardDescription>
+              {progress.currentStep} • Started{' '}
+              {formatDistanceToNow(progress.startTime)} ago
+            </CardDescription>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {statusBadge}
+        </div>
+      </div>
+    );
+  }, [progress?.status, progress?.fileName, progress?.currentStep, progress?.startTime, statusBadge]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Memoize statistics content to prevent re-renders
+  const statisticsContent = useMemo(() => {
+    if (!progress) return null;
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+          <FileText className="h-4 w-4 text-blue-500" />
+          <div>
+            <div className="text-sm font-medium">{progress.statistics.chunksCreated}</div>
+            <div className="text-xs text-gray-600">Chunks</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+          <Image className="h-4 w-4 text-green-500" />
+          <div>
+            <div className="text-sm font-medium">{progress.statistics.imagesExtracted}</div>
+            <div className="text-xs text-gray-600">Images</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+          <Database className="h-4 w-4 text-purple-500" />
+          <div>
+            <div className="text-sm font-medium">{progress.statistics.kbEntriesSaved}</div>
+            <div className="text-xs text-gray-600">KB Entries</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+          <Tag className="h-4 w-4 text-orange-500" />
+          <div>
+            <div className="text-sm font-medium">{progress.statistics.categoriesExtracted}</div>
+            <div className="text-xs text-gray-600">Categories</div>
+          </div>
+        </div>
+      </div>
+    );
+  }, [progress?.statistics]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!progress) {
     return (
       <Card className={cn('w-full', className)}>
@@ -314,37 +383,6 @@ export const EnhancedProgressMonitor: React.FC<
     );
   }
 
-  // Memoize status badge to prevent re-renders
-  const statusBadge = React.useMemo(() => (
-    <Badge
-      variant={
-        progress.status === 'completed' ? 'default' : 'secondary'
-      }
-    >
-      {progress.status.charAt(0).toUpperCase() +
-        progress.status.slice(1)}
-    </Badge>
-  ), [progress.status]);
-
-  // Memoize header content to prevent re-renders
-  const headerContent = React.useMemo(() => (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-2">
-        {getStatusIcon(progress.status)}
-        <div>
-          <CardTitle className="text-lg">{progress.fileName}</CardTitle>
-          <CardDescription>
-            {progress.currentStep} • Started{' '}
-            {formatDistanceToNow(progress.startTime)} ago
-          </CardDescription>
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        {statusBadge}
-      </div>
-    </div>
-  ), [progress.status, progress.fileName, progress.currentStep, progress.startTime, statusBadge]);
-
   return (
     <Card className={cn('w-full', className)}>
       <CardHeader>
@@ -364,46 +402,7 @@ export const EnhancedProgressMonitor: React.FC<
         </div>
 
         {/* Statistics - Memoized to prevent re-renders */}
-        {showStatistics && React.useMemo(() => (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-              <FileText className="h-4 w-4 text-blue-500" />
-              <div>
-                <div className="text-sm font-medium">
-                  {progress.statistics.chunksCreated}
-                </div>
-                <div className="text-xs text-gray-600">Chunks</div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-              <Image className="h-4 w-4 text-green-500" />
-              <div>
-                <div className="text-sm font-medium">
-                  {progress.statistics.imagesExtracted}
-                </div>
-                <div className="text-xs text-gray-600">Images</div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-              <Database className="h-4 w-4 text-purple-500" />
-              <div>
-                <div className="text-sm font-medium">
-                  {progress.statistics.kbEntriesSaved}
-                </div>
-                <div className="text-xs text-gray-600">KB Entries</div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-              <Tag className="h-4 w-4 text-orange-500" />
-              <div>
-                <div className="text-sm font-medium">
-                  {progress.statistics.categoriesExtracted}
-                </div>
-                <div className="text-xs text-gray-600">Categories</div>
-              </div>
-            </div>
-          </div>
-        ), [progress.statistics])}
+        {showStatistics && statisticsContent}
 
         {/* Step Details - Use memoized StepItem component */}
         {showStepDetails && (

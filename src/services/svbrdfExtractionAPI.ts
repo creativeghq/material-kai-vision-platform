@@ -66,7 +66,7 @@ export class SVBRDFExtractionAPI {
         throw new Error(response.error || 'SVBRDF extraction failed');
       }
 
-      return data as SVBRDFExtractionResult;
+      return response.data as SVBRDFExtractionResult;
     } catch (error) {
       console.error('Error starting SVBRDF extraction:', error);
       throw error;

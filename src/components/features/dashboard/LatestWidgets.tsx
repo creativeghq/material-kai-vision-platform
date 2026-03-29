@@ -431,7 +431,7 @@ function FactoriesWidget() {
     selectedFactory
       ? allProducts.filter((p) => p.metadata?.factory_group_name === selectedFactory.name)
       : [],
-    [allProducts, selectedFactory]
+    [allProducts, selectedFactory],
   );
 
   return (

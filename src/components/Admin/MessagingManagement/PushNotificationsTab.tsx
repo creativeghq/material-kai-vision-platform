@@ -111,7 +111,7 @@ export const PushNotificationsTab: React.FC = () => {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const recentActivity = (subs || []).filter(
-        s => new Date(s.created_at) > sevenDaysAgo
+        s => new Date(s.created_at) > sevenDaysAgo,
       ).length;
 
       setAnalytics({

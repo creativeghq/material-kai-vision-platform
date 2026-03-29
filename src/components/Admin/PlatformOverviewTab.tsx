@@ -194,7 +194,7 @@ export function PlatformOverviewTab() {
       week, debit: h[i]*8, purchase: f[i]*6, refund: b[i], bonus: i%4===0?50:0, monthly_grant: i===0?200:0,
     })));
     setAiModelCosts([
-      {model:'Claude Sonnet',credits:840,cost:8.40},{model:'GPT-4o',credits:480,cost:4.80},
+      {model:'Claude Sonnet',credits:840,cost:8.40},{model:'GPT-5.2',credits:480,cost:4.80},
       {model:'Qwen3-VL',credits:280,cost:2.80},{model:'Voyage-3',credits:180,cost:1.80},
       {model:'Claude Haiku',credits:60,cost:0.60},{model:'text-embedding',credits:45,cost:0.45},
     ]);
