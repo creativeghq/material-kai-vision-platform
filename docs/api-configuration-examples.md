@@ -229,7 +229,7 @@ Test two configurations side-by-side by submitting separate jobs with different 
 
 **Problem**: Too many false positives/negatives in image classification.
 
-**Solution**: Increase confidence threshold and use Claude Sonnet for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-sonnet-4-20250514` in your `ai_config`.
+**Solution**: Increase confidence threshold and use Claude Sonnet for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-sonnet-4-6-20260217` in your `ai_config`.
 
 ### Slow Processing
 

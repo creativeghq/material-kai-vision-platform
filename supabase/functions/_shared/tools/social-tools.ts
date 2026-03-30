@@ -216,7 +216,7 @@ export const createSocialGenerateImageTool = (userId: string, workspaceId: strin
     {
       name: 'social_generate_image',
       description: `Generate a high-quality image for social media using AI. Costs 5-10 credits depending on model.
-Model auto-selection: lifestyle/people → Aurora (xAI, 10cr), product/interior → Gemini Flash (5cr), artistic/textured → FLUX Dev (6cr).
+Model auto-selection: lifestyle/people → Aurora (xAI, 10cr), product/interior → Gemini Flash (5cr), artistic/textured → FLUX 2 Pro (6cr).
 Returns image_url ready to use in a post.`,
       schema: z.object({
         prompt: z.string().describe('Detailed image generation prompt'),
@@ -235,20 +235,20 @@ Returns image_url ready to use in a post.`,
 
 /**
  * Social Media Tool: Generate Video
- * Kling 1.6 Pro for social reels, Veo 2.0 for premium
- * Credits: 15-30 cr via generate-social-video edge function
+ * Kling 3.0 for social reels (cinematic + audio), Veo 2.0 for premium
+ * Credits: 20-30 cr via generate-social-video edge function
  */
 export const createSocialGenerateVideoTool = (userId: string, workspaceId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ prompt, source_image_url, model, aspect_ratio, duration_seconds, post_id }) => {
       try {
-        onProgress?.(`Starting video generation with ${model ?? 'kling-1.6-pro'}...`);
+        onProgress?.(`Starting video generation with ${model ?? 'kling-3.0'}...`);
         const result = await callSocialFunction('generate-social-video', {
           user_id: userId,
           workspace_id: workspaceId,
           prompt,
           source_image_url,
-          model: model ?? 'kling-1.6-pro',
+          model: model ?? 'kling-3.0',
           aspect_ratio: aspect_ratio ?? '9:16',
           duration_seconds: duration_seconds ?? 10,
           post_id,
@@ -260,14 +260,14 @@ export const createSocialGenerateVideoTool = (userId: string, workspaceId: strin
     },
     {
       name: 'social_generate_video',
-      description: `Generate a short video for social media. Costs 15 cr (Kling, fast) or 30 cr (Veo 2.0, premium).
+      description: `Generate a short video for social media. Costs 20 cr (Kling 3.0, cinematic + audio) or 30 cr (Veo 2.0, premium).
 Best for: Instagram Reels, TikTok, LinkedIn video posts.
 Returns a video_url or prediction_id if still processing.`,
       schema: z.object({
         prompt: z.string().describe('Video generation prompt — describe motion, scene, mood'),
         source_image_url: z.string().describe('Source image URL to animate'),
-        model: z.enum(['kling-1.6-pro', 'veo-2']).optional()
-          .describe('kling-1.6-pro = 15cr fast; veo-2 = 30cr premium (default: kling-1.6-pro)'),
+        model: z.enum(['kling-3.0', 'veo-2']).optional()
+          .describe('kling-3.0 = 20cr cinematic+audio; veo-2 = 30cr premium (default: kling-3.0)'),
         aspect_ratio: z.enum(['9:16', '16:9', '1:1']).optional()
           .describe('9:16 for Reels/TikTok, 16:9 for YouTube (default: 9:16)'),
         duration_seconds: z.number().int().min(5).max(15).optional()

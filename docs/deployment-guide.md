@@ -83,7 +83,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
 | `VISION_GUIDED_ENABLED` | Public | Server ENV | Enable Vision AI Layer 3 for image extraction | `false` (default), `true` |
 | `VISION_GUIDED_PROVIDER` | Public | Server ENV | Vision AI provider (uses existing API keys) | `anthropic`, `openai`, `together` |
-| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-sonnet-4-5-20250929`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
+| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-sonnet-4-6-20260217`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |

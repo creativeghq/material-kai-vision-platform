@@ -159,10 +159,10 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
       description: `Generate an interior design video using AI. Routes to the best model based on video type.
 Video types and recommended models:
 - walkthrough: Veo 2.0 (30cr) — cinematic camera moves through a room
-- product_spotlight: Kling 1.6 Pro (15cr) — focuses on a specific material/product
-- before_after: Kling 1.6 Pro (15cr) — transition between two room states (requires before_image_url)
+- product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
+- before_after: Kling 3.0 (20cr) — transition between two room states (requires before_image_url)
 - floorplan_flythrough: Veo 2.0 (30cr) — aerial view flythrough
-- social_reel: Kling 1.6 Pro (15cr) — 9:16 short-form video for social media
+- social_reel: Kling 3.0 (20cr) — 9:16 short-form video for social media with audio
 - premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
 
 Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
@@ -170,7 +170,7 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
         source_image_url: z.string().describe('Source image URL to animate or base the video on'),
         video_type: z.enum(['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'])
           .describe('Type of video to generate'),
-        model: z.enum(['veo-2', 'kling-1.6-pro', 'wan2.1-i2v', 'runway-gen4-turbo']).optional()
+        model: z.enum(['veo-2', 'kling-3.0', 'kling-1.6-pro', 'wan2.1-i2v', 'runway-gen4-turbo']).optional()
           .describe('Override model selection (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()

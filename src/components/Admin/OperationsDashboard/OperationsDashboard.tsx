@@ -728,7 +728,7 @@ const OperationsDashboardInner: React.FC = () => {
       'hunter-email-finder', 'hunter-domain-search',
       'zerobounce-validate', 'firecrawl-scrape',
       'late-publish', 'social-caption',
-      'xai-aurora', 'flux-dev',
+      'xai-aurora', 'flux-2-pro', 'flux-dev',
     ];
     supabase
       .from('ai_usage_logs')
@@ -913,7 +913,7 @@ const OperationsDashboardInner: React.FC = () => {
                           <div className="text-sm text-blue-700">Est. Total Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
                             ${agentChats.reduce((sum, chat) => {
-                              const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
+                              const model = chat.metadata?.model || 'claude-sonnet-4-6-20260217';
                               const inputTokens = estimateTokens(chat.content);
                               const outputTokens = estimateTokens(chat.content);
                               return sum + calculateCost(model, inputTokens, outputTokens).total;
@@ -986,7 +986,7 @@ const OperationsDashboardInner: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {agentChats.slice(0, 20).map((chat) => {
-                      const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
+                      const model = chat.metadata?.model || 'claude-sonnet-4-6-20260217';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
@@ -1181,7 +1181,7 @@ const OperationsDashboardInner: React.FC = () => {
                       { key: 'late-publish',          label: 'Late.dev Publish',     category: 'Social',       unit: 'post',       raw: 0.0,    billed: null },
                       { key: 'social-caption',        label: 'Social Caption Gen',   category: 'Social',       unit: 'generation', raw: 0.002,  billed: 0.003 },
                       { key: 'xai-aurora',            label: 'xAI Aurora Image',     category: 'Social',       unit: 'image',      raw: 0.07,   billed: 0.105 },
-                      { key: 'flux-dev',              label: 'FLUX Dev Image',       category: 'Social',       unit: 'image',      raw: 0.04,   billed: 0.06 },
+                      { key: 'flux-2-pro',            label: 'FLUX 2 Pro Image',     category: 'Social',       unit: 'image',      raw: 0.04,   billed: 0.06 },
                     ].map((svc) => {
                       const allTime = svcAllTimeTotals[svc.key];
                       return (

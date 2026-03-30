@@ -2,7 +2,7 @@
  * Generate Social Video Edge Function
  *
  * Generates short-form social media videos via Replicate:
- *   kling-1.6-pro  → 15 credits (fast, great for reels)
+ *   kling-3.0      → 20 credits (fast, cinematic reels with audio)
  *   veo-2          → 30 credits (premium quality via generate-interior-video-v2)
  *
  * Credits are debited upfront and are non-refundable.
@@ -18,14 +18,16 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
 
-type VideoModel = 'kling-1.6-pro' | 'veo-2';
+type VideoModel = 'kling-3.0' | 'kling-1.6-pro' | 'veo-2';
 
 const CREDIT_COSTS: Record<VideoModel, number> = {
+  'kling-3.0':     20,
   'kling-1.6-pro': 15,
   'veo-2':         30,
 };
 
 const REPLICATE_MODELS: Record<string, string> = {
+  'kling-3.0':     'kwaivgi/kling-v3-video',
   'kling-1.6-pro': 'klingai/kling-1.6-pro',
 };
 
@@ -91,7 +93,7 @@ Deno.serve(async (req) => {
   const {
     prompt,
     source_image_url,
-    model = 'kling-1.6-pro' as VideoModel,
+    model = 'kling-3.0' as VideoModel,
     aspect_ratio = '9:16',
     duration_seconds = 10,
     workspace_id,
@@ -141,7 +143,7 @@ Deno.serve(async (req) => {
     }
 
     // ① Pre-flight check (kling only — veo-2 handled above)
-    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-1.6-pro');
+    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-3.0');
     if (!sufficient) {
       return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
     }
@@ -160,7 +162,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
     }
 
-    replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-1.6-pro'];
+    replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-3.0'];
     const prediction = await createReplicatePrediction(replicateModel, {
       image: source_image_url,
       prompt: prompt || 'Smooth cinematic camera motion, professional quality',

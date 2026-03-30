@@ -82,29 +82,36 @@ export default defineConfig(({ mode }) => {
               '@react-three/fiber': 'vendor-3d',
               '@react-three/drei': 'vendor-3d',
               '@sparkjsdev/spark': 'vendor-3d',
-              // Core framework
+              // Core framework only — keep this chunk small
               'react': 'vendor-react',
               'react-dom': 'vendor-react',
               'react-router-dom': 'vendor-react',
-              // UI primitives
+              'react-is': 'vendor-react',
+              // UI primitives (individual @radix-ui/* caught by prefix match below)
               'lucide-react': 'vendor-ui',
-              '@radix-ui/react-dialog': 'vendor-ui',
-              '@radix-ui/react-dropdown-menu': 'vendor-ui',
-              '@radix-ui/react-tooltip': 'vendor-ui',
-              '@radix-ui/react-popover': 'vendor-ui',
-              '@radix-ui/react-tabs': 'vendor-ui',
-              '@radix-ui/react-select': 'vendor-ui',
-              // Charts — co-bundle with react to guarantee forwardRef is initialized before recharts reads it
-              'recharts': 'vendor-react',
+              'embla-carousel-react': 'vendor-ui',
+              'cmdk': 'vendor-ui',
+              'vaul': 'vendor-ui',
+              'input-otp': 'vendor-ui',
+              // Charts — recharts v3 uses function components (no forwardRef),
+              // safe in its own chunk; Rollup import ordering guarantees React loads first
+              'recharts': 'vendor-charts',
               // Supabase
               '@supabase/supabase-js': 'vendor-supabase',
-              // Sentry — depends on React, co-bundle to avoid forwardRef init order issues
-              '@sentry/react': 'vendor-react',
+              // Sentry
+              '@sentry/react': 'vendor-sentry',
               // Data layer
               '@tanstack/react-query': 'vendor-query',
               '@tanstack/query-core': 'vendor-query',
-              // Flow builder — depends on React, co-bundle
-              '@xyflow/react': 'vendor-react',
+              // Flow builder — Rollup import ordering guarantees React loads first
+              '@xyflow/react': 'vendor-flow',
+              '@xyflow/system': 'vendor-flow',
+              // Email template builder (lazy-loaded page, ~1.1 MB)
+              'grapesjs': 'vendor-grapesjs',
+              'grapesjs-preset-newsletter': 'vendor-grapesjs',
+              // PDF generation (dynamically imported on button click)
+              'jspdf': 'vendor-pdf',
+              'html2canvas': 'vendor-pdf',
               // Utility libraries
               'date-fns': 'vendor-utils',
               'clsx': 'vendor-utils',
@@ -113,6 +120,9 @@ export default defineConfig(({ mode }) => {
               'zustand': 'vendor-utils',
               'immer': 'vendor-utils',
             };
+
+            // Prefix-match all @radix-ui/* packages into vendor-ui
+            if (pkg.startsWith('@radix-ui/')) return 'vendor-ui';
 
             return CHUNK[pkg] ?? undefined;
           },

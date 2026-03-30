@@ -11,8 +11,9 @@
  */
 
 import React, { useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// Dynamically imported on button click to avoid bundling ~613KB on page load
+// import html2canvas from 'html2canvas';
+// import jsPDF from 'jspdf';
 import { Download, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +64,12 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
 
     setGenerating(true);
     try {
+      // Dynamically import PDF libs — only loaded when user clicks Download
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
       // Wait for all web fonts (Roboto Slab, Open Sans) to be ready before capture
       await document.fonts.ready;
 

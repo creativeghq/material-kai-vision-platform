@@ -12,13 +12,15 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // AI Pricing Configuration (synced with ai_model_pricing DB table and ai_pricing.py)
-// Last synced: 2026-02-15
+// Last synced: 2026-03-30
 const AI_PRICING = {
   // Anthropic Claude Models (per 1M tokens)
   claude: {
     'claude-haiku-4-5': { input: 1.00, output: 5.00 },
     'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
     'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
+    'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+    'claude-sonnet-4-6-20260217': { input: 3.00, output: 15.00 },
     'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
     'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
     'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },

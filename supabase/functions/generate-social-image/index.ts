@@ -4,7 +4,7 @@
  * Routes to the best AI image model based on content type:
  *   lifestyle / people  → xAI Aurora (grok-2-aurora)   10 credits
  *   product / interior  → Gemini Imagen                  5 credits
- *   artistic / textured → FLUX Dev (Replicate)           6 credits
+ *   artistic / textured → FLUX 2 Pro (Replicate)         6 credits
  *
  * Credits are debited upfront and are non-refundable.
  * Stores result in Supabase Storage and updates social_posts.
@@ -27,8 +27,8 @@ type AspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
 
 const MODEL_SERVICE_KEYS: Record<Exclude<ImageModel, 'auto'>, string> = {
   aurora: 'xai-aurora',
-  gemini: 'flux-dev', // Gemini billed at cheapest rate; actual Gemini billing via AI usage logs
-  flux:   'flux-dev',
+  gemini: 'flux-2-pro', // Gemini billed at cheapest rate; actual Gemini billing via AI usage logs
+  flux:   'flux-2-pro',
 };
 
 const CREDIT_COSTS: Record<Exclude<ImageModel, 'auto'>, number> = {
@@ -113,14 +113,14 @@ async function generateWithGemini(prompt: string, aspectRatio: AspectRatio): Pro
   return `data:image/png;base64,${b64}`;
 }
 
-// ── Replicate FLUX Dev ────────────────────────────────────────────────────────
+// ── Replicate FLUX 2 Pro ──────────────────────────────────────────────────────
 async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promise<string> {
   const fluxAspect = aspectRatio === '9:16' ? '9:16'
     : aspectRatio === '16:9' ? '16:9'
     : aspectRatio === '4:5' ? '4:5'
     : '1:1';
 
-  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-dev/predictions', {
+  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-2-pro/predictions', {
     method: 'POST',
     headers: {
       'Authorization': `Token ${REPLICATE_API_KEY}`,

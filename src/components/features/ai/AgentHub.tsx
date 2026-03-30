@@ -96,7 +96,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-5-20250929',
+    defaultModel: 'anthropic/claude-sonnet-4-6-20260217',
   },
   {
     id: 'interior-designer',
@@ -106,7 +106,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-5-20250929',
+    defaultModel: 'anthropic/claude-sonnet-4-6-20260217',
   },
   {
     id: 'demo',
@@ -123,7 +123,7 @@ const AGENTS: AgentDefinition[] = [
 // AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
   // Language Models
-  { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic', type: 'language' },
+  { id: 'anthropic/claude-sonnet-4-6-20260217', name: 'Claude Sonnet 4.6', provider: 'anthropic', type: 'language' },
   { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', type: 'language' },
   { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai', type: 'language' },
 
@@ -273,7 +273,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929',
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-6-20260217',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());

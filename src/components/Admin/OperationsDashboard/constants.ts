@@ -6,7 +6,8 @@ export const MARKUP_MULTIPLIER = 1.50;
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   // Claude Models
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+  'claude-sonnet-4-6-20260217': { input: 3.00, output: 15.00 },
   'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
   'claude-haiku-4-5': { input: 0.80, output: 4.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
@@ -31,7 +32,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 export const MODEL_CONFIGS: ModelConfig[] = [
   // Claude Models
   { id: 'claude-haiku-4', name: 'Claude Haiku 4.5', provider: 'anthropic', model: 'claude-haiku-4-20250514', inputCostPer1M: 0.80, outputCostPer1M: 4.00, speed: 'fast', usedFor: ['Search Agent', 'Quick Queries', 'Validation'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4.5', provider: 'anthropic', model: 'claude-sonnet-4-20250514', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4.6', provider: 'anthropic', model: 'claude-sonnet-4-6-20260217', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
   { id: 'claude-sonnet-3.5', name: 'Claude Sonnet 3.5', provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['Legacy Tasks'], totalInputTokens: 0, totalOutputTokens: 0 },
 
   // OpenAI Models

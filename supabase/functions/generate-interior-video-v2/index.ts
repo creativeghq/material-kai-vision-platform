@@ -6,7 +6,7 @@
  *
  * Models:
  *   veo-2           → 30 credits (Google, cinematic walkthroughs)
- *   kling-1.6-pro   → 15 credits (Replicate, fast product/social)
+ *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
  *   wan2.1-i2v      → 10 credits (Replicate, budget option)
  *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
  *
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
   }
 
   // Resolve model
-  const resolvedModel: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-1.6-pro';
+  const resolvedModel: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-v3.0';
   const creditCost = CREDIT_COSTS[resolvedModel];
 
   // ① Debit credits upfront

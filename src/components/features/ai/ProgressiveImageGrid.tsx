@@ -1063,7 +1063,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                           {[
                             { value: 'auto',              label: 'Auto',           description: 'Best model selected automatically' },
                             { value: 'veo-2',             label: 'Veo 2',          description: 'Google Veo 2 — high quality',        credits: 30 },
-                            { value: 'kling-1.6-pro',     label: 'Kling 1.6 Pro', description: 'Kling — fast & cinematic',            credits: 15 },
+                            { value: 'kling-3.0',         label: 'Kling 3.0',     description: 'Kling 3.0 — cinematic + audio',      credits: 20 },
                             { value: 'wan2.1-i2v',        label: 'Wan 2.1',        description: 'Wan2.1 — open-source quality',       credits: 10 },
                             { value: 'runway-gen4-turbo', label: 'Runway Gen-4',   description: 'Runway Gen-4 — premium output',      credits: 40 },
                           ].map(vm => (

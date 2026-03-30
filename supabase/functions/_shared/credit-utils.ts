@@ -23,9 +23,11 @@ const EXTERNAL_SERVICE_PRICING: Record<string, { cost_per_unit: number; unit: st
   'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit' },
   // Social media image generation
   'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image' },    // → ~10 cr after markup
-  'flux-dev':             { cost_per_unit: 0.04,   unit: 'image' },    // → ~6 cr after markup
+  'flux-2-pro':           { cost_per_unit: 0.04,   unit: 'image' },    // → ~6 cr after markup (FLUX 2 Pro)
+  'flux-dev':             { cost_per_unit: 0.04,   unit: 'image' },    // legacy fallback
   // Social media video generation (cost per second of output)
-  'kling-1.6-pro':        { cost_per_unit: 0.08,   unit: 'second' },   // 15s reel → ~18 cr after markup
+  'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second' },   // Kling 3.0 — cinematic + audio
+  'kling-1.6-pro':        { cost_per_unit: 0.08,   unit: 'second' },   // legacy fallback
   'wan2.1-i2v':           { cost_per_unit: 0.05,   unit: 'second' },   // 10s → ~8 cr after markup
   'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second' },   // 10s → ~23 cr after markup
   // Social caption/hashtag generation (Claude Haiku)

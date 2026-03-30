@@ -46,9 +46,9 @@ The `ai_config` object accepts the following optional fields:
 - `text_embedding_dimensions` — Default: 1024
 - `text_embedding_input_type` — Default: "document"
 - `classification_primary_model` — Default: "Qwen/Qwen3-VL-32B-Instruct"
-- `classification_validation_model` — Default: "claude-sonnet-4-20250514"
+- `classification_validation_model` — Default: "claude-sonnet-4-6-20260217"
 - `classification_confidence_threshold` — Default: 0.7
-- `discovery_model` — Default: "claude-sonnet-4-20250514"
+- `discovery_model` — Default: "claude-sonnet-4-6-20260217"
 - `metadata_extraction_model` — Default: "claude"
 - `chunking_model` — Default: "gpt-4o"
 - `discovery_temperature` — Default: 0.1

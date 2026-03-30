@@ -592,9 +592,9 @@ try {
     maxTokens: 4096,
   });
 
-  // Claude Sonnet 4.5 - Full model for complex tasks
+  // Claude Sonnet 4.6 - Full model for complex tasks
   modelSonnet = new ChatAnthropic({
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6-20260217',
     temperature: 1,
     maxTokens: 4096,
   });
@@ -618,7 +618,7 @@ function getModelNameForAgent(agentId: string): string {
   if (agentId === 'demo') {
     return 'claude-haiku-4-5-20251001';
   }
-  return 'claude-sonnet-4-5-20250929';
+  return 'claude-sonnet-4-6-20260217';
 }
 
 interface AgentConfig {

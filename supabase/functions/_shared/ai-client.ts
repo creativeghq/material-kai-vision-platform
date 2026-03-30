@@ -46,7 +46,7 @@ const klingai = createKlingAI({ accessKeyId: KLINGAI_ACCESS_KEY, secretAccessKey
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
-const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
+const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-6-20260217';
 
 // ── Types ──
 export interface AIGenerateConfig {
