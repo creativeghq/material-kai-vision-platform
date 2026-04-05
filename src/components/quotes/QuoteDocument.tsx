@@ -155,12 +155,11 @@ const IntroPage: React.FC<{ bgUrl: string | null }> = ({ bgUrl }) => (
 
 const COL_WIDTHS = {
   num: '4%',
-  product: '28%',
-  room: '10%',
-  qty: '8%',
-  unitPrice: '16%',
-  discPrice: '16%',
-  total: '16%',
+  product: '32%',
+  room: '12%',
+  qty: '10%',
+  price: '22%',
+  total: '18%',
 };
 
 const ItemsPage: React.FC<{
@@ -200,14 +199,13 @@ const ItemsPage: React.FC<{
             <col style={{ width: COL_WIDTHS.product }} />
             <col style={{ width: COL_WIDTHS.room }} />
             <col style={{ width: COL_WIDTHS.qty }} />
-            <col style={{ width: COL_WIDTHS.unitPrice }} />
-            <col style={{ width: COL_WIDTHS.discPrice }} />
+            <col style={{ width: COL_WIDTHS.price }} />
             <col style={{ width: COL_WIDTHS.total }} />
           </colgroup>
 
           <thead>
             <tr style={{ backgroundColor: C.tableHeader }}>
-              {['#', 'Product', 'Room', 'Qty', 'Unit Price', 'Disc. Price', 'Total'].map((h, i) => (
+              {['#', 'Product', 'Room', 'Qty', 'Price', 'Total'].map((h, i) => (
                 <th
                   key={h}
                   style={{
@@ -215,7 +213,7 @@ const ItemsPage: React.FC<{
                     fontSize: 65,
                     fontWeight: 700,
                     color: C.white,
-                    textAlign: i >= 3 ? 'right' : 'left' as React.CSSProperties['textAlign'],
+                    textAlign: i >= 3 ? 'right' : 'left' as any,
                     letterSpacing: 4,
                     textTransform: 'uppercase',
                   }}
@@ -271,15 +269,22 @@ const ItemsPage: React.FC<{
                   <td style={{ padding: '35px 60px', fontSize: 65, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
                     {item.quantity} {item.unit}
                   </td>
-                  {/* Unit Price */}
-                  <td style={{ padding: '35px 60px', fontSize: 65, color: item.discounted_price != null ? C.gray : C.black, textAlign: 'right', verticalAlign: 'top' }}>
+                  {/* Price — strikethrough original + actual when discounted */}
+                  <td style={{ padding: '35px 60px', textAlign: 'right', verticalAlign: 'top' }}>
                     {item.discounted_price != null ? (
-                      <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{fmt(item.unit_price, data.currency)}</span>
-                    ) : fmt(item.unit_price, data.currency)}
-                  </td>
-                  {/* Disc. Price */}
-                  <td style={{ padding: '35px 60px', fontSize: 65, color: item.discounted_price != null ? C.primary : C.gray, textAlign: 'right', verticalAlign: 'top', opacity: item.discounted_price != null ? 1 : 0.3 }}>
-                    {item.discounted_price != null ? fmt(item.discounted_price, data.currency) : '—'}
+                      <div>
+                        <div style={{ fontSize: 47, color: C.gray, textDecoration: 'line-through', opacity: 0.6, lineHeight: 1.2 }}>
+                          {fmt(item.unit_price, data.currency)}
+                        </div>
+                        <div style={{ fontSize: 65, fontWeight: 700, color: C.primary, lineHeight: 1.3 }}>
+                          {fmt(item.discounted_price, data.currency)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 65, color: C.black }}>
+                        {fmt(item.unit_price, data.currency)}
+                      </div>
+                    )}
                   </td>
                   {/* Total */}
                   <td style={{ padding: '35px 60px', fontSize: 65, fontWeight: 700, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>

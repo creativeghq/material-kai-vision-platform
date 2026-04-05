@@ -104,7 +104,6 @@ interface CustomProductForm {
   room: string;
   dimensions: string;
   installation_requirements: string;
-  delivery_date: string;
 }
 
 const EMPTY_CUSTOM: CustomProductForm = {
@@ -119,7 +118,6 @@ const EMPTY_CUSTOM: CustomProductForm = {
   room: '',
   dimensions: '',
   installation_requirements: '',
-  delivery_date: '',
 };
 
 interface AddProductsSheetProps {
@@ -258,7 +256,6 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
         room: customForm.room.trim() || undefined,
         dimensions: customForm.dimensions.trim() || undefined,
         installation_requirements: customForm.installation_requirements.trim() || undefined,
-        delivery_date: customForm.delivery_date || undefined,
       });
       toast({ title: 'Custom Product Added', description: `"${customForm.name}" added to the quote.` });
       setCustomForm(EMPTY_CUSTOM);
@@ -584,10 +581,6 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                       rows={2}
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                     />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cp-delivery">Expected Delivery Date</Label>
-                    <Input id="cp-delivery" type="date" value={customForm.delivery_date} onChange={e => setCustomField('delivery_date', e.target.value)} />
                   </div>
                 </div>
 

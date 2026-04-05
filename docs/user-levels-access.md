@@ -52,7 +52,7 @@ Roles are computed from two database sources:
 | Agent Hub (`/agent-hub`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | MoodBoards (`/moodboard`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Discover (`/discover`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Quotes Cart (`/quotes`) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Quotes (`/quotes`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Factory Analytics (`/factory-analytics`) | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Admin Panel (`/admin`) | ❌ | ❌² | ❌² | ❌² | ✅ |
 | Public Profiles (`/u/:id`) | ✅ | ✅ | ✅ | ✅ | ✅ |

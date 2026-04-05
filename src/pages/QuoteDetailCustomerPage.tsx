@@ -426,6 +426,19 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                   });
                 }
               } : undefined}
+              onUpdateItem={quote.status === 'draft' ? async (itemId, data) => {
+                try {
+                  await quotesService.updateItem(itemId, data);
+                  await loadQuoteDetails();
+                } catch (error) {
+                  console.error('Error updating item:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to update item',
+                    variant: 'destructive',
+                  });
+                }
+              } : undefined}
               onRemoveItem={async (itemId) => {
                 try {
                   await quotesService.removeItem(itemId);
@@ -445,6 +458,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               }}
               editable={quote.status === 'draft'}
               editPricing={false}
+              showPricing={quote.status === 'quoted' || quote.status === 'accepted'}
             />
           </TabsContent>
 
@@ -609,10 +623,20 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                         )}
                       </div>
                       <div className="flex-1 pb-4">
-                        <p className="font-medium text-sm">{step.timeline_step?.name || 'Step'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{step.timeline_step?.name || 'Step'}</p>
+                          {(step as any).quote_item && (
+                            <Badge variant="secondary" className="text-[10px] font-normal">
+                              {(step as any).quote_item.product?.name || (step as any).quote_item.custom_product_name || 'Product'}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {step.timeline_step?.description}
                         </p>
+                        {step.notes && (
+                          <p className="text-xs text-foreground mt-1 bg-muted/50 rounded px-2 py-1">{step.notes}</p>
+                        )}
                         <Badge variant="outline" className="mt-2 rounded-full text-xs capitalize">
                           {step.status.replace('_', ' ')}
                         </Badge>

@@ -3,6 +3,7 @@ import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrenc
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product, SimpleProduct } from '@/components/features/products/types';
@@ -24,10 +25,14 @@ interface QuoteItemsListProps {
   /** Quantity update (customer + admin) */
   onUpdateQuantity?: (itemId: string, quantity: number) => Promise<void>;
   /** Pricing + unit + FF&E update (admin only) */
-  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null }) => Promise<void>;
+  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; notes?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null }) => Promise<void>;
   onRemoveItem?: (itemId: string) => Promise<void>;
   /** When true admin pricing fields (price, discounted, unit) are editable */
   editPricing?: boolean;
+  /** When false, price/total columns are hidden entirely (e.g. customer view before quote is priced). Defaults to true. */
+  showPricing?: boolean;
+  /** When true, unit column is editable via dropdown (admin only). Defaults to false. */
+  editUnits?: boolean;
   emptyMessage?: string;
   emptyButtonText?: string;
   editable?: boolean;
@@ -118,6 +123,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   onUpdateItem,
   onRemoveItem,
   editPricing = false,
+  showPricing = true,
+  editUnits = false,
   emptyMessage = 'No items in this quote yet',
   emptyButtonText = 'Add Your First Product',
   editable = false,
@@ -211,13 +218,16 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 min-w-[220px]">Product</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 w-28">Room</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 w-20">Unit</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-28">Price</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-32">
-                    Disc. Price
-                    {editPricing && <span className="block text-[10px] font-normal opacity-60">optional</span>}
-                  </th>
+                  {showPricing && (
+                    <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-36">
+                      Price
+                      {editPricing && <span className="block text-[10px] font-normal opacity-60">click to edit</span>}
+                    </th>
+                  )}
                   <th className="text-center text-xs font-medium text-muted-foreground px-4 py-3 w-28">Qty</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-28">Total</th>
+                  {showPricing && (
+                    <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-28">Total</th>
+                  )}
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 w-20">Actions</th>
                 </tr>
               </thead>
@@ -310,9 +320,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                           </div>
                         </td>
 
-                        {/* Room */}
+                        {/* Room — editable by customer on draft quotes */}
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          {editPricing ? (
+                          {editable && onUpdateItem ? (
                             <FFETextCell
                               value={item.room || ''}
                               placeholder="Room"
@@ -331,7 +341,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
 
                         {/* Unit */}
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          {editPricing && isCustom ? (
+                          {editUnits && onUpdateItem ? (
                             <UnitCell
                               value={unit}
                               onSave={(v) => handleUnitSave(item.id, v)}
@@ -341,33 +351,36 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                           )}
                         </td>
 
-                        {/* Price */}
-                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                          {isSavingPrice ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
-                          ) : (
-                            <PriceCell
-                              value={item.unit_price}
-                              editable={editPricing}
-                              onSave={v => handlePriceSave(item.id, 'unit_price', v)}
-                            />
-                          )}
-                        </td>
-
-                        {/* Discounted Price */}
-                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                          {isSavingPrice ? (
-                            <span />
-                          ) : (
-                            <PriceCell
-                              value={(item as any).discounted_price}
-                              editable={editPricing}
-                              placeholder="—"
-                              onSave={v => handlePriceSave(item.id, 'discounted_price', v)}
-                              highlight={hasDiscount}
-                            />
-                          )}
-                        </td>
+                        {/* Price (merged: original + discounted) */}
+                        {showPricing && (
+                          <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                            {isSavingPrice ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
+                            ) : editPricing ? (
+                              <div className="space-y-1">
+                                <PriceCell
+                                  value={item.unit_price}
+                                  editable
+                                  onSave={v => handlePriceSave(item.id, 'unit_price', v)}
+                                />
+                                <PriceCell
+                                  value={(item as any).discounted_price}
+                                  editable
+                                  placeholder="Disc."
+                                  onSave={v => handlePriceSave(item.id, 'discounted_price', v)}
+                                  highlight={hasDiscount}
+                                />
+                              </div>
+                            ) : hasDiscount ? (
+                              <div>
+                                <span className="text-xs text-muted-foreground line-through">{fmtPrice(item.unit_price)}</span>
+                                <div className="text-sm font-semibold text-primary">{fmtPrice((item as any).discounted_price)}</div>
+                              </div>
+                            ) : (
+                              <span className="text-sm">{fmtPrice(item.unit_price)}</span>
+                            )}
+                          </td>
+                        )}
 
                         {/* Quantity */}
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -402,21 +415,23 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         </td>
 
                         {/* Total */}
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-semibold">
-                            {fmtPrice(displayTotal)}
-                          </span>
-                          {hasDiscount && item.unit_price != null && (
-                            <div className="text-xs text-muted-foreground line-through">
-                              {fmtPrice(Number(item.unit_price) * item.quantity)}
-                            </div>
-                          )}
-                        </td>
+                        {showPricing && (
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm font-semibold">
+                              {fmtPrice(displayTotal)}
+                            </span>
+                            {hasDiscount && item.unit_price != null && (
+                              <div className="text-xs text-muted-foreground line-through">
+                                {fmtPrice(Number(item.unit_price) * item.quantity)}
+                              </div>
+                            )}
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
-                            {(hasDetails || editPricing) && (
+                            {(hasDetails || editable) && (
                               <Button
                                 variant="ghost" size="icon" className="h-7 w-7"
                                 onClick={e => { e.stopPropagation(); setExpandedItemId(isExpanded ? null : item.id); }}
@@ -452,20 +467,20 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                       {/* Expandable Details Row — Notes, Installation, Delivery */}
                       {isExpanded && (
                         <tr className="bg-muted/10">
-                          <td colSpan={8} className="px-5 py-3">
+                          <td colSpan={99} className="px-5 py-3">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pl-[52px]">
                               {/* Notes */}
                               <div className="space-y-1">
                                 <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                   <Package className="h-3 w-3" /> Notes
                                 </label>
-                                {editPricing ? (
+                                {editable && onUpdateItem ? (
                                   <textarea
                                     defaultValue={item.notes || ''}
                                     placeholder="General notes..."
                                     rows={2}
                                     className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                                    onBlur={e => onUpdateItem && onUpdateItem(item.id, { room: item.room })}
+                                    onBlur={e => onUpdateItem(item.id, { notes: e.target.value })}
                                   />
                                 ) : (
                                   <p className="text-xs text-foreground">{item.notes || <span className="text-muted-foreground">—</span>}</p>
@@ -477,7 +492,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                   <Wrench className="h-3 w-3" /> Installation Requirements
                                 </label>
-                                {editPricing ? (
+                                {editable && onUpdateItem ? (
                                   <FFETextAreaCell
                                     value={item.installation_requirements || ''}
                                     placeholder="e.g. Requires electrical outlet, wall mounting brackets..."
@@ -488,27 +503,27 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 )}
                               </div>
 
-                              {/* Delivery Date */}
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                  <Truck className="h-3 w-3" /> Expected Delivery
-                                </label>
-                                {editPricing ? (
-                                  <Input
-                                    type="date"
-                                    defaultValue={item.delivery_date || ''}
-                                    className="h-7 text-xs"
-                                    onChange={e => handleFFESave(item.id, 'delivery_date', e.target.value || null)}
-                                  />
-                                ) : item.delivery_date ? (
-                                  <p className="text-xs text-foreground flex items-center gap-1">
-                                    <Truck className="h-3 w-3 text-muted-foreground" />
-                                    {new Date(item.delivery_date).toLocaleDateString()}
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground">—</p>
-                                )}
-                              </div>
+                              {/* Delivery Date — admin edits via editPricing, customer sees only when showPricing (quoted/accepted) */}
+                              {(editPricing || (showPricing && item.delivery_date)) && (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                    <Truck className="h-3 w-3" /> Expected Delivery
+                                  </label>
+                                  {editPricing ? (
+                                    <Input
+                                      type="date"
+                                      defaultValue={item.delivery_date || ''}
+                                      className="h-7 text-xs"
+                                      onChange={e => handleFFESave(item.id, 'delivery_date', e.target.value || null)}
+                                    />
+                                  ) : (
+                                    <p className="text-xs text-foreground flex items-center gap-1">
+                                      <Truck className="h-3 w-3 text-muted-foreground" />
+                                      {new Date(item.delivery_date!).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -587,17 +602,17 @@ const FFETextAreaCell: React.FC<{
 };
 
 /** Inline editable unit cell for custom items */
-const UnitCell: React.FC<{ value: string; onSave: (v: string) => void }> = ({ value, onSave }) => {
-  const [local, setLocal] = useState(value);
-  useEffect(() => setLocal(value), [value]);
-  return (
-    <Input
-      value={local}
-      onChange={e => setLocal(e.target.value)}
-      onBlur={() => { if (local !== value) onSave(local); }}
-      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-      className="h-7 w-16 text-xs px-2"
-      placeholder="pcs"
-    />
-  );
-};
+const UNIT_OPTIONS = ['pcs', 'sqm', 'lm', 'kg', 'liters', 'sets', 'rolls', 'boxes', 'pairs'] as const;
+
+const UnitCell: React.FC<{ value: string; onSave: (v: string) => void }> = ({ value, onSave }) => (
+  <Select value={value} onValueChange={v => { if (v !== value) onSave(v); }}>
+    <SelectTrigger className="h-7 w-20 text-xs px-2">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {UNIT_OPTIONS.map(u => (
+        <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);

@@ -140,12 +140,14 @@ export interface QuoteTimeline {
   id: string;
   quote_id: string;
   timeline_step_id: string;
+  quote_item_id?: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'skipped';
   notes?: string;
   completed_at?: string;
   created_at: string;
   updated_at: string;
   timeline_step?: TimelineStep;
+  quote_item?: { id: string; product_id?: string; custom_product_name?: string; product?: { name: string } | null } | null;
 }
 
 // =====================================================
@@ -425,6 +427,19 @@ export class QuotesService {
     installation_requirements?: string;
     delivery_date?: string;
   }): Promise<QuoteItem> {
+    // Resolve default unit from product metadata
+    let customUnit: string | null = null;
+    try {
+      const { data: product } = await supabase
+        .from('products')
+        .select('metadata')
+        .eq('id', data.product_id)
+        .single();
+      if (product?.metadata?.unit) {
+        customUnit = product.metadata.unit;
+      }
+    } catch { /* non-fatal — falls back to null (displays as pcs) */ }
+
     const { data: item, error } = await supabase
       .from('quote_items')
       .insert({
@@ -439,6 +454,7 @@ export class QuotesService {
         dimensions: data.dimensions || null,
         installation_requirements: data.installation_requirements || null,
         delivery_date: data.delivery_date || null,
+        custom_unit: customUnit,
       })
       .select()
       .single();
@@ -1393,7 +1409,7 @@ export class QuotesService {
   async getQuoteTimeline(quoteId: string): Promise<QuoteTimeline[]> {
     const { data, error } = await supabase
       .from('quote_timeline')
-      .select('*, timeline_step:timeline_steps(*)')
+      .select('*, timeline_step:timeline_steps(*), quote_item:quote_items(id, product_id, custom_product_name, product:products(name))')
       .eq('quote_id', quoteId)
       .order('created_at', { ascending: true });
 
@@ -1454,6 +1470,7 @@ export class QuotesService {
     quoteId: string,
     timelineStepId: string,
     notes?: string,
+    quoteItemId?: string,
   ): Promise<QuoteTimeline> {
     // Get the current max order for this quote
     const { data: existingSteps } = await supabase
@@ -1473,8 +1490,9 @@ export class QuotesService {
         step_order: nextOrder,
         status: 'pending',
         notes: notes || null,
+        quote_item_id: quoteItemId || null,
       })
-      .select('*, timeline_step:timeline_steps(*)')
+      .select('*, timeline_step:timeline_steps(*), quote_item:quote_items(id, product_id, custom_product_name, product:products(name))')
       .single();
 
     if (error) throw error;

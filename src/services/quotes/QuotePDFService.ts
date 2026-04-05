@@ -80,14 +80,18 @@ class QuotePDFService {
    */
   async saveItemPrices(
     quoteId: string,
-    items: { id: string; unit_price: number; line_total: number }[],
+    items: { id: string; unit_price: number; discounted_price?: number | null; line_total: number }[],
     vatRate: number,
   ): Promise<{ success: boolean; error?: string }> {
     // Update each item's pricing
     for (const item of items) {
       const { error } = await supabase
         .from('quote_items')
-        .update({ unit_price: item.unit_price, line_total: item.line_total })
+        .update({
+          unit_price: item.unit_price,
+          discounted_price: item.discounted_price ?? null,
+          line_total: item.line_total,
+        })
         .eq('id', item.id);
 
       if (error) {

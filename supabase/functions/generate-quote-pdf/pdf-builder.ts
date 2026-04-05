@@ -39,15 +39,14 @@ const ROWS_PER_PAGE = 22;
 // Column definitions (proportional widths totaling TABLE_W)
 const COLUMNS = [
   { label: '#', width: 22 },
-  { label: 'Product', width: 105 },
-  { label: 'Room', width: 50 },
-  { label: 'SKU', width: 48 },
-  { label: 'Size / Color', width: 52 },
-  { label: 'Qty', width: 28 },
-  { label: 'Unit', width: 30 },
-  { label: 'Price', width: 52 },
-  { label: 'Disc. Price', width: 55 },
-  { label: 'Total', width: 73 },
+  { label: 'Product', width: 120 },
+  { label: 'Room', width: 55 },
+  { label: 'SKU', width: 52 },
+  { label: 'Size / Color', width: 56 },
+  { label: 'Qty', width: 30 },
+  { label: 'Unit', width: 32 },
+  { label: 'Price', width: 68 },
+  { label: 'Total', width: 80 },
 ];
 
 /**
@@ -424,32 +423,32 @@ function drawTableRow(
   page.drawText(item.unit || 'pcs', { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
   x += COLUMNS[6].width;
 
-  // Unit Price (right-aligned in column) — struck through if discounted
-  const priceStr = formatCurrency(item.unit_price);
-  const priceColor = item.discounted_price != null ? COLOR_GRAY : COLOR_BLACK;
-  drawRightAligned(page, priceStr, x + COLUMNS[7].width - 4, textY, fontSize, font, priceColor);
+  // Price — single column: strikethrough original + actual when discounted
+  const priceColRight = x + COLUMNS[7].width - 4;
   if (item.discounted_price != null) {
-    // Strikethrough line over the price text
-    const priceWidth = font.widthOfTextAtSize(priceStr, fontSize);
-    const priceRightX = x + COLUMNS[7].width - 4;
+    // Original price with strikethrough (smaller, gray, above)
+    const origStr = formatCurrency(item.unit_price);
+    const origSize = fontSize - 1;
+    drawRightAligned(page, origStr, priceColRight, textY + 4, origSize, font, COLOR_GRAY);
+    const origWidth = font.widthOfTextAtSize(origStr, origSize);
     page.drawLine({
-      start: { x: priceRightX - priceWidth, y: textY + 3 },
-      end: { x: priceRightX, y: textY + 3 },
-      thickness: 0.5,
+      start: { x: priceColRight - origWidth, y: textY + 7 },
+      end: { x: priceColRight, y: textY + 7 },
+      thickness: 0.4,
       color: COLOR_GRAY,
     });
+    // Actual price below
+    const discStr = formatCurrency(item.discounted_price);
+    drawRightAligned(page, discStr, priceColRight, textY - 7, fontSize, fontBold, COLOR_BLACK);
+  } else {
+    const priceStr = formatCurrency(item.unit_price);
+    drawRightAligned(page, priceStr, priceColRight, textY, fontSize, font, COLOR_BLACK);
   }
   x += COLUMNS[7].width;
 
-  // Disc. Price (right-aligned)
-  const discPriceStr = item.discounted_price != null ? formatCurrency(item.discounted_price) : '—';
-  const discPriceColor = item.discounted_price != null ? COLOR_BLACK : COLOR_LIGHT_GRAY;
-  drawRightAligned(page, discPriceStr, x + COLUMNS[8].width - 4, textY, fontSize, font, discPriceColor);
-  x += COLUMNS[8].width;
-
   // Line Total (right-aligned, bold)
   const totalStr = formatCurrency(item.line_total);
-  drawRightAligned(page, totalStr, x + COLUMNS[9].width - 4, textY, fontSize, fontBold, COLOR_BLACK);
+  drawRightAligned(page, totalStr, x + COLUMNS[8].width - 4, textY, fontSize, fontBold, COLOR_BLACK);
 }
 
 function drawTotals(

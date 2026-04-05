@@ -2497,6 +2497,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
                               onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
                               onEditImage={(imageUrl) => {
+                                // Auto-submit lighting edits directly (skip modal)
+                                if (imageUrl.includes('|LIGHTING|')) {
+                                  const idx = imageUrl.indexOf('|LIGHTING|');
+                                  const imgUrl = imageUrl.slice(0, idx);
+                                  const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
+                                  setAttachedImages([imgUrl]);
+                                  setSelectedGenerationMode('image-edit');
+                                  setInput(prompt);
+                                  setTimeout(() => { handleSendMessageRef.current(); }, 100);
+                                  return;
+                                }
                                 setAttachedImages([imageUrl]);
                                 setSelectedGenerationMode('image-edit');
                                 setShowGeminiEditModal(true);
@@ -3083,6 +3094,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }}
           onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
           onEditImage={(imageUrl) => {
+            // Auto-submit lighting edits directly (skip modal)
+            if (imageUrl.includes('|LIGHTING|')) {
+              const idx = imageUrl.indexOf('|LIGHTING|');
+              const imgUrl = imageUrl.slice(0, idx);
+              const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
+              setAttachedImages([imgUrl]);
+              setSelectedGenerationMode('image-edit');
+              setInput(prompt);
+              setTimeout(() => { handleSendMessageRef.current(); }, 100);
+              return;
+            }
             setAttachedImages([imageUrl]);
             setSelectedGenerationMode('image-edit');
             setGeminiModalImage(null);

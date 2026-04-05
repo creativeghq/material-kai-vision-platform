@@ -22,7 +22,7 @@ const BASE_NAV_ITEMS = [
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users },
-  { id: 'quotes', label: 'Quotes Cart', path: '/quotes', icon: FileText },
+  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText },
 ];
 
 const SIDEBAR_STORAGE_KEY = 'kai-sidebar-expanded';

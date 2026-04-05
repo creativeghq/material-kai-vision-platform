@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ShoppingCart, Loader2, FileText } from 'lucide-react';
+import { Plus, ShoppingCart, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 
 import {
   Dialog,
@@ -43,6 +43,11 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
   const [newQuoteName, setNewQuoteName] = useState('');
   const [creating, setCreating] = useState(false);
   const [notes, setNotes] = useState('');
+  // FF&E fields
+  const [showFFE, setShowFFE] = useState(false);
+  const [room, setRoom] = useState('');
+  const [dimensions, setDimensions] = useState('');
+  const [installationRequirements, setInstallationRequirements] = useState('');
 
   useEffect(() => {
     loadQuotes();
@@ -78,6 +83,9 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         quantity,
         notes,
         added_from: '3d_generation',
+        ...(room && { room }),
+        ...(dimensions && { dimensions }),
+        ...(installationRequirements && { installation_requirements: installationRequirements }),
       });
       onSuccess(newQuote.name || newQuoteName.trim());
     } catch (error) {
@@ -110,6 +118,9 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         quantity,
         notes,
         added_from: 'manual',
+        ...(room && { room }),
+        ...(dimensions && { dimensions }),
+        ...(installationRequirements && { installation_requirements: installationRequirements }),
       });
 
       const selectedQuote = quotes.find(q => q.id === selectedQuoteId);
@@ -177,6 +188,50 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
               rows={2}
             />
           </div>
+
+          {/* FF&E Specification Fields */}
+          <button
+            type="button"
+            onClick={() => setShowFFE(!showFFE)}
+            className="w-full flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            <span>Product Specifications</span>
+            {showFFE ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          {showFFE && (
+            <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/30">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Room</Label>
+                  <Input
+                    value={room}
+                    onChange={e => setRoom(e.target.value)}
+                    placeholder="e.g. Living Room"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Dimensions</Label>
+                  <Input
+                    value={dimensions}
+                    onChange={e => setDimensions(e.target.value)}
+                    placeholder="e.g. 120×60×45"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Installation Requirements</Label>
+                <Textarea
+                  value={installationRequirements}
+                  onChange={e => setInstallationRequirements(e.target.value)}
+                  placeholder="e.g. Requires wall anchoring, professional install"
+                  className="mt-1"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-8">

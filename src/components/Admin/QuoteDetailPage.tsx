@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -57,6 +57,7 @@ export const QuoteDetailPage: React.FC = () => {
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [updatingTimelineStep, setUpdatingTimelineStep] = useState<string | null>(null);
   const [selectedTimelineStepId, setSelectedTimelineStepId] = useState<string>('');
+  const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string>('');
   const [timelineNote, setTimelineNote] = useState('');
   const [addingTimeline, setAddingTimeline] = useState(false);
 
@@ -75,12 +76,14 @@ export const QuoteDetailPage: React.FC = () => {
 
   // Pricing state
   const [itemPrices, setItemPrices] = useState<Record<string, string>>({});
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>({});
   const [vatRate, setVatRate] = useState<string>('24');
   const [savingPrices, setSavingPrices] = useState(false);
 
   // PDF generation state
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
 
   // HTML/client-side PDF — hook must be at top level (before any early returns)
   const { data: docData } = useQuoteDocument(id || '');
@@ -105,12 +108,20 @@ export const QuoteDetailPage: React.FC = () => {
       // Initialize pricing state from loaded data
       if (data?.items) {
         const prices: Record<string, string> = {};
+        const discounts: Record<string, string> = {};
         data.items.forEach((item: QuoteItemWithProduct) => {
           if (item.unit_price !== null && item.unit_price !== undefined) {
             prices[item.id] = String(item.unit_price);
           }
+          // Reverse-calculate discount % from unit_price and discounted_price
+          const dp = (item as any).discounted_price;
+          if (dp != null && item.unit_price && item.unit_price > 0) {
+            const pct = ((item.unit_price - dp) / item.unit_price) * 100;
+            if (pct > 0) discounts[item.id] = String(Math.round(pct * 100) / 100);
+          }
         });
         setItemPrices(prices);
+        setItemDiscounts(discounts);
       }
       if (data?.vat_rate) {
         setVatRate(String(data.vat_rate));
@@ -225,7 +236,8 @@ export const QuoteDetailPage: React.FC = () => {
     if (!id || !selectedTimelineStepId) return;
     try {
       setAddingTimeline(true);
-      await quotesService.addTimelineStepToQuote(id, selectedTimelineStepId, timelineNote || undefined);
+      const itemId = selectedTimelineItemId && selectedTimelineItemId !== '__none__' ? selectedTimelineItemId : undefined;
+      await quotesService.addTimelineStepToQuote(id, selectedTimelineStepId, timelineNote || undefined, itemId);
       if (quote?.user_id) {
         const stepLabel = timelineSteps.find((s) => s.id === selectedTimelineStepId)?.name ?? 'a step';
         sendQuoteNotification(quote.user_id, `Your quote "${quote?.name || 'Quote'}" has a new update: ${stepLabel}`, id);
@@ -235,6 +247,7 @@ export const QuoteDetailPage: React.FC = () => {
         description: 'Timeline step added',
       });
       setSelectedTimelineStepId('');
+      setSelectedTimelineItemId('');
       setTimelineNote('');
       await loadTimelineData();
     } catch (error) {
@@ -341,9 +354,17 @@ export const QuoteDetailPage: React.FC = () => {
   };
 
   // Pricing helpers
-  const getItemLineTotal = (itemId: string, quantity: number): number => {
+  const getItemEffectivePrice = (itemId: string): number => {
     const price = parseFloat(itemPrices[itemId] || '0');
-    return price * quantity;
+    const discountPct = parseFloat(itemDiscounts[itemId] || '0');
+    if (discountPct > 0 && price > 0) {
+      return Math.round(price * (1 - discountPct / 100) * 100) / 100;
+    }
+    return price;
+  };
+
+  const getItemLineTotal = (itemId: string, quantity: number): number => {
+    return getItemEffectivePrice(itemId) * quantity;
   };
 
   const pricingSubtotal = (quote?.items || []).reduce((sum, item) => {
@@ -364,11 +385,18 @@ export const QuoteDetailPage: React.FC = () => {
     if (!quote?.id || !quote.items) return;
     try {
       setSavingPrices(true);
-      const items = quote.items.map(item => ({
-        id: item.id,
-        unit_price: parseFloat(itemPrices[item.id] || '0'),
-        line_total: getItemLineTotal(item.id, item.quantity),
-      }));
+      const items = quote.items.map(item => {
+        const unitPrice = parseFloat(itemPrices[item.id] || '0');
+        const discountPct = parseFloat(itemDiscounts[item.id] || '0');
+        const effectivePrice = getItemEffectivePrice(item.id);
+        const discountedPrice = discountPct > 0 ? effectivePrice : null;
+        return {
+          id: item.id,
+          unit_price: unitPrice,
+          discounted_price: discountedPrice,
+          line_total: effectivePrice * item.quantity,
+        };
+      });
       const result = await quotePDFService.saveItemPrices(quote.id, items, pricingVatRate);
       if (result.success) {
         toast({ title: 'Prices saved', description: 'Item prices and totals updated.' });
@@ -420,6 +448,24 @@ export const QuoteDetailPage: React.FC = () => {
       toast({ title: 'Error', description: 'Failed to download PDF', variant: 'destructive' });
     } finally {
       setDownloadingPDF(false);
+    }
+  };
+
+  const handleSendQuote = async () => {
+    if (!quote) return;
+    try {
+      setSendingQuote(true);
+      await quotesService.updateQuote(quote.id, { status: 'quoted' });
+      await loadQuoteDetails();
+      if (quote.user_id) {
+        sendQuoteNotification(quote.user_id, `Your quote "${quote.name || 'Quote'}" has been priced and is ready for your review`, quote.id);
+      }
+      toast({ title: 'Quote Sent', description: 'Quote has been sent to the customer for review.' });
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      toast({ title: 'Error', description: 'Failed to send quote to customer', variant: 'destructive' });
+    } finally {
+      setSendingQuote(false);
     }
   };
 
@@ -522,92 +568,35 @@ export const QuoteDetailPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-3">
-            {/* HTML Preview + client-side PDF (always available) */}
+            {/* Quote Status Badge */}
+            <QuoteStatusBadge status={quote.status} />
+
+            {quote.quote_number && (
+              <Badge variant="outline" className="font-mono">{quote.quote_number}</Badge>
+            )}
+
+            {/* Preview + Download PDF (client-side) */}
             <QuoteDownloadButtons
               quoteId={quote.id}
               quoteNumber={quote.quote_number}
               data={docData}
-              headerMode
             />
 
-            {/* PDF Actions */}
-            {quote.pdf_storage_path && quote.pdf_generation_status === 'completed' && (
-              <>
-                {quote.quote_number && (
-                  <Badge variant="outline" className="font-mono">{quote.quote_number}</Badge>
+            {/* Send Quote to Customer — only when submitted/draft and all items priced */}
+            {(quote.status === 'submitted' || quote.status === 'draft') && allItemsHavePrices && (
+              <Button
+                size="sm"
+                onClick={handleSendQuote}
+                disabled={sendingQuote}
+                className="rounded-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {sendingQuote ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sending...</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-1" /> Send Quote</>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadPDF}
-                  disabled={downloadingPDF}
-                >
-                  {downloadingPDF ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-1" />
-                  )}
-                  Download PDF
-                </Button>
-              </>
+              </Button>
             )}
-            <Button
-              size="sm"
-              onClick={handleGeneratePDF}
-              disabled={generatingPDF || !allItemsHavePrices}
-              title={!allItemsHavePrices ? 'Set prices for all items first' : undefined}
-            >
-              {generatingPDF ? (
-                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...</>
-              ) : quote.pdf_storage_path ? (
-                <><RefreshCw className="h-4 w-4 mr-1" /> Regenerate PDF</>
-              ) : (
-                <><FileText className="h-4 w-4 mr-1" /> Generate PDF</>
-              )}
-            </Button>
-
-            {/* Quote Status Badge */}
-            <QuoteStatusBadge status={quote.status} />
-
-            {/* Status Tag Selector */}
-            <Select
-              value={quote.status_tag_id || ''}
-              onValueChange={handleStatusTagChange}
-              disabled={updatingStatus}
-            >
-              <SelectTrigger className="w-48 h-9 bg-white border-2 relative">
-                {updatingStatus && (
-                  <Loader2 className="h-4 w-4 animate-spin absolute left-3" />
-                )}
-                <SelectValue placeholder="Assign Status Tag">
-                  {selectedTag && (
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: selectedTag.color }}
-                      />
-                      <span className="truncate">{selectedTag.name}</span>
-                    </div>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground">No tag</span>
-                </SelectItem>
-                {statusTags.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      <span>{tag.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -787,11 +776,11 @@ export const QuoteDetailPage: React.FC = () => {
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
               onAddProducts={() => setIsAddProductsOpen(true)}
-              onUpdateQuantity={quote.status === 'draft' ? async (itemId, quantity) => {
+              onUpdateQuantity={['draft', 'submitted'].includes(quote.status) ? async (itemId, quantity) => {
                 await quotesService.updateItem(itemId, { quantity });
                 await loadQuoteDetails();
               } : undefined}
-              onUpdateItem={quote.status === 'draft' ? async (itemId, data) => {
+              onUpdateItem={['draft', 'submitted'].includes(quote.status) ? async (itemId, data) => {
                 await quotesService.updateItem(itemId, data);
                 await loadQuoteDetails();
               } : undefined}
@@ -800,7 +789,8 @@ export const QuoteDetailPage: React.FC = () => {
                 await loadQuoteDetails();
               }}
               editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
-              editPricing={quote.status === 'draft'}
+              editPricing={false}
+              editUnits={['draft', 'submitted'].includes(quote.status)}
             />
           </TabsContent>
 
@@ -824,26 +814,38 @@ export const QuoteDetailPage: React.FC = () => {
                         <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                           <tr>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3">Product</th>
-                            <th className="text-left text-xs font-medium text-muted-foreground p-3 w-20">Qty</th>
+                            <th className="text-center text-xs font-medium text-muted-foreground p-3 w-16">Qty</th>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-32">Unit Price</th>
+                            <th className="text-left text-xs font-medium text-muted-foreground p-3 w-24">Discount</th>
+                            <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Final Price</th>
                             <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Line Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(quote.items || []).map((item, idx) => {
+                            const unitPrice = parseFloat(itemPrices[item.id] || '0');
+                            const discountPct = parseFloat(itemDiscounts[item.id] || '0');
+                            const effectivePrice = getItemEffectivePrice(item.id);
                             const lineTotal = getItemLineTotal(item.id, item.quantity);
+                            const hasDiscount = discountPct > 0 && unitPrice > 0;
+                            const productName = !item.product_id
+                              ? (item.custom_product_name || 'Custom Item')
+                              : (item.product?.name || 'Unknown');
+
                             return (
                               <tr key={item.id} className={idx % 2 === 1 ? 'bg-muted/20' : ''}>
                                 <td className="p-3">
-                                  <div className="font-medium text-sm">{item.product?.name || 'Unknown'}</div>
-                                  {item.selected_size && (
-                                    <span className="text-xs text-muted-foreground">{item.selected_size}</span>
-                                  )}
-                                  {item.selected_color && (
-                                    <span className="text-xs text-muted-foreground ml-2">{item.selected_color}</span>
-                                  )}
+                                  <div className="font-medium text-sm">{productName}</div>
+                                  <div className="flex gap-2 mt-0.5">
+                                    {item.selected_size && (
+                                      <span className="text-xs text-muted-foreground">{item.selected_size}</span>
+                                    )}
+                                    {item.selected_color && (
+                                      <span className="text-xs text-muted-foreground">{item.selected_color}</span>
+                                    )}
+                                  </div>
                                 </td>
-                                <td className="p-3 text-sm">{item.quantity}</td>
+                                <td className="p-3 text-sm text-center">{item.quantity}</td>
                                 <td className="p-3">
                                   <div className="relative">
                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
@@ -857,6 +859,33 @@ export const QuoteDetailPage: React.FC = () => {
                                       onChange={(e) => setItemPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
                                     />
                                   </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      max="100"
+                                      placeholder="0"
+                                      className="h-8 w-20 pr-6 text-right"
+                                      value={itemDiscounts[item.id] || ''}
+                                      onChange={(e) => setItemDiscounts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right text-sm">
+                                  {hasDiscount ? (
+                                    <div>
+                                      <span className="text-xs text-muted-foreground line-through">€{unitPrice.toFixed(2)}</span>
+                                      <div className="font-semibold text-primary">€{effectivePrice.toFixed(2)}</div>
+                                    </div>
+                                  ) : unitPrice > 0 ? (
+                                    <span className="font-medium">€{unitPrice.toFixed(2)}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </td>
                                 <td className="p-3 text-right text-sm font-semibold">
                                   €{lineTotal.toFixed(2)}
@@ -1075,34 +1104,83 @@ export const QuoteDetailPage: React.FC = () => {
 
           {/* Timeline Tab */}
           <TabsContent value="timeline" className="space-y-5 mt-5">
+            {/* Expected Deliveries Summary */}
+            {(quote.items || []).some((item: any) => item.delivery_date) && (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-primary mb-4">
+                  <Truck className="h-4 w-4" /> Expected Deliveries
+                </h3>
+                <div className="space-y-2">
+                  {(quote.items || []).filter((item: any) => item.delivery_date).map((item: any) => {
+                    const name = !item.product_id
+                      ? (item.custom_product_name || 'Custom Item')
+                      : (item.product?.name || 'Product');
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{name}</span>
+                          {item.room && <Badge variant="secondary" className="text-[10px]">{item.room}</Badge>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">{new Date(item.delivery_date).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Add Timeline Step Dropdown Section */}
             <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
               <div className="mb-5">
                 <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                  <ListChecks className="h-4 w-4" /> Add Timeline Step
+                  <ListChecks className="h-4 w-4" /> Add Timeline Entry
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Select a timeline step from the dropdown and optionally add a note</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Add a step to the timeline, optionally linked to a specific product</p>
               </div>
               <div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   {/* Timeline Step Dropdown */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Select Step</label>
+                    <label className="text-sm font-medium mb-2 block">Step</label>
                     <Select value={selectedTimelineStepId} onValueChange={setSelectedTimelineStepId}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Choose a timeline step..." />
+                        <SelectValue placeholder="Choose step..." />
                       </SelectTrigger>
                       <SelectContent>
                         {timelineSteps
-                          .filter(s => !quoteTimeline.some(qt => qt.timeline_step_id === s.id))
                           .sort((a, b) => a.display_order - b.display_order)
                           .map((step) => (
                             <SelectItem key={step.id} value={step.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{step.name}</span>
-                              </div>
+                              {step.name}
                             </SelectItem>
                           ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Product (optional) */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Product (optional)</label>
+                    <Select value={selectedTimelineItemId} onValueChange={setSelectedTimelineItemId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="All products" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">All products</SelectItem>
+                        {(quote.items || []).map((item: any) => {
+                          const name = !item.product_id
+                            ? (item.custom_product_name || 'Custom Item')
+                            : (item.product?.name || 'Product');
+                          return (
+                            <SelectItem key={item.id} value={item.id}>
+                              {name}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1132,7 +1210,7 @@ export const QuoteDetailPage: React.FC = () => {
                   ) : (
                     <Plus className="h-4 w-4 mr-2" />
                   )}
-                  Add Step to Timeline
+                  Add to Timeline
                 </Button>
 
                 {quoteTimeline.length === 0 && quote.status === 'accepted' && (
@@ -1222,7 +1300,15 @@ export const QuoteDetailPage: React.FC = () => {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-medium">{step.name}</h4>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">{step.name}</h4>
+                                {item.quote_item && (
+                                  <Badge variant="outline" className="text-[10px] font-normal">
+                                    <Package className="h-2.5 w-2.5 mr-1" />
+                                    {item.quote_item.product?.name || item.quote_item.custom_product_name || 'Product'}
+                                  </Badge>
+                                )}
+                              </div>
                               <Badge className={`border ${getStatusBadgeColor(item.status)}`}>
                                 {item.status.replace('_', ' ')}
                               </Badge>
