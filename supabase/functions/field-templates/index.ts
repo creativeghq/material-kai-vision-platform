@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 /**
  * Field Templates API
@@ -9,7 +10,7 @@ import { authenticate, isAdminAccess } from '../_shared/auth.ts';
  * - Secret key (apikey header): Full admin access
  * - User JWT (Authorization header): User-specific operations
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('field-templates', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -120,5 +121,5 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
 

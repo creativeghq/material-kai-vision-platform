@@ -604,6 +604,7 @@ export const createVirtualStagingTool = (
           type: 'virtual_staging_ready',
           job_id: result.job_id,
           image_url: result.image_url,
+          source_image_url: resolvedImageUrl,
           room: result.room,
           furniture_style: result.furniture_style,
           credits_used: result.credits_used,

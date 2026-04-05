@@ -12,6 +12,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface SendEmailRequest {
   to: string | string[];
@@ -62,7 +63,7 @@ async function sendViaResend(payload: {
   return data.id as string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('email-api', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -460,4 +461,4 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));

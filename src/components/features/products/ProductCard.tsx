@@ -4,14 +4,18 @@
  * Global component - can be used in agents, search, quotes, etc.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Sun, Smartphone } from 'lucide-react';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { Product } from './types';
+import { trackProductView } from '@/services/manufacturerAnalyticsService';
+
+const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').then(m => ({ default: m.LightingPreviewModal })).catch(() => ({ default: () => null })));
+const ARPreviewModal = lazy(() => import('@/components/features/ar/ARPreviewModal').then(m => ({ default: m.ARPreviewModal })).catch(() => ({ default: () => null })));
 
 interface ProductCardProps {
   product: Product;
@@ -26,6 +30,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   categoryColor = '#3b82f6',
   showActions = true,
 }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const trackedRef = useRef(false);
+  const [showLighting, setShowLighting] = useState(false);
+  const [showAR, setShowAR] = useState(false);
+
+  // Track product view when card becomes visible (IntersectionObserver)
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !trackedRef.current) {
+          trackedRef.current = true;
+          const mfg = product.metadata?.factory_name || product.metadata?.manufacturer || product.metadata?.brand || '';
+          trackProductView(product.id, String(mfg), window.location.pathname);
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [product.id]);
+
   const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0];
   const stockStatusColor =
     product.stock.status === 'High'
@@ -35,7 +62,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         : 'bg-red-100 text-red-800 border-red-300';
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-shadow duration-200 bg-white border border-gray-200">
+    <Card ref={cardRef} className="overflow-hidden hover:shadow-xl transition-shadow duration-200 bg-white border border-gray-200">
       {/* Product Image */}
       <div className="relative h-48 bg-gray-100">
         {primaryImage && (
@@ -152,6 +179,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               />
             </div>
 
+            {/* Lighting + AR row */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={(e) => { e.stopPropagation(); setShowLighting(true); }}
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1"
+                title="Preview material under different lighting"
+              >
+                <Sun className="h-3.5 w-3.5" />
+                Lighting
+              </Button>
+              <Button
+                onClick={(e) => { e.stopPropagation(); setShowAR(true); }}
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1"
+                title="View material in AR"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+                AR View
+              </Button>
+            </div>
+
             {/* View Details Button */}
             <Button
               onClick={() => onViewDetails(product)}
@@ -164,6 +215,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </Button>
           </div>
         )}
+
+        {/* Lighting Preview Modal (lazy-loaded) */}
+        <Suspense fallback={null}>
+          {showLighting && (
+            <LightingPreviewModal
+              isOpen={showLighting}
+              onClose={() => setShowLighting(false)}
+              productImage={primaryImage?.url || ''}
+              productName={product.name}
+              productCategory={product.category}
+              pbrMaps={product.metadata?.pbr_maps}
+            />
+          )}
+          {showAR && (
+            <ARPreviewModal
+              isOpen={showAR}
+              onClose={() => setShowAR(false)}
+              productId={product.id}
+              productName={product.name}
+              productImage={primaryImage?.url || ''}
+              pbrMaps={product.metadata?.pbr_maps}
+            />
+          )}
+        </Suspense>
       </CardContent>
     </Card>
   );

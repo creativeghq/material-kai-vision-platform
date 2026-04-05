@@ -191,9 +191,10 @@ The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, mul
 Model: Claude Sonnet 4.5 | LangGraph + Supabase checkpointer (conversations resume across sessions)
 
 Tools available to all authenticated users:
-- `material_search` — 7-vector fusion search across the catalog
+- `material_search` — 7-vector fusion search across the catalog, with **Explainable Search Spec** (structured interpretation of query across color/material/style/texture/specification dimensions, displayed as a collapsible card above results)
 - `knowledge_base_search` — RAG over the workspace knowledge base
 - `visual_search` — automatic image-to-material matching when images are attached
+- `analyze_inspiration_url` — **Design Inspiration URL Finder**: scrape any design URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites) → extract design tokens (colors, materials, textures, styles) → search catalog for matching products. Accessible via a Globe icon button in the chat toolbar that opens a dedicated modal.
 
 Tools gated to Admin/Owner only:
 - `b2b_manufacturer_search` — live web search via Anthropic's built-in `web_search_20250305` tool. CEE queries include native-language terms (Polish, Czech, Slovak, etc.)
@@ -213,6 +214,7 @@ Model: Claude Sonnet 4.5 | Focused on spatial design and visualization
 - Matches generated designs back to real catalog materials using 7-vector search
 - Estimates project costs based on matched materials and dimensions
 - Generates explorable 3D VR worlds from any design image — see Feature 5
+- `analyze_inspiration_url` — paste a design URL to extract materials, colors, and styles and find matching catalog products
 
 **Demo Agent**
 Model: Claude Haiku 4.5 | Platform showcases and sales demonstrations. Admin-only.
@@ -243,9 +245,11 @@ The Interior Designer agent generates photorealistic interior design images and 
 
 The Gemini system uses a two-step style-transfer pipeline — an inspiration image is analyzed by Gemini Vision into a structured design specification, which is then used to edit the target room. This prevents spatial "bleed" (the inspiration image never directly influences the generated geometry) and produces far more accurate style transfers than naive image-to-image approaches.
 
-**C. Virtual Staging**
+**C. Virtual Staging (with Before/After QA)**
 
 Empty room photos → furnished renders via Replicate `proplabs/virtual-staging` (~56 seconds). 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a KAI agent tool.
+
+Virtual staging results now include a **before/after comparison viewer** (`VirtualStagingViewer` component) with an interactive slider that lets users drag between the original empty room and the staged result. An "Analyze Quality" button triggers a Claude Vision assessment of the staging quality — evaluating lighting consistency, perspective accuracy, furniture scale, material realism, and edge blending — each scored 1–10.
 
 **D. Region Editing (Masked Inpainting)**
 

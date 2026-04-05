@@ -52,6 +52,11 @@ export interface QuoteItem {
   unit_price?: number;
   discounted_price?: number;
   line_total?: number;
+  // FF&E fields
+  room?: string;
+  dimensions?: string;
+  installation_requirements?: string;
+  delivery_date?: string;
 }
 
 export interface QuoteWithItems extends Quote {
@@ -415,6 +420,10 @@ export class QuotesService {
     added_from?: QuoteItem['added_from'];
     selected_size?: string;
     selected_color?: string;
+    room?: string;
+    dimensions?: string;
+    installation_requirements?: string;
+    delivery_date?: string;
   }): Promise<QuoteItem> {
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -426,6 +435,10 @@ export class QuotesService {
         added_from: data.added_from || 'manual',
         selected_size: data.selected_size,
         selected_color: data.selected_color,
+        room: data.room || null,
+        dimensions: data.dimensions || null,
+        installation_requirements: data.installation_requirements || null,
+        delivery_date: data.delivery_date || null,
       })
       .select()
       .single();
@@ -456,6 +469,10 @@ export class QuotesService {
     selected_size?: string;
     selected_color?: string;
     notes?: string;
+    room?: string;
+    dimensions?: string;
+    installation_requirements?: string;
+    delivery_date?: string;
   }): Promise<QuoteItem> {
     const qty = data.quantity || 1;
     const unitPrice = data.unit_price ?? null;
@@ -475,6 +492,10 @@ export class QuotesService {
         selected_color: data.selected_color || null,
         notes: data.notes || null,
         added_from: 'manual',
+        room: data.room || null,
+        dimensions: data.dimensions || null,
+        installation_requirements: data.installation_requirements || null,
+        delivery_date: data.delivery_date || null,
       })
       .select()
       .single();
@@ -496,6 +517,10 @@ export class QuotesService {
       unit_price?: number | null;
       discounted_price?: number | null;
       custom_unit?: string;
+      room?: string;
+      dimensions?: string;
+      installation_requirements?: string;
+      delivery_date?: string | null;
     },
   ): Promise<QuoteItem> {
     // Recalculate line_total when pricing or quantity changes

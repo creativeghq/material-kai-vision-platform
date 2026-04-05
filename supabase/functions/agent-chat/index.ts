@@ -42,7 +42,7 @@ import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts'
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Tool factory imports — extracted from this file for maintainability
-import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool } from '../_shared/tools/search-tools.ts';
+import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool, createInspirationUrlTool } from '../_shared/tools/search-tools.ts';
 import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } from '../_shared/tools/generation-tools.ts';
 import { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } from '../_shared/tools/ops-tools.ts';
 import { createQueryDatabaseTool } from '../_shared/tools/database-tools.ts';
@@ -50,6 +50,7 @@ import { createResearchAnalysisTool, createAnalyticsAnalysisTool, createBusiness
 import { createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } from '../_shared/tools/b2b-tools.ts';
 import { createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } from '../_shared/tools/seo-tools.ts';
 import { createDispatchBackgroundTaskTool } from '../_shared/tools/background-tools.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
@@ -641,7 +642,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       // Core tools (all users)
-      'knowledge_base_search', 'material_search', 'visual_search',
+      'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -668,7 +669,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'generate_3d'],
+    tools: ['material_search', 'generate_3d', 'analyze_inspiration_url'],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
@@ -842,7 +843,7 @@ async function executeAgent(
     tools.push(createKnowledgeBaseSearchTool(workspaceId));
   }
 
-  // Material search (text-based 7-vector fusion)
+  // Material search (text-based 7-vector fusion) — now with search_spec support
   if (config.tools.includes('material_search')) {
     // For Interior Designer: Only add tool when user is looking for catalog materials
     // (prevents agent from triggering material search during generation conversations)
@@ -863,14 +864,19 @@ async function executeAgent(
         materialSearchKeywords.some(keyword => userInputLower.includes(keyword)) ||
         materialSearchRegex.test(userInputLower);
       if (shouldEnableMaterialSearch) {
-        tools.push(createSearchTool(workspaceId));
+        tools.push(createSearchTool(workspaceId, onChunk));
       } else {
         console.log('⏭️ Material search disabled for Interior Designer (user did not ask for catalog materials)');
       }
     } else {
       // For KAI and other agents: Always available (LLM decides when to use)
-      tools.push(createSearchTool(workspaceId));
+      tools.push(createSearchTool(workspaceId, onChunk));
     }
+  }
+
+  // Inspiration URL analysis (all users) — scrape a design URL and find matching materials
+  if (config.tools.includes('analyze_inspiration_url')) {
+    tools.push(createInspirationUrlTool(userId, workspaceId, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
@@ -1319,7 +1325,7 @@ async function logAgentUsage(
 /**
  * Main handler
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('agent-chat', async (req) => {
   // Handle CORS preflight - must return 200/204 with proper headers
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -1641,5 +1647,5 @@ Deno.serve(async (req) => {
       },
     );
   }
-});
+}));
 

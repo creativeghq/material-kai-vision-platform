@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AddToMoodboardModal } from './AddToMoodboardModal';
 import { RecommendationsService } from '@/services/recommendationsService';
+import { trackProductSave } from '@/services/manufacturerAnalyticsService';
 
 interface AddToMoodboardButtonProps {
   productId: string;
@@ -38,6 +39,8 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
   };
 
   const handleSuccess = (moodboardName: string) => {
+    // Track as product save for manufacturer analytics
+    trackProductSave(productId, '', window.location.pathname);
     // Track as click interaction (strong engagement signal)
     RecommendationsService.trackClick(productId, {
       source: 'moodboard_button',

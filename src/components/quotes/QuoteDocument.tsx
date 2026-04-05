@@ -155,11 +155,12 @@ const IntroPage: React.FC<{ bgUrl: string | null }> = ({ bgUrl }) => (
 
 const COL_WIDTHS = {
   num: '4%',
-  product: '36%',
+  product: '28%',
+  room: '10%',
   qty: '8%',
   unitPrice: '16%',
   discPrice: '16%',
-  total: '18%',
+  total: '16%',
 };
 
 const ItemsPage: React.FC<{
@@ -197,6 +198,7 @@ const ItemsPage: React.FC<{
           <colgroup>
             <col style={{ width: COL_WIDTHS.num }} />
             <col style={{ width: COL_WIDTHS.product }} />
+            <col style={{ width: COL_WIDTHS.room }} />
             <col style={{ width: COL_WIDTHS.qty }} />
             <col style={{ width: COL_WIDTHS.unitPrice }} />
             <col style={{ width: COL_WIDTHS.discPrice }} />
@@ -205,7 +207,7 @@ const ItemsPage: React.FC<{
 
           <thead>
             <tr style={{ backgroundColor: C.tableHeader }}>
-              {['#', 'Product', 'Qty', 'Unit Price', 'Disc. Price', 'Total'].map((h, i) => (
+              {['#', 'Product', 'Room', 'Qty', 'Unit Price', 'Disc. Price', 'Total'].map((h, i) => (
                 <th
                   key={h}
                   style={{
@@ -213,7 +215,7 @@ const ItemsPage: React.FC<{
                     fontSize: 65,
                     fontWeight: 700,
                     color: C.white,
-                    textAlign: i >= 2 ? 'right' : 'left' as React.CSSProperties['textAlign'],
+                    textAlign: i >= 3 ? 'right' : 'left' as React.CSSProperties['textAlign'],
                     letterSpacing: 4,
                     textTransform: 'uppercase',
                   }}
@@ -233,10 +235,15 @@ const ItemsPage: React.FC<{
                   <td style={{ padding: '35px 60px', fontSize: 56, color: C.gray, verticalAlign: 'top' }}>
                     {rowNum}
                   </td>
-                  {/* Product + description */}
+                  {/* Product + description + dimensions */}
                   <td style={{ padding: '35px 60px', verticalAlign: 'top' }}>
                     <div style={{ fontSize: 65, fontWeight: 700, color: C.black, lineHeight: 1.3 }}>
                       {item.product_name}
+                      {item.dimensions && (
+                        <span style={{ fontSize: 47, fontWeight: 400, color: C.gray, marginLeft: 30 }}>
+                          {item.dimensions}
+                        </span>
+                      )}
                       {item.sku && (
                         <span style={{ fontSize: 47, fontWeight: 400, color: C.gray, marginLeft: 40 }}>
                           SKU: {item.sku}
@@ -255,6 +262,10 @@ const ItemsPage: React.FC<{
                         {[item.selected_size, item.selected_color].filter(Boolean).join(' · ')}
                       </div>
                     )}
+                  </td>
+                  {/* Room */}
+                  <td style={{ padding: '35px 60px', fontSize: 56, color: C.black, verticalAlign: 'top' }}>
+                    {item.room || '—'}
                   </td>
                   {/* Qty */}
                   <td style={{ padding: '35px 60px', fontSize: 65, color: C.black, textAlign: 'right', verticalAlign: 'top' }}>
@@ -294,6 +305,47 @@ const ItemsPage: React.FC<{
             </div>
           </div>
         )}
+
+        {/* Specifications & Delivery — only on last items page, only if any FF&E data */}
+        {showTotals && (() => {
+          const ffeItems = data.items.filter(
+            it => it.installation_requirements || it.delivery_date
+          );
+          if (ffeItems.length === 0) return null;
+          return (
+            <div style={{
+              marginTop: 60,
+              paddingTop: 40,
+              borderTop: '4px solid rgba(0,0,0,0.10)',
+            }}>
+              <div style={{ fontSize: 56, fontWeight: 700, color: C.black, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 30 }}>
+                Specifications & Delivery
+              </div>
+              {ffeItems.map(item => (
+                <div key={item.id} style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 52, fontWeight: 700, color: C.black }}>
+                    {item.product_name}
+                    {item.dimensions && (
+                      <span style={{ fontWeight: 400, color: C.gray, marginLeft: 20 }}>{item.dimensions}</span>
+                    )}
+                  </div>
+                  {item.installation_requirements && (
+                    <div style={{ fontSize: 47, color: C.gray, marginTop: 8 }}>
+                      <span style={{ fontWeight: 700, color: C.black }}>Installation: </span>
+                      {item.installation_requirements}
+                    </div>
+                  )}
+                  {item.delivery_date && (
+                    <div style={{ fontSize: 47, color: C.gray, marginTop: 6 }}>
+                      <span style={{ fontWeight: 700, color: C.black }}>Delivery: </span>
+                      {fmtDate(item.delivery_date)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </BgPage>
   );

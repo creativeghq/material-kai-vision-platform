@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getMivaaActionCost } from '../_shared/mivaa-pricing.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Environment variables
 // Try to use local API first (for server environment), fall back to external domain
@@ -369,7 +370,7 @@ async function handleJobStatus(jobId: string): Promise<Response> {
   }
 }
 
-serve(async (req) => {
+serve(withApiLogging('mivaa-gateway', async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -672,4 +673,4 @@ serve(async (req) => {
       },
     );
   }
-});
+}));

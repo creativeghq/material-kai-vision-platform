@@ -34,12 +34,15 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
+import { AdminStatCard } from './AdminStatCard';
 
 // Types for our data structures
 type SystemMetrics = {
   processedDocuments: number;
   knowledgeEntries: number;
   activeSessions: number;
+  totalChats: number;
+  interiorChats: number;
 };
 
 // Static — no runtime dependencies, defined outside component to avoid recreation on every render
@@ -226,6 +229,8 @@ const AdminDashboard: React.FC = () => {
     processedDocuments: 0,
     knowledgeEntries: 0,
     activeSessions: 0,
+    totalChats: 0,
+    interiorChats: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -248,10 +253,21 @@ const AdminDashboard: React.FC = () => {
         .from('search_analytics')
         .select('*', { count: 'exact', head: true });
 
+      const { count: totalChats } = await supabase
+        .from('agent_chat_conversations')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: interiorChats } = await supabase
+        .from('agent_chat_conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('agent_id', 'interior-designer');
+
       setSystemMetrics({
         processedDocuments: processedDocs || 0,
         knowledgeEntries: knowledgeEntries || 0,
         activeSessions: activeSessions || 0,
+        totalChats: totalChats || 0,
+        interiorChats: interiorChats || 0,
       });
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -370,81 +386,12 @@ const AdminDashboard: React.FC = () => {
       {!loading && (
         <>
       <div className="px-3 sm:px-6 pt-4 sm:pt-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Processed Documents</p>
-                  <p className="text-2xl font-bold">{systemMetrics.processedDocuments.toLocaleString()}</p>
-                </div>
-              </div>
-              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                Processed
-              </Badge>
-            </div>
-          </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <DatabaseIcon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Knowledge Entries</p>
-                  <p className="text-2xl font-bold">{systemMetrics.knowledgeEntries.toLocaleString()}</p>
-                </div>
-              </div>
-              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                Active
-              </Badge>
-            </div>
-          </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Search Queries</p>
-                  <p className="text-2xl font-bold">{systemMetrics.activeSessions.toLocaleString()}</p>
-                </div>
-              </div>
-              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                Total
-              </Badge>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <AdminStatCard title="Processed Documents" value={systemMetrics.processedDocuments.toLocaleString()} icon={FileText} />
+          <AdminStatCard title="Knowledge Entries" value={systemMetrics.knowledgeEntries.toLocaleString()} icon={DatabaseIcon} />
+          <AdminStatCard title="Search Queries" value={systemMetrics.activeSessions.toLocaleString()} icon={BarChart3} />
+          <AdminStatCard title="Total Chats" value={systemMetrics.totalChats.toLocaleString()} icon={MessageSquare} />
+          <AdminStatCard title="Interior Chats" value={systemMetrics.interiorChats.toLocaleString()} icon={Home} />
         </div>
       </div>
 

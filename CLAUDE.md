@@ -71,6 +71,74 @@
 - **Frontend**: `/admin/background-agents` → BackgroundAgentsPage + AgentRunHistoryDrawer + AgentLogsViewer + CreateAgentModal
 - **Service**: `src/services/backgroundAgents.ts`
 
+## FF&E Specification on Quotes
+- **New fields on `quote_items`**: `room`, `dimensions`, `installation_requirements`, `delivery_date`
+- **QuoteItemsList**: Room column, dimensions appended to product name, expandable detail row (notes + installation + delivery)
+- **AddProductsSheet**: FF&E section in custom product form, room field in catalog product selection
+- **PDF generation**: Room column in items table, dimensions in product name, "SPECIFICATIONS & DELIVERY" section at bottom
+- **Service**: `QuotesService.addItem()`, `addCustomItem()`, `updateItem()` all accept FF&E fields
+
+## Manufacturer Analytics (Enhanced)
+- **Tracking service**: `src/services/manufacturerAnalyticsService.ts` — batched fire-and-forget event tracking (flush every 5s or 20 events)
+- **Events**: `product_view`, `product_save`, `product_quote`, `product_search_impression`, `product_search_click`, `product_compare`
+- **DB table**: `manufacturer_analytics_events` with indexes on event_type, product_id, manufacturer_id, user_id, created_at
+- **ProductCard**: IntersectionObserver tracks views when card is 50% visible
+- **AddToQuoteButton/AddToMoodboardButton**: Track quote/save events on success
+- **Factory Analytics Dashboard**: Enhanced with Geographic Demand, Designer Engagement by Profession, Competitive Positioning sections
+- **Tiered access**: `MyFactoryTab` accepts `tier` prop ('free'|'pro'|'enterprise'). Geographic/designer/competitive sections gated behind Pro.
+
+## AR Material Preview (Plan 8)
+- **Components**: `src/components/features/ar/` — ARPreviewModal, ViewInARButton, ARPage, useARSupport
+- **Edge function**: `generate-pbr-maps/index.ts` — generates PBR texture maps (albedo, normal, roughness, metalness) via Replicate API
+- **AR detection**: `useARSupport()` returns 'webxr' | 'quicklook' | 'desktop' | 'none'
+- **Route**: `/ar/:productId` — standalone AR page for QR handoff from desktop
+- **Integration**: ProductCard shows "AR View" button, opens ARPreviewModal (3D material swatch viewer)
+- **Future**: @react-three/xr for full WebXR on Android, @google/model-viewer for iOS USDZ Quick Look
+- **Credits**: 8 credits per PBR map generation, AR viewing is free
+
+## Lighting Simulation (Plan 10)
+- **Layer 1 (AI)**: "Lighting Variants" dropdown on ProgressiveImageGrid — generates same room under 6 lighting presets via Gemini edit
+- **Layer 2 (3D)**: `src/components/features/lighting/` — MaterialLightingViewer, LightingPreviewModal, lightingPresets, useSunPosition
+- **Presets**: Natural Daylight, Golden Hour, Overcast, Showroom Spots, Warm Evening, Night
+- **Controls**: Preset selector, time-of-day slider (6AM-9PM), room orientation (N/E/S/W), surface type (wall/floor/column/curved)
+- **PBR**: Uses MeshPhysicalMaterial with albedo + normal + roughness + metalness maps from SVBRDF or generate-pbr-maps
+- **Integration**: ProductCard shows "Lighting" button, opens LightingPreviewModal
+- **Sun calculation**: Built-in simplified solar position (no suncalc dependency) — altitude peaks at noon, color temp shifts warm↔cool
+
+## Pinterest Integration (Plan 9)
+- **Service**: `src/services/pinterestService.ts` — extractPin, importPin, importPinsBulk, OAuth board browsing
+- **Modal**: `src/components/business/moodboard/PinterestImportModal.tsx` — single URL, bulk URL, and OAuth board browser
+- **Edge functions**: `pinterest-import/index.ts` (oEmbed extraction + import), `pinterest-oauth/index.ts` (OAuth + board/pin API proxy)
+- **Integration**: "Import from Pinterest" button on MoodBoardDetailPage header
+- **Auto-matching**: Imported pin images run through MIVAA visual search to suggest matching catalog products
+- **OAuth tokens**: Stored in `social_accounts` table (platform='pinterest'), auto-refresh on expiry
+- **Phase 1 (no OAuth)**: Paste pin URL → oEmbed extraction → import image → AI match
+- **Phase 2 (OAuth)**: Connect account → browse boards → select pins → bulk import
+- **Env vars**: `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_REDIRECT_URI`
+
+## Design Inspiration URL Finder
+- **Tool**: `analyze_inspiration_url` in `_shared/tools/search-tools.ts` — available to all users (KAI + Interior Designer agents)
+- **Pipeline**: Firecrawl scrape URL → Claude Haiku extracts design tokens (colors, hex codes, materials, textures, styles, room type) → MIVAA 7-vector search for matching products
+- **Frontend modal**: `InspirationUrlModal.tsx` — Globe icon button in chat toolbar, all agents
+- **Frontend card**: `InspirationCard.tsx` — renders extracted palette swatches, material/style tags, hero image, source link
+- **Chunk type**: `inspiration_analysis` emitted via onChunk during tool execution
+- **Credit cost**: 1 credit (Firecrawl scrape) + Haiku token cost
+- **Shared utility**: `_shared/utils/web-scraper.ts` — reusable `scrapeUrl()` extracted from b2b-tools
+
+## Explainable Search Spec
+- **Schema extension**: `material_search` tool now accepts optional `search_spec` object (intent, color_keywords, color_hex, material_types, style_keywords, texture_finish, specifications)
+- **LLM-generated**: The agent fills in the spec as part of its tool call — no extra LLM call needed
+- **Chunk type**: `search_spec` emitted via onChunk, stored as `pendingSearchSpec`, attached to assistant message
+- **Frontend card**: `SearchSpecCard.tsx` — collapsible panel above product results showing color swatches, material/style tags, spec details
+- **Persistence**: Saved to `searchSpec` field in message metadata, restored on conversation reload
+
+## Virtual Staging Before/After QA
+- **Component**: `VirtualStagingViewer.tsx` — replaces old static image display for virtual staging results
+- **Before/After slider**: CSS clip-path based, pointer-drag interaction, no external dependency
+- **Source image**: `source_image_url` now included in `virtualStagingData` (from both edge function chunk and frontend direct call)
+- **Quality analysis**: "Analyze Quality" button sends both images to KAI for Claude Vision assessment (lighting, perspective, scale, materials, edge blending — scored 1-10)
+- **Toggle**: "Before / After" button shows/hides the comparison slider
+
 ## Design System Summary
 Full reference: `.claude/design-system.md`
 - **Primary**: `#3E192A` deep plum (`--primary: 330 43% 17%`). **Accent**: warm peach (`--accent: 22 100% 93%`). **Background**: warm beige (`--background: 40 25% 96%`).

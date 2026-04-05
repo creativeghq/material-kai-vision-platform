@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -23,8 +23,8 @@ interface QuoteItemsListProps {
   onAddProducts?: () => void;
   /** Quantity update (customer + admin) */
   onUpdateQuantity?: (itemId: string, quantity: number) => Promise<void>;
-  /** Pricing + unit update (admin only) */
-  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string }) => Promise<void>;
+  /** Pricing + unit + FF&E update (admin only) */
+  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null }) => Promise<void>;
   onRemoveItem?: (itemId: string) => Promise<void>;
   /** When true admin pricing fields (price, discounted, unit) are editable */
   editPricing?: boolean;
@@ -127,6 +127,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
@@ -160,6 +161,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const handleUnitSave = async (itemId: string, unit: string) => {
     if (!onUpdateItem) return;
     await onUpdateItem(itemId, { custom_unit: unit });
+  };
+
+  const handleFFESave = async (itemId: string, field: 'room' | 'dimensions' | 'installation_requirements' | 'delivery_date', value: string | null) => {
+    if (!onUpdateItem) return;
+    await onUpdateItem(itemId, { [field]: value || undefined });
   };
 
   const handleRemoveItem = async (e: React.MouseEvent, itemId: string) => {
@@ -202,7 +208,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
             <table className="w-full">
               <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                 <tr>
-                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 min-w-[180px]">Product</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 min-w-[220px]">Product</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 w-28">Room</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 w-20">Unit</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-28">Price</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 w-32">
@@ -221,6 +228,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const isRemoving = removingItemId === item.id;
                   const isSavingPrice = savingPriceId === item.id;
                   const isCustom = !item.product_id;
+                  const isExpanded = expandedItemId === item.id;
 
                   const unit = isCustom
                     ? (item.custom_unit || 'pcs')
@@ -235,43 +243,47 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const hasDiscount = (item as any).discounted_price != null &&
                     (item as any).discounted_price !== item.unit_price;
 
+                  const productName = isCustom ? (item.custom_product_name || 'Custom Item') : (item.product?.name || 'Unknown Product');
+                  const displayName = item.dimensions ? `${productName}, ${item.dimensions}` : productName;
+
+                  const hasDetails = item.notes || item.installation_requirements || item.delivery_date;
+
                   return (
-                    <tr
-                      key={item.id}
-                      className={`hover:bg-muted/20 transition-colors group ${isCustom || editPricing ? 'cursor-default' : 'cursor-pointer'}`}
-                      onClick={() => !isCustom && !editPricing && item.product && handleViewProduct(item.product)}
-                    >
-                      {/* Product */}
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-                            {isCustom ? (
-                              <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                                <PenLine className="h-4 w-4 text-primary/60" />
-                              </div>
-                            ) : item.product?.image_url ? (
-                              <img src={item.product.image_url} alt={item.product.name || 'Product'} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="h-4 w-4 text-muted-foreground/50" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className={`text-sm font-medium leading-tight truncate max-w-[160px] ${!isCustom && !editPricing ? 'group-hover:text-primary transition-colors' : ''}`}>
-                                {isCustom ? (item.custom_product_name || 'Custom Item') : (item.product?.name || 'Unknown Product')}
-                              </p>
-                              {isCustom && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary/70 flex-shrink-0">Custom</Badge>
+                    <React.Fragment key={item.id}>
+                      <tr
+                        className={`hover:bg-muted/20 transition-colors group ${isCustom || editPricing ? 'cursor-default' : 'cursor-pointer'}`}
+                        onClick={() => !isCustom && !editPricing && item.product && handleViewProduct(item.product)}
+                      >
+                        {/* Product + Dimensions */}
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                              {isCustom ? (
+                                <div className="w-full h-full flex items-center justify-center bg-primary/10">
+                                  <PenLine className="h-4 w-4 text-primary/60" />
+                                </div>
+                              ) : item.product?.image_url ? (
+                                <img src={item.product.image_url} alt={item.product.name || 'Product'} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="h-4 w-4 text-muted-foreground/50" />
+                                </div>
                               )}
                             </div>
-                            {(isCustom ? item.custom_sku : item.product?.sku) && (
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                SKU: {isCustom ? item.custom_sku : item.product?.sku}
-                              </p>
-                            )}
-                            {(item.selected_size || selectedSize || item.selected_color) && (
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className={`text-sm font-medium leading-tight truncate max-w-[200px] ${!isCustom && !editPricing ? 'group-hover:text-primary transition-colors' : ''}`}>
+                                  {displayName}
+                                </p>
+                                {isCustom && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary/70 flex-shrink-0">Custom</Badge>
+                                )}
+                              </div>
+                              {(isCustom ? item.custom_sku : item.product?.sku) && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  SKU: {isCustom ? item.custom_sku : item.product?.sku}
+                                </p>
+                              )}
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(item.selected_size || selectedSize) && (
                                   <Badge variant="secondary" className="text-[10px] rounded-full gap-1 font-normal px-1.5 py-0">
@@ -284,122 +296,224 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                     {item.selected_color}
                                   </Badge>
                                 )}
+                                {hasDetails && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setExpandedItemId(isExpanded ? null : item.id); }}
+                                    className="inline-flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary transition-colors"
+                                  >
+                                    {isExpanded ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
+                                    Details
+                                  </button>
+                                )}
                               </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Room */}
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          {editPricing ? (
+                            <FFETextCell
+                              value={item.room || ''}
+                              placeholder="Room"
+                              onSave={v => handleFFESave(item.id, 'room', v)}
+                              icon={<Home className="h-3 w-3 text-muted-foreground" />}
+                            />
+                          ) : item.room ? (
+                            <span className="text-xs text-foreground flex items-center gap-1">
+                              <Home className="h-3 w-3 text-muted-foreground" />
+                              {item.room}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        {/* Unit */}
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          {editPricing && isCustom ? (
+                            <UnitCell
+                              value={unit}
+                              onSave={(v) => handleUnitSave(item.id, v)}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{unit}</span>
+                          )}
+                        </td>
+
+                        {/* Price */}
+                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                          {isSavingPrice ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
+                          ) : (
+                            <PriceCell
+                              value={item.unit_price}
+                              editable={editPricing}
+                              onSave={v => handlePriceSave(item.id, 'unit_price', v)}
+                            />
+                          )}
+                        </td>
+
+                        {/* Discounted Price */}
+                        <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                          {isSavingPrice ? (
+                            <span />
+                          ) : (
+                            <PriceCell
+                              value={(item as any).discounted_price}
+                              editable={editPricing}
+                              placeholder="—"
+                              onSave={v => handlePriceSave(item.id, 'discounted_price', v)}
+                              highlight={hasDiscount}
+                            />
+                          )}
+                        </td>
+
+                        {/* Quantity */}
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          {onUpdateQuantity ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="outline" size="icon" className="h-6 w-6 rounded-full"
+                                disabled={isUpdating || item.quantity <= 1}
+                                onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity - 1); }}
+                              >
+                                {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
+                              </Button>
+                              <Input
+                                type="number" min={1} value={item.quantity}
+                                onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
+                                className="w-12 h-6 text-center text-xs px-1"
+                                disabled={isUpdating}
+                              />
+                              <Button
+                                variant="outline" size="icon" className="h-6 w-6 rounded-full"
+                                disabled={isUpdating}
+                                onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity + 1); }}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-center">
+                              <Badge variant="secondary" className="rounded-full text-xs font-normal px-3">{item.quantity}</Badge>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Total */}
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-semibold">
+                            {fmtPrice(displayTotal)}
+                          </span>
+                          {hasDiscount && item.unit_price != null && (
+                            <div className="text-xs text-muted-foreground line-through">
+                              {fmtPrice(Number(item.unit_price) * item.quantity)}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            {(hasDetails || editPricing) && (
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={e => { e.stopPropagation(); setExpandedItemId(isExpanded ? null : item.id); }}
+                                title="Toggle details"
+                              >
+                                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
+                            {!isCustom && !editPricing && (
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={e => { e.stopPropagation(); item.product && handleViewProduct(item.product); }}
+                                title="View product"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {onRemoveItem && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                disabled={isRemoving || !editable}
+                                onClick={e => editable && handleRemoveItem(e, item.id)}
+                                title="Remove item"
+                              >
+                                {isRemoving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </Button>
                             )}
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      </tr>
 
-                      {/* Unit */}
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        {editPricing && isCustom ? (
-                          <UnitCell
-                            value={unit}
-                            onSave={(v) => handleUnitSave(item.id, v)}
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{unit}</span>
-                        )}
-                      </td>
+                      {/* Expandable Details Row — Notes, Installation, Delivery */}
+                      {isExpanded && (
+                        <tr className="bg-muted/10">
+                          <td colSpan={8} className="px-5 py-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pl-[52px]">
+                              {/* Notes */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                  <Package className="h-3 w-3" /> Notes
+                                </label>
+                                {editPricing ? (
+                                  <textarea
+                                    defaultValue={item.notes || ''}
+                                    placeholder="General notes..."
+                                    rows={2}
+                                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                    onBlur={e => onUpdateItem && onUpdateItem(item.id, { room: item.room })}
+                                  />
+                                ) : (
+                                  <p className="text-xs text-foreground">{item.notes || <span className="text-muted-foreground">—</span>}</p>
+                                )}
+                              </div>
 
-                      {/* Price */}
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        {isSavingPrice ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
-                        ) : (
-                          <PriceCell
-                            value={item.unit_price}
-                            editable={editPricing}
-                            onSave={v => handlePriceSave(item.id, 'unit_price', v)}
-                          />
-                        )}
-                      </td>
+                              {/* Installation Requirements */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                  <Wrench className="h-3 w-3" /> Installation Requirements
+                                </label>
+                                {editPricing ? (
+                                  <FFETextAreaCell
+                                    value={item.installation_requirements || ''}
+                                    placeholder="e.g. Requires electrical outlet, wall mounting brackets..."
+                                    onSave={v => handleFFESave(item.id, 'installation_requirements', v)}
+                                  />
+                                ) : (
+                                  <p className="text-xs text-foreground">{item.installation_requirements || <span className="text-muted-foreground">—</span>}</p>
+                                )}
+                              </div>
 
-                      {/* Discounted Price */}
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        {isSavingPrice ? (
-                          <span />
-                        ) : (
-                          <PriceCell
-                            value={(item as any).discounted_price}
-                            editable={editPricing}
-                            placeholder="—"
-                            onSave={v => handlePriceSave(item.id, 'discounted_price', v)}
-                            highlight={hasDiscount}
-                          />
-                        )}
-                      </td>
-
-                      {/* Quantity */}
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        {onUpdateQuantity ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="outline" size="icon" className="h-6 w-6 rounded-full"
-                              disabled={isUpdating || item.quantity <= 1}
-                              onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity - 1); }}
-                            >
-                              {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
-                            </Button>
-                            <Input
-                              type="number" min={1} value={item.quantity}
-                              onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
-                              className="w-12 h-6 text-center text-xs px-1"
-                              disabled={isUpdating}
-                            />
-                            <Button
-                              variant="outline" size="icon" className="h-6 w-6 rounded-full"
-                              disabled={isUpdating}
-                              onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity + 1); }}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-center">
-                            <Badge variant="secondary" className="rounded-full text-xs font-normal px-3">{item.quantity}</Badge>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Total */}
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold">
-                          {fmtPrice(displayTotal)}
-                        </span>
-                        {hasDiscount && item.unit_price != null && (
-                          <div className="text-xs text-muted-foreground line-through">
-                            {fmtPrice(Number(item.unit_price) * item.quantity)}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          {!isCustom && !editPricing && (
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={e => { e.stopPropagation(); item.product && handleViewProduct(item.product); }}
-                              title="View product"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {onRemoveItem && (
-                            <Button
-                              variant="ghost" size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              disabled={isRemoving || !editable}
-                              onClick={e => editable && handleRemoveItem(e, item.id)}
-                              title="Remove item"
-                            >
-                              {isRemoving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                              {/* Delivery Date */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                  <Truck className="h-3 w-3" /> Expected Delivery
+                                </label>
+                                {editPricing ? (
+                                  <Input
+                                    type="date"
+                                    defaultValue={item.delivery_date || ''}
+                                    className="h-7 text-xs"
+                                    onChange={e => handleFFESave(item.id, 'delivery_date', e.target.value || null)}
+                                  />
+                                ) : item.delivery_date ? (
+                                  <p className="text-xs text-foreground flex items-center gap-1">
+                                    <Truck className="h-3 w-3 text-muted-foreground" />
+                                    {new Date(item.delivery_date).toLocaleDateString()}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">—</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -425,6 +539,50 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
         onClose={() => { setIsModalOpen(false); setSelectedProduct(null); }}
       />
     </>
+  );
+};
+
+/** Inline editable text cell for FF&E fields */
+const FFETextCell: React.FC<{
+  value: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+  icon?: React.ReactNode;
+}> = ({ value, placeholder, onSave, icon }) => {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  return (
+    <div className="flex items-center gap-1">
+      {icon}
+      <Input
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={() => { if (local !== value) onSave(local); }}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        className="h-7 w-24 text-xs px-2"
+        placeholder={placeholder}
+      />
+    </div>
+  );
+};
+
+/** Inline editable textarea for FF&E detail fields */
+const FFETextAreaCell: React.FC<{
+  value: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+}> = ({ value, placeholder, onSave }) => {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  return (
+    <textarea
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value) onSave(local); }}
+      placeholder={placeholder}
+      rows={2}
+      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+    />
   );
 };
 

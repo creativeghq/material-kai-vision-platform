@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Check, ExternalLink, Loader2 } from 'lucide-react';
+import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { StripeService } from '@/services/stripe.service';
+import { apiGatewayService, type ApiKey } from '@/services/apiGateway/apiGatewayService';
 
 const stripeService = new StripeService();
 
@@ -18,11 +20,27 @@ export const SubscriptionTab: React.FC = () => {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [showNewKeyForm, setShowNewKeyForm] = useState(false);
+  const [revealedKeyId, setRevealedKeyId] = useState<string | null>(null);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; ok: boolean } | null>(null);
+
   const tiers = stripeService.getSubscriptionTiers();
+  const hasSubscription = currentTier !== 'free';
 
   useEffect(() => {
     loadSubscriptionData();
   }, [user]);
+
+  useEffect(() => {
+    if (user && hasSubscription) loadApiKeys();
+  }, [user, hasSubscription]);
 
   const loadSubscriptionData = async () => {
     if (!user) return;
@@ -43,6 +61,80 @@ export const SubscriptionTab: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading subscription:', error);
+    }
+  };
+
+  const loadApiKeys = async () => {
+    if (!user) return;
+    setApiKeysLoading(true);
+    try {
+      const keys = await apiGatewayService.getUserApiKeys(user.id);
+      setApiKeys(keys);
+    } catch (err) {
+      console.error('Failed to load API keys:', err);
+    } finally {
+      setApiKeysLoading(false);
+    }
+  };
+
+  const generateApiKey = async () => {
+    if (!user || !newKeyName.trim()) return;
+    setGeneratingKey(true);
+    try {
+      const key = await apiGatewayService.generateApiKey(user.id, newKeyName.trim());
+      setApiKeys((prev) => [key, ...prev]);
+      setNewKeyName('');
+      setShowNewKeyForm(false);
+      setRevealedKeyId(key.id);
+      toast({ title: 'API Key Created', description: 'Copy it now — it won\'t be shown in full again.' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to generate API key.', variant: 'destructive' });
+    } finally {
+      setGeneratingKey(false);
+    }
+  };
+
+  const revokeApiKey = async (id: string) => {
+    try {
+      await apiGatewayService.revokeApiKey(id);
+      setApiKeys((prev) => prev.map((k) => k.id === id ? { ...k, is_active: false } : k));
+      toast({ title: 'Key Revoked', description: 'The API key has been deactivated.' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to revoke key.', variant: 'destructive' });
+    }
+  };
+
+  const copyApiKey = (key: ApiKey) => {
+    navigator.clipboard.writeText(key.api_key);
+    setCopiedKeyId(key.id);
+    setTimeout(() => setCopiedKeyId(null), 2000);
+  };
+
+  const maskKey = (k: string) => k.length <= 8 ? k : k.slice(0, 4) + '••••••••••••••••' + k.slice(-4);
+
+  const testApiKey = async (key: ApiKey) => {
+    setTestingKeyId(key.id);
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase
+        .from('api_keys')
+        .select('id, is_active')
+        .eq('api_key', key.api_key)
+        .eq('is_active', true)
+        .maybeSingle();
+      const ok = !error && !!data;
+      setTestResult({ id: key.id, ok });
+      toast({
+        title: ok ? 'Key Verified' : 'Key Invalid',
+        description: ok ? 'Your API key is active and valid.' : 'This key could not be verified.',
+        variant: ok ? 'default' : 'destructive',
+      });
+      setTimeout(() => setTestResult(null), 5000);
+    } catch {
+      setTestResult({ id: key.id, ok: false });
+      toast({ title: 'Test Failed', description: 'Could not verify the API key.', variant: 'destructive' });
+    } finally {
+      setTestingKeyId(null);
     }
   };
 
@@ -190,6 +282,121 @@ export const SubscriptionTab: React.FC = () => {
           </Card>
         ))}
       </div>
+
+      {/* API Keys */}
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5 text-primary" />API Keys</CardTitle>
+            {hasSubscription && (
+              <Button size="sm" variant="outline" onClick={() => setShowNewKeyForm((v) => !v)}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />Generate Key
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!hasSubscription ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl border bg-muted/30">
+              <Lock className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Subscription Required to Generate API Key</p>
+                <p className="text-xs text-muted-foreground">Subscribe to a Pro or Enterprise plan above to unlock API access.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {showNewKeyForm && (
+                <div className="flex gap-2 pb-2">
+                  <Input
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), generateApiKey())}
+                    placeholder="Key name (e.g. My App, Testing…)"
+                    className="flex-1"
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={generateApiKey} disabled={!newKeyName.trim() || generatingKey}>
+                    {generatingKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowNewKeyForm(false); setNewKeyName(''); }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {apiKeysLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : apiKeys.length > 0 ? (
+                <div className="space-y-2">
+                  {apiKeys.map((key) => (
+                    <div key={key.id} className={`flex items-center justify-between p-3 rounded-xl border ${key.is_active ? 'bg-muted/30' : 'bg-destructive/5 border-destructive/20'}`}>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Shield className={`h-4 w-4 shrink-0 ${key.is_active ? 'text-green-600' : 'text-muted-foreground'}`} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{key.key_name}</p>
+                            {!key.is_active && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Revoked</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {revealedKeyId === key.id ? key.api_key : maskKey(key.api_key)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Created {new Date(key.created_at).toLocaleDateString()}
+                            {key.last_used_at && ` · Last used ${new Date(key.last_used_at).toLocaleDateString()}`}
+                            {key.expires_at && ` · Expires ${new Date(key.expires_at).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
+                          {revealedKeyId === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => copyApiKey(key)}>
+                          {copiedKeyId === key.id ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                        </Button>
+                        {key.is_active && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={`h-8 p-0 text-xs gap-1 ${testResult?.id === key.id ? (testResult.ok ? 'text-green-600' : 'text-destructive') : ''}`}
+                            onClick={() => testApiKey(key)}
+                            disabled={testingKeyId === key.id}
+                          >
+                            {testingKeyId === key.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : testResult?.id === key.id ? (
+                              testResult.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />
+                            ) : (
+                              <Shield className="h-3.5 w-3.5" />
+                            )}
+                            <span className="hidden sm:inline">Test</span>
+                          </Button>
+                        )}
+                        {key.is_active && (
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => revokeApiKey(key.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No API keys yet. Generate one to access the Material KAI API.</p>
+              )}
+
+              <div className="text-xs text-muted-foreground pt-1 border-t space-y-1">
+                <p>Use your API key in requests via one of these headers:</p>
+                <code className="block bg-muted/50 rounded px-2 py-1 text-[11px]">Authorization: Bearer kai_••••</code>
+                <code className="block bg-muted/50 rounded px-2 py-1 text-[11px]">X-API-Key: kai_••••</code>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

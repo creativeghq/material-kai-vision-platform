@@ -15,6 +15,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // =====================================================
 // Types
@@ -340,7 +341,7 @@ function normalizePhoneNumber(phone: string): string {
 // Main Handler
 // =====================================================
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('messaging-api', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -966,4 +967,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -1118,6 +1118,41 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         {virtualStagingGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                         {virtualStagingGenerating ? 'Staging…' : 'Virtual Staging'}
                       </button>
+                    )}
+                    {/* Lighting Variants — generates same room under different lighting */}
+                    {onEditImage && selectedImage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors shadow-sm">
+                            <Sun className="w-3.5 h-3.5" />
+                            Lighting Variants
+                            <ChevronDown className="w-3 h-3 ml-0.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Generate this room under different lighting</DropdownMenuLabel>
+                          {[
+                            { value: 'golden hour — warm amber sunlight at a low angle, long soft shadows, cosy', label: 'Golden Hour', desc: 'Warm amber sunlight, long shadows', credits: 6 },
+                            { value: 'bright midday daylight — crisp, even natural light, no harsh shadows', label: 'Bright Midday', desc: 'Crisp, even natural light', credits: 6 },
+                            { value: 'soft overcast daylight — diffused natural light, calm serene mood', label: 'Soft Overcast', desc: 'Diffused, calm, serene mood', credits: 6 },
+                            { value: 'warm evening ambiance — soft warm artificial lighting, cosy glow, no daylight', label: 'Warm Evening', desc: 'Soft warm artificial glow', credits: 6 },
+                            { value: 'night time interior — dark outside, warm interior lights on, atmospheric', label: 'Night', desc: 'Dark outside, warm interior', credits: 6 },
+                            { value: 'dramatic spotlight / accent lighting — targeted beams on key surfaces', label: 'Dramatic Spots', desc: 'Targeted accent beams', credits: 6 },
+                          ].map(l => (
+                            <DropdownMenuItem key={l.label} onClick={() => {
+                              const prompt = `Change the lighting to: ${l.value}. Keep all furniture positions, fixtures, walls, windows, doors, and architecture exactly where they are. Only modify the lighting and shadows. Photorealistic result. 24mm architectural lens, corrected verticals, no fisheye.`;
+                              onEditImage(selectedImage.url + '|LIGHTING|' + prompt);
+                            }}>
+                              <Sun className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-sky-600" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-xs">{l.label}</div>
+                                <div className="text-[11px] text-muted-foreground">{l.desc}</div>
+                              </div>
+                              <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">{l.credits} cr</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                     {onGenerateMaterialsBoard && selectedImage && (
                       <DropdownMenu>

@@ -210,6 +210,29 @@ Complete documentation for Material Kai Vision Platform.
 - Confidence scoring system
 - Best practices and troubleshooting
 
+### 🆕 New Features
+
+**[ar-material-preview.md](ar-material-preview.md)** - AR Material Preview ✨ NEW
+- WebXR AR on Android, 3D swatch viewer on iOS/desktop
+- PBR map generation (albedo, normal, roughness, metalness)
+- QR code handoff for desktop-to-mobile AR
+- 8 credits per PBR generation, viewing free
+
+**[lighting-simulation.md](lighting-simulation.md)** - Lighting Simulation ✨ NEW
+- AI room re-lighting (6 presets via Gemini edit)
+- 3D PBR material viewer with time-of-day and orientation controls
+- Material category defaults (ceramic, wood, metal, fabric, stone, glass)
+
+**[pinterest-integration.md](pinterest-integration.md)** - Pinterest Integration ✨ NEW
+- Phase 1: URL paste → oEmbed import → auto material matching
+- Phase 2: OAuth board browsing → bulk pin import
+- Integration with moodboards and visual search
+
+**[manufacturer-analytics.md](manufacturer-analytics.md)** - Manufacturer Analytics (Enhanced) ✨ NEW
+- Batched event tracking (view, save, quote, search, click, compare)
+- Geographic demand, designer engagement, competitive positioning
+- Tiered access (free/pro/enterprise)
+
 ---
 
 ### 🏗️ Architecture & Design
@@ -558,12 +581,20 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: March 2026
-**Version**: 3.5.0
+**Last Updated**: April 2026
+**Version**: 3.6.0
 **Status**: Production
 **Maintainer**: Development Team
 
-**Recent Changes (2026-03):**
+**Recent Changes (2026-04):**
+- ✨ **NEW**: AR Material Preview — WebXR + 3D swatch + PBR maps (`ar-material-preview.md`)
+- ✨ **NEW**: Lighting Simulation — AI re-lighting + 3D PBR viewer (`lighting-simulation.md`)
+- ✨ **NEW**: Pinterest Integration — Pin import + OAuth board browsing (`pinterest-integration.md`)
+- ✨ **NEW**: Manufacturer Analytics — Enhanced tracking + tiered dashboard (`manufacturer-analytics.md`)
+- ✨ **UPDATED**: Quotes System — FF&E specification fields for procurement workflows
+- ✨ **UPDATED**: Features Guide — Added sections 28-31
+
+**Previous Changes (2026-03):**
 - ✨ **NEW**: Flow Engine — Visual workflow automation with triggers, conditions, actions (`flow-engine.md`)
 - ✨ **NEW**: Interior Video Generation — 4 AI models: Veo-2, Kling v3, Wan 2.1, Runway Gen4 (`interior-video-generation.md`)
 - ✨ **NEW**: Virtual Staging — Replicate proplabs room staging (`virtual-staging.md`)

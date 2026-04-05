@@ -103,4 +103,44 @@ The `generate-virtual-staging` function is accessible as a KAI agent tool. When 
 
 ---
 
-**Last Updated:** March 2026
+## Before/After Comparison & Quality Analysis
+
+Virtual staging results are displayed using the `VirtualStagingViewer` component, which provides:
+
+### Before/After Slider
+
+The viewer includes an interactive **comparison slider** that lets users drag between the original empty room and the staged result. The `source_image_url` is now included in the `virtual_staging_ready` chunk alongside the result image, enabling side-by-side comparison.
+
+- **CSS clip-path based** — no external library dependency
+- **Pointer-drag interaction** — works on desktop and mobile
+- **Toggle button** — "Before / After" shows/hides the comparison mode
+
+### Quality Analysis
+
+An **"Analyze Quality"** button triggers a Claude Vision assessment of the staging result. The system sends both the original and staged images to the KAI agent, which evaluates:
+
+| Dimension | What is assessed |
+|-----------|-----------------|
+| Lighting consistency | Does staged light match original source direction and warmth? |
+| Perspective accuracy | Are walls/floors at correct angles relative to camera? |
+| Furniture scale | Are proportions realistic for the room size? |
+| Material realism | Do textures read naturally at render resolution? |
+| Style fidelity | Does result match the requested furniture style? |
+| Edge blending | Are furniture edges cleanly composited? |
+
+Each dimension is scored 1–10 with specific feedback.
+
+### Data Flow
+
+```
+Edge Function (generation-tools.ts)
+  → onChunk({ type: 'virtual_staging_ready', source_image_url, image_url, ... })
+  → AgentHub chunk handler stores source_image_url in virtualStagingData
+  → VirtualStagingViewer renders comparison slider
+```
+
+For direct calls (non-agent path via `handleGenerateVirtualStaging`), the `imageUrl` parameter is stored as `source_image_url` in the staging message.
+
+---
+
+**Last Updated:** April 2026

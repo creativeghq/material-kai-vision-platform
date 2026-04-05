@@ -4,6 +4,7 @@ import { Plus, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AddToQuoteModal } from './AddToQuoteModal';
+import { trackProductQuote } from '@/services/manufacturerAnalyticsService';
 
 interface AddToQuoteButtonProps {
   productId: string;
@@ -39,6 +40,7 @@ export const AddToQuoteButton: React.FC<AddToQuoteButtonProps> = ({
   };
 
   const handleSuccess = (quoteName: string) => {
+    trackProductQuote(productId, '', window.location.pathname);
     toast({
       title: 'Added to Quote',
       description: `${productName || 'Product'} added to "${quoteName}"`,

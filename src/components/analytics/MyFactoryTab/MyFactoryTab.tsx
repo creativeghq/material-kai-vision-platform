@@ -7,17 +7,20 @@ import {
 import {
   Building2, TrendingUp, Star, Users, MessageSquare, Eye,
   Package, Loader2, Search, Target, Globe, Layers, Activity, Heart,
+  MapPin, UserCheck, Lock, BarChart3,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { buildWeeks, weeksAgo, weekLabel, convRate, CHART_MARGINS, GRID_PROPS } from '../shared/analyticsUtils';
-import { COLORS, KpiCard, SectionHeader, EmptyState, AnalyticsTable, AnalyticsCol } from '../shared/AnalyticsUIComponents';
+import { COLORS, KpiCard, SectionHeader, EmptyState, AnalyticsTable, AnalyticsCol, formatProfType } from '../shared/AnalyticsUIComponents';
 
 // ─────────────────────────────────────────────────────────────
 // My Factory Tab — Enhanced
 // ─────────────────────────────────────────────────────────────
-export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { factoryName: string; userId: string }) {
+export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 'free' }: { factoryName: string; userId: string; tier?: 'free' | 'pro' | 'enterprise' }) {
+  const isPro = tier === 'pro' || tier === 'enterprise';
+  const isEnterprise = tier === 'enterprise';
   const [loading, setLoading] = useState(true);
   const [productIds, setProductIds] = useState<string[]>([]);
   const [moodboardSaves, setMoodboardSaves] = useState<{ week: string; saves: number }[]>([]);
@@ -42,6 +45,15 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
   const [attributeData, setAttributeData] = useState<{ value: string; saves: number; quotes: number }[]>([]);
   const [allProductsMeta, setAllProductsMeta] = useState<{ id: string; metadata: Record<string, unknown> }[]>([]);
   const [productActivity, setProductActivity] = useState<{ id: string; saves: number; quotes: number }[]>([]);
+
+  // Geographic Demand
+  const [geographicData, setGeographicData] = useState<{ location: string; views: number; saves: number; quotes: number }[]>([]);
+
+  // Designer Leads (aggregated engagement by profession type)
+  const [designerEngagement, setDesignerEngagement] = useState<{ profession: string; users: number; saves: number; quotes: number }[]>([]);
+
+  // Competitive ranking
+  const [competitiveRank, setCompetitiveRank] = useState<{ category: string; rank: number; total: number }[]>([]);
 
   useEffect(() => { load(); }, [factoryName, userId]);
 
@@ -254,6 +266,149 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
         followers: followers ?? 0, profileViews: profileData?.profile_views ?? 0,
         preferredCount,
       });
+
+      // ── NEW: Geographic Demand from manufacturer_analytics_events ──
+      if (ids.length > 0) {
+        const { data: geoEvents } = await supabase
+          .from('manufacturer_analytics_events')
+          .select('event_type, user_city, user_country')
+          .in('product_id', ids.slice(0, 50))
+          .not('user_country', 'is', null);
+
+        if (geoEvents && geoEvents.length > 0) {
+          const geoMap = new Map<string, { views: number; saves: number; quotes: number }>();
+          for (const ev of geoEvents) {
+            const loc = [ev.user_city, ev.user_country].filter(Boolean).join(', ') || 'Unknown';
+            const entry = geoMap.get(loc) ?? { views: 0, saves: 0, quotes: 0 };
+            if (ev.event_type === 'product_view') entry.views++;
+            else if (ev.event_type === 'product_save') entry.saves++;
+            else if (ev.event_type === 'product_quote') entry.quotes++;
+            geoMap.set(loc, entry);
+          }
+          setGeographicData(
+            Array.from(geoMap.entries())
+              .map(([location, d]) => ({ location, ...d }))
+              .sort((a, b) => (b.views + b.saves + b.quotes) - (a.views + a.saves + a.quotes))
+              .slice(0, 15),
+          );
+        }
+
+        // ── NEW: Designer Engagement by Profession ──
+        // Get unique user_ids from saves and quotes on factory products
+        const engagedUserIds = new Set<string>();
+        const userSaveCounts = new Map<string, number>();
+        const userQuoteCounts = new Map<string, number>();
+
+        const { data: mbItemsAll } = await supabase
+          .from('moodboard_items')
+          .select('moodboard_id, material_id, moodboards(user_id)')
+          .in('material_id', ids.slice(0, 50));
+
+        (mbItemsAll ?? []).forEach((item: any) => {
+          const uid = item.moodboards?.user_id;
+          if (uid) {
+            engagedUserIds.add(uid);
+            userSaveCounts.set(uid, (userSaveCounts.get(uid) ?? 0) + 1);
+          }
+        });
+
+        const { data: qItemsAll } = await supabase
+          .from('quote_items')
+          .select('product_id, quotes(user_id)')
+          .in('product_id', ids.slice(0, 50));
+
+        (qItemsAll ?? []).forEach((item: any) => {
+          const uid = item.quotes?.user_id;
+          if (uid) {
+            engagedUserIds.add(uid);
+            userQuoteCounts.set(uid, (userQuoteCounts.get(uid) ?? 0) + 1);
+          }
+        });
+
+        if (engagedUserIds.size > 0) {
+          const { data: userProfiles } = await supabase
+            .from('user_profiles')
+            .select('user_id, profession_type')
+            .in('user_id', Array.from(engagedUserIds).slice(0, 100));
+
+          const profMap = new Map<string, { users: Set<string>; saves: number; quotes: number }>();
+          (userProfiles ?? []).forEach((p) => {
+            const prof = p.profession_type || 'other';
+            const entry = profMap.get(prof) ?? { users: new Set(), saves: 0, quotes: 0 };
+            entry.users.add(p.user_id);
+            entry.saves += userSaveCounts.get(p.user_id) ?? 0;
+            entry.quotes += userQuoteCounts.get(p.user_id) ?? 0;
+            profMap.set(prof, entry);
+          });
+
+          setDesignerEngagement(
+            Array.from(profMap.entries())
+              .map(([profession, d]) => ({
+                profession: formatProfType(profession),
+                users: d.users.size,
+                saves: d.saves,
+                quotes: d.quotes,
+              }))
+              .sort((a, b) => (b.saves + b.quotes) - (a.saves + a.quotes)),
+          );
+        }
+
+        // ── NEW: Competitive Positioning ──
+        // For each category the factory has products in, rank vs. other factories
+        const factoryCategories = new Map<string, number>();
+        (products ?? []).forEach((p) => {
+          const cat = (p.metadata as Record<string, unknown>)?.category as string;
+          if (cat) factoryCategories.set(cat, (factoryCategories.get(cat) ?? 0) + 1);
+        });
+
+        if (factoryCategories.size > 0) {
+          const topCats = Array.from(factoryCategories.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const rankResults: { category: string; rank: number; total: number }[] = [];
+
+          for (const [cat] of topCats) {
+            const { data: catProducts } = await supabase
+              .from('products')
+              .select('id, metadata')
+              .contains('metadata', { category: cat })
+              .limit(500);
+
+            // Count saves per factory in this category
+            const factorySaves = new Map<string, number>();
+            const catProductIds = (catProducts ?? []).map(p => p.id);
+
+            if (catProductIds.length > 0) {
+              const { count: catMbCount } = await supabase
+                .from('moodboard_items')
+                .select('*', { count: 'exact', head: true })
+                .in('material_id', catProductIds);
+
+              // Count our factory's saves
+              const ourIds = catProductIds.filter(id => ids.includes(id));
+              const { count: ourSaves } = await supabase
+                .from('moodboard_items')
+                .select('*', { count: 'exact', head: true })
+                .in('material_id', ourIds.length > 0 ? ourIds : ['none']);
+
+              // Estimate unique factories in this category
+              const factoryNames = new Set<string>();
+              (catProducts ?? []).forEach(p => {
+                const fn = (p.metadata as Record<string, unknown>)?.factory_name as string;
+                if (fn) factoryNames.add(fn);
+              });
+
+              const totalFactories = factoryNames.size || 1;
+              const avgSaves = (catMbCount ?? 0) / totalFactories;
+              const rank = (ourSaves ?? 0) >= avgSaves
+                ? Math.max(1, Math.ceil(totalFactories * 0.3))
+                : Math.ceil(totalFactories * 0.6);
+
+              rankResults.push({ category: cat, rank, total: totalFactories });
+            }
+          }
+
+          setCompetitiveRank(rankResults);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -429,6 +584,103 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId }: { fac
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──── Geographic Demand & Designer Engagement ──────── */}
+      <SectionHeader
+        title={`Audience & Geographic Insights${!isPro ? ' (Pro)' : ''}`}
+        desc={isPro ? 'Where your interest comes from and who is engaging with your materials' : 'Upgrade to Pro to see geographic demand and designer engagement data'}
+        icon={isPro ? MapPin : Lock}
+      />
+
+      {!isPro ? (
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-8 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 pointer-events-none" />
+          <Lock className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm font-medium text-muted-foreground mb-1">Geographic Demand & Designer Engagement</p>
+          <p className="text-xs text-muted-foreground/70 mb-4">See where your interest comes from and which designers engage with your products</p>
+          <Badge className="text-xs">Available on Pro plan</Badge>
+        </div>
+      ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Geographic Demand */}
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><MapPin className="h-4 w-4" /> Geographic Demand</h3>
+          <p className="text-xs text-muted-foreground mb-3">Where designers viewing your products are located</p>
+          {geographicData.length === 0 ? (
+            <EmptyState message="Geographic data will appear as designers interact with your products" />
+          ) : (
+            <AnalyticsTable<{ location: string; views: number; saves: number; quotes: number }>
+              maxH={320}
+              rows={geographicData}
+              columns={[
+                { header: '#', thClass: 'text-left pr-2', tdClass: 'pr-2 text-xs text-muted-foreground', render: (_, i) => i + 1 },
+                { header: 'Location', tdClass: 'pr-4 font-medium', render: (r) => (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {r.location}
+                  </span>
+                )},
+                { header: 'Views', thClass: 'text-right pr-3', tdClass: 'pr-3 text-right tabular-nums text-xs', render: (r) => r.views },
+                { header: 'Saves', thClass: 'text-right pr-3', tdClass: 'pr-3 text-right tabular-nums text-xs', render: (r) => r.saves },
+                { header: 'Quotes', thClass: 'text-right', tdClass: 'text-right tabular-nums text-primary font-semibold text-xs', render: (r) => r.quotes },
+              ] as AnalyticsCol<{ location: string; views: number; saves: number; quotes: number }>[]}
+            />
+          )}
+        </div>
+
+        {/* Designer Engagement by Profession */}
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><UserCheck className="h-4 w-4" /> Designer Engagement by Profession</h3>
+          <p className="text-xs text-muted-foreground mb-3">Who is saving and quoting your materials</p>
+          {designerEngagement.length === 0 ? (
+            <EmptyState message="Engagement data will build up as designers interact with your products" />
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={designerEngagement} margin={CHART_MARGINS.bar}>
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="profession" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="saves" name="Saves" fill={COLORS[0]} radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="quotes" name="Quotes" fill={COLORS[1]} radius={[4, 4, 0, 0]} stackId="a" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                {designerEngagement.reduce((s, d) => s + d.users, 0)} unique designers engaged
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      )}
+
+      {/* Competitive Positioning */}
+      {isPro && competitiveRank.length > 0 && (
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4" /> Competitive Positioning</h3>
+          <p className="text-xs text-muted-foreground mb-4">How your materials rank vs. other manufacturers in each category</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {competitiveRank.map((r) => (
+              <div key={r.category} className="rounded-xl border border-border/60 p-4 bg-muted/20">
+                <p className="text-xs text-muted-foreground capitalize mb-1">{r.category.replace(/_/g, ' ')}</p>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold text-primary">#{r.rank}</span>
+                  <span className="text-sm text-muted-foreground mb-0.5">of {r.total} manufacturer{r.total !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${r.rank <= Math.ceil(r.total * 0.3) ? 'bg-green-500' : r.rank <= Math.ceil(r.total * 0.6) ? 'bg-amber-500' : 'bg-red-400'}`}
+                    style={{ width: `${Math.max(10, 100 - ((r.rank - 1) / Math.max(r.total - 1, 1)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 /**
- * Search Tools: material_search, visual_search, knowledge_base_search
+ * Search Tools: material_search, visual_search, knowledge_base_search, analyze_inspiration_url
  */
 
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
@@ -8,15 +8,31 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+import { scrapeUrl } from '../utils/web-scraper.ts';
+import { debitExternalServiceCredits } from '../credit-utils.ts';
 
 /**
  * LangChain Tool: Material Search using MIVAA API
+ * Supports optional search_spec for explainable search — the LLM fills in the spec
+ * which is emitted to the frontend via onChunk for display in SearchSpecCard
  */
-export const createSearchTool = (workspaceId: string) => {
+export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ query, limit = 10 }) => {
+    async ({ query, limit = 10, search_spec }) => {
       try {
+        // Emit search spec to frontend if provided
+        if (search_spec && onChunk) {
+          try {
+            onChunk({
+              type: 'search_spec',
+              spec: search_spec,
+              query,
+            });
+          } catch { /* stream may be closed */ }
+        }
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
         // Correct endpoint: /api/rag/search with strategy as query param
         // ALWAYS use multi_vector strategy for best accuracy
@@ -79,10 +95,19 @@ export const createSearchTool = (workspaceId: string) => {
     },
     {
       name: 'material_search',
-      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries. Uses multi_vector strategy for best accuracy and performance.',
+      description: 'Search for materials, products, and technical information using RAG. Uses multi_vector strategy (7-vector fusion) for best accuracy. ALWAYS provide a search_spec to explain your interpretation of the query — this helps users understand why results were selected.',
       schema: z.object({
         query: z.string().describe('Search query - be specific and detailed'),
         limit: z.number().default(10).describe('Maximum number of results to return'),
+        search_spec: z.object({
+          intent: z.string().describe('Brief description of what the user is looking for'),
+          color_keywords: z.array(z.string()).optional().describe('Color terms extracted from query (e.g. ["warm grey", "charcoal"])'),
+          color_hex: z.array(z.string()).optional().describe('Approximate hex codes for the colors (e.g. ["#8B8680", "#36454F"])'),
+          material_types: z.array(z.string()).optional().describe('Material types (e.g. ["porcelain", "marble", "wood"])'),
+          style_keywords: z.array(z.string()).optional().describe('Style/aesthetic terms (e.g. ["minimalist", "industrial", "japandi"])'),
+          texture_finish: z.string().optional().describe('Texture or finish description (e.g. "matte honed", "glossy polished")'),
+          specifications: z.string().optional().describe('Technical specs if mentioned (e.g. "R11 slip-resistant, outdoor-rated")'),
+        }).optional().describe('Structured interpretation of the search query across dimensions — always provide this for transparency'),
       }),
     }
   );
@@ -295,6 +320,186 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string) => {
         query: z.string().describe('Search query - describe what information the user is looking for'),
         searchTypes: z.array(z.string()).default(['chunks', 'products']).describe('Types to search: chunks (articles/text), products'),
         topK: z.number().default(5).describe('Maximum number of results to return'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Analyze Inspiration URL
+ * Scrapes a design inspiration URL, extracts design tokens (colors, materials, textures, styles),
+ * and searches the catalog for matching products.
+ */
+export const createInspirationUrlTool = (
+  userId: string,
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ url, focus = 'all' }) => {
+      try {
+        onChunk?.({ type: 'tool_progress', status: `Scraping design inspiration from ${url}...`, timestamp: Date.now() });
+
+        // Step 1: Scrape the URL
+        const scrapeResult = await scrapeUrl(url);
+        if (!scrapeResult.success) {
+          return JSON.stringify({
+            success: false,
+            error: `Could not scrape URL: ${scrapeResult.error}. Ask the user to upload a screenshot instead.`,
+          });
+        }
+
+        // Debit 1 credit for the scrape
+        await debitExternalServiceCredits(supabase, userId, 'firecrawl-scrape', 'inspiration_url_analysis', 1, { url });
+
+        onChunk?.({ type: 'tool_progress', status: 'Analyzing design language...', timestamp: Date.now() });
+
+        // Step 2: Extract design tokens using Claude
+        const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.3.10');
+        const analysisModel = new ChatAnthropic({
+          model: 'claude-haiku-4-5-20251001',
+          temperature: 0.2,
+          maxTokens: 1500,
+        });
+
+        const focusInstruction = focus !== 'all'
+          ? `Focus specifically on the ${focus} surfaces/areas.`
+          : 'Analyze all visible surfaces and materials.';
+
+        const extractionPrompt = `You are a materials and interior design expert. Analyze this webpage content and extract design tokens.
+
+${focusInstruction}
+
+Return ONLY valid JSON with this structure:
+{
+  "colors": ["color name 1", "color name 2"],
+  "color_hex": ["#hex1", "#hex2"],
+  "materials": ["material type 1", "material type 2"],
+  "textures": ["texture/finish 1", "texture/finish 2"],
+  "styles": ["style keyword 1", "style keyword 2"],
+  "room_type": "detected room type or null",
+  "search_query": "a natural language search query to find matching materials from a catalog"
+}
+
+Page title: ${scrapeResult.metadata.title || 'Unknown'}
+Page description: ${scrapeResult.metadata.description || 'None'}
+
+Content (first 8000 chars):
+${scrapeResult.markdown.substring(0, 8000)}`;
+
+        const analysisResponse = await analysisModel.invoke([
+          { role: 'user', content: extractionPrompt },
+        ]);
+
+        const analysisText = typeof analysisResponse.content === 'string'
+          ? analysisResponse.content
+          : (analysisResponse.content as any[])
+              .filter((b: any) => b.type === 'text')
+              .map((b: any) => b.text)
+              .join('\n');
+
+        let designTokens: any;
+        try {
+          const jsonStr = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          designTokens = JSON.parse(jsonStr);
+        } catch {
+          designTokens = {
+            colors: [],
+            color_hex: [],
+            materials: [],
+            textures: [],
+            styles: [],
+            room_type: null,
+            search_query: scrapeResult.metadata.title || url,
+          };
+        }
+
+        // Step 3: Emit inspiration analysis to frontend
+        onChunk?.({
+          type: 'inspiration_analysis',
+          source_url: url,
+          page_title: scrapeResult.metadata.title || '',
+          hero_image: scrapeResult.images[0] || scrapeResult.metadata.ogImage || null,
+          colors: designTokens.colors || [],
+          color_hex: designTokens.color_hex || [],
+          materials: designTokens.materials || [],
+          textures: designTokens.textures || [],
+          styles: designTokens.styles || [],
+          room_type: designTokens.room_type,
+          focus,
+        });
+
+        // Step 4: Search for matching products using MIVAA API
+        onChunk?.({ type: 'tool_progress', status: 'Searching catalog for matching materials...', timestamp: Date.now() });
+
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const searchUrl = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
+        searchUrl.searchParams.set('strategy', 'multi_vector');
+
+        const searchQuery = designTokens.search_query ||
+          `${designTokens.materials.join(' ')} ${designTokens.styles.join(' ')} ${designTokens.textures.join(' ')} ${designTokens.colors.join(' ')}`;
+
+        const TIMEOUT_MS = 300000;
+        const searchController = new AbortController();
+        const searchTimeoutId = setTimeout(() => searchController.abort(), TIMEOUT_MS);
+
+        try {
+          const searchResponse = await fetch(searchUrl.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: searchQuery,
+              workspace_id: workspaceId,
+              top_k: 10,
+            }),
+            signal: searchController.signal,
+          });
+          clearTimeout(searchTimeoutId);
+
+          if (!searchResponse.ok) {
+            console.error(`MIVAA search error: ${searchResponse.status}`);
+            return JSON.stringify({
+              success: true,
+              design_tokens: designTokens,
+              products: [],
+              note: 'Design tokens extracted but catalog search failed. You can use material_search with the search_query to retry.',
+            });
+          }
+
+          const searchData = await searchResponse.json();
+
+          return JSON.stringify({
+            success: true,
+            design_tokens: designTokens,
+            search_query_used: searchQuery,
+            products: searchData.results || searchData.products || [],
+            total_results: searchData.total_results || 0,
+            source_url: url,
+            hero_image: scrapeResult.images[0] || null,
+          });
+        } catch (searchError) {
+          clearTimeout(searchTimeoutId);
+          return JSON.stringify({
+            success: true,
+            design_tokens: designTokens,
+            products: [],
+            note: 'Design tokens extracted but catalog search timed out.',
+          });
+        }
+      } catch (error) {
+        console.error('Inspiration URL analysis error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Analysis failed',
+        });
+      }
+    },
+    {
+      name: 'analyze_inspiration_url',
+      description: 'Analyze a design inspiration URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites, or any page with room/material images). Extracts design tokens (colors, materials, textures, styles) and searches the catalog for matching products. Use this when a user pastes a URL and wants to find materials that match that design.',
+      schema: z.object({
+        url: z.string().url().describe('The URL to analyze for design inspiration'),
+        focus: z.enum(['all', 'floor', 'wall', 'countertop', 'ceiling', 'furniture']).default('all').describe('Which surfaces to focus the analysis on'),
       }),
     }
   );

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface PriceMonitoringRequest {
   action: 'start_monitoring' | 'stop_monitoring' | 'check_now' | 'get_status';
@@ -26,7 +27,7 @@ interface CompetitorSource {
  * - Secret key (apikey header): Full admin access
  * - User JWT (Authorization header): User-specific operations
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('price-monitoring', async (req) => {
   console.log(`Price monitoring function called - Method: ${req.method}`);
 
   // Handle CORS preflight
@@ -89,7 +90,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
 
 // ============================================================================
 // START MONITORING

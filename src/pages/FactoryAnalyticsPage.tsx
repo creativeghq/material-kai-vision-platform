@@ -54,7 +54,7 @@ export default function FactoryAnalyticsPage() {
 
           {isFactory && user && (
             <TabsContent value="my-factory">
-              <MyFactoryTab factoryName={factoryClaimedName ?? ''} userId={user.id} />
+              <MyFactoryTab factoryName={factoryClaimedName ?? ''} userId={user.id} tier={isAdmin ? 'enterprise' : 'pro'} />
             </TabsContent>
           )}
 

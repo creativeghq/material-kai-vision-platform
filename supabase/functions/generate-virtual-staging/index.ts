@@ -12,6 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -144,7 +145,7 @@ async function runReplicate(
   throw new Error('Virtual staging timed out after 3 minutes');
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
@@ -181,7 +182,7 @@ Deno.serve(async (req) => {
   }
 
   return await handleRequest(supabase, body, userId);
-});
+}));
 
 async function handleRequest(
   supabase: ReturnType<typeof createClient>,

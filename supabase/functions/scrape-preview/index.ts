@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface ScrapePreviewRequest {
   url: string;
@@ -35,7 +36,7 @@ interface ScrapePreviewResponse {
   error?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('scrape-preview', async (req) => {
   console.log(`Scrape preview function called - Method: ${req.method}`);
 
   // Handle CORS preflight requests
@@ -116,7 +117,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
 
 async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ materials: PreviewMaterial[], markdown: string }> {
   const apiKey = Deno.env.get('FIRECRAWL_API_KEY');

@@ -82,7 +82,7 @@ Add these in **Supabase Dashboard → Project Settings → Edge Functions → Se
 | `image_type` param | Model | Credits |
 |--------------------|-------|---------|
 | `lifestyle` | xAI Aurora (`grok-2-aurora`) | 10 cr |
-| `product` or `interior` | Gemini Flash (`gemini-2.0-flash-exp`) | 5 cr |
+| `product` or `interior` | Imagen 3.0 (`imagen-3.0-generate-002`) | 5 cr |
 | `artistic` | FLUX Dev (Replicate) | 6 cr |
 
 ---

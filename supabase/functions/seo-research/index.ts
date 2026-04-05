@@ -13,6 +13,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { DataForSEOClient } from '../_shared/dataforseo-client.ts';
 import type { SEOResearchRequest, SEOResearchResponse } from '../_shared/seo-types.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -28,7 +29,7 @@ function jsonResponse(body: any, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('seo-research', async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -170,4 +171,4 @@ Deno.serve(async (req) => {
       500,
     );
   }
-});
+}));

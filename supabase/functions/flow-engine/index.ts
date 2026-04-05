@@ -12,6 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1044,7 +1045,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('flow-engine', async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -1079,4 +1080,4 @@ Deno.serve(async (req) => {
     console.error('Flow engine error:', message);
     return jsonResponse({ success: false, error: message }, 500);
   }
-});
+}));

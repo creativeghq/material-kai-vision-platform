@@ -21,6 +21,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { editImageWithGrok } from '../_shared/ai-client.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -72,7 +73,7 @@ async function uploadResult(
   return supabase.storage.from('generation-images').getPublicUrl(path).data.publicUrl;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
@@ -164,4 +165,4 @@ Deno.serve(async (req) => {
     console.error('[generate-region-edit] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
-});
+}));

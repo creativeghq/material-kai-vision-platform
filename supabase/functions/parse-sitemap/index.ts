@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
-serve(async (req) => {
+serve(withApiLogging('parse-sitemap', async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -139,4 +140,4 @@ serve(async (req) => {
       },
     );
   }
-});
+}));

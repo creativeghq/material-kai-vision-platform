@@ -444,3 +444,30 @@ All quote operations are handled through the `QuotesService` which interfaces wi
 - `supabase/migrations/20250106_quote_system_enhancements.sql` - Status tags, upsells, timeline system
 
 All migrations have been executed and verified in production.
+
+## FF&E Specification Fields
+
+The quote items table includes FF&E (Furniture, Fixtures & Equipment) specification fields for interior design procurement workflows.
+
+### New Fields on `quote_items`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `room` | text | Room or area assignment (e.g., "Living Room", "Master Bedroom") |
+| `dimensions` | text | Product dimensions in W×H×D format (e.g., "120×60×45") |
+| `installation_requirements` | text | Installation notes (e.g., "Requires wall anchoring, electrical outlet within 1m") |
+| `delivery_date` | date | Expected delivery date for procurement tracking |
+
+### UI Integration
+
+- **QuoteItemsList**: Room shown as a dedicated column. Dimensions appended to product name (e.g., "Marble Slab, 120×60"). Expandable detail row shows notes, installation requirements, and delivery date.
+- **AddProductsSheet**: FF&E section in custom product form with room, dimensions, installation, and delivery fields. Catalog products have a room field in the selection table.
+- **PDF Generation**: Room column in items table. Dimensions in product name. "SPECIFICATIONS & DELIVERY" section at bottom of items pages listing installation requirements and delivery dates per item.
+
+### Service Methods
+
+`QuotesService.addItem()`, `addCustomItem()`, and `updateItem()` all accept the FF&E fields:
+- `room?: string`
+- `dimensions?: string`
+- `installation_requirements?: string`
+- `delivery_date?: string`

@@ -30,6 +30,7 @@ import {
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -487,7 +488,7 @@ Photorealistic micro-textures, natural imperfections, and realistic reflections;
 Negative prompt: oversized props, exaggerated scale, distorted proportions, fisheye, warped lines, CGI, 3D render, plastic texture, fake materials, blurry details, label artifacts, duplicated objects, watermark, text artifacts. ${extraPrompt ?? ''}`;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -873,7 +874,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
     console.error(`[generate-interior-gemini] Error (mode=${mode}):`, message);
     return jsonResponse({ success: false, error: message }, 500);
   }
-});
+}));
 
 function detectMode(body: GenerateInteriorRequest): GenerationMode {
   // With a reference image, default to image-edit regardless of edit_instruction presence.

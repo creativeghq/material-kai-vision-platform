@@ -3,6 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../_shared/ai-client.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface SuggestFieldsRequest {
   url: string;
@@ -16,7 +17,7 @@ interface SuggestFieldsRequest {
  * - Secret key (apikey header): Full admin access
  * - User JWT (Authorization header): User-specific operations
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('suggest-fields', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -119,4 +120,4 @@ ${pageContent.substring(0, 3000)}`;
       }
     );
   }
-});
+}));

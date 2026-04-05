@@ -4,6 +4,7 @@ import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface XMLImportRequest {
   workspace_id: string;
@@ -290,7 +291,7 @@ function fallbackMappings(fieldSamples: Map<string, string[]>): Map<string, { ma
   return suggestions;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
   console.log(`XML Import Orchestrator called - Method: ${req.method}`);
 
   // Handle CORS preflight requests
@@ -573,7 +574,7 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));
 
 /**
  * Parse XML content and extract product data

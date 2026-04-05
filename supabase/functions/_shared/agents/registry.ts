@@ -17,6 +17,7 @@ import { KaiTaskAgent }             from './kai-task-agent.ts';
 import { SocialAnalyticsSyncAgent } from './social-analytics-sync-agent.ts';
 import { SocialInsightsSyncAgent }  from './social-insights-sync-agent.ts';
 import { FactoryEnrichmentAgent }   from './factory-enrichment-agent.ts';
+import { ModelHealthCheckAgent }    from './model-health-check-agent.ts';
 
 const RUNNERS: AgentRunner[] = [
   new KaiTaskAgent(),
@@ -25,6 +26,7 @@ const RUNNERS: AgentRunner[] = [
   new SocialAnalyticsSyncAgent(),
   new SocialInsightsSyncAgent(),
   new FactoryEnrichmentAgent(),
+  new ModelHealthCheckAgent(),
 ];
 
 /** Keyed map for fast O(1) lookup by agent_type */

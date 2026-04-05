@@ -13,6 +13,11 @@ export interface QuoteDocumentItem {
   line_total: number;
   selected_size: string | null;
   selected_color: string | null;
+  // FF&E fields
+  room: string | null;
+  dimensions: string | null;
+  installation_requirements: string | null;
+  delivery_date: string | null;
 }
 
 export interface QuoteDocumentClient {
@@ -98,6 +103,7 @@ export function useQuoteDocument(quoteId: string) {
           .select(`
             id, quantity, notes, selected_size, selected_color, unit_price, discounted_price, line_total,
             custom_product_name, custom_product_description, custom_sku, custom_unit,
+            room, dimensions, installation_requirements, delivery_date,
             products ( id, name, metadata )
           `)
           .eq('quote_id', quoteId)
@@ -125,6 +131,10 @@ export function useQuoteDocument(quoteId: string) {
             line_total: parseFloat(item.line_total) || 0,
             selected_size: item.selected_size || null,
             selected_color: item.selected_color || null,
+            room: item.room || null,
+            dimensions: item.dimensions || null,
+            installation_requirements: item.installation_requirements || null,
+            delivery_date: item.delivery_date || null,
           };
         });
 

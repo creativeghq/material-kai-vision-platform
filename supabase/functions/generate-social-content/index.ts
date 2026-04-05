@@ -12,6 +12,7 @@ import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -37,7 +38,7 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-social-content', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -180,4 +181,4 @@ Return exactly this JSON structure:
     console.error('[generate-social-content] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
-});
+}));

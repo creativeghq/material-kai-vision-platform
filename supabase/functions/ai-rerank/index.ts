@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateWithClaude } from '../_shared/ai-client.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') || '',
@@ -43,7 +44,7 @@ interface ReRankResponse {
   };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('ai-rerank', async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -174,4 +175,4 @@ Response format:
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));

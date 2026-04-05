@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -191,7 +192,7 @@ async function listAllFiles(bucketName: string, folderPath = ''): Promise<string
  *            prompts, extraction_prompts, prompt_history,
  *            quote-templates bucket, pdf-documents bucket, profile-avatars bucket
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('reset-platform', async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -389,4 +390,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

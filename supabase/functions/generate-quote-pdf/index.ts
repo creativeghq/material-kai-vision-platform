@@ -4,11 +4,12 @@ import { authenticate } from '../_shared/auth.ts';
 import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile } from './data-fetcher.ts';
 import { buildQuotePDF } from './pdf-builder.ts';
 import type { QuotePDFRequest, QuotePDFResponse } from './types.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -178,7 +179,7 @@ Deno.serve(async (req) => {
       500
     );
   }
-});
+}));
 
 function jsonResponse(body: QuotePDFResponse, status = 200): Response {
   return new Response(JSON.stringify(body), {

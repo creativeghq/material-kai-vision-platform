@@ -67,6 +67,10 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import SEOArticleViewer from './SEOArticleViewer';
+import { InspirationUrlModal } from './InspirationUrlModal';
+import { InspirationCard } from './InspirationCard';
+import { SearchSpecCard } from './SearchSpecCard';
+import { VirtualStagingViewer } from './VirtualStagingViewer';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
@@ -222,11 +226,34 @@ interface Message {
   }; // Veo video walkthrough
   virtualStagingData?: {
     image_url: string;
+    source_image_url?: string;
     job_id: string;
     room: string;
     furniture_style: string;
     credits_used: number;
   }; // Virtual staging result
+  inspirationData?: {
+    source_url: string;
+    page_title?: string;
+    hero_image?: string | null;
+    colors: string[];
+    color_hex: string[];
+    materials: string[];
+    textures: string[];
+    styles: string[];
+    room_type?: string | null;
+    focus?: string;
+  }; // Design inspiration URL analysis
+  searchSpec?: {
+    intent: string;
+    color_keywords?: string[];
+    color_hex?: string[];
+    material_types?: string[];
+    style_keywords?: string[];
+    texture_finish?: string;
+    specifications?: string;
+    query: string;
+  }; // Explainable search spec
   materialsBoardData?: {
     image_url: string;
     job_id: string;
@@ -294,6 +321,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [showInspirationModal, setShowInspirationModal] = useState(false);
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -948,6 +976,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         agentId: 'interior-designer',
         virtualStagingData: {
           image_url: result.image_url,
+          source_image_url: imageUrl,
           job_id: result.job_id,
           room: result.room,
           furniture_style: result.furniture_style,
@@ -1081,6 +1110,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const canUseCache = userAttachedImages.length === 0 && selectedAgent === 'kai';
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
+      let pendingSearchSpec: Message['searchSpec'] | null = null;
 
       if (canUseCache) {
         const cachedResponse = getCachedResponse(userInput, selectedAgent, workspaceId);
@@ -1326,6 +1356,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   model: selectedModel,
                   virtualStagingData: {
                     image_url: chunk.image_url,
+                    source_image_url: chunk.source_image_url,
                     job_id: chunk.job_id,
                     room: chunk.room,
                     furniture_style: chunk.furniture_style,
@@ -1419,6 +1450,44 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   text: `Started SEO article pipeline for "${chunk.target_keyword}".`,
                   agentId: selectedAgent,
                   model: selectedModel,
+                };
+              // Handle inspiration_analysis — design tokens extracted from URL
+              } else if (chunk.type === 'inspiration_analysis') {
+                const inspirationMsg: Message = {
+                  id: `msg-inspiration-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Analyzed design inspiration from ${chunk.page_title || chunk.source_url}. Found ${chunk.materials?.length || 0} materials, ${chunk.colors?.length || 0} colors, and ${chunk.styles?.length || 0} style keywords.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  inspirationData: {
+                    source_url: chunk.source_url,
+                    page_title: chunk.page_title,
+                    hero_image: chunk.hero_image,
+                    colors: chunk.colors || [],
+                    color_hex: chunk.color_hex || [],
+                    materials: chunk.materials || [],
+                    textures: chunk.textures || [],
+                    styles: chunk.styles || [],
+                    room_type: chunk.room_type,
+                    focus: chunk.focus,
+                  },
+                };
+                setMessages(prev => [...prev, inspirationMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: inspirationMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, inspirationData: inspirationMsg.inspirationData },
+                  });
+                }
+              // Handle search_spec — explainable search dimensions
+              } else if (chunk.type === 'search_spec') {
+                // Attach search spec to the NEXT materialData message (store in pending state)
+                pendingSearchSpec = {
+                  ...chunk.spec,
+                  query: chunk.query,
                 };
               } else if (chunk.type === 'final_result') {
                 finalResult = chunk;
@@ -1558,6 +1627,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         designData, // Include design data with spatial analysis
         generation_job: data.generation_job, // Async 3D generation job info
         geminiImageData: pendingGeminiData ?? undefined,
+        searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
       };
 
       // Track active generation job if present
@@ -1593,6 +1663,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             designData, // Save design data for Interior Designer Agent (includes spatial analysis)
             generation_job: data.generation_job, // Save generation job info for async 3D generation
             geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
+            searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec
           },
         });
       }
@@ -1699,6 +1770,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           articleData: msg.metadata?.articleData as any | undefined,
           virtualStagingData: msg.metadata?.virtualStagingData as any | undefined,
           materialsBoardData: msg.metadata?.materialsBoardData as any | undefined,
+          inspirationData: msg.metadata?.inspirationData as any | undefined,
+          searchSpec: msg.metadata?.searchSpec as any | undefined,
         })),
       );
     },
@@ -2103,7 +2176,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-[#3E192A] text-white shadow-sm'
@@ -2119,8 +2192,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           onUseIn3DScene={handleUseProductIn3DScene}
                         />
                       </div>
+                    ) : message.inspirationData ? (
+                      <div className="space-y-3">
+                        <InspirationCard
+                          sourceUrl={message.inspirationData.source_url}
+                          pageTitle={message.inspirationData.page_title}
+                          heroImage={message.inspirationData.hero_image}
+                          colors={message.inspirationData.colors}
+                          colorHex={message.inspirationData.color_hex}
+                          materials={message.inspirationData.materials}
+                          textures={message.inspirationData.textures}
+                          styles={message.inspirationData.styles}
+                          roomType={message.inspirationData.room_type}
+                          focus={message.inspirationData.focus}
+                        />
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                      </div>
                     ) : message.materialData ? (
                       <div className="space-y-4">
+                        {/* Explainable search spec — shows how KAI interpreted the query */}
+                        {message.searchSpec && (
+                          <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
+                        )}
                         <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
                         {/* Display real materials using DemoAgentResults format */}
                         <DemoAgentResults
@@ -2254,31 +2347,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">
                         <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
-                        <img
-                          src={message.virtualStagingData.image_url}
-                          alt={`Virtual staging — ${message.virtualStagingData.room}`}
-                          className="w-full rounded-xl border border-white/20 shadow-md object-cover"
-                          loading="lazy"
-                        />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">{message.virtualStagingData.room}</span>
-                          <span className="bg-accent px-2 py-0.5 rounded-full">{message.virtualStagingData.furniture_style}</span>
-                          <span className="ml-auto">{message.virtualStagingData.credits_used} credits used</span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = message.virtualStagingData!.image_url;
-                            a.download = `virtual-staging-${message.virtualStagingData!.room.toLowerCase().replace(' ', '-')}.jpg`;
-                            a.click();
+                        <VirtualStagingViewer
+                          resultImageUrl={message.virtualStagingData.image_url}
+                          sourceImageUrl={message.virtualStagingData.source_image_url}
+                          room={message.virtualStagingData.room}
+                          furnitureStyle={message.virtualStagingData.furniture_style}
+                          creditsUsed={message.virtualStagingData.credits_used}
+                          onAnalyzeQuality={() => {
+                            setInput(`Analyze the quality of this virtual staging result. Compare the original empty room with the staged version. Assess: lighting consistency, perspective accuracy, furniture scale vs room size, material realism, and edge blending. Score each dimension 1-10.`);
+                            if (message.virtualStagingData?.image_url) {
+                              setAttachedImages([message.virtualStagingData.image_url]);
+                            }
                           }}
-                        >
-                          <Download className="h-4 w-4" />
-                          Download
-                        </Button>
+                        />
                       </div>
                     ) : message.videoData ? (
                       <div className="space-y-3">
@@ -2888,6 +2969,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <TooltipContent side="left"><p>Prompt library</p></TooltipContent>
                     </Tooltip>
                   )}
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setShowInspirationModal(true)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      >
+                        <Globe className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>Design inspiration from URL</p></TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* Textarea — resizable */}
@@ -2952,6 +3045,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             }
             setVirtualStagingImageUrl(imageUrl || '');
           }}
+        />
+      )}
+
+      {/* Inspiration URL Modal */}
+      {showInspirationModal && (
+        <InspirationUrlModal
+          onSubmit={(url, focus) => {
+            const focusSuffix = focus !== 'all' ? ` (focus on ${focus} surfaces)` : '';
+            setInput(`Find materials matching this design inspiration: ${url}${focusSuffix}`);
+            setShowInspirationModal(false);
+          }}
+          onClose={() => setShowInspirationModal(false)}
         />
       )}
 

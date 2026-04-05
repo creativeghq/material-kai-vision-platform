@@ -38,14 +38,16 @@ const ROWS_PER_PAGE = 22;
 
 // Column definitions (proportional widths totaling TABLE_W)
 const COLUMNS = [
-  { label: '#', width: 25 },
-  { label: 'Product', width: 148 },
-  { label: 'SKU', width: 60 },
-  { label: 'Size / Color', width: 67 },
-  { label: 'Qty', width: 40 },
-  { label: 'Unit', width: 40 },
-  { label: 'Price', width: 65 },
-  { label: 'Total', width: 70 },
+  { label: '#', width: 22 },
+  { label: 'Product', width: 105 },
+  { label: 'Room', width: 50 },
+  { label: 'SKU', width: 48 },
+  { label: 'Size / Color', width: 52 },
+  { label: 'Qty', width: 28 },
+  { label: 'Unit', width: 30 },
+  { label: 'Price', width: 52 },
+  { label: 'Disc. Price', width: 55 },
+  { label: 'Total', width: 73 },
 ];
 
 /**
@@ -308,6 +310,23 @@ function addItemsPages(
     // Totals on the last items page
     if (pageIdx === totalPages - 1) {
       drawTotals(page, quote, y, font, fontBold);
+
+      // FF&E notes section (installation requirements + delivery dates)
+      const ffeItems = items.filter(
+        item => item.installation_requirements || item.delivery_date
+      );
+      if (ffeItems.length > 0) {
+        let ffeY = y - 100; // Below totals
+        if (ffeY < 120) {
+          // Not enough space — add new page
+          const ffePage = pdfDoc.addPage([PAGE_W, PAGE_H]);
+          ffePage.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+          ffeY = PAGE_H - 80;
+          drawFFENotes(ffePage, ffeItems, ffeY, font, fontBold);
+        } else {
+          drawFFENotes(page, ffeItems, ffeY, font, fontBold);
+        }
+      }
     }
   }
 }
@@ -367,43 +386,70 @@ function drawTableRow(
 
   const textY = y - 16;
   let x = TABLE_MARGIN_LEFT;
-  const fontSize = 8;
+  const fontSize = 7;
 
   // # column
-  page.drawText(String(rowNum), { x: x + 6, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  page.drawText(String(rowNum), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
   x += COLUMNS[0].width;
 
-  // Product name (truncate if needed)
-  const productName = truncateText(item.product_name, font, fontSize, COLUMNS[1].width - 12);
-  page.drawText(productName, { x: x + 6, y: textY, size: fontSize, font: fontBold, color: COLOR_BLACK });
+  // Product name + dimensions (truncate if needed)
+  const fullProductName = item.dimensions
+    ? `${item.product_name}, ${item.dimensions}`
+    : item.product_name;
+  const productName = truncateText(fullProductName, font, fontSize, COLUMNS[1].width - 10);
+  page.drawText(productName, { x: x + 4, y: textY, size: fontSize, font: fontBold, color: COLOR_BLACK });
   x += COLUMNS[1].width;
 
-  // SKU
-  page.drawText(item.sku || '-', { x: x + 6, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  // Room
+  const roomText = truncateText(item.room || '-', font, fontSize, COLUMNS[2].width - 10);
+  page.drawText(roomText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[2].width;
+
+  // SKU
+  const skuText = truncateText(item.sku || '-', font, fontSize, COLUMNS[3].width - 10);
+  page.drawText(skuText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  x += COLUMNS[3].width;
 
   // Size / Color
   const sizeColor = [item.selected_size, item.selected_color].filter(Boolean).join(' / ') || '-';
-  const sizeColorTrunc = truncateText(sizeColor, font, fontSize, COLUMNS[3].width - 12);
-  page.drawText(sizeColorTrunc, { x: x + 6, y: textY, size: fontSize, font, color: COLOR_BLACK });
-  x += COLUMNS[3].width;
-
-  // Qty
-  page.drawText(String(item.quantity), { x: x + 6, y: textY, size: fontSize, font, color: COLOR_BLACK });
+  const sizeColorTrunc = truncateText(sizeColor, font, fontSize, COLUMNS[4].width - 10);
+  page.drawText(sizeColorTrunc, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[4].width;
 
-  // Unit
-  page.drawText(item.unit || 'pcs', { x: x + 6, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  // Qty
+  page.drawText(String(item.quantity), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[5].width;
 
-  // Unit Price (right-aligned in column)
-  const priceStr = formatCurrency(item.unit_price);
-  drawRightAligned(page, priceStr, x + COLUMNS[6].width - 6, textY, fontSize, font, COLOR_BLACK);
+  // Unit
+  page.drawText(item.unit || 'pcs', { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
   x += COLUMNS[6].width;
+
+  // Unit Price (right-aligned in column) — struck through if discounted
+  const priceStr = formatCurrency(item.unit_price);
+  const priceColor = item.discounted_price != null ? COLOR_GRAY : COLOR_BLACK;
+  drawRightAligned(page, priceStr, x + COLUMNS[7].width - 4, textY, fontSize, font, priceColor);
+  if (item.discounted_price != null) {
+    // Strikethrough line over the price text
+    const priceWidth = font.widthOfTextAtSize(priceStr, fontSize);
+    const priceRightX = x + COLUMNS[7].width - 4;
+    page.drawLine({
+      start: { x: priceRightX - priceWidth, y: textY + 3 },
+      end: { x: priceRightX, y: textY + 3 },
+      thickness: 0.5,
+      color: COLOR_GRAY,
+    });
+  }
+  x += COLUMNS[7].width;
+
+  // Disc. Price (right-aligned)
+  const discPriceStr = item.discounted_price != null ? formatCurrency(item.discounted_price) : '—';
+  const discPriceColor = item.discounted_price != null ? COLOR_BLACK : COLOR_LIGHT_GRAY;
+  drawRightAligned(page, discPriceStr, x + COLUMNS[8].width - 4, textY, fontSize, font, discPriceColor);
+  x += COLUMNS[8].width;
 
   // Line Total (right-aligned, bold)
   const totalStr = formatCurrency(item.line_total);
-  drawRightAligned(page, totalStr, x + COLUMNS[7].width - 6, textY, fontSize, fontBold, COLOR_BLACK);
+  drawRightAligned(page, totalStr, x + COLUMNS[9].width - 4, textY, fontSize, fontBold, COLOR_BLACK);
 }
 
 function drawTotals(
@@ -448,6 +494,85 @@ function drawTotals(
   // Grand Total
   page.drawText('GRAND TOTAL', { x: labelX, y, size: 12, font: fontBold, color: COLOR_DARK });
   drawRightAligned(page, formatCurrency(quote.grand_total, quote.currency), rightEdge, y, 12, fontBold, COLOR_DARK);
+}
+
+function drawFFENotes(
+  page: PDFPage,
+  items: QuoteData['items'],
+  startY: number,
+  font: PDFFont,
+  fontBold: PDFFont
+): void {
+  let y = startY;
+
+  // Section header
+  page.drawLine({
+    start: { x: TABLE_MARGIN_LEFT, y: y + 10 },
+    end: { x: TABLE_MARGIN_LEFT + TABLE_W, y: y + 10 },
+    thickness: 0.5,
+    color: COLOR_LIGHT_GRAY,
+  });
+
+  page.drawText('SPECIFICATIONS & DELIVERY', {
+    x: TABLE_MARGIN_LEFT,
+    y,
+    size: 10,
+    font: fontBold,
+    color: COLOR_DARK,
+  });
+  y -= 18;
+
+  for (const item of items) {
+    if (y < 60) break; // Safety margin
+
+    // Product name as sub-header
+    const itemLabel = item.dimensions
+      ? `${item.product_name}, ${item.dimensions}`
+      : item.product_name;
+    page.drawText(truncateText(itemLabel, fontBold, 8, TABLE_W - 20), {
+      x: TABLE_MARGIN_LEFT,
+      y,
+      size: 8,
+      font: fontBold,
+      color: COLOR_BLACK,
+    });
+    y -= 14;
+
+    if (item.installation_requirements) {
+      page.drawText('Installation:', {
+        x: TABLE_MARGIN_LEFT + 8,
+        y,
+        size: 7,
+        font: fontBold,
+        color: COLOR_GRAY,
+      });
+      const installLines = wrapText(item.installation_requirements, font, 7, TABLE_W - 80);
+      for (const line of installLines) {
+        page.drawText(line, { x: TABLE_MARGIN_LEFT + 70, y, size: 7, font, color: COLOR_BLACK });
+        y -= 11;
+      }
+    }
+
+    if (item.delivery_date) {
+      page.drawText('Delivery:', {
+        x: TABLE_MARGIN_LEFT + 8,
+        y,
+        size: 7,
+        font: fontBold,
+        color: COLOR_GRAY,
+      });
+      page.drawText(formatDate(item.delivery_date), {
+        x: TABLE_MARGIN_LEFT + 70,
+        y,
+        size: 7,
+        font,
+        color: COLOR_BLACK,
+      });
+      y -= 11;
+    }
+
+    y -= 6; // Space between items
+  }
 }
 
 // =====================================================

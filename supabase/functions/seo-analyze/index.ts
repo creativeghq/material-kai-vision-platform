@@ -23,6 +23,7 @@ import type {
   ContentBrief,
   GEOScore,
 } from '../_shared/seo-types.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -39,7 +40,7 @@ function jsonResponse(body: any, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('seo-analyze', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -157,7 +158,7 @@ Deno.serve(async (req) => {
       500,
     );
   }
-});
+}));
 
 // ════════════════════════════════════════════════════════════════
 // CONTENT ANALYSIS ENGINE (15+ checks)

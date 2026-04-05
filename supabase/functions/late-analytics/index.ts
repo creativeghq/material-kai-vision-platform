@@ -12,6 +12,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -39,7 +40,7 @@ async function lateApi(method: string, path: string): Promise<unknown> {
   return await res.json();
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('late-analytics', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -231,4 +232,4 @@ Deno.serve(async (req) => {
   }
 
   return jsonResponse({ success: false, error: `Unknown action: ${action}` }, 400);
-});
+}));

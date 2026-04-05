@@ -540,6 +540,7 @@ export const ProfileTab: React.FC = () => {
   const [factoryOptions, setFactoryOptions] = useState<FactoryOption[]>([]);
 
   const [factoryVerified, setFactoryVerified] = useState(false);
+
   const [factoryClaimedName, setFactoryClaimedName] = useState<string | null>(null);
   const [regRequest, setRegRequest] = useState<{ status: string; rejection_reason?: string | null } | null>(null);
   const [showRegForm, setShowRegForm] = useState(false);

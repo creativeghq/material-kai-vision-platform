@@ -75,11 +75,11 @@ const ModelDebuggingPanel: React.FC = () => {
       }
     }
 
-    // Initialize with the 7 user-specified models
+    // Initialize with all Replicate models from replicateConfig
     const initialModels: ModelStatus[] = [
       {
         name: 'adirik/interior-design',
-        displayName: '🏡 Interior Design AI',
+        displayName: 'Interior Design AI',
         type: 'image-to-image',
         status: 'working',
         lastTested: '2025-07-16T17:10:00Z',
@@ -99,67 +99,129 @@ const ModelDebuggingPanel: React.FC = () => {
         ],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'AI-powered interior design generation from room images',
+        description: 'Interior design transformation with ControlNet depth',
       },
       {
         name: 'erayyavuz/interior-ai',
-        displayName: '🏠 Interior AI',
+        displayName: 'Interior AI',
         type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Interior design transformation using AI (supports text and image inputs)',
+          'e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9',
+        description: 'Lifelike interior designs from text and image references',
       },
       {
         name: 'jschoormans/comfyui-interior-remodel',
-        displayName: '🎨 ComfyUI Interior Remodel',
+        displayName: 'ComfyUI Interior Remodel',
         type: 'hybrid',
         status: 'untested',
         recentLogs: [],
-        versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'ComfyUI-based interior remodeling system (text + image)',
+        versionHash: 'latest',
+        description: 'ComfyUI-based interior remodeling',
       },
       {
         name: 'julian-at/interiorly-gen1-dev',
-        displayName: '🏛️ Interiorly Gen1 Dev',
+        displayName: 'Interiorly Gen1 Dev',
         type: 'hybrid',
         status: 'untested',
         recentLogs: [],
-        versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Advanced interior generation development model (text + image)',
+        versionHash: 'latest',
+        description: 'Interiorly generation model v1 development',
       },
       {
         name: 'jschoormans/interior-v2',
-        displayName: '🏘️ Interior V2',
+        displayName: 'Interior V2',
+        type: 'hybrid',
+        status: 'untested',
+        recentLogs: [],
+        versionHash: 'latest',
+        description: 'Interior design v2 — fast generation',
+      },
+      {
+        name: 'doobls-ai/interor-2',
+        displayName: 'Doobls Interior 2',
         type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Second generation interior design model (text + image)',
+          '91f2ef63c76a73d2ec4c67cf7b2a9672e074046cf4fde1d98e46a5829f7ea68b',
+        description: 'Flux LoRA interior design — fast generation with img2img support',
+      },
+      {
+        name: 'rihan-a/colourful_interiors',
+        displayName: 'Colourful Interiors',
+        type: 'hybrid',
+        status: 'untested',
+        recentLogs: [],
+        versionHash:
+          'ba0425bc2e4bebafa8bd918519fdf3b5a022969a6a7c8ba0746b807bb5b541a3',
+        description: 'Flux LoRA for vibrant colourful interiors (trigger word: INTR)',
+      },
+      {
+        name: 'pointblack/stable-interiors-v2',
+        displayName: 'Stable Interiors V2 (PointBlack)',
+        type: 'image-to-image',
+        status: 'untested',
+        recentLogs: [],
+        versionHash:
+          '569b1bd6e4df6c9c900ad932d4a3a9f05585fac957dc6bc627aa1654853a97b5',
+        description: 'SD-based img2img interior transformation',
+      },
+      {
+        name: 'youzu/stable-interiors-v2',
+        displayName: 'Stable Interiors V2 (Youzu)',
+        type: 'image-to-image',
+        status: 'untested',
+        recentLogs: [],
+        versionHash:
+          '4836eb257a4fb8b87bac9eacbef9292ee8e1a497398ab96207067403a4be2daf',
+        description: 'Fast SD-based img2img interior transformation (~12s)',
       },
       {
         name: 'rocketdigitalai/interior-design-sdxl',
-        displayName: '🚀 Interior Design SDXL',
+        displayName: 'Interior Design SDXL',
         type: 'text-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'SDXL-based interior design generation from text prompts',
+        versionHash: 'latest',
+        description: 'SDXL + ControlNet depth/ProMax for photorealistic interior renders',
       },
       {
         name: 'davisbrown/designer-architecture',
-        displayName: '🏗️ Designer Architecture',
+        displayName: 'Designer Architecture',
         type: 'text-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash:
-          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Architectural design generation from text prompts',
+        versionHash: 'latest',
+        description: 'Designer architecture generation',
+      },
+      {
+        name: 'stability-ai/stable-diffusion',
+        displayName: 'Stable Diffusion',
+        type: 'text-to-image',
+        status: 'untested',
+        recentLogs: [],
+        versionHash: 'latest',
+        description: 'Stable Diffusion text-to-image generation',
+      },
+      {
+        name: 'runwayml/stable-diffusion-v1-5',
+        displayName: 'Stable Diffusion v1.5',
+        type: 'text-to-image',
+        status: 'untested',
+        recentLogs: [],
+        versionHash: 'latest',
+        description: 'Stable Diffusion v1.5 text-to-image generation',
+      },
+      {
+        name: 'threestudio-project/threestudio',
+        displayName: 'ThreeStudio 3D',
+        type: 'text-to-image',
+        status: 'untested',
+        recentLogs: [],
+        versionHash: 'latest',
+        description: '3D object generation from text',
       },
     ];
     setModels(initialModels);
@@ -471,18 +533,6 @@ const ModelDebuggingPanel: React.FC = () => {
                                   </span>
                                   <span className="text-xs">
                                     {new Date(model.lastTested).toLocaleString()}
-                                  </span>
-                                </div>
-                              )}
-                              {model.lastTested && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">
-                                    Last Tested:
-                                  </span>
-                                  <span>
-                                    {new Date(
-                                      model.lastTested,
-                                    ).toLocaleString()}
                                   </span>
                                 </div>
                               )}

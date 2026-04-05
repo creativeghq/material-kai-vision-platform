@@ -30,7 +30,16 @@ export async function fetchQuoteData(
       selected_size,
       selected_color,
       unit_price,
+      discounted_price,
       line_total,
+      custom_product_name,
+      custom_product_description,
+      custom_sku,
+      custom_unit,
+      room,
+      dimensions,
+      installation_requirements,
+      delivery_date,
       products (
         id,
         name,
@@ -63,23 +72,35 @@ export async function fetchQuoteData(
   // Resolve client details
   const client = await fetchClientData(supabase, quote.user_id);
 
-  // Map items
+  // Map items (supports both catalog products and custom items)
   const mappedItems: QuoteItemData[] = items.map((item: any) => {
     const product = item.products;
     const metadata = product?.metadata || {};
+    const isCustom = !product;
 
     return {
       id: item.id,
-      product_name: product?.name || 'Unknown Product',
-      description: product?.description || metadata?.description || null,
-      sku: product?.sku || metadata?.sku || null,
+      product_name: isCustom
+        ? (item.custom_product_name || 'Custom Item')
+        : (product?.name || 'Unknown Product'),
+      description: isCustom
+        ? (item.custom_product_description || null)
+        : (product?.description || metadata?.description || null),
+      sku: isCustom
+        ? (item.custom_sku || null)
+        : (product?.sku || metadata?.sku || null),
       selected_size: item.selected_size || null,
       selected_color: item.selected_color || null,
       quantity: item.quantity,
-      unit: metadata?.unit || 'pcs',
+      unit: isCustom ? (item.custom_unit || 'pcs') : (metadata?.unit || 'pcs'),
       unit_price: parseFloat(item.unit_price) || 0,
+      discounted_price: item.discounted_price != null ? parseFloat(item.discounted_price) : null,
       line_total: parseFloat(item.line_total) || 0,
       notes: item.notes || null,
+      room: item.room || null,
+      dimensions: item.dimensions || null,
+      installation_requirements: item.installation_requirements || null,
+      delivery_date: item.delivery_date || null,
     };
   });
 

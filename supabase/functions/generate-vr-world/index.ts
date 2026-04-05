@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -44,7 +45,7 @@ interface GenerateVRRequest {
   model?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('generate-vr-world', async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -265,7 +266,7 @@ Deno.serve(async (req) => {
       500
     );
   }
-});
+}));
 
 // --- WorldLabs API helpers ---
 

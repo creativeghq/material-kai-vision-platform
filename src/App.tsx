@@ -41,6 +41,9 @@ const MoodBoardPage = lazy(() => import('./components/business/moodboard/MoodBoa
 const MoodBoardDetailPage = lazy(() => import('./components/business/moodboard/MoodBoardDetailPage').then(m => ({ default: m.MoodBoardDetailPage })));
 const SVBRDFExtractionPage = lazy(() => import('./components/experimental/svbrdf/SVBRDFExtractionPage').then(m => ({ default: m.SVBRDFExtractionPage })));
 
+// AR Preview (standalone page for QR handoff)
+const ARPage = lazy(() => import('./components/features/ar/ARPage').then(m => ({ default: m.default })).catch(() => ({ default: () => null })));
+
 // Billing & quotes (customer-facing)
 const SubscriptionPlansPage = lazy(() => import('./components/business/billing/SubscriptionPlansPage').then(m => ({ default: m.SubscriptionPlansPage })));
 const CreditPackagesPage = lazy(() => import('./components/business/billing/CreditPackagesPage').then(m => ({ default: m.CreditPackagesPage })));
@@ -833,6 +836,9 @@ const App = () => (
                 <Route path="/ready" element={<HealthPage />} />
                 <Route path="/coverage" element={<CoveragePage />} />
                 <Route path="/coverage/*" element={<CoveragePage />} />
+                {/* AR Material Preview (public, no layout — for QR handoff from desktop) */}
+                <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
+
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

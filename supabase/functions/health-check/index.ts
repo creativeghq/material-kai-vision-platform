@@ -20,6 +20,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const ANTHROPIC_API_KEY   = Deno.env.get('ANTHROPIC_API_KEY')   || '';
 const OPENAI_API_KEY      = Deno.env.get('OPENAI_API_KEY')      || '';
@@ -158,7 +159,7 @@ async function checkExternalService(url: string): Promise<ExternalResult> {
 
 // ── Handler ────────────────────────────────────────────────────────────────
 
-serve(async (req) => {
+serve(withApiLogging('health-check', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -212,4 +213,4 @@ serve(async (req) => {
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+}));

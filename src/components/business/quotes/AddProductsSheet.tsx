@@ -88,6 +88,8 @@ const getAvailableSizes = (metadata?: Record<string, any>): string[] => {
 interface SelectedProduct extends ProductWithImage {
   quantity: number;
   selectedSize?: string;
+  room?: string;
+  dimensions?: string;
 }
 
 interface CustomProductForm {
@@ -99,6 +101,10 @@ interface CustomProductForm {
   quantity: number;
   size: string;
   color: string;
+  room: string;
+  dimensions: string;
+  installation_requirements: string;
+  delivery_date: string;
 }
 
 const EMPTY_CUSTOM: CustomProductForm = {
@@ -110,6 +116,10 @@ const EMPTY_CUSTOM: CustomProductForm = {
   quantity: 1,
   size: '',
   color: '',
+  room: '',
+  dimensions: '',
+  installation_requirements: '',
+  delivery_date: '',
 };
 
 interface AddProductsSheetProps {
@@ -209,6 +219,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
           quantity: product.quantity,
           added_from: 'manual',
           notes,
+          room: product.room || undefined,
+          dimensions: product.dimensions || undefined,
         });
       }
       toast({ title: 'Products Added', description: `Added ${selectedProducts.length} product(s) to the quote.` });
@@ -243,6 +255,10 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
         quantity: customForm.quantity,
         selected_size: customForm.size.trim() || undefined,
         selected_color: customForm.color.trim() || undefined,
+        room: customForm.room.trim() || undefined,
+        dimensions: customForm.dimensions.trim() || undefined,
+        installation_requirements: customForm.installation_requirements.trim() || undefined,
+        delivery_date: customForm.delivery_date || undefined,
       });
       toast({ title: 'Custom Product Added', description: `"${customForm.name}" added to the quote.` });
       setCustomForm(EMPTY_CUSTOM);
@@ -389,6 +405,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                       <TableRow>
                         <TableHead className="w-16">Image</TableHead>
                         <TableHead>Product</TableHead>
+                        <TableHead className="w-28">Room</TableHead>
                         <TableHead className="w-36">Size</TableHead>
                         <TableHead className="w-28 text-center">Qty</TableHead>
                         <TableHead className="w-10"></TableHead>
@@ -413,6 +430,14 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                             <TableCell>
                               <p className="font-medium text-sm truncate max-w-[120px]">{product.name || 'Unnamed'}</p>
                               {product.sku && <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>}
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                value={product.room || ''}
+                                onChange={e => setSelectedProducts(prev => prev.map(p => p.id === product.id ? { ...p, room: e.target.value } : p))}
+                                placeholder="Room"
+                                className="h-8 text-xs"
+                              />
                             </TableCell>
                             <TableCell>
                               {availableSizes.length > 0 ? (
@@ -527,12 +552,42 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 {/* Size + Color */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="cp-size">Size / Dimensions</Label>
+                    <Label htmlFor="cp-size">Size / Variant</Label>
                     <Input id="cp-size" value={customForm.size} onChange={e => setCustomField('size', e.target.value)} placeholder="e.g. 60×60 cm" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="cp-color">Color / Finish</Label>
                     <Input id="cp-color" value={customForm.color} onChange={e => setCustomField('color', e.target.value)} placeholder="e.g. Carrara White" />
+                  </div>
+                </div>
+
+                {/* FF&E Fields */}
+                <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">FF&E Specification</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cp-room">Room / Area</Label>
+                      <Input id="cp-room" value={customForm.room} onChange={e => setCustomField('room', e.target.value)} placeholder="e.g. Living Room" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cp-dims">Dimensions (W×H×D)</Label>
+                      <Input id="cp-dims" value={customForm.dimensions} onChange={e => setCustomField('dimensions', e.target.value)} placeholder="e.g. 120×60×45" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cp-install">Installation Requirements</Label>
+                    <textarea
+                      id="cp-install"
+                      value={customForm.installation_requirements}
+                      onChange={e => setCustomField('installation_requirements', e.target.value)}
+                      placeholder="e.g. Requires wall anchoring, electrical outlet within 1m..."
+                      rows={2}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cp-delivery">Expected Delivery Date</Label>
+                    <Input id="cp-delivery" type="date" value={customForm.delivery_date} onChange={e => setCustomField('delivery_date', e.target.value)} />
                   </div>
                 </div>
 

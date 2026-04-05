@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface SessionManagerRequest {
   sessionId: string;
@@ -15,7 +16,7 @@ interface SessionManagerRequest {
  * - Secret key (apikey header): Full admin access
  * - User JWT (Authorization header): User-specific operations
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
   console.log(`Session manager called - Method: ${req.method}`);
 
   // Handle CORS preflight requests
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
 
 /**
  * Launch a Firecrawl /v1/crawl job for the session's source URL.

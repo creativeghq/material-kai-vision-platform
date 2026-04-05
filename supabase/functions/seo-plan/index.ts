@@ -22,6 +22,7 @@ import type {
   ArticlePlan,
   KeywordResearchResult,
 } from '../_shared/seo-types.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -69,7 +70,7 @@ const ArticlePlanSchema = z.object({
   statisticalClaims: z.array(z.string()),
 });
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('seo-plan', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -160,7 +161,7 @@ Deno.serve(async (req) => {
       500,
     );
   }
-});
+}));
 
 // ════════════════════════════════════════════════════════════════
 // PROMPT BUILDERS

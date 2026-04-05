@@ -40,8 +40,14 @@ export interface QuoteItemData {
   quantity: number;
   unit: string;
   unit_price: number;
+  discounted_price: number | null;
   line_total: number;
   notes: string | null;
+  // FF&E fields
+  room: string | null;
+  dimensions: string | null;
+  installation_requirements: string | null;
+  delivery_date: string | null;
 }
 
 export interface ClientData {

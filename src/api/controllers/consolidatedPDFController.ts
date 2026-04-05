@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import {
   JWTAuthMiddleware,
   AuthenticatedRequest,
@@ -300,12 +299,8 @@ export class RateLimitHelper {
     resetTime: Date;
   }> {
     try {
-      // Get rate limit for this endpoint
-      const rateLimit = await apiGatewayService.getRateLimit(
-        endpoint,
-        clientIP,
-        userId,
-      );
+      // Default rate limit (60 req/min)
+      const rateLimit = 60;
 
       // Query recent requests from database
       const oneMinuteAgo = new Date(Date.now() - 60000);
