@@ -41,19 +41,13 @@ import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
-// Tool factory imports — LAZY loaded at request time to stay under 2s boot limit.
-// Each tool module has top-level await import() calls for @langchain/core, zod, etc.
-// Loading all 8 modules at boot exceeds the Supabase Edge Runtime boot time budget.
-const toolModules = {
-  search: () => import('../_shared/tools/search-tools.ts'),
-  generation: () => import('../_shared/tools/generation-tools.ts'),
-  ops: () => import('../_shared/tools/ops-tools.ts'),
-  database: () => import('../_shared/tools/database-tools.ts'),
-  subAgent: () => import('../_shared/tools/sub-agent-tools.ts'),
-  b2b: () => import('../_shared/tools/b2b-tools.ts'),
-  seo: () => import('../_shared/tools/seo-tools.ts'),
-  background: () => import('../_shared/tools/background-tools.ts'),
-};
+// Tool factory imports — core tools loaded at boot, heavy/admin-only tools lazy-loaded.
+// Each tool module has top-level await import() for @langchain/core, zod, etc.
+// Loading all 8 at boot exceeds the Supabase Edge Runtime ~2s boot limit,
+// so we only eagerly load the 3 modules every request needs.
+import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool, createInspirationUrlTool } from '../_shared/tools/search-tools.ts';
+import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } from '../_shared/tools/generation-tools.ts';
+import { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } from '../_shared/tools/ops-tools.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
@@ -838,32 +832,48 @@ async function executeAgent(
   const tools: any[] = [];
   const isAdmin = userRole === 'admin' || userRole === 'owner';
 
-  // Lazy-load tool modules (only the ones this agent needs)
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod] = await Promise.all([
-    config.tools.some((t: string) => ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t)) ? toolModules.search() : null,
-    config.tools.some((t: string) => ['generate_3d'].includes(t)) ? toolModules.generation() : null,
-    config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t)) ? toolModules.ops() : null,
-    config.tools.includes('query_database') ? toolModules.database() : null,
-    config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t)) ? toolModules.subAgent() : null,
-    config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t)) ? toolModules.b2b() : null,
-    config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t)) ? toolModules.seo() : null,
-    config.tools.includes('dispatch_background_task') ? toolModules.background() : null,
-  ]);
+  // Lazy-load admin/heavy tool modules at request time (not boot time).
+  // search-tools, generation-tools, ops-tools are loaded at boot (every request needs them).
+  // database, sub-agent, b2b, seo, background tools are loaded on demand.
+  const needsDb = config.tools.includes('query_database');
+  const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
+  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
+  const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
+  const needsBg = config.tools.includes('dispatch_background_task');
 
-  // Destructure tool factories from loaded modules
-  const { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool, createInspirationUrlTool } = searchMod ?? {} as any;
-  const { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } = generationMod ?? {} as any;
-  const { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } = opsMod ?? {} as any;
-  const { createQueryDatabaseTool } = dbMod ?? {} as any;
-  const { createResearchAnalysisTool, createAnalyticsAnalysisTool, createBusinessAnalysisTool, createProductAnalysisTool } = subAgentMod ?? {} as any;
-  const { createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } = b2bMod ?? {} as any;
-  const { createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } = seoMod ?? {} as any;
-  const { createDispatchBackgroundTaskTool } = bgMod ?? {} as any;
+  let dbMod: any = null, subAgentMod: any = null, b2bMod: any = null, seoMod: any = null, bgMod: any = null;
+  if (needsDb || needsSub || needsB2b || needsSeo || needsBg) {
+    [dbMod, subAgentMod, b2bMod, seoMod, bgMod] = await Promise.all([
+      needsDb  ? import('../_shared/tools/database-tools.ts') : null,
+      needsSub ? import('../_shared/tools/sub-agent-tools.ts') : null,
+      needsB2b ? import('../_shared/tools/b2b-tools.ts') : null,
+      needsSeo ? import('../_shared/tools/seo-tools.ts') : null,
+      needsBg  ? import('../_shared/tools/background-tools.ts') : null,
+    ]);
+  }
+
+  const createQueryDatabaseTool = dbMod?.createQueryDatabaseTool;
+  const createResearchAnalysisTool = subAgentMod?.createResearchAnalysisTool;
+  const createAnalyticsAnalysisTool = subAgentMod?.createAnalyticsAnalysisTool;
+  const createBusinessAnalysisTool = subAgentMod?.createBusinessAnalysisTool;
+  const createProductAnalysisTool = subAgentMod?.createProductAnalysisTool;
+  const createB2BManufacturerSearchTool = b2bMod?.createB2BManufacturerSearchTool;
+  const createCompanyWebsiteScrapeTool = b2bMod?.createCompanyWebsiteScrapeTool;
+  const createCompanyEnrichmentTool = b2bMod?.createCompanyEnrichmentTool;
+  const createContactDiscoveryTool = b2bMod?.createContactDiscoveryTool;
+  const createEmailValidateTool = b2bMod?.createEmailValidateTool;
+  const createSaveToCRMTool = b2bMod?.createSaveToCRMTool;
+  const createSEOKeywordResearchTool = seoMod?.createSEOKeywordResearchTool;
+  const createSEOArticlePlannerTool = seoMod?.createSEOArticlePlannerTool;
+  const createSEOArticleWriterTool = seoMod?.createSEOArticleWriterTool;
+  const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
+  const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
+  const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
 
   // --- Core tools (all users) ---
 
   // Knowledge Base search - always add first so agent checks KB before answering
-  if (config.tools.includes('knowledge_base_search') && createKnowledgeBaseSearchTool) {
+  if (config.tools.includes('knowledge_base_search')) {
     tools.push(createKnowledgeBaseSearchTool(workspaceId));
   }
 
