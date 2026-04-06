@@ -13,14 +13,7 @@
 // ⚠️ Boot-time code kept MINIMAL — Supabase Edge Runtime has a strict ~2s boot limit.
 // All heavy npm packages and tool modules are lazy-loaded on first request via initRuntime().
 
-// process.env polyfill MUST run at module top-level — Deno blocks env mutation at request time.
-try {
-  if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
-  else if (!(globalThis as any).process.env) (globalThis as any).process.env = {};
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
-} catch {
-  // Edge runtime may block env mutation — @langchain/anthropic will fall back to Deno.env
-}
+// No process.env polyfill needed — API key passed directly to ChatAnthropic constructor.
 
 import { corsHeaders } from '../_shared/cors.ts';
 
@@ -105,11 +98,13 @@ async function initRuntime() {
     model: 'claude-haiku-4-5-20251001',
     temperature: 0.7,
     maxTokens: 4096,
+    anthropicApiKey: ANTHROPIC_API_KEY,
   });
   modelSonnet = new ChatAnthropic({
     model: 'claude-sonnet-4-6-20260217',
     temperature: 1,
     maxTokens: 4096,
+    anthropicApiKey: ANTHROPIC_API_KEY,
   });
 
   _initialized = true;
