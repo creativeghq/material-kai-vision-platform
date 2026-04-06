@@ -57,12 +57,12 @@ async function initRuntime() {
     import('../_shared/auth.ts'),
     import('../_shared/skills-loader.ts'),
     import('../_shared/flow-events.ts'),
-    import('npm:@supabase/supabase-js@2'),
-    import('npm:@langchain/anthropic@1.3.10'),
-    import('npm:@langchain/core@1.1.15/tools'),
-    import('npm:zod@3.24.0'),
-    import('npm:@langchain/langgraph@1.1.3'),
-    import('npm:@langchain/core@1.1.15/messages'),
+    import('@supabase/supabase-js'),
+    import('@langchain/anthropic'),
+    import('@langchain/core/tools'),
+    import('zod'),
+    import('@langchain/langgraph'),
+    import('@langchain/core/messages'),
   ]);
 
   debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
