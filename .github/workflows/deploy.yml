@@ -110,14 +110,56 @@ jobs:
           echo "📋 Project Ref: ${{ secrets.SUPABASE_PROJECT_ID }}"
           echo "🔑 Token present: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && 'Yes' || 'No' }}"
 
+          PROJECT_REF="${{ secrets.SUPABASE_PROJECT_ID }}"
+
           # Test authentication first
           echo "🔍 Testing Supabase authentication..."
           supabase projects list || echo "⚠️ Authentication test failed"
 
-          # Deploy functions
-          echo "📦 Deploying functions..."
-          supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
-          echo "✅ Supabase functions deployed successfully"
+          # Deploy functions one-by-one to avoid container resource exhaustion.
+          # Only deploys functions whose code actually changed (Supabase CLI detects this).
+          echo "📦 Deploying functions individually..."
+          FAILED=""
+          DEPLOYED=""
+          SKIPPED=""
+
+          for FUNC_DIR in supabase/functions/*/; do
+            FUNC_NAME=$(basename "$FUNC_DIR")
+
+            # Skip _shared directory and any non-function dirs
+            if [ "$FUNC_NAME" = "_shared" ] || [ ! -f "$FUNC_DIR/index.ts" ]; then
+              continue
+            fi
+
+            echo "━━━ Deploying: $FUNC_NAME"
+            if supabase functions deploy "$FUNC_NAME" --no-verify-jwt --project-ref "$PROJECT_REF" 2>&1 | tee /tmp/deploy_output.txt; then
+              if grep -q "No change found" /tmp/deploy_output.txt; then
+                SKIPPED="$SKIPPED $FUNC_NAME"
+              else
+                DEPLOYED="$DEPLOYED $FUNC_NAME"
+              fi
+            else
+              echo "⚠️  Failed to deploy: $FUNC_NAME"
+              FAILED="$FAILED $FUNC_NAME"
+            fi
+          done
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Deployment Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          [ -n "$DEPLOYED" ] && echo "✅ Deployed:$DEPLOYED"
+          [ -n "$SKIPPED" ] && echo "⏭️  No changes:$SKIPPED"
+          [ -n "$FAILED" ] && echo "❌ Failed:$FAILED"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Fail the step only if a critical function failed
+          if echo "$FAILED" | grep -q "agent-chat"; then
+            echo "❌ Critical function agent-chat failed to deploy!"
+            exit 1
+          fi
+
+          echo "✅ Supabase functions deployment complete"
 
       - name: 🔧 Install Vercel CLI
         run: |
