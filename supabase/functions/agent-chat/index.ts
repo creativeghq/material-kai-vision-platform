@@ -101,7 +101,7 @@ async function initRuntime() {
     anthropicApiKey: ANTHROPIC_API_KEY,
   });
   modelSonnet = new ChatAnthropic({
-    model: 'claude-sonnet-4-6-20260217',
+    model: 'claude-sonnet-4-6',
     temperature: 1,
     maxTokens: 4096,
     anthropicApiKey: ANTHROPIC_API_KEY,
@@ -647,7 +647,7 @@ function getModelNameForAgent(agentId: string): string {
   if (agentId === 'demo') {
     return 'claude-haiku-4-5-20251001';
   }
-  return 'claude-sonnet-4-6-20260217';
+  return 'claude-sonnet-4-6';
 }
 
 interface AgentConfig {
