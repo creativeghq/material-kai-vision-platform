@@ -93,13 +93,18 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
   const [selectedStyle, setSelectedStyle] = useState<string>('');
   const [furnitureItems, setFurnitureItems] = useState<string>('');
 
-  // Reset when reopened
+  // Reset when reopened — auto-skip step 1 if defaultRoom is provided
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
-      setSelectedRoom(defaultRoom || '');
       setSelectedStyle('');
       setFurnitureItems('');
+      if (defaultRoom) {
+        setSelectedRoom(defaultRoom);
+        setStep(2);
+      } else {
+        setSelectedRoom('');
+        setStep(1);
+      }
     }
   }, [isOpen, defaultRoom]);
 

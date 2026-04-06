@@ -2489,6 +2489,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               modelCount={message.generation_job.model_count}
                               models={message.generation_job.models}
                               workspaceId={workspaceId}
+                              roomType={message.generation_job.room_type}
                               onImageClick={(_url, _name) => {
                                 // TODO: open image lightbox
                               }}
@@ -2824,6 +2825,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   >
                     <Pencil className="w-3 h-3" />
                     Edit Image
+                  </button>
+
+                  {/* Virtual Staging — stage uploaded room image with AI furniture */}
+                  <button
+                    onClick={() => {
+                      if (attachedImages.length > 0) {
+                        setVirtualStagingImageUrl(attachedImages[0]);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
+                    title="Virtually stage this room with AI-generated furniture (20 credits)"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Stage Room
                   </button>
                 </div>
               )}

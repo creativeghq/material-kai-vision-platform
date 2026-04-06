@@ -56,6 +56,8 @@ interface ProgressiveImageGridProps {
   directImage?: { url: string; title?: string };
   /** Called when the direct-image modal is closed */
   onDirectImageClose?: () => void;
+  /** Room type from generation context — auto-skips step 1 in Virtual Staging modal */
+  roomType?: string;
 }
 
 const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
@@ -76,6 +78,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   onEditImage,
   directImage,
   onDirectImageClose,
+  roomType,
 }) => {
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -1159,7 +1162,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         <DropdownMenuTrigger asChild>
                           <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-700 transition-colors shadow-sm">
                             <Layers className="w-3.5 h-3.5" />
-                            Materials Selection Board
+                            Materials Board
                             <ChevronDown className="w-3 h-3 ml-0.5" />
                           </button>
                         </DropdownMenuTrigger>
@@ -1180,16 +1183,19 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                             </div>
                             <span className="ml-auto text-xs text-muted-foreground pl-4">15 cr</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'photorealistic-render')}>
-                            <Camera className="h-4 w-4 mr-2" />
-                            <div>
-                              <div className="font-medium">Photorealistic Render</div>
-                              <div className="text-xs text-muted-foreground">Ultra-detailed magazine-quality room render</div>
-                            </div>
-                            <span className="ml-auto text-xs text-muted-foreground pl-4">15 cr</span>
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    )}
+                    {/* Photorealistic Render — standalone button */}
+                    {onGenerateMaterialsBoard && selectedImage && (
+                      <button
+                        onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'photorealistic-render')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                        title="Generate ultra-detailed magazine-quality photorealistic render (15 credits)"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        Photorealistic Render
+                      </button>
                     )}
                     {selectedImage && (
                       <MoodboardSavePopover
@@ -1613,6 +1619,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
         <VirtualStagingModal
           isOpen={showVirtualStagingModal}
           onClose={() => setShowVirtualStagingModal(false)}
+          defaultRoom={roomType}
           generating={virtualStagingGenerating}
           onGenerate={async (params) => {
             setVirtualStagingGenerating(true);
