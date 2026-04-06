@@ -41,13 +41,9 @@ import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
-// Tool factory imports — core tools loaded at boot, heavy/admin-only tools lazy-loaded.
-// Each tool module has top-level await import() for @langchain/core, zod, etc.
-// Loading all 8 at boot exceeds the Supabase Edge Runtime ~2s boot limit,
-// so we only eagerly load the 3 modules every request needs.
-import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool, createInspirationUrlTool } from '../_shared/tools/search-tools.ts';
-import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } from '../_shared/tools/generation-tools.ts';
-import { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } from '../_shared/tools/ops-tools.ts';
+// ALL tool modules lazy-loaded inside executeAgent() at request time.
+// Each module does top-level await import() for @langchain/core, zod, etc.
+// Loading ANY of them at boot pushes past the Supabase Edge Runtime ~2s limit.
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
@@ -832,26 +828,40 @@ async function executeAgent(
   const tools: any[] = [];
   const isAdmin = userRole === 'admin' || userRole === 'owner';
 
-  // Lazy-load admin/heavy tool modules at request time (not boot time).
-  // search-tools, generation-tools, ops-tools are loaded at boot (every request needs them).
-  // database, sub-agent, b2b, seo, background tools are loaded on demand.
+  // Lazy-load ALL tool modules at request time (not boot time).
+  // Each module does top-level await for @langchain/core + zod.
+  // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
+  const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
+  const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
+  const needsOps = config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t));
   const needsDb = config.tools.includes('query_database');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
 
-  let dbMod: any = null, subAgentMod: any = null, b2bMod: any = null, seoMod: any = null, bgMod: any = null;
-  if (needsDb || needsSub || needsB2b || needsSeo || needsBg) {
-    [dbMod, subAgentMod, b2bMod, seoMod, bgMod] = await Promise.all([
-      needsDb  ? import('../_shared/tools/database-tools.ts') : null,
-      needsSub ? import('../_shared/tools/sub-agent-tools.ts') : null,
-      needsB2b ? import('../_shared/tools/b2b-tools.ts') : null,
-      needsSeo ? import('../_shared/tools/seo-tools.ts') : null,
-      needsBg  ? import('../_shared/tools/background-tools.ts') : null,
-    ]);
-  }
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod]: any[] = await Promise.all([
+    needsSearch ? import('../_shared/tools/search-tools.ts') : null,
+    needsGen    ? import('../_shared/tools/generation-tools.ts') : null,
+    needsOps    ? import('../_shared/tools/ops-tools.ts') : null,
+    needsDb     ? import('../_shared/tools/database-tools.ts') : null,
+    needsSub    ? import('../_shared/tools/sub-agent-tools.ts') : null,
+    needsB2b    ? import('../_shared/tools/b2b-tools.ts') : null,
+    needsSeo    ? import('../_shared/tools/seo-tools.ts') : null,
+    needsBg     ? import('../_shared/tools/background-tools.ts') : null,
+  ]);
 
+  const createSearchTool = searchMod?.createSearchTool;
+  const createVisualSearchTool = searchMod?.createVisualSearchTool;
+  const createKnowledgeBaseSearchTool = searchMod?.createKnowledgeBaseSearchTool;
+  const createInspirationUrlTool = searchMod?.createInspirationUrlTool;
+  const create3DGenerationTool = generationMod?.create3DGenerationTool;
+  const createGeminiGenerationTool = generationMod?.createGeminiGenerationTool;
+  const createVirtualStagingTool = generationMod?.createVirtualStagingTool;
+  const createGenerationStatusTool = generationMod?.createGenerationStatusTool;
+  const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
+  const createQuerySentryTool = opsMod?.createQuerySentryTool;
+  const createCostEstimationTool = opsMod?.createCostEstimationTool;
   const createQueryDatabaseTool = dbMod?.createQueryDatabaseTool;
   const createResearchAnalysisTool = subAgentMod?.createResearchAnalysisTool;
   const createAnalyticsAnalysisTool = subAgentMod?.createAnalyticsAnalysisTool;
