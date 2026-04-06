@@ -50,7 +50,6 @@ import { createResearchAnalysisTool, createAnalyticsAnalysisTool, createBusiness
 import { createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } from '../_shared/tools/b2b-tools.ts';
 import { createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } from '../_shared/tools/seo-tools.ts';
 import { createDispatchBackgroundTaskTool } from '../_shared/tools/background-tools.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
@@ -1325,7 +1324,7 @@ async function logAgentUsage(
 /**
  * Main handler
  */
-Deno.serve(withApiLogging('agent-chat', async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight - must return 200/204 with proper headers
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -1647,5 +1646,5 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       },
     );
   }
-}));
+});
 
