@@ -13,6 +13,10 @@
 // ⚠️ Boot-time code kept MINIMAL — Supabase Edge Runtime has a strict ~2s boot limit.
 // All heavy npm packages and tool modules are lazy-loaded on first request via initRuntime().
 
+// process.env polyfill MUST run at module top-level — Deno blocks env mutation at request time.
+if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
+(globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Runtime singletons — initialized once on first request
@@ -46,10 +50,6 @@ async function initRuntime() {
   MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
-
-  // Polyfill process.env for npm packages
-  if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
 
   // Load all shared modules + npm packages in parallel
   const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod] = await Promise.all([
