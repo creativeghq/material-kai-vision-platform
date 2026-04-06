@@ -14,8 +14,13 @@
 // All heavy npm packages and tool modules are lazy-loaded on first request via initRuntime().
 
 // process.env polyfill MUST run at module top-level — Deno blocks env mutation at request time.
-if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
-(globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+try {
+  if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
+  else if (!(globalThis as any).process.env) (globalThis as any).process.env = {};
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+} catch {
+  // Edge runtime may block env mutation — @langchain/anthropic will fall back to Deno.env
+}
 
 import { corsHeaders } from '../_shared/cors.ts';
 
