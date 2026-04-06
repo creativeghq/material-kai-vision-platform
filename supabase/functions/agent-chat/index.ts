@@ -743,6 +743,7 @@ async function executeAgent(
   onChunk?: (chunk: any) => void,
   pinnedMaterialImages: string[] = [], // Catalog product images pinned by user for Gemini multi-reference
   generationMode?: string, // Explicit mode override from UI chip selection
+  conversation_id?: string | null, // Supabase conversation ID for background task dispatch
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -1554,6 +1555,7 @@ Deno.serve(async (req) => {
               },
               pinned_material_images, // Catalog product images pinned by user
               generation_mode || undefined, // Explicit mode override from UI chip
+              conversation_id, // Supabase conversation ID for background task dispatch
             );
             if (finalResult) {
             }
