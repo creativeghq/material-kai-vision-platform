@@ -19,7 +19,8 @@
  *   }));
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders } from './cors.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
 
@@ -57,7 +58,7 @@ export function withApiLogging(functionName: string, handler: Handler): Handler 
       errorMessage = err instanceof Error ? err.message : String(err);
       response = new Response(
         JSON.stringify({ error: errorMessage }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } },
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 

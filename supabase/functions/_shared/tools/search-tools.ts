@@ -11,8 +11,26 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-import { scrapeUrl } from '../utils/web-scraper.ts';
-import { debitExternalServiceCredits } from '../credit-utils.ts';
+// Lazy imports — loaded only when inspiration URL tool is actually called
+// (keeps boot time fast for agent-chat which imports this module at startup)
+let _scrapeUrl: typeof import('../utils/web-scraper.ts').scrapeUrl | null = null;
+let _debitCredits: typeof import('../credit-utils.ts').debitExternalServiceCredits | null = null;
+
+async function getScrapeUrl() {
+  if (!_scrapeUrl) {
+    const mod = await import('../utils/web-scraper.ts');
+    _scrapeUrl = mod.scrapeUrl;
+  }
+  return _scrapeUrl;
+}
+
+async function getDebitCredits() {
+  if (!_debitCredits) {
+    const mod = await import('../credit-utils.ts');
+    _debitCredits = mod.debitExternalServiceCredits;
+  }
+  return _debitCredits;
+}
 
 /**
  * LangChain Tool: Material Search using MIVAA API
@@ -341,6 +359,7 @@ export const createInspirationUrlTool = (
         onChunk?.({ type: 'tool_progress', status: `Scraping design inspiration from ${url}...`, timestamp: Date.now() });
 
         // Step 1: Scrape the URL
+        const scrapeUrl = await getScrapeUrl();
         const scrapeResult = await scrapeUrl(url);
         if (!scrapeResult.success) {
           return JSON.stringify({
@@ -350,6 +369,7 @@ export const createInspirationUrlTool = (
         }
 
         // Debit 1 credit for the scrape
+        const debitExternalServiceCredits = await getDebitCredits();
         await debitExternalServiceCredits(supabase, userId, 'firecrawl-scrape', 'inspiration_url_analysis', 1, { url });
 
         onChunk?.({ type: 'tool_progress', status: 'Analyzing design language...', timestamp: Date.now() });
