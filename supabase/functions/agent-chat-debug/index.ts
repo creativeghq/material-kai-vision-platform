@@ -1,101 +1,83 @@
 /**
- * agent-chat-debug: Minimal function that does the same imports as agent-chat
- * Deploy, then: curl https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/agent-chat-debug
- * The response body will show exactly which import crashes.
+ * agent-chat-debug v2: Replicate agent-chat's exact import pattern
+ * Uses STATIC imports (like agent-chat) not dynamic ones
  */
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Phase 1: env vars (same as agent-chat)
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const steps: string[] = [];
-
-try {
-  steps.push('1. env vars OK');
-
-  // --- Static imports that agent-chat uses (replicated as dynamic for diagnosis) ---
-  await import('../_shared/credit-utils.ts');
-  steps.push('2. credit-utils OK');
-
-  await import('../_shared/prompt-utils.ts');
-  steps.push('3. prompt-utils OK');
-
-  await import('../_shared/langgraph-core.ts');
-  steps.push('4. langgraph-core OK');
-
-  await import('../_shared/cors.ts');
-  steps.push('5. cors OK');
-
-  await import('../_shared/auth.ts');
-  steps.push('6. auth OK');
-
-  await import('../_shared/skills-loader.ts');
-  steps.push('7. skills-loader OK');
-
-  await import('../_shared/flow-events.ts');
-  steps.push('8. flow-events OK');
-
-  await import('../_shared/tools/search-tools.ts');
-  steps.push('9. search-tools OK');
-
-  await import('../_shared/tools/generation-tools.ts');
-  steps.push('10. generation-tools OK');
-
-  await import('../_shared/tools/ops-tools.ts');
-  steps.push('11. ops-tools OK');
-
-  await import('../_shared/tools/database-tools.ts');
-  steps.push('12. database-tools OK');
-
-  await import('../_shared/tools/sub-agent-tools.ts');
-  steps.push('13. sub-agent-tools OK');
-
-  await import('../_shared/tools/b2b-tools.ts');
-  steps.push('14. b2b-tools OK');
-
-  await import('../_shared/tools/seo-tools.ts');
-  steps.push('15. seo-tools OK');
-
-  await import('../_shared/tools/background-tools.ts');
-  steps.push('16. background-tools OK');
-
-  await import('../_shared/api-logger.ts');
-  steps.push('17. api-logger OK');
-
-  // npm packages
-  await import('npm:@supabase/supabase-js@2');
-  steps.push('18. supabase-js OK');
-
-  await import('npm:@langchain/anthropic@1.3.10');
-  steps.push('19. langchain-anthropic OK');
-
-  await import('npm:@langchain/core@1.1.15/tools');
-  steps.push('20. langchain-core/tools OK');
-
-  await import('npm:zod@3.24.0');
-  steps.push('21. zod OK');
-
-  await import('npm:@langchain/langgraph@1.1.3');
-  steps.push('22. langchain-langgraph OK');
-
-  await import('npm:@langchain/core@1.1.15/messages');
-  steps.push('23. langchain-core/messages OK');
-
-  steps.push('ALL IMPORTS OK');
-} catch (err) {
-  steps.push(`CRASH: ${err instanceof Error ? err.message : String(err)}`);
-  steps.push(`Stack: ${err instanceof Error ? err.stack : 'N/A'}`);
+if (!ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY must be set');
 }
 
-const bootResult = steps.join('\n');
-console.log('Boot result:\n' + bootResult);
+if (!(globalThis as any).process) {
+  (globalThis as any).process = { env: {} };
+}
+(globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+
+// Phase 2: STATIC imports — exactly like agent-chat
+import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { extractTextContent } from '../_shared/langgraph-core.ts';
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { createSearchTool, createVisualSearchTool, createKnowledgeBaseSearchTool, createInspirationUrlTool } from '../_shared/tools/search-tools.ts';
+import { create3DGenerationTool, createGeminiGenerationTool, createVirtualStagingTool, createGenerationStatusTool } from '../_shared/tools/generation-tools.ts';
+import { createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool } from '../_shared/tools/ops-tools.ts';
+import { createQueryDatabaseTool } from '../_shared/tools/database-tools.ts';
+import { createResearchAnalysisTool, createAnalyticsAnalysisTool, createBusinessAnalysisTool, createProductAnalysisTool } from '../_shared/tools/sub-agent-tools.ts';
+import { createB2BManufacturerSearchTool, createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool, createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool } from '../_shared/tools/b2b-tools.ts';
+import { createSEOKeywordResearchTool, createSEOArticlePlannerTool, createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool } from '../_shared/tools/seo-tools.ts';
+import { createDispatchBackgroundTaskTool } from '../_shared/tools/background-tools.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
+
+// Phase 3: Dynamic imports — exactly like agent-chat
+const { createClient } = await import('@supabase/supabase-js');
+const { ChatAnthropic } = await import('@langchain/anthropic');
+const { tool } = await import('@langchain/core/tools');
+const { z } = await import('zod');
+const { StateGraph, Annotation, END, START } = await import('@langchain/langgraph');
+const { BaseMessage, HumanMessage, AIMessage, SystemMessage } = await import('@langchain/core/messages');
+
+// Phase 4: Top-level code — exactly like agent-chat
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+let modelHaiku: ChatAnthropic;
+let modelSonnet: ChatAnthropic;
+try {
+  modelHaiku = new ChatAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    temperature: 0.7,
+    maxTokens: 4096,
+  });
+  modelSonnet = new ChatAnthropic({
+    model: 'claude-sonnet-4-6-20260217',
+    temperature: 1,
+    maxTokens: 4096,
+  });
+} catch (error) {
+  console.error('Model init failed:', error);
+  throw error;
+}
+
+console.log('✅ agent-chat-debug booted successfully');
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-  return new Response(JSON.stringify({ steps, bootResult }, null, 2), {
+  return new Response(JSON.stringify({
+    status: 'ok',
+    message: 'All imports + top-level code executed successfully',
+    hasSearchTool: typeof createSearchTool === 'function',
+    hasInspirationTool: typeof createInspirationUrlTool === 'function',
+    hasWithApiLogging: typeof withApiLogging === 'function',
+    models: { haiku: !!modelHaiku, sonnet: !!modelSonnet },
+  }, null, 2), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
