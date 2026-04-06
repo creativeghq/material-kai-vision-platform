@@ -108,7 +108,7 @@ Response format:
 
     // Map model selection to full model ID
     const modelId = model === 'claude-sonnet-4-5'
-      ? 'claude-sonnet-4-6-20260217'
+      ? 'claude-sonnet-4-6'
       : 'claude-haiku-4-5-20251001';
 
     // Call Claude via unified AI SDK client

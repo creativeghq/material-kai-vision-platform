@@ -67,7 +67,7 @@ export const createResearchAnalysisTool = (workspaceId: string) => {
 
         // Create a mini-agent execution with research context
         const researchModel = new ChatAnthropic({
-          model: 'claude-sonnet-4-6-20260217',
+          model: 'claude-sonnet-4-6',
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -130,7 +130,7 @@ export const createAnalyticsAnalysisTool = () => {
         const systemPrompt = await getAgentSystemPrompt('analytics');
 
         const analyticsModel = new ChatAnthropic({
-          model: 'claude-sonnet-4-6-20260217',
+          model: 'claude-sonnet-4-6',
           temperature: 0.5,
           maxTokens: 2048,
         });
@@ -190,7 +190,7 @@ export const createBusinessAnalysisTool = (workspaceId: string) => {
         const systemPrompt = await getAgentSystemPrompt('business');
 
         const businessModel = new ChatAnthropic({
-          model: 'claude-sonnet-4-6-20260217',
+          model: 'claude-sonnet-4-6',
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -252,7 +252,7 @@ export const createProductAnalysisTool = (workspaceId: string) => {
         const systemPrompt = await getAgentSystemPrompt('product');
 
         const productModel = new ChatAnthropic({
-          model: 'claude-sonnet-4-6-20260217',
+          model: 'claude-sonnet-4-6',
           temperature: 0.7,
           maxTokens: 2048,
         });
