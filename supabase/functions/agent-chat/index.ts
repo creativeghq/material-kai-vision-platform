@@ -10,54 +10,105 @@
  * - MIVAA Python API integration for search
  */
 
-// ⚠️ CRITICAL: Set up process.env polyfill BEFORE any imports
-// npm: packages in Deno expect Node.js process.env, not Deno.env
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
+// ⚠️ Boot-time code kept MINIMAL — Supabase Edge Runtime has a strict ~2s boot limit.
+// All heavy npm packages and tool modules are lazy-loaded on first request via initRuntime().
 
-import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
-import { getToolPrompt } from '../_shared/prompt-utils.ts';
-import { extractTextContent } from '../_shared/langgraph-core.ts';
-
-if (!ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY must be set');
-}
-
-// Polyfill process.env for npm packages that expect a Node.js environment.
-// Merge into the existing object rather than replacing it — other edge functions
-// running in the same Deno isolate may have already set keys we shouldn't wipe.
-if (!(globalThis as any).process) {
-  (globalThis as any).process = { env: {} };
-}
-(globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-
-
-// NOW import dependencies (after polyfill is set up)
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
-import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
 
-// ALL tool modules lazy-loaded inside executeAgent() at request time.
-// Each module does top-level await import() for @langchain/core, zod, etc.
-// Loading ANY of them at boot pushes past the Supabase Edge Runtime ~2s limit.
+// Runtime singletons — initialized once on first request
+let _initialized = false;
+let ANTHROPIC_API_KEY: string;
+let SUPABASE_URL: string;
+let SUPABASE_SERVICE_ROLE_KEY: string;
+let MIVAA_GATEWAY_URL: string;
+let MIVAA_API_KEY: string;
+let supabase: any;
+let ChatAnthropic: any;
+let tool: any;
+let z: any;
+let StateGraph: any, Annotation: any, END: any, START: any;
+let BaseMessage: any, HumanMessage: any, AIMessage: any, SystemMessage: any;
+let createClient: any;
+let debitExternalServiceCredits: any, checkCreditBalance: any;
+let getToolPrompt: any;
+let extractTextContent: any;
+let authenticate: any, isAdminAccess: any;
+let getSkillsForAgent: any, getSkillContent: any;
+let emitFlowEvent: any;
 
-// We use dynamic imports for libraries that might access process.env at top-level
-// This ensures the polyfill runs BEFORE these modules are loaded
-const { createClient } = await import('@supabase/supabase-js');
-const { ChatAnthropic } = await import('@langchain/anthropic');
-const { tool } = await import('@langchain/core/tools');
-const { z } = await import('zod');
+async function initRuntime() {
+  if (_initialized) return;
 
-// LangGraph imports for StateGraph-based agent orchestration
-const { StateGraph, Annotation, END, START } = await import('@langchain/langgraph');
-const { BaseMessage, HumanMessage, AIMessage, SystemMessage } = await import('@langchain/core/messages');
+  ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+  SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+  MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
+
+  // Polyfill process.env for npm packages
+  if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+
+  // Load all shared modules + npm packages in parallel
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod] = await Promise.all([
+    import('../_shared/credit-utils.ts'),
+    import('../_shared/prompt-utils.ts'),
+    import('../_shared/langgraph-core.ts'),
+    import('../_shared/auth.ts'),
+    import('../_shared/skills-loader.ts'),
+    import('../_shared/flow-events.ts'),
+    import('@supabase/supabase-js'),
+    import('@langchain/anthropic'),
+    import('@langchain/core/tools'),
+    import('zod'),
+    import('@langchain/langgraph'),
+    import('@langchain/core/messages'),
+  ]);
+
+  debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
+  checkCreditBalance = creditMod.checkCreditBalance;
+  getToolPrompt = promptMod.getToolPrompt;
+  extractTextContent = lgCoreMod.extractTextContent;
+  authenticate = authMod.authenticate;
+  isAdminAccess = authMod.isAdminAccess;
+  getSkillsForAgent = skillsMod.getSkillsForAgent;
+  getSkillContent = skillsMod.getSkillContent;
+  emitFlowEvent = flowMod.emitFlowEvent;
+  createClient = sbMod.createClient;
+  ChatAnthropic = anthropicMod.ChatAnthropic;
+  tool = toolsMod.tool;
+  z = zodMod.z;
+  StateGraph = lgMod.StateGraph;
+  Annotation = lgMod.Annotation;
+  END = lgMod.END;
+  START = lgMod.START;
+  BaseMessage = msgMod.BaseMessage;
+  HumanMessage = msgMod.HumanMessage;
+  AIMessage = msgMod.AIMessage;
+  SystemMessage = msgMod.SystemMessage;
+
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Initialize singletons that depend on loaded modules
+  checkpointer = new SupabaseCheckpointer();
+  longTermMemory = new LongTermMemory();
+  buildAgentStateAnnotation();
+
+  modelHaiku = new ChatAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    temperature: 0.7,
+    maxTokens: 4096,
+  });
+  modelSonnet = new ChatAnthropic({
+    model: 'claude-sonnet-4-6-20260217',
+    temperature: 1,
+    maxTokens: 4096,
+  });
+
+  _initialized = true;
+}
 
 /**
  * Supabase-based Checkpointer for LangGraph
@@ -218,15 +269,18 @@ class LongTermMemory {
   }
 }
 
-// Initialize memory and checkpointer singletons
-const checkpointer = new SupabaseCheckpointer();
-const longTermMemory = new LongTermMemory();
+// Singletons — initialized in initRuntime()
+let checkpointer: SupabaseCheckpointer;
+let longTermMemory: LongTermMemory;
 
 /**
  * LangGraph State Annotation
  * Defines the state schema for the agent graph
  */
-const AgentStateAnnotation = Annotation.Root({
+let AgentStateAnnotation: any;
+function buildAgentStateAnnotation() {
+  if (AgentStateAnnotation) return;
+  AgentStateAnnotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
     reducer: (prev, next) => [...prev, ...next],
     default: () => [],
@@ -271,9 +325,10 @@ const AgentStateAnnotation = Annotation.Root({
     reducer: (prev, next) => prev || next,
     default: () => false,
   }),
-});
+  });
+}
 
-type AgentState = typeof AgentStateAnnotation.State;
+type AgentState = any;
 
 /**
  * Create a LangGraph-based agent with StateGraph
@@ -573,29 +628,9 @@ async function getAgentSystemPrompt(agentType: string): Promise<string> {
   }
 }
 
-// Initialize Claude models AT MODULE LOAD TIME
-// Haiku for fast search queries, Sonnet for complex tasks
-let modelHaiku: ChatAnthropic;
-let modelSonnet: ChatAnthropic;
-
-try {
-  // Claude Haiku 4.5 - Fast model for search queries (~3-5 seconds)
-  modelHaiku = new ChatAnthropic({
-    model: 'claude-haiku-4-5-20251001',
-    temperature: 0.7,
-    maxTokens: 4096,
-  });
-
-  // Claude Sonnet 4.6 - Full model for complex tasks
-  modelSonnet = new ChatAnthropic({
-    model: 'claude-sonnet-4-6-20260217',
-    temperature: 1,
-    maxTokens: 4096,
-  });
-} catch (error) {
-  console.error('❌ Failed to initialize ChatAnthropic models:', error);
-  throw error;
-}
+// Claude models — initialized in initRuntime()
+let modelHaiku: any;
+let modelSonnet: any;
 
 // Model selection based on agent type
 function getModelForAgent(agentId: string): ChatAnthropic {
@@ -1379,6 +1414,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Initialize runtime on first real request (not OPTIONS)
+    await initRuntime();
 
     // Get request body
     const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null } = await req.json();
