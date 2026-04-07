@@ -925,33 +925,10 @@ async function executeAgent(
 
   // Material search (text-based 7-vector fusion) — now with search_spec support
   if (config.tools.includes('material_search')) {
-    // For Interior Designer: Only add tool when user is looking for catalog materials
-    // (prevents agent from triggering material search during generation conversations)
-    if (agentId === 'interior-designer') {
-      const userInputLower = userInput.toLowerCase();
-      const materialSearchKeywords = [
-        'find materials', 'search for materials', 'show me products', 'what materials',
-        'matching materials', 'search materials', 'find me tiles', 'find me flooring',
-        'find me marble', 'find me wood', 'find me stone', 'find me fabric',
-        'similar products', 'similar materials', 'catalog', 'browse materials',
-        'what products', 'find products', 'search products', 'recommend materials',
-        'suggest materials', 'what tiles', 'what flooring', 'show tiles', 'show flooring',
-        'find catalog', 'material catalog', 'show catalog',
-      ];
-      // Also match patterns like "find me X" / "show me X" / "what X should I use"
-      const materialSearchRegex = /\b(find|search|show|browse|recommend|suggest)\b.{0,20}\b(tile|floor|marble|wood|stone|fabric|wallpaper|carpet|paint|material|product)/i;
-      const shouldEnableMaterialSearch =
-        materialSearchKeywords.some(keyword => userInputLower.includes(keyword)) ||
-        materialSearchRegex.test(userInputLower);
-      if (shouldEnableMaterialSearch) {
-        tools.push(createSearchTool(workspaceId, onChunk));
-      } else {
-        console.log('⏭️ Material search disabled for Interior Designer (user did not ask for catalog materials)');
-      }
-    } else {
-      // For KAI and other agents: Always available (LLM decides when to use)
-      tools.push(createSearchTool(workspaceId, onChunk));
-    }
+    // Always make material_search available — let the LLM decide when to use it.
+    // Previously gated behind keyword matching for interior-designer, but this caused
+    // queries like "Harmony tiles" to have no search tool available, returning no results.
+    tools.push(createSearchTool(workspaceId, onChunk));
   }
 
   // Inspiration URL analysis (all users) — scrape a design URL and find matching materials

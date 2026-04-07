@@ -54,7 +54,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/core/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/core/ui/sheet';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
@@ -596,16 +596,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
     // Generic thinking messages
     const thinkingMessages = [
-      'Processing your request. This shouldn\'t take long.',
-      'Analyzing the parameters. Bear with me.',
       'Running calculations. The elegant kind.',
       'Thinking this through. Properly, of course.',
       'Considering the possibilities. There are several good ones.',
+      'Processing your request. This shouldn\'t take long.',
+      'Analyzing the parameters. Bear with me.',
     ];
 
     // Iteration messages
     const iterationMessages = [
-      'Making progress. Steady as she goes.',
+      'Making progress. Steady as it goes.',
       'Refining the approach. Precision matters.',
       'Working through the details. Almost there.',
       'Iterating thoughtfully. Quality takes time.',
@@ -626,7 +626,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (data.tool && toolMessages[data.tool]) {
           return pickRandom(toolMessages[data.tool]);
         }
-        return `Executing ${data.tool || 'operation'}. One moment.`;
+        return `Executing AI tools. One moment.`;
 
       case 'tool_result':
         return pickRandom(resultMessages);
@@ -2041,7 +2041,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   <MessageSquare className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 glass-panel">
+              <SheetContent side="left" className="w-80 p-0 glass-panel" aria-describedby={undefined}>
+                <SheetTitle className="sr-only">Chat History</SheetTitle>
                 <div className="flex flex-col h-full">
                   <div className="p-5 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
