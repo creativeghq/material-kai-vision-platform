@@ -559,8 +559,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const toolMessages: Record<string, string[]> = {
       material_search: [
         'Scouring the material database. One moment while I work my magic.',
-        'Searching through rather a lot of materials for you, sir.',
-        'Running material analysis. The things I do for interior design.',
+        'Searching through rather a lot of materials for you.',
+        'Running analysis. The things I do for you!',
       ],
       vector_search: [
         'Consulting the semantic archives. Fascinating stuff, really.',
@@ -586,6 +586,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         'Analyzing spatial configuration. Architecture is poetry, really.',
         'Calculating dimensional relationships. Geometry at its finest.',
         'Evaluating the spatial dynamics. Every room tells a story.',
+      ],
+      knowledge_base_search: [
+        'Executing internal search also. One moment.',
+        'Searching the knowledge base for you.',
+        'Looking through our documentation. Bear with me.',
       ],
     };
 
