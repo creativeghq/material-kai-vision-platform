@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -67,7 +68,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <div className="relative h-48 bg-gray-100">
         {primaryImage && (
           <img
-            src={primaryImage.url}
+            src={getOptimizedImageUrl(primaryImage.url, 'preview')}
             alt={primaryImage.alt}
             className="w-full h-full object-cover"
             onError={(e) => {

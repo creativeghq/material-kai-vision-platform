@@ -13,10 +13,9 @@ const Card = React.forwardRef<
       className,
     )}
     style={{
-      background: 'var(--glass-bg)',
-      backdropFilter: 'var(--glass-blur)',
-      border: 'none',
-      boxShadow: 'var(--glass-shadow)',
+      background: 'var(--glass-background)',
+      backdropFilter: `blur(var(--glass-blur))`,
+      border: '1px solid var(--glass-border)',
       ...style,
     }}
     {...props}

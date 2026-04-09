@@ -7,11 +7,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern beige/cream theme - warm neutral background */
+/* Dark theme - modern dark background */
 body {
-  background: hsl(40, 25%, 96%);  /* #F5F3EE - Warm beige/cream */
+  background: hsl(0, 0%, 7%);  /* #121212 - Near black */
   min-height: 100vh;
-  color: hsl(0, 0%, 15%);  /* Dark text */
+  color: hsl(0, 0%, 92%);  /* Light text */
   font-family: var(--font-sans);
   font-weight: var(--font-normal);  /* Regular weight by default */
   -webkit-font-smoothing: antialiased;
@@ -50,9 +50,16 @@ body {
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--background));
 }
 
-/* Reroute legacy hover:bg-primary/10 pattern to the warm peach accent globally */
+/* Reroute legacy hover:bg-primary/10 pattern to subtle hover globally */
 .hover\:bg-primary\/10:hover {
-  background-color: hsl(var(--accent)) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Badge neutral override for dark theme */
+.badge-neutral {
+  background-color: hsl(0 0% 14%);
+  color: hsl(0 0% 60%);
+  border-color: hsl(0 0% 22%);
 }
 
 /* Fade-in animation for progressive image loading */
@@ -136,149 +143,148 @@ All colors MUST be HSL.
     --font-bold: 700;      /* Bold */
     --font-extrabold: 800; /* Extra-bold */
 
-    /* ===== NOTION LIGHT THEME COLOR SYSTEM ===== */
-    /* Main Background - Warm beige/cream (KEPT FROM NEW DESIGN) */
-    --background: 40 25% 96%;  /* #F5F3EE - Warm beige/cream */
-    --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
+    /* ===== DARK THEME COLOR SYSTEM ===== */
+    /* Main Background - Near black */
+    --background: 0 0% 7%;  /* #121212 - Near black */
+    --foreground: 0 0% 92%;  /* #EBEBEB - Light text */
 
-    /* Page container - Subtle off-white for depth */
-    --page-background: 40 25% 96%;  /* Unified with --background */
+    /* Page container */
+    --page-background: 0 0% 7%;  /* Unified with --background */
 
-    /* Content sections/cards - White with transparency (glass effect) */
-    --card: 0 0% 100%;  /* #FFFFFF - White cards */
-    --card-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
+    /* Content sections/cards - Dark elevated surfaces */
+    --card: 0 0% 11%;  /* #1C1C1C - Dark card */
+    --card-foreground: 0 0% 92%;  /* Light text */
 
-    --popover: 0 0% 100%;  /* #FFFFFF - White popover */
-    --popover-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
+    --popover: 0 0% 13%;  /* #212121 - Slightly elevated */
+    --popover-foreground: 0 0% 92%;  /* Light text */
 
-    /* Primary - Deep Plum / Burgundy #330 43% 17% */
-    --primary: 330 43% 17%;
-    --primary-foreground: 0 0% 100%;  /* White text on plum */
+    /* Primary - Deep Plum brightened for dark bg */
+    --primary: 330 50% 35%;  /* Brightened plum */
+    --primary-foreground: 0 0% 100%;  /* White text on red */
 
-    /* Secondary - Light gray (Notion-like) */
-    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
-    --secondary-foreground: 0 0% 20%;  /* Dark text */
+    /* Secondary - Dark gray surfaces */
+    --secondary: 0 0% 14%;  /* #242424 - Dark surface */
+    --secondary-foreground: 0 0% 85%;  /* Light text */
 
-    /* Muted - Subtle light backgrounds (Notion-like) */
-    --muted: 0 0% 96%;  /* #F5F5F5 - Very light gray */
-    --muted-foreground: 0 0% 38%;  /* #616161 - Improved contrast ~5.9:1 on white (was 45% ~4.4:1) */
+    /* Muted - Subtle dark backgrounds */
+    --muted: 0 0% 14%;  /* #242424 */
+    --muted-foreground: 0 0% 55%;  /* #8C8C8C - Good contrast on dark */
 
-    /* Accent - Warm peach hover/background state */
-    --accent: 22 100% 93%;  /* #FFE8DB - Warm peach */
-    --accent-foreground: 0 0% 20%;  /* Dark text */
+    /* Accent - Warm peach toned down for dark */
+    --accent: 22 60% 18%;  /* Dark warm accent */
+    --accent-foreground: 22 100% 85%;  /* Warm peach text */
 
-    /* Amber - Vibrant warm highlight #FFC077 */
-    --amber: 32 100% 73%;       /* #FFC077 - Main amber */
-    --amber-bg: 32 100% 90%;    /* Soft amber for light backgrounds */
-    --amber-foreground: 0 0% 18%; /* Dark text on amber */
+    /* Amber - Vibrant warm highlight */
+    --amber: 32 100% 65%;       /* Slightly toned amber */
+    --amber-bg: 32 80% 15%;     /* Dark amber background */
+    --amber-foreground: 32 100% 85%; /* Light amber text */
 
-    /* Destructive - Muted red (Notion-like) */
-    --destructive: 0 70% 50%;  /* #D9534F - Muted red */
+    /* Destructive - Red for dark theme */
+    --destructive: 0 70% 50%;  /* Red */
     --destructive-foreground: 0 0% 100%;  /* White text */
 
-    /* Borders - Very subtle light gray (Notion-like, soft) */
-    --border: 0 0% 90%;  /* #E5E5E5 - Very light border */
-    --input: 0 0% 90%;  /* #E5E5E5 - Input border */
-    --ring: 330 43% 17%;  /* Focus ring (primary plum) */
+    /* Borders - Subtle white borders */
+    --border: 0 0% 16%;  /* #292929 - Subtle border */
+    --input: 0 0% 16%;  /* #292929 - Input border */
+    --ring: 330 50% 35%;  /* Focus ring (primary plum) */
 
-    --radius: 0.5rem;  /* 8px - Slightly rounded corners (Notion-like) */
+    --radius: 0.5rem;  /* 8px */
 
-    /* Sidebar - Clean white (Notion light) */
-    --sidebar-background: 40 25% 96%;  /* Unified with --background */
-    --sidebar-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
-    --sidebar-accent: 330 43% 17%;  /* Primary plum for active items */
+    /* Sidebar/TopNav - Dark theme */
+    --sidebar-background: 0 0% 9%;  /* Slightly lighter than bg */
+    --sidebar-foreground: 0 0% 60%;  /* Medium gray text */
+    --sidebar-accent: 330 50% 35%;  /* Primary plum for active items */
     --sidebar-accent-foreground: 0 0% 100%;  /* White text on plum */
-    --sidebar-border: 0 0% 93%;  /* #EDEDED - Very subtle border */
+    --sidebar-border: 0 0% 16%;  /* Subtle border */
 
-    /* Hero section background - Clean white */
-    --hero-background: 0 0% 100%;  /* #FFFFFF - Pure white */
+    /* Hero section background */
+    --hero-background: 0 0% 11%;  /* Same as card */
 
-    /* ===== STAT BUBBLE COLORS (Notion-Style) ===== */
-    /* Muted, professional colors */
-    --bubble-sage: 95 20% 77%;       /* Soft sage green (primary) */
-    --bubble-green: 142 71% 45%;     /* Muted green */
-    --bubble-purple: 271 76% 53%;    /* Muted purple */
-    --bubble-orange: 32 100% 73%;    /* Amber #FFC077 */
-    --bubble-text: 0 0% 100%;        /* White text on bubbles */
-    --bubble-text-muted: 0 0% 80%;   /* Muted white for secondary text */
+    /* ===== STAT BUBBLE COLORS (Dark Theme) ===== */
+    --bubble-sage: 95 25% 30%;       /* Dark sage */
+    --bubble-green: 142 50% 35%;     /* Dark green */
+    --bubble-purple: 271 50% 40%;    /* Dark purple */
+    --bubble-orange: 32 80% 40%;     /* Dark amber */
+    --bubble-text: 0 0% 95%;         /* White text on bubbles */
+    --bubble-text-muted: 0 0% 70%;   /* Muted light text */
 
-    /* Card gradients - Minimal (Notion-like) */
-    --card-gradient-start: 0 0% 15%;  /* Slightly lighter gray */
-    --card-gradient-end: 0 0% 13%;    /* Slightly darker gray */
+    /* Card gradients */
+    --card-gradient-start: 0 0% 13%;
+    --card-gradient-end: 0 0% 10%;
 
-    /* Gradients - Subtle (Notion-like) */
-    --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.1) 0%, rgba(198, 208, 188, 0.02) 100%);
-    --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    /* Gradients - Subtle */
+    --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.06) 0%, rgba(198, 208, 188, 0.01) 100%);
+    --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.005) 100%);
 
-    /* Shadows - Very subtle (Notion light theme) */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
-    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.08);
-    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.1);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+    /* Shadows - Deeper for dark theme */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.5);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3);
 
-    /* Animation - Smooth (Notion-like) */
+    /* Animation */
     --transition-smooth: all 0.15s ease;
     --transition-bounce: all 0.2s ease;
 
-    /* Status colors - Light theme with good contrast */
-    --success: 142 71% 35%;  /* Darker green for readability */
-    --success-foreground: 0 0% 100%;  /* White text */
-    --success-bg: 142 71% 95%;  /* Very light green background */
+    /* Status colors - Dark theme with good contrast */
+    --success: 142 71% 45%;  /* Green */
+    --success-foreground: 0 0% 100%;
+    --success-bg: 142 50% 12%;  /* Dark green bg */
 
-    --warning: 32 100% 36%;  /* Dark amber for text — readable on light bg */
-    --warning-foreground: 0 0% 100%;  /* White text on dark amber */
-    --warning-bg: 32 100% 91%;  /* Soft amber background */
+    --warning: 32 100% 55%;  /* Amber */
+    --warning-foreground: 0 0% 100%;
+    --warning-bg: 32 60% 12%;  /* Dark amber bg */
 
-    --error: 0 70% 45%;  /* Darker red for readability */
-    --error-foreground: 0 0% 100%;  /* White text */
-    --error-bg: 0 70% 95%;  /* Very light red background */
+    --error: 0 70% 55%;  /* Red */
+    --error-foreground: 0 0% 100%;
+    --error-bg: 0 50% 12%;  /* Dark red bg */
 
-    --info: 210 100% 45%;  /* Darker blue for readability */
-    --info-foreground: 0 0% 100%;  /* White text */
-    --info-bg: 210 100% 95%;  /* Very light blue background */
+    --info: 210 100% 55%;  /* Blue */
+    --info-foreground: 0 0% 100%;
+    --info-bg: 210 60% 12%;  /* Dark blue bg */
 
-    /* Chart colors - Muted palette (Notion-like) */
-    --chart-1: 95 20% 77%;    /* Soft sage green (primary) */
-    --chart-2: 142 71% 45%;   /* Muted green */
-    --chart-3: 271 76% 53%;   /* Muted purple */
-    --chart-4: 32 100% 73%;   /* Amber #FFC077 */
-    --chart-5: 349 86% 61%;   /* Muted red */
+    /* Chart colors - Vibrant on dark */
+    --chart-1: 142 60% 50%;    /* Green */
+    --chart-2: 210 80% 55%;    /* Blue */
+    --chart-3: 271 70% 60%;    /* Purple */
+    --chart-4: 32 100% 65%;    /* Amber */
+    --chart-5: 349 80% 58%;    /* Red */
 
-    /* Badge color system - Light theme with excellent accessibility */
-    --badge-pending-bg: 45 93% 95%;      /* Very light yellow */
-    --badge-pending-text: 45 93% 35%;    /* Dark yellow */
-    --badge-pending-border: 45 93% 70%;  /* Medium yellow */
+    /* Badge color system - Dark theme */
+    --badge-pending-bg: 45 60% 12%;
+    --badge-pending-text: 45 93% 70%;
+    --badge-pending-border: 45 60% 25%;
 
-    --badge-updated-bg: 210 100% 95%;    /* Very light blue */
-    --badge-updated-text: 210 100% 35%;  /* Dark blue */
-    --badge-updated-border: 210 100% 70%; /* Medium blue */
+    --badge-updated-bg: 210 60% 12%;
+    --badge-updated-text: 210 100% 70%;
+    --badge-updated-border: 210 60% 25%;
 
-    --badge-approved-bg: 142 71% 95%;    /* Very light green */
-    --badge-approved-text: 142 71% 30%;  /* Dark green */
-    --badge-approved-border: 142 71% 65%; /* Medium green */
+    --badge-approved-bg: 142 50% 12%;
+    --badge-approved-text: 142 71% 65%;
+    --badge-approved-border: 142 50% 25%;
 
-    --badge-rejected-bg: 0 70% 95%;      /* Very light red */
-    --badge-rejected-text: 0 70% 40%;    /* Dark red */
-    --badge-rejected-border: 0 70% 70%;  /* Medium red */
+    --badge-rejected-bg: 0 50% 12%;
+    --badge-rejected-text: 0 70% 65%;
+    --badge-rejected-border: 0 50% 25%;
 
-    --badge-sent-bg: 271 76% 95%;        /* Very light purple */
-    --badge-sent-text: 271 76% 35%;      /* Dark purple */
-    --badge-sent-border: 271 76% 70%;    /* Medium purple */
+    --badge-sent-bg: 271 50% 12%;
+    --badge-sent-text: 271 76% 70%;
+    --badge-sent-border: 271 50% 25%;
 
-    --badge-draft-bg: 0 0% 95%;          /* Very light gray */
-    --badge-draft-text: 0 0% 35%;        /* Dark gray */
-    --badge-draft-border: 0 0% 70%;      /* Medium gray */
+    --badge-draft-bg: 0 0% 14%;
+    --badge-draft-text: 0 0% 60%;
+    --badge-draft-border: 0 0% 25%;
 
-    /* ===== GLASSMORPHISM SYSTEM (NEW) ===== */
-    --glass-background: rgba(255, 255, 255, 0.7);
+    /* ===== GLASSMORPHISM SYSTEM (Dark) ===== */
+    --glass-background: rgba(255, 255, 255, 0.05);
     --glass-blur: 12px;
-    --glass-border: rgba(255, 255, 255, 0.3);
-    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 
-    /* ===== REFINED SHADOWS (NEW) ===== */
-    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.05), 0 5px 20px -5px rgba(0, 0, 0, 0.1);
+    /* ===== REFINED SHADOWS (Dark) ===== */
+    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.4), 0 5px 20px -5px rgba(0, 0, 0, 0.3);
   }
 
 .dark {
@@ -376,23 +382,21 @@ All colors MUST be HSL.
     gap: var(--grid-gap);
   }
 
-  /* Dashboard Card - Glass morphism effect (Notion-style) */
+  /* Dashboard Card - Dark glass effect */
   .dashboard-card {
     background: var(--glass-background);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border-radius: var(--radius-lg);
     padding: var(--card-padding);
-    box-shadow: var(--glass-shadow);
     transition: var(--transition-bounce);
     border: 1px solid var(--glass-border);
   }
 
   .dashboard-card:hover {
-    background: rgba(255, 255, 255, 0.85);
-    box-shadow: var(--shadow-premium);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   /* Tabs where item-level card lift should be suppressed */
@@ -414,42 +418,42 @@ All colors MUST be HSL.
     );
   }
 
-  /* Stat bubbles - Glass effect with subtle colors (Notion-style) */
+  /* Stat bubbles - Dark glass effect */
   .stat-bubble {
     border-radius: var(--radius);
     padding: var(--card-padding);
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
     transition: var(--transition-smooth);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     color: hsl(var(--foreground));
     font-weight: var(--font-normal);
   }
 
   .stat-bubble.sage {
-    background: rgba(198, 208, 188, 0.15);
-    border-color: rgba(198, 208, 188, 0.3);
-    color: hsl(95 25% 35%);
+    background: rgba(198, 208, 188, 0.08);
+    border-color: rgba(198, 208, 188, 0.15);
+    color: hsl(95 30% 65%);
   }
 
   .stat-bubble.green {
-    background: rgba(52, 168, 83, 0.1);
-    border-color: rgba(52, 168, 83, 0.2);
-    color: hsl(142 71% 30%);
+    background: rgba(52, 168, 83, 0.08);
+    border-color: rgba(52, 168, 83, 0.15);
+    color: hsl(142 60% 55%);
   }
 
   .stat-bubble.purple {
-    background: rgba(157, 78, 221, 0.1);
-    border-color: rgba(157, 78, 221, 0.2);
-    color: hsl(271 76% 40%);
+    background: rgba(157, 78, 221, 0.08);
+    border-color: rgba(157, 78, 221, 0.15);
+    color: hsl(271 70% 65%);
   }
 
   .stat-bubble.orange {
-    background: rgba(255, 192, 119, 0.15);
-    border-color: rgba(255, 192, 119, 0.35);
-    color: hsl(32 100% 32%);
+    background: rgba(255, 192, 119, 0.08);
+    border-color: rgba(255, 192, 119, 0.15);
+    color: hsl(32 100% 65%);
   }
 
   /* Stat card - For metrics/statistics */

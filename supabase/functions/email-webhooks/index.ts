@@ -6,7 +6,7 @@
  * Set RESEND_WEBHOOK_SECRET in Supabase Edge Function secrets (from Resend dashboard → Webhooks).
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

@@ -75,40 +75,23 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
     name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <section
-      className="relative overflow-hidden mx-2 sm:mx-4 rounded-[2rem] px-3 sm:px-6 py-4 sm:py-5"
-      style={{
-        background: 'linear-gradient(135deg, hsl(330,43%,13%) 0%, hsl(315,38%,22%) 50%, hsl(290,28%,32%) 100%)',
-      }}
-    >
-      {/* Decorative blobs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute -top-20 -left-20 w-64 h-64 rounded-full opacity-20"
-          style={{ background: 'radial-gradient(circle, hsl(320,55%,55%) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute -bottom-16 -right-8 w-72 h-72 rounded-full opacity-15"
-          style={{ background: 'radial-gradient(circle, hsl(280,45%,55%) 0%, transparent 70%)' }}
-        />
-      </div>
-
-      <div className="relative flex items-center justify-between gap-4">
+    <section className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/8">
+      <div className="flex items-center justify-between gap-4">
         {/* Left: page icon + title */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-            <Icon className="h-5 w-5 text-white" />
+          <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Icon className="h-4.5 w-4.5 text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl font-light text-white tracking-tight">{title}</h1>
+            <h1 className="text-lg font-light text-foreground tracking-tight">{title}</h1>
             {subtitle && (
-              <p className="text-xs text-white/65 mt-0.5 hidden sm:block">{subtitle}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{subtitle}</p>
             )}
           </div>
         </div>
 
         {/* Right: custom actions + notifications + avatar */}
-        <div className="flex items-center gap-3 shrink-0 [&_button]:text-white [&_button]:hover:bg-white/10">
+        <div className="flex items-center gap-3 shrink-0">
           {actions && <div className="flex items-center gap-2">{actions}</div>}
 
           <NotificationsPanel unreadCount={unreadCount} onCountChange={setUnreadCount} />
@@ -117,7 +100,7 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
-                  <Avatar className="h-9 w-9 border-2 border-white/30">
+                  <Avatar className="h-9 w-9 border-2 border-white/10">
                     {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}
                     <AvatarFallback
                       className="font-semibold text-xs"
@@ -152,7 +135,7 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
         </div>
       </div>
 
-      {children && <div className="mt-4 relative">{children}</div>}
+      {children && <div className="mt-3">{children}</div>}
     </section>
   );
 }

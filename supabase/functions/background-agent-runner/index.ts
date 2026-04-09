@@ -27,7 +27,7 @@ import { getRunner, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
 import { DelegateToMivaaError } from '../_shared/agents/types.ts';
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
 
-const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+const { createClient } = await import('@supabase/supabase-js');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

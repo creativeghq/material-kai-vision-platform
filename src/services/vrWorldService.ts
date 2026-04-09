@@ -37,12 +37,14 @@ export interface GenerateVRParams {
   roomType?: string;
   style?: string;
   model?: string;
+  isPano?: boolean;  // Set true for panoramic source images
 }
 
 // Credit costs — must match CREDIT_COSTS in generate-vr-world edge function
+// WorldLabs Marble API v1.x pricing ($1 = 1,250 WL credits, 1.50x markup)
 export const VR_CREDIT_COSTS: Record<string, number> = {
-  'marble-0.1-mini': 75,
-  'marble-0.1-plus': 300,
+  'marble-1.0-draft': 18,  // 230 WL cr = $0.184 × 1.50 markup
+  'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
 };
 
 // Inpainting credit costs per operation
@@ -82,7 +84,8 @@ export const vrWorldService = {
         prompt: params.prompt,
         room_type: params.roomType,
         style: params.style,
-        model: params.model || 'marble-0.1-mini',
+        model: params.model || 'marble-1.0-draft',
+        is_pano: params.isPano,
       },
     });
 

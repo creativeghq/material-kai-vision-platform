@@ -24,7 +24,7 @@ const MIVAA_API_KEY             = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders } from '../_shared/cors.ts';
 
-const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+const { createClient } = await import('@supabase/supabase-js');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 Deno.serve(async (req: Request) => {

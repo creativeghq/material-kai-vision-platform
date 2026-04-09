@@ -32,7 +32,7 @@ import {
   type FactoryObject,
 } from '../_shared/agents/propagation-utils.ts';
 
-const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+const { createClient } = await import('@supabase/supabase-js');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type ScopeColumn = 'source_document_id' | 'scrape_session_id';

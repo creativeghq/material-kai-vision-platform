@@ -9,7 +9,7 @@
  *   - products.metadata['factory_name'] / ['factory_group_name'] — backward-compat flat fields
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── Factory object shape ──────────────────────────────────────────────────────
 

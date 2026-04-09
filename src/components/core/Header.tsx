@@ -219,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-50 m-4 rounded-3xl glass-panel bg-white/50 border border-white/30 h-20">
+      <header className="sticky top-0 z-50 m-4 rounded-3xl glass-panel bg-white/5 border border-white/8 h-20">
         <div className="flex h-full items-center px-8">
           {/* Brand icon */}
           <div className="flex items-center space-x-3 mr-12">

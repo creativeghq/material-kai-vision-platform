@@ -158,43 +158,46 @@ function buildPrompt(
   selectedSub: string[],
   custom: string,
   wallZone: string,
+  roomContext?: string | null,
 ): string {
+  // Append room context if available (e.g. "This is a kitchen." or "This is a modern bedroom.")
+  const roomSuffix = roomContext ? ` Room context: ${roomContext}.` : '';
   switch (category) {
     case 'colors': {
       const color = selected[0] || custom;
       const finish = selectedSub[0] ? `, ${selectedSub[0]} finish` : '';
-      return `Change the wall color to ${color}${finish}. Apply the new color to ${wallZone || 'all visible wall surfaces'} floor-to-ceiling, edge-to-edge — zero original finish remaining visible anywhere. ${SPATIAL_LOCK}`;
+      return `Change the wall color to ${color}${finish}. Apply the new color to ${wallZone || 'all visible wall surfaces'} floor-to-ceiling, edge-to-edge — zero original finish remaining visible anywhere. ${SPATIAL_LOCK}${roomSuffix}`;
     }
     case 'lighting': {
       const lighting = selected[0] || custom;
-      return `Transform the lighting atmosphere to: ${lighting}. Adjust light quality, color temperature, shadows, highlights, and reflections on all surfaces consistently. ${SPATIAL_LOCK}`;
+      return `Transform the lighting atmosphere to: ${lighting}. Adjust light quality, color temperature, shadows, highlights, and reflections on all surfaces consistently. ${SPATIAL_LOCK}${roomSuffix}`;
     }
     case 'flooring': {
       const floor = selected[0] || custom;
       const grout = selectedSub[0] ? ` Use ${selectedSub[0]}.` : '';
-      return `Replace the entire floor with: ${floor}. Cover the complete floor area edge-to-edge with no gaps.${grout} ${SPATIAL_LOCK}`;
+      return `Replace the entire floor with: ${floor}. Cover the complete floor area edge-to-edge with no gaps.${grout} ${SPATIAL_LOCK}${roomSuffix}`;
     }
     case 'walls': {
       const wall = selected[0] || custom;
       const zone = selectedSub[0] || wallZone || 'all visible wall surfaces';
-      return `Replace the wall surface finish with: ${wall}. Apply it to ${zone}. Every surface in that zone must be fully covered — no original finish remains visible. ${SPATIAL_LOCK}`;
+      return `Replace the wall surface finish with: ${wall}. Apply it to ${zone}. Every surface in that zone must be fully covered — no original finish remains visible. ${SPATIAL_LOCK}${roomSuffix}`;
     }
     case 'plants': {
       const plants = selected[0] || custom;
-      return `Update the plants and greenery: ${plants}. Integrate them naturally into the existing layout. ${SPATIAL_LOCK}`;
+      return `Update the plants and greenery: ${plants}. Integrate them naturally into the existing layout. ${SPATIAL_LOCK}${roomSuffix}`;
     }
     case 'style': {
-      const style = selected[0] || custom;
+      const styleChoice = selected[0] || custom;
       const intensity = selectedSub[0] || 'complete — total transformation, every element updated to match the new style';
-      return `Restyle this entire room in ${style} design — ${intensity}. Update floors, walls, ceiling, fixtures, furniture, lighting, and decor to perfectly match the style. Room spatial layout and fixed architecture stay intact.`;
+      return `Restyle this entire room in ${styleChoice} design — ${intensity}. Update floors, walls, ceiling, fixtures, furniture, lighting, and decor to perfectly match the style. Room spatial layout and fixed architecture stay intact.${roomSuffix}`;
     }
     case 'furniture': {
-      return custom || 'Update the furniture in this room. Keep the room proportions and architecture unchanged.';
+      return (custom || 'Update the furniture in this room. Keep the room proportions and architecture unchanged.') + roomSuffix;
     }
     case 'region':
     case 'custom':
     default:
-      return custom;
+      return custom + roomSuffix;
   }
 }
 
@@ -250,6 +253,10 @@ interface GeminiEditModalProps {
   /** Called with final prompt + model tier. Modal auto-closes before calling. */
   onApply: (params: GeminiEditParams) => void;
   generating?: boolean;
+  /** Room type context from the image being edited (e.g. 'bedroom', 'kitchen'). When provided, it's appended to the prompt for better results. */
+  roomType?: string | null;
+  /** Style context from the image being edited (e.g. 'modern', 'scandinavian'). */
+  style?: string | null;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -259,6 +266,8 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
   onClose,
   onApply,
   generating = false,
+  roomType = null,
+  style = null,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<EditCategoryId | null>(null);
@@ -283,12 +292,17 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
     }
   }, [isOpen]);
 
+  // Build room context string from props
+  const roomContext = roomType
+    ? `${style ? `${style} ` : ''}${roomType.replace(/_/g, ' ')}`
+    : style || null;
+
   // Auto-rebuild prompt when options change
   useEffect(() => {
     if (category && (selected.length > 0 || custom)) {
-      setPrompt(buildPrompt(category, selected, selectedSub, custom, wallZone));
+      setPrompt(buildPrompt(category, selected, selectedSub, custom, wallZone, roomContext));
     }
-  }, [category, selected, selectedSub, custom, wallZone]);
+  }, [category, selected, selectedSub, custom, wallZone, roomContext]);
 
   const handleCategorySelect = (id: EditCategoryId) => {
     // Region edit bypasses steps 2+3 — goes straight to canvas mode

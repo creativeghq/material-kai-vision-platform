@@ -119,13 +119,8 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
     }
   };
 
-  const btnBase = headerMode
-    ? 'rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20 hover:text-white'
-    : 'rounded-full';
-
-  const btnPrimary = headerMode
-    ? 'rounded-full bg-white/20 hover:bg-white/30 text-white border border-white/20 hover:text-white disabled:opacity-40'
-    : 'rounded-full';
+  const btnBase = 'rounded-full';
+  const btnPrimary = 'rounded-full';
 
   return (
     <>

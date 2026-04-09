@@ -403,26 +403,19 @@ async function handleRequest(
     if (svbrdfResult) {
       console.log('[generate-pbr-maps] MIVAA SVBRDF extraction succeeded');
 
-      // Upload SVBRDF maps to our storage
-      pbrMaps.normal_url = await uploadToStorage(
-        supabase,
-        svbrdfResult.normal,
-        product_id,
-        'normal',
-      );
-      pbrMaps.roughness_url = await uploadToStorage(
-        supabase,
-        svbrdfResult.roughness,
-        product_id,
-        'roughness',
-      );
+      // Upload SVBRDF maps to our storage (parallel for lower latency)
+      const uploadPromises = [
+        uploadToStorage(supabase, svbrdfResult.normal, product_id, 'normal'),
+        uploadToStorage(supabase, svbrdfResult.roughness, product_id, 'roughness'),
+        ...(svbrdfResult.metalness
+          ? [uploadToStorage(supabase, svbrdfResult.metalness, product_id, 'metalness')]
+          : []),
+      ];
+      const uploadResults = await Promise.all(uploadPromises);
+      pbrMaps.normal_url = uploadResults[0];
+      pbrMaps.roughness_url = uploadResults[1];
       if (svbrdfResult.metalness) {
-        pbrMaps.metalness_url = await uploadToStorage(
-          supabase,
-          svbrdfResult.metalness,
-          product_id,
-          'metalness',
-        );
+        pbrMaps.metalness_url = uploadResults[2];
       }
       pbrMaps.status = 'completed';
     } else {

@@ -134,7 +134,7 @@ export const QuotesPage: React.FC = () => {
         title="My Quotes"
         subtitle="Create and manage your material quotes"
         actions={
-          <Button onClick={() => setShowCreateModal(true)} className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20">
+          <Button onClick={() => setShowCreateModal(true)} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
             New Quote
           </Button>

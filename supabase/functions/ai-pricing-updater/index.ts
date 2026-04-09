@@ -12,7 +12,7 @@
  * Schedule: Run via cron weekly (Sundays at 00:00 UTC)
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Known pricing sources for major providers (per 1M tokens)

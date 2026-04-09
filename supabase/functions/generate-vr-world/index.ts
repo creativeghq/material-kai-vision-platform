@@ -23,18 +23,19 @@ const worldlabsApiKey = Deno.env.get('WORLDLABS_API_KEY') || '';
 const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
 // Credit costs per model (raw cost × 1.50 markup × 100 credits/$)
-// marble-0.1-mini: $0.50 raw × 1.50 = $0.75 billed → 75 credits
-// marble-0.1-plus: $2.00 raw × 1.50 = $3.00 billed → 300 credits
+// WorldLabs pricing: $1 = 1,250 WL credits
+// marble-1.0-draft: 230 WL cr = $0.184 raw × 1.50 = $0.276 → 18 credits
+// marble-1.1:      1580 WL cr = $1.264 raw × 1.50 = $1.896 → 190 credits
 const MARKUP_MULTIPLIER = 1.50;
 const CREDIT_COSTS: Record<string, number> = {
-  'marble-0.1-mini': 75,   // $0.50 raw × 1.50 markup = $0.75
-  'marble-0.1-plus': 300,  // $2.00 raw × 1.50 markup = $3.00
+  'marble-1.0-draft': 18,  // 230 WL cr = $0.184 × 1.50 markup
+  'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
 };
 
-// Max polling duration (3 minutes for mini, 7 minutes for plus)
+// Max polling duration (3 minutes for draft, 7 minutes for 1.1)
 const MAX_POLL_DURATION: Record<string, number> = {
-  'marble-0.1-mini': 180_000,
-  'marble-0.1-plus': 420_000,
+  'marble-1.0-draft': 180_000,
+  'marble-1.1': 420_000,
 };
 
 interface GenerateVRRequest {
@@ -43,6 +44,7 @@ interface GenerateVRRequest {
   room_type?: string;
   style?: string;
   model?: string;
+  is_pano?: boolean;  // Set true for panoramic source images
 }
 
 Deno.serve(withApiLogging('generate-vr-world', async (req) => {
@@ -76,8 +78,8 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       return jsonResponse({ success: false, error: 'Missing prompt' }, 400);
     }
 
-    const model = body.model || 'marble-0.1-mini';
-    const creditCost = CREDIT_COSTS[model] || CREDIT_COSTS['marble-0.1-mini'];
+    const model = body.model || 'marble-1.0-draft';
+    const creditCost = CREDIT_COSTS[model] || CREDIT_COSTS['marble-1.0-draft'];
 
     // Check and debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc('debit_user_credits', {
@@ -136,7 +138,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       .eq('id', vrWorldId);
 
     console.log(`[generate-vr-world] Starting world generation...`);
-    const operation = await startWorldGeneration(mediaAsset.id, body.prompt, model);
+    const operation = await startWorldGeneration(mediaAsset.id, body.prompt, model, body.is_pano);
     console.log(`[generate-vr-world] Operation started: ${operation.operationId}`);
 
     await supabase
@@ -194,14 +196,23 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       metadata: { vr_world_id: vrWorldId },
     }).then(() => {});
 
-    // Return the completed record
-    const { data: completedWorld } = await supabase
-      .from('vr_worlds')
-      .select('*')
-      .eq('id', vrWorldId)
-      .single();
-
-    return jsonResponse({ success: true, data: completedWorld });
+    // Return constructed response directly (avoids an extra DB read)
+    return jsonResponse({
+      success: true,
+      data: {
+        id: vrWorldId,
+        world_id: world.id,
+        user_id: userId,
+        caption: assets.caption || world.caption || null,
+        splat_url_100k: assets.splat100k,
+        splat_url_500k: assets.splat500k,
+        splat_url_full: assets.splatFull,
+        collider_glb_url: assets.colliderGlb,
+        panorama_url: assets.panorama,
+        thumbnail_url: assets.thumbnail,
+        status: 'completed',
+      },
+    });
 
   } catch (error) {
     console.error('[generate-vr-world] Error:', error);
@@ -340,13 +351,8 @@ async function startWorldGeneration(
   mediaAssetId: string,
   prompt: string,
   model: string,
+  isPano?: boolean,
 ): Promise<{ operationId: string }> {
-  // Map our model names to WorldLabs model names
-  const modelMap: Record<string, string> = {
-    'marble-0.1-mini': 'Marble 0.1-mini',
-    'marble-0.1-plus': 'Marble 0.1-plus',
-  };
-
   const response = await fetch(`${WORLDLABS_BASE_URL}/worlds:generate`, {
     method: 'POST',
     headers: {
@@ -362,8 +368,9 @@ async function startWorldGeneration(
           media_asset_id: mediaAssetId,
         },
         text_prompt: prompt,
+        ...(isPano ? { is_pano: true } : {}),
       },
-      model: modelMap[model] || 'Marble 0.1-mini',
+      model,
     }),
   });
 

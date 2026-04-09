@@ -273,7 +273,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   <PenLine className="h-4 w-4 text-primary/60" />
                                 </div>
                               ) : item.product?.image_url ? (
-                                <img src={item.product.image_url} alt={item.product.name || 'Product'} className="w-full h-full object-cover" />
+                                <img src={item.product.image_url} alt={item.product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <Package className="h-4 w-4 text-muted-foreground/50" />

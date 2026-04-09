@@ -17,7 +17,7 @@
  *     → Returns all connected accounts for the workspace
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';

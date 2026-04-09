@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -359,7 +360,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   {/* Image */}
                   <div className="aspect-video bg-muted rounded-lg overflow-hidden" style={{ marginBottom: 'var(--space-sm)' }}>
                     <img
-                      src={image.image_url}
+                      src={getOptimizedImageUrl(image.image_url, 'preview')}
                       alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                       className="w-full h-full object-cover"
                     />
@@ -424,7 +425,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               {/* Left Side - Image */}
               <div className="flex-1 flex items-center justify-center bg-muted rounded-lg overflow-hidden">
                 <img
-                  src={selectedImage.image_url}
+                  src={getOptimizedImageUrl(selectedImage.image_url, 'display')}
                   alt={selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
                   className="max-w-full max-h-full object-contain"
                 />

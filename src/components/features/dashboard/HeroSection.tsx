@@ -11,7 +11,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   return (
-    <div className="glass-panel relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center">
+    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center rounded-xl border border-white/8 bg-[hsl(0,0%,11%)]">
       {/* Subtle backdrop gradient for depth */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
 
@@ -41,7 +41,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
               className={`w-full sm:w-auto h-10 sm:h-12 px-6 sm:px-8 text-base sm:text-lg font-light transition-all duration-300 hover:scale-105 ${
                 action.type === 'primary'
                   ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border-none'
-                  : 'bg-background/50 backdrop-blur-sm border-white/30'
+                  : 'bg-background border-white/10'
               }`}
               onClick={() => onNavigate(action.path)}
             >

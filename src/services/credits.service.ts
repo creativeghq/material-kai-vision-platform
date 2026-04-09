@@ -189,9 +189,10 @@ export const creditsAPI = {
     };
 
     // Flat-rate pricing for non-token-based services (in credits, includes 1.50x markup)
+    // WorldLabs Marble API v1.x: $1 = 1,250 WL credits
     const flatRatePricing: Record<string, number> = {
-      'worldlabs-marble-mini': 75,   // $0.50 raw × 1.50 markup = $0.75 → 75 credits
-      'worldlabs-marble-plus': 300,  // $2.00 raw × 1.50 markup = $3.00 → 300 credits
+      'worldlabs-marble-draft': 18,  // 230 WL cr = $0.184 × 1.50 markup → 18 credits
+      'worldlabs-marble-1.1': 190,   // 1580 WL cr = $1.264 × 1.50 markup → 190 credits
     };
 
     // Check for flat-rate model first

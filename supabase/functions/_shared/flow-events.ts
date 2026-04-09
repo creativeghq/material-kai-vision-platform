@@ -13,8 +13,19 @@
  *   emitFlowEvent('vr_world_created', { world_id: '...' }); // no await
  */
 
+import { createClient } from '@supabase/supabase-js';
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Module-level singleton — reused across calls within the same isolate
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase && supabaseUrl && supabaseServiceKey) {
+    _supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabase;
+}
 
 /**
  * Emit an event to both the flow engine AND any background agents
@@ -30,8 +41,7 @@ export async function emitAgentEvent(
   if (!supabaseUrl || !supabaseServiceKey) return;
 
   try {
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = getSupabase()!;
 
     const { data: agents } = await supabase
       .from('background_agents')

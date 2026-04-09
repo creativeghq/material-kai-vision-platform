@@ -163,8 +163,8 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
   {
     id: 'vr_world',
     label: 'VR World generation',
-    description: 'Draft to high quality — billed at full quality rate (highest)',
-    creditsPerAction: 300,
+    description: 'Draft (18 cr) to high quality (190 cr) — Marble 1.x',
+    creditsPerAction: 190,
     unit: 'world',
     category: 'vr_generation',
   },

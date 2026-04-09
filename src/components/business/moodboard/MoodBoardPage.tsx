@@ -203,7 +203,7 @@ export const MoodBoardPage = () => {
         actions={
           <Button
             onClick={() => setShowCreateDialog(true)}
-            className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20"
+            variant="outline" size="sm"
           >
             <Plus className="h-4 w-4 mr-2" />
             New MoodBoard

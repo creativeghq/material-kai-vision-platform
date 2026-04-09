@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -315,7 +316,7 @@ export const MoodBoardDetailPage: React.FC = () => {
         {/* Background image */}
         {heroImage ? (
           <img
-            src={heroImage}
+            src={getOptimizedImageUrl(heroImage, 'display')}
             alt={moodboard.title}
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -466,7 +467,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                   {isMedia ? (
                     mediaType === 'image' && mediaUrl ? (
                       <img
-                        src={mediaUrl}
+                        src={getOptimizedImageUrl(mediaUrl, 'preview')}
                         alt={mediaTitle || 'Generated image'}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
@@ -485,7 +486,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                     )
                   ) : item.material?.thumbnail_url ? (
                     <img
-                      src={item.material.thumbnail_url}
+                      src={getOptimizedImageUrl(item.material.thumbnail_url, 'preview')}
                       alt={item.material.name || 'Product'}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />

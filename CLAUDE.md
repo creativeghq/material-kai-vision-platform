@@ -37,11 +37,13 @@
 - material_visual_search: visual 0.30, understanding 0.20, semantic 0.25, material 0.15, vision_confidence 0.10
 
 ## WorldLabs Marble VR Integration
-- **API**: WorldLabs Marble — generates explorable 3D Gaussian Splat worlds from images+text
+- **API**: WorldLabs Marble v1.x — generates explorable 3D Gaussian Splat worlds from images
+- **Models**: `marble-1.0-draft` (fast preview, 18 cr, ~30-45s), `marble-1.1` (quality, 190 cr, ~5min). Legacy 0.1-mini/0.1-plus deprecated.
+- **Panorama**: `is_pano: true` flag for 360° source images — better reconstruction when available
 - **Viewer**: Spark.js (@sparkjsdev/spark) — Three.js GSplat renderer, code-split via dynamic import
 - **Edge Function**: `generate-vr-world/index.ts` — uploads image → generates world → polls → stores asset URLs
 - **DB Table**: `vr_worlds` — stores world_id, splat URLs (100k/500k/full), collider GLB, panorama, status
-- **Credits**: 50 (mini, ~30-45s), 200 (plus, ~5min). Refund on failure.
+- **Credits**: 18 (draft, ~30-45s), 190 (1.1, ~5min). Refund on failure. Pricing: $1 = 1,250 WL credits × 1.50 markup.
 - **Three.js**: three@0.178, @types/three@0.179. Only SparkRenderer constructor needs @ts-expect-error.
 - **Env var**: `WORLDLABS_API_KEY` in Supabase Edge Function secrets
 
@@ -141,9 +143,11 @@
 
 ## Design System Summary
 Full reference: `.claude/design-system.md`
-- **Primary**: `#3E192A` deep plum (`--primary: 330 43% 17%`). **Accent**: warm peach (`--accent: 22 100% 93%`). **Background**: warm beige (`--background: 40 25% 96%`).
+- **Theme**: Dark mode. **Background**: near black (`--background: 0 0% 7%`). **Foreground**: light (`--foreground: 0 0% 92%`).
+- **Primary**: brightened plum (`--primary: 330 50% 35%`). **Accent**: dark warm (`--accent: 22 60% 18%`).
+- **Navigation**: Horizontal top nav bar (h-14), not sidebar. Logo left, nav center, profile right. Admin accessed via `/admin` page boxes.
 - **Font**: Open Sans. `font-bold` → 300, `font-semibold/medium` → 400 globally. Headings are light weight by design.
-- **Glass cards**: `.dashboard-card` class (rgba white 0.7 + blur 12px). Never recreate inline.
+- **Glass cards**: `.dashboard-card` class (rgba white 0.05 + blur 12px on dark). Never recreate inline.
 - **Tabs active**: TabsList: `w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0`. TabsTrigger: `flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground`. **NEVER add `rounded-full` to TabsTrigger** — that is only for Buttons.
 - **Tables**: `<CardContent className="p-0">`, no wrapper div, no fixed column widths.
-- **Buttons**: all pill-shaped (`rounded-full`). Variants: default (plum), outline (white→peach), secondary (peach), ghost, destructive, link.
+- **Buttons**: all pill-shaped (`rounded-full`). Variants: default (plum), outline, secondary, ghost, destructive, link.

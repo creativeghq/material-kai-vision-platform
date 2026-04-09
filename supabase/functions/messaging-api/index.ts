@@ -11,7 +11,7 @@
  * - User JWT (Authorization header): User-specific operations
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';

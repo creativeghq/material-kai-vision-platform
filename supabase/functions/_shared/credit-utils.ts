@@ -8,7 +8,7 @@
  * Uses the existing debit_user_credits RPC and ai_usage_logs table.
  */
 
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // ── External Service Pricing (per unit, in USD) ──
 // Kept in sync with mivaa-pdf-extractor/app/config/ai_pricing.py

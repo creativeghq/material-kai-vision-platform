@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "stripe": "https://esm.sh/stripe@14.10.0"
   }
 }

@@ -10,7 +10,7 @@
  * Stores result in Supabase Storage and updates social_posts.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';

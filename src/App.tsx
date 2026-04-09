@@ -118,7 +118,16 @@ const CoveragePage = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes — avoid redundant refetches on mount
+      gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
+      refetchOnWindowFocus: false, // don't refetch on tab switch
+      retry: 1, // single retry on failure
+    },
+  },
+});
 
 const App = () => (
   <CriticalErrorBoundary name="Application Root">

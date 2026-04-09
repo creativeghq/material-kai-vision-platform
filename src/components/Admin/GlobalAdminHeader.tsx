@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, Activity } from 'lucide-react';
+import { Brain, Activity, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
@@ -21,40 +21,45 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className="px-3 sm:px-6 py-3 sm:py-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => navigate('/')}
-              onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-              className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
-            >
-              <Brain className="h-4 w-4" />
-              <span className="hidden xs:inline">Back to Main</span>
-            </Button>
-            <Button
-              onClick={() => navigate('/admin')}
-              onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-              className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
-            >
-              <Activity className="h-4 w-4" />
-              <span className="hidden xs:inline">Back to Admin</span>
-            </Button>
+    <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/8">
+      <div className="flex items-center justify-between gap-4">
+        {/* Left: icon + title */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Settings className="h-4.5 w-4.5 text-primary" />
           </div>
-          <div className="hidden sm:block h-6 w-px bg-border" />
-          <div>
-            <h1 className="text-lg sm:text-2xl font-bold tracking-tight">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-lg font-light text-foreground tracking-tight">{title}</h1>
             {description && (
-              <div className="text-xs sm:text-sm text-muted-foreground">{description}</div>
+              <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{description}</p>
             )}
           </div>
         </div>
-        {badge && (
-          <Badge className="text-sm px-2 py-1 self-start sm:self-auto" style={{ background: 'hsl(var(--primary))' }}>
-            {badge}
-          </Badge>
-        )}
+
+        {/* Right: nav buttons + badge */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2"
+          >
+            <Brain className="h-4 w-4" />
+            <span className="hidden sm:inline">Main</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/admin')}
+            className="flex items-center gap-2"
+          >
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Admin</span>
+          </Button>
+          {badge && (
+            <Badge className="text-xs px-2 py-0.5">{badge}</Badge>
+          )}
+        </div>
       </div>
     </div>
   );

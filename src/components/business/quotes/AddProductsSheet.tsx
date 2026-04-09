@@ -352,7 +352,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                         >
                           <div className="w-14 h-14 rounded bg-muted flex-shrink-0 overflow-hidden">
                             {product.image_url ? (
-                              <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" />
+                              <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <Package className="h-5 w-5 text-muted-foreground" />
@@ -416,7 +416,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                             <TableCell>
                               <div className="w-12 h-12 rounded bg-muted overflow-hidden">
                                 {product.image_url ? (
-                                  <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" />
+                                  <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <Package className="h-4 w-4 text-muted-foreground" />

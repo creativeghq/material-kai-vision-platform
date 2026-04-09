@@ -8,12 +8,9 @@ import type { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import Design3DModal from './Design3DModal';
 import SEOArticleViewer from './SEOArticleViewer';
-import { AddToMoodboardModal } from '@/components/business/moodboard/AddToMoodboardModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { Button } from '@/components/core/ui/button';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
-import { Star, Package, BookmarkPlus, Globe, Video, Box } from 'lucide-react';
+import { Package } from 'lucide-react';
 
 
 interface DemoAgentResultsProps {
@@ -46,8 +43,6 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected3DDesign, setSelected3DDesign] = useState<any>(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
-  const [moodboardProduct, setMoodboardProduct] = useState<{ id: string; name?: string; image?: string } | null>(null);
-
   const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
     setIsModalOpen(true);
@@ -58,12 +53,12 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
     setSelectedProduct(null);
   };
 
-  // Product List Display — table/list layout
+  // Product List Display — image grid layout
   if (result.type === 'product_list' && result.data) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="space-y-3">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-900">
             {result.message || 'Product Results'}
           </h3>
@@ -72,146 +67,51 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           </Badge>
         </div>
 
-        {/* Column headers */}
-        <div
-          className="grid px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold uppercase tracking-wider text-gray-400"
-          style={{ gridTemplateColumns: '1fr 120px 100px 200px' }}
-        >
-          <span>Product Details</span>
-          <span>Category</span>
-          <span className="text-center">Rate</span>
-          <span className="text-right">Actions</span>
-        </div>
-
-        {/* Product Rows */}
-        <div className="divide-y divide-gray-50">
+        {/* Product Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {result.data.map((product: Product) => {
             const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0];
-            const rating = (product as any).metadata?.rating ?? 4.2;
-            const reviewCount = (product as any).metadata?.review_count ?? null;
-            const ratingInt = Math.round(rating);
 
             return (
               <div
                 key={product.id}
-                className="grid items-center px-5 py-3 hover:bg-gray-50/70 transition-colors cursor-pointer group"
-                style={{ gridTemplateColumns: '1fr 120px 100px 200px' }}
+                className="group cursor-pointer rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
                 onClick={() => handleViewDetails(product)}
               >
-                {/* Thumbnail + name */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                    {primaryImage ? (
-                      <img
-                        src={primaryImage.url}
-                        alt={primaryImage.alt || product.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="h-5 w-5 text-gray-300" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 line-clamp-1">{product.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
-                      {(product as any).metadata?.factory_name || (product as any).metadata?.manufacturer || 'Offer new products...'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Category */}
-                <div className="flex flex-wrap gap-1">
+                {/* Image */}
+                <div className="aspect-square bg-gray-100 overflow-hidden relative">
+                  {primaryImage ? (
+                    <img
+                      src={primaryImage.url}
+                      alt={primaryImage.alt || product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="h-8 w-8 text-gray-300" />
+                    </div>
+                  )}
+                  {/* Category badge overlay */}
                   {product.category && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 rounded font-normal">
+                    <Badge className="absolute top-2 left-2 text-[10px] px-1.5 py-0 h-5 bg-white/90 text-gray-700 border-0 backdrop-blur-sm shadow-sm">
                       {product.category}
                     </Badge>
                   )}
-                  {product.type && product.type !== product.category && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 rounded font-normal">
-                      {product.type}
-                    </Badge>
-                  )}
                 </div>
 
-                {/* Rating */}
-                <div className="flex flex-col items-center gap-0.5">
-                  <div className="flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`h-2.5 w-2.5 ${star <= ratingInt ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'}`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[10px] text-gray-400">
-                    {rating.toFixed(1)}{reviewCount ? ` (${reviewCount})` : ''}
-                  </span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleViewDetails(product)}
-                  >
-                    View
-                  </Button>
-                  <AddToQuoteButton
-                    productId={product.id}
-                    productName={product.name}
-                    productImage={primaryImage?.url}
-                    variant="ghost"
-                    size="sm"
-                    showText={false}
-                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:text-rose-700 hover:bg-rose-50"
-                    title="Add to Moodboard"
-                    onClick={() => setMoodboardProduct({ id: product.id, name: product.name, image: primaryImage?.url })}
-                  >
-                    <BookmarkPlus className="h-3.5 w-3.5" />
-                  </Button>
-                  {onUseIn3DScene && primaryImage?.url && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                      title="Use in 3D Scene"
-                      onClick={() => onUseIn3DScene(primaryImage.url, product.name)}
-                    >
-                      <Box className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {onGenerateVR && primaryImage?.url && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-violet-500 hover:text-violet-700 hover:bg-violet-50"
-                      title="Generate VR World (50 credits)"
-                      disabled={vrGenerating}
-                      onClick={() => onGenerateVR(primaryImage.url, { prompt: product.name })}
-                    >
-                      <Globe className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {onGenerateVideo && primaryImage?.url && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-orange-500 hover:text-orange-700 hover:bg-orange-50"
-                      title="Generate Video (30 credits)"
-                      onClick={() => onGenerateVideo(primaryImage.url)}
-                    >
-                      <Video className="h-3.5 w-3.5" />
-                    </Button>
+                {/* Info */}
+                <div className="p-2.5">
+                  <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                    {product.name}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-1">
+                    {(product as any).metadata?.factory_name || (product as any).metadata?.manufacturer || ''}
+                  </p>
+                  {product.pricing?.retail != null && (
+                    <p className="text-sm font-semibold text-gray-900 mt-1.5">
+                      €{Number(product.pricing.retail).toFixed(2)}
+                    </p>
                   )}
                 </div>
               </div>
@@ -223,22 +123,16 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           product={selectedProduct}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
+          onGenerateVR={onGenerateVR}
+          onGenerateVideo={onGenerateVideo}
+          onUseIn3DScene={onUseIn3DScene}
+          vrGenerating={vrGenerating}
           categoryColor={
             selectedProduct
               ? categoryColors[selectedProduct.category] || categoryColors[selectedProduct.type]
               : undefined
           }
         />
-
-        {moodboardProduct && (
-          <AddToMoodboardModal
-            productId={moodboardProduct.id}
-            productName={moodboardProduct.name}
-            productImage={moodboardProduct.image}
-            onClose={() => setMoodboardProduct(null)}
-            onSuccess={(_name) => setMoodboardProduct(null)}
-          />
-        )}
       </div>
     );
   }

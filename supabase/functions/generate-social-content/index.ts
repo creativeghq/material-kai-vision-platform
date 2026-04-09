@@ -7,7 +7,7 @@
  * Cost: 2 credits (social-caption service in credit-utils). Non-refundable.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';

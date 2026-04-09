@@ -1,4 +1,5 @@
 import React from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import {
   FileText,
   Image,
@@ -187,7 +188,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
         <div className="flex-shrink-0">
           {result.thumbnail ? (
             <img
-              src={result.thumbnail}
+              src={getOptimizedImageUrl(result.thumbnail, 'thumbnail')}
               alt={result.title}
               className="w-16 h-16 object-cover rounded-lg border"
             />
@@ -403,7 +404,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {result.thumbnail ? (
               <img
-                src={result.thumbnail}
+                src={getOptimizedImageUrl(result.thumbnail, 'thumbnail')}
                 alt={result.title}
                 className="w-12 h-12 object-cover rounded-lg border flex-shrink-0"
               />

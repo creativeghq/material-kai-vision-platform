@@ -9,7 +9,7 @@
  * - Request/response data storage
  */
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // AI Pricing Configuration (synced with ai_model_pricing DB table and ai_pricing.py)
 // Last synced: 2026-03-30

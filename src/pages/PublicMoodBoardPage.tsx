@@ -208,7 +208,7 @@ export default function PublicMoodBoardPage() {
                   {item.media_type === 'video' ? (
                     <video src={item.media_url!} controls className="w-full h-48 object-cover" />
                   ) : (
-                    <img src={item.media_url!} alt="Media" className="w-full h-48 object-cover" />
+                    <img src={item.media_url!} alt="Media" className="w-full h-48 object-cover" loading="lazy" />
                   )}
                   {item.notes && (
                     <p className="p-3 text-xs text-muted-foreground italic">"{item.notes}"</p>

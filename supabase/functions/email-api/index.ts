@@ -7,7 +7,7 @@
  * - User JWT (Authorization header): User-specific operations
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';

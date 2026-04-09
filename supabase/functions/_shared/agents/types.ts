@@ -5,7 +5,7 @@
  * the execution context it receives at runtime.
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── DB row shapes ────────────────────────────────────────────────────────────
 

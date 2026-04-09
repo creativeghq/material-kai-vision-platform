@@ -9,7 +9,7 @@
  * They are re-exported here so existing agent imports keep working.
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LogLevel } from './types.ts';
 
 // Re-export LangGraph utilities so agents that import from './base-agent.ts' continue to work.

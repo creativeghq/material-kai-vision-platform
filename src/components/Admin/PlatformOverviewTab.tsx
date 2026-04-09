@@ -996,7 +996,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">VR World Quality Split (mini vs plus)</CardTitle><p className="text-xs text-muted-foreground mt-1">mini = 50 credits (~30s), plus = 200 credits (~5min)</p></CardHeader>
+          <CardHeader><CardTitle className="text-sm">VR World Quality Split (draft vs 1.1)</CardTitle><p className="text-xs text-muted-foreground mt-1">draft = 18 credits (~30s), 1.1 = 190 credits (~5min)</p></CardHeader>
           <CardContent>
             {vrQualitySplit.length === 0 ? <EmptyState message="No VR worlds generated yet" /> : (
               <ResponsiveContainer width="100%" height={220}>

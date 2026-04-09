@@ -9,7 +9,7 @@
  * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { checkCreditBalance } from '../_shared/credit-utils.ts';

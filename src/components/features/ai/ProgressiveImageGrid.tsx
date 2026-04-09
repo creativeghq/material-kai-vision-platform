@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -651,7 +652,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 ) : result.status === 'completed' && result.image_urls[0] ? (
                   <>
                     <img
-                      src={result.image_urls[0]}
+                      src={getOptimizedImageUrl(result.image_urls[0], 'preview')}
                       alt={result.model_name}
                       className="w-full h-full object-cover animate-fade-in"
                     />
@@ -714,7 +715,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 onClick={() => setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' })}
               >
                 <img
-                  src={edited.url}
+                  src={getOptimizedImageUrl(edited.url, 'preview')}
                   alt={edited.label}
                   className="w-full aspect-square object-cover"
                 />
@@ -896,7 +897,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {selectedImage && (
                       <>
                         <img
-                          src={selectedImage.url}
+                          src={getOptimizedImageUrl(selectedImage.url, 'display')}
                           alt={selectedImage.name}
                           className="w-full h-full object-contain pointer-events-none select-none"
                         />
@@ -1105,7 +1106,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         onClick={() => { if (!vrGenerating) onGenerateVR(selectedImage!.url, { prompt: selectedImage!.name }); }}
                         disabled={vrGenerating}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
-                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
                       >
                         {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
                         {vrGenerating ? 'Generating VR World…' : 'Generate VR World'}
@@ -1318,7 +1319,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                             <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 relative">
                               {(seg.crop_storage_url || seg.crop_data_url) && (
                                 <img
-                                  src={seg.crop_storage_url ?? seg.crop_data_url}
+                                  src={getOptimizedImageUrl(seg.crop_storage_url ?? seg.crop_data_url, 'thumbnail')}
                                   alt={seg.label}
                                   className="w-full h-full object-cover cursor-zoom-in"
                                   onClick={() => setLightboxUrl(seg.crop_storage_url ?? seg.crop_data_url!)}
@@ -1360,7 +1361,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
                                       {match.image_url ? (
                                         <img
-                                          src={match.image_url}
+                                          src={getOptimizedImageUrl(match.image_url, 'thumbnail')}
                                           alt={name}
                                           className="w-full h-full object-cover cursor-zoom-in"
                                           onClick={() => setLightboxUrl(match.image_url)}
@@ -1533,7 +1534,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           {/* Image + mask overlay */}
           {selectedImage && activeMask && (
             <div className="relative rounded-lg overflow-hidden border border-border">
-              <img src={selectedImage.url} alt="" className="w-full object-contain" />
+              <img src={getOptimizedImageUrl(selectedImage.url, 'display')} alt="" className="w-full object-contain" />
               <div
                 className="absolute inset-0"
                 style={{
@@ -1640,7 +1641,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           onClick={() => setLightboxUrl(null)}
         >
           <img
-            src={lightboxUrl}
+            src={getOptimizedImageUrl(lightboxUrl, 'full')}
             alt=""
             className="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}

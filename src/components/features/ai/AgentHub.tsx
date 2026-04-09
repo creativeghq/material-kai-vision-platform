@@ -3,7 +3,7 @@
  * Replaces SearchHub with comprehensive agent orchestration
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import {
   Bot,
   Search,
@@ -287,6 +287,38 @@ const normalizeContent = (content: unknown): string => {
   return String(content ?? '');
 };
 
+/**
+ * Isolated timer component — manages its own 100ms interval so the parent
+ * AgentHub doesn't re-render 10x/sec just for the elapsed-time display.
+ */
+const ThinkingTimer = memo(({ isActive, onElapsedCapture }: {
+  isActive: boolean;
+  onElapsedCapture?: React.MutableRefObject<number>;
+}) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!isActive) {
+      setElapsed(0);
+      return;
+    }
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const ms = Date.now() - start;
+      setElapsed(ms);
+      if (onElapsedCapture) onElapsedCapture.current = ms;
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isActive, onElapsedCapture]);
+
+  return (
+    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
+      {(elapsed / 1000).toFixed(1) + 's'}
+    </span>
+  );
+});
+ThinkingTimer.displayName = 'ThinkingTimer';
+
 export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
   onMaterialSelect,
@@ -312,6 +344,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const imageDragIndexRef = useRef<number | null>(null);
   const [geminiModalImage, setGeminiModalImage] = useState<string | null>(null);
   const [showGeminiEditModal, setShowGeminiEditModal] = useState(false);
+  const [geminiEditRoomType, setGeminiEditRoomType] = useState<string | null>(null);
+  const [geminiEditStyle, setGeminiEditStyle] = useState<string | null>(null);
   const [regionEditImageUrl, setRegionEditImageUrl] = useState<string | null>(null);
   // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
@@ -324,7 +358,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [showInspirationModal, setShowInspirationModal] = useState(false);
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  // Elapsed time tracked by ThinkingTimer component; ref avoids re-renders in parent
+  const elapsedTimeRef = useRef(0);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
 
   // Real reasoning steps from agent (Jarvis-style)
@@ -487,27 +522,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, reasoningSteps]);
 
-  // Timer for thinking duration
+  // Track thinking start/end (timer rendering is in ThinkingTimer component)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
     if (isLoading) {
       setThinkingStartTime(Date.now());
-      setElapsedTime(0);
-      interval = setInterval(() => {
-        setElapsedTime((prev) => prev + 100);
-      }, 100);
+      elapsedTimeRef.current = 0;
     } else {
       setThinkingStartTime(null);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
   }, [isLoading]);
-
-  // Format elapsed time as seconds with 1 decimal
-  const formatElapsedTime = (ms: number) => {
-    return (ms / 1000).toFixed(1) + 's';
-  };
 
   // Subscribe to background task results — when a task dispatched from this chat
   // completes, the runner inserts an assistant message into agent_chat_messages
@@ -1652,7 +1675,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Save assistant message to database with response metrics
       if (conversationId) {
-        const responseTimeMs = elapsedTime; // Capture elapsed time before state resets
+        const responseTimeMs = elapsedTimeRef.current; // Capture elapsed time before state resets
         await agentChatHistoryService.saveMessage({
           conversationId,
           role: 'assistant',
@@ -1929,7 +1952,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   return (
     <div className="flex flex-1 min-h-0">
       {/* Middle Panel - Conversation List (desktop only) */}
-      <div className="hidden md:flex w-80 flex-col m-4 rounded-3xl glass-panel bg-white/40 border-white/20 overflow-hidden">
+      <div className="hidden md:flex w-72 flex-col bg-[hsl(0,0%,9%)] border-r border-white/8 overflow-hidden flex-shrink-0">
         {/* Header */}
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3 mb-4">
@@ -1969,7 +1992,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
                     currentConversationId === convo.id
                       ? 'bg-primary/10 border-l-2 border-primary'
-                      : 'hover:bg-accent'
+                      : 'hover:bg-white/5'
                   }`}
                   onClick={() => editingConvoId !== convo.id && handleLoadConversation(convo.id)}
                 >
@@ -1985,7 +2008,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         onBlur={() => handleConfirmRename(convo.id)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full text-sm font-medium bg-white/80 border border-primary/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full text-sm font-medium bg-white/10 text-foreground border border-white/15 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     ) : (
                       <div className="font-medium text-sm truncate">{convo.title}</div>
@@ -2004,7 +2027,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </button>
                     <button
                       onClick={(e) => handleDeleteConversation(e, convo.id)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-900/20 transition-all"
                       title="Delete conversation"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -2041,7 +2064,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   <MessageSquare className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 glass-panel" aria-describedby={undefined}>
+              <SheetContent side="left" className="w-80 p-0 bg-[hsl(0,0%,9%)] border-r border-white/8" aria-describedby={undefined}>
                 <SheetTitle className="sr-only">Chat History</SheetTitle>
                 <div className="flex flex-col h-full">
                   <div className="p-5 border-b border-white/10">
@@ -2078,7 +2101,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
                               currentConversationId === convo.id
                                 ? 'bg-primary/10 border-l-2 border-primary'
-                                : 'hover:bg-accent'
+                                : 'hover:bg-white/5'
                             }`}
                             onClick={() => { if (editingConvoId !== convo.id) { handleLoadConversation(convo.id); setMobileConvOpen(false); } }}
                           >
@@ -2094,7 +2117,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                   onBlur={() => handleConfirmRename(convo.id)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="w-full text-sm font-medium bg-white/80 border border-primary/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                                  className="w-full text-sm font-medium bg-white/10 text-foreground border border-white/15 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
                                 />
                               ) : (
                                 <div className="font-medium text-sm truncate">{convo.title}</div>
@@ -2113,7 +2136,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               </button>
                               <button
                                 onClick={(e) => handleDeleteConversation(e, convo.id)}
-                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-900/20 transition-all"
                                 title="Delete conversation"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -2144,7 +2167,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
         )}
         {/* Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 space-y-4 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4">
@@ -2517,6 +2540,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 }
                                 setAttachedImages([imageUrl]);
                                 setSelectedGenerationMode('image-edit');
+                                setGeminiEditRoomType(message.generation_job?.room_type || null);
+                                setGeminiEditStyle(message.generation_job?.style || null);
                                 setShowGeminiEditModal(true);
                               }}
                               onAskJARVIS={(segment) => {
@@ -2603,7 +2628,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <Bot className="h-4 w-4 text-white animate-pulse" />
                     </div>
                   </div>
-                  <div className="max-w-[80%] rounded-2xl p-5 glass-panel bg-primary/5 border-primary/20">
+                  <div className="max-w-[80%] rounded-2xl p-5 bg-primary/5 border border-primary/20">
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
                         <div className="flex gap-1.5">
@@ -2612,9 +2637,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <div className="w-2 h-2 rounded-full bg-primary animate-bounce"></div>
                         </div>
                         <span className="text-sm font-bold text-primary uppercase tracking-widest">Reasoning</span>
-                        <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-white/40 text-primary border border-primary/10">
-                          {formatElapsedTime(elapsedTime)}
-                        </span>
+                        <ThinkingTimer isActive={isLoading} onElapsedCapture={elapsedTimeRef} />
                       </div>
 
                       {/* Real Reasoning Steps - Jarvis Style */}
@@ -2658,10 +2681,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="m-4 rounded-3xl glass-panel bg-white/40 border-white/20">
+        <div className="px-4 pb-4 pt-2">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
-            <div className="px-6 pt-3">
+            <div className="pb-2">
               <div className="p-2 border rounded-lg" style={{ background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
@@ -2673,7 +2696,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
           {/* Attached Images */}
           {attachedImages.length > 0 && (
-            <div className="px-6 pt-3 space-y-2">
+            <div className="pb-2 space-y-2">
 
               {/* 2-image drag-and-drop slots for interior designer */}
               {attachedImages.length >= 2 && selectedAgent === 'interior-designer' ? (
@@ -2824,6 +2847,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   <button
                     onClick={() => {
                       setSelectedGenerationMode('image-edit');
+                      // Find room context from the most recent generation in conversation
+                      const lastGen = [...messages].reverse().find(m => m.generation_job?.room_type);
+                      setGeminiEditRoomType(lastGen?.generation_job?.room_type || null);
+                      setGeminiEditStyle(lastGen?.generation_job?.style || null);
                       setShowGeminiEditModal(true);
                     }}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
@@ -2906,7 +2933,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
 
           {/* Input Controls */}
-          <div className="px-4 pb-4 pt-2">
+          <div>
             <input
               ref={fileInputRef}
               type="file"
@@ -3168,6 +3195,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       <GeminiEditModal
         isOpen={showGeminiEditModal}
         onClose={() => setShowGeminiEditModal(false)}
+        roomType={geminiEditRoomType}
+        style={geminiEditStyle}
         onApply={(params) => {
           if (params.regionEdit) {
             // Use the image the user clicked Edit on, falling back to last generated then attached

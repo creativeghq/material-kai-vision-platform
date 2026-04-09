@@ -17,7 +17,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle, Globe, Video, Box } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
@@ -33,6 +33,10 @@ interface ProductDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   categoryColor?: string;
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  onGenerateVideo?: (imageUrl: string) => void;
+  onUseIn3DScene?: (imageUrl: string, productName: string) => void;
+  vrGenerating?: boolean;
 }
 
 // Helper to extract value from {value, confidence} objects or plain values
@@ -107,6 +111,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   isOpen,
   onClose,
   categoryColor,
+  onGenerateVR,
+  onGenerateVideo,
+  onUseIn3DScene,
+  vrGenerating,
 }) => {
   const { user } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -1149,7 +1157,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             : 'border-border hover:border-muted-foreground/50'
                         }`}
                       >
-                        <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                        <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
                       </button>
                     ))}
                   </div>
@@ -1266,6 +1274,46 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 className="w-full"
               />
             </div>
+
+            {/* VR / Video / 3D Actions */}
+            {(onGenerateVR || onGenerateVideo || onUseIn3DScene) && currentImage?.url && (
+              <div className="flex flex-wrap gap-2">
+                {onUseIn3DScene && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    onClick={() => { onUseIn3DScene(currentImage.url, product.name); onClose(); }}
+                  >
+                    <Box className="h-3.5 w-3.5" />
+                    Use in 3D Scene
+                  </Button>
+                )}
+                {onGenerateVR && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    disabled={vrGenerating}
+                    onClick={() => { onGenerateVR(currentImage.url, { prompt: product.name }); onClose(); }}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    {vrGenerating ? 'Generating...' : 'VR World'}
+                  </Button>
+                )}
+                {onGenerateVideo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    onClick={() => { onGenerateVideo(currentImage.url); onClose(); }}
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    Generate Video
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

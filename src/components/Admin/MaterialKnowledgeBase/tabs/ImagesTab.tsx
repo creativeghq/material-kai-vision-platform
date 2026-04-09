@@ -1,4 +1,5 @@
 import React from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Image as ImageIcon, Eye } from 'lucide-react';
 import {
   Card,
@@ -69,7 +70,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({
                   <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden">
                     {image.image_url ? (
                       <img
-                        src={image.image_url}
+                        src={getOptimizedImageUrl(image.image_url, 'preview')}
                         alt={image.caption || 'Document image'}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -153,7 +154,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({
                               <div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                                 {image.image_url ? (
                                   <img
-                                    src={image.image_url}
+                                    src={getOptimizedImageUrl(image.image_url, 'display')}
                                     alt={image.caption || 'Document image'}
                                     className="w-full h-full object-cover"
                                     onError={(e) => {

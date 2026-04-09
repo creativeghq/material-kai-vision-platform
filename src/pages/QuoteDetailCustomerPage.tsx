@@ -237,7 +237,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               <Button
                 onClick={handleSubmitQuote}
                 disabled={submittingQuote || (quote.items?.length || 0) === 0}
-                className="rounded-full bg-white/15 hover:bg-white/25 text-white border border-white/20"
+                variant="outline" size="sm"
               >
                 {submittingQuote ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

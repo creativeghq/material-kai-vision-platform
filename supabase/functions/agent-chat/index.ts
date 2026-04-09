@@ -68,6 +68,7 @@ async function initRuntime() {
   debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
   checkCreditBalance = creditMod.checkCreditBalance;
   getToolPrompt = promptMod.getToolPrompt;
+  getAgentSystemPrompt = promptMod.getAgentSystemPrompt;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
   isAdminAccess = authMod.isAdminAccess;
@@ -419,39 +420,35 @@ function createAgentGraph(
     }
 
 
-    const toolMessages: any[] = [];
     const newToolResults: any[] = [];
     const newProducts: any[] = [];
     let generationJob = null;
 
-    for (const toolCall of toolCalls) {
+    // Execute all tool calls in parallel for lower latency
+    const TOOL_TIMEOUT_MS = 90_000;
+    const toolSettled = await Promise.allSettled(
+      toolCalls.map(async (toolCall: any) => {
+        // Send tool call status
+        try {
+          onChunk?.({
+            type: 'tool_call',
+            tool: toolCall.name,
+            args: toolCall.args,
+            message: `Calling ${toolCall.name}...`
+          });
+        } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
-      // Send tool call status
-      try {
-        onChunk?.({
-          type: 'tool_call',
-          tool: toolCall.name,
-          args: toolCall.args,
-          message: `Calling ${toolCall.name}...`
-        });
-      } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
-
-      try {
-        const tool = tools.find((t: any) => t.name === toolCall.name);
-        if (!tool) {
+        const matchedTool = tools.find((t: any) => t.name === toolCall.name);
+        if (!matchedTool) {
           throw new Error(`Tool not found: ${toolCall.name}`);
         }
 
-        const toolStartTime = Date.now();
-        // 90-second per-tool cap prevents a single tool from blocking the whole agent run
-        const TOOL_TIMEOUT_MS = 90_000;
         const toolResult = await Promise.race([
-          tool.invoke(toolCall.args),
+          matchedTool.invoke(toolCall.args),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error(`Tool '${toolCall.name}' timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
           ),
         ]);
-        const toolElapsed = Date.now() - toolStartTime;
 
         // Send tool result
         try {
@@ -462,6 +459,19 @@ function createAgentGraph(
             message: `${toolCall.name} completed`
           });
         } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
+
+        return { toolCall, toolResult };
+      })
+    );
+
+    // Collect results in original order (preserves message ordering for LLM)
+    const toolMessages: any[] = [];
+    for (let i = 0; i < toolCalls.length; i++) {
+      const settled = toolSettled[i];
+      const toolCall = toolCalls[i];
+
+      if (settled.status === 'fulfilled') {
+        const { toolResult } = settled.value;
 
         // Parse and collect results
         try {
@@ -519,7 +529,6 @@ function createAgentGraph(
           console.warn('Could not parse tool result:', parseError);
         }
 
-        // Create tool message for model
         toolMessages.push({
           role: 'tool',
           content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
@@ -527,7 +536,8 @@ function createAgentGraph(
           name: toolCall.name,
         });
 
-      } catch (error) {
+      } else {
+        const error = settled.reason;
         console.error(`❌ Tool ${toolCall.name} failed:`, error);
 
         try {
@@ -596,37 +606,9 @@ function createAgentGraph(
   return graph.compile();
 }
 
-/**
- * Load agent system prompt from database (prompts table)
- * NO FALLBACK - All prompts must exist in the database
- */
-async function getAgentSystemPrompt(agentType: string): Promise<string> {
-  try {
-    const { data, error } = await supabase
-      .from('prompts')
-      .select('system_prompt')
-      .eq('prompt_type', 'agent')
-      .eq('category', agentType)
-      .eq('is_active', true)
-      .eq('status', 'active')
-      .single();
-
-    if (error) {
-      console.error(`❌ CRITICAL: No prompt found in database for agent '${agentType}'. Error:`, error);
-      throw new Error(`Agent prompt not found in database: ${agentType}. Please add it via /admin/ai-configs.`);
-    }
-
-    if (!data?.system_prompt) {
-      console.error(`❌ CRITICAL: Prompt for agent '${agentType}' exists but has empty system_prompt`);
-      throw new Error(`Agent prompt is empty in database: ${agentType}. Please update it via /admin/ai-configs.`);
-    }
-
-    return data.system_prompt;
-  } catch (error) {
-    console.error(`❌ Failed to load prompt for ${agentType}:`, error);
-    throw error;
-  }
-}
+// getAgentSystemPrompt: Uses shared cached version from _shared/prompt-utils.ts
+// Imported as part of initRuntime() → promptMod
+let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
 
 // Claude models — initialized in initRuntime()
 let modelHaiku: any;
@@ -810,7 +792,7 @@ async function executeAgent(
   // All prompts must exist in the database (managed via /admin/ai-configs)
   let systemPrompt: string;
   try {
-    systemPrompt = await getAgentSystemPrompt(agentId);
+    systemPrompt = await getAgentSystemPrompt(supabase, agentId);
   } catch (error) {
     console.error(`❌ Failed to load system prompt for ${agentId}:`, error);
     throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1050,13 +1032,10 @@ async function executeAgent(
 
   // 🔷 LangGraph StateGraph-based execution with checkpointing
 
-  // Generate thread ID for checkpointing (based on conversation context)
-  const threadId = `${userId}-${agentId}-${Date.now()}`;
-
-  // Try to restore from checkpoint if available
-  const existingCheckpoint = await checkpointer.get(threadId);
-  if (existingCheckpoint) {
-  }
+  // Use conversation_id for stable thread ID (falls back to user+agent if none provided)
+  const threadId = conversation_id
+    ? `${userId}-${agentId}-${conversation_id}`
+    : `${userId}-${agentId}-${Date.now()}`;
 
   // Create the agent graph — force tool use for interior-designer (prevents JARVIS text-first responses)
   const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
@@ -1125,12 +1104,12 @@ async function executeAgent(
     // Execute the graph
     const result = await agentGraph.invoke(initialState);
 
-    // Save checkpoint for future resume
-    await checkpointer.put(threadId, {
+    // Save checkpoint for future resume (fire-and-forget — don't block response)
+    checkpointer.put(threadId, {
       messages: result.messages,
       toolResults: result.toolResults,
       timestamp: new Date().toISOString(),
-    });
+    }).catch(e => console.warn('⚠️ Checkpoint save failed:', e));
 
     // Log final usage stats
 
@@ -1169,56 +1148,38 @@ async function executeAgent(
 }
 
 /**
- * Check user role and agent access
+ * Get user workspace membership (role + workspace_id) in a single query.
+ * Replaces the previous two-query pattern (checkAgentAccess + getUserWorkspaceId).
  */
-async function checkAgentAccess(userId: string, agentId: string): Promise<{ allowed: boolean; role: string }> {
-  try {
-    // Get user's workspace role
-    const { data: memberData, error } = await supabase
-      .from('workspace_members')
-      .select('role')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !memberData) {
-      return { allowed: false, role: 'viewer' };
-    }
-
-    const userRole = memberData.role;
-    const agentConfig = AGENT_CONFIGS[agentId];
-
-    if (!agentConfig) {
-      return { allowed: false, role: userRole };
-    }
-
-    const allowed = agentConfig.allowedRoles.includes(userRole);
-    return { allowed, role: userRole };
-  } catch (error) {
-    console.error('Error checking agent access:', error);
-    return { allowed: false, role: 'viewer' };
-  }
-}
-
-/**
- * Get workspace ID for user
- */
-async function getUserWorkspaceId(userId: string): Promise<string | null> {
+async function getUserWorkspaceMembership(userId: string): Promise<{ role: string; workspaceId: string | null }> {
   try {
     const { data, error } = await supabase
       .from('workspace_members')
-      .select('workspace_id')
+      .select('role, workspace_id')
       .eq('user_id', userId)
       .single();
 
     if (error || !data) {
-      return null;
+      return { role: 'viewer', workspaceId: null };
     }
 
-    return data.workspace_id;
+    return { role: data.role, workspaceId: data.workspace_id };
   } catch (error) {
-    console.error('Error getting workspace ID:', error);
-    return null;
+    console.error('Error getting workspace membership:', error);
+    return { role: 'viewer', workspaceId: null };
   }
+}
+
+/**
+ * Check user role and agent access
+ */
+function checkAgentAccess(role: string, agentId: string): { allowed: boolean; role: string } {
+  const agentConfig = AGENT_CONFIGS[agentId];
+  if (!agentConfig) {
+    return { allowed: false, role };
+  }
+  const allowed = agentConfig.allowedRoles.includes(role);
+  return { allowed, role };
 }
 
 
@@ -1413,10 +1374,22 @@ Deno.serve(async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
-    // Check agent access (skip for secret key access)
-    const { allowed, role } = isAdminAccess(auth)
+    // Get user workspace membership (single query for role + workspace_id)
+    const isAdmin = isAdminAccess(auth);
+    const membership = isAdmin
+      ? { role: 'admin', workspaceId: null as string | null }
+      : await getUserWorkspaceMembership(userId!);
+
+    // For admin key access, still need workspace_id
+    if (isAdmin && !membership.workspaceId) {
+      const m = await getUserWorkspaceMembership(userId!);
+      membership.workspaceId = m.workspaceId;
+    }
+
+    // Check agent access
+    const { allowed, role } = isAdmin
       ? { allowed: true, role: 'admin' }
-      : await checkAgentAccess(userId!, agentId);
+      : checkAgentAccess(membership.role, agentId);
     if (!allowed) {
       return new Response(
         JSON.stringify({
@@ -1429,8 +1402,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get workspace ID
-    const workspaceId = await getUserWorkspaceId(userId!);
+    const workspaceId = membership.workspaceId;
     if (!workspaceId) {
       throw new Error('No workspace found for user');
     }
