@@ -487,16 +487,19 @@ function createAgentGraph(
           // Collect products from search
           if (toolCall.name === 'material_search' && parsedResult.results) {
             const products = parsedResult.results.map((r: any) => {
-              const imageUrl = r.image_url || r.thumbnail || r.metadata?.image_url;
+              // MIVAA returns "product_name" not "name", and images in "related_images"
+              const productName = r.product_name || r.name || r.title || 'Unnamed Product';
+              const relatedImg = r.related_images?.[0]?.url;
+              const imageUrl = r.image_url || r.thumbnail || relatedImg || r.metadata?.image_url;
               return {
                 id: r.id || r.product_id || `product-${Date.now()}`,
                 sku: r.sku || r.metadata?.sku || '',
-                name: r.name || r.title || 'Unnamed Product',
+                name: productName,
                 description: r.description || r.content || '',
                 category: r.category || r.metadata?.category || 'materials',
                 type: r.type || r.metadata?.material_type || 'general',
                 status: 'active',
-                images: imageUrl ? [{ url: imageUrl, alt: r.name || 'Product', isPrimary: true }] : [],
+                images: imageUrl ? [{ url: imageUrl, alt: productName, isPrimary: true }] : [],
                 metadata: {
                   ...r.metadata,
                   factory_name: r.factory || r.metadata?.factory || r.manufacturer,
