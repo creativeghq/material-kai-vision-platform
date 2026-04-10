@@ -10,6 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
+import {
+  PRODUCT_IMAGE_SELECT,
+  getManufacturer,
+  getMaterialCategory,
+  getProductImageUrl,
+  getProductName,
+} from '@/utils/productMetadata';
 
 interface Product {
   id: string;
@@ -44,21 +51,30 @@ export const RecommendedForYou = ({ limit = 20, algorithm = 'user_user' }: Recom
         return;
       }
 
-      // Fetch product details
+      // Fetch product details. products only has category_id; image, manufacturer,
+      // and category live in metadata or via image_product_associations.
       const materialIds = recs.map((r) => r.material_id);
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, image_url, category, manufacturer')
+        .select(`id, name, description, metadata, ${PRODUCT_IMAGE_SELECT}`)
         .in('id', materialIds);
 
       if (!error && data) {
-        // Sort products by recommendation score
-        const sortedProducts = data.sort((a, b) => {
-          const scoreA = recs.find((r) => r.material_id === a.id)?.score || 0;
-          const scoreB = recs.find((r) => r.material_id === b.id)?.score || 0;
-          return scoreB - scoreA;
-        });
-        setProducts(sortedProducts);
+        const mapped: Product[] = data
+          .map((p: any) => ({
+            id: p.id,
+            name: getProductName(p),
+            description: p.description || '',
+            image_url: getProductImageUrl(p) || '',
+            category: getMaterialCategory(p.metadata) || '',
+            manufacturer: getManufacturer(p.metadata) || '',
+          }))
+          .sort((a, b) => {
+            const scoreA = recs.find((r) => r.material_id === a.id)?.score || 0;
+            const scoreB = recs.find((r) => r.material_id === b.id)?.score || 0;
+            return scoreB - scoreA;
+          });
+        setProducts(mapped);
       }
 
       setLoading(false);

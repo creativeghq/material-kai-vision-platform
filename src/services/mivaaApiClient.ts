@@ -185,9 +185,11 @@ export class MivaaApiClient {
   }
 
   /**
-   * Make authenticated request to MIVAA API with retry logic
+   * Make authenticated request to MIVAA API with retry logic.
+   * Public so service-layer modules can call arbitrary endpoints without
+   * needing a typed wrapper for every one.
    */
-  private async request<T = any>(
+  async request<T = any>(
     endpoint: string,
     options: RequestInit = {},
   ): Promise<MivaaApiResponse<T>> {

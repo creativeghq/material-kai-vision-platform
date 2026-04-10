@@ -170,7 +170,7 @@ export const AdminPanel: React.FC = () => {
   }: {
     title: string;
     value: string | number;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
     description: string;
   }) => (
     <div className="dashboard-card">

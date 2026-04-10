@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   Zap, Globe, UserPlus, Clock, FileText, Hand,
-  LogIn, CheckCircle2, XCircle,
+  LogIn, CheckCircle2, XCircle, ClipboardCheck, Image, FileCheck, Package,
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2,
@@ -18,6 +18,10 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   quote_requested: FileText,
   quote_approved: CheckCircle2,
   quote_rejected: XCircle,
+  contract_created: ClipboardCheck,
+  image_uploaded: Image,
+  document_processed: FileCheck,
+  product_added: Package,
   search_executed: Search,
   model_3d_created: Box,
   vr_world_created: Orbit,
@@ -27,6 +31,12 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   moodboard_created: LayoutGrid,
   moodboard_item_added: ImagePlus,
   moodboard_shared: Share2,
+  moodboard_commented: ImagePlus,
+  hire_me_received: UserPlus,
+  profile_followed: UserPlus,
+  profile_published: UserPlus,
+  material_reviewed: CheckCircle2,
+  preferred_factory_added: Package,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

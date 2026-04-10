@@ -23,6 +23,12 @@ interface Campaign {
   sent_at?: string;
   recipient_count: number;
   subject_line?: string;
+  preview_text?: string;
+  from_name?: string;
+  from_email?: string;
+  reply_to?: string;
+  track_opens: boolean;
+  track_clicks: boolean;
   template?: {
     id: string;
     name: string;

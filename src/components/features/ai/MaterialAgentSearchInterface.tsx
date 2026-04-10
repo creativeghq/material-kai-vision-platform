@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
+import { MarkdownRenderer } from './MarkdownRenderer';
 // import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
@@ -445,7 +446,7 @@ export const MaterialAgentSearchInterface: React.FC<
           const ragResponse = await UnifiedSearchService.search({
             query: input.trim(),
             workspace_id: workspaceData.workspace_id,
-            strategy: 'semantic',
+            strategy: 'multi_vector',
             top_k: 5,
             similarity_threshold: 0.7,
             include_content: true,
@@ -973,7 +974,11 @@ export const MaterialAgentSearchInterface: React.FC<
                             : 'bg-muted'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'assistant' ? (
+                        <MarkdownRenderer content={message.content} className="text-sm" />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )}
 
                       {message.thinking && (
                         <details className="mt-2">

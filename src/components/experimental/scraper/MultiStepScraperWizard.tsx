@@ -440,7 +440,7 @@ export const MultiStepScraperWizard: React.FC<MultiStepScraperWizardProps> = ({
           retryCount,
           concurrentPages,
           firecrawlOptions,
-        } as Json,
+        } as unknown as Json,
       };
 
       const { data: insertedSession, error: sessionError } = await supabase

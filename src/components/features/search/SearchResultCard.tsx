@@ -31,6 +31,8 @@ import { RecommendationsService } from '@/services/recommendationsService';
 // Types for search results
 export interface SearchResult {
   id: string;
+  /** Display name (alias for title in some result shapes) */
+  name?: string;
   title: string;
   description: string;
   type: 'document' | 'image' | 'data' | 'analysis';

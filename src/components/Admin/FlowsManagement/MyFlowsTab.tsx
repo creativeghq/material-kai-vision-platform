@@ -85,6 +85,12 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   moodboard_created: LayoutGrid,
   moodboard_item_added: ImagePlus,
   moodboard_shared: Share2,
+  moodboard_commented: ImagePlus,
+  hire_me_received: UserPlus,
+  profile_followed: UserPlus,
+  profile_published: UserPlus,
+  material_reviewed: CheckCircle2,
+  preferred_factory_added: Package,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -109,6 +115,12 @@ const triggerLabels: Record<TriggerType, string> = {
   moodboard_created: 'Moodboard Created',
   moodboard_item_added: 'Moodboard Item Added',
   moodboard_shared: 'Moodboard Shared',
+  moodboard_commented: 'Moodboard Commented',
+  hire_me_received: 'Hire Me Received',
+  profile_followed: 'Profile Followed',
+  profile_published: 'Profile Published',
+  material_reviewed: 'Material Reviewed',
+  preferred_factory_added: 'Preferred Factory Added',
 };
 
 const statusColors: Record<FlowStatus, string> = {

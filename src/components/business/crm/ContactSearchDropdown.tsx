@@ -54,10 +54,16 @@ export function ContactSearchDropdown({
 
       setLoading(true);
       try {
-        const response = await contactsAPI.listContacts(20, 0, search);
-        const filteredContacts = response.data.filter(
-          (contact: Contact) => !excludeContactIds.includes(contact.id),
-        );
+        const response = await contactsAPI.listContacts(50, 0);
+        const term = search.toLowerCase();
+        const filteredContacts = response.data.filter((contact: Contact) => {
+          if (excludeContactIds.includes(contact.id)) return false;
+          const haystack = [contact.name, contact.email, contact.company]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(term);
+        });
         setContacts(filteredContacts);
       } catch (error) {
         console.error('Error fetching contacts:', error);

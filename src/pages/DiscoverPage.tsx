@@ -27,20 +27,30 @@ import {
   CAT_COLORS, MATERIAL_CATS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
 } from '@/lib/materialCategories';
+import {
+  PRODUCT_IMAGE_SELECT,
+  getManufacturer,
+  getMaterialCategory,
+  getProductImageUrl,
+  getProductName,
+} from '@/utils/productMetadata';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PER_PAGE = 20;
 
 function toProduct(p: RawProduct): Product {
+  const imageUrl = p.imageUrl || null;
   return {
     id: p.id,
-    name: p.name,
+    name: getProductName(p),
     description: p.description || '',
     category: catLabel(p.detectedCat),
     type: p.metadata?.material_category || '',
     status: p.status || 'active',
-    images: [],
+    images: imageUrl
+      ? [{ url: imageUrl, alt: p.name, isPrimary: true }]
+      : [],
     metadata: p.metadata,
     pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
     stock: { quantity: 0, status: 'Unknown', unit: 'unit' },
@@ -74,6 +84,7 @@ interface RawProduct {
   metadata: Record<string, any>;
   detectedCat: string;
   factoryName: string;
+  imageUrl?: string | null;
 }
 
 interface Factory {
@@ -174,9 +185,8 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
 
 function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawProduct) => void }) {
   const color = CAT_COLORS[product.detectedCat] ?? CAT_COLORS.other;
-  const displayCat = product.metadata?.material_category
-    ? product.metadata.material_category.replace(/_/g, ' ')
-    : catLabel(product.detectedCat);
+  const rawCat = getMaterialCategory(product.metadata);
+  const displayCat = rawCat ? rawCat.replace(/_/g, ' ') : catLabel(product.detectedCat);
 
   return (
     <div
@@ -185,8 +195,20 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
     >
       {/* Thumbnail + name */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-md flex items-center justify-center">
-          <Package className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+        <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-md flex items-center justify-center bg-muted/40 overflow-hidden">
+          {product.imageUrl ? (
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              loading="lazy"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <Package className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+          )}
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
@@ -430,17 +452,22 @@ export const DiscoverPage: React.FC = () => {
   async function loadProducts() {
     const { data } = await supabase
       .from('products')
-      .select('id, name, description, status, metadata')
+      .select(`id, name, description, status, metadata, ${PRODUCT_IMAGE_SELECT}`)
       .limit(300);
     if (!data) return;
 
     setProducts(data.map((p) => {
       const meta = (p.metadata ?? {}) as Record<string, any>;
+      // Use shared accessor so VALENOVA-style records (manufacturer in
+      // metadata.manufacturer rather than factory_group_name) are correctly
+      // bucketed under their real factory.
+      const factoryName = getManufacturer(meta) || 'Unknown';
       return {
         ...p,
         metadata: meta,
         detectedCat: detectCat(meta),
-        factoryName: meta.factory_group_name || 'Unknown',
+        factoryName,
+        imageUrl: getProductImageUrl(p),
       };
     }));
   }

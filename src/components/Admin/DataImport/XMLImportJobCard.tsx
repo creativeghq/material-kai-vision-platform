@@ -52,10 +52,10 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
 }) => {
   const getStatusBadge = (status: string) => {
     const variants = {
-      pending: { variant: 'secondary' as const, icon: Clock, text: 'Pending' },
-      processing: { variant: 'default' as const, icon: RefreshCw, text: 'Processing' },
+      pending: { variant: 'secondary' as const, icon: Clock, text: 'Pending', className: '' },
+      processing: { variant: 'default' as const, icon: RefreshCw, text: 'Processing', className: '' },
       completed: { variant: 'default' as const, icon: CheckCircle, text: 'Completed', className: 'bg-green-600' },
-      failed: { variant: 'destructive' as const, icon: XCircle, text: 'Failed' },
+      failed: { variant: 'destructive' as const, icon: XCircle, text: 'Failed', className: '' },
     };
 
     const config = variants[status as keyof typeof variants] || variants.pending;

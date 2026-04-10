@@ -178,36 +178,36 @@ export class ApiConfigManager {
    * Get configuration for a specific API
    */
   static getApiConfig<T extends ApiConfig>(apiName: string): T {
-    const config = apiRegistry.getApi(apiName);
+    const config = apiRegistry.getApiConfig<T>(apiName);
     if (!config) {
       throw new Error(`API configuration not found: ${apiName}`);
     }
-    return config as T;
+    return config;
   }
 
   /**
    * Get all registered API configurations
    */
-  static getAllApiConfigs(): Map<string, ApiConfig> {
-    return apiRegistry.getAllApis();
+  static getAllApiConfigs(): ApiConfig[] {
+    return apiRegistry.getAllConfigs();
   }
 
   /**
    * Check if an API is configured
    */
   static hasApiConfig(apiName: string): boolean {
-    return apiRegistry.hasApi(apiName);
+    return apiRegistry.getApiConfig(apiName) !== null;
   }
 
   /**
    * Get configuration summary for debugging (sanitized - no API keys exposed)
    */
   static getConfigSummary(): Record<string, unknown> {
-    const apis = apiRegistry.getAllApis();
+    const apis = apiRegistry.getAllConfigs();
     const summary: Record<string, unknown> = {};
 
-    apis.forEach((config, name) => {
-      summary[name] = {
+    apis.forEach((config) => {
+      summary[config.name] = {
         environment: config.environment,
         hasApiKey: !!config.apiKey, // Only boolean, not the actual key
         baseUrl: config.baseUrl,
@@ -240,17 +240,18 @@ export class ApiConfigManager {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    const apis = apiRegistry.getAllApis();
+    const apis = apiRegistry.getAllConfigs();
 
-    apis.forEach((config, name) => {
-      // Check for API key if required
-      if (config.requiresAuth && !config.apiKey) {
-        warnings.push(`${name}: Missing API key`);
+    apis.forEach((config) => {
+      // ApiConfig types declare apiKey as optional — warn when it's missing
+      // for any registered API. (There is no `requiresAuth` flag on the union.)
+      if (!config.apiKey) {
+        warnings.push(`${config.name}: Missing API key`);
       }
 
       // Check for base URL
       if (!config.baseUrl) {
-        errors.push(`${name}: Missing base URL`);
+        errors.push(`${config.name}: Missing base URL`);
       }
     });
 

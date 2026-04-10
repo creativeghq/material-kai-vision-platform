@@ -45,6 +45,7 @@ export interface Generation3DResult {
     feedback: string;
   };
   processing_time_ms: number;
+  spatial_analysis?: unknown;
 }
 
 export interface Generation3DRecord {

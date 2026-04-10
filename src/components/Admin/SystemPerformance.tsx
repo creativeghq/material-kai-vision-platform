@@ -379,7 +379,7 @@ export const SystemPerformance: React.FC = () => {
   }: {
     title: string;
     value: string | number;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
     description: string;
     trend?: number;
     status?: 'good' | 'warning' | 'error';

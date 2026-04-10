@@ -14,6 +14,14 @@ import { Loader2, Package, Search, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Material } from '@/types/materials';
+import {
+  PRODUCT_IMAGE_SELECT,
+  getProductImageUrl,
+  getProductName,
+  getManufacturer,
+  getCollection,
+  getMaterialCategory,
+} from '@/utils/productMetadata';
 
 /**
  * Materials Page
@@ -71,10 +79,10 @@ export const MaterialsPage: React.FC = () => {
 
       setWorkspaceId(workspaceData.workspace_id);
 
-      // Load products from database
+      // Load products from database, embedding the best image via image_product_associations
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select(`*, ${PRODUCT_IMAGE_SELECT}`)
         .eq('workspace_id', workspaceData.workspace_id)
         .order('created_at', { ascending: false });
 
@@ -88,29 +96,41 @@ export const MaterialsPage: React.FC = () => {
         return;
       }
 
-      // Transform products to Material format
+      // Transform products to Material format using shared metadata accessors,
+      // so manufacturer / collection / image are picked up regardless of which
+      // metadata key the extraction stored them under.
       const transformedMaterials: Material[] = (productsData || []).map(
-        (product) => ({
-          id: product.id,
-          name: product.name,
-          description: product.description || '',
-          category: product.category_id || 'other',
-          properties: {
-            ...(product.properties || {}),
-          },
-          metadata: {
-            ...(product.metadata || {}),
-            finish: product.properties?.finish,
-            size: product.properties?.size,
-            installationMethod: product.properties?.installation_method,
-            application: product.properties?.application,
-          },
-          standards: [],
-          createdAt: product.created_at,
-          updatedAt: product.updated_at,
-          thumbnailUrl: product.metadata?.thumbnail_url,
-          imageUrl: product.metadata?.image_url,
-        }),
+        (product) => {
+          const imageUrl = getProductImageUrl(product) || undefined;
+          const manufacturer = getManufacturer(product.metadata);
+          const collection = getCollection(product.metadata);
+          return {
+            id: product.id,
+            name: getProductName(product),
+            description: product.description || '',
+            category:
+              getMaterialCategory(product.metadata) ||
+              product.category_id ||
+              'other',
+            properties: {
+              ...(product.properties || {}),
+            },
+            metadata: {
+              ...(product.metadata || {}),
+              finish: product.properties?.finish,
+              size: product.properties?.size,
+              installationMethod: product.properties?.installation_method,
+              application: product.properties?.application,
+              manufacturer,
+              collection,
+            },
+            standards: [],
+            createdAt: product.created_at,
+            updatedAt: product.updated_at,
+            thumbnailUrl: imageUrl,
+            imageUrl,
+          };
+        },
       );
 
       setMaterials(transformedMaterials);

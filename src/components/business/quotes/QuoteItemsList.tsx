@@ -7,6 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product, SimpleProduct } from '@/components/features/products/types';
+import {
+  getProductImageUrl,
+  getProductName,
+  getMaterialCategory,
+} from '@/utils/productMetadata';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -41,31 +46,35 @@ interface QuoteItemsListProps {
 }
 
 // Convert quote product to display product format
-const convertToDisplayProduct = (product: SimpleProduct): Product => ({
-  id: product.id,
-  sku: product.sku || '',
-  name: product.name || 'Unknown Product',
-  description: product.description || '',
-  category: product.metadata?.material_category || 'other',
-  type: product.metadata?.type || '',
-  status: 'Active',
-  images: product.image_url ? [{ url: product.image_url, alt: product.name || 'Product', isPrimary: true }] : [],
-  metadata: product.metadata || {},
-  properties: product.metadata?.properties || {},
-  specifications: product.metadata?.specifications || {},
-  pricing: {
-    retail: product.metadata?.price || 0,
-    wholesale: product.metadata?.wholesale_price || 0,
-    currency: 'EUR',
-  },
-  stock: {
-    quantity: product.metadata?.stock_quantity || 0,
-    status: 'Available',
-    unit: product.metadata?.unit || 'pcs',
-  },
-  tags: product.metadata?.tags || [],
-  variants: [],
-});
+const convertToDisplayProduct = (product: SimpleProduct): Product => {
+  const displayName = getProductName(product);
+  const imageUrl = getProductImageUrl(product);
+  return {
+    id: product.id,
+    sku: product.sku || '',
+    name: displayName,
+    description: product.description || '',
+    category: getMaterialCategory(product.metadata) || 'other',
+    type: product.metadata?.type || '',
+    status: 'Active',
+    images: imageUrl ? [{ url: imageUrl, alt: displayName, isPrimary: true }] : [],
+    metadata: product.metadata || {},
+    properties: product.metadata?.properties || {},
+    specifications: product.metadata?.specifications || {},
+    pricing: {
+      retail: product.metadata?.price || 0,
+      wholesale: product.metadata?.wholesale_price || 0,
+      currency: 'EUR',
+    },
+    stock: {
+      quantity: product.metadata?.stock_quantity || 0,
+      status: 'Available',
+      unit: product.metadata?.unit || 'pcs',
+    },
+    tags: product.metadata?.tags || [],
+    variants: [],
+  };
+};
 
 /** Inline editable price cell — shows text when not editable, input when editable */
 const PriceCell: React.FC<{
@@ -272,8 +281,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <div className="w-full h-full flex items-center justify-center bg-primary/10">
                                   <PenLine className="h-4 w-4 text-primary/60" />
                                 </div>
-                              ) : item.product?.image_url ? (
-                                <img src={item.product.image_url} alt={item.product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
+                              ) : item.product && getProductImageUrl(item.product) ? (
+                                <img src={getProductImageUrl(item.product) || ''} alt={getProductName(item.product)} className="w-full h-full object-cover" loading="lazy" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <Package className="h-4 w-4 text-muted-foreground/50" />

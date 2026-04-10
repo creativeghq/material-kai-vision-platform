@@ -42,6 +42,8 @@ export interface Product {
   stock: ProductStock;
   tags: string[];
   variants?: ProductVariant[];
+  /** Source PDF document this product was extracted from (when applicable) */
+  source_document_id?: string;
 }
 
 /**

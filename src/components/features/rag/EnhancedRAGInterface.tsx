@@ -62,7 +62,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any | null>(null);
   const [searchType, setSearchType] = useState<
-    'semantic' | 'hybrid' | 'multi_vector' | 'all'
+    'comprehensive' | 'semantic' | 'hybrid' | 'all'
   >('semantic');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
@@ -271,7 +271,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     setQuery(search.query);
     setSearchType(search.search_strategy as any);
     if (search.material_filters) {
-      setMaterialFilters(search.material_filters);
+      setMaterialFilters(search.material_filters as unknown as MaterialFilters);
     }
     setShowSavedSearches(false);
     toast({

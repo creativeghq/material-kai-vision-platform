@@ -186,7 +186,7 @@ export function useSegmentation({
 
         // Attach DB ids — build a lookup map to avoid O(n²) nested scan
         if (inserted) {
-          const idByIndex = new Map(inserted.map((r) => [r.segment_index, r.id]));
+          const idByIndex = new Map<number, string>(inserted.map((r) => [r.segment_index as number, r.id as string]));
           for (const s of allSegments) {
             const dbId = idByIndex.get(s.segment_index);
             if (dbId) s.id = dbId;

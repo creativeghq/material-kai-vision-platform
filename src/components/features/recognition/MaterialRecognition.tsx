@@ -87,13 +87,13 @@ export const MaterialRecognition: React.FC = () => {
             composition: response.data.composition || {},
             sustainability: response.data.sustainability || {},
             imageUrl: URL.createObjectURL(file),
-            processingTime: response.metadata.processingTime,
+            processingTime: response.processing_time,
           });
         } else {
           console.error('MIVAA analysis failed:', response.error);
           // Don't create fake results - let user know the analysis failed
           toast.error(
-            `Analysis failed for ${file.name}: ${response.error?.message || 'Unknown error'}`,
+            `Analysis failed for ${file.name}: ${response.error || 'Unknown error'}`,
           );
           // Skip this file and continue with next one
           continue;

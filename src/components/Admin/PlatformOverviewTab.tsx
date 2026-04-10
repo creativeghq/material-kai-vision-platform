@@ -305,7 +305,7 @@ export function PlatformOverviewTab() {
     // KB Health
     setChunkGrowth(wks.map((week,i) => ({ week, count:b[i]*18 })));
     setKbDocsByCategory([{name:'Materials',value:48},{name:'Products',value:36},{name:'Guides',value:28},{name:'Technical',value:22},{name:'FAQ',value:14}]);
-    setKbKpis({ totalChunks:2847, totalDocs:148 });
+    setKbKpis({ totalChunks:2847, totalDocs:148, publishedDocs:135, embeddingSuccessRate:'98%' });
 
     // Pipeline Health
     setPdfJobTrend(wks.map((week,i) => ({ week, success:f[i]+2, failed:Math.max(0,Math.floor((f[i]+2)*0.09)) })));
@@ -384,7 +384,7 @@ export function PlatformOverviewTab() {
       const topPids = Array.from(prodCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => id);
       if (topPids.length > 0) {
         const { data: topProds } = await supabase.from('products').select('id,name').in('id', topPids);
-        const nameMap = new Map((topProds ?? []).map((p: any) => [p.id, p.name]));
+        const nameMap = new Map<string, string>((topProds ?? []).map((p: any) => [p.id as string, p.name as string]));
         setTopQuotedProducts(topPids.map(id => ({ name: nameMap.get(id) ?? id.slice(0, 12), count: prodCount.get(id) ?? 0 })));
       }
 
@@ -632,7 +632,7 @@ export function PlatformOverviewTab() {
         (chunks ?? []).forEach((c: any) => { const l = weekLabel(new Date(c.created_at)); if (ckMap.has(l)) ckMap.set(l, (ckMap.get(l) ?? 0) + 1); });
         setChunkGrowth(Array.from(ckMap.entries()).map(([week, count]) => ({ week, count })));
 
-        const catMap = new Map((kbCats ?? []).map((c: any) => [c.id, c.name]));
+        const catMap = new Map<string, string>((kbCats ?? []).map((c: any) => [c.id as string, c.name as string]));
         const docCatMap = new Map<string, number>();
         const docStatusMap = new Map<string, number>();
         const embMap = new Map<string, number>();

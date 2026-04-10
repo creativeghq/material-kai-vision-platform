@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { getProductName } from '@/utils/productMetadata';
 
 export interface CreateMoodBoardData {
   title: string;
@@ -36,7 +37,14 @@ class MoodBoardAPI {
       .from('moodboards')
       .select(`
         *,
-        moodboard_items(id, material_id, position, notes, added_at)
+        moodboard_items(
+          id,
+          material_id,
+          position,
+          notes,
+          added_at,
+          material:products(id, name, category_id, properties, metadata)
+        )
       `)
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
@@ -54,10 +62,10 @@ class MoodBoardAPI {
     const productImageMap: Record<string, string> = {};
     if (allProductIds.size > 0) {
       const { data: imageRelations } = await supabase
-        .from('product_image_relationships')
-        .select('product_id, image:document_images(image_url)')
+        .from('image_product_associations')
+        .select('product_id, overall_score, image:document_images(image_url)')
         .in('product_id', [...allProductIds])
-        .order('relevance_score', { ascending: false });
+        .order('overall_score', { ascending: false });
 
       if (imageRelations) {
         for (const rel of imageRelations) {
@@ -70,8 +78,16 @@ class MoodBoardAPI {
     }
 
     return (data || []).map((board: any) => {
-      const rawItems: Array<{ id: string; material_id: string; position: number; notes?: string; added_at: string }> =
-        (board.moodboard_items || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+      const rawItems: Array<{
+        id: string;
+        material_id: string;
+        position: number;
+        notes?: string;
+        added_at: string;
+        material?: { id: string; name?: string; category_id?: string; properties?: any; metadata?: any } | null;
+      }> = (board.moodboard_items || []).sort(
+        (a: any, b: any) => (a.position ?? 0) - (b.position ?? 0),
+      );
 
       const items: MoodBoardItem[] = rawItems.map(item => ({
         id: item.id,
@@ -80,13 +96,26 @@ class MoodBoardAPI {
         notes: item.notes,
         position: item.position ?? 0,
         added_at: item.added_at,
-        material: {
-          id: item.material_id,
-          name: '',
-          category: '',
-          thumbnail_url: productImageMap[item.material_id] || undefined,
-          properties: {},
-        },
+        material: item.material
+          ? {
+              id: item.material.id,
+              name: getProductName(item.material),
+              category:
+                item.material.metadata?.category ||
+                item.material.metadata?.material_category ||
+                item.material.category_id ||
+                'Uncategorized',
+              thumbnail_url: productImageMap[item.material.id] || undefined,
+              properties: item.material.properties || {},
+              metadata: item.material.metadata || {},
+            }
+          : {
+              id: item.material_id,
+              name: 'Unnamed Product',
+              category: 'Uncategorized',
+              thumbnail_url: productImageMap[item.material_id] || undefined,
+              properties: {},
+            },
       }));
 
       return {
@@ -231,14 +260,14 @@ class MoodBoardAPI {
       .map(item => item.material?.id)
       .filter((id): id is string => !!id);
 
-    // Fetch images for all products using product_image_relationships
+    // Fetch best image for each product via image_product_associations
     const productImageMap: Record<string, string> = {};
     if (productIds.length > 0) {
       const { data: imageRelations } = await supabase
-        .from('product_image_relationships')
-        .select('product_id, image:document_images(image_url)')
+        .from('image_product_associations')
+        .select('product_id, overall_score, image:document_images(image_url)')
         .in('product_id', productIds)
-        .order('relevance_score', { ascending: false });
+        .order('overall_score', { ascending: false });
 
       if (imageRelations) {
         for (const rel of imageRelations) {
@@ -250,12 +279,17 @@ class MoodBoardAPI {
       }
     }
 
-    // Transform data to include thumbnail_url from product_image_relationships
+    // Transform data to include thumbnail_url
     return (data || []).map(item => ({
       ...item,
       material: item.material ? {
         ...item.material,
-        category: item.material.metadata?.category || item.material.category_id || 'Uncategorized',
+        name: getProductName(item.material),
+        category:
+          item.material.metadata?.category ||
+          item.material.metadata?.material_category ||
+          item.material.category_id ||
+          'Uncategorized',
         thumbnail_url: productImageMap[item.material.id] || null,
       } : null,
     }));
@@ -301,14 +335,14 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
-    // Fetch image for the product using product_image_relationships
+    // Fetch best image for the product via image_product_associations
     let thumbnail_url: string | null = null;
     if (result.material?.id) {
       const { data: imageRelations } = await supabase
-        .from('product_image_relationships')
+        .from('image_product_associations')
         .select('image:document_images(image_url)')
         .eq('product_id', result.material.id)
-        .order('relevance_score', { ascending: false })
+        .order('overall_score', { ascending: false })
         .limit(1);
 
       if (imageRelations && imageRelations.length > 0) {
@@ -328,7 +362,12 @@ class MoodBoardAPI {
       ...result,
       material: result.material ? {
         ...result.material,
-        category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
+        name: getProductName(result.material),
+        category:
+          result.material.metadata?.category ||
+          result.material.metadata?.material_category ||
+          result.material.category_id ||
+          'Uncategorized',
         thumbnail_url,
       } : null,
     };
@@ -359,14 +398,14 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
-    // Fetch image for the product using product_image_relationships
+    // Fetch best image for the product via image_product_associations
     let thumbnail_url: string | null = null;
     if (result.material?.id) {
       const { data: imageRelations } = await supabase
-        .from('product_image_relationships')
+        .from('image_product_associations')
         .select('image:document_images(image_url)')
         .eq('product_id', result.material.id)
-        .order('relevance_score', { ascending: false })
+        .order('overall_score', { ascending: false })
         .limit(1);
 
       if (imageRelations && imageRelations.length > 0) {
@@ -380,7 +419,12 @@ class MoodBoardAPI {
       ...result,
       material: result.material ? {
         ...result.material,
-        category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
+        name: getProductName(result.material),
+        category:
+          result.material.metadata?.category ||
+          result.material.metadata?.material_category ||
+          result.material.category_id ||
+          'Uncategorized',
         thumbnail_url,
       } : null,
     };

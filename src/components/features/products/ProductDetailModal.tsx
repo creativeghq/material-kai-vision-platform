@@ -2,7 +2,7 @@
  * Product Detail Modal
  * Global component for displaying full product/material details
  * Supports category-based templates for different material types
- * Fetches images from product_image_relationships table
+ * Fetches images from image_product_associations table
  */
 
 import React, { useState, useEffect } from 'react';
@@ -159,7 +159,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     checkAdmin();
   }, [user]);
 
-  // Load images from product_image_relationships when modal opens
+  // Load images from image_product_associations when modal opens
   useEffect(() => {
     const loadImages = async () => {
       if (!product?.id) return;

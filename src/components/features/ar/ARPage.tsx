@@ -11,6 +11,11 @@ import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
 import { ARPreviewModal } from './ARPreviewModal';
+import {
+  PRODUCT_IMAGE_SELECT,
+  getProductImageUrl,
+  getProductName,
+} from '@/utils/productMetadata';
 
 interface ProductData {
   id: string;
@@ -46,10 +51,11 @@ const ARPage: React.FC = () => {
 
     async function fetchProduct() {
       try {
-        // Try the products table first
+        // Try the products table first, embedding the best image via the
+        // image_product_associations relationship.
         const { data, error: fetchError } = await supabase
           .from('products')
-          .select('id, name, image_url, metadata')
+          .select(`id, name, metadata, ${PRODUCT_IMAGE_SELECT}`)
           .eq('id', productId)
           .single();
 
@@ -80,8 +86,8 @@ const ARPage: React.FC = () => {
         } else {
           setProduct({
             id: data.id,
-            name: data.name || 'Material',
-            image_url: data.image_url,
+            name: getProductName(data),
+            image_url: getProductImageUrl(data) || '',
             metadata: data.metadata as ProductData['metadata'],
           });
         }

@@ -14,8 +14,9 @@ import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton'
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { Product } from './types';
 import { trackProductView } from '@/services/manufacturerAnalyticsService';
+import { getManufacturer, getProductName } from '@/utils/productMetadata';
 
-const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').then(m => ({ default: m.LightingPreviewModal })).catch(() => ({ default: () => null })));
+const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').catch(() => ({ default: () => null })));
 const ARPreviewModal = lazy(() => import('@/components/features/ar/ARPreviewModal').then(m => ({ default: m.ARPreviewModal })).catch(() => ({ default: () => null })));
 
 interface ProductCardProps {
@@ -44,17 +45,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       ([entry]) => {
         if (entry.isIntersecting && !trackedRef.current) {
           trackedRef.current = true;
-          const mfg = product.metadata?.factory_name || product.metadata?.manufacturer || product.metadata?.brand || '';
-          trackProductView(product.id, String(mfg), window.location.pathname);
+          const mfg = getManufacturer(product.metadata) || '';
+          trackProductView(product.id, mfg, window.location.pathname);
         }
       },
       { threshold: 0.5 },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [product.id]);
+  }, [product.id, product.metadata]);
 
   const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0];
+  const displayName = getProductName(product);
   const stockStatusColor =
     product.stock.status === 'High'
       ? 'bg-green-100 text-green-800 border-green-300'
@@ -85,7 +87,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900 text-base line-clamp-1">
-                {product.name}
+                {displayName}
               </h3>
               <p className="text-sm text-gray-600 mt-0.5">SKU {product.sku}</p>
             </div>

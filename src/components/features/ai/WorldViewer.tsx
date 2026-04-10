@@ -167,7 +167,6 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
     scene.add(camera);
 
     // SparkRenderer added to scene (official pattern — NOT camera.add)
-    // @ts-expect-error spark types not fully typed
     const spark = new SparkRenderer({ renderer });
     scene.add(spark);
 

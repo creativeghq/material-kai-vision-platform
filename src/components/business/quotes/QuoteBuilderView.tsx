@@ -40,7 +40,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '@/services/quotes/QuotesService';
-import { ProductDetailModal } from '@/components/Admin/PDFProcessingData/ProductDetailModal';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import { getProductName, getProductImageUrl } from '@/utils/productMetadata';
 
 interface QuoteBuilderViewProps {
   quote: QuoteWithItems;
@@ -142,7 +143,12 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const handleAddProduct = async (product: Product) => {
     try {
       setAddingProductId(product.id);
-      await quotesService.addItem(quote.id, product.id, 1, undefined, 'search');
+      await quotesService.addItem({
+        quote_id: quote.id,
+        product_id: product.id,
+        quantity: 1,
+        added_from: 'search',
+      });
       toast({
         title: 'Success',
         description: `${product.name || 'Product'} added to quote`,
@@ -414,7 +420,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
                             <Package className="h-5 w-5 text-muted-foreground" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-medium truncate">{product.name || 'Unnamed Product'}</p>
+                            <p className="font-medium truncate">{getProductName(product)}</p>
                             {product.sku && (
                               <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
                             )}
@@ -487,10 +493,10 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
                               className="w-14 h-14 rounded bg-gray-100 overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-green-500 transition-all"
                               onClick={() => item.product && setSelectedProduct(item.product)}
                             >
-                              {item.product?.image_url ? (
+                              {item.product && getProductImageUrl(item.product) ? (
                                 <img
-                                  src={item.product.image_url}
-                                  alt={item.product.name || 'Product'}
+                                  src={getProductImageUrl(item.product) || ''}
+                                  alt={getProductName(item.product)}
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
@@ -715,6 +721,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
+          isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
         />
       )}

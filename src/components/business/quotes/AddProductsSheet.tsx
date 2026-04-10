@@ -49,6 +49,13 @@ import {
 import { ScrollArea } from '@/components/core/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService } from '@/services/quotes/QuotesService';
+import {
+  getAvailableSizes,
+  getManufacturer,
+  getCollection,
+  getProductName,
+  getProductImageUrl,
+} from '@/utils/productMetadata';
 
 interface ProductWithImage {
   id: string;
@@ -58,32 +65,6 @@ interface ProductWithImage {
   metadata?: Record<string, any>;
   image_url?: string;
 }
-
-// Helper to extract available sizes from product metadata
-const getAvailableSizes = (metadata?: Record<string, any>): string[] => {
-  if (!metadata) return [];
-
-  const sizes: string[] = [];
-  const availableSizes = metadata.available_sizes || metadata.dimensions || [];
-
-  if (Array.isArray(availableSizes)) {
-    availableSizes.forEach((d: unknown) => {
-      if (typeof d === 'object' && d !== null) {
-        const dim = d as Record<string, unknown>;
-        if (dim.width && dim.height) {
-          const unit = dim.unit || 'cm';
-          sizes.push(`${dim.width}×${dim.height}${dim.depth ? `×${dim.depth}` : ''} ${unit}`);
-        }
-      } else if (typeof d === 'string') {
-        sizes.push(d);
-      }
-    });
-  } else if (typeof availableSizes === 'string') {
-    sizes.push(...availableSizes.split(',').map(s => s.trim()).filter(Boolean));
-  }
-
-  return sizes;
-};
 
 interface SelectedProduct extends ProductWithImage {
   quantity: number;
@@ -341,9 +322,11 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                   <div className="divide-y">
                     {searchResults.map((product) => {
                       const metadata = product.metadata || {};
-                      const manufacturer = metadata.manufacturer || metadata.brand || metadata.factory;
-                      const collection = metadata.collection || metadata.series;
+                      const manufacturer = getManufacturer(metadata);
+                      const collection = getCollection(metadata);
                       const availableSizes = getAvailableSizes(metadata);
+                      const displayName = getProductName(product);
+                      const imageUrl = getProductImageUrl(product);
                       return (
                         <button
                           key={product.id}
@@ -351,8 +334,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                           className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
                         >
                           <div className="w-14 h-14 rounded bg-muted flex-shrink-0 overflow-hidden">
-                            {product.image_url ? (
-                              <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
+                            {imageUrl ? (
+                              <img src={imageUrl} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <Package className="h-5 w-5 text-muted-foreground" />
@@ -360,7 +343,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{product.name || 'Unnamed Product'}</p>
+                            <p className="font-medium truncate">{displayName}</p>
                             {manufacturer && (
                               <p className="text-xs text-muted-foreground truncate">
                                 by {manufacturer}{collection ? ` • ${collection}` : ''}
@@ -415,17 +398,20 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                           <TableRow key={product.id}>
                             <TableCell>
                               <div className="w-12 h-12 rounded bg-muted overflow-hidden">
-                                {product.image_url ? (
-                                  <img src={product.image_url} alt={product.name || 'Product'} className="w-full h-full object-cover" loading="lazy" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <Package className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                )}
+                                {(() => {
+                                  const imgUrl = getProductImageUrl(product);
+                                  return imgUrl ? (
+                                    <img src={imgUrl} alt={getProductName(product)} className="w-full h-full object-cover" loading="lazy" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Package className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <p className="font-medium text-sm truncate max-w-[120px]">{product.name || 'Unnamed'}</p>
+                              <p className="font-medium text-sm truncate max-w-[120px]">{getProductName(product)}</p>
                               {product.sku && <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>}
                             </TableCell>
                             <TableCell>

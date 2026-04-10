@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { buildWeeks, weeksAgo, weekLabel, convRate, CHART_MARGINS, GRID_PROPS } from '../shared/analyticsUtils';
 import { COLORS, KpiCard, SectionHeader, EmptyState, AnalyticsTable, AnalyticsCol, formatProfType } from '../shared/AnalyticsUIComponents';
+import { getManufacturer } from '@/utils/productMetadata';
 
 // ─────────────────────────────────────────────────────────────
 // My Factory Tab — Enhanced
@@ -392,7 +393,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
               // Estimate unique factories in this category
               const factoryNames = new Set<string>();
               (catProducts ?? []).forEach(p => {
-                const fn = (p.metadata as Record<string, unknown>)?.factory_name as string;
+                const fn = getManufacturer(p.metadata as Record<string, unknown>);
                 if (fn) factoryNames.add(fn);
               });
 

@@ -412,22 +412,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .delete()
         .eq('image_id', imageId);
 
-      // 3. Delete from product_image_relationships
-      await supabase
-        .from('product_image_relationships')
-        .delete()
-        .eq('image_id', imageId);
-
-      // 4. Delete from image_metafield_values
+      // 3. Delete from image_metafield_values
       await supabase
         .from('image_metafield_values')
         .delete()
         .eq('image_id', imageId);
 
-      // 5. Delete from image_validations
+      // 4. Delete from image_validations
       await supabase.from('image_validations').delete().eq('image_id', imageId);
 
-      // 6. Finally delete from document_images
+      // 5. Finally delete from document_images
       const { error: deleteError } = await supabase
         .from('document_images')
         .delete()

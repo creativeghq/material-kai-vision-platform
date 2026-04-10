@@ -51,6 +51,10 @@ export interface StandardMivaaPayload {
   // Metadata
   metadata?: Record<string, unknown>;
   tags?: string[];
+
+  // Workspace / user scoping (passed through to backend for tenant isolation)
+  workspace_id?: string;
+  user_id?: string;
 }
 
 /**
@@ -306,7 +310,7 @@ export class MivaaErrorHandler {
         retryable,
       },
       metadata: {
-        processingTime: 0,
+        processing_time: 0,
         timestamp: new Date().toISOString(),
         endpoint: context,
       },

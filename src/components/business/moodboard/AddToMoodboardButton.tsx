@@ -11,10 +11,12 @@ interface AddToMoodboardButtonProps {
   productId: string;
   productName?: string;
   productImage?: string;
-  variant?: 'default' | 'outline' | 'ghost' | 'icon';
+  variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
   showText?: boolean;
+  /** Analytics source label (e.g. 'search', 'agent', 'product_card') */
+  source?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
   size = 'default',
   className = '',
   showText = true,
+  source: _source,
 }) => {
   const { toast } = useToast();
   const [showModal, setShowModal] = useState(false);
@@ -62,7 +65,7 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
         size={size}
         className={className}
       >
-        {variant === 'icon' || size === 'icon' ? (
+        {size === 'icon' ? (
           <Palette className="h-4 w-4" />
         ) : (
           <>

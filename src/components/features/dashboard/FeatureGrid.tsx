@@ -22,7 +22,7 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({ onNavigate }) => {
       </div>
 
       <div className={styles.featuresGrid}>
-        {featuresConfig.cards.map((card: FeatureCard) => (
+        {(featuresConfig.cards as readonly FeatureCard[]).map((card) => (
           <Card
             key={card.id}
             className={styles.featureCard}

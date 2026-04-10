@@ -36,6 +36,11 @@ import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { supabase } from '@/integrations/supabase/client';
 import { INPAINTING_CREDIT_COSTS, INPAINTING_MODEL_LABELS, InpaintingModel } from '@/services/vrWorldService';
+import {
+  getMaterialCategory,
+  getProductImageUrl,
+  getProductName,
+} from '@/utils/productMetadata';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -349,9 +354,9 @@ function toPickedMaterial(raw: any): PickedMaterial {
   const primaryImage = raw.images?.find((i: any) => i.isPrimary) || raw.images?.[0];
   return {
     id: raw.id,
-    name: raw.name || 'Unknown Material',
-    category: raw.category || raw.metadata?.material_category || 'Other',
-    imageUrl: primaryImage?.url || raw.metadata?.image_url,
+    name: getProductName(raw),
+    category: raw.category || getMaterialCategory(raw.metadata) || 'Other',
+    imageUrl: primaryImage?.url || getProductImageUrl(raw) || undefined,
     finish: raw.metadata?.finish,
     dominantColor: raw.metadata?.dominant_color,
     materialType: raw.metadata?.material_type || raw.type,

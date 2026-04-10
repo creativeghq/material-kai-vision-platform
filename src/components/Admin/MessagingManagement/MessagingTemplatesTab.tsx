@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingTemplate, MessagingChannelType } from '@/services/messaging';
+import type { MessageType } from '@/services/messaging/types';
 
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-4 w-4" />,
@@ -431,7 +432,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
               <Label>Category</Label>
               <Select
                 value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                onValueChange={(value) => setFormData({ ...formData, category: value as MessageType })}
               >
                 <SelectTrigger>
                   <SelectValue />

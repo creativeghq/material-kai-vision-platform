@@ -208,23 +208,23 @@ export const MaterialsDataPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="products" className="mt-6">
-            <ProductsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+            <ProductsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="chunks" className="mt-6">
-            <ChunksTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+            <ChunksTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="images" className="mt-6">
-            <ImagesTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+            <ImagesTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="embeddings" className="mt-6">
-            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="relations" className="mt-6">
-            <RelationsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+            <RelationsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
         </Tabs>
       </div>

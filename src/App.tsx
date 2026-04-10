@@ -33,7 +33,6 @@ const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePa
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
-const PDFKnowledgeDemo = lazy(() => import('./pages/PDFKnowledgeDemo').then(m => ({ default: m.PDFKnowledgeDemo })));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -543,16 +542,6 @@ const App = () => (
                           <SystemSettingsPage />
                         </Layout>
                       </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/pdf-knowledge-demo"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <PDFKnowledgeDemo />
-                      </Layout>
                     </AuthGuard>
                   }
                 />

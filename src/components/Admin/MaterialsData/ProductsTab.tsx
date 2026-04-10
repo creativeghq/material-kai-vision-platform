@@ -23,6 +23,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import {
+  getManufacturer,
+  getMaterialCategory,
+  getProductName,
+} from '@/utils/productMetadata';
 
 interface Product {
   id: string;
@@ -37,7 +42,7 @@ interface Product {
 interface ProductsTabProps {
   workspaceId: string;
   jobIdFilter?: string;
-  onStatsUpdate: (wsId: string) => void;
+  onStatsUpdate: () => void;
 }
 
 export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
@@ -121,8 +126,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
         title: 'Success',
         description: 'Product deleted successfully',
       });
-      loadProducts();
-      onStatsUpdate(workspaceId);
+      loadProducts(currentPage);
+      onStatsUpdate();
     } catch (error) {
       console.error('Failed to delete product:', error);
       toast({
@@ -231,19 +236,16 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   };
 
                   // Normalize category - use consistent casing
-                  const rawCategory = product.metadata?.material_category;
-                  const category = isNotFound(rawCategory) ? 'N/A' : rawCategory;
+                  const rawCategory = getMaterialCategory(product.metadata);
+                  const category = !rawCategory || isNotFound(rawCategory) ? 'N/A' : rawCategory;
 
-                  // Get manufacturer - try factory_name first, then factory_group_name
-                  const factoryName = product.metadata?.factory_name;
-                  const factoryGroup = product.metadata?.factory_group_name;
-                  const manufacturer = !isNotFound(factoryName) ? factoryName
-                                     : !isNotFound(factoryGroup) ? factoryGroup
-                                     : 'N/A';
+                  // Get manufacturer via the shared accessor (checks every known key)
+                  const rawMfg = getManufacturer(product.metadata);
+                  const manufacturer = !rawMfg || isNotFound(rawMfg) ? 'N/A' : rawMfg;
 
                   return (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium">{getProductName(product)}</TableCell>
                     <TableCell>{getSourceBadge(product.source_type)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">

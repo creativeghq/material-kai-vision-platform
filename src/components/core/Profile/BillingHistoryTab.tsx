@@ -12,19 +12,11 @@ import {
   TableRow,
 } from '@/components/core/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
-import { CreditsService } from '@/services/credits.service';
+import { CreditsService, type CreditTransaction } from '@/services/credits.service';
 
 const creditsService = new CreditsService();
 
-interface Transaction {
-  id: string;
-  created_at: string;
-  transaction_type: 'credit' | 'debit';
-  amount: number;
-  balance_after: number;
-  description: string;
-  metadata?: any;
-}
+type Transaction = CreditTransaction;
 
 export const BillingHistoryTab: React.FC = () => {
   const { user } = useAuth();
@@ -115,12 +107,12 @@ export const BillingHistoryTab: React.FC = () => {
                     </TableCell>
                     <TableCell
                       className={`text-right font-semibold ${
-                        transaction.transaction_type === 'credit'
+                        transaction.transaction_type !== 'debit'
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}
                     >
-                      {transaction.transaction_type === 'credit' ? '+' : '-'}
+                      {transaction.transaction_type !== 'debit' ? '+' : '-'}
                       {Math.abs(transaction.amount ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">

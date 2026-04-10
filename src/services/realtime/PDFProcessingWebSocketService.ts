@@ -196,7 +196,7 @@ class PDFProcessingWebSocketService {
       if (this.wsManager && this.wsManager.isConnected()) {
         this.wsManager.send({
           type: eventType,
-          data,
+          payload: data,
         });
       }
       console.log(`📡 Broadcasted ${eventType} event:`, data);

@@ -198,9 +198,9 @@ export const DetectionsTab: React.FC<DetectionsTabProps> = ({
                                 100,
                                 ((count as number) /
                                   Math.max(
-                                    ...Object.values(
+                                    ...(Object.values(
                                       detectionsData.timeline!,
-                                    ),
+                                    ) as number[]),
                                   )) *
                                   100,
                               )}%`,

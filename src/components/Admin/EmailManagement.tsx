@@ -53,7 +53,7 @@ export const EmailManagement: React.FC = () => {
         end: new Date().toISOString().split('T')[0],
       });
 
-      setAnalytics(analyticsData);
+      setAnalytics((prev) => ({ ...prev, ...analyticsData }));
     } catch (error) {
       console.error('Error loading email data:', error);
     } finally {

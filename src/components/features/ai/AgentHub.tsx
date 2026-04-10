@@ -755,7 +755,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         agentId: 'interior-designer',
         worldData: {
           vrWorldId: vrResult.vrWorldId,
-          status: vrResult.status || 'completed',
+          status: (vrResult.status as 'pending' | 'uploading' | 'generating' | 'completed' | 'failed') || 'completed',
           splatUrl100k: vrResult.splatUrl100k,
           splatUrl500k: vrResult.splatUrl500k,
           splatUrlFull: vrResult.splatUrlFull,
@@ -2213,7 +2213,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   >
                     {message.demoData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <DemoAgentResults
                           result={message.demoData}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
@@ -2235,7 +2235,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           roomType={message.inspirationData.room_type}
                           focus={message.inspirationData.focus}
                         />
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.materialData ? (
                       <div className="space-y-4">
@@ -2243,7 +2243,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {message.searchSpec && (
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         {/* Display real materials using DemoAgentResults format */}
                         <DemoAgentResults
                           result={{
@@ -2258,7 +2258,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.designData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         {/* Display design results with DesignCanvas */}
                         <DesignCanvas
                           images={message.designData.images}
@@ -2342,7 +2342,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.materialsBoardData ? (
                       <div className="space-y-3">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <img
                           src={message.materialsBoardData.image_url}
                           alt={`Materials Selection Board — ${message.materialsBoardData.board_mode}`}
@@ -2375,7 +2375,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <VirtualStagingViewer
                           resultImageUrl={message.virtualStagingData.image_url}
                           sourceImageUrl={message.virtualStagingData.source_image_url}
@@ -2392,7 +2392,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.videoData ? (
                       <div className="space-y-3">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <video
                           src={message.videoData.video_url}
                           controls
@@ -2420,7 +2420,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         <WorldViewer
                           vrWorldId={message.worldData.vrWorldId}
                           initialStatus={message.worldData.status}

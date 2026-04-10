@@ -58,8 +58,7 @@ export class SVBRDFExtractionAPI {
       }
 
       const response = await mivaaApi.extractSvbrdf({
-        image_url: request.image_url,
-        image_data: request.image_data,
+        image_url: request.source_image_url,
       });
 
       if (!response.success || !response.data) {

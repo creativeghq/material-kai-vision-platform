@@ -137,7 +137,7 @@ export const MaterialFeedbackPanel: React.FC<MaterialFeedbackPanelProps> = ({
         // Reload feedback
         loadFeedback();
       } else {
-        throw new Error(response.error?.message || 'Failed to submit feedback');
+        throw new Error(response.error || 'Failed to submit feedback');
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);

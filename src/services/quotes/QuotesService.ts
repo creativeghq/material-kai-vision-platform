@@ -39,7 +39,7 @@ export interface QuoteItem {
   product_id: string | null;
   quantity: number;
   notes?: string;
-  added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page';
+  added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page' | 'moodboard';
   added_at: string;
   selected_size?: string;
   selected_color?: string;
@@ -842,6 +842,7 @@ export class QuotesService {
     description?: string;
     price: number;
     display_order?: number;
+    is_active?: boolean;
   }): Promise<Upsell> {
     const { data: upsell, error } = await supabase
       .from('upsells')
@@ -850,7 +851,7 @@ export class QuotesService {
         description: data.description,
         price: data.price,
         display_order: data.display_order || 0,
-        is_active: true,
+        is_active: data.is_active ?? true,
       })
       .select()
       .single();

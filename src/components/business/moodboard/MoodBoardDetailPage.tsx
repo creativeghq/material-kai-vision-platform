@@ -33,6 +33,7 @@ import { PinterestImportModal } from './PinterestImportModal';
 import { RecommendationsService } from '@/services/recommendationsService';
 import { quotesService } from '@/services/quotes/QuotesService';
 import { supabase } from '@/integrations/supabase/client';
+import { getProductName, getManufacturer } from '@/utils/productMetadata';
 
 // ─── Helper: pick the most visually interesting hero image ────────────────────
 // Priority: generated images > 3D/VR/video renders > products with rich metadata > first available
@@ -226,7 +227,7 @@ export const MoodBoardDetailPage: React.FC = () => {
     const product: Product = {
       id: item.material.id,
       sku: props.sku || '',
-      name: item.material.name || 'Unnamed Product',
+      name: getProductName(item.material),
       description: item.notes || props.description || '',
       category: item.material.category || 'Uncategorized',
       type: props.type || item.material.category || '',
@@ -250,10 +251,11 @@ export const MoodBoardDetailPage: React.FC = () => {
     const facs = new Set<string>();
     for (const item of items) {
       if (item.material?.category) cats.add(item.material.category);
-      const props = item.material?.properties as Record<string, any> | undefined;
-      if (props?.factory_name) facs.add(props.factory_name);
-      if (props?.manufacturer) facs.add(props.manufacturer);
-      if (props?.supplier) facs.add(props.supplier);
+      // Check both properties and metadata, since extraction sources differ
+      const mfg =
+        getManufacturer((item.material as any)?.metadata) ||
+        getManufacturer((item.material as any)?.properties);
+      if (mfg) facs.add(mfg);
     }
     return { categories: Array.from(cats), factories: Array.from(facs) };
   }, [items]);
@@ -507,7 +509,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                   {/* Name tag at bottom */}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 py-2 translate-y-full group-hover:translate-y-0 transition-transform duration-200">
                     <p className="text-white text-xs font-medium line-clamp-1">
-                      {isMedia ? (mediaTitle || 'Generated Media') : (item.material?.name || 'Unnamed')}
+                      {isMedia ? (mediaTitle || 'Generated Media') : (item.material ? getProductName(item.material) : 'Unnamed')}
                     </p>
                     {!isMedia && item.material?.category && (
                       <p className="text-white/60 text-[10px] line-clamp-1">{item.material.category}</p>

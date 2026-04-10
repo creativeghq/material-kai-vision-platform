@@ -94,6 +94,11 @@ export interface SearchResult {
     relevance_score: number;
     relationship_type: string;
   }>;
+
+  // Product-level enrichment (when result is product-shaped, not chunk-shaped)
+  name?: string;
+  category?: string;
+  metafield_values?: Record<string, unknown>;
 }
 
 /**

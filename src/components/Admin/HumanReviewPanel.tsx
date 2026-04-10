@@ -91,9 +91,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       const avgCompletionTime =
         completedTasks.length > 0
           ? completedTasks.reduce((sum, task) => {
-              if (task.completed_at && task.created_at) {
-                const completedAt = new Date(task.completed_at).getTime();
-                const createdAt = new Date(task.created_at).getTime();
+              if (task.completedAt && task.createdAt) {
+                const completedAt = new Date(task.completedAt).getTime();
+                const createdAt = new Date(task.createdAt).getTime();
                 return sum + (completedAt - createdAt);
               }
               return sum;

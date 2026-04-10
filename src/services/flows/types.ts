@@ -17,6 +17,10 @@ export type TriggerType =
   | 'quote_requested'
   | 'quote_approved'
   | 'quote_rejected'
+  | 'contract_created'
+  | 'image_uploaded'
+  | 'document_processed'
+  | 'product_added'
   | 'search_executed'
   | 'model_3d_created'
   | 'vr_world_created'
@@ -60,6 +64,16 @@ export interface QuoteRequestedTriggerConfig {
 
 export interface QuoteApprovedTriggerConfig {}
 export interface QuoteRejectedTriggerConfig {}
+export interface ContractCreatedTriggerConfig {}
+export interface ImageUploadedTriggerConfig {
+  filter_category?: string;
+}
+export interface DocumentProcessedTriggerConfig {
+  filter_status?: 'success' | 'failed';
+}
+export interface ProductAddedTriggerConfig {
+  filter_source?: 'pdf_processing' | 'web_scraping' | 'xml_import' | 'manual';
+}
 
 export interface SearchExecutedTriggerConfig {
   filter_agent?: string;
@@ -77,7 +91,7 @@ export interface AgentImageAnalyzedTriggerConfig {
 }
 
 export interface ProductAddedToQuoteTriggerConfig {
-  filter_added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page';
+  filter_added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page' | 'moodboard';
 }
 
 export interface MoodboardCreatedTriggerConfig {}
@@ -117,6 +131,10 @@ export type TriggerConfigMap = {
   quote_requested: QuoteRequestedTriggerConfig;
   quote_approved: QuoteApprovedTriggerConfig;
   quote_rejected: QuoteRejectedTriggerConfig;
+  contract_created: ContractCreatedTriggerConfig;
+  image_uploaded: ImageUploadedTriggerConfig;
+  document_processed: DocumentProcessedTriggerConfig;
+  product_added: ProductAddedTriggerConfig;
   search_executed: SearchExecutedTriggerConfig;
   model_3d_created: Model3DCreatedTriggerConfig;
   vr_world_created: VRWorldCreatedTriggerConfig;
@@ -377,10 +395,13 @@ export interface ZeroBounceValidateConfig {
 // =====================================================
 export type FlowNodeCategory = 'trigger' | 'condition' | 'action';
 
+// Index signature is required so FlowNodeData satisfies xyflow's
+// `Record<string, unknown>` constraint on Node<T> data.
 export interface BaseNodeData {
   label: string;
   description?: string;
   category: FlowNodeCategory;
+  [key: string]: unknown;
 }
 
 export interface TriggerNodeData extends BaseNodeData {

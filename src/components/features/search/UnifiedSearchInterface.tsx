@@ -57,6 +57,14 @@ type SearchResult = {
   document_id?: string;
   document_name?: string;
   page_number?: number;
+  // Product enrichment (when result is product-shaped)
+  category?: string;
+  metafield_values?: Array<{
+    display_name: string;
+    value_text?: string;
+    value_number?: number;
+    value_boolean?: boolean;
+  }>;
 };
 
 interface EntityData {
@@ -340,14 +348,25 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       let searchResponse;
 
+      // Encode the selected image to base64 (when present) — UnifiedSearchService
+      // wants either an HTTP URL or a base64 string, never a raw File.
+      let imageBase64: string | undefined;
+      if (selectedImage) {
+        imageBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(selectedImage);
+        });
+      }
+
       // ✅ All search types now use multi_vector strategy (the only supported strategy)
       // multi_vector automatically handles text, image, color, texture, style, and material searches
       searchResponse = await UnifiedSearchService.searchMultiVector({
         query: searchType === 'text' ? query.trim() : (selectedImage?.name || `${searchType}_search`),
         workspace_id: workspaceData.workspace_id,
         limit: 15,
-        image_url: selectedImage?.url,
-        image_base64: selectedImage?.base64,
+        image_base64: imageBase64,
         enableQueryUnderstanding: true,
       });
 
@@ -429,11 +448,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           throw new Error('No workspace found for user');
         }
 
-        // Quick text-based search using semantic strategy
+        // Quick text-based search using multi_vector strategy
         const quickResponse = await UnifiedSearchService.search({
           query: searchQuery,
           workspace_id: workspaceData.workspace_id,
-          strategy: 'semantic',
+          strategy: 'multi_vector',
           top_k: 8,
         });
 

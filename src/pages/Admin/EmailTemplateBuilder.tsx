@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/core/
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeviceView = 'desktop' | 'tablet' | 'mobile';
@@ -127,14 +128,18 @@ async function renderKaiBlock(
         const { data: imgs } = await supabase.from('document_images').select('document_id, image_url').in('document_id', docIds);
         imgs?.forEach(img => { if (!imageMap[img.document_id]) imageMap[img.document_id] = img.image_url; });
       }
-      const items = products.map(p => ({
-        image: p.source_document_id ? (imageMap[p.source_document_id] || '') : '',
-        title: p.name || 'Untitled Material',
-        subtitle: showDetails
-          ? [p.metadata?.material_category?.replace(/_/g, ' '), p.metadata?.available_colors?.slice(0, 2).join(', ')].filter(Boolean).join(' · ') || 'Material'
-          : '',
-        url: '#',
-      }));
+      const items = products.map(p => {
+        const cat = getMaterialCategory(p.metadata);
+        const colors = getAvailableColors(p.metadata);
+        return {
+          image: p.source_document_id ? (imageMap[p.source_document_id] || '') : '',
+          title: getProductName(p),
+          subtitle: showDetails
+            ? [cat?.replace(/_/g, ' '), colors.slice(0, 2).join(', ')].filter(Boolean).join(' · ') || 'Material'
+            : '',
+          url: '#',
+        };
+      });
       return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 4)));
     }
 

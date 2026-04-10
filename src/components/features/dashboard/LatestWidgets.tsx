@@ -8,6 +8,13 @@ import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import type { Product } from '@/components/features/products/types';
 import { CAT_COLORS, PROFESSIONAL_TYPE_LABELS as PROF_LABELS, detectCat, catLabel } from '@/lib/materialCategories';
+import {
+  PRODUCT_IMAGE_SELECT,
+  getManufacturer,
+  getProductImageUrl,
+  getProductName,
+  getMaterialCategory,
+} from '@/utils/productMetadata';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LatestMaterial {
@@ -54,10 +61,10 @@ function toProduct(item: LatestMaterial): Product {
   const cat = detectCat(meta);
   return {
     id: item.id,
-    name: item.name,
+    name: getProductName(item),
     description: item.description || '',
     category: cat.charAt(0).toUpperCase() + cat.slice(1),
-    type: meta.material_category || '',
+    type: getMaterialCategory(meta) || '',
     status: item.status || 'active',
     images: item.image_url ? [{ url: item.image_url, alt: item.name, isPrimary: true }] : [],
     metadata: meta,
@@ -142,7 +149,7 @@ function MaterialsWidget() {
   useEffect(() => {
     supabase
       .from('products')
-      .select('id, name, created_at, description, status, metadata, image_product_associations(document_images(image_url))')
+      .select(`id, name, created_at, description, status, metadata, ${PRODUCT_IMAGE_SELECT}`)
       .order('created_at', { ascending: false })
       .limit(6)
       .then(({ data }) => {
@@ -153,7 +160,7 @@ function MaterialsWidget() {
           description: p.description,
           status: p.status,
           metadata: p.metadata ?? {},
-          image_url: p.image_product_associations?.[0]?.document_images?.image_url ?? null,
+          image_url: getProductImageUrl(p),
         }));
         setItems(products);
         setLoading(false);
@@ -287,10 +294,10 @@ function FactoryDetailModal({
   function openProduct(p: RawFactoryProduct) {
     setSelectedProduct({
       id: p.id,
-      name: p.name,
+      name: getProductName(p),
       description: '',
       category: detectCat(p.metadata).charAt(0).toUpperCase() + detectCat(p.metadata).slice(1),
-      type: p.metadata?.material_category || '',
+      type: getMaterialCategory(p.metadata) || '',
       status: 'active',
       images: p.image_url ? [{ url: p.image_url, alt: p.name, isPrimary: true }] : [],
       metadata: p.metadata,
@@ -395,25 +402,27 @@ function FactoriesWidget() {
   useEffect(() => {
     supabase
       .from('products')
-      .select('id, name, metadata, image_product_associations(document_images(image_url))')
+      .select(`id, name, metadata, ${PRODUCT_IMAGE_SELECT}`)
       .limit(500)
       .then(({ data }) => {
         const products = (data ?? []).map((p: any) => ({
           id: p.id,
           name: p.name,
           metadata: p.metadata ?? {},
-          image_url: p.image_product_associations?.[0]?.document_images?.image_url ?? null,
+          image_url: getProductImageUrl(p),
         }));
         setAllProducts(products);
         setLoading(false);
       });
   }, []);
 
-  // Derive factories from product metadata (same logic as DiscoverPage)
+  // Derive factories from product metadata via shared accessor — picks up
+  // VALENOVA-style records where the manufacturer lives in metadata.manufacturer
+  // rather than metadata.factory_group_name.
   const factories = useMemo<DerivedFactory[]>(() => {
     const map = new Map<string, { count: number; cats: Set<string> }>();
     allProducts.forEach((p) => {
-      const name = p.metadata?.factory_group_name;
+      const name = getManufacturer(p.metadata);
       if (!name || name === 'Unknown') return;
       if (!map.has(name)) map.set(name, { count: 0, cats: new Set() });
       const e = map.get(name)!;
@@ -429,7 +438,7 @@ function FactoriesWidget() {
 
   const factoryProducts = useMemo(() =>
     selectedFactory
-      ? allProducts.filter((p) => p.metadata?.factory_group_name === selectedFactory.name)
+      ? allProducts.filter((p) => getManufacturer(p.metadata) === selectedFactory.name)
       : [],
     [allProducts, selectedFactory],
   );

@@ -9,6 +9,7 @@ import {
 } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { getManufacturer } from '@/utils/productMetadata';
 
 interface ProductsTabProps {
   products: any[];
@@ -117,14 +118,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                       </div>
                     </div>
 
-                    {product.metadata?.supplier && (
-                      <div className="mb-3 text-sm">
-                        <span className="font-medium">Supplier:</span>
-                        <p className="text-muted-foreground">
-                          {product.metadata.supplier}
-                        </p>
-                      </div>
-                    )}
+                    {(() => {
+                      const mfg = getManufacturer(product.metadata);
+                      return mfg ? (
+                        <div className="mb-3 text-sm">
+                          <span className="font-medium">Supplier:</span>
+                          <p className="text-muted-foreground">{mfg}</p>
+                        </div>
+                      ) : null;
+                    })()}
 
                     <div className="flex gap-2">
                       <Button

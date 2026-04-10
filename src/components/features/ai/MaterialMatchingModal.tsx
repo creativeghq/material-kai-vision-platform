@@ -13,6 +13,7 @@ import {
   Eye,
   Home,
 } from 'lucide-react';
+import { getManufacturer, getProductName } from '@/utils/productMetadata';
 
 interface Material {
   id: string;
@@ -232,13 +233,14 @@ export const MaterialMatchingModal: React.FC<MaterialMatchingModalProps> = ({
                   {/* Details */}
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
-                      {material.name}
+                      {getProductName(material)}
                     </h3>
-                    {material.metadata?.manufacturer && (
-                      <p className="text-xs text-gray-500 mb-2">
-                        {material.metadata.manufacturer}
-                      </p>
-                    )}
+                    {(() => {
+                      const mfg = getManufacturer(material.metadata);
+                      return mfg ? (
+                        <p className="text-xs text-gray-500 mb-2">{mfg}</p>
+                      ) : null;
+                    })()}
                     {material.description && (
                       <p className="text-sm text-gray-600 line-clamp-2 mb-3">
                         {material.description}

@@ -11,6 +11,7 @@ import SEOArticleViewer from './SEOArticleViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Package } from 'lucide-react';
+import { getManufacturer, getProductName } from '@/utils/productMetadata';
 
 
 interface DemoAgentResultsProps {
@@ -103,10 +104,10 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                 {/* Info */}
                 <div className="p-2.5">
                   <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-                    {product.name}
+                    {getProductName(product)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                    {(product as any).metadata?.factory_name || (product as any).metadata?.manufacturer || ''}
+                    {getManufacturer((product as any).metadata) || ''}
                   </p>
                   {product.pricing?.retail != null && (
                     <p className="text-sm font-semibold text-gray-900 mt-1.5">

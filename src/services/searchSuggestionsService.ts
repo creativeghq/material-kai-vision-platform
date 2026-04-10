@@ -13,6 +13,8 @@ export interface SearchSuggestion {
   suggestion_text: string;
   suggestion_type: 'trending' | 'recent' | 'popular' | 'product' | 'material';
   category?: string;
+  /** Optional confidence score from semantic / typo-correction backends */
+  confidence?: number;
   popularity_score: number;
   click_count: number;
   impression_count: number;
@@ -105,7 +107,7 @@ export class SearchSuggestionsService {
       });
 
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get autocomplete suggestions');
+        throw new Error(response.error || 'Failed to get autocomplete suggestions');
       }
 
       return response.data as AutoCompleteResponse;
@@ -148,7 +150,7 @@ export class SearchSuggestionsService {
       );
 
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get trending searches');
+        throw new Error(response.error || 'Failed to get trending searches');
       }
 
       return response.data as TrendingSearchesResponse;
@@ -187,7 +189,7 @@ export class SearchSuggestionsService {
       });
 
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to check typo correction');
+        throw new Error(response.error || 'Failed to check typo correction');
       }
 
       return response.data as TypoCorrectionResponse;

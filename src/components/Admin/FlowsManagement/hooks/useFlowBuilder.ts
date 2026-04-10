@@ -64,6 +64,7 @@ export const useFlowBuilder = create<FlowBuilderState>((set, get) => ({
 
   onNodesChange: (changes) => {
     set((state) => ({
+      // applyNodeChanges erases the data generic; reassert it.
       nodes: applyNodeChanges(changes, state.nodes) as Node<FlowNodeData>[],
       isDirty: true,
     }));

@@ -799,9 +799,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           .delete()
           .in('product_id', productIds);
 
-        // Delete product_image_relationships
+        // Delete image_product_associations
         const { count: imgRelCount } = await supabase
-          .from('product_image_relationships')
+          .from('image_product_associations')
           .delete()
           .in('product_id', productIds)
           .select('*', { count: 'exact', head: true });
