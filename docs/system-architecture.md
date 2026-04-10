@@ -248,7 +248,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 **OpenAI**:
 - GPT-4o (Alternative discovery)
-- text-embedding-3-small (Text embeddings, 1024D)
+- (text-embedding-3-small retired 2026-04 — Voyage AI is the sole text embedder)
 
 **Voyage AI**:
 - voyage-3.5 (Text + understanding embeddings, 1024D)

@@ -132,12 +132,10 @@ Real-time updates → Frontend displays results
 - **Performance**: High accuracy, multimodal capabilities
 - **Pipeline Stages**: Product Discovery (alternative to Claude)
 
-**text-embedding-3-small** (legacy fallback):
-- **Use Cases**: Text chunk embeddings, semantic search
+**text-embedding-3-small** (retired 2026-04):
+- **Use Cases**: Text chunk embeddings (historical)
 - **Dimensions**: 1536
-- **Performance**: 62.3% MTEB score
-- **Cost**: $0.02 per 1M tokens
-- **Note**: Primary embeddings now use Voyage AI voyage-3.5 (1024D, stored as halfvec)
+- **Status**: Retired in 2026-04. Primary and only text embedder is now Voyage AI voyage-3.5 (1024D, stored as halfvec in VECS). OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.
 
 #### 3. HuggingFace Endpoint - Qwen3-VL 32B Vision
 
@@ -151,14 +149,14 @@ Real-time updates → Frontend displays results
 - **Cost**: $0.30 per 1M tokens
 - **Pipeline Stages**: Image Analysis (Stage 6, 8)
 
-#### 4. CLIP (OpenAI)
+#### 4. SLIG (SigLIP2 via HuggingFace Cloud) — updated 2026-04
 
-- **Model**: Vision Transformer Base 32
-- **Dimensions**: 512
-- **Use Cases**: Visual embeddings, image-text similarity, visual search
-- **Performance**: Industry standard for visual embeddings
-- **Cost**: Free (self-hosted)
-- **Pipeline Stages**: Image Embedding Generation (Stage 8)
+- **Model**: SigLIP2 via SLIG cloud endpoint (replaced CLIP ViT-B/32 and SigLIP-SO400M in 2026-04)
+- **Dimensions**: 768 (halfvec in VECS)
+- **Use Cases**: Visual, color, texture, style, and material embeddings — 5 specialized 768D vectors per image
+- **Performance**: Superior quality vs CLIP 512D; text-guided specialized vectors via similarity mode
+- **Cost**: HuggingFace Inference Endpoint (auto-pause enabled)
+- **Pipeline Stages**: Image Embedding Generation (Stage 7)
 
 #### 5. Replicate Models
 
@@ -309,13 +307,13 @@ The platform uses **6 embedding types** for comprehensive search:
 
 **Semantic Search** (Text):
 - Query: "sustainable wood materials"
-- Embedding: OpenAI text-embedding-3-small (1536D)
-- Similarity: Cosine similarity via pgvector
+- Embedding: Voyage AI voyage-3.5 (1024D, updated 2026-04)
+- Similarity: Cosine similarity via pgvector (halfvec)
 - Accuracy: 85%+
 
 **Visual Search** (Images):
 - Query: Upload image or describe visually
-- Embedding: CLIP ViT-B/32 (512D)
+- Embedding: SLIG SigLIP2 768D (updated 2026-04)
 - Similarity: Visual similarity matching
 - Accuracy: 88%+
 
@@ -345,8 +343,8 @@ The platform uses **6 embedding types** for comprehensive search:
 
 **workspaces**: Multi-tenant workspace management
 **documents**: PDF documents and metadata
-**document_chunks**: Semantic text chunks with 1536D embeddings
-**document_images**: Extracted images with 512D CLIP embeddings
+**document_chunks**: Semantic text chunks with 1024D Voyage embeddings (updated 2026-04)
+**document_images**: Image metadata + boolean presence flags (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`). All image vectors live in VECS collections (updated 2026-04 — legacy 512D CLIP columns were dropped).
 **products**: Product records from PDFs
 **background_jobs**: Async job tracking with checkpoint recovery
 **material_metadata_fields**: Dynamic metafield definitions

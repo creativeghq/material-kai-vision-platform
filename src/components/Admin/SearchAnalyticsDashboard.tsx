@@ -9,10 +9,15 @@ import {
   Download,
   Calendar,
   Filter,
+  Zap,
+  Database,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -22,6 +27,67 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+
+interface PerformanceStats {
+  total_searches: number;
+  cache_hits: number;
+  cache_hit_rate: number;
+  zero_result_count: number;
+  zero_result_rate: number;
+  product_name_searches: number;
+  avg_total_ms: number;
+  p50_total_ms: number;
+  p95_total_ms: number;
+  p99_total_ms: number;
+  avg_query_understanding_ms: number;
+  avg_embedding_generation_ms: number;
+  avg_vector_search_ms: number;
+  avg_fulltext_search_ms: number;
+  avg_scoring_ms: number;
+  avg_enhancement_ms: number;
+}
+
+interface SlowestQuery {
+  query_text: string;
+  total_ms: number;
+  query_understanding_ms: number | null;
+  embedding_generation_ms: number | null;
+  vector_search_ms: number | null;
+  fulltext_search_ms: number | null;
+  scoring_ms: number | null;
+  enhancement_ms: number | null;
+  result_count: number;
+  cache_hit: boolean;
+  timestamp: string;
+}
+
+interface ZeroResultQuery {
+  query_text: string;
+  occurrences: number;
+  unique_users: number;
+  last_seen: string;
+}
+
+interface CacheStats {
+  total_cached_queries: number;
+  total_cache_hits: number;
+  avg_hits_per_entry: number;
+  oldest_entry: string | null;
+  newest_entry: string | null;
+  avg_parse_latency_saved_ms: number;
+  estimated_total_ms_saved: number;
+}
+
+interface CachedQuery {
+  query_text: string;
+  hit_count: number;
+  parse_latency_ms: number;
+  total_ms_saved: number;
+  is_product_name: boolean;
+  model_used: string;
+  last_hit_at: string;
+  created_at: string;
+}
 
 interface PopularSearch {
   query_text: string;
@@ -61,9 +127,15 @@ export const SearchAnalyticsDashboard = () => {
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
   const [materialDemand, setMaterialDemand] = useState<MaterialDemand[]>([]);
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
+  const [perfStats, setPerfStats] = useState<PerformanceStats | null>(null);
+  const [slowestQueries, setSlowestQueries] = useState<SlowestQuery[]>([]);
+  const [zeroResults, setZeroResults] = useState<ZeroResultQuery[]>([]);
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [topCached, setTopCached] = useState<CachedQuery[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [activeTab, setActiveTab] = useState('overview');
   const { toast } = useToast();
 
   const loadAnalytics = async () => {
@@ -96,6 +168,46 @@ export const SearchAnalyticsDashboard = () => {
 
       if (!statsError && statsData) {
         setStats(statsData);
+      }
+
+      // Load per-stage performance stats
+      const { data: perfData, error: perfError } = await supabase.rpc('get_search_performance_stats', {
+        time_interval: interval,
+      });
+      if (!perfError && perfData) {
+        setPerfStats(perfData);
+      }
+
+      // Load slowest queries
+      const { data: slowData, error: slowError } = await supabase.rpc('get_slowest_queries', {
+        time_interval: interval,
+        max_results: 20,
+      });
+      if (!slowError && slowData) {
+        setSlowestQueries(slowData);
+      }
+
+      // Load zero-result queries
+      const { data: zeroData, error: zeroError } = await supabase.rpc('get_zero_result_queries', {
+        time_interval: interval,
+        max_results: 30,
+      });
+      if (!zeroError && zeroData) {
+        setZeroResults(zeroData);
+      }
+
+      // Load cache stats
+      const { data: cacheData, error: cacheError } = await supabase.rpc('get_query_cache_stats');
+      if (!cacheError && cacheData) {
+        setCacheStats(cacheData);
+      }
+
+      // Load top cached queries
+      const { data: topCachedData, error: topCachedError } = await supabase.rpc('get_top_cached_queries', {
+        max_results: 20,
+      });
+      if (!topCachedError && topCachedData) {
+        setTopCached(topCachedData);
       }
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -189,6 +301,23 @@ export const SearchAnalyticsDashboard = () => {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Zap className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+          <TabsTrigger value="cache" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Database className="h-4 w-4" />
+            Cache Effectiveness
+          </TabsTrigger>
+        </TabsList>
+
+      <TabsContent value="overview" className="space-y-6">
       {/* Stats Overview - Compact Design */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -451,6 +580,295 @@ export const SearchAnalyticsDashboard = () => {
           </div>
         </CardContent>
       </Card>
+      </TabsContent>
+
+      {/* ─────────────────── PERFORMANCE TAB ─────────────────── */}
+      <TabsContent value="performance" className="space-y-6">
+        {/* Stage Timing Breakdown */}
+        {perfStats && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Avg Total</p>
+                </div>
+                <div className="text-2xl font-bold">{perfStats.avg_total_ms}ms</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  p50 {perfStats.p50_total_ms?.toFixed(0)}ms / p95 {perfStats.p95_total_ms?.toFixed(0)}ms
+                </p>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Database className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Cache Hit Rate</p>
+                </div>
+                <div className="text-2xl font-bold">{perfStats.cache_hit_rate?.toFixed(1) || 0}%</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {perfStats.cache_hits?.toLocaleString()} of {perfStats.total_searches?.toLocaleString()}
+                </p>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Zero-Result Rate</p>
+                </div>
+                <div className="text-2xl font-bold">{perfStats.zero_result_rate?.toFixed(1) || 0}%</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {perfStats.zero_result_count?.toLocaleString()} empty
+                </p>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Product-Name Searches</p>
+                </div>
+                <div className="text-2xl font-bold">
+                  {perfStats.product_name_searches?.toLocaleString() || 0}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {perfStats.total_searches > 0
+                    ? ((perfStats.product_name_searches / perfStats.total_searches) * 100).toFixed(1)
+                    : 0}% of total
+                </p>
+              </div>
+            </div>
+
+            {/* Per-Stage Average Timings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Per-Stage Average Timings
+                </CardTitle>
+                <CardDescription>
+                  Where time is spent on a typical search request — find the bottleneck
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const stages = [
+                    { name: 'Query Understanding (LLM)', value: perfStats.avg_query_understanding_ms || 0, color: 'bg-purple-500' },
+                    { name: 'Embedding Generation', value: perfStats.avg_embedding_generation_ms || 0, color: 'bg-blue-500' },
+                    { name: 'Vector + Fulltext Search', value: perfStats.avg_vector_search_ms || 0, color: 'bg-green-500' },
+                    { name: 'Fulltext Search', value: perfStats.avg_fulltext_search_ms || 0, color: 'bg-emerald-500' },
+                    { name: 'Scoring', value: perfStats.avg_scoring_ms || 0, color: 'bg-amber-500' },
+                    { name: 'Enhancement (related products/images)', value: perfStats.avg_enhancement_ms || 0, color: 'bg-orange-500' },
+                  ].filter((s) => s.value > 0);
+                  const max = Math.max(...stages.map((s) => s.value), 1);
+
+                  return (
+                    <div className="space-y-3">
+                      {stages.map((stage, i) => (
+                        <div key={i}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{stage.name}</span>
+                            <span className="text-sm tabular-nums text-muted-foreground">
+                              {stage.value}ms
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${stage.color}`}
+                              style={{ width: `${(stage.value / max) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      {stages.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-6">
+                          No stage timing data yet. Run some searches to populate.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Slowest Queries */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Slowest Queries
+            </CardTitle>
+            <CardDescription>
+              Top 20 slowest searches with stage breakdown — investigate these first
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {slowestQueries.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No slow queries recorded yet.
+                </p>
+              )}
+              {slowestQueries.map((q, i) => (
+                <div key={i} className="border rounded-lg p-3 hover:bg-accent/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
+                      <span className="font-medium truncate">{q.query_text}</span>
+                      {q.cache_hit && (
+                        <Badge variant="secondary" className="shrink-0">cached</Badge>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-bold tabular-nums">{q.total_ms}ms</div>
+                      <div className="text-xs text-muted-foreground">{q.result_count} results</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {q.query_understanding_ms != null && (
+                      <span>QU: {q.query_understanding_ms}ms</span>
+                    )}
+                    {q.vector_search_ms != null && <span>Search: {q.vector_search_ms}ms</span>}
+                    {q.enhancement_ms != null && <span>Enhance: {q.enhancement_ms}ms</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Zero-Result Queries */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Zero-Result Queries
+            </CardTitle>
+            <CardDescription>
+              What users searched for but didn't find — gaps in your catalog
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {zeroResults.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No zero-result queries in this period. Catalog coverage is good.
+                </p>
+              )}
+              {zeroResults.map((q, i) => (
+                <div key={i} className="flex items-center justify-between p-2 border rounded hover:bg-accent/30">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
+                    <span className="font-medium truncate">{q.query_text}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm shrink-0">
+                    <Badge variant="destructive">{q.occurrences}x</Badge>
+                    <span className="text-muted-foreground">{q.unique_users} users</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* ─────────────────── CACHE EFFECTIVENESS TAB ─────────────────── */}
+      <TabsContent value="cache" className="space-y-6">
+        {cacheStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Cached Queries</p>
+              </div>
+              <div className="text-2xl font-bold">
+                {cacheStats.total_cached_queries?.toLocaleString() || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">unique entries</p>
+            </div>
+
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Total Cache Hits</p>
+              </div>
+              <div className="text-2xl font-bold">
+                {cacheStats.total_cache_hits?.toLocaleString() || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {cacheStats.avg_hits_per_entry?.toFixed(1) || 0} avg per entry
+              </p>
+            </div>
+
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Time Saved</p>
+              </div>
+              <div className="text-2xl font-bold">
+                {((cacheStats.estimated_total_ms_saved || 0) / 1000).toFixed(1)}s
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                ~{cacheStats.avg_parse_latency_saved_ms || 0}ms per hit
+              </p>
+            </div>
+
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Cache Age</p>
+              </div>
+              <div className="text-2xl font-bold">
+                {cacheStats.oldest_entry
+                  ? Math.round((Date.now() - new Date(cacheStats.oldest_entry).getTime()) / (1000 * 60 * 60 * 24))
+                  : 0}
+                d
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">since oldest entry</p>
+            </div>
+          </div>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Top Cached Queries
+            </CardTitle>
+            <CardDescription>
+              Most-hit cache entries — these queries skip the LLM parser entirely
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {topCached.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No cached queries yet. Run some searches to populate the cache.
+                </p>
+              )}
+              {topCached.map((q, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
+                    <span className="font-medium truncate">{q.query_text}</span>
+                    {q.is_product_name && (
+                      <Badge variant="secondary" className="shrink-0 text-xs">product-name</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm shrink-0">
+                    <Badge>{q.hit_count} hits</Badge>
+                    <span className="text-muted-foreground tabular-nums">
+                      {(q.total_ms_saved / 1000).toFixed(1)}s saved
+                    </span>
+                    <span className="text-xs text-muted-foreground">{q.model_used}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      </Tabs>
     </div>
   );
 };

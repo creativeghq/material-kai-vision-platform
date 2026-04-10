@@ -165,21 +165,21 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 7: CLIP Embeddings (75-85%) - URL-BASED PROCESSING        │
-│ Models: Google SigLIP ViT-SO400M (5 types per image)          │
+│ STAGE 7: SLIG Embeddings (75-85%) - URL-BASED PROCESSING        │
+│ Models: SigLIP2 via SLIG cloud endpoint (768D, 5 types)       │
 │ Process: Use Supabase URLs directly (NO download!)            │
-│ Output: 5 CLIP embeddings per material image                   │
+│ Output: 5 SLIG 768D embeddings per material image              │
 │                                                                 │
 │ 🚀 ZERO-DOWNLOAD ARCHITECTURE:                                │
-│   1. Pass Supabase URL to CLIP service                        │
-│   2. CLIP downloads internally (httpx)                        │
-│   3. Generate 5 embeddings (Visual, Color, Texture, etc.)     │
-│   4. Save to VECS collections                                  │
-│   5. CLIP auto-cleanup (no manual deletion needed)            │
+│   1. Pass Supabase URL to SLIG cloud endpoint                 │
+│   2. SLIG fetches internally                                  │
+│   3. Generate 5 embeddings (visual, color, texture, style, mat)│
+│   4. Save directly to VECS collections (updated 2026-04)       │
+│   5. Auto-cleanup (no manual deletion needed)                  │
 │                                                                 │
-│ Memory: ~100MB per batch (CLIP model + tensors)               │
+│ Memory: ~100MB per batch                                      │
 │ Time: ~2-3 seconds per image                                   │
-│ Disk: 0 images (CLIP downloads to RAM)                        │
+│ Disk: 0 images (URL-based)                                    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -591,19 +591,13 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ---
 
-### Phase 2: Background Image Dimension Extraction
+### Image OCR Dimension Extraction (inline, updated 2026-04)
 
-**File**: `app/services/images/background_image_processor.py`
-**Method**: `_extract_dimensions_from_image_text()`
-**Called from**: `_enrich_product_metadata_from_spec_image()` (when image is NOT a spec table)
-
-**Purpose**: As part of the asynchronous Phase 2 image pipeline (Qwen vision analysis), if an image contains readable text (labels, overlaid specs, captions), this method extracts size and thickness data from Qwen's `raw_qwen_output` and fills products that are still missing these fields.
-
-**When it runs**: Phase 2 background processor — after the main pipeline completes. Does not block pipeline completion.
+**Note (2026-04)**: The former asynchronous "Phase 2 background image processor" (`app/services/images/background_image_processor.py`) was deleted — it called a non-existent `generate_material_embeddings` method and produced no output. Image-text dimension extraction is now handled inline during Phase 1 image processing by `_enrich_product_metadata_from_spec_image()` in the image processing service, using the same regex patterns against Qwen vision output.
 
 **Logic**:
-- If `keyword_hits >= 3` → image is a spec table → handled by `_enrich_product_metadata_from_spec_image()`
-- If `keyword_hits < 3` → image is a product photo with possible text overlay → runs `_extract_dimensions_from_image_text()`
+- If `keyword_hits >= 3` → image is a spec table → handled by `_enrich_product_metadata_from_spec_image()` as a spec table
+- If `keyword_hits < 3` → image is a product photo with possible text overlay → regex extraction against Qwen raw output
 
 **Regex patterns applied** (same as Stage 4.6 but on Qwen's OCR output):
 - Size: `(\d+)[xX×](\d+)\s*(?:cm|CM|mm|MM)?`
@@ -617,7 +611,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 |-------|-------|--------|-----------|-----|
 | Sibling propagation | 4.5 | Sibling product DB | 0.75 | No |
 | Text chunk regex | 4.6 | document_chunks text | 0.65 | No |
-| Image OCR regex | Phase 2 | Qwen raw_qwen_output | 0.70 | Yes (Qwen) |
+| Image OCR regex | Phase 1 (inline) | Qwen raw_qwen_output | 0.70 | Yes (Qwen) |
 
 ---
 
@@ -687,38 +681,37 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ---
 
-### Stage 7: CLIP Embeddings (75-85%) - URL-Based Processing
+### Stage 7: SLIG Embeddings (75-85%) - URL-Based Processing (updated 2026-04)
 
 **🚀 ZERO-DOWNLOAD ARCHITECTURE**
 
-**Model**: Google SigLIP ViT-SO400M
+**Model**: SigLIP2 via SLIG cloud endpoint (768D). Legacy SigLIP ViT-SO400M (1152D) was retired in 2026-04 — its collections were 100% orphans.
 
 **Process (Per Image)**:
-1. **Pass Supabase URL to CLIP service** (no manual download!)
-2. CLIP downloads internally using httpx
-3. Generate 5 embedding types
-4. Save to VECS collections
-5. CLIP auto-cleanup (tensors deleted automatically)
+1. **Pass Supabase URL to SLIG service** (no manual download!)
+2. SLIG fetches internally
+3. Generate 5 embedding types (all 768D)
+4. Save directly to VECS collections (`image_slig_embeddings`, `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, `image_material_embeddings`)
+5. Auto-cleanup
 
 **Why Zero-Download?**
-- **CLIP Supports URLs Natively**: No need to download manually
-- **Automatic Memory Management**: CLIP handles cleanup
+- **URL-native**: No need to download manually
 - **Faster Processing**: No extra download step
 - **Same Quality**: URL vs base64 produces identical embeddings
 
-**5 CLIP Embedding Types Generated Per Image**:
+**5 SLIG Embedding Types Generated Per Image** (SigLIP2 via SLIG cloud endpoint, 768D each):
 
-1. **Visual Embeddings** (512D) — Overall visual appearance, enables visual similarity search. Collection: `image_clip_embeddings`.
-2. **Color Embeddings** (512D) — Color palette analysis, color-based search. Collection: `image_color_embeddings`.
-3. **Texture Embeddings** (512D) — Surface texture analysis, texture-based search. Collection: `image_texture_embeddings`.
-4. **Application Embeddings** (512D) — Use case classification, application-based search. Collection: `image_application_embeddings`.
-5. **Material Embeddings** (512D) — Material type classification, material-based search. Collection: `image_material_embeddings`.
+1. **Visual Embeddings** (768D) — Overall visual appearance, enables visual similarity search. Collection: `image_slig_embeddings`. Producer key: `visual_768`.
+2. **Color Embeddings** (768D) — Text-guided color similarity. Collection: `image_color_embeddings`. Producer key: `color_slig_768`.
+3. **Texture Embeddings** (768D) — Text-guided texture similarity. Collection: `image_texture_embeddings`. Producer key: `texture_slig_768`.
+4. **Style Embeddings** (768D) — Text-guided style similarity. Collection: `image_style_embeddings`. Producer key: `style_slig_768`.
+5. **Material Embeddings** (768D) — Text-guided material similarity. Collection: `image_material_embeddings`. Producer key: `material_slig_768`.
 
-**Output**: A JSON result with `material_images_processed`, `clip_embeddings_generated`, `total_embeddings`, `memory_usage`, `processing_time`, and `embeddings_by_type` (visual, color, texture, application, material counts).
+**Output**: A JSON result with `material_images_processed`, `slig_embeddings_generated`, `total_embeddings`, `memory_usage`, `processing_time`, and `embeddings_by_type` (visual, color, texture, style, material counts).
 
 **Performance Metrics**:
 - Time per image: 2-3 seconds
-- Memory per batch: ~100MB (CLIP model + tensors)
+- Memory per batch: ~100MB
 - Disk usage: 0 images
 - Total time for 150 images: 5-8 minutes
 
@@ -841,7 +834,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 3. **CHUNKS_CREATED** - Text chunking complete
 4. **TEXT_EMBEDDINGS_GENERATED** - Text embeddings complete
 5. **IMAGES_EXTRACTED** - Images uploaded to Supabase Storage ✅ UPDATED
-6. **IMAGE_EMBEDDINGS_GENERATED** - CLIP embeddings + Qwen Vision complete ✅ UPDATED
+6. **IMAGE_EMBEDDINGS_GENERATED** - SLIG 768D embeddings + Qwen Vision complete ✅ UPDATED
 7. **PRODUCTS_DETECTED** - Products identified
 8. **PRODUCTS_CREATED** - Product creation complete
 9. **COMPLETED** - All processing complete
@@ -850,7 +843,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
-- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All CLIP embeddings + Qwen Vision analysis complete
+- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All 5 SLIG embeddings (768D) + Qwen Vision analysis + understanding embedding (1024D Voyage) complete
 - Recovery uses Supabase URLs for all subsequent processing (no local files needed)
 
 ---
@@ -864,7 +857,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 - Images extracted: 249
 - Material images: 150
 - Non-material images: 99 (deleted from Supabase)
-- CLIP embeddings generated: 750 (5 types × 150 material images)
+- SLIG embeddings generated: 750 (5 types × 150 material images, all 768D)
 - Processing time: 2-3 minutes (vs 30+ minutes before)
 - Memory usage: <3GB peak (vs 7.7GB OOM before)
 - Disk usage: 0 images (vs 249 cumulative before)
@@ -875,7 +868,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 - Material recognition: 90%+
 - Metadata extraction: 88%+
 - Search relevance: 85%+
-- CLIP embedding quality: 95%+
+- SLIG embedding quality: 95%+
 
 **URL-Based Architecture Impact**:
 - **Before**: 7.7GB memory → OOM crash at 249 images
@@ -896,16 +889,16 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 **ImageProcessingService** (`app/services/image_processing_service.py`)
 - `classify_images()` - Qwen Vision + Claude validation
 - `upload_images_to_storage()` - Upload to Supabase Storage
-- `save_images_and_generate_clips()` - DB save + CLIP embeddings
+- `save_images_and_generate_clips()` - DB save + SLIG 768D embeddings (name retained for backwards compat; writes directly to VECS)
 
 **UnifiedChunkingService** (`app/services/unified_chunking_service.py`)
 - `chunk_text()` - Semantic/hybrid/fixed-size/layout-aware chunking
 - Supports 4 chunking strategies with quality scoring
 
-**RelevancyService** (`app/services/relevancy_service.py`)
-- `create_chunk_image_relationships()` - Based on embedding similarity
+**RelevancyService** (`app/services/relevancy_service.py`) (updated 2026-04)
 - `create_product_image_relationships()` - Based on page ranges
 - `create_all_relationships()` - Orchestrate all relationships
+- Note: chunk-image relationships are populated by `entity_linking_service.link_images_to_chunks` using **page_proximity**. The former `create_chunk_image_relationships()` method was deleted in 2026-04 — it computed cosine similarity between 1024D text and 768D visual vectors, which was mathematically invalid.
 
 ### Internal API Endpoints
 
@@ -1251,8 +1244,8 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
   - Regex patterns for WxH cm sizes and Xmm thickness
   - Fills products still missing data after Stage 4.5
   - No AI calls, confidence 0.65, source: "document_text"
-- ✅ **Image OCR Dimension Extraction (Phase 2)**: Regex on Qwen vision output
-  - Runs in background after pipeline completion
+- ✅ **Image OCR Dimension Extraction (inline, updated 2026-04)**: Regex on Qwen vision output
+  - Runs inline during Phase 1 image processing (no separate Phase 2)
   - Catches dimensions from product photo text overlays
   - Confidence 0.70, source: "image_text"
 - ✅ **URL-Based Architecture**: All image processing uses Supabase URLs (zero disk usage)

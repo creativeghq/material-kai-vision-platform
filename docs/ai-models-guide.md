@@ -20,8 +20,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | voyage-3.5 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
 | voyage-3 | Voyage AI | Alternative text embeddings | 1024D vectors | $0.06 input |
 | voyage-3-lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
-| text-embedding-3-small | OpenAI | **FALLBACK** Text embeddings | 1024D vectors | $0.02 input |
-| text-embedding-3-large | OpenAI | Large text embeddings | 3072D vectors | $0.13 input |
+| text-embedding-3-small | OpenAI | **LEGACY** (CI changelog only, retired from production 2026-04) | 1536D vectors | $0.02 input |
 | **Vision Models** |
 | Qwen3-VL-32B-Instruct | HuggingFace Endpoint | **PRIMARY** Vision analysis | State-of-the-art OCR | Cloud endpoint |
 | **Visual Embeddings** |
@@ -101,19 +100,22 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 4. text-embedding-3-small (OpenAI)
+### 4. Voyage AI voyage-3.5 (updated 2026-04)
 
-**Purpose**: Generate text embeddings for semantic search
+**Purpose**: Generate text embeddings for semantic search (sole production text embedder)
 
 **Capabilities**:
-- Convert text to 1536D vectors
+- Convert text to 1024D vectors (stored as halfvec in VECS)
 - Enable semantic similarity search
-- Fast embedding generation
+- Fast embedding generation, supports `document` and `query` input types
+- Dict key: `text_1024` (was previously `text_1536` under OpenAI text-embedding-3-small)
 
 **Performance**:
-- Dimension: 1536D
-- Latency: 100-200ms
-- Cost: $0.02 per 1M tokens
+- Dimension: 1024D
+- Latency: 100-300ms
+- Cost: $0.06 per 1M tokens
+
+**Note**: OpenAI `text-embedding-3-small` (1536D) was retired from the production path in 2026-04. It is only retained for the legacy CI changelog workflow.
 
 **When to Use**:
 - Text embedding generation
@@ -153,47 +155,45 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 6-10. OpenAI CLIP Models
+### 6-10. SLIG (SigLIP2) Specialized Embeddings (updated 2026-04)
 
-**Purpose**: Multi-modal visual embeddings
+**Purpose**: Multi-modal visual embeddings via HuggingFace Cloud Endpoint. Replaced legacy OpenAI CLIP (256/512/1536D) and SigLIP-SO400M (1152D) in 2026-04 — those columns were dropped from the database.
 
-**5 Embedding Types**:
+**5 Embedding Types** (all 768D halfvec, written directly to VECS):
 
-#### Visual Embeddings (512D)
+#### Visual Embeddings (768D) → `image_slig_embeddings`
 - Overall visual appearance
 - Enables visual similarity search
-- General visual features
+- Producer key: `visual_768`
 
-#### Large Visual Embeddings (1536D)
-- High-resolution visual features
-- Better accuracy
-- More detailed representation
+#### Color Embeddings (768D) → `image_color_embeddings`
+- Text-guided color palette analysis
+- Producer key: `color_slig_768`
 
-#### Color Embeddings (256D)
-- Color palette analysis
-- Color-based search
-- Dominant colors extraction
+#### Texture Embeddings (768D) → `image_texture_embeddings`
+- Text-guided surface texture analysis
+- Producer key: `texture_slig_768`
 
-#### Texture Embeddings (256D)
-- Surface texture analysis
-- Texture-based search
-- Material texture classification
+#### Style Embeddings (768D) → `image_style_embeddings`
+- Text-guided design aesthetic
+- Producer key: `style_slig_768`
 
-#### Application Embeddings (512D)
-- Use case classification
-- Application-based search
-- Context understanding
+#### Material Embeddings (768D) → `image_material_embeddings`
+- Text-guided material classification
+- Producer key: `material_slig_768`
+
+Additionally, an **Understanding Embedding** (1024D, Voyage AI from Qwen3-VL vision_analysis JSON) → `image_understanding_embeddings` is generated inline for spec-based semantic search.
 
 **Performance**:
-- Dimension: 256D-1536D (varies)
-- Latency: 200-500ms per image
-- Cost: $0.02 per 1M tokens
+- Dimension: 768D (specialized) / 1024D (understanding)
+- Latency: 150-400ms per image
+- Cost: Cloud endpoint, auto-pause enabled
 
 **When to Use**:
 - Visual similarity search
 - Color-based discovery
-- Texture analysis
-- Application classification
+- Texture, style, and material analysis
+- Spec-based search via understanding embedding
 
 ---
 
@@ -243,9 +243,9 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 |-------|---------------|-----------------|---------|
 | 0 | Claude Sonnet 4.5 | GPT-4o | Product discovery |
 | 2 | Anthropic Chunking | - | Text segmentation |
-| 4 | text-embedding-3-small | - | Text embeddings |
+| 4 | voyage-3.5 (Voyage AI) | - | Text embeddings (1024D, updated 2026-04) |
 | 6 | Qwen3-VL 17B | - | Image analysis |
-| 7-10 | CLIP (5 types) | - | Visual embeddings |
+| 7-10 | SLIG (SigLIP2, 5 types) | - | Visual embeddings (768D) |
 | 11 | Claude Haiku 4.5 | Claude Sonnet 4.5 | Product validation |
 | 13 | Claude Sonnet 4.5 | - | Quality enhancement |
 
@@ -328,7 +328,7 @@ The model configuration maps each task to its designated model: `discovery` uses
 - Document chunks
 - Semantic search
 
-**Migration**: Replaced text-embedding-3-small (1536D → 1024D)
+**Migration**: Replaced text-embedding-3-small in production 2026-04 (1536D → 1024D, dict key `text_1536` → `text_1024`)
 
 ---
 
@@ -394,7 +394,7 @@ The model configuration maps each task to its designated model: `discovery` uses
 ### Text Embeddings
 1. **Voyage-3** (PRIMARY) - All production text embeddings
 2. **Voyage-3-Lite** - Simple/fast tasks only
-3. **text-embedding-3-small** - Legacy (being phased out)
+3. **text-embedding-3-small** - Retired 2026-04 (CI changelog workflow only)
 
 ### Vision Analysis
 1. **Qwen3-VL-32B-Instruct** (PRIMARY) - All production vision tasks (HuggingFace endpoint)

@@ -105,7 +105,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - GPT-4o
 - GPT-5
 - Qwen3-VL 17B Vision
-- OpenAI text-embedding-3-small
+- Voyage AI voyage-3.5 (updated 2026-04 — replaced OpenAI text-embedding-3-small)
 
 ---
 
@@ -240,7 +240,7 @@ All stages integrate with Sentry for exception capture. Any exception raised dur
 - Claude Haiku 4.5: $0.80 / 1M input tokens, $4.00 / 1M output tokens
 - GPT-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
 - Qwen3-VL 17B: $0.30 / 1M tokens
-- text-embedding-3-small: $0.02 / 1M tokens
+- Voyage AI voyage-3.5: $0.06 / 1M tokens (sole production text embedder as of 2026-04)
 
 Cost calculation multiplies token counts by per-million rates for input and output separately, then sums them.
 

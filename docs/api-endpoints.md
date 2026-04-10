@@ -34,7 +34,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 
 **Previous Updates (v2.3.0 - Knowledge Base System):**
 - **KNOWLEDGE BASE:** 15+ new endpoints for document management with AI embeddings (NEW)
-  - Document CRUD with automatic embedding generation (1536D)
+  - Document CRUD with automatic embedding generation (1024D Voyage AI)
   - Smart content change detection (only regenerate when needed)
   - PDF text extraction using PyMuPDF
   - Semantic search (vector similarity)
@@ -117,7 +117,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 
 **Purpose:** Create a new knowledge base document with automatic embedding generation
 **Used In:** Knowledge Base admin panel, Documentation editor
-**Flow:** User creates document → Generate 1536D embedding → Store in database
+**Flow:** User creates document → Generate 1024D Voyage AI embedding → Store in database
 
 **Request fields:** `workspace_id`, `title`, `content`, `content_markdown`, `summary`, `category_id`, `seo_keywords`, `status`, `visibility`, `metadata`
 
@@ -126,7 +126,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Database Operations:**
 - INSERT into `kb_docs` with embedding
 - INSERT into `kb_doc_versions` (version history)
-- Generate 1536D embedding using OpenAI text-embedding-3-small
+- Generate 1024D embedding using Voyage AI voyage-3.5 (updated 2026-04)
 
 ---
 
@@ -185,7 +185,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Database Operations:**
 - Extract text using PyMuPDF (fitz)
 - INSERT into `kb_docs` with extracted text
-- Generate 1536D embedding
+- Generate 1024D Voyage AI embedding
 
 ---
 
@@ -197,7 +197,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 
 **Architecture:**
 1. Frontend calls MIVAA API with search query
-2. MIVAA generates embedding for query using OpenAI (text-embedding-3-small)
+2. MIVAA generates embedding for query using Voyage AI voyage-3.5 (updated 2026-04)
 3. MIVAA calls Supabase `kb_match_docs()` RPC function with query embedding
 4. Supabase performs vector similarity search using pgvector `<=>` operator
 5. Returns ranked results with similarity scores
@@ -205,14 +205,14 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Why MIVAA Backend is Required:**
 - Document embeddings already stored in `kb_docs.text_embedding` (generated when doc created)
 - Search only generates ONE embedding (for the query)
-- Cannot generate embeddings in Supabase RPC (requires OpenAI API call)
+- Cannot generate embeddings in Supabase RPC (requires Voyage AI API call)
 - Uses pgvector's optimized cosine similarity for fast search
 
 **Request fields:** `workspace_id`, `query`, `search_type`, `limit`
 
 **Search Types:**
 - `semantic` - Vector similarity using pgvector cosine distance (default)
-  - Generates query embedding via OpenAI
+  - Generates query embedding via Voyage AI
   - Compares against stored document embeddings
   - Returns results with similarity scores (0.0 - 1.0)
   - Minimum threshold: 0.5
@@ -225,7 +225,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Response fields:** `success`, `results` (array with id, title, content, similarity_score, created_at), `total_count`, `search_time_ms`, `search_type`
 
 **Database Operations:**
-- Generate query embedding (1536D)
+- Generate query embedding (1024D, Voyage AI)
 - Vector similarity search using `<=>` operator
 - Track search in `kb_search_analytics`
 

@@ -129,7 +129,10 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing product quality for ${productId}...`);
 
-      // Get product data with quality scores
+      // Get product data with quality scores.
+      // Post 2026-04 cleanup, the only product-level embedding column is text_embedding_1024.
+      // Image-level embeddings live in vecs.image_*_embeddings collections, accessed
+      // via image_product_associations + the has_*_slig flags on document_images.
       const { data: product, error: productError } = await supabase
         .from('products')
         .select(
@@ -137,9 +140,7 @@ export class QualityControlService {
           id, name, description, long_description, specifications, metadata,
           quality_score, confidence_score, completeness_score, quality_metrics,
           quality_assessment,
-          text_embedding_1024, visual_clip_embedding_512, multimodal_fusion_embedding_2048,
-          color_embedding_256, texture_embedding_256, application_embedding_512,
-          embedding_metadata
+          text_embedding_1024, embedding_metadata
         `,
         )
         .eq('id', productId)
@@ -227,14 +228,16 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing chunk quality for ${chunkId}...`);
 
-      // Get chunk data with quality scores
+      // Get chunk data with quality scores.
+      // Post 2026-04 cleanup, document_vectors only carries text_embedding_1024.
+      // Visual embeddings live in vecs.image_*_embeddings collections, not here.
       const { data: chunk, error: chunkError } = await supabase
         .from('document_vectors')
         .select(
           `
           chunk_id, content, metadata, page_number,
           coherence_score, quality_score, boundary_quality, semantic_completeness,
-          text_embedding_1024, visual_clip_embedding_512, embedding_metadata
+          text_embedding_1024, embedding_metadata
         `,
         )
         .eq('chunk_id', chunkId)
@@ -321,13 +324,17 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing image quality for ${imageId}...`);
 
-      // Get image data with validation results
+      // Get image data with validation results.
+      // Post 2026-04 cleanup, embedding columns are dropped from document_images.
+      // Presence of embeddings is now tracked via has_*_slig boolean flags;
+      // the actual vectors live in vecs.image_*_embeddings collections.
       const { data: image, error: imageError } = await supabase
         .from('document_images')
         .select(
           `
           id, filename, file_size, dimensions, metadata,
-          visual_clip_embedding_512, color_embedding_256, texture_embedding_256,
+          has_slig_embedding, has_understanding_embedding,
+          has_color_slig, has_texture_slig, has_style_slig, has_material_slig,
           embedding_metadata
         `,
         )
@@ -510,22 +517,17 @@ export class QualityControlService {
   // ===== HELPER METHODS =====
 
   /**
-   * Calculate embedding coverage for a product
+   * Calculate embedding coverage for a product.
+   *
+   * Post 2026-04 cleanup, the only product-level embedding is text_embedding_1024.
+   * All visual embeddings (SLIG, color, texture, style, material, understanding)
+   * live on associated images in vecs.image_*_embeddings — image-level coverage
+   * is computed separately by the backend RPC `get_product_embedding_status`.
    */
   private static calculateEmbeddingCoverage(product: any): number {
-    const embeddingTypes = [
-      'text_embedding_1024',
-      'visual_clip_embedding_512',
-      'multimodal_fusion_embedding_2048',
-      'color_embedding_256',
-      'texture_embedding_256',
-      'application_embedding_512',
-    ];
-
-    const presentEmbeddings = embeddingTypes.filter(
-      (type) => product[type] && product[type].length > 0,
-    );
-    return presentEmbeddings.length / embeddingTypes.length;
+    return product.text_embedding_1024 && product.text_embedding_1024.length > 0
+      ? 1
+      : 0;
   }
 
   /**
@@ -550,19 +552,24 @@ export class QualityControlService {
   }
 
   /**
-   * Calculate embedding coverage for an image
+   * Calculate embedding coverage for an image.
+   *
+   * Post 2026-04 cleanup, the actual vectors live in vecs.image_*_embeddings
+   * collections. document_images carries boolean presence flags instead — we
+   * compute coverage as the fraction of expected embedding types that are present.
    */
   private static calculateImageEmbeddingCoverage(image: any): number {
-    const embeddingTypes = [
-      'visual_clip_embedding_512',
-      'color_embedding_256',
-      'texture_embedding_256',
+    const flags = [
+      'has_slig_embedding',
+      'has_understanding_embedding',
+      'has_color_slig',
+      'has_texture_slig',
+      'has_style_slig',
+      'has_material_slig',
     ];
 
-    const presentEmbeddings = embeddingTypes.filter(
-      (type) => image[type] && image[type].length > 0,
-    );
-    return presentEmbeddings.length / embeddingTypes.length;
+    const present = flags.filter((flag) => image[flag] === true);
+    return present.length / flags.length;
   }
 
   /**

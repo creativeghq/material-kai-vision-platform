@@ -53,14 +53,20 @@
 - **Context**: TBD
 - **Cost**: TBD
 
-#### text-embedding-3-small
+#### text-embedding-3-small (retired from production 2026-04)
+- **Status**: Retired in 2026-04 from the production path. Still used only for the legacy CI changelog workflow.
+- **Replacement**: Voyage AI `voyage-3.5` (1024D) is now the sole production text embedder. See below.
+- **Dimensions**: 1536D (historical)
+- **Cost**: $0.02 per 1M tokens
+
+#### Voyage AI voyage-3.5 (production text embedder, updated 2026-04)
 - **Use Cases**:
   - Text chunk embeddings
   - Semantic search
-  - Text similarity comparison
-- **Dimensions**: 1536D
-- **Cost**: $0.02 per 1M tokens
-- **Performance**: 62.3% MTEB score
+  - Understanding embeddings (from Qwen3-VL vision_analysis JSON)
+- **Dimensions**: 1024D (stored as halfvec in VECS)
+- **Dict key**: `text_1024`
+- **Cost**: $0.06 per 1M tokens
 
 ---
 
@@ -87,28 +93,25 @@
 
 ### 4. Google
 
-#### SigLIP ViT-SO400M (Primary CLIP)
+#### SLIG (SigLIP2 via HuggingFace Cloud Endpoint) — Primary visual embedder, updated 2026-04
 - **Use Cases**:
   - Visual embeddings (5 types per image)
-  - Image-text similarity
+  - Image-text similarity via similarity mode
   - Visual search
   - Multi-vector search
-- **Dimensions**: 512D per embedding type
-- **Performance**: Industry-leading visual embeddings
-- **Cost**: Self-hosted (free)
+- **Dimensions**: 768D per embedding type (halfvec in VECS)
+- **Performance**: Superior to legacy CLIP 512D and SigLIP-SO400M 1152D (both retired 2026-04)
+- **Cost**: Cloud endpoint (auto-pause enabled)
 - **Pipeline Stages**: Image Embedding Generation (Stage 7)
 
-**5 Embedding Types Generated**:
-1. **Visual Embeddings** - Overall appearance
-2. **Color Embeddings** - Color palette analysis
-3. **Texture Embeddings** - Surface texture
-4. **Style Embeddings** - Design style
-5. **Material Embeddings** - Material type classification
+**5 Embedding Types Generated** (all 768D → VECS):
+1. **Visual** → `image_slig_embeddings` (producer key `visual_768`)
+2. **Color** → `image_color_embeddings` (producer key `color_slig_768`)
+3. **Texture** → `image_texture_embeddings` (producer key `texture_slig_768`)
+4. **Style** → `image_style_embeddings` (producer key `style_slig_768`)
+5. **Material** → `image_material_embeddings` (producer key `material_slig_768`)
 
-#### CLIP ViT-B/32 (Fallback)
-- **Use Cases**: Backup visual embeddings if SigLIP fails
-- **Dimensions**: 512D
-- **Cost**: Self-hosted (free)
+Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analysis JSON) → `image_understanding_embeddings` for spec-based semantic search.
 
 ---
 
@@ -190,9 +193,9 @@
 ### PDF Processing Pipeline
 - **Stage 0A (Product Discovery)**: Claude Sonnet 4.5 or GPT-4o
 - **Stage 0B (Entity Discovery)**: Claude Sonnet 4.5 or GPT-4o
-- **Stage 2 (Text Embeddings)**: OpenAI text-embedding-3-small
+- **Stage 2 (Text Embeddings)**: Voyage AI voyage-3.5 (1024D, updated 2026-04)
 - **Stage 6 (Image Classification)**: Qwen3-VL 17B Vision
-- **Stage 7 (CLIP Embeddings)**: Google SigLIP ViT-SO400M (5 types)
+- **Stage 7 (SLIG Embeddings)**: SigLIP2 via HuggingFace cloud endpoint (768D, 5 types + understanding 1024D)
 - **Stage 8 (Image Analysis)**: Qwen3-VL 17B Vision
 
 ### Web Scraping Integration
@@ -221,8 +224,8 @@
 
 ### High-Volume Operations (Use Cheaper Models)
 - **Quick Classification**: Claude Haiku 4.5 ($0.0025/1K tokens)
-- **Text Embeddings**: OpenAI text-embedding-3-small ($0.02/1M tokens)
-- **Visual Embeddings**: SigLIP (self-hosted, free)
+- **Text Embeddings**: Voyage AI voyage-3.5 ($0.06/1M tokens, updated 2026-04)
+- **Visual Embeddings**: SLIG SigLIP2 cloud endpoint (auto-pause enabled)
 
 ### High-Accuracy Operations (Use Premium Models)
 - **Product Discovery**: Claude Sonnet 4.5 ($0.015/1K tokens)

@@ -341,6 +341,14 @@ function createAgentGraph(
   onChunk?: (chunk: any) => void,
   forceToolCall?: boolean,
   maxIterations = 10,
+  // Observability context — passed through to agent_tool_call_logs
+  observability?: {
+    userId?: string;
+    workspaceId?: string;
+    conversationId?: string;
+    agentId?: string;
+    supabase?: any;
+  },
 ) {
 
   // Agent node: calls the model
@@ -426,6 +434,7 @@ function createAgentGraph(
 
     // Execute all tool calls in parallel for lower latency
     const TOOL_TIMEOUT_MS = 90_000;
+    const toolTimings: Record<string, number> = {};
     const toolSettled = await Promise.allSettled(
       toolCalls.map(async (toolCall: any) => {
         // Send tool call status
@@ -443,12 +452,14 @@ function createAgentGraph(
           throw new Error(`Tool not found: ${toolCall.name}`);
         }
 
+        const _t_start = Date.now();
         const toolResult = await Promise.race([
           matchedTool.invoke(toolCall.args),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error(`Tool '${toolCall.name}' timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
           ),
         ]);
+        toolTimings[toolCall.id || toolCall.name] = Date.now() - _t_start;
 
         // Send tool result
         try {
@@ -563,6 +574,72 @@ function createAgentGraph(
     const generationToolsCalled = toolCalls.some((tc: any) =>
       ['generate_3d', 'generate_gemini'].includes(tc.name)
     );
+
+    // ── Observability: log every tool call to agent_tool_call_logs ──
+    // Fire-and-forget — never block the response on logging
+    if (observability?.supabase) {
+      try {
+        const logRows = toolCalls.map((toolCall: any, i: number) => {
+          const settled = toolSettled[i];
+          const success = settled.status === 'fulfilled';
+          let resultCount: number | null = null;
+          let zeroResult = false;
+          let resultSummary: any = null;
+          let errorMessage: string | null = null;
+
+          if (success) {
+            try {
+              const tr = (settled as any).value.toolResult;
+              const parsed = typeof tr === 'string' ? JSON.parse(tr) : tr;
+              // Try to extract a result count from common shapes
+              if (Array.isArray(parsed?.results)) {
+                resultCount = parsed.results.length;
+              } else if (Array.isArray(parsed?.data)) {
+                resultCount = parsed.data.length;
+              } else if (Array.isArray(parsed?.products)) {
+                resultCount = parsed.products.length;
+              }
+              zeroResult = resultCount === 0;
+              // Summarise but don't store full payload
+              resultSummary = {
+                result_count: resultCount,
+                has_results: resultCount !== null && resultCount > 0,
+                top_score: parsed?.results?.[0]?.score ?? null,
+                processing_time: parsed?.processing_time ?? null,
+              };
+            } catch { /* ignore parse errors */ }
+          } else {
+            const err = (settled as any).reason;
+            errorMessage = err instanceof Error ? err.message : String(err);
+          }
+
+          return {
+            conversation_id: observability.conversationId || null,
+            user_id: observability.userId || null,
+            workspace_id: observability.workspaceId || null,
+            agent_id: observability.agentId || null,
+            tool_name: toolCall.name,
+            tool_args: toolCall.args || null,
+            result_summary: resultSummary,
+            result_count: resultCount,
+            zero_result: zeroResult,
+            duration_ms: toolTimings[toolCall.id || toolCall.name] || null,
+            success,
+            error_message: errorMessage,
+          };
+        });
+
+        observability.supabase
+          .from('agent_tool_call_logs')
+          .insert(logRows)
+          .then((res: any) => {
+            if (res?.error) console.warn('[agent-chat] tool call log insert error:', res.error.message);
+          })
+          .catch((e: any) => console.warn('[agent-chat] tool call log insert threw:', e));
+      } catch (logErr) {
+        console.warn('[agent-chat] tool call logging failed:', logErr);
+      }
+    }
 
     return {
       messages: toolMessages,
@@ -1042,7 +1119,13 @@ async function executeAgent(
 
   // Create the agent graph — force tool use for interior-designer (prevents JARVIS text-first responses)
   const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
-  const agentGraph = createAgentGraph(selectedModel, tools, onChunk, forceToolCall);
+  const agentGraph = createAgentGraph(selectedModel, tools, onChunk, forceToolCall, 10, {
+    userId,
+    workspaceId,
+    conversationId: conversation_id || undefined,
+    agentId,
+    supabase, // module-level service-role client
+  });
 
   // Convert messages to LangChain format, with multimodal support for images
   const lastUserMsgIndex = messages.reduce((last: number, msg: any, i: number) =>

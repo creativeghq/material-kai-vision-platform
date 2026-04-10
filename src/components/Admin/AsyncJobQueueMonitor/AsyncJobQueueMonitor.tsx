@@ -1355,6 +1355,101 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
+  /**
+   * Regenerate ALL image embeddings for a document — fills in any missing
+   * vectors across the 6 image-embedding collections (visual SLIG, color,
+   * texture, style, material, understanding).
+   *
+   * `force_regenerate: true` is intentional. Without it, the backend skips
+   * any image whose visual_768 already exists in `image_slig_embeddings` —
+   * which is exactly the wrong behavior for "fix incomplete embeddings",
+   * because the most common partial state is "has visual SLIG but missing
+   * the 4 specialized SLIG and/or the understanding embedding". Forcing
+   * regenerate is idempotent (VECS upserts overwrite at the same image_id),
+   * costs one extra SLIG call per image, and is the simplest way to bring
+   * any image up to the full 7-vector spec.
+   */
+  const handleRegenerateImageEmbeddings = async (job: typeof selectedJob) => {
+    if (!job?.document_id) return;
+    setPipelineActionLoading('image-embeddings');
+    try {
+      const result = await callPipelineAction('regenerate-image-embeddings', {
+        document_id: job.document_id,
+        workspace_id: job.workspace_id,
+        force_regenerate: true,
+        job_id: job.id, // lets the backend push progress updates to the same job row
+      });
+      toast.success(
+        `${result.images_processed} images processed, ${result.embeddings_generated} vectors written` +
+          (result.errors?.length ? ` (${result.errors.length} errors)` : ''),
+      );
+      await fetchQueueData();
+    } catch (e: any) {
+      toast.error(`Failed: ${e.message}`);
+    } finally {
+      setPipelineActionLoading(null);
+    }
+  };
+
+  /**
+   * Fill ALL missing embeddings for the selected document — runs the text
+   * regenerator and the image regenerator back-to-back. This is the
+   * one-click "make this document complete" action.
+   *
+   * Each step runs independently and reports its own success/failure so a
+   * partial run still surfaces actionable info to the user. Image regen
+   * takes longer (Qwen + SLIG calls per image) so it runs second.
+   */
+  const handleFillAllEmbeddings = async (job: typeof selectedJob) => {
+    if (!job?.document_id) return;
+    setPipelineActionLoading('fill-all-embeddings');
+    let textOk = false;
+    let imageOk = false;
+    let textMsg = '';
+    let imageMsg = '';
+    try {
+      try {
+        const textResult = await callPipelineAction('regenerate-text-embeddings', {
+          document_id: job.document_id,
+          workspace_id: job.workspace_id,
+          force_regenerate: false,
+        });
+        textOk = true;
+        textMsg = `${textResult.embeddings_generated} text`;
+      } catch (te: any) {
+        textMsg = `text failed: ${te.message}`;
+      }
+
+      try {
+        const imageResult = await callPipelineAction('regenerate-image-embeddings', {
+          document_id: job.document_id,
+          workspace_id: job.workspace_id,
+          force_regenerate: true,
+          job_id: job.id,
+        });
+        imageOk = true;
+        imageMsg =
+          `${imageResult.images_processed} images / ` +
+          `${imageResult.embeddings_generated} vectors` +
+          (imageResult.errors?.length ? ` (${imageResult.errors.length} errors)` : '');
+      } catch (ie: any) {
+        imageMsg = `images failed: ${ie.message}`;
+      }
+
+      const summary = `${textMsg} • ${imageMsg}`;
+      if (textOk && imageOk) {
+        toast.success(`Fill complete: ${summary}`);
+      } else if (textOk || imageOk) {
+        toast.warning(`Partial fill: ${summary}`);
+      } else {
+        toast.error(`Fill failed: ${summary}`);
+      }
+      await fetchQueueData();
+    } finally {
+      setPipelineActionLoading(null);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -2641,7 +2736,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         Queue Understanding
                       </Button>
                     )}
-                    {/* Regenerate text embeddings */}
+                    {/* Fill missing TEXT embeddings (chunk text_embedding_1024 — Voyage AI) */}
                     {selectedJob.document_id && (
                       <Button
                         size="sm"
@@ -2649,13 +2744,50 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="h-7 text-xs"
                         disabled={pipelineActionLoading !== null}
                         onClick={() => handleRegenerateTextEmbeddings(selectedJob)}
+                        title="Generate Voyage AI text embeddings for any document chunks that are missing them"
                       >
                         {pipelineActionLoading === 'text-embeddings' ? (
                           <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
                         ) : (
-                          <Link className="h-3 w-3 mr-1.5" />
+                          <FileText className="h-3 w-3 mr-1.5" />
                         )}
-                        Fill Text Embeddings
+                        Fill Text
+                      </Button>
+                    )}
+                    {/* Fill missing IMAGE embeddings (visual SLIG + 4 specialized + understanding) */}
+                    {selectedJob.document_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handleRegenerateImageEmbeddings(selectedJob)}
+                        title="Regenerate the 6 image embedding vectors (visual SLIG, color, texture, style, material, understanding) for every image in this document. Idempotent — safe to re-run."
+                      >
+                        {pipelineActionLoading === 'image-embeddings' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <ImageIcon className="h-3 w-3 mr-1.5" />
+                        )}
+                        Fill Images
+                      </Button>
+                    )}
+                    {/* One-click: fill BOTH text and image embeddings */}
+                    {selectedJob.document_id && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        disabled={pipelineActionLoading !== null}
+                        onClick={() => handleFillAllEmbeddings(selectedJob)}
+                        title="Fill ALL missing embeddings for this document — runs the text regenerator and the image regenerator back-to-back. Use this after a job that finished with partial embeddings."
+                      >
+                        {pipelineActionLoading === 'fill-all-embeddings' ? (
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <Zap className="h-3 w-3 mr-1.5" />
+                        )}
+                        Fill All Embeddings
                       </Button>
                     )}
                   </div>

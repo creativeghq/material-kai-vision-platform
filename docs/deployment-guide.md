@@ -1127,14 +1127,14 @@ This section covers all third-party services used by the platform, their pricing
 
 ### 🧠 OpenAI
 
-**Role**: Embeddings and AI changelog generation in CI workflows.
+**Role**: AI changelog generation and product discovery. (updated 2026-04 — production text embeddings use Voyage AI, see below. OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.)
 
 **Dashboard**: https://platform.openai.com
 **Pricing**: https://openai.com/pricing
 
 | Model | Price | Used For |
 |-------|-------|---------|
-| text-embedding-3-small | $0.02/M tokens | Embeddings (changelog workflow) |
+| text-embedding-3-small | $0.02/M tokens | CI changelog workflow only (legacy) |
 | GPT-4o | $2.50/$10/M tokens | AI changelog analysis |
 
 ---

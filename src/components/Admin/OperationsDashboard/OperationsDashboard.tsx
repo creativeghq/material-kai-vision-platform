@@ -122,6 +122,17 @@ const OperationsDashboardInner: React.FC = () => {
   const [resendEmailStats, setResendEmailStats] = useState<ResendEmailStats | null>(null);
   const [resendEmailLoading, setResendEmailLoading] = useState(false);
   const [notifChannelStats, setNotifChannelStats] = useState<NotificationChannelStats[]>([]);
+  const [toolCallStats, setToolCallStats] = useState<Array<{
+    tool_name: string;
+    total_calls: number;
+    successful_calls: number;
+    failed_calls: number;
+    zero_result_calls: number;
+    success_rate: number;
+    zero_result_rate: number;
+    avg_duration_ms: number;
+    p95_duration_ms: number;
+  }>>([]);
   const { toast } = useToast();
 
   // Detect feature type from agent chat metadata
@@ -638,6 +649,18 @@ const OperationsDashboardInner: React.FC = () => {
           ...d,
         })).sort((a, b) => b.total - a.total)
       );
+
+      // ── Tool call analytics (per-tool success/zero-result/latency) ──
+      try {
+        const { data: toolData } = await supabase.rpc('get_tool_call_stats', {
+          time_interval: '7 days',
+        });
+        if (toolData && Array.isArray(toolData)) {
+          setToolCallStats(toolData);
+        }
+      } catch (toolErr) {
+        console.warn('Failed to load tool call stats:', toolErr);
+      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -1071,6 +1094,81 @@ const OperationsDashboardInner: React.FC = () => {
                 {agentChats.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No agent chat data available yet. Start chatting with the agent to see analytics.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tool Call Analytics — per-tool success/zero-result/latency rates */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Tool Call Analytics
+                </CardTitle>
+                <CardDescription>
+                  How often each agent tool is called, succeeds, returns zero results, and how fast it is. Last 7 days.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {toolCallStats.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tool</TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
+                        <TableHead className="text-right">Success Rate</TableHead>
+                        <TableHead className="text-right">Zero-Result Rate</TableHead>
+                        <TableHead className="text-right">Avg ms</TableHead>
+                        <TableHead className="text-right">p95 ms</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {toolCallStats.map((tool) => (
+                        <TableRow key={tool.tool_name}>
+                          <TableCell className="font-mono text-sm">{tool.tool_name}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {Number(tool.total_calls).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              className={
+                                tool.success_rate >= 95
+                                  ? 'bg-green-100 text-green-700 border-green-200'
+                                  : tool.success_rate >= 80
+                                  ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                  : 'bg-red-100 text-red-700 border-red-200'
+                              }
+                            >
+                              {Number(tool.success_rate || 0).toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              className={
+                                tool.zero_result_rate >= 30
+                                  ? 'bg-red-100 text-red-700 border-red-200'
+                                  : tool.zero_result_rate >= 10
+                                  ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                              }
+                            >
+                              {Number(tool.zero_result_rate || 0).toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {Number(tool.avg_duration_ms || 0).toFixed(0)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {Number(tool.p95_duration_ms || 0).toFixed(0)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No tool call data yet. Trigger some agent chats to populate.
                   </div>
                 )}
               </CardContent>

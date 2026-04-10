@@ -17,18 +17,43 @@
 - **7-embedding fusion search**: text, visual, understanding, color, texture, style, material
 - **halfvec (float16)**: ALL vector columns migrated from vector→halfvec. 50% storage savings, zero accuracy loss. vecs 0.4.5 works via PostgreSQL implicit casts.
 - **Understanding embeddings**: Qwen3-VL vision_analysis JSON → text → Voyage AI 1024D embedding. Enables spec-based search.
-- **2-phase image pipeline**: Phase 1 (sync) = classification + SLIG embeddings. Phase 2 (background) = full Qwen analysis + understanding embedding.
+- **2-phase image pipeline**: Phase 1 (sync) = classification + SLIG embeddings (visual + 4 specialized + understanding, all written directly to VECS collections). Phase 2 (the legacy `background_image_processor.py` step that re-ran a separate analysis pass) was deleted 2026-04 — it was silently broken (called a non-existent `generate_material_embeddings` method) and produced no output.
 
-## Important DB Details
-- VECS collections: slig=768D, color/texture/style/material/siglip=1152D, understanding=1024D
-- products.embedding is 1024D (not 1536), products.visual_clip_embedding_512 is 512D (not 768)
-- document_images.visual_clip_embedding_512 is actually 768D (misleading column name)
-- Always check actual DB dimensions before writing migration SQL — column names don't always match dimensions
+## Important DB Details — VECS-Only Architecture (post 2026-04 cleanup)
+- **VECS is the single source of truth for image embeddings.** No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, all halfvec for 50% storage savings:
+  - `image_slig_embeddings` — **768D** (primary visual, SigLIP2 via SLIG cloud endpoint)
+  - `image_color_embeddings` — **768D** (text-guided color SLIG)
+  - `image_texture_embeddings` — **768D** (text-guided texture SLIG)
+  - `image_style_embeddings` — **768D** (text-guided style SLIG)
+  - `image_material_embeddings` — **768D** (text-guided material SLIG)
+  - `image_understanding_embeddings` — **1024D** (Voyage AI from Qwen3-VL vision_analysis)
+  - Legacy 1152D `image_siglip_embeddings` and 1152D specialized collections were dropped 2026-04 — they were 100% orphans from the SigLIP-SO400M era.
+- **Boolean presence flags on `document_images`**: `has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`. These are the canonical "does this image have embedding X?" lookup — set automatically by `vecs_service._set_image_flag()` whenever an embedding is upserted. Use these flags for O(1) presence checks instead of round-tripping to VECS.
+- **Dropped columns 2026-04** (DO NOT reference in code or queries):
+  - `document_images`: `visual_clip_embedding_512`, `color_embedding_256`, `texture_embedding_256`, `application_embedding_512`, `multimodal_fusion_embedding_2688`
+  - `products`: `embedding`, `visual_clip_embedding_512`, `color_clip_embedding_512`, `texture_clip_embedding_512`, `style_clip_embedding_512`, `material_clip_embedding_512`, `multimodal_fusion_embedding_2048`
+  - `document_vectors`: `visual_clip_embedding_512`
+  - The dual-store columns were broken since the CLIP→SLIG migration (dimension constraint mismatches) — dropping them removed dead state, not functionality.
+- **Producer→consumer key naming** (real_embeddings_service.generate_all_embeddings):
+  - `visual_768` → `image_slig_embeddings`
+  - `color_slig_768` → `image_color_embeddings`
+  - `texture_slig_768` → `image_texture_embeddings`
+  - `style_slig_768` → `image_style_embeddings`
+  - `material_slig_768` → `image_material_embeddings`
+  - `understanding_1024` → `image_understanding_embeddings`
+  - **Never use `*_siglip_1152` or `*_clip_512` keys — those were legacy aliases removed in the SLIG migration.**
+- **Product embeddings**: only `text_embedding_1024` lives on the products row (Voyage AI from name+description+metadata, generated inline by `stage_4_products`). All visual product embeddings are derived from associated images via `image_product_associations` + the `has_*_slig` flags. Use the RPC `get_product_embedding_status(product_id)` for product-level coverage.
 - vecs 0.4.5: no native halfvec support but PostgreSQL implicit cast vector→halfvec makes it transparent
 - Drop indexes BEFORE altering column types, then recreate with halfvec_cosine_ops
 - Embedding dict key is "text_1024" (was "text_1536" — fixed 2026-02-07)
 - Dead SQL functions cleaned up: enhanced_vector_search, enhanced_vector_search_service, vector_similarity_search, search_kb_docs
-- document_images columns (color_embedding_256, texture_embedding_256, application_embedding_512) are still actively written to (background_image_processor.py, image_processing_service.py) and read in rag_routes.py, qualityControlService.ts, real_quality_scoring_service.py — do NOT drop them; they are NOT legacy
+- **Deleted in 2026-04 cleanup**:
+  - `mivaa-pdf-extractor/app/services/images/background_image_processor.py` (entire file — called non-existent method, silently broken)
+  - `RelevancyService.create_chunk_image_relationships()` (computed cosine similarity between 1024D text and 768D visual — mathematically invalid)
+  - `process_images_background` function in `rag_routes.py` (referenced deleted background_image_processor)
+  - `clip_embedding_job_service._save_visual_embedding_to_db` (wrote to dropped column)
+  - `/api/internal/backfill-product-embeddings` endpoint (one-shot backfill, used + removed)
+- **chunk_image_relationships are populated by `entity_linking_service.link_images_to_chunks` using page_proximity** — not by relevancy_service.
 
 ## Search Weight Configurations (7-vector)
 - unified_search: text 0.15, visual 0.15, understanding 0.20, color/texture/style/material 0.125

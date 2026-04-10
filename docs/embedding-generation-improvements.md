@@ -65,7 +65,7 @@ The image embedding system generates visual embeddings for all processed images 
 
 #### `_get_embedding_checkpoint(document_id: str) -> Optional[int]`
 
-Queries the `document_images` table to count images with existing non-null `visual_clip_embedding_512` values for the given document. Returns the count as an integer checkpoint index.
+Queries the `document_images` table to count images with `has_slig_embedding = TRUE` for the given document (updated 2026-04 — the legacy `visual_clip_embedding_512` column was dropped; VECS is now the single source of truth for image vectors, and per-image presence is tracked via boolean flags on `document_images`). Returns the count as an integer checkpoint index.
 
 #### `_process_single_image_with_retry(...) -> Tuple[bool, bool, Optional[str]]`
 
@@ -176,9 +176,9 @@ Understanding embeddings capture the structured knowledge from Qwen3-VL's vision
 2. **VECS Search** → Similarity search against understanding collection
 3. **Score Fusion** → Combined with 6 other embedding scores using weighted fusion
 
-### Pipeline Integration
+### Pipeline Integration (updated 2026-04)
 
-- **Background Processor** (Phase 2): Generates understanding embedding after Qwen analysis
+- **Phase 1 image pipeline (inline)**: Generates the understanding embedding directly after Qwen analysis, in the same pass that writes SLIG embeddings to VECS. The former asynchronous "Phase 2 background processor" (`background_image_processor.py`) was deleted in 2026-04 — it was silently broken and produced no output.
 - **CLIP Job Service**: Generates understanding embedding for images with existing vision_analysis
 - **Regeneration Endpoint**: Includes understanding in embedding regeneration
 - **Backfill Script**: `scripts/backfill_understanding_embeddings.py` for existing images

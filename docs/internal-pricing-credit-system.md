@@ -38,11 +38,11 @@ Example: A $0.15 USD API call = **15 platform credits**
   - Qwen3-VL-32B, Qwen3-VL-8B (vision models)
 - **Cost Calculation**: Same formula as OpenAI.
 
-### 4. **Embedding Models**
+### 4. **Embedding Models** (updated 2026-04)
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
-  - text-embedding-3-small/large
-  - text-embedding-ada-002
+  - Voyage AI `voyage-3.5` (1024D) — sole production text embedder
+  - OpenAI `text-embedding-3-small` — legacy CI changelog workflow only
 - **Cost Calculation**: USD Cost = (tokens / 1M × price). Platform Credits = USD Cost × 100.
 
 ### 5. **Vision Models**

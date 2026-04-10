@@ -288,7 +288,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - Dimension: 1024D
   - Input Type: `document`
   - One embedding per chunk
-  - Uses Voyage AI API (fallback to OpenAI text-embedding-3-small if needed)
+  - Uses Voyage AI API (sole text embedder; OpenAI fallback retired 2026-04)
 
 - **Relationships**:
   - Creates chunk-to-product relationships
@@ -370,7 +370,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 1. **Product Discovery**: Claude Sonnet 4.5 or GPT-5 (configurable)
 2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Sonnet 4.5 (validation)
 3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
-4. **Text Embeddings**: Voyage AI voyage-3.5 (1024D) → OpenAI text-embedding-3-small fallback (1024D)
+4. **Text Embeddings**: Voyage AI voyage-3.5 (1024D) — sole provider (updated 2026-04)
 
 ### Thresholds
 - **Image Classification Confidence**: 0.7 (70% minimum)

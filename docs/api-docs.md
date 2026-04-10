@@ -29,15 +29,16 @@ The multi-vector search has been **significantly enhanced** to be the single com
 
 ### What's New
 
-✅ **6 Specialized Embeddings** (SigLIP2-based)
-- text_embedding_1024 (20%) - Semantic understanding (Voyage AI, stored in document_chunks.text_embedding)
-- visual_clip_512 (20%) - Visual similarity (CLIP, stored in document_images.visual_clip_512)
-- color_siglip_1152 (15%) - Color palette matching (SigLIP2 text-guided, stored in document_images.color_siglip_1152)
-- texture_siglip_1152 (15%) - Texture pattern matching (SigLIP2 text-guided, stored in document_images.texture_siglip_1152)
-- style_siglip_1152 (15%) - Design style matching (SigLIP2 text-guided, stored in document_images.style_siglip_1152)
-- material_siglip_1152 (15%) - Material type matching (SigLIP2 text-guided, stored in document_images.material_siglip_1152)
+✅ **7 Specialized Embeddings** (SigLIP2 / SLIG + Voyage AI, updated 2026-04)
+- text_embedding (15%) - Semantic understanding (Voyage AI 1024D, dict key `text_1024`, stored in document_chunks.text_embedding)
+- visual_768 / image_slig_embeddings (15%) - Visual similarity (SigLIP2 cloud 768D)
+- understanding_1024 / image_understanding_embeddings (20%) - Spec-based semantic (Voyage AI 1024D from Qwen3-VL vision_analysis JSON)
+- color_slig_768 / image_color_embeddings (12.5%) - Color palette matching (SLIG text-guided 768D)
+- texture_slig_768 / image_texture_embeddings (12.5%) - Texture pattern matching (SLIG text-guided 768D)
+- style_slig_768 / image_style_embeddings (12.5%) - Design style matching (SLIG text-guided 768D)
+- material_slig_768 / image_material_embeddings (12.5%) - Material type matching (SLIG text-guided 768D)
 
-**Note**: Embeddings stored directly in table columns (document_chunks.text_embedding, document_images.visual_clip_512, etc.)
+**Note (2026-04)**: All image embeddings now live **exclusively in the VECS collections** (`vecs.image_*_embeddings`, halfvec). The former dual-store columns on `document_images` (`visual_clip_embedding_512`, `color_embedding_256`, `texture_embedding_256`, `application_embedding_512`, `multimodal_fusion_embedding_2688`) were dropped — they had been broken since the CLIP→SLIG dimension change. Presence is tracked via boolean flags on `document_images` (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`) for O(1) lookup. Text embeddings remain in `document_chunks.text_embedding`.
 
 ✅ **JSONB Metadata Filtering**
 - Filter by material properties (finish, dimensions, etc.)

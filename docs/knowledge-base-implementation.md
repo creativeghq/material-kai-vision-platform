@@ -11,7 +11,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 ### Tables Created (6 total)
 
 1. **`kb_docs`** - Main documents table
-   - Embeddings support (1536D vector with ivfflat index)
+   - Embeddings support (1024D vector with ivfflat index)
    - Embedding metadata (model, timestamp, status, error tracking)
    - Content fields (title, content, markdown, summary)
    - Status & visibility control (draft/published/archived, public/private/workspace)
@@ -79,7 +79,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 #### Document Management (5 endpoints)
 
 1. **POST `/api/kb/documents`** - Create document
-   - Automatic embedding generation (1536D)
+   - Automatic embedding generation (1024D)
    - Smart embedding status tracking
    - Error handling with retry support
    - Returns: Document with embedding status
@@ -107,7 +107,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 
 6. **POST `/api/kb/search`** - Search documents
    - **Semantic Search:** Vector similarity using pgvector cosine distance
-     - Generates embedding for search query using OpenAI (text-embedding-3-small)
+     - Generates embedding for search query using Voyage AI voyage-3.5 (updated 2026-04)
      - Compares against stored document embeddings using `<=>` operator
      - Returns results with similarity scores (0.0 - 1.0)
      - Minimum threshold: 0.5 (configurable)
@@ -124,7 +124,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 
    **Architecture:**
    - Frontend → MIVAA API `/api/kb/search`
-   - MIVAA generates query embedding (OpenAI)
+   - MIVAA generates query embedding (Voyage AI)
    - MIVAA calls Supabase `kb_match_docs()` RPC function
    - Supabase performs vector similarity search using pgvector
    - Returns ranked results with similarity scores
@@ -172,7 +172,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 ### When Embeddings Are Generated
 
 1. **CREATE Document**
-   - User creates new doc → Backend generates embedding (1536D)
+   - User creates new doc → Backend generates embedding (1024D)
    - Sync operation (happens immediately)
    - Status: `pending` → `success` or `failed`
 
@@ -198,8 +198,8 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 ### Embedding Metadata Tracking
 
 Stored in `kb_docs` table:
-- `text_embedding` - The 1536D vector
-- `embedding_model` - 'text-embedding-3-small'
+- `text_embedding` - The 1024D vector
+- `embedding_model` - 'voyage-3.5' (updated 2026-04)
 - `embedding_generated_at` - Timestamp
 - `embedding_status` - 'pending', 'success', 'failed'
 - `embedding_error_message` - Error details if failed
@@ -240,7 +240,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ## Key Features
 
-1. **Automatic Embedding Generation** - Text embeddings (1536D) for semantic search
+1. **Automatic Embedding Generation** - Text embeddings (1024D) for semantic search
 2. **Smart Content Detection** - Only regenerate embeddings when content changes
 3. **PDF Text Extraction** - PyMuPDF integration for text-only extraction
 4. **Semantic Search** - Vector similarity search using embeddings
@@ -260,7 +260,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 - **Indexes:** 15+ created
 - **RLS Policies:** 24 created
 - **Lines of Code:** 605 (backend API)
-- **Embedding Dimension:** 1536D
+- **Embedding Dimension:** 1024D
 - **Search Types:** 3 (semantic, full-text, hybrid)
 - **Relationship Types:** 5 (primary, supplementary, related, certification, specification)
 
@@ -270,7 +270,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 - **Backend:** FastAPI (Python)
 - **Database:** Supabase (PostgreSQL)
-- **Embeddings:** OpenAI text-embedding-3-small (1536D)
+- **Embeddings:** Voyage AI voyage-3.5 (1024D, updated 2026-04)
 - **PDF Extraction:** PyMuPDF (fitz)
 - **Vector Search:** pgvector with ivfflat index
 - **Security:** Row Level Security (RLS)
@@ -371,6 +371,6 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 - **Indexes:** 15+ created
 - **RLS Policies:** 24 created
 - **Lines of Code:** 605 (backend) + 1,200+ (frontend)
-- **Embedding Dimension:** 1536D
+- **Embedding Dimension:** 1024D
 - **Search Types:** 3 (semantic, full-text, hybrid)
 - **Relationship Types:** 5 (primary, supplementary, related, certification, specification)

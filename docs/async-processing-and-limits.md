@@ -260,7 +260,7 @@ Shared limits across all methods: 5 concurrent HuggingFace Endpoint (Qwen3-VL) r
 
 **Used by**: PDF, Web Scraping, XML Import
 
-Uses the `google/siglip-so400m-patch14-384` (SigLIP 1152D) model and generates five specialized embedding types: `color_siglip_1152`, `texture_siglip_1152`, `material_siglip_1152`, `style_siglip_1152`, and `visual_siglip_1152`.
+Uses SigLIP2 via the SLIG cloud endpoint (HuggingFace Inference Endpoint, 768D) and generates five specialized 768D embedding types written directly to VECS: `image_slig_embeddings` (visual), `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, and `image_material_embeddings`. Plus an understanding embedding (1024D Voyage AI from Qwen3-VL vision_analysis) → `image_understanding_embeddings`. Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped.
 
 ---
 

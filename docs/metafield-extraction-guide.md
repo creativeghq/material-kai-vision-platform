@@ -146,7 +146,7 @@ The AI creates semantic chunks while preserving metafield information:
 1. **Create semantic text chunks** (1000 tokens, 200 overlap)
 2. **Preserve metafield information** in chunk metadata
 3. **Link chunks to products** - Maintain product relationships
-4. **Generate text embeddings** (1536D OpenAI embeddings)
+4. **Generate text embeddings** (1024D Voyage AI embeddings, updated 2026-04)
 
 ### How Metafields Are Preserved in Chunks
 

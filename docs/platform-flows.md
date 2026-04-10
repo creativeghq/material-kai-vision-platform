@@ -33,10 +33,10 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Stage 1: Focused Extraction (product pages only)
    - Stage 2: Text Extraction (PyMuPDF4LLM)
    - Stage 3: Semantic Chunking
-   - Stage 4: Text Embeddings (OpenAI 1536D)
+   - Stage 4: Text Embeddings (Voyage AI 1024D)
    - Stage 5: Image Extraction
    - Stage 6: Image Analysis (Qwen Vision)
-   - Stages 7-10: Multi-Vector CLIP Embeddings
+   - Stages 7-10: Multi-Vector SLIG 768D Embeddings (5 types) + Voyage 1024D understanding
    - Stage 11: Product Creation & Entity Linking
    - Stage 12: Entity Relationship Mapping
    - Stage 13: Quality Enhancement
@@ -62,8 +62,8 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 2. Frontend calls MIVAA search API
    ↓
 3. Query processing:
-   - Text: Generate embedding (OpenAI 1536D)
-   - Image: Generate CLIP embedding (512D)
+   - Text: Generate embedding (Voyage AI 1024D)
+   - Image: Generate SLIG embedding (768D)
    - Natural language: AI query enhancement
    ↓
 4. Multi-vector similarity search (pgvector)
@@ -168,7 +168,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 4. User attaches to products (optional)
    ↓
-5. AI generates embeddings (OpenAI 1536D)
+5. AI generates embeddings (Voyage AI 1024D)
    ↓
 6. Document saved to knowledge_base table
    ↓

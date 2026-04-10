@@ -12,15 +12,17 @@ This plan outlines a comprehensive strategy for extracting metadata from **multi
 
 ## Current System Architecture
 
-### Embedding Types (6 Total)
+### Embedding Types (7 Total, updated 2026-04)
 
-1. **text_1536** - OpenAI text embedding (1536D)
-2. **visual_512** - SigLIP visual embedding (512D, downsampled from 1152D)
-3. **color_siglip_1152** - Text-guided color embedding (1152D)
-4. **texture_siglip_1152** - Text-guided texture embedding (1152D)
-5. **material_siglip_1152** - Text-guided material embedding (1152D)
-6. **style_siglip_1152** - Text-guided style embedding (1152D)
-7. **multimodal_2048** - Fused text+visual embedding (2048D)
+1. **text_1024** - Voyage AI voyage-3.5 text embedding (1024D) — sole text embedder (was `text_1536` OpenAI)
+2. **visual_768** - SigLIP2 SLIG primary visual embedding (768D, cloud endpoint) → `image_slig_embeddings`
+3. **color_slig_768** - Text-guided color embedding (768D) → `image_color_embeddings`
+4. **texture_slig_768** - Text-guided texture embedding (768D) → `image_texture_embeddings`
+5. **material_slig_768** - Text-guided material embedding (768D) → `image_material_embeddings`
+6. **style_slig_768** - Text-guided style embedding (768D) → `image_style_embeddings`
+7. **understanding_1024** - Voyage AI embedding of Qwen3-VL vision_analysis JSON (1024D) → `image_understanding_embeddings`
+
+Legacy 1152D SigLIP-SO400M and 512D CLIP collections, as well as the fused `multimodal_2048` vector, were dropped in 2026-04.
 
 ### Text-Guided Prompts
 
@@ -181,7 +183,7 @@ The specialized embeddings are generated using text prompts that focus the model
 
 ### New Table: `metadata_vocabulary`
 
-A new `metadata_vocabulary` table stores: `id` (UUID), `field_name` (e.g., 'color', 'texture', 'material', 'style'), `value` (e.g., 'beige', 'matte', 'ceramic', 'modern'), `embedding` (VECTOR(1152) — pre-computed SigLIP embedding), `category` (e.g., 'warm_colors', 'neutral_colors'), and `synonyms` (TEXT array). Indexes are created on `field_name` and on the embedding column using `ivfflat` with `vector_cosine_ops`.
+A new `metadata_vocabulary` table stores: `id` (UUID), `field_name` (e.g., 'color', 'texture', 'material', 'style'), `value` (e.g., 'beige', 'matte', 'ceramic', 'modern'), `embedding` (HALFVEC(768) — pre-computed SLIG / SigLIP2 embedding, updated 2026-04), `category` (e.g., 'warm_colors', 'neutral_colors'), and `synonyms` (TEXT array). Indexes are created on `field_name` and on the embedding column using `ivfflat` with `halfvec_cosine_ops`.
 
 ### Enhanced `products.metadata` Structure
 
