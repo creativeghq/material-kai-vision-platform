@@ -96,38 +96,44 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Agent Chat (conversations, messages, uploaded files)</li>
+              <li>Background Agent runs, logs, checkpoints, memories &amp; tool-call history</li>
+              <li>Flow Engine runs &amp; step history</li>
               <li>Quotes System (quotes, items, timeline, upsells, status tags)</li>
-              <li>Moodboards (moodboards, items, products, quote requests)</li>
-              <li>3D Generation History</li>
-              <li>Analytics (events, quality metrics, scoring logs, recommendations)</li>
-              <li>Document Entities & Relationships</li>
-              <li>Relevancy Relationships (product-chunk, chunk-image, product-image)</li>
-              <li>PDF Processing (jobs, checkpoints, progress, queues)</li>
-              <li>Products & Materials Catalog (products, visual analysis)</li>
-              <li>Document Data (chunks, embeddings, images, documents)</li>
+              <li>Moodboards (moodboards, items, products, comments, quote requests)</li>
+              <li>3D / Video / VR generation history (incl. WorldLabs VR worlds)</li>
+              <li>Analytics (events, manufacturer analytics, quality &amp; recommendation metrics)</li>
+              <li>User behavior profiles &amp; personalization state</li>
+              <li>Search caches &amp; derived state (suggestions, trending, query understanding, similarity cache, duplicate detection)</li>
+              <li>Document Entities &amp; Relationships (product-document, chunk-product, chunk-image)</li>
+              <li>PDF Processing (jobs, checkpoints, progress, queues, batch jobs)</li>
+              <li>Products &amp; Materials Catalog (products, images, properties, categories, visual analysis)</li>
+              <li>Document Data (chunks, embeddings, images, documents, OCR, spatial &amp; layout analysis)</li>
               <li>YOLO Layout Data (layout regions, extracted tables)</li>
-              <li>VECS Vector Collections (visual, color, texture, style, material embeddings)</li>
-              <li>Processing Results & Quality Data</li>
+              <li>Chunk derivatives (boundaries, classifications, quality flags, validation scores)</li>
+              <li><strong>VECS Vector Collections</strong> (visual/SLIG, color, texture, style, material, <strong>understanding</strong>)</li>
+              <li>Processing Results &amp; Quality Data</li>
               <li>Web Scraping (sessions, pages, temp materials)</li>
               <li>Data Import (jobs, history)</li>
-              <li>Agent Tasks</li>
+              <li>AI / API / webhook call logs (ai_call_logs, ai_usage_logs, api_usage_logs, mivaa_api_usage_logs, webhook_calls)</li>
               <li>Storage files (pdf-tiles, material-images, moodboard-images, 3d-renders)</li>
+              <li><strong>MIVAA server /tmp folder</strong> (leftover PDFs, image extractions, processing cache)</li>
             </ul>
 
             <p className="font-semibold text-foreground pt-2">
               ✅ The following data will be PRESERVED:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li><strong>Knowledge Base & Documentation</strong> (kb_docs, categories, attachments, search analytics)</li>
-              <li>Users & Authentication</li>
-              <li>Profiles & Workspaces</li>
+              <li><strong>Knowledge Base &amp; Documentation</strong> (kb_docs, categories, attachments, search analytics)</li>
+              <li>Users, Profiles &amp; Workspaces</li>
               <li>CRM (contacts, companies, relationships)</li>
-              <li>API Keys & Usage Logs</li>
-              <li>Global Upsells (admin-managed)</li>
-              <li>Global Timeline Elements</li>
-              <li>Material Metadata Field Definitions</li>
-              <li>PDF files in pdf-documents folder</li>
-              <li><strong>System Settings & Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
+              <li>Credits &amp; Billing (user_credits, transactions, packages)</li>
+              <li>Prompts &amp; extraction prompts (admin-managed); prompt_history is trimmed to the 5 most recent edits per prompt</li>
+              <li>Background agent definitions &amp; flow definitions (admin-managed)</li>
+              <li>Global Upsells &amp; Timeline Steps (admin-managed)</li>
+              <li>Roles, permissions &amp; RBAC</li>
+              <li>AI model pricing, subscription plans, webhook endpoints</li>
+              <li>PDF files in pdf-documents bucket</li>
+              <li><strong>System Settings &amp; Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
               <li><strong>Uploaded Template Images</strong> (cover, back cover, items background in quote-templates)</li>
               <li><strong>User Avatars</strong> (profile pictures in profile-avatars)</li>
             </ul>

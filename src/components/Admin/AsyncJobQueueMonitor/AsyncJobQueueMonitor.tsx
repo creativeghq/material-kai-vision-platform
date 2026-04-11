@@ -1788,7 +1788,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
-                              Stage: {job.metadata.stage}
+                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
+                              {(job.metadata as any)?.sub_stage && (
+                                <span className="ml-1 text-slate-400">({job.metadata.stage})</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2020,7 +2023,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
-                              Stage: {job.metadata.stage}
+                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
+                              {(job.metadata as any)?.sub_stage && (
+                                <span className="ml-1 text-slate-400">({job.metadata.stage})</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2222,7 +2228,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
-                              Stage: {job.metadata.stage}
+                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
+                              {(job.metadata as any)?.sub_stage && (
+                                <span className="ml-1 text-slate-400">({job.metadata.stage})</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2424,7 +2433,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
-                              Stage: {job.metadata.stage}
+                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
+                              {(job.metadata as any)?.sub_stage && (
+                                <span className="ml-1 text-slate-400">({job.metadata.stage})</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2663,7 +2675,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <div className="mt-2 flex items-center gap-4 text-[10px] uppercase font-bold tracking-tight text-red-700">
                         <div className="flex items-center gap-1">
                           <Activity className="h-3 w-3" />
-                          Stage: {selectedJob.metadata?.stage || 'Unknown'}
+                          Stage: {(selectedJob.metadata as any)?.sub_stage || selectedJob.metadata?.stage || 'Unknown'}
+                          {(selectedJob.metadata as any)?.sub_stage && selectedJob.metadata?.stage && (
+                            <span className="ml-1 text-slate-400">({selectedJob.metadata.stage})</span>
+                          )}
                         </div>
                         <button
                           onClick={() => {
@@ -2845,7 +2860,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <div className="flex items-center gap-4 text-[10px] uppercase font-bold tracking-tight text-amber-700 mb-2">
                         <div className="flex items-center gap-1">
                           <Activity className="h-3 w-3" />
-                          Stage: {selectedJob.metadata?.stage || 'Unknown'}
+                          Stage: {(selectedJob.metadata as any)?.sub_stage || selectedJob.metadata?.stage || 'Unknown'}
+                          {(selectedJob.metadata as any)?.sub_stage && selectedJob.metadata?.stage && (
+                            <span className="ml-1 text-slate-400">({selectedJob.metadata.stage})</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           <CheckCircle className="h-3 w-3" />

@@ -5,6 +5,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -12,92 +14,158 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // PRESERVED (never deleted during platform reset):
 //
 // DB Tables:
-//   - system_settings          ← /admin/system-settings config (quote expiration, PDF template, company details)
+//   - system_settings          ← /admin/system-settings config
 //   - upsells                  ← global admin-managed upsell catalogue
 //   - timeline_steps           ← global project timeline steps
-//   - kb_docs                  ← Knowledge Base documents
-//   - kb_categories            ← KB categories
-//   - kb_doc_attachments       ← KB product links
-//   - kb_search_analytics      ← KB search analytics
-//   - crm_companies            ← CRM companies
-//   - crm_contacts             ← CRM contacts
-//   - crm_contact_relationships← CRM relationships
-//   - profiles / auth.users    ← user accounts
+//   - flows                    ← flow engine definitions (admin-managed)
+//   - background_agents        ← background agent definitions (admin-managed)
+//   - roles / role_permissions ← RBAC
+//   - ai_model_pricing         ← pricing reference data
+//   - subscription_plans       ← billing plans
+//   - webhook_endpoints        ← configured webhook URLs
+//   - kb_docs / kb_categories / kb_doc_attachments / kb_search_analytics
+//                              ← Knowledge Base (admin-managed docs)
+//   - crm_companies / crm_contacts / crm_contact_relationships / crm_company_contacts
+//                              ← CRM (user request — keep contacts)
+//   - profiles / auth.users / workspaces / workspace_members
+//                              ← user accounts & workspaces
 //
 //   ── Credits & Billing (DO NOT TOUCH) ──
 //   - user_credits             ← per-user credit balances
 //   - credit_transactions      ← full credit debit/top-up history
 //   - credit_packages          ← available credit package catalogue
 //
-//   ── Prompts (DO NOT TOUCH) ──
-//   - prompts                  ← saved agent/system prompts (admin-managed)
+//   ── Prompts (admin-managed) ──
+//   - prompts                  ← saved agent/system prompts
 //   - extraction_prompts       ← PDF extraction prompt configurations
-//   - prompt_history           ← per-user prompt history
+//   - prompt_history           ← audit trail — TRIMMED to 5 most recent per prompt_id (not wiped)
 //
 // Storage Buckets:
-//   - quote-templates          ← cover.png / backcover.png / items-background.png uploaded via system settings
+//   - quote-templates          ← cover.png / backcover.png / items-background.png
 //   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
 //   - pdf-documents            ← original uploaded PDF files
 // ============================================================
 
-// Tables to clear (in order to respect foreign key constraints)
-// Order matters! Delete child tables before parent tables
+// Tables to clear (in order to respect foreign key constraints).
+// Order matters — delete child tables before parent tables.
+//
+// Grouped by functional area. Anything that caches, embeds, summarizes or
+// logs derived/AI-produced data MUST be in this list — otherwise a "reset"
+// leaves behind stale state that the AI will happily serve back to users
+// (hallucination from ghost data).
 const TABLES_TO_CLEAR = [
-  // Agent Chat System (DELETE)
+  // ── Agent Chat (user conversations) ─────────────────────────────────
   'agent_chat_messages',           // Chat messages (child of conversations)
   'agent_chat_conversations',      // Chat conversations
   'agent_uploaded_files',          // Files uploaded in chat
 
-  // CRM Contacts - PRESERVED (users requested to keep contacts and companies)
-  // 'crm_contact_relationships',     // Contact relationships (child of contacts) - PRESERVED
-  // 'crm_contacts',                  // CRM contacts - PRESERVED
-  // NOTE: crm_companies is also PRESERVED (not in this list)
+  // ── Background Agent Framework (runs + state, NOT definitions) ──────
+  // NOTE: 'background_agents' (agent definitions) is PRESERVED — admin config.
+  'agent_tool_call_logs',          // Per-tool-call log (child of agent_runs)
+  'agent_run_logs',                // Run log lines (child of agent_runs)
+  'agent_runs',                    // Background agent runs
+  'agent_checkpoints',             // Agent intermediate checkpoints
+  'agent_memories',                // Agent long-term memory (hallucination risk)
+  'agent_usage_logs',              // Per-run token/cost usage
+  'agent_tasks',                   // Agent task records
 
-  // Quotes System (DELETE - except global upsells and timeline steps)
-  'quote_timeline',                // Quote timeline progress (child of quotes)
-  'quote_upsells',                 // Quote upsells junction (child of quotes)
-  'quote_items',                   // Quote items (child of quotes)
-  'quote_requests',                // Quote requests (child of quotes)
+  // ── Flow Engine ─────────────────────────────────────────────────────
+  'flow_run_steps',                // Step runs (child of flow_runs)
+  'flow_runs',                     // Flow runs
+  // NOTE: 'flows' (definitions) is PRESERVED — admin config.
+
+  // ── Quotes System (except global upsells and timeline steps) ────────
+  'quote_timeline',                // Quote timeline progress
+  'quote_upsells',                 // Quote upsells junction
+  'quote_items',                   // Quote items
+  'quote_requests',                // Quote requests
   'quotes',                        // Quotes
   'status_tags',                   // Custom status tags
-  // NOTE: 'upsells' and 'timeline_steps' are PRESERVED (global data)
-  // NOTE: 'system_settings' is PRESERVED (platform config, PDF template, company details)
 
-  // Moodboards (DELETE)
-  'moodboard_quote_requests',      // Moodboard quote requests (child of moodboards)
-  'moodboard_products',            // Moodboard products (child of moodboards)
-  'moodboard_items',               // Moodboard items (child of moodboards)
+  // ── Moodboards ──────────────────────────────────────────────────────
+  'moodboard_comments',            // Comments on moodboards
+  'moodboard_quote_requests',      // Moodboard quote requests
+  'moodboard_products',            // Moodboard products
+  'moodboard_items',               // Moodboard items
   'moodboards',                    // Moodboards
 
-  // 3D Generation (DELETE)
+  // ── 3D / Video / VR generation ──────────────────────────────────────
+  'generation_3d_segments',        // 3D generation segments (child of generation_3d)
   'generation_3d',                 // 3D generation history
+  'generation_videos',             // Video generation history
+  'vr_worlds',                     // WorldLabs Marble VR worlds
 
-  // Analytics (DELETE)
+  // ── Analytics (user-generated + derived metrics) ────────────────────
   'analytics_events',              // Analytics events
+  'manufacturer_analytics_events', // Manufacturer product view/save/quote events
   'quality_metrics_daily',         // Daily quality metrics
   'quality_scoring_logs',          // Quality scoring logs
   'recommendation_analytics',      // Recommendation analytics
+  'recommendation_scores',         // Cached recommendation scores
+  'response_quality_metrics',      // Assistant response quality
+  'retrieval_quality_metrics',     // RAG retrieval quality
+  'user_interaction_events',       // User interaction events
+  'user_material_interactions',    // Per-user material interactions
+  'user_behavior_profiles',        // Derived personalization profiles (hallucination risk)
 
-  // Document Entities & Relationships (DELETE)
-  'product_document_relationships', // Product-document entity relationships
+  // ── Search caches & derived search state (direct hallucination risk)
+  'saved_searches',                // User saved searches
+  'search_analytics',              // Search analytics events
+  'search_query_corrections',      // Derived query corrections
+  'search_query_tracking',         // Per-query tracking
+  'search_sessions',               // Search sessions
+  'search_suggestion_clicks',      // Suggestion click tracking
+  'search_suggestions',            // Derived autocomplete suggestions
+  'trending_searches',             // Trending terms
+  'unmatched_term_frequency',      // Unknown term frequency
+  'query_intelligence',            // Derived query intelligence
+  'query_understanding_cache',     // Cached NL→query parses (hallucination risk)
+  'duplicate_detection_cache',     // Cached duplicate detection
+  'product_similarity_cache',      // Cached product similarity
+
+  // ── Document Entities & Relationships ───────────────────────────────
+  'product_document_relationships',// Product↔document entity relationships
   'document_entities',             // Document entities (certificates, logos, specs)
 
-  // Relevancy Relationships (DELETE)
-  'image_product_associations',    // Image-product associations (visual search)
-  'product_chunk_relationships',   // Product-chunk relevancies
-  'chunk_image_relationships',     // Chunk-image relevancies
-  'product_image_relationships',   // Product-image relevancies
+  // ── Relevancy Relationships ─────────────────────────────────────────
+  'image_product_associations',    // Image↔product associations
+  'chunk_product_relationships',   // Chunk↔product relevancies
+  'chunk_image_relationships',     // Chunk↔image relevancies
+  'chunk_relationships',           // Chunk↔chunk relationships
   'material_metadata_values',      // Material metadata values
   'material_metadata_relevancy',   // Material metadata relevancy
 
-  // PDF Processing (DELETE)
-  'job_checkpoints',               // Job checkpoints (child of background_jobs)
-  'job_progress',                  // Job progress tracking (child of background_jobs)
+  // ── PDF Processing & Chunking (derivative data) ─────────────────────
+  'job_checkpoints',               // Job checkpoints
+  'job_progress',                  // Job progress tracking
   'ai_analysis_queue',             // AI analysis queue
   'image_processing_queue',        // Image processing queue
-  'embeddings',                    // Text and image embeddings
-  'product_tables',                // YOLO extracted tables (child of products)
-  'product_layout_regions',        // YOLO layout regions (child of products)
+  'claude_validation_queue',       // Claude validation queue
+  'processing_queue',              // Generic processing queue
+  'processing_metrics',            // Processing metrics
+  'batch_jobs',                    // Batch jobs
+  'embeddings',                    // Text/image embeddings (public schema)
+  'embedding_stability_metrics',   // Embedding drift metrics
+  'product_tables',                // YOLO extracted tables
+  'product_layout_regions',        // YOLO layout regions
+  'product_enrichments',           // Product enrichment results
+  'product_merge_history',         // Product merge history
+  'product_processing_status',     // Product processing status
+  'product_usage_stats',           // Product usage stats
+  'chunk_boundaries',              // Chunk boundary metadata
+  'chunk_classifications',         // Chunk classifications
+  'chunk_quality_flags',           // Chunk quality flags
+  'chunk_validation_scores',       // Chunk validation scores
+  'category_extractions',          // Category extraction results
+  'document_layout_analysis',      // YOLO document layout
+  'document_processing_status',    // Document processing status
+  'document_quality_metrics',      // Document quality metrics
+  'ocr_results',                   // OCR results
+  'spatial_analysis',              // Spatial analysis results
+  'pdf_processing_results',        // PDF processing results
+  'pdf_integration_health_results',// PDF integration health
+  'validation_results',            // Validation results
+  'review_summaries',              // Derived review summaries
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
   'products',                      // Extracted products
@@ -105,32 +173,44 @@ const TABLES_TO_CLEAR = [
   'documents',                     // PDF documents metadata
   'processed_documents',           // Processed document records
 
-  // Materials & Catalog (DELETE)
+  // ── Materials & Catalog (user-populated per 2026-04 decision) ───────
+  'material_images',               // Material images
+  'material_properties',           // Material properties
+  'material_categories',           // Material categories
   'materials_catalog',             // Materials catalog entries
   'material_visual_analysis',      // Visual analysis results
 
-  // Processing & Quality (DELETE)
+  // ── Processing Results ──────────────────────────────────────────────
   'processing_results',            // Processing results
 
-  // Agent Tasks (DELETE)
-  'agent_tasks',                   // Agent task records
-
-  // Web Scraping (DELETE)
+  // ── Web Scraping ────────────────────────────────────────────────────
   'scraped_materials_temp',        // Temporary scraped materials
+  'scraping_pages',                // Scraping pages (child of sessions)
   'scraping_sessions',             // Scraping sessions
-  'scraping_pages',                // Scraping pages
 
-  // Data Import (DELETE)
+  // ── Data Import ─────────────────────────────────────────────────────
   'data_import_jobs',              // Data import jobs
   'data_import_history',           // Data import history
 
+  // ── Generic Uploads ─────────────────────────────────────────────────
+  'uploaded_files',                // Generic uploaded files
+
+  // ── API / Webhook Logs ──────────────────────────────────────────────
+  'ai_call_logs',                  // AI call logs (per-call)
+  'ai_usage_logs',                 // AI usage aggregates
+  'api_usage_logs',                // API usage logs
+  'mivaa_api_usage_logs',          // MIVAA API usage logs
+  'webhook_calls',                 // Webhook call history
+
   // ============================================================
-  // PRESERVED TABLES - Knowledge Base & Documentation (kb_* tables)
-  // These are NOT deleted during platform reset:
-  // - kb_docs                  // Knowledge Base documents
-  // - kb_categories            // KB document categories
-  // - kb_doc_attachments       // KB product links/attachments
-  // - kb_search_analytics      // KB search analytics
+  // PRESERVED (not in this list — see header comment for full list):
+  // - Knowledge Base (kb_*)
+  // - CRM (crm_*)
+  // - Users / Profiles / Workspaces / Credits
+  // - Admin config: system_settings, prompts, extraction_prompts,
+  //   upsells, timeline_steps, flows, background_agents, roles,
+  //   ai_model_pricing, subscription_plans, webhook_endpoints, etc.
+  // - prompt_history — trimmed separately (keep 5 most recent per prompt)
   // ============================================================
 ];
 
@@ -319,14 +399,15 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     console.log('\n🗑️  STEP 3: Clear VECS collections');
     results.vecs = [];
 
-    // VECS collections to clear - these store image embeddings for visual search
-    // Includes primary visual embeddings and specialized embeddings (color, texture, style, material)
+    // VECS collections to clear — every image embedding collection.
+    // Missing even one causes the AI to retrieve ghost images after reset.
     const vecsCollections = [
-      'image_slig_embeddings',      // Primary visual embeddings (768D)
-      'image_color_embeddings',     // Color-focused embeddings (768D)
-      'image_texture_embeddings',   // Texture pattern embeddings (768D)
-      'image_style_embeddings',     // Design style embeddings (768D)
-      'image_material_embeddings'   // Material type embeddings (768D)
+      'image_slig_embeddings',          // Primary visual embeddings (SigLIP2, 768D)
+      'image_color_embeddings',         // Color-focused SLIG (768D)
+      'image_texture_embeddings',       // Texture pattern SLIG (768D)
+      'image_style_embeddings',         // Design style SLIG (768D)
+      'image_material_embeddings',      // Material type SLIG (768D)
+      'image_understanding_embeddings', // Voyage AI understanding embeddings from Qwen3-VL vision_analysis (1024D)
     ];
     for (const collection of vecsCollections) {
       try {
@@ -371,14 +452,68 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     }
 
     const totalVecsDeleted = results.vecs.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
+
+    // STEP 4: Trim prompt_history to keep only the 5 most recent rows per prompt_id.
+    // prompt_history is the audit trail of admin edits to prompts — we keep a
+    // short rolling window rather than wiping it (so admins can still roll back
+    // a recent change), but we don't let it grow unbounded across resets.
+    console.log('\n🗑️  STEP 4: Trim prompt_history (keep 5 most recent per prompt)');
+    results.prompt_history = { deleted: 0 };
+    try {
+      const { data: trimResult, error: trimError } = await supabase.rpc('trim_prompt_history', { keep_n: 5 });
+      if (trimError) {
+        console.error('   ❌ prompt_history trim failed:', trimError);
+        results.prompt_history = { deleted: 0, error: trimError.message };
+      } else {
+        const trimmed = typeof trimResult === 'number' ? trimResult : 0;
+        console.log(`   ✅ Trimmed ${trimmed} old prompt_history rows`);
+        results.prompt_history = { deleted: trimmed };
+      }
+    } catch (error: any) {
+      console.error('   ❌ prompt_history trim error:', error);
+      results.prompt_history = { deleted: 0, error: error.message };
+    }
+
+    // STEP 5: Wipe MIVAA server /tmp folder.
+    // Calls the admin cleanup endpoint on the Python backend with
+    // max_age_hours=0 so every non-system temp file is removed.
+    console.log('\n🗑️  STEP 5: Clear MIVAA server /tmp folder');
+    results.server_tmp = { called: false };
+    try {
+      const tmpRes = await fetch(
+        `${MIVAA_GATEWAY_URL}/api/system/cleanup-temp-files?max_age_hours=0&dry_run=false`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(MIVAA_API_KEY ? { Authorization: `Bearer ${MIVAA_API_KEY}` } : {}),
+          },
+        },
+      );
+
+      if (!tmpRes.ok) {
+        const text = await tmpRes.text();
+        console.error(`   ❌ MIVAA cleanup HTTP ${tmpRes.status}:`, text);
+        results.server_tmp = { called: true, ok: false, status: tmpRes.status, error: text };
+      } else {
+        const tmpJson = await tmpRes.json();
+        const freedMb = tmpJson?.stats?.total_size_freed_mb ?? 0;
+        console.log(`   ✅ MIVAA /tmp cleanup complete — ${freedMb.toFixed?.(2) ?? freedMb} MB freed`);
+        results.server_tmp = { called: true, ok: true, stats: tmpJson?.stats || null };
+      }
+    } catch (error: any) {
+      console.error('   ❌ MIVAA cleanup call failed:', error);
+      results.server_tmp = { called: true, ok: false, error: error.message };
+    }
+
     const successfulTables = results.tables.filter((r: any) => !r.error).length;
     const failedTables = results.tables.filter((r: any) => r.error).length;
-    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings`);
+    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings, prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), ${totalStorageDeleted} files from storage, and ${totalVecsDeleted} embeddings from VECS`,
+        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), ${totalStorageDeleted} files from storage, ${totalVecsDeleted} embeddings from VECS, trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
         results,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
