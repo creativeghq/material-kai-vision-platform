@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle, Globe, Video, Box } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
+import { formatMaterialCategory } from '@/utils/productMetadata';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
@@ -125,6 +126,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [embeddings, setEmbeddings] = useState<any>({});
   const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
   const [isRelinking, setIsRelinking] = useState(false);
+  // Knowledge base docs attached to this product (via kb_doc_attachments)
+  const [kbDocs, setKbDocs] = useState<Array<{
+    id: string;
+    title: string;
+    content: string;
+    content_markdown?: string | null;
+    summary?: string | null;
+    metadata: Record<string, unknown>;
+    relationship_type: string;
+  }>>([]);
   // Modal stacking for recommendations — clicking a result opens that product
   const [stackedProductId, setStackedProductId] = useState<string | null>(null);
   const [stackedProduct, setStackedProduct] = useState<Product | null>(null);
@@ -228,15 +239,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   }, [product?.id, isOpen]);
 
-  // Load admin data (chunks, embeddings, relevances)
+  // Load chunks for ALL users (not just admins). The Details tab's Description
+  // card falls back to chunk content when product.description is empty, so
+  // end-users also need chunks loaded. Admin-specific data (embedding status,
+  // relevance counts) stays in the admin-gated effect below.
   useEffect(() => {
-    const loadAdminData = async () => {
-      if (!product?.id || !isAdmin || !isOpen) return;
-      // Skip DB queries for demo products (non-UUID IDs like "demo-wood-green-001")
+    const loadChunks = async () => {
+      if (!product?.id || !isOpen) return;
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
 
       try {
-        // Load chunks from chunk_product_relationships table
         const { data: chunkRelations, error: chunkError } = await supabase
           .from('chunk_product_relationships')
           .select(`
@@ -256,21 +268,85 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         if (chunkError) {
           console.error('[ProductDetailModal] Error loading chunks:', JSON.stringify(chunkError));
           setChunks([]);
-        } else if (chunkRelations && chunkRelations.length > 0) {
-          const loadedChunks = chunkRelations
-            .filter(rel => rel.document_chunks)
-            .map(rel => ({
-              id: rel.document_chunks.id,
-              content: rel.document_chunks.content,
-              page_number: rel.document_chunks.metadata?.page_number ?? null,
-              chunk_index: rel.document_chunks.chunk_index,
-              relevance_score: rel.relevance_score,
-            }));
-          console.log('[ProductDetailModal] Loaded chunks:', loadedChunks.length);
-          setChunks(loadedChunks);
-        } else {
-          setChunks([]);
+          return;
         }
+        const loaded = (chunkRelations || [])
+          .filter(rel => rel.document_chunks)
+          .map(rel => ({
+            id: rel.document_chunks.id,
+            content: rel.document_chunks.content,
+            page_number: rel.document_chunks.metadata?.page_number ?? null,
+            chunk_index: rel.document_chunks.chunk_index,
+            relevance_score: rel.relevance_score,
+          }));
+        setChunks(loaded);
+      } catch (err) {
+        console.error('[ProductDetailModal] loadChunks exception:', err);
+        setChunks([]);
+      }
+    };
+    loadChunks();
+  }, [product?.id, isOpen]);
+
+  // Load KB docs attached to this product via kb_doc_attachments.
+  // Shown in the Knowledge tab for ALL users (not admin-only).
+  useEffect(() => {
+    const loadKbDocs = async () => {
+      if (!product?.id || !isOpen) return;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
+      try {
+        const { data, error } = await supabase
+          .from('kb_doc_attachments')
+          .select(`
+            relationship_type,
+            kb_docs (
+              id,
+              title,
+              content,
+              content_markdown,
+              summary,
+              metadata,
+              status
+            )
+          `)
+          .eq('product_id', product.id);
+
+        if (error) {
+          console.error('[ProductDetailModal] loadKbDocs error:', error);
+          setKbDocs([]);
+          return;
+        }
+
+        const loaded = (data || [])
+          .filter((row: any) => row.kb_docs && row.kb_docs.status === 'published')
+          .map((row: any) => ({
+            id: row.kb_docs.id,
+            title: row.kb_docs.title,
+            content: row.kb_docs.content || '',
+            content_markdown: row.kb_docs.content_markdown,
+            summary: row.kb_docs.summary,
+            metadata: row.kb_docs.metadata || {},
+            relationship_type: row.relationship_type,
+          }));
+        setKbDocs(loaded);
+      } catch (err) {
+        console.error('[ProductDetailModal] loadKbDocs exception:', err);
+        setKbDocs([]);
+      }
+    };
+    loadKbDocs();
+  }, [product?.id, isOpen]);
+
+  // Load admin data (embeddings, relevances — chunks are now loaded above)
+  useEffect(() => {
+    const loadAdminData = async () => {
+      if (!product?.id || !isAdmin || !isOpen) return;
+      // Skip DB queries for demo products (non-UUID IDs like "demo-wood-green-001")
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
+
+      try {
+        // Chunks already loaded by the effect above (for all users).
+        // This effect only handles admin-specific embedding/relevance data.
 
         // Get relationship counts
         const { count: chunkCount } = await supabase
@@ -438,12 +514,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const origin = extractValue(allData?.origin) || extractValue(allData?.country_of_origin) || '';
   const collection = extractValue(designData?.collection) || extractValue(allData?.collection) || '';
 
-  // Extract tile dimensions from available_sizes or dimensions (not page_range!)
-  const availableSizes = allData?.available_sizes || dimensionsData || [];
+  // Extract tile dimensions — prefer the structured `dimensions` array written
+  // by Stage 4.7 enrichment (`{metric_cm: "11.8x11.8", imperial_in: "4.65x4.65"}`)
+  // over the legacy `available_sizes` which used to be populated with
+  // AI-hallucinated values by older extractor runs.
+  const availableSizes = (Array.isArray(dimensionsData) && dimensionsData.length > 0)
+    ? dimensionsData
+    : (allData?.available_sizes || []);
   const size = Array.isArray(availableSizes) && availableSizes.length > 0
     ? availableSizes.map((d: unknown) => {
         if (typeof d === 'object' && d !== null) {
           const dim = d as Record<string, unknown>;
+          // Structured dimension object from Stage 4.7 chunk regex extractor
+          if (dim.metric_cm) {
+            const metric = String(dim.metric_cm);
+            const imperial = dim.imperial_in ? ` (${dim.imperial_in}")` : '';
+            return `${metric} cm${imperial}`;
+          }
           // Format: width x height (e.g., "15×38 cm")
           if (dim.width && dim.height) {
             const unit = dim.unit || 'cm';
@@ -558,18 +645,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const finish = extractValue(materialPropsData?.finish)
     || extractValue(allData?.finish)
     || '—';
-  // Material category chain: AI/vision-extracted → body_type → product.type →
-  // em-dash. "N/A" read like a real value to the user, which hid missing data.
-  const material = extractValue(allData?.material_category)
+  // Material category chain: AI/vision-extracted → body_type → product.type.
+  // Formatted via `formatMaterialCategory` so slugs like "ceramic_tile" become
+  // "Ceramic Tile" for display. Returns "—" when nothing is set.
+  const materialRaw = extractValue(allData?.material_category)
     || extractValue(materialPropsData?.body_type)
     || product.type
-    || '—';
+    || null;
+  const material = formatMaterialCategory(materialRaw, '—');
 
   // Metadata categories
   // Extract commercial data
   const commercialData = allData?.commercial || {};
   const packagingData = allData?.packaging || {};
   const performanceData = allData?.performance || {};
+  const complianceData = allData?.compliance || {};
 
   const materialProperties = {
     'Material Category': material,
@@ -618,29 +708,110 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return String(colVal);
   };
 
+  // Appearance colors: prefer the explicit `available_colors` (per-product
+  // primary colors from the AI extractor), then fall back to the vision-rollup
+  // color list (20 perceptual shades across the images). Show both if they
+  // differ meaningfully so users see both the "official" and the "observed"
+  // palette.
+  const primaryColors = extractProductColors() || extractValue(allData?.colors);
+  const visionColorsRaw = appearanceData?.colors_from_vision;
+  const visionColors = Array.isArray(visionColorsRaw)
+    ? (visionColorsRaw as string[])
+        .map(c => String(c))
+        .filter(Boolean)
+        .slice(0, 12)  // cap for display
+        .join(', ')
+    : undefined;
+
+  // Helper: pretty-print numeric/string values with optional unit suffix
+  const pickPackagingValue = (obj: Record<string, unknown> | undefined, key: string): string | undefined => {
+    if (!obj) return undefined;
+    const v = obj[key];
+    if (v === null || v === undefined || v === '') return undefined;
+    if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+      const inner = (v as Record<string, unknown>).value;
+      return inner != null ? String(inner) : undefined;
+    }
+    return String(v);
+  };
+
+  // ─── Patterns aggregated across variants (chip list) ──────────────
+  // Vision rollup writes every unique pattern it saw on each variant image
+  // into appearance.patterns. Rendered as a chip list above the Appearance
+  // card key/value grid so multi-pattern products don't collapse into a
+  // single "Pattern" line.
+  const patternsList: string[] = (() => {
+    const raw = appearanceData?.patterns ?? materialPropsData?.patterns ?? allData?.patterns;
+    const inner = (raw && typeof raw === 'object' && 'value' in (raw as Record<string, unknown>))
+      ? (raw as Record<string, unknown>).value
+      : raw;
+    if (Array.isArray(inner)) {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      (inner as unknown[]).forEach(p => {
+        const s = String(p).trim();
+        if (!s) return;
+        const norm = s.toLowerCase();
+        if (seen.has(norm)) return;
+        seen.add(norm);
+        out.push(s);
+      });
+      return out;
+    }
+    if (typeof inner === 'string' && inner.trim()) {
+      return inner.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  })();
+
   const appearance = {
-    'Colors': extractProductColors() || extractValue(allData?.colors),
+    'Colors': primaryColors,
+    'Observed Shades': (visionColors && visionColors !== primaryColors) ? visionColors : undefined,
+    'Primary Color': extractValue(appearanceData?.primary_color_hex),  // hex swatch
+    // Only show singular "Pattern" key if we DON'T have the aggregated list
+    // (avoids duplicating information with the chip row above).
+    'Pattern': patternsList.length === 0 ? extractValue(appearanceData?.pattern) : undefined,
+    'Texture': extractValue(appearanceData?.texture),
     'Textures': extractValue(allData?.textures),
     'Shade Variation': extractValue(appearanceData?.shade_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
   };
 
   const performance = {
-    'Traffic Level': extractValue(applicationData?.traffic_level),
-    'Slip Resistance': extractValue(materialPropsData?.slip_resistance) || extractValue(performanceData?.slip_resistance),
-    'Water Resistance': extractValue(materialPropsData?.water_resistance) || extractValue(performanceData?.water_resistance),
-    'Water Absorption': extractValue(performanceData?.water_absorption) || extractValue(materialPropsData?.water_absorption),
-    'Fire Rating': extractValue(materialPropsData?.fire_rating) || extractValue(performanceData?.fire_rating),
+    'Traffic Level': extractValue(performanceData?.traffic_level) || extractValue(applicationData?.traffic_level),
+    'Slip Resistance': extractValue(performanceData?.slip_resistance) || extractValue(materialPropsData?.slip_resistance),
+    'PEI Rating': extractValue(performanceData?.pei_rating),
+    'Water Absorption': extractValue(performanceData?.water_absorption_class)
+      || extractValue(performanceData?.water_absorption)
+      || extractValue(materialPropsData?.water_absorption),
+    'Water Absorption %': extractValue(performanceData?.water_absorption_pct),
+    'Fire Rating': extractValue(performanceData?.fire_rating)
+      || extractValue(materialPropsData?.fire_rating)
+      || extractValue(complianceData?.fire_rating),
     'Abrasion Resistance': extractValue(performanceData?.abrasion_resistance),
     'Wear Rating': extractValue(performanceData?.wear_rating) || extractValue(materialPropsData?.wear_rating),
     'Surface Hardness': extractValue(performanceData?.surface_hardness) || extractValue(materialPropsData?.surface_hardness),
+    'Shade Variation': extractValue(performanceData?.shade_variation),
     'Frost Resistance': extractValue(performanceData?.frost_resistance),
   };
 
+  // Pretty-print recommended_use arrays as "Wall, Floor, Shower Wall"
+  const fmtList = (v: unknown): string | undefined => {
+    if (!v) return undefined;
+    if (Array.isArray(v)) {
+      return (v as unknown[]).map(x => String(x)).filter(Boolean).map(s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).join(', ');
+    }
+    if (typeof v === 'string') return v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return String(v);
+  };
+
   const application = {
-    'Recommended Use': extractValue(applicationData?.recommended_use) || extractValue(allData?.applications),
+    'Recommended Use': fmtList(applicationData?.recommended_use) || fmtList(allData?.applications) || fmtList(allData?.recommended_use),
+    'Applications': fmtList(allData?.applications),
     'Installation Method': extractValue(applicationData?.installation_method) || extractValue(applicationData?.installation),
-    'Joint Width': extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width),
+    'Joint Width': extractValue(applicationData?.joint_width_mm)
+      ? `${extractValue(applicationData?.joint_width_mm)} mm`
+      : extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width),
     'Room Type': extractValue(applicationData?.room_type) || extractValue(applicationData?.suitable_rooms) || extractValue(allData?.room_type),
   };
 
@@ -651,6 +822,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Studio': extractValue(designData?.studio),
     'Collection': collection,
     'Brand': extractValue(designData?.brand),
+    'Design Style': extractValue(designData?.design_style),
+    'Material Subtype': extractValue(materialPropsData?.material_subtype),
+    'Inspiration': extractValue(designData?.inspiration) || extractValue(allData?.inspiration),
     'Philosophy': extractValue(designData?.philosophy),
     'Studio Founded': extractValue(designData?.studio_founded),
   };
@@ -694,8 +868,28 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         }
         return undefined; // Keyed dict but no match — leave empty
       }
-      // Non-name keys (e.g., SKU numbers) — show all as plain text
-      return entries.map(([k, v]) => `${k}: ${v}`).join(', ');
+      // Non-name keys (e.g., SKU numbers) — show all as plain text.
+      // For nested values we flatten instead of relying on toString() which
+      // would turn {dose: 100, supplier: "Mapei"} into "[object Object]".
+      return entries.map(([k, v]) => {
+        if (v === null || v === undefined) return `${k}: —`;
+        if (Array.isArray(v)) {
+          return `${k}: ${(v as unknown[]).map(String).join(', ')}`;
+        }
+        if (typeof v === 'object') {
+          // Flatten nested object: {dose:100, supplier:"Mapei"} → "Mapei (100)"
+          const nested = v as Record<string, unknown>;
+          const supplier = nested.supplier ?? nested.brand ?? nested.name;
+          const dose = nested.dose ?? nested.amount ?? nested.quantity;
+          if (supplier && dose !== undefined) return `${k}: ${supplier} (${dose})`;
+          // Fallback: join inner entries "key: val"
+          const innerStr = Object.entries(nested)
+            .map(([ik, iv]) => `${ik}: ${iv}`)
+            .join(', ');
+          return `${k}: ${innerStr}`;
+        }
+        return `${k}: ${v}`;
+      }).join(', ');
     }
     return undefined;
   };
@@ -742,119 +936,171 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Coverage per Box (sqft)': extractProductValue(packagingData?.coverage_per_box_sqft) || extractValue(packagingData?.coverage_sqft),
   };
 
-  // Extract product variants from SKU codes and commercial data
-  const extractVariants = (): Array<{
+  // Extract product variants using the new commercial schema.
+  //
+  // Data sources, in priority order:
+  //   1. commercial.vision_variants  — Structured array produced by the Claude
+  //      Vision spec extractor: [{sku, name, color, format, pattern?}].
+  //      This is the canonical source when the spec vision pass has run.
+  //   2. commercial.sku_codes        — Legacy dict keyed by variant slug
+  //      ("valenova_blue_30x60": "V2BL3060"). Parsed into the same shape
+  //      when vision_variants is absent.
+  //
+  // Grout code lookup per variant:
+  //   - commercial.grout_details     — [{supplier, product, code, for_variant}]
+  //     from the vision extractor. Match by for_variant (name or color).
+  //   - commercial.grout_color_codes — Dict keyed by variant/color name.
+  //
+  // We return ONE row per variant with an object of grout codes keyed by
+  // supplier ({mapei: "M142", kerakoll: "K05", ...}) so the table can render
+  // whatever suppliers are present without hard-coding a single column.
+  interface Variant {
     sku: string;
     name: string;
     color: string;
     pattern: string;
     size: string;
-    groutCode: string;
-  }> => {
-    const variants: Array<{
-      sku: string;
-      name: string;
-      color: string;
-      pattern: string;
-      size: string;
-      groutCode: string;
-    }> = [];
+    groutCodes: Record<string, string>; // supplier → code
+  }
 
-    // Try to get variants from sku_codes object
-    const skuCodes = commercialData?.sku_codes;
-    if (skuCodes) {
-      const skuObj = typeof skuCodes === 'object' && 'value' in skuCodes
-        ? skuCodes.value as Record<string, unknown>
-        : skuCodes as Record<string, unknown>;
+  const extractVariants = (): Variant[] => {
+    const variants: Variant[] = [];
 
-      if (typeof skuObj === 'object' && skuObj !== null) {
-        // Helper: strip accents and uppercase for accent-insensitive comparison
-        const normalizeForMatch = (s: string) =>
-          s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-        const normProductName = normalizeForMatch(productNameUpper);
+    // Helper: unwrap {value, confidence} wrappers
+    const unwrap = (v: unknown): unknown => {
+      if (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+        return (v as Record<string, unknown>).value;
+      }
+      return v;
+    };
 
-        Object.entries(skuObj).forEach(([key, value]) => {
-          // Only include SKU variants that belong to THIS product.
-          // The first underscore-delimited segment of the key identifies the product/variant
-          // (e.g. "ona_mint_12x45" → "ONA", "pique_3d_anth_10x10" → "PIQUE").
-          const keyBase = normalizeForMatch(key.split('_')[0]);
-          if (keyBase !== normProductName) return; // skip other products' variants
+    // ─── Grout lookup table ────────────────────────────────────────────
+    // Build once per product: variantKey (lowercased) → {supplier: code}
+    const groutByVariant: Record<string, Record<string, string>> = {};
 
-          // Parse variant info from key (e.g., "pique_3d_anth_10x10" or "ona_mint_12x45")
+    // grout_details: structured array from vision extractor
+    const groutDetails = unwrap(commercialData?.grout_details);
+    if (Array.isArray(groutDetails)) {
+      groutDetails.forEach((g: any) => {
+        const supplier = String(g?.supplier || '').toLowerCase().trim();
+        const code = String(g?.code || g?.product || '').trim();
+        const forVariant = String(g?.for_variant || '').toLowerCase().trim();
+        if (!supplier || !code || !forVariant) return;
+        if (!groutByVariant[forVariant]) groutByVariant[forVariant] = {};
+        groutByVariant[forVariant][supplier] = code;
+      });
+    }
+
+    // grout_color_codes: dict {variantName: code} or {variantName: {supplier: code}}
+    const groutColorCodes = unwrap(commercialData?.grout_color_codes);
+    if (groutColorCodes && typeof groutColorCodes === 'object' && !Array.isArray(groutColorCodes)) {
+      Object.entries(groutColorCodes as Record<string, unknown>).forEach(([variantKey, code]) => {
+        const key = variantKey.toLowerCase().trim();
+        if (!groutByVariant[key]) groutByVariant[key] = {};
+        if (typeof code === 'string' || typeof code === 'number') {
+          // Single code — assume Mapei unless key says otherwise
+          groutByVariant[key].mapei = String(code);
+        } else if (code && typeof code === 'object') {
+          Object.entries(code as Record<string, unknown>).forEach(([sup, c]) => {
+            if (c !== null && c !== undefined) {
+              groutByVariant[key][sup.toLowerCase()] = String(c);
+            }
+          });
+        }
+      });
+    }
+
+    // Legacy per-supplier dicts: commercial.grout_mapei = {color: code}, etc.
+    (['mapei', 'kerakoll', 'isomat', 'technica'] as const).forEach(sup => {
+      const supData = unwrap(commercialData?.[`grout_${sup}`]);
+      if (supData && typeof supData === 'object' && !Array.isArray(supData)) {
+        Object.entries(supData as Record<string, unknown>).forEach(([vkey, code]) => {
+          const key = vkey.toLowerCase().trim();
+          if (!groutByVariant[key]) groutByVariant[key] = {};
+          if (code !== null && code !== undefined && !groutByVariant[key][sup]) {
+            groutByVariant[key][sup] = String(code);
+          }
+        });
+      }
+    });
+
+    const lookupGrout = (...keys: string[]): Record<string, string> => {
+      for (const k of keys) {
+        const lower = k.toLowerCase().trim();
+        if (lower && groutByVariant[lower]) return groutByVariant[lower];
+      }
+      return {};
+    };
+
+    // ─── Source 1: commercial.vision_variants (preferred) ──────────────
+    const visionVariants = unwrap(commercialData?.vision_variants);
+    if (Array.isArray(visionVariants) && visionVariants.length > 0) {
+      visionVariants.forEach((v: any) => {
+        // Filter to this product only — vision_variants may be shared across
+        // all products in a chunk and contain other product's rows.
+        const vName = String(v?.name || '').trim();
+        const vProduct = String(v?.product || v?.product_name || '').trim();
+        const matchesProduct =
+          !vProduct ||
+          normalizeMatch(vProduct) === productNameNorm ||
+          normalizeMatch(vName).includes(productNameNorm);
+        if (!matchesProduct) return;
+
+        const color = String(v?.color || '').trim();
+        const pattern = String(v?.pattern || '').trim();
+        const size = String(v?.format || v?.size || '').trim();
+        const sku = String(v?.sku || v?.sku_code || '').trim();
+
+        variants.push({
+          sku: sku || '—',
+          name: vName || [productNameUpper, pattern, color].filter(Boolean).join(' '),
+          color: color || '—',
+          pattern: pattern || '—',
+          size: size || '—',
+          groutCodes: lookupGrout(vName, color, sku),
+        });
+      });
+    }
+
+    // ─── Source 2: commercial.sku_codes (legacy fallback) ──────────────
+    if (variants.length === 0) {
+      const skuCodes = unwrap(commercialData?.sku_codes);
+      if (skuCodes && typeof skuCodes === 'object' && !Array.isArray(skuCodes)) {
+        Object.entries(skuCodes as Record<string, unknown>).forEach(([key, value]) => {
+          // First segment of the key identifies the product
+          // ("valenova_blue_30x60" → "VALENOVA").
+          const keyBase = normalizeMatch(key.split('_')[0]);
+          if (keyBase !== productNameNorm) return;
+
           const parts = key.toLowerCase().split('_');
+          const sizeMatch = key.match(/(\d+)[xX](\d+)/);
+          const size = sizeMatch ? `${sizeMatch[1]}×${sizeMatch[2]}` : '—';
 
-          // Extract size (look for pattern like "10x10", "20x40")
-          const sizeMatch = key.match(/(\d+)x(\d+)/i);
-          const size = sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}` : '';
+          const colorKeywords = ['white', 'clay', 'sand', 'taupe', 'bordeaux', 'anthracite', 'anth', 'brown', 'mint', 'green', 'grey', 'gray', 'blue', 'red', 'black', 'beige', 'ivory', 'cream'];
+          const color = parts.find(p => colorKeywords.includes(p)) || '';
+          const colorLabel = color === 'anth' ? 'Anthracite' : color ? color.charAt(0).toUpperCase() + color.slice(1) : '—';
 
-          // Extract color (common colors to look for)
-          const colorKeywords = ['white', 'clay', 'sand', 'taupe', 'bordeaux', 'anthracite', 'anth', 'brown', 'mint', 'green', 'grey', 'gray'];
-          let color = '';
-          for (const colorKey of colorKeywords) {
-            if (parts.includes(colorKey)) {
-              color = colorKey === 'anth' ? 'Anthracite' : colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
-              break;
-            }
-          }
+          const patternKeywords = ['3d', 'cloth', 'mosaic', 'waffle', 'wave', 'relief'];
+          const pattern = parts.find(p => patternKeywords.includes(p)) || '';
+          const patternLabel = pattern === '3d' ? '3D Relief' : pattern ? pattern.charAt(0).toUpperCase() + pattern.slice(1) : '—';
 
-          // Extract pattern
-          const patternKeywords = ['3d', 'cloth', 'mosaic', 'waffle', 'wave'];
-          let pattern = '';
-          for (const patternKey of patternKeywords) {
-            if (parts.includes(patternKey)) {
-              pattern = patternKey === '3d' ? '3D Relief' : patternKey.charAt(0).toUpperCase() + patternKey.slice(1);
-              break;
-            }
-          }
-
-          // Build variant name
-          const productName = parts.filter(p =>
-            !colorKeywords.includes(p) &&
-            !patternKeywords.includes(p) &&
-            !p.match(/\d+x\d+/),
-          ).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
-
-          const variantName = [productName, pattern, color].filter(Boolean).join(' ').trim();
-
-          // Get grout code from commercial data if available
-          let groutCode = '';
-          const groutMapei = commercialData?.grout_mapei;
-          if (groutMapei && typeof groutMapei === 'object' && 'value' in groutMapei) {
-            const groutObj = groutMapei.value as Record<string, unknown>;
-            if (typeof groutObj === 'object' && groutObj !== null) {
-              // Try to match by color
-              const colorLower = color.toLowerCase();
-              if (groutObj[colorLower]) {
-                groutCode = String(groutObj[colorLower]);
-              }
-            }
-          }
+          const nameParts = parts.filter(p =>
+            !colorKeywords.includes(p) && !patternKeywords.includes(p) && !/^\d+x\d+$/.test(p),
+          );
+          const nameLabel = nameParts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+          const variantName = [nameLabel, patternLabel !== '—' ? patternLabel : '', colorLabel !== '—' ? colorLabel : '']
+            .filter(Boolean).join(' ').trim();
 
           variants.push({
             sku: String(value),
             name: variantName || key,
-            color: color || '-',
-            pattern: pattern || '-',
-            size: size || '-',
-            groutCode: groutCode || '-',
+            color: colorLabel,
+            pattern: patternLabel,
+            size,
+            groutCodes: lookupGrout(variantName, colorLabel, color, key),
           });
         });
       }
-    }
-
-    // Also try to get from variants array if exists
-    const variantsArray = allData?.variants || commercialData?.variants;
-    if (Array.isArray(variantsArray)) {
-      variantsArray.forEach((v: any) => {
-        variants.push({
-          sku: extractValue(v.sku) || extractValue(v.sku_code) || '-',
-          name: extractValue(v.name) || extractValue(v.variant_name) || '-',
-          color: extractValue(v.color) || '-',
-          pattern: extractValue(v.pattern) || '-',
-          size: extractValue(v.size) || extractValue(v.dimensions) || '-',
-          groutCode: extractValue(v.grout_code) || extractValue(v.mapei_code) || '-',
-        });
-      });
     }
 
     return variants;
@@ -862,21 +1108,105 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const productVariants = extractVariants();
 
-  // Extract compliance data
-  const complianceData = allData?.compliance || {};
-
   const careAndMaintenance = {
     'Care Instructions': extractValue(applicationData?.care_instructions) || extractValue(allData?.care_instructions),
     'Maintenance': extractValue(applicationData?.maintenance) || extractValue(allData?.maintenance),
     'Cleaning': extractValue(allData?.cleaning),
   };
 
+  // ─── Certifications as chip list ──────────────────────────────────
+  // Certifications come from multiple sources and may live on either
+  // top-level metadata or under compliance.certifications. The catalog
+  // knowledge extractor propagates catalog-level certs (ISO / CE / EN / LEED)
+  // to every product in the document, so even pages without a per-product
+  // spec table will have a populated list.
+  const extractCertList = (val: unknown): string[] => {
+    if (!val) return [];
+    const inner = (val && typeof val === 'object' && 'value' in (val as Record<string, unknown>))
+      ? (val as Record<string, unknown>).value
+      : val;
+    if (Array.isArray(inner)) {
+      return (inner as unknown[]).map(v => String(v).trim()).filter(Boolean);
+    }
+    if (typeof inner === 'string') {
+      return inner.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+  const certList: string[] = (() => {
+    const candidates: string[] = [
+      ...extractCertList(complianceData?.certifications),
+      ...extractCertList(allData?.certifications),
+      ...extractCertList(complianceData?.standards),
+      ...extractCertList(allData?.standards),
+    ];
+    const seen = new Set<string>();
+    return candidates.filter(c => {
+      const norm = c.toLowerCase().replace(/[\s-]/g, '');
+      if (seen.has(norm)) return false;
+      seen.add(norm);
+      return true;
+    });
+  })();
+  const certSource = extractValue(complianceData?.certifications_source);
+
+  // Remaining fields that still render as a normal key/value card.
   const certifications = {
-    'Certifications': extractValue(allData?.certifications) || extractValue(complianceData?.certifications),
-    'Standards': extractValue(allData?.standards) || extractValue(complianceData?.standards),
     'Eco Friendly': extractValue(allData?.eco_friendly) || extractValue(complianceData?.eco_friendly),
     'Sustainability Rating': extractValue(allData?.sustainability_rating) || extractValue(complianceData?.sustainability_rating),
     'Fire Rating': extractValue(complianceData?.fire_rating) || extractValue(allData?.fire_rating),
+  };
+
+  // Renders the certifications section: a header, chip list, and the
+  // remaining key/value fields below. Hidden entirely when there is nothing.
+  const renderCertificationsCard = () => {
+    const hasChips = certList.length > 0;
+    const hasFields = Object.values(certifications).some(v => v && v !== 'N/A' && v !== '');
+    if (!hasChips && !hasFields) return null;
+    return (
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+            Certifications & Compliance
+          </h3>
+        </div>
+        {hasChips && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Certifications
+              {certSource === 'catalog_knowledge' && (
+                <span className="ml-2 normal-case font-normal text-[10px] text-muted-foreground/60">
+                  (catalog-wide)
+                </span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {certList.map(cert => (
+                <Badge
+                  key={cert}
+                  variant="outline"
+                  className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 border-primary/30 text-primary"
+                >
+                  {cert}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        {hasFields && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(certifications)
+              .filter(([, v]) => v && v !== 'N/A' && v !== '')
+              .map(([key, value]) => (
+                <div key={key} className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
+                  <p className="text-xs font-semibold">{renderValue(value)}</p>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Helper function to safely render any value (handles objects, arrays, primitives)
@@ -929,6 +1259,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     const filteredData = Object.entries(data).filter(([, value]) => value && value !== 'N/A' && value !== '');
     if (filteredData.length === 0) return null;
 
+    const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+
     return (
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
         <div className="mb-4">
@@ -940,6 +1272,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
             const parts = str.split(', ').filter(p => p.trim());
+
+            // Special-case: hex color values → render as color swatch + code
+            if (HEX_RE.test(str)) {
+              return (
+                <div key={key} className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span
+                      className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0"
+                      style={{ backgroundColor: str }}
+                      aria-label={`Color swatch ${str}`}
+                    />
+                    <p className="text-xs font-semibold">{str}</p>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div key={key} className="bg-muted/30 rounded-lg p-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
@@ -963,9 +1313,37 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
-  // Helper function to render product variants table
+  // Helper function to render product variants table.
+  // Columns are: SKU, Variant, Color, Pattern, Size, then ONE column per
+  // grout supplier that actually has data for at least one variant.
+  // Grout suppliers come from the new schema (commercial.grout_details +
+  // commercial.grout_color_codes) via extractVariants().
   const renderVariantsTable = () => {
     if (productVariants.length === 0) return null;
+
+    // Union of supplier keys across all variants, ordered canonically.
+    const SUPPLIER_ORDER = ['mapei', 'kerakoll', 'isomat', 'technica'] as const;
+    const supplierSet = new Set<string>();
+    productVariants.forEach(v => {
+      Object.keys(v.groutCodes || {}).forEach(s => supplierSet.add(s));
+    });
+    const suppliers: string[] = [
+      ...SUPPLIER_ORDER.filter(s => supplierSet.has(s)),
+      ...Array.from(supplierSet).filter(s => !(SUPPLIER_ORDER as readonly string[]).includes(s)),
+    ];
+
+    const colorSwatch = (color: string): string => {
+      const c = color.toLowerCase();
+      const map: Record<string, string> = {
+        white: '#f5f5f5', anthracite: '#424242', sand: '#c2b280',
+        bordeaux: '#800020', brown: '#795548', mint: '#98ff98',
+        green: '#4caf50', grey: '#9e9e9e', gray: '#9e9e9e',
+        taupe: '#8b8589', clay: '#b5651d', blue: '#1e88e5',
+        red: '#e53935', black: '#212121', beige: '#d7c9a7',
+        ivory: '#fffff0', cream: '#f5f0e1',
+      };
+      return map[c] || '#e0e0e0';
+    };
 
     return (
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
@@ -984,7 +1362,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <th className="text-left px-3 py-2.5 font-medium">Color</th>
                   <th className="text-left px-3 py-2.5 font-medium">Pattern</th>
                   <th className="text-left px-3 py-2.5 font-medium">Size</th>
-                  <th className="text-left px-6 py-2.5 font-medium">Mapei Code</th>
+                  {suppliers.map(sup => (
+                    <th key={sup} className="text-left px-3 py-2.5 font-medium capitalize">
+                      {sup}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -999,29 +1381,112 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <span className="inline-flex items-center gap-2">
                         <span
                           className="w-3 h-3 rounded-full border border-border/50 flex-shrink-0"
-                          style={{
-                            backgroundColor:
-                              variant.color.toLowerCase() === 'white' ? '#f5f5f5' :
-                              variant.color.toLowerCase() === 'anthracite' ? '#424242' :
-                              variant.color.toLowerCase() === 'sand' ? '#c2b280' :
-                              variant.color.toLowerCase() === 'bordeaux' ? '#800020' :
-                              variant.color.toLowerCase() === 'brown' ? '#795548' :
-                              variant.color.toLowerCase() === 'mint' ? '#98ff98' :
-                              variant.color.toLowerCase() === 'green' ? '#4caf50' :
-                              variant.color.toLowerCase() === 'grey' || variant.color.toLowerCase() === 'gray' ? '#9e9e9e' :
-                              variant.color.toLowerCase() === 'taupe' ? '#8b8589' :
-                              variant.color.toLowerCase() === 'clay' ? '#b5651d' :
-                              '#e0e0e0',
-                          }}
+                          style={{ backgroundColor: colorSwatch(variant.color) }}
                         />
                         {variant.color}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{variant.pattern}</td>
                     <td className="px-3 py-2 text-muted-foreground">{variant.size}</td>
-                    <td className="px-6 py-2 font-mono text-muted-foreground">{variant.groutCode}</td>
+                    {suppliers.map(sup => (
+                      <td key={sup} className="px-3 py-2 font-mono text-muted-foreground">
+                        {variant.groutCodes[sup] || '—'}
+                      </td>
+                    ))}
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Packaging-per-variant table. The vision extractor emits
+  // `packaging.per_variant` when the catalog's packing table has different
+  // pieces/box or weight per format. We render one row per variant here;
+  // when only scalar packaging exists the table is hidden (scalar values
+  // already live in the Key Specs sidebar Packaging block).
+  const renderPackagingPerVariantTable = () => {
+    const packagingRaw = allData?.packaging;
+    const packaging = (packagingRaw && typeof packagingRaw === 'object' && 'value' in packagingRaw)
+      ? (packagingRaw as Record<string, unknown>).value
+      : packagingRaw;
+    const perVariantRaw = packaging && typeof packaging === 'object'
+      ? (packaging as Record<string, unknown>).per_variant
+      : undefined;
+    const perVariant = (perVariantRaw && typeof perVariantRaw === 'object' && 'value' in (perVariantRaw as Record<string, unknown>))
+      ? (perVariantRaw as Record<string, unknown>).value
+      : perVariantRaw;
+
+    if (!Array.isArray(perVariant) || perVariant.length === 0) return null;
+
+    // Filter to rows belonging to this product if the extractor tagged them.
+    const rows = (perVariant as Array<Record<string, unknown>>).filter(r => {
+      const vProduct = r.product || r.product_name;
+      if (!vProduct) return true; // untagged rows assumed for this product
+      return normalizeMatch(String(vProduct)) === productNameNorm ||
+             normalizeMatch(String(vProduct)).includes(productNameNorm);
+    });
+    if (rows.length === 0) return null;
+
+    const cell = (v: unknown): string => {
+      if (v === null || v === undefined || v === '') return '—';
+      return String(v);
+    };
+
+    return (
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+            Packaging per Variant ({rows.length})
+          </h3>
+        </div>
+        <div className="overflow-hidden -mx-6 -mb-6 mt-2">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                <tr className="text-xs font-semibold text-muted-foreground">
+                  <th className="text-left px-6 py-2.5 font-medium">Variant</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Format</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Pcs / Box</th>
+                  <th className="text-left px-3 py-2.5 font-medium">m² / Box</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Weight / Box</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Boxes / Pallet</th>
+                  <th className="text-left px-6 py-2.5 font-medium">Pallet Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const weightBoxKg = r.weight_box_kg ?? r.weight_per_box_kg;
+                  const weightBoxLb = r.weight_box_lb ?? r.weight_per_box_lb;
+                  const weightBox = weightBoxKg
+                    ? (weightBoxLb ? `${weightBoxKg} kg (${weightBoxLb} lb)` : `${weightBoxKg} kg`)
+                    : '—';
+                  const m2Box = r.m2_box ?? r.m2_per_box;
+                  const sqftBox = r.sqft_box ?? r.sqft_per_box;
+                  const coverage = m2Box
+                    ? (sqftBox ? `${m2Box} (${sqftBox} sqft)` : String(m2Box))
+                    : '—';
+                  const palletWeight = r.weight_pallet_kg ?? r.weight_per_pallet_kg;
+                  return (
+                    <tr
+                      key={`pkgv-${i}`}
+                      className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-6 py-2 font-medium">{cell(r.variant ?? r.name)}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{cell(r.format ?? r.size)}</td>
+                      <td className="px-3 py-2">{cell(r.pcs_box ?? r.pieces_per_box)}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{coverage}</td>
+                      <td className="px-3 py-2">{weightBox}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{cell(r.boxes_pallet ?? r.boxes_per_pallet)}</td>
+                      <td className="px-6 py-2 text-muted-foreground">
+                        {palletWeight ? `${palletWeight} kg` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1033,10 +1498,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        {/* Header with Factory/Brand Info */}
+        {/* Header with Factory/Brand Info + Quick Actions.
+            Quote-based platform — no pricing/stock shown. Action buttons live
+            in the header so users can quote / save from the first screen. */}
         <DialogHeader className="border-b pb-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Factory className="h-5 w-5 text-muted-foreground" />
                 <div className="flex items-center gap-2">
@@ -1054,21 +1521,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 {collection && <span className="font-medium">{collection}</span>}
-                <span className="text-muted-foreground/40">•</span>
+                {collection && <span className="text-muted-foreground/40">•</span>}
                 <span>SKU: {safeString(product.sku, 'N/A')}</span>
               </div>
             </div>
-            <Badge
-              className="text-sm px-3 py-1"
-              style={{
-                backgroundColor: `${effectiveColor}20`,
-                color: effectiveColor,
-                borderColor: effectiveColor,
-                border: '1px solid',
-              }}
-            >
-              {safeString(product.status, 'active')}
-            </Badge>
+            {/* Quick actions — compact, right-aligned, mirrors the name area */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <AddToQuoteButton
+                productId={product.id}
+                productName={product.name}
+                productImage={currentImage?.url}
+                variant="default"
+                size="sm"
+                className="text-xs"
+              />
+              <AddToMoodboardButton
+                productId={product.id}
+                productName={product.name}
+                productImage={currentImage?.url}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+              />
+            </div>
           </div>
           <DialogDescription className="text-sm text-muted-foreground mt-3">
             {safeString(product.description)}
@@ -1118,12 +1593,59 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Details Tab */}
           <TabsContent value="details" className="mt-6">
             {/* Full description card — first thing on the Details tab so users
-                see the narrative before diving into specs. Hidden if there's no
-                description at all (keeps the UI clean for sparse products). */}
+                see the narrative before diving into specs. Falls back through:
+                  1. product.long_description
+                  2. product.description
+                  3. narrative paragraphs extracted from the product's chunks
+                     (catches cases where the PDF had a description but the
+                     AI extractor didn't populate the product column)
+                Hidden entirely if no description can be found anywhere. */}
             {(() => {
-              const longDesc = safeString(product.long_description);
+              // Product.long_description is optional and not in the TS type;
+              // cast through Record<string, unknown> so we can read it safely.
+              const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
               const shortDesc = safeString(product.description);
-              const fullDesc = longDesc || shortDesc;
+              let fullDesc = longDesc || shortDesc;
+
+              if (!fullDesc && chunks.length > 0) {
+                // Pick narrative paragraphs from chunks — skip chunks that are
+                // mostly SKU codes, page separators, or TOC-like lines, and
+                // prefer chunks that mention the product name.
+                const productNameLower = (product.name || '').toLowerCase();
+                const candidates = chunks
+                  .map(c => String(c.content || ''))
+                  .filter(text => {
+                    // Reject if mostly digits/codes (SKU tables)
+                    const digitRatio = (text.match(/\d/g) || []).length / Math.max(text.length, 1);
+                    if (digitRatio > 0.15) return false;
+                    // Reject very short lines
+                    if (text.trim().length < 80) return false;
+                    return true;
+                  })
+                  .sort((a, b) => {
+                    // Prefer chunks mentioning the product name
+                    const aHasName = a.toLowerCase().includes(productNameLower) ? 1 : 0;
+                    const bHasName = b.toLowerCase().includes(productNameLower) ? 1 : 0;
+                    return bHasName - aHasName;
+                  });
+
+                if (candidates.length > 0) {
+                  // Extract just the English narrative (skip "Page N" separators
+                  // and bilingual duplicates). Take the first 2-3 sentences that
+                  // look like product description.
+                  const raw = candidates[0];
+                  // Strip "--- # Page N ---" markers
+                  const cleaned = raw
+                    .replace(/---\s*#\s*Page\s*\d+\s*---/gi, '')
+                    .replace(/Page\s*\d+/gi, '')
+                    .replace(/^\d+\s+―/gm, '')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+                  // Take up to the first 500 chars for a readable lead-in
+                  fullDesc = cleaned.length > 500 ? cleaned.slice(0, 500).trim() + '…' : cleaned;
+                }
+              }
+
               if (!fullDesc) return null;
               return (
                 <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mb-6">
@@ -1222,9 +1744,62 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-border/30">
+                  <span className="text-xs text-muted-foreground">Factory</span>
+                  <span className="text-xs font-semibold">{factory}</span>
+                </div>
+                {(() => {
+                  // Factory Group — only show when it is meaningfully different
+                  // from Factory (groups like "Grupo Halcón" that own multiple brands).
+                  const group = extractValue(allData?.factory_group_name);
+                  if (!group || group === factory) return null;
+                  return (
+                    <div className="flex justify-between items-center py-2 border-b border-border/30">
+                      <span className="text-xs text-muted-foreground">Factory Group</span>
+                      <span className="text-xs font-semibold">{String(group)}</span>
+                    </div>
+                  );
+                })()}
+                {origin && (
+                  <div className="flex justify-between items-center py-2 border-b border-border/30">
+                    <span className="text-xs text-muted-foreground">Country of Origin</span>
+                    <span className="text-xs font-semibold">{origin}</span>
+                  </div>
+                )}
+                {collection && (
+                  <div className="flex justify-between items-center py-2 border-b border-border/30">
+                    <span className="text-xs text-muted-foreground">Collection</span>
+                    <span className="text-xs font-semibold">{collection}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center py-2 border-b border-border/30">
                   <span className="text-xs text-muted-foreground">Material</span>
                   <span className="text-xs font-semibold">{material}</span>
                 </div>
+                {(() => {
+                  const bodyType = extractValue(materialPropsData?.body_type);
+                  if (!bodyType) return null;
+                  return (
+                    <div className="flex justify-between items-center py-2 border-b border-border/30">
+                      <span className="text-xs text-muted-foreground">Body Type</span>
+                      <span className="text-xs font-semibold capitalize">{String(bodyType)}</span>
+                    </div>
+                  );
+                })()}
+                <div className="flex justify-between items-center py-2 border-b border-border/30">
+                  <span className="text-xs text-muted-foreground">Finish</span>
+                  <span className="text-xs font-semibold capitalize">{finish}</span>
+                </div>
+                {(() => {
+                  // Material subtype (from vision): "glazed relief", "3D embossed", etc.
+                  const subtype = extractValue(materialPropsData?.material_subtype);
+                  if (!subtype) return null;
+                  return (
+                    <div className="flex justify-between items-center py-2 border-b border-border/30">
+                      <span className="text-xs text-muted-foreground">Subtype</span>
+                      <span className="text-xs font-semibold capitalize">{String(subtype)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="py-2 border-b border-border/30">
                   <span className="text-xs text-muted-foreground">Size</span>
                   {size === 'N/A' ? (
@@ -1244,76 +1819,78 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <span className="text-xs text-muted-foreground">Thickness</span>
                   <span className="text-xs font-semibold">{thickness || '—'}</span>
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-xs text-muted-foreground">Finish</span>
-                  <span className="text-xs font-semibold">{finish}</span>
-                </div>
+                {Array.isArray(designData?.designers) && designData.designers.length > 0 && (
+                  <div className="flex justify-between items-center py-2 border-b border-border/30">
+                    <span className="text-xs text-muted-foreground">Designer</span>
+                    <span className="text-xs font-semibold">{designData.designers.join(', ')}</span>
+                  </div>
+                )}
+
+                {/* Packaging subsection — inside Key Specs card, below Material Properties.
+                    Only renders rows whose values are non-empty, so sparse products
+                    still show a clean card without placeholder junk. */}
+                {(() => {
+                  const pkg = (allData?.packaging || {}) as Record<string, unknown>;
+                  const pick = (k: string): string | null => {
+                    const v = pkg[k];
+                    if (v === null || v === undefined || v === '') return null;
+                    if (typeof v === 'number') return String(v);
+                    if (typeof v === 'string') return v;
+                    // {value, confidence} wrapper
+                    if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+                      const inner = (v as Record<string, unknown>).value;
+                      return inner != null ? String(inner) : null;
+                    }
+                    return null;
+                  };
+                  const pieces = pick('pieces_per_box');
+                  const patternsCount = pick('patterns_count');
+                  const boxes = pick('boxes_per_pallet');
+                  const coverageM2 = pick('m2_per_box') ?? pick('coverage_m2');
+                  const coverageSqft = pick('sqft_per_box') ?? pick('coverage_sqft');
+                  const weightKg = pick('weight_per_box_kg') ?? pick('weight_kg');
+                  const weightLb = pick('weight_per_box_lb') ?? pick('weight_lb');
+                  const palletKg = pick('weight_per_pallet_kg');
+
+                  const rows = [
+                    pieces && { label: 'Pieces / Box', value: pieces },
+                    patternsCount && { label: 'Patterns', value: patternsCount },
+                    coverageM2 && {
+                      label: 'Coverage / Box',
+                      value: coverageSqft ? `${coverageM2} m² (${coverageSqft} sqft)` : `${coverageM2} m²`,
+                    },
+                    weightKg && {
+                      label: 'Weight / Box',
+                      value: weightLb ? `${weightKg} kg (${weightLb} lb)` : `${weightKg} kg`,
+                    },
+                    boxes && { label: 'Boxes / Pallet', value: boxes },
+                    palletKg && { label: 'Pallet Weight', value: `${palletKg} kg` },
+                  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+                  if (rows.length === 0) return null;
+                  return (
+                    <>
+                      <div className="pt-2 pb-1">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Packaging</p>
+                      </div>
+                      {rows.map((r, i) => (
+                        <div
+                          key={r.label}
+                          className={`flex justify-between items-center py-2 ${i < rows.length - 1 ? 'border-b border-border/30' : ''}`}
+                        >
+                          <span className="text-xs text-muted-foreground">{r.label}</span>
+                          <span className="text-xs font-semibold">{r.value}</span>
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* Pricing & Stock */}
-            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Pricing & Availability
-                </h3>
-              </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-muted/30 p-3 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Retail Price</p>
-                    <p className="text-lg font-semibold">
-                      {product.pricing?.currency === 'EUR' ? '€' : '$'}
-                      {(product.pricing?.retail || 0).toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 p-3 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Wholesale</p>
-                    <p className="text-lg font-semibold">
-                      {product.pricing?.currency === 'EUR' ? '€' : '$'}
-                      {(product.pricing?.wholesale || 0).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-                <div className="pt-3 border-t border-border/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">In Stock:</span>
-                    <Badge
-                      className={`text-xs px-2 py-0.5 ${
-                        product.stock?.status === 'High'
-                          ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                          : product.stock?.status === 'Medium'
-                            ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
-                            : 'bg-red-100 text-red-800 hover:bg-red-100'
-                      }`}
-                    >
-                      {product.stock?.quantity ?? 0} {product.stock?.unit ?? 'pcs'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <AddToQuoteButton
-                productId={product.id}
-                productName={product.name}
-                productImage={currentImage?.url}
-                variant="default"
-                size="lg"
-                className="w-full"
-              />
-              <AddToMoodboardButton
-                productId={product.id}
-                productName={product.name}
-                productImage={currentImage?.url}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              />
-            </div>
+            {/* Pricing & Availability intentionally removed —
+                quote-based platform, retail/wholesale/stock aren't tracked.
+                Quick quote/moodboard actions live in the DialogHeader. */}
 
             {/* VR / Video / 3D Actions */}
             {(onGenerateVR || onGenerateVideo || onUseIn3DScene) && currentImage?.url && (
@@ -1357,20 +1934,153 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Metadata Sections */}
+        {/* Metadata Sections.
+            Layout rules:
+              - Material Properties is NOT rendered here — Material Category,
+                Body Type, Finish, Subtype, Thickness, Size, Designer all live
+                in the Key Specifications sidebar.
+              - Packaging, Dimensions, Manufacturing are NOT rendered here
+                either (also in sidebar).
+              - Appearance: full-width (colors + patterns + textures).
+              - Performance + Application share a row.
+              - Certifications + Care & Maintenance share a row.
+              - Design and Commercial follow full-width.
+              - Variants table at the very bottom. */}
         <div className="mt-6 space-y-4">
-          {renderMetadataCategory('Material Properties', materialProperties)}
-          {renderMetadataCategory('Dimensions', dimensions)}
-          {renderMetadataCategory('Appearance', appearance)}
-          {renderMetadataCategory('Performance', performance)}
-          {renderMetadataCategory('Application', application)}
-          {renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
-          {renderMetadataCategory('Certifications & Compliance', certifications)}
-          {renderMetadataCategory('Design', design)}
-          {renderMetadataCategory('Manufacturing', manufacturing)}
+          {(() => {
+            // Appearance card layout:
+            //   1. Patterns chip row          (full width, if any)
+            //   2. Colors chip row            (full width, if any)
+            //   3. Observed Shades chip row   (full width, if any)
+            //   4. Remaining scalar fields    (2-column grid)
+            // Colors/Shades used to render as bulleted lists stacked vertically
+            // which wasted space. They're now compact horizontal chips,
+            // capitalized per word.
+            const hasAppearanceFields = Object.values(appearance).some(
+              v => v && v !== 'N/A' && v !== '',
+            );
+            if (patternsList.length === 0 && !hasAppearanceFields) return null;
+
+            // Title-case every word: "terracotta red" → "Terracotta Red"
+            const titleCase = (s: string): string =>
+              s.replace(/\b\w/g, c => c.toUpperCase());
+
+            // Split a comma-separated value into clean, capitalized items.
+            const splitToChips = (val: unknown): string[] => {
+              const raw = typeof val === 'string' ? val : renderValue(val);
+              if (!raw || raw === 'N/A') return [];
+              return raw
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
+                .map(titleCase);
+            };
+
+            const colorChips = splitToChips(appearance['Colors']);
+            const shadeChips = splitToChips(appearance['Observed Shades']);
+
+            // Everything else (Primary Color hex, Pattern, Texture, etc.) still
+            // renders in the 2-col grid. Exclude the multi-value list fields
+            // that are now shown as chip rows above.
+            const CHIP_ROW_KEYS = new Set(['Colors', 'Observed Shades']);
+            const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+            const gridFields = Object.entries(appearance).filter(
+              ([k, v]) => !CHIP_ROW_KEYS.has(k) && v && v !== 'N/A' && v !== '',
+            );
+
+            // Compact chip-row block reused for Colors + Observed Shades.
+            const renderChipRow = (label: string, chips: string[]) => {
+              if (chips.length === 0) return null;
+              return (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    {label} ({chips.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {chips.map(c => (
+                      <Badge
+                        key={c}
+                        variant="outline"
+                        className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50"
+                      >
+                        {c}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    Appearance
+                  </h3>
+                </div>
+                {patternsList.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Available Patterns ({patternsList.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {patternsList.map(p => (
+                        <Badge
+                          key={p}
+                          variant="outline"
+                          className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 border-primary/30 text-primary"
+                        >
+                          {titleCase(p)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {renderChipRow('Colors', colorChips)}
+                {renderChipRow('Observed Shades', shadeChips)}
+                {gridFields.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {gridFields.map(([key, value]) => {
+                      const str = renderValue(value);
+                      if (HEX_RE.test(str)) {
+                        return (
+                          <div key={key} className="bg-muted/30 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0"
+                                style={{ backgroundColor: str }}
+                                aria-label={`Color swatch ${str}`}
+                              />
+                              <p className="text-xs font-semibold">{str}</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={key} className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
+                          <p className="text-xs font-semibold">{titleCase(str)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {renderMetadataCategory('Performance', performance)}
+            {renderMetadataCategory('Application & Installation', application)}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {renderCertificationsCard()}
+            {renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
+          </div>
+          {renderMetadataCategory('Design & Style', design)}
           {renderMetadataCategory('Commercial Information', commercial)}
-          {renderMetadataCategory('Packaging', packaging)}
           {renderVariantsTable()}
+          {renderPackagingPerVariantTable()}
         </div>
 
       </TabsContent>
@@ -1456,17 +2166,91 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       <TabsContent value="knowledge" className="mt-6">
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Knowledge Base Articles</h3>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-8 text-muted-foreground">
-                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Knowledge base linking coming soon</p>
-                <p className="text-sm mt-2">
-                  This will show cleaning instructions, maintenance guides, and related documentation
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {kbDocs.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8 text-muted-foreground">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No knowledge base articles yet</p>
+                  <p className="text-sm mt-2">
+                    Cleaning, handling, installation and regulation guides will appear here
+                    once the catalog knowledge extractor has run.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {(() => {
+                // Group KB docs by relationship_type so related content displays together
+                const groups: Record<string, typeof kbDocs> = {};
+                for (const d of kbDocs) {
+                  const g = d.relationship_type || 'other';
+                  (groups[g] = groups[g] || []).push(d);
+                }
+                // Preferred display order
+                const order = [
+                  'packaging',
+                  'care',
+                  'installation',
+                  'regulation',
+                  'certification',
+                  'compliance',
+                  'sustainability',
+                  'reference',
+                  'legal',
+                  'brand',
+                  'other',
+                ];
+                const sortedKeys = Object.keys(groups).sort((a, b) => {
+                  const ai = order.indexOf(a);
+                  const bi = order.indexOf(b);
+                  return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                });
+                const prettyLabel = (k: string) =>
+                  k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                return sortedKeys.map(groupKey => (
+                  <div key={groupKey} className="space-y-3">
+                    <h4 className="text-sm font-semibold text-primary">
+                      {prettyLabel(groupKey)}
+                    </h4>
+                    {groups[groupKey].map(doc => (
+                      <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            {doc.title}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {doc.summary && (
+                            <p className="text-sm text-muted-foreground mb-3 italic">
+                              {doc.summary}
+                            </p>
+                          )}
+                          <div className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">
+                            {(doc.content_markdown || doc.content || '').slice(0, 1500)}
+                            {(doc.content_markdown || doc.content || '').length > 1500 && '…'}
+                          </div>
+                          {Array.isArray((doc.metadata as any)?.key_points) &&
+                            (doc.metadata as any).key_points.length > 0 && (
+                            <ul className="mt-3 space-y-1">
+                              {((doc.metadata as any).key_points as string[]).slice(0, 6).map((p, i) => (
+                                <li key={i} className="text-xs flex items-start gap-2 text-muted-foreground">
+                                  <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/60 flex-shrink-0" />
+                                  {p}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
         </div>
       </TabsContent>
 

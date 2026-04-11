@@ -95,7 +95,8 @@ export function getProductName(product: ProductLike): string {
 }
 
 /**
- * Returns the material category (wall_tile, floor_tile, fabric, etc.)
+ * Returns the material category slug (wall_tile, floor_tile, fabric, etc.)
+ * as-is. Use `formatMaterialCategory()` for a display-friendly version.
  */
 export function getMaterialCategory(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null;
@@ -105,6 +106,44 @@ export function getMaterialCategory(metadata?: Record<string, any> | null): stri
     metadata.product_type ||
     null
   );
+}
+
+/**
+ * Formats a material category slug as Title Case for display.
+ *
+ *   "ceramic_tile"    → "Ceramic Tile"
+ *   "wood_flooring"   → "Wood Flooring"
+ *   "natural_stone"   → "Natural Stone"
+ *   "wall_tile"       → "Wall Tile"
+ *   "bathroom_tile"   → "Bathroom Tile"
+ *   "3d_wall_panel"   → "3D Wall Panel"
+ *   null / empty      → "—"
+ *
+ * Also handles free-text values like "ceramic tile" (returns "Ceramic Tile"),
+ * controlled vocabulary slugs, and the handful of acronyms we know about.
+ */
+const KNOWN_ACRONYMS = new Set(["3D", "2D", "LED", "LVT", "PVC", "EPDM", "SBR", "PEI", "SGN"]);
+
+export function formatMaterialCategory(
+  value: string | null | undefined,
+  fallback: string = "—",
+): string {
+  if (!value) return fallback;
+  const normalized = String(value).trim();
+  if (!normalized) return fallback;
+  // Split on underscores, hyphens, or whitespace
+  const parts = normalized
+    .split(/[_\-\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return fallback;
+  return parts
+    .map((p) => {
+      const upper = p.toUpperCase();
+      if (KNOWN_ACRONYMS.has(upper)) return upper;
+      return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    })
+    .join(" ");
 }
 
 /**
