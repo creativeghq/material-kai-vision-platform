@@ -660,6 +660,45 @@ export class MivaaApiClient {
   }
 
   /**
+   * Get the document extraction health / observability snapshot.
+   *
+   * Returns per-document extraction state: whether Layer 1 (catalog
+   * layout) + Layer 2 (catalog legends) have run, which legend types
+   * were found, global certifications propagated, per-product coverage
+   * buckets, and a sample of products with missing critical fields +
+   * source breakdown (which extractor populated each field).
+   *
+   * Used by the Document Health tab in AsyncJobQueueMonitor.
+   */
+  async getDocumentExtractionStatus(
+    documentId: string,
+    sampleLimit: number = 20,
+  ): Promise<MivaaApiResponse> {
+    return this.request(
+      `/api/internal/document-extraction-status/${documentId}?sample_limit=${sampleLimit}`,
+      { method: 'GET' },
+    );
+  }
+
+  /**
+   * Standalone runner for Layer 1 (catalog layout analyzer) + Layer 2
+   * (catalog legend extractor v2). Use this to re-process the catalog-
+   * wide data without re-running the full Stage 0-4 pipeline.
+   *
+   * Pass `force=true` to bypass the idempotency check.
+   */
+  async runCatalogKnowledge(
+    documentId: string,
+    force: boolean = false,
+  ): Promise<MivaaApiResponse> {
+    const qs = force ? '?force=true' : '';
+    return this.request(
+      `/api/internal/run-catalog-knowledge/${documentId}${qs}`,
+      { method: 'POST' },
+    );
+  }
+
+  /**
    * Detect material zones in a 3D rendered image.
    * Returns bounding boxes (relative 0–1) + metadata per zone.
    */

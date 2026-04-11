@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from '../TempFileCleanupModal';
 import { JobCheckpointTimeline } from '../JobCheckpointTimeline';
+import { DocumentHealthPanel } from './DocumentHealthPanel';
 import {
   RefreshCw,
   AlertTriangle,
@@ -2893,9 +2894,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           ) : (
             <>
             <Tabs defaultValue="products" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className={`grid w-full ${selectedJob?.status === 'completed' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="products">Product Extraction Pipeline</TabsTrigger>
                 <TabsTrigger value="logs">Technical Logs</TabsTrigger>
+                {selectedJob?.status === 'completed' && (
+                  <TabsTrigger value="health">Document Health</TabsTrigger>
+                )}
               </TabsList>
 
               {/* Product Extraction Tab - Enhanced with complete pipeline */}
@@ -3684,6 +3688,27 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                 </div>
               </TabsContent>
+
+              {/* Document Health Tab — shown after the job finishes.
+                  Calls /api/internal/document-extraction-status/{document_id}
+                  and displays catalog-layout detection results, legend
+                  extraction status, global certifications, per-product
+                  coverage buckets, and a per-product drilldown with
+                  missing critical fields + source breakdown. */}
+              {selectedJob?.status === 'completed' && (
+                <TabsContent value="health" className="space-y-4 mt-6">
+                  {selectedJob?.document_id ? (
+                    <DocumentHealthPanel documentId={selectedJob.document_id} />
+                  ) : (
+                    <Alert>
+                      <AlertDescription>
+                        This job has no linked document_id, so the extraction
+                        health report cannot be displayed.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </TabsContent>
+              )}
             </Tabs>
 
             {/* Shared Processing Metrics Footer */}
