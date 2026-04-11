@@ -1,497 +1,675 @@
-# Full Workflow Test — End-to-End Validation Plan
+# MIVAA E2E Test — Claude Execution Script
 
-This document describes how to run the **MIVAA full workflow test** against a fresh PDF (or against the existing 9 documents that need backfilling) and how to verify that **every** part of the post-2026-04 7-vector embedding pipeline is producing the data we expect.
-
-It is the canonical "did everything actually work?" runbook. Run it after every deploy that touches the image or embedding pipeline.
+> **You are Claude. This file is a directive, not documentation. When the user asks you to "run scripts/README.md" or "run the E2E test", you execute every step in this file in order, using the exact tool calls specified, and only stop on the gates. You do not improvise. You do not ask the user for clarification on anything that is already specified here. You only stop and report when a hard gate fails.**
 
 ---
 
-## 0. Purpose & success criteria
+## 0. WHAT YOU ARE DOING
 
-We need a fresh PDF run that ends with **100% completion** and produces all of the following:
+You are running an end-to-end validation of the post-2026-04 MIVAA pipeline by executing the canonical test script `test_full_workflow.sh --test` on the production server. The script discovers all products in `harmony-signature-book-24-25.pdf`, then processes **only the first product** end-to-end (test mode).
 
-| Asset | Where it lives | Expected count for the test PDF |
-|---|---|---|
-| **Document chunks** | `document_chunks` | > 0 |
-| **Chunk text embeddings** | `document_chunks.text_embedding` (Voyage 1024D) | = chunks count |
-| **Images extracted** | `document_images` | > 0 |
-| **Visual SLIG embeddings** | `vecs.image_slig_embeddings` (768D) | = material image count |
-| **Color SLIG embeddings** | `vecs.image_color_embeddings` (768D) | = material image count |
-| **Texture SLIG embeddings** | `vecs.image_texture_embeddings` (768D) | = material image count |
-| **Style SLIG embeddings** | `vecs.image_style_embeddings` (768D) | = material image count |
-| **Material SLIG embeddings** | `vecs.image_material_embeddings` (768D) | = material image count |
-| **Understanding embeddings** | `vecs.image_understanding_embeddings` (Voyage 1024D from Qwen3-VL `vision_analysis`) | ≈ material image count (Claude fallback acceptable) |
-| **Boolean presence flags** | `document_images.has_*_slig`, `has_understanding_embedding` | one row per image, true where the corresponding VECS row exists |
-| **Products** | `products` | exactly 1 in test mode (`test_single_product=true`) |
-| **Product text embeddings** | `products.text_embedding_1024` | = product count |
-| **Chunk → product relationships** | `chunk_product_relationships` | > 0 |
-| **Chunk → image relationships** | `chunk_image_relationships` | > 0 (page proximity, populated by `entity_linking_service`) |
-| **Image → product associations** | `image_product_associations` | > 0 |
-| **Visual metadata (text tags)** | `document_images.visual_metadata` (color names, finishes, etc) | populated for material images |
-| **vision_analysis JSON** | `document_images.vision_analysis` | populated for material images (12-field schema, see Phase A) |
-| **vision_provider** | `document_images.vision_provider` | `'qwen'` or `'claude_fallback'` |
+The goal is to prove that — for that one processed product — every part of the 7-vector pipeline produced data:
 
-If **any** of those is missing or zero where it should be > 0, the test is **NOT done**. Identify the failure step, fix the root cause, restart the pipeline, repeat until clean.
+- Discovery returns exactly 11 products
+- Test mode processes exactly 1 product (no more)
+- That product produces chunks, chunk text embeddings, images, all 6 image embedding vectors per material image, vision_analysis JSON, visual metadata, products row with text_embedding_1024, and all the relationship rows
+- `final-result.html` is written to `/tmp/final-result.html` on the production server with every section populated and zero unmet gates
+- Sentry shows zero new issues caused by the run
 
-> **Hard rule for the test PDF.** We must discover **exactly 11 products** during stage 0 discovery. If discovery returns anything other than 11, **cancel everything**. We must process **only 1 product** (`test_single_product=true`) — if more than one starts processing, cancel them all. The run is only declared successful when `final-result.html` is written and contains the full per-vector breakdown.
+If you hit a gate failure, you stop the active job, root-cause it using §4 below, fix it, restart from the affected step (NOT the whole script), and re-loop on that step until it passes — within the loop budget in §5.
+
+You manage progress with `TodoWrite` — one todo per Step in §3 below. You mark each one `in_progress` before running it and `completed` only after its gate passes.
 
 ---
 
-## 1. The script — `test_full_workflow.sh`
+## 1. PRECONDITIONS — verify these BEFORE starting
 
-Located at `mivaa-pdf-extractor/test_full_workflow.sh` on the production server (the script lives inside the python service repo, not in `/scripts/`).
+You assume all of the following are true. If any is false, **STOP** and report.
 
-```bash
-# Test mode (process 1 product only — what we use for end-to-end validation)
-./test_full_workflow.sh --test
-```
+| Precondition | How to verify |
+|---|---|
+| The fix branch is deployed to production (`v1api.materialshub.gr`) | `Bash`: `curl -s https://v1api.materialshub.gr/health \| jq '.services.database.status, .services.storage.status, .services.anthropic.status'` — all must return `"healthy"` |
+| The Material Image Analyzer prompt v2 is in the database | `mcp__supabase__execute_sql`: `SELECT version FROM prompts WHERE name = 'Material Image Analyzer' AND is_active = true;` — must return `version >= 2` |
+| You have ssh-mcp access to the production server | `mcp__ssh-mcp__exec`: `whoami && hostname && systemctl is-active mivaa-pdf-extractor.service` — must return `active` |
+| `test_full_workflow.sh` exists on the server with `--test` support | `mcp__ssh-mcp__exec`: `ls -la /var/www/mivaa-pdf-extractor/test_full_workflow.sh && grep -c "test_single_product" /var/www/mivaa-pdf-extractor/test_full_workflow.sh` — file must exist, grep must return ≥ 1 |
+| You have `mcp__supabase__execute_sql` and `mcp__sentry__list_issues` available | Tool list at the top of your context |
 
-What it does:
-
-1. Refuses to start if a job for the same PDF is already running (deduplication).
-2. Health-checks the API (database, storage, Anthropic). If Qwen is unhealthy the script will warn but continue — Claude fallback covers it.
-3. Uploads the test PDF (`harmony-signature-book-24-25.pdf`) with `test_single_product=true`.
-4. Polls `/api/rag/documents/job/{job_id}` every 10 s and prints `status | progress% | current_stage`.
-5. On success, calls a `verify_results` function that fetches `/api/rag/documents/job/{job_id}` and checks `chunks_created`, `images_extracted`, `clip_embeddings_generated`, `products_discovered`.
-6. On failure, dumps the last 100 lines of `journalctl -u mivaa-pdf-extractor.service` filtered to errors/exceptions.
-
-Default timeout: **30 minutes**. If the run takes longer, **kill the job and investigate** — most stages should be done within 5–10 min in test mode. The full pipeline target is **30–45 min** in non-test mode (all 11 products).
-
-**Working directory for outputs:** `/tmp/`. Every checkpoint produces a JSON dump named `/tmp/job_{job_id}_{status}.json`.
+If any precondition fails, **report the failure and stop**. Do not attempt to deploy, fix, or work around it.
 
 ---
 
-## 2. How to connect — SSH MCP
+## 2. CONSTANTS
 
-You drive this test from your workstation via the **ssh MCP** so you can read `journalctl` and tail logs in real time.
+Use these literal values throughout. Do not invent or substitute.
 
 ```
-mcp__ssh-mcp__exec   for read-only commands (cat, tail, jq, journalctl, curl)
-mcp__ssh-mcp__sudo-exec   for service restarts
+WORKSPACE_ID                  = ffafc28b-1b8b-4b0d-b226-9f9a6154004e
+PDF_NAME                      = harmony-signature-book-24-25.pdf
+EXPECTED_PRODUCTS_DISCOVERED  = 11
+EXPECTED_PRODUCTS_PROCESSED   = 1                    # test_single_product=true
+SCRIPT_PATH                   = /var/www/mivaa-pdf-extractor/test_full_workflow.sh
+SCRIPT_FLAGS                  = --test
+SERVICE_NAME                  = mivaa-pdf-extractor.service
+TEST_RUN_LOG                  = /tmp/test_run.log
+FINAL_REPORT                  = /tmp/final-result.html
+PRODUCTION_API                = https://v1api.materialshub.gr
+LOCAL_API_ON_SERVER           = http://localhost:8000
+LOG_TAIL_FILTER               = "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|🎨|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR|Discovery|product|chunk_image_relationship|image_product_association|TEST MODE"
+POLL_INTERVAL_SEC             = 30
+STALL_DETECTION_POLLS         = 3                    # 3 polls with no progress = stuck
+HARD_TIMEOUT_MINUTES          = 45
 ```
 
-The service runs as `mivaa-pdf-extractor.service`. Logs:
+You will discover and capture these during the run:
+
 ```
-sudo journalctl -u mivaa-pdf-extractor.service -f          # live tail
-sudo journalctl -u mivaa-pdf-extractor.service -n 200      # last 200 lines
-sudo journalctl -u mivaa-pdf-extractor.service --since "5 minutes ago"
-```
-
-Job logs are also written into `/tmp/`. The `Product Checker` script — `/tmp/check_products_created.sh` — polls the database for new product rows tied to the active job, useful when you want to know "did stage 4 actually finish writing products?".
-
----
-
-## 3. Investigation philosophy
-
-> **Layer-by-layer.** Validate each layer (stage) before moving on. If a step fails, stop, find why, fix, restart from the affected stage, repeat until that step is 100% clean. **Do not** keep going past a failed stage hoping the next one will mask it.
-
-For each stage you check:
-
-1. The stage's **own log lines** (`journalctl ... | grep "Stage N"`)
-2. The **HuggingFace endpoint calls** that stage should make (see §4 — these MUST appear in the logs; absence means the endpoint is not being called)
-3. The **database / VECS** tables the stage writes to
-4. The **stage transition** — that the next stage actually started
-
-Any warnings or exceptions surfaced in `journalctl` get reported. Don't bury them — they're either real bugs we need to fix or noise we need to suppress.
-
----
-
-## 4. HuggingFace endpoints we MUST see in the logs
-
-If a HuggingFace call is missing from the logs for a step that's supposed to use it, **stop and fix** before continuing. Symptoms of "endpoint not called" usually mean the manager is paused, the auth token is wrong, or the registry singleton lost its handle.
-
-| Endpoint | Stage that calls it | Log markers to grep for |
-|---|---|---|
-| **Qwen3-VL-32B** (image classification) | Stage 3 — `image_processing_service.classify_images` | `🤖 Starting AI-based image classification`, `Qwen OpenAI client base_url`, `qwen_endpoint` |
-| **Qwen3-VL-32B** (material analysis → vision_analysis JSON) | Stage 3 — `_analyze_material_image → _try_qwen_material_analysis` | `🔬 ... vision_analysis valid for ... (qwen)`, `🩹 Falling back to Claude` (only if Qwen fails) |
-| **YOLO** (layout regions) | Stage 1 — `extract_product_pages` | `YOLO ...`, `product_layout_regions` |
-| **SLIG (SigLIP2)** primary visual embedding | Stage 3 — `real_embeddings_service._generate_visual_embedding` | `☁️ Visual Embeddings: SLIG Cloud Endpoint`, `✅ SLIG image embedding: 768D`, `Saved visual embedding to VECS` |
-| **SLIG calculate_similarity** (color/texture/style/material text-guided blends) | Stage 3 — `_generate_specialized_siglip_embeddings` | `✅ Generated color specialized embedding (768D, similarity=...)` × 4 per image |
-| **SLIG get_text_embedding** (text-guided prompts) | same as above | `✅ SLIG text embedding: 768D` |
-| **Voyage AI** (text + understanding embeddings) | Stages 2, 3, 4 | `voyage-3.5`, `Generating text embedding`, `Understanding embedding generated (1024D)` |
-| **Anthropic Claude Sonnet 4.6** (classification fallback + material analysis fallback) | Stage 3 | `validate_with_claude`, `claude_fallback`, `claude-sonnet-4-6-20260217` |
-
-**Tail command to watch all of these in real time:**
-
-```bash
-sudo journalctl -u mivaa-pdf-extractor.service -f \
-  | grep -E "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|🎨|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR"
+JOB_ID                  # set in Step 4 from /tmp/test_run.log
+DOCUMENT_ID             # set in Step 4 from /api/rag/documents/job/{JOB_ID}
+PRODUCT_ID              # set in Step 6 — the single product processed by test mode
+TEST_DOC_FIRST_IMAGE_ID # set in Step 6 — first material image of that product
+BASELINE_SENTRY_ISSUES  # set in Step 2
 ```
 
 ---
 
-## 5. The 7 phases
+## 3. STEPS — execute in order, do not skip
 
-Run them in order. Each phase verifies a specific layer before allowing the next.
+**Create a TodoWrite at the start with one entry per step (Steps 1–9 below). Mark each `in_progress` when you start it and `completed` only when its gate passes.**
 
-### Phase A — Pre-flight (≤ 30 sec)
+### STEP 1 — Pre-flight: deploy live & prompt loaded
 
-Confirm the deploy is live and the prompt loader picked up the v2 strict-schema prompt.
-
-```bash
-# 1. Service is reachable
-curl -s http://localhost:8000/health | jq '.services | {database, storage, anthropic, qwen}'
-
-# 2. The Material Image Analyzer prompt loaded successfully on startup
-sudo journalctl -u mivaa-pdf-extractor.service --since "10 minutes ago" \
-  | grep -E "Loaded Material Image Analyzer prompt|Loaded classification prompt"
+```
+Bash: curl -s https://v1api.materialshub.gr/health | jq '.services | {database, storage, anthropic, qwen}'
 ```
 
-Expected: both "Loaded ... prompt from database" lines should be present. If `Material Image Analyzer prompt not found` appears, **stop** — the strict v2 prompt did not seed correctly. Re-run the prompt update SQL.
+**Gate 1.1**: `database.status`, `storage.status`, `anthropic.status` all `"healthy"`. Qwen may be unhealthy — that's fine, Claude fallback covers it.
 
-### Phase B — Single-image smoke test (≤ 60 sec, costs ~$0.0002)
-
-Pick one existing image_id and run it through the `regenerate-image-embeddings` endpoint with `force_regenerate=true`. This validates Bugs 1+2+3 fixes WITHOUT touching a fresh PDF.
-
-```bash
-# Get an image_id we can test with
-IMAGE_ID=$(curl -s http://localhost:8000/api/rag/documents/jobs?limit=1 \
-  | jq -r '.jobs[0].document_id' \
-  | xargs -I{} curl -s "http://localhost:8000/api/internal/document/{}/images?limit=1" \
-  | jq -r '.images[0].id')
-
-# Force-regenerate that one image
-curl -s -X POST http://localhost:8000/api/internal/regenerate-image-embeddings \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"workspace_id\": \"ffafc28b-1b8b-4b0d-b226-9f9a6154004e\",
-    \"image_ids\": [\"$IMAGE_ID\"],
-    \"force_regenerate\": true
-  }" | jq .
+```
+mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "15 minutes ago" | grep -E "Loaded Material Image Analyzer prompt|Loaded classification prompt" | tail -5
 ```
 
-Then verify against the database (run via `mcp__supabase__execute_sql`):
+**Gate 1.2**: both `Loaded Material Image Analyzer prompt from database` AND `Loaded classification prompt from database` lines must appear. If `Material Image Analyzer prompt not found` appears anywhere, **STOP** — the v2 prompt did not seed correctly. Report the gate failure with the journalctl line as evidence.
 
-```sql
--- 1. vision_analysis populated with the new schema
-SELECT
-  id,
-  vision_provider,
-  jsonb_object_keys(vision_analysis) AS field
-FROM document_images
-WHERE id = '<IMAGE_ID>';
+```
+mcp__supabase__execute_sql: SELECT version, updated_at FROM prompts WHERE name = 'Material Image Analyzer' AND is_active = true;
 ```
 
-Expected: `vision_provider` is `'qwen'` or `'claude_fallback'`, and at least 4 of these 12 keys appear: `material_type, material_subtype, color_palette, primary_color_hex, texture, pattern, finish, design_style, applications, physical_properties, quality_assessment, confidence`.
+**Gate 1.3**: `version >= 2`. If 1, the v2 prompt update did not run. **STOP** and report.
 
-```sql
--- 2. All 6 VECS collections received this image
-SELECT
-  (SELECT 1 FROM vecs.image_slig_embeddings           WHERE id = '<IMAGE_ID>') AS visual,
-  (SELECT 1 FROM vecs.image_color_embeddings          WHERE id = '<IMAGE_ID>') AS color,
-  (SELECT 1 FROM vecs.image_texture_embeddings        WHERE id = '<IMAGE_ID>') AS texture,
-  (SELECT 1 FROM vecs.image_style_embeddings          WHERE id = '<IMAGE_ID>') AS style,
-  (SELECT 1 FROM vecs.image_material_embeddings       WHERE id = '<IMAGE_ID>') AS material,
-  (SELECT 1 FROM vecs.image_understanding_embeddings  WHERE id = '<IMAGE_ID>') AS understanding;
+### STEP 2 — Sentry baseline
+
+Capture the current Sentry issue list BEFORE starting the run so you can detect new errors caused by the test.
+
+```
+mcp__sentry__list_issues:
+  query = "is:unresolved firstSeen:-1h"
+  sort = "date"
+  limit = 50
 ```
 
-Expected: all 6 columns return `1`. If any return `NULL`, see the troubleshooting table at §7.
+Save the resulting issue IDs to a list called `BASELINE_SENTRY_ISSUES`. You will compare against this in Step 8.
 
-```sql
--- 3. Boolean flags match VECS
-SELECT
-  has_slig_embedding, has_color_slig, has_texture_slig,
-  has_style_slig, has_material_slig, has_understanding_embedding
-FROM document_images
-WHERE id = '<IMAGE_ID>';
+### STEP 3 — Refuse to run if a duplicate job exists
+
+```
+Bash: curl -s "https://v1api.materialshub.gr/api/rag/documents/jobs?limit=20" | jq -r '.jobs[] | select(.filename == "harmony-signature-book-24-25.pdf" and (.status == "processing" or .status == "pending")) | .id'
 ```
 
-Expected: all 6 flags are `true`. If a flag is `false` but the matching VECS row exists, the `_set_image_flag` call inside `vecs_service` failed silently — check logs for `Failed to set has_*` debug lines.
+**Gate 3.1**: must return empty (no output). If a job is already running for the same PDF, do NOT start a duplicate. Cancel it via:
 
-### Phase C — Specialized vector differentiation (≤ 10 sec, no cost)
+```
+Bash: curl -s -X POST "https://v1api.materialshub.gr/api/internal/reset-job/<existing_job_id>"
+```
 
-This is the **Bug 2 regression check**. Before our 2026-04 fix, all 4 specialized vectors (color/texture/style/material) were silent clones of the base visual embedding. After the fix they should be **distinct** text-guided blends.
+Then re-run Step 3. If the existing job belongs to another user / wasn't started by you, **STOP** and report — do not cancel work you didn't initiate without authorization.
 
-```sql
-WITH t AS (
+### STEP 4 — Launch `test_full_workflow.sh --test`
+
+You launch the script in the background on the production server so you can poll status while it runs. The script handles the upload, dedupe, monitoring, and `verify_results` itself — your job is to monitor it and validate against stricter gates than the script's own checks.
+
+```
+mcp__ssh-mcp__exec: cd /var/www/mivaa-pdf-extractor && rm -f /tmp/test_run.log && nohup ./test_full_workflow.sh --test > /tmp/test_run.log 2>&1 & echo "PID=$!"
+```
+
+**Gate 4.0**: shell returned a PID. The script is now running in the background.
+
+Wait 20 seconds for the upload to register and the script to print the job ID:
+
+```
+Bash: sleep 20
+mcp__ssh-mcp__exec: grep "Job ID:" /tmp/test_run.log | tail -1
+```
+
+Capture the UUID after `Job ID:` → `JOB_ID`. **Gate 4.1**: a UUID was captured. If not:
+
+```
+mcp__ssh-mcp__exec: tail -100 /tmp/test_run.log
+```
+
+Diagnose from the log output, fix the cause (likely health check failure or duplicate-job blocker), and re-run Step 4. After 2 retries, **STOP** and report.
+
+```
+Bash: curl -s "https://v1api.materialshub.gr/api/rag/documents/job/<JOB_ID>" | jq '{id, status, document_id, current_stage}'
+```
+
+Capture `document_id` → `DOCUMENT_ID`. **Gate 4.2**: `status` is one of `pending`, `processing`, or `initialized`.
+
+### STEP 5 — Monitor stage by stage
+
+Poll every `POLL_INTERVAL_SEC` (30 s) until the script reports completion. Update the in-progress todo's `activeForm` with the current stage name on every poll so the user sees movement.
+
+**Per poll, you do all 3 of these:**
+
+```
+Bash: curl -s "https://v1api.materialshub.gr/api/rag/documents/job/<JOB_ID>" \
+  | jq '{status, progress, current_stage, current_step: .metadata.current_step, error_message}'
+```
+
+```
+mcp__ssh-mcp__exec: tail -30 /tmp/test_run.log
+```
+
+```
+mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "90 seconds ago" | grep -E "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR|discovered|product|TEST MODE" | tail -40
+```
+
+**Stall detection**: track the value of `progress` across consecutive polls. If `progress` does not change for `STALL_DETECTION_POLLS` (3) consecutive polls (90 s), assume the stage is stuck. Look up "stuck job" in §4 and apply its remedy.
+
+**Hard timeout**: 45 minutes (`HARD_TIMEOUT_MINUTES`) total wall-clock from the moment Step 4 launched. If exceeded, POST `/api/internal/reset-job/<JOB_ID>` and **STOP** with `❌ E2E TEST BLOCKED — TIMEOUT`.
+
+**Per-stage gates** — verify each as it appears in the logs. As soon as a gate fails, run the matching §4 lookup and either fix-and-retry the affected step (within loop budget) or stop the job and re-run from Step 4:
+
+| # | Stage | Gate (must see in logs OR DB) | Fail action |
+|---|---|---|---|
+| 5.1 | **Stage 0 — Discovery** | `discovered 11 products` (or equivalent count = 11) appears in journalctl | If count != 11, immediately POST `/api/internal/reset-job/<JOB_ID>`. **STOP** and report — discovery prompt or model output changed unexpectedly. |
+| 5.2 | **Test mode gate** | `🧪 TEST MODE: Processing first product only` (or `Processing first product only`) appears. NO `processing product 2/11` (or equivalent) appears at any time. | If a 2nd product starts processing, immediately POST `/api/internal/reset-job/<JOB_ID>`. **STOP** and report — `test_single_product=true` is not honored. |
+| 5.3 | **Stage 1 — Layout extraction** | `YOLO` log lines appear OR `product_layout_regions` rows are written | If neither appears within 3 min, look up "YOLO endpoint paused" in §4. |
+| 5.4 | **Stage 2 — Chunking** | `chunks_created: N` (with N > 0) appears AND followed by `voyage-3.5` text-embedding calls per chunk | If chunks but no Voyage calls, look up "Voyage misconfigured" in §4. |
+| 5.5 | **Stage 3 — Image classification** | `🤖 Starting AI-based image classification` appears AND per-image classification results follow | If no Qwen calls within 3 min, look up "Qwen endpoint paused" in §4. |
+| 5.6 | **Stage 3 — Material analysis (vision_analysis)** | per material image: `🔬 ... vision_analysis valid for ... (qwen)` OR `🔬 ... vision_analysis valid for ... (claude_fallback)` | If `failed` provenance for >50% of images, look up "Qwen JSON malformed" in §4. |
+| 5.7 | **Stage 3 — Visual SLIG embedding** | per material image: `✅ SLIG image embedding: 768D` AND `Saved visual embedding to VECS` | If absent, look up "SLIG endpoint paused" in §4. |
+| 5.8 | **Stage 3 — Specialized SLIG (color/texture/style/material)** | per material image: 4 lines of `✅ Generated color specialized embedding (768D, similarity=...)` — one each for color, texture, style, material | If only 1 of 4 appears, **STOP** the entire run — silent-fallback bug regression. Report immediately, do NOT proceed. Re-verify in Step 6 before continuing. |
+| 5.9 | **Stage 3 — Understanding embedding** | per material image with vision_analysis: `✅ Understanding embedding generated (1024D)` | If absent, look up "Voyage understanding broken" in §4. |
+| 5.10 | **Per-image progress events** | `current_step` from job metadata polling shows `v:N c:N t:N s:N m:N u:N` tally and these counts increase together | If no per-image progress events, the `tracker` parameter wasn't threaded — confirm Step 1.2 prompt-load output and check that `product_processor.py` is passing `tracker=tracker` into `process_product_images`. |
+| 5.11 | **Stage 4 — Product creation** | `INSERT INTO products` for product 1 only AND `text_embedding_1024` is non-null on the inserted row | If embedding null, Voyage call failed silently. Check journalctl for `voyage` errors. |
+| 5.12 | **Entity linking** | `Created N chunk-image relationship entries` AND `image_product_associations` rows are inserted | If `chunk_image_relationships` is 0 for the new doc, `entity_linking_service.link_images_to_chunks` did not run. Look up in §4. |
+| 5.13 | **Stage 3 — Icon extraction** | Per icon candidate: `🔖 Icon {id} (page N): extracted N spec items (slip_resistance, fire_rating, ...)`. The icon split log line `🔖 Icon split: N regular material, N icon candidates ...` appears once per Stage 3. | If `icon_candidates_processed > 0` but `icon_metadata_extracted == 0`, the OCR or Claude call is failing on every icon — look up "icon extraction failed" in §4. If NO icon split log line appears AT ALL, the detection rules (size + grid) didn't fire — that's NOT a failure on its own (the test PDF may legitimately have no spec icons), but expect at least 1 icon batch on a typical ceramic catalog. |
+| 5.14 | **Job completion** | `status == "completed"` AND `progress == 100`. The script also writes `/tmp/job_<JOB_ID>_final.json` on success. | If `status == "failed"`, look up the error message in §4 and re-run the affected step. |
+
+**Gate 5.final**: `status == "completed"` AND `progress == 100` AND `/tmp/job_<JOB_ID>_final.json` exists.
+
+**Capture for the final report**: from the script's run, save the Stage 3 summary line for the test product:
+```
+mcp__ssh-mcp__exec: grep -E "Vectors per type|Vision analysis: qwen|Icons: extracted" /tmp/test_run.log | tail -10
+```
+You'll paste these into the final-result.html in Step 7.
+
+### STEP 6 — Verification SQL block
+
+After Step 5 reports completion, run all 6 verification queries against the test document. Substitute `<DOC_ID>` with `DOCUMENT_ID`. Capture each result.
+
+#### Query A — Per-vector embedding counts for the test document
+
+```
+mcp__supabase__execute_sql:
   SELECT
-    (SELECT vec FROM vecs.image_color_embeddings    WHERE id = '<IMAGE_ID>') AS color,
-    (SELECT vec FROM vecs.image_texture_embeddings  WHERE id = '<IMAGE_ID>') AS texture,
-    (SELECT vec FROM vecs.image_style_embeddings    WHERE id = '<IMAGE_ID>') AS style,
-    (SELECT vec FROM vecs.image_material_embeddings WHERE id = '<IMAGE_ID>') AS material
-)
-SELECT
-  (color    <=> texture)::float  AS d_color_texture,
-  (color    <=> style)::float    AS d_color_style,
-  (color    <=> material)::float AS d_color_material,
-  (texture  <=> style)::float    AS d_texture_style,
-  (texture  <=> material)::float AS d_texture_material,
-  (style    <=> material)::float AS d_style_material
-FROM t;
+    COUNT(*)                                                      AS total_images,
+    SUM(CASE WHEN has_slig_embedding         THEN 1 ELSE 0 END)   AS visual,
+    SUM(CASE WHEN has_color_slig             THEN 1 ELSE 0 END)   AS color,
+    SUM(CASE WHEN has_texture_slig           THEN 1 ELSE 0 END)   AS texture,
+    SUM(CASE WHEN has_style_slig             THEN 1 ELSE 0 END)   AS style,
+    SUM(CASE WHEN has_material_slig          THEN 1 ELSE 0 END)   AS material,
+    SUM(CASE WHEN has_understanding_embedding THEN 1 ELSE 0 END)  AS understanding
+  FROM document_images
+  WHERE document_id = '<DOCUMENT_ID>';
 ```
 
-**Expected**: all 6 distances are **> 0** (typically 0.05–0.40 — text-guided blends share most of the base visual signal but lean toward their aspect direction).
-**Failure mode**: any distance == `0.0` means the silent fallback bug is back. Stop, do not proceed.
+**Gate 6.A**: `visual`, `color`, `texture`, `style`, `material` ALL equal `total_images`. `understanding >= floor(total_images * 0.9)` (allow 10% Qwen+Claude double-failure — that's the design tolerance).
 
-### Phase D — Single-document backfill via the new UI button (≤ 5 min)
+#### Query B — Vision analysis provenance
 
-Validates the new `Fill Images` button in `AsyncJobQueueMonitor.tsx`, the per-image progress events, and the full backfill flow on existing data.
-
-1. Open `/admin/async-job-queue-monitor` in a browser.
-2. Pick **one** of the 9 existing documents (the ones with only `visual_768` populated).
-3. Click **Fill Images**.
-4. **Watch the UI**: the progress bar should advance smoothly with the per-image step labels:
-
-   ```
-   Stage 3: Processing images for {document} (12/50) — v:12 c:12 t:12 s:11 m:12 u:12
-   ```
-
-   The letters mean visual / color / texture / style / material / understanding counts. They should **increase together** image by image. If `u:` lags significantly behind the others, Qwen is failing on those images and falling back to Claude (acceptable). If `c:` / `t:` / `s:` / `m:` lag, the SLIG specialized path is broken (NOT acceptable — see Phase C).
-
-5. After completion, the toast should show: `N images processed, M vectors written` (M ≈ 6 × N).
-6. Re-run **Phase B** for any 1 image from this document. All 6 VECS collections must now be populated.
-7. Verify counts at the document level:
-
-   ```sql
-   SELECT
-     SUM(CASE WHEN has_slig_embedding         THEN 1 ELSE 0 END) AS visual,
-     SUM(CASE WHEN has_color_slig             THEN 1 ELSE 0 END) AS color,
-     SUM(CASE WHEN has_texture_slig           THEN 1 ELSE 0 END) AS texture,
-     SUM(CASE WHEN has_style_slig             THEN 1 ELSE 0 END) AS style,
-     SUM(CASE WHEN has_material_slig          THEN 1 ELSE 0 END) AS material,
-     SUM(CASE WHEN has_understanding_embedding THEN 1 ELSE 0 END) AS understanding,
-     COUNT(DISTINCT vision_provider)          AS distinct_providers,
-     COUNT(*)                                 AS total_images
-   FROM document_images
-   WHERE document_id = '<DOCUMENT_ID>';
-   ```
-
-   Expected: `visual`, `color`, `texture`, `style`, `material` should all equal `total_images` (or come very close). `understanding` should be ≈ `total_images` minus a small number if any analysis attempts failed entirely. `distinct_providers` should be `1` (qwen) or `2` (qwen + claude_fallback).
-
-### Phase E — Fresh PDF, full pipeline (≤ 10 min, the main test)
-
-This is the canonical end-to-end test. It exercises every stage from upload through to product creation and entity linking.
-
-```bash
-ssh into the server, then:
-cd /var/www/mivaa-pdf-extractor
-./test_full_workflow.sh --test
+```
+mcp__supabase__execute_sql:
+  SELECT vision_provider, COUNT(*) AS images
+  FROM document_images
+  WHERE document_id = '<DOCUMENT_ID>' AND vision_analysis IS NOT NULL
+  GROUP BY vision_provider;
 ```
 
-In a second SSH session, tail the structured log markers:
+**Gate 6.B**: at least one row exists with `vision_provider IN ('qwen', 'claude_fallback')`. `failed` should NOT appear (failed analyses don't write `vision_analysis`).
 
-```bash
-sudo journalctl -u mivaa-pdf-extractor.service -f \
-  | grep -E "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|🎨|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR|Discovery|product"
+#### Query C — Relationships and product count
+
+```
+mcp__supabase__execute_sql:
+  SELECT
+    (SELECT COUNT(*) FROM document_chunks      WHERE document_id = '<DOCUMENT_ID>') AS chunks,
+    (SELECT COUNT(*) FROM document_chunks      WHERE document_id = '<DOCUMENT_ID>' AND text_embedding IS NOT NULL) AS chunks_with_text_embedding,
+    (SELECT COUNT(*) FROM document_images      WHERE document_id = '<DOCUMENT_ID>') AS images,
+    (SELECT COUNT(*) FROM products             WHERE source_document_id = '<DOCUMENT_ID>') AS products,
+    (SELECT COUNT(*) FROM products             WHERE source_document_id = '<DOCUMENT_ID>' AND text_embedding_1024 IS NOT NULL) AS products_with_embedding,
+    (SELECT COUNT(*) FROM chunk_product_relationships  cpr JOIN document_chunks dc ON dc.id = cpr.chunk_id WHERE dc.document_id = '<DOCUMENT_ID>') AS chunk_product_links,
+    (SELECT COUNT(*) FROM chunk_image_relationships    cir JOIN document_chunks dc ON dc.id = cir.chunk_id WHERE dc.document_id = '<DOCUMENT_ID>') AS chunk_image_links,
+    (SELECT COUNT(*) FROM image_product_associations   ipa JOIN document_images di ON di.id = ipa.image_id WHERE di.document_id = '<DOCUMENT_ID>') AS image_product_assocs;
 ```
 
-Hard checkpoints:
+**Gate 6.C** (the most important gate of the entire run):
+- `chunks_with_text_embedding == chunks`
+- `products == 1` (test mode — MUST be exactly 1, not 0, not >1)
+- `products_with_embedding == 1`
+- `chunk_image_links > 0` (page proximity grounding worked)
+- `image_product_assocs > 0` (product↔image association worked)
+- `chunk_product_links > 0`
 
-| Checkpoint | What you should see | If missing |
+If `products` != 1, **STOP** the run — test mode regression. If `products == 1` but `products_with_embedding == 0`, the Voyage product embedding call failed silently — check journalctl for `voyage` errors and re-run from Step 4 after fixing.
+
+Capture the product UUID:
+
+```
+mcp__supabase__execute_sql:
+  SELECT id, name, source_document_id
+  FROM products
+  WHERE source_document_id = '<DOCUMENT_ID>'
+  LIMIT 1;
+```
+
+Capture `id` → `PRODUCT_ID`.
+
+#### Query D — Visual metadata (Stage 3.5)
+
+```
+mcp__supabase__execute_sql:
+  SELECT
+    COUNT(*) FILTER (WHERE visual_metadata IS NOT NULL AND visual_metadata != '{}'::jsonb) AS images_with_visual_metadata,
+    COUNT(*) AS total_images
+  FROM document_images
+  WHERE document_id = '<DOCUMENT_ID>';
+```
+
+**Gate 6.D**: `images_with_visual_metadata > 0`.
+
+#### Query E — VECS truth source (cross-check against query A)
+
+```
+mcp__supabase__execute_sql:
+  SELECT 'image_slig_embeddings'           AS coll, COUNT(*) FROM vecs.image_slig_embeddings           WHERE metadata->>'document_id' = '<DOCUMENT_ID>'
+  UNION ALL SELECT 'image_color_embeddings',          COUNT(*) FROM vecs.image_color_embeddings          WHERE metadata->>'document_id' = '<DOCUMENT_ID>'
+  UNION ALL SELECT 'image_texture_embeddings',        COUNT(*) FROM vecs.image_texture_embeddings        WHERE metadata->>'document_id' = '<DOCUMENT_ID>'
+  UNION ALL SELECT 'image_style_embeddings',          COUNT(*) FROM vecs.image_style_embeddings          WHERE metadata->>'document_id' = '<DOCUMENT_ID>'
+  UNION ALL SELECT 'image_material_embeddings',       COUNT(*) FROM vecs.image_material_embeddings       WHERE metadata->>'document_id' = '<DOCUMENT_ID>'
+  UNION ALL SELECT 'image_understanding_embeddings',  COUNT(*) FROM vecs.image_understanding_embeddings  WHERE metadata->>'document_id' = '<DOCUMENT_ID>';
+```
+
+**Gate 6.E**: each collection's count equals the corresponding count in Query A. If query A says `5 has_color_slig` but `vecs.image_color_embeddings` has `7` rows, the boolean flag updater is broken — look up `has_color_slig=false but vecs row exists` in §4.
+
+#### Query F — vision_analysis schema sanity
+
+```
+mcp__supabase__execute_sql:
+  SELECT
+    id,
+    vision_provider,
+    array_length(array(SELECT jsonb_object_keys(vision_analysis)), 1) AS field_count,
+    vision_analysis->>'material_type' AS material_type,
+    vision_analysis->'color_palette'  AS colors,
+    vision_analysis->>'finish'        AS finish,
+    (vision_analysis->>'confidence')::float AS confidence
+  FROM document_images
+  WHERE document_id = '<DOCUMENT_ID>'
+    AND vision_analysis IS NOT NULL
+  ORDER BY page_number, id
+  LIMIT 5;
+```
+
+**Gate 6.F**: every returned row has `field_count >= 4`, `material_type IS NOT NULL`, `confidence > 0`. Capture the first row's `id` → `TEST_DOC_FIRST_IMAGE_ID`.
+
+#### Query G — Specialized vector differentiation (Bug 2 regression check)
+
+This is the **make-or-break** post-run check. If any of the 6 cosine distances is exactly `0.0`, the silent-fallback bug is back and the run is dead.
+
+```
+mcp__supabase__execute_sql:
+  WITH t AS (
+    SELECT
+      (SELECT vec FROM vecs.image_color_embeddings    WHERE id = '<TEST_DOC_FIRST_IMAGE_ID>') AS color,
+      (SELECT vec FROM vecs.image_texture_embeddings  WHERE id = '<TEST_DOC_FIRST_IMAGE_ID>') AS texture,
+      (SELECT vec FROM vecs.image_style_embeddings    WHERE id = '<TEST_DOC_FIRST_IMAGE_ID>') AS style,
+      (SELECT vec FROM vecs.image_material_embeddings WHERE id = '<TEST_DOC_FIRST_IMAGE_ID>') AS material
+  )
+  SELECT
+    (color    <=> texture)::float  AS d_color_texture,
+    (color    <=> style)::float    AS d_color_style,
+    (color    <=> material)::float AS d_color_material,
+    (texture  <=> style)::float    AS d_texture_style,
+    (texture  <=> material)::float AS d_texture_material,
+    (style    <=> material)::float AS d_style_material;
+```
+
+**Gate 6.G**: all 6 distances `> 0`. Acceptable range typically 0.005–0.50. If ANY distance is exactly `0.0`, **STOP** the run, report the silent-fallback regression, and do not declare success regardless of any other gate result.
+
+#### Query H — Icon metadata rollup on the test product
+
+This validates that icons → flat top-level spec keys flowed end-to-end. If the test PDF has any spec icon strips, at least one of these should be populated.
+
+```
+mcp__supabase__execute_sql:
+  SELECT
+    p.id,
+    p.name,
+    p.metadata->>'slip_resistance'    AS slip_resistance,
+    p.metadata->>'pei_rating'          AS pei_rating,
+    p.metadata->>'fire_rating'         AS fire_rating,
+    p.metadata->>'frost_resistance'    AS frost_resistance,
+    p.metadata->>'water_absorption'    AS water_absorption,
+    p.metadata->>'v_rating'            AS v_rating,
+    p.metadata->'certifications'       AS certifications,
+    p.metadata->>'chemical_resistance' AS chemical_resistance,
+    p.metadata->>'thermal_shock'       AS thermal_shock,
+    p.metadata->>'stain_resistance'    AS stain_resistance
+  FROM products p
+  WHERE p.source_document_id = '<DOCUMENT_ID>';
+```
+
+**Gate 6.H** (soft):
+- If the test PDF page contains spec icons (typical ceramic catalogs do), **at least one** of these columns should be non-null.
+- If ALL are null AND `vector_stats.icon_candidates_processed > 0` from Step 5.13, the rollup function silently dropped everything — look up "icon rollup empty" in §4.
+- If ALL are null AND `vector_stats.icon_candidates_processed == 0`, the test PDF page didn't have icons (or detection didn't fire). That's not a failure — note in the report and continue.
+
+#### Query I — Per-image icon_metadata audit trail
+
+```
+mcp__supabase__execute_sql:
+  SELECT
+    di.id,
+    di.page_number,
+    di.category,
+    jsonb_array_length(COALESCE(di.metadata->'icon_metadata', '[]'::jsonb)) AS icon_items,
+    di.metadata->'icon_metadata' AS icon_metadata
+  FROM document_images di
+  WHERE di.document_id = '<DOCUMENT_ID>'
+    AND di.metadata ? 'icon_metadata'
+  ORDER BY di.page_number, di.id
+  LIMIT 10;
+```
+
+**Gate 6.I** (soft): if Query H showed populated spec fields, this query MUST return rows showing the source icons that contributed those values. If Query H is populated but Query I is empty, the rollup function is reading from a different source than the icon processor wrote to.
+
+### STEP 7 — Generate `/tmp/final-result.html`
+
+Build the report on the production server with the actual captured data inlined. You will use a heredoc to write the file in one shot, with the SQL results from Step 6 substituted directly into the HTML.
+
+```
+mcp__ssh-mcp__exec: bash -lc 'cat > /tmp/final-result.html <<HTMLEOF
+<html>
+<head>
+<title>MIVAA E2E Test Run — <JOB_ID></title>
+<style>
+body{font-family:system-ui;padding:24px;max-width:1100px;line-height:1.5}
+table{border-collapse:collapse;width:100%;margin:8px 0}
+td,th{border:1px solid #ccc;padding:6px 12px;text-align:left;vertical-align:top}
+th{background:#f3f3f3}
+.ok{color:#080;font-weight:bold}
+.fail{color:#a00;font-weight:bold}
+pre{background:#f7f7f7;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px}
+h2{border-bottom:2px solid #ddd;padding-bottom:4px;margin-top:32px}
+</style>
+</head>
+<body>
+<h1>MIVAA E2E Test Run Report</h1>
+<p>
+  <b>Job:</b> <code><JOB_ID></code><br>
+  <b>Document:</b> <code><DOCUMENT_ID></code><br>
+  <b>Product:</b> <code><PRODUCT_ID></code><br>
+  <b>Generated:</b> $(date -u +"%Y-%m-%dT%H:%M:%SZ")<br>
+  <b>Test mode:</b> <code>--test</code> (single-product)
+</p>
+
+<h2>1. Job summary</h2>
+<pre>
+$(curl -s http://localhost:8000/api/rag/documents/job/<JOB_ID> | jq "{status, progress, current_stage, started_at, completed_at, result}")
+</pre>
+
+<h2>2. Embedding coverage (boolean flags)</h2>
+<pre>
+<RESULT_QUERY_A>
+</pre>
+
+<h2>3. Vision analysis provenance</h2>
+<pre>
+<RESULT_QUERY_B>
+</pre>
+
+<h2>4. Relationships, products and chunks</h2>
+<pre>
+<RESULT_QUERY_C>
+</pre>
+
+<h2>5. Visual metadata (Stage 3.5)</h2>
+<pre>
+<RESULT_QUERY_D>
+</pre>
+
+<h2>6. VECS truth source (cross-check vs §2)</h2>
+<pre>
+<RESULT_QUERY_E>
+</pre>
+
+<h2>7. vision_analysis schema sanity (first 5 images)</h2>
+<pre>
+<RESULT_QUERY_F>
+</pre>
+
+<h2>8. Specialized vector differentiation (Bug 2 regression check)</h2>
+<p>For image <code><TEST_DOC_FIRST_IMAGE_ID></code> — all 6 distances must be &gt; 0.</p>
+<pre>
+<RESULT_QUERY_G>
+</pre>
+
+<h2>9. Icon metadata rollup (Query H)</h2>
+<p>Flat top-level spec keys on the test product, populated by the icon extraction pipeline.</p>
+<pre>
+<RESULT_QUERY_H>
+</pre>
+
+<h2>10. Per-image icon audit trail (Query I, first 10 images)</h2>
+<pre>
+<RESULT_QUERY_I>
+</pre>
+
+<h2>11. Failed images (if any)</h2>
+<pre>
+$(curl -s http://localhost:8000/api/rag/documents/job/<JOB_ID> | jq ".result.failed_images // []")
+</pre>
+
+<h2>12. Sentry deltas during this run</h2>
+<pre>
+<SENTRY_DELTA_FROM_STEP_8>
+</pre>
+
+</body>
+</html>
+HTMLEOF
+ls -la /tmp/final-result.html'
+```
+
+When you actually issue this command, you substitute the `<RESULT_QUERY_*>` placeholders with the actual jq-pretty-printed results captured in Step 6. Substitute `<SENTRY_DELTA_FROM_STEP_8>` with the result you'll capture in Step 8.
+
+**Gate 7.1**: `/tmp/final-result.html` exists and is `> 2500` bytes (the icon sections add roughly 500 bytes of structure even when empty).
+
+```
+mcp__ssh-mcp__exec: wc -c /tmp/final-result.html
+```
+
+### STEP 8 — Sentry delta check
+
+Re-query Sentry for issues that appeared since `BASELINE_SENTRY_ISSUES` was captured.
+
+```
+mcp__sentry__list_issues:
+  query = "is:unresolved firstSeen:-1h"
+  sort = "date"
+  limit = 50
+```
+
+Diff against `BASELINE_SENTRY_ISSUES`. New issues = issues whose ID is in the new list but NOT in the baseline.
+
+For each new issue, fetch detail:
+
+```
+mcp__sentry__get_sentry_resource:
+  url = <issue_url>
+```
+
+Classify each new issue:
+- **Real bug** (mentions our code or producer keys): record in the report and **fail Gate 8.1**
+- **Acceptable noise** (e.g., openai RateLimitError that the `before_send` filter should have caught — file a tracking item but pass Gate 8.1)
+
+**Gate 8.1**: zero NEW real-bug issues. Acceptable noise is OK but must be enumerated in section 10 of the report.
+
+After this check, update `/tmp/final-result.html` section 10 with the actual Sentry delta result via:
+
+```
+mcp__ssh-mcp__exec: <use sed or cat heredoc to insert the delta into final-result.html>
+```
+
+### STEP 9 — Final report to user
+
+Report to the user with this exact structure if every gate passed:
+
+```
+✅ E2E TEST PASSED
+
+Job ID:               <JOB_ID>
+Document ID:          <DOCUMENT_ID>
+Product ID:           <PRODUCT_ID>  (test mode — exactly 1 processed)
+Discovery:            11 / 11 ✓
+Duration:             <minutes from Step 4 launch to Step 5.final>
+Chunks:               <chunks> (all with text_embedding_1024 ✓)
+Material images:      <total_regular_images>
+Icon candidates:      <icon_candidates> (extracted: <icon_metadata_extracted>, failed: <icon_extraction_failed>)
+Per-vector counts:
+  visual SLIG:        <n>/<total_regular_images>
+  color SLIG:         <n>/<total_regular_images>
+  texture SLIG:       <n>/<total_regular_images>
+  style SLIG:         <n>/<total_regular_images>
+  material SLIG:      <n>/<total_regular_images>
+  understanding 1024: <n>/<total_regular_images>
+Vision analysis src:  qwen=<n> claude_fallback=<n> (failed=<n>)
+Icon spec rollup:     <list of populated spec field names from Query H, e.g. slip_resistance, fire_rating, ...>
+Relationships:
+  chunk-image:        <n>
+  chunk-product:      <n>
+  image-product:      <n>
+Differentiation:      all 6 distances > 0 (min=<min> max=<max>) ✓
+Sentry delta:         <n> new issues (real bugs: 0)
+Report:               /tmp/final-result.html (<size> bytes)
+```
+
+If any gate failed and could not be recovered after at most 3 fix-and-retry loops on the same step, report this instead:
+
+```
+❌ E2E TEST BLOCKED
+
+Failed at:     Step <N> (gate <gate id>)
+Symptom:       <one-line description>
+Root cause:    <your diagnosis, with file:line citation if applicable>
+Logs:          <key journalctl excerpt or DB row>
+What I tried:  <ordered list of fix attempts and their results>
+Next action:   <what the user needs to decide>
+Partial report: /tmp/final-result.html  (if generated)
+```
+
+---
+
+## 4. FAILURE LOOKUP TABLE
+
+Use this when a gate fails. Each row tells you the symptom, the root cause, the fix to apply, and which step to re-run after applying the fix.
+
+| Symptom | Root cause | Fix → re-run step |
 |---|---|---|
-| **Stage 0 — discovery** | `"Stage 0: Discovery"` followed by `"discovered 11 products"` | If count != 11, **cancel the job** and stop. Discovery prompt or model output changed unexpectedly. |
-| **Test mode gate** | `"🧪 TEST MODE: Processing first product only"` | If "processing product 2/11" shows up, cancel — test_single_product is not honored. |
-| **Stage 1 — extraction** | `"YOLO ..."`, `product_layout_regions` rows being inserted | If no YOLO logs, the YOLO endpoint is paused. |
-| **Stage 2 — chunking** | `"chunks_created: N"`, then `"Voyage ... text embedding"` per chunk | If chunks but no Voyage text-embed calls, Voyage is misconfigured. |
-| **Stage 3 — image classification** | `"🤖 Starting AI-based image classification"`, then per-image classification results | If no Qwen calls, Qwen endpoint is paused or auth is wrong. |
-| **Stage 3 — material analysis** | per material image: `"🔬 ... vision_analysis valid for ... (qwen)"` (or `(claude_fallback)`) | If `"failed"` for >50% of images, analyzer prompt or endpoint is broken. |
-| **Stage 3 — visual SLIG** | per material image: `"✅ SLIG image embedding: 768D"`, then `"Saved visual embedding to VECS"` | If absent, SLIG endpoint is paused. |
-| **Stage 3 — specialized SLIG** | per material image: `"✅ Generated color specialized embedding"`, ×4 (color/texture/style/material) | If only 1 of 4 appears or values look identical, silent fallback bug regression — stop. |
-| **Stage 3 — understanding** | per material image: `"Understanding embedding generated (1024D)"` | If absent for images that DID get vision_analysis, Voyage understanding call is broken. |
-| **Per-image progress events** | `tracker` updates with the per-vector tally `v:12 c:12 t:12 s:11 m:12 u:12` | Visible in `/admin/async-job-queue-monitor` UI for the running job. |
-| **Stage 4 — products** | `"Voyage text embedding"` × 1 (the test product), `INSERT INTO products`, `text_embedding_1024` non-null | If the embedding is null, Voyage call failed silently. |
-| **Entity linking** | `"Created N chunk-image relationship entries"`, `"Created N chunk-product relationship entries"`, `"image_product_associations"` rows inserted | If `chunk_image_relationships` count is 0, `entity_linking_service.link_images_to_chunks` did not run for this document. |
-
-When the script reports completion, run the final verification block (see §6).
-
-### Phase F — Combined "Fill All Embeddings" sanity check (≤ 5 min)
-
-Validates the new combined UI button that runs text + image regen back-to-back.
-
-1. Pick a document where you intentionally know there are missing chunks AND incomplete image vectors. (You can construct this by uploading a fresh small PDF, then immediately deleting one chunk's `text_embedding` value and one image's `has_color_slig` flag via SQL.)
-2. Open `/admin/async-job-queue-monitor`, select that document.
-3. Click **Fill All Embeddings**.
-4. The toast should show both halves:
-   ```
-   Fill complete: N text • M images / K vectors
-   ```
-   Or, if one half failed:
-   ```
-   Partial fill: N text • images failed: <reason>
-   ```
-5. Re-run the document-level query from Phase D step 7 — all 6 columns should now equal total_images.
-
-### Phase G — Final results report → `final-result.html`
-
-The test is **only** declared successful when this file exists with all sections filled. Generate it from the verification queries.
-
-```bash
-# After Phase E completes successfully, on the server:
-JOB_ID="<job_id_from_phase_E>"
-DOC_ID="<document_id_from_phase_E>"
-WORKSPACE_ID="ffafc28b-1b8b-4b0d-b226-9f9a6154004e"
-
-# Build the report
-{
-  echo "<html><head><title>Test Run — $JOB_ID</title>"
-  echo "<style>body{font-family:system-ui;padding:24px;max-width:900px}"
-  echo "table{border-collapse:collapse;width:100%;margin:8px 0}"
-  echo "td,th{border:1px solid #ccc;padding:6px 12px;text-align:left}"
-  echo "th{background:#f3f3f3}"
-  echo ".ok{color:#0a0}.fail{color:#a00}</style></head><body>"
-  echo "<h1>MIVAA Test Run Report</h1>"
-  echo "<p>Job: <code>$JOB_ID</code> &middot; Document: <code>$DOC_ID</code> &middot; $(date)</p>"
-
-  # Job summary
-  echo "<h2>Job summary</h2><pre>"
-  curl -s "http://localhost:8000/api/rag/documents/job/$JOB_ID" \
-    | jq '{ status, progress, current_stage, started_at, completed_at, result }'
-  echo "</pre>"
-
-  # The stats blocks — use psql or the supabase REST API to fetch counts.
-  # See the SQL queries in §6 below — wrap each in `<h2>...</h2><pre>...</pre>`.
-  echo "<h2>Embedding coverage</h2><pre>"
-  # paste the per-vector count query from §6
-  echo "</pre>"
-
-  echo "<h2>Vision analysis provenance</h2><pre>"
-  # paste the vision_provider query from §6
-  echo "</pre>"
-
-  echo "<h2>Relationships</h2><pre>"
-  # paste the relationship counts query from §6
-  echo "</pre>"
-
-  echo "<h2>Differentiation check</h2><pre>"
-  # paste the cosine-distance query from Phase C, against one image_id
-  echo "</pre>"
-
-  echo "<h2>Failures (if any)</h2><pre>"
-  curl -s "http://localhost:8000/api/rag/documents/job/$JOB_ID" \
-    | jq '.result.failed_images // []'
-  echo "</pre>"
-
-  echo "</body></html>"
-} > /tmp/final-result.html
-
-cat /tmp/final-result.html
-```
-
-If `final-result.html` cannot be generated (because some data is missing), **do not declare the test successful**. Stop, fix the gap, restart the relevant phase.
+| `Material Image Analyzer prompt not found in database` at startup (Gate 1.2) | v2 prompt not seeded in DB | Run `mcp__supabase__execute_sql` to update the `prompts` row with the v2 strict-schema text. Then `mcp__ssh-mcp__sudo-exec`: `systemctl restart mivaa-pdf-extractor.service`. Wait 30s. Re-run Step 1. |
+| `Failed to resume Qwen endpoint` for every image (Stage 5.5) | HuggingFace endpoint paused or token expired | Try `mcp__ssh-mcp__exec`: `curl -s -H "Authorization: Bearer $HUGGINGFACE_API_KEY" https://huggingface.co/api/inference-endpoints/<endpoint>/resume` (only if you can find the endpoint name in env vars). Wait 60s. If that fails or token issue, **STOP** — needs user. |
+| `vision_analysis valid for ... (claude_fallback)` for >50% of images (Gate 5.6) | Qwen returning malformed JSON | The Claude fallback IS the safety net — this is acceptable for the run to pass. Note in the report and continue. If 100% claude_fallback, that's a red flag — report but don't fail. |
+| Step 6.G distance == 0.0 anywhere | Silent base-embedding fallback regression in `_generate_specialized_siglip_embeddings` | `Grep`: search for `specialized\[.*\] = base_image_embedding` in `mivaa-pdf-extractor/app/services/embeddings/real_embeddings_service.py`. If found, the Bug 2 fix was reverted — **STOP** and report to user. Do NOT loop. |
+| `image_understanding_embeddings` count is 0 but `vision_analysis` is populated (Gate 6.A understanding=0) | Voyage understanding call failing silently | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Failed to generate understanding\|VOYAGE_API_KEY" \| tail -20`. If env var missing, **STOP** — needs user. |
+| `chunk_image_relationships` count is 0 for the new doc (Gate 6.C `chunk_image_links == 0`) | `entity_linking_service.link_images_to_chunks` did not run | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Created.*chunk-image relationship\|link_images_to_chunks"`. If absent, the orchestration call was skipped. Read `mivaa-pdf-extractor/app/api/pdf_processing/product_processor.py` and trace why. |
+| `has_color_slig=false` but `vecs.image_color_embeddings` row exists (Gate 6.E mismatch) | `_set_image_flag` failed silently | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Failed to set has_" \| tail -10`. Likely a Supabase REST client init issue. `mcp__ssh-mcp__sudo-exec`: `systemctl restart mivaa-pdf-extractor.service`. Re-run from Step 4. |
+| Step 5 `progress` stuck for 3 consecutive polls (90 s) — "stuck job" | A long-running stage is hung | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service --since "3 minutes ago" \| tail -100`. Look for the last log line. If a specific endpoint is unresponsive, that's the suspect. POST `/api/internal/reset-job/<JOB_ID>`, fix the upstream cause, re-run Step 4. |
+| Qwen 503/504 spam in Step 5 logs | HuggingFace endpoint scaling | The retry helper handles this automatically. Wait 60s and re-poll. If it persists past 5 min, scale up the endpoint replicas (if supported) or **STOP** and report. |
+| Step 4 — `Job ID:` line not present in `/tmp/test_run.log` | Upload failed before producing a job | `mcp__ssh-mcp__exec`: `tail -100 /tmp/test_run.log`. Common causes: PDF URL unreachable, dedupe blocked because a stale `processing` job exists, health check failed. If dedupe, run reset on the stale job and re-run Step 4. |
+| Gate 5.1 — discovery returns count != 11 | Discovery prompt or model output drift | **STOP** the job immediately via `/api/internal/reset-job`. Report — this is a hard precondition violation and needs user investigation. |
+| Gate 5.2 — second product starts processing | `test_single_product=true` not honored | **STOP** the job via reset-job. Test mode regression. Report. |
+| Gate 6.C — `products` count > 1 | Same as above | Same — **STOP** and report. |
+| Gate 6.C — `products` count == 0 | Stage 4 product creation failed | Look for `Stage 4` errors in journalctl. If Voyage product embedding failed, the retry path didn't insert the row. Look up "Voyage misconfigured" symptom. |
+| Gate 6.C — `products_with_embedding == 0` (but products == 1) | Voyage product embedding call failed silently after the row was inserted | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -i voyage \| tail -20`. Check `VOYAGE_API_KEY`. After fixing, you can run `Bash`: `curl -s -X POST https://v1api.materialshub.gr/api/internal/regenerate-text-embeddings -d '{"workspace_id":"...","document_id":"<DOCUMENT_ID>","force_regenerate":true}'` to backfill. Re-run Step 6.C. |
+| Gate 6.A — vector counts < total_images | Some images failed during Stage 3 | Inspect `result.failed_images` array on the job. For each failure, look up its specific symptom in this table. After fixing, run "Fill Images" via `Bash`: `curl -s -X POST https://v1api.materialshub.gr/api/internal/regenerate-image-embeddings -d '{"workspace_id":"...","document_id":"<DOCUMENT_ID>","force_regenerate":true}'` to backfill the failures. Re-run Step 6. |
+| Gate 5.13 / 6.H — `icon_candidates_processed > 0` but `icon_metadata_extracted == 0` | OCR or Claude is failing on every icon. Most common causes: (a) `ocr_service.extract_icon_metadata` raised an exception, (b) `Icon-Based Metadata Extraction` prompt was renamed/deactivated, (c) Claude returned non-JSON | `mcp__supabase__execute_sql`: `SELECT name, is_active, version FROM prompts WHERE category = 'icon_metadata' AND is_active = true;` — must return 1 row. Then `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "extract_icon_metadata\|Icon OCR\|icon extraction failed" \| tail -30`. Fix the root cause and re-run Step 4. |
+| Gate 6.H — Query H all-null but `icon_candidates_processed > 0` ("icon rollup empty") | The icon processor wrote to `document_images.metadata['icon_metadata']` but the Stage 4 rollup either (a) didn't find the icons, (b) every field_name was unknown to `material_metadata_fields`, or (c) the merge ran but stored under a different key | First check Query I — if it has rows, the rollup connector is broken (look at `_merge_icon_metadata_into_product` in stage_4_products.py). If Query I is empty, the per-image persist failed silently — look at `_process_icon_candidate` logs. |
+| Gate 5.13 — no icon split log line at all | Icon detection rules didn't fire (no group of ≥3 small square images on any single page) | NOT a failure on its own — many catalog pages don't have icons. But if you expected icons, check `journalctl ... \| grep "Icon split"` to see whether `_split_material_and_icon_candidates` ran at all. If it ran but split-into-icons was zero, lower `ICON_MIN_PER_PAGE` from 3 to 2 in `image_processing_service.py`. |
 
 ---
 
-## 6. Verification SQL block (run after Phase E)
+## 5. LOOP BUDGET
 
-Substitute `<DOC_ID>` with the test document's UUID before running. All queries should return data — empty results indicate a gap.
+For each gate failure, you may attempt up to **3 fix-and-retry loops** on the affected step before giving up and reporting `❌ E2E TEST BLOCKED`. Do not try more than 3. If a fix requires user input (token rotation, env var change, prompt rewrite that changes architecture, deploying new code), report immediately — do not loop.
 
-```sql
--- A. Per-vector embedding counts for the test document
-SELECT
-  COUNT(*)                                          AS total_images,
-  SUM(CASE WHEN has_slig_embedding         THEN 1 ELSE 0 END) AS visual,
-  SUM(CASE WHEN has_color_slig             THEN 1 ELSE 0 END) AS color,
-  SUM(CASE WHEN has_texture_slig           THEN 1 ELSE 0 END) AS texture,
-  SUM(CASE WHEN has_style_slig             THEN 1 ELSE 0 END) AS style,
-  SUM(CASE WHEN has_material_slig          THEN 1 ELSE 0 END) AS material,
-  SUM(CASE WHEN has_understanding_embedding THEN 1 ELSE 0 END) AS understanding
-FROM document_images
-WHERE document_id = '<DOC_ID>';
--- Expected: all six counts equal total_images (understanding may be slightly lower
--- if Qwen+Claude both failed on a few images — log reasons in failed list).
-
--- B. Vision analysis provenance breakdown
-SELECT
-  vision_provider,
-  COUNT(*) AS images
-FROM document_images
-WHERE document_id = '<DOC_ID>' AND vision_analysis IS NOT NULL
-GROUP BY vision_provider;
--- Expected: a row for 'qwen' (most images) and possibly a row for 'claude_fallback'
--- (a small number — that's the safety net working). 'failed' should NOT appear here
--- because failed analyses don't write vision_analysis.
-
--- C. Relationships
-SELECT
-  (SELECT COUNT(*) FROM document_chunks         WHERE document_id = '<DOC_ID>') AS chunks,
-  (SELECT COUNT(*) FROM document_chunks         WHERE document_id = '<DOC_ID>' AND text_embedding IS NOT NULL) AS chunks_with_text_embedding,
-  (SELECT COUNT(*) FROM document_images         WHERE document_id = '<DOC_ID>') AS images,
-  (SELECT COUNT(*) FROM products                WHERE source_document_id = '<DOC_ID>') AS products,
-  (SELECT COUNT(*) FROM products                WHERE source_document_id = '<DOC_ID>' AND text_embedding_1024 IS NOT NULL) AS products_with_embedding,
-  (SELECT COUNT(*) FROM chunk_product_relationships    cpr JOIN document_chunks dc ON dc.id = cpr.chunk_id WHERE dc.document_id = '<DOC_ID>') AS chunk_product_links,
-  (SELECT COUNT(*) FROM chunk_image_relationships      cir JOIN document_chunks dc ON dc.id = cir.chunk_id WHERE dc.document_id = '<DOC_ID>') AS chunk_image_links,
-  (SELECT COUNT(*) FROM image_product_associations     ipa JOIN document_images di ON di.id = ipa.image_id WHERE di.document_id = '<DOC_ID>') AS image_product_assocs;
--- Expected: chunks_with_text_embedding = chunks, products_with_embedding = products,
--- chunk_image_links > 0 (page proximity), image_product_assocs > 0.
-
--- D. Visual metadata extracted from embeddings (Stage 3.5)
-SELECT
-  COUNT(*) FILTER (WHERE visual_metadata IS NOT NULL AND visual_metadata != '{}'::jsonb) AS images_with_visual_metadata,
-  COUNT(*) AS total_images
-FROM document_images
-WHERE document_id = '<DOC_ID>';
--- Expected: images_with_visual_metadata > 0 for material images.
-
--- E. Per-vector counts in VECS itself (truth source)
-SELECT 'image_slig_embeddings'           AS coll, COUNT(*) FROM vecs.image_slig_embeddings           WHERE metadata->>'document_id' = '<DOC_ID>'
-UNION ALL SELECT 'image_color_embeddings',          COUNT(*) FROM vecs.image_color_embeddings          WHERE metadata->>'document_id' = '<DOC_ID>'
-UNION ALL SELECT 'image_texture_embeddings',        COUNT(*) FROM vecs.image_texture_embeddings        WHERE metadata->>'document_id' = '<DOC_ID>'
-UNION ALL SELECT 'image_style_embeddings',          COUNT(*) FROM vecs.image_style_embeddings          WHERE metadata->>'document_id' = '<DOC_ID>'
-UNION ALL SELECT 'image_material_embeddings',       COUNT(*) FROM vecs.image_material_embeddings       WHERE metadata->>'document_id' = '<DOC_ID>'
-UNION ALL SELECT 'image_understanding_embeddings',  COUNT(*) FROM vecs.image_understanding_embeddings  WHERE metadata->>'document_id' = '<DOC_ID>';
--- Expected: all 6 collection counts match A's per-vector counts. If A says "5 has_color_slig"
--- but vecs.image_color_embeddings has 7 rows for this doc, the boolean flag updater is broken.
--- If A says "5" and VECS has 5, you're golden.
-
--- F. Sanity: confirm the `vision_analysis` JSON shape matches the v2 strict schema
-SELECT
-  id,
-  vision_provider,
-  array_length(array(SELECT jsonb_object_keys(vision_analysis)), 1) AS field_count,
-  vision_analysis->>'material_type' AS material_type,
-  vision_analysis->'color_palette'  AS colors,
-  vision_analysis->>'finish'        AS finish,
-  (vision_analysis->>'confidence')::float AS confidence
-FROM document_images
-WHERE document_id = '<DOC_ID>'
-  AND vision_analysis IS NOT NULL
-LIMIT 5;
--- Expected: field_count is 8-12 (exact 12 if Qwen returned all keys; lower acceptable
--- if some are null but at least 4 must be populated per validator). material_type
--- and colors should be human-readable for material images.
-```
+Total wall-clock budget for the entire script: **45 minutes** (`HARD_TIMEOUT_MINUTES`). If the run exceeds 45 minutes total, stop the active job, generate a partial `/tmp/final-result.html` with whatever data you have, and report `❌ E2E TEST BLOCKED — TIMEOUT`.
 
 ---
 
-## 7. Common failure modes & fixes
+## 6. OUT-OF-SCOPE ACTIONS — DO NOT DO THESE
 
-| Symptom in logs / DB | Root cause | Fix |
-|---|---|---|
-| `Material Image Analyzer prompt not found in database` at startup | The v2 prompt update SQL didn't run (or ran in the wrong DB) | Re-run the prompt update SQL via `mcp__supabase__execute_sql` |
-| `Failed to resume Qwen endpoint` for every image | HuggingFace endpoint is paused or token expired | Manually wake the endpoint via the registry; re-check `HUGGINGFACE_API_KEY` |
-| `vision_analysis valid for ... (claude_fallback)` for >50% of images | Qwen is responding but returning malformed JSON | Tighten the prompt further OR look at the raw Qwen output in `journalctl` and adjust the system prompt |
-| All 4 specialized cosine distances == 0.0 (Phase C) | Silent base-embedding fallback regression | Search for `base_image_embedding` in `_generate_specialized_siglip_embeddings` — there should be NO `specialized[type] = base_image_embedding` line anywhere |
-| `image_understanding_embeddings` count is 0 but `vision_analysis` is populated | Voyage understanding call is failing silently | Grep for `Understanding embedding generated` and `Failed to generate understanding`; check `VOYAGE_API_KEY` |
-| `chunk_image_relationships` is 0 for the new document | `entity_linking_service.link_images_to_chunks` did not run | Verify `process_document_with_discovery` was called and it reached the entity-linking step |
-| `has_color_slig=false` but `vecs.image_color_embeddings` has the row | `_set_image_flag('has_color_slig', ...)` failed silently | Look for `Failed to set has_color_slig` debug lines; check that `vecs_service._get_supabase_rest()` succeeded |
-| Stage 3 finishes but `images_processed` < material image count | Per-image retries exhausted | Look at `failed_images` array in the job result; each entry has the failure reason |
-| Job stuck at the same `progress` for >5 minutes | A long-running stage is silently hung | Tail logs; if no movement, kill the job (`/api/internal/reset-job/{job_id}`) and restart |
-| Qwen 503/504 spam | HuggingFace endpoint scaling | Retry helper kicks in automatically; if persistent, scale endpoint replicas up |
+You will NOT do the following without explicit per-action user authorization:
+
+- Commit, push, or open PRs in any git repo
+- Modify any source file in `mivaa-pdf-extractor/`, `src/`, or `supabase/`
+- Cancel a running job that ISN'T the one you uploaded in Step 4
+- Create new GitHub issues, send emails, or post Slack/Sentry comments
+- Modify any DB row except the prompt-update SQL in §4 row 1 (and ONLY when fixing Gate 1.2)
+- Restart `mivaa-pdf-extractor.service` except when §4 explicitly tells you to as part of a documented fix loop
+
+If you find yourself wanting to do any of the above to make a gate pass, **STOP** and ask the user instead.
 
 ---
 
-## 8. After a clean run
+## 7. TOOLS YOU WILL USE
 
-1. `final-result.html` exists at `/tmp/final-result.html` and contains all 7 sections from Phase G.
-2. The Sentry dashboard shows **zero new issues** for the duration of the test run (the openai RateLimitError filter we added in `main.py` should keep the noise down — if a new issue type appears, investigate).
-3. Update the issue tracker with the test run's ✅ result and link the `final-result.html` snapshot.
-4. If this test was driven by a deploy candidate, the deploy is now **green** to roll out to non-test mode (`./test_full_workflow.sh` without `--test`) on the full 11-product run.
+| Tool | Purpose |
+|---|---|
+| `TodoWrite` | Maintain the per-step progress list (Steps 1–9) |
+| `Bash` | curl against `https://v1api.materialshub.gr/*` (the public API) |
+| `mcp__ssh-mcp__exec` | All read commands on the production server (journalctl, tail, grep, jq, ls, the test_full_workflow.sh launch, heredoc final-result.html generation) |
+| `mcp__ssh-mcp__sudo-exec` | Only `systemctl restart mivaa-pdf-extractor.service` and only when §4 tells you to |
+| `mcp__supabase__execute_sql` | All DB queries — verification SQL block in Step 6, and prompt-update fixes in §4 |
+| `mcp__sentry__list_issues` | Step 2 baseline + Step 8 delta |
+| `mcp__sentry__get_sentry_resource` | Detail any new Sentry issue from Step 8 |
+| `Read`, `Grep` | When §4 tells you to inspect a specific file:line for a regression |
+
+You will NOT use `Edit`, `Write`, or any tool that modifies repo state in this directory tree (this is a read-and-validate run, not a code change run). You may use `mcp__ssh-mcp__exec` with shell heredocs / sed to write `/tmp/final-result.html` on the production server — that's the one allowed write target.
 
 ---
 
-## 9. Quick reference — file locations
+## 8. QUICK REFERENCE — file & endpoint locations
 
 | What | Where |
 |---|---|
-| Test script | `mivaa-pdf-extractor/test_full_workflow.sh` |
-| Single-product test python | `mivaa-pdf-extractor/scripts/testing/test_single_product.py` |
+| Test script (production server) | `/var/www/mivaa-pdf-extractor/test_full_workflow.sh` |
+| Test script in repo | `mivaa-pdf-extractor/test_full_workflow.sh` |
+| Test script log capture | `/tmp/test_run.log` (created by Step 4) |
+| Per-job status dumps | `/tmp/job_<JOB_ID>_*.json` (created by the script itself) |
+| Final report | `/tmp/final-result.html` (created by Step 7) |
 | Job logs (live) | `sudo journalctl -u mivaa-pdf-extractor.service -f` |
-| Job status JSON dumps | `/tmp/job_<id>_*.json` |
-| Product checker | `/tmp/check_products_created.sh` |
-| Final report (this run) | `/tmp/final-result.html` |
-| Image processing service (where the new pipeline lives) | `mivaa-pdf-extractor/app/services/images/image_processing_service.py` |
-| Real embeddings service (specialized SLIG generation) | `mivaa-pdf-extractor/app/services/embeddings/real_embeddings_service.py` |
-| VECS service (collection upserts + boolean flag updates) | `mivaa-pdf-extractor/app/services/embeddings/vecs_service.py` |
-| Entity linking (page-proximity chunk↔image relationships) | `mivaa-pdf-extractor/app/services/discovery/entity_linking_service.py` |
-| Async Job Queue Monitor (admin UI with the new buttons) | `src/components/Admin/AsyncJobQueueMonitor/AsyncJobQueueMonitor.tsx` |
-| Internal regenerate endpoint | `mivaa-pdf-extractor/app/api/internal_routes.py` `POST /api/internal/regenerate-image-embeddings` |
+| Image processing service | `mivaa-pdf-extractor/app/services/images/image_processing_service.py` |
+| Specialized SLIG generation | `mivaa-pdf-extractor/app/services/embeddings/real_embeddings_service.py` `_generate_specialized_siglip_embeddings` |
+| VECS service (boolean flags) | `mivaa-pdf-extractor/app/services/embeddings/vecs_service.py` `_set_image_flag` |
+| Entity linking | `mivaa-pdf-extractor/app/services/discovery/entity_linking_service.py` `link_images_to_chunks` |
+| Material analyzer prompt loader | `mivaa-pdf-extractor/app/services/images/image_processing_service.py` `_load_material_analyzer_prompt` |
+| Reset job endpoint | `POST https://v1api.materialshub.gr/api/internal/reset-job/{job_id}` |
+| Health endpoint | `GET https://v1api.materialshub.gr/health` |
+| Job status endpoint | `GET https://v1api.materialshub.gr/api/rag/documents/job/{job_id}` |
+| Image regen (for Gate 6.A backfill) | `POST https://v1api.materialshub.gr/api/internal/regenerate-image-embeddings` |
+| Text regen (for Gate 6.C backfill) | `POST https://v1api.materialshub.gr/api/internal/regenerate-text-embeddings` |
+
+---
+
+**END OF DIRECTIVE.** When the user says "run scripts/README.md" or equivalent, you start at §1 Preconditions and execute every step in §3 in order, stopping only at gate failures or completion.

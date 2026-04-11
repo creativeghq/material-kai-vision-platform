@@ -429,7 +429,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
   const productNameNorm = normalizeMatch(productNameUpper);
 
-  const factory = extractValue(allData?.factory_name) || extractValue(allData?.factory_group_name) || 'Unknown Factory';
+  // Factory chain: primary → group → brand → em-dash (avoid hallucinated
+  // "Unknown Factory" placeholder that reads like a real value).
+  const factory = extractValue(allData?.factory_name)
+    || extractValue(allData?.factory_group_name)
+    || extractValue(allData?.brand)
+    || '—';
   const origin = extractValue(allData?.origin) || extractValue(allData?.country_of_origin) || '';
   const collection = extractValue(designData?.collection) || extractValue(allData?.collection) || '';
 
@@ -549,8 +554,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
     return undefined;
   })();
-  const finish = extractValue(materialPropsData?.finish) || 'N/A';
-  const material = extractValue(allData?.material_category) || product.type || 'N/A';
+  // Finish: AI-extracted first, vision_analysis rollup second, em-dash last.
+  const finish = extractValue(materialPropsData?.finish)
+    || extractValue(allData?.finish)
+    || '—';
+  // Material category chain: AI/vision-extracted → body_type → product.type →
+  // em-dash. "N/A" read like a real value to the user, which hid missing data.
+  const material = extractValue(allData?.material_category)
+    || extractValue(materialPropsData?.body_type)
+    || product.type
+    || '—';
 
   // Metadata categories
   // Extract commercial data
@@ -921,7 +934,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{title}</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {/* 2-column grid on all but tiny screens — product detail rows are short,
+            so 2-col uses the horizontal space well without wasting vertical. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
             const parts = str.split(', ').filter(p => p.trim());
@@ -1060,29 +1075,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tabs for Details and Monitor */}
+        {/* Tabs — end-users see Details/Knowledge/Similar/Works Well With.
+            Admins additionally see Chunks/Extraction/Monitor after those. */}
         <Tabs defaultValue="details" className="mt-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            {/* End-user tabs (always visible) */}
             <TabsTrigger value="details" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Info className="h-4 w-4" />
               Details
             </TabsTrigger>
-            {isAdmin && (
-              <>
-                <TabsTrigger value="chunks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <FileText className="h-4 w-4" />
-                  Chunks ({chunks.length})
-                </TabsTrigger>
-                <TabsTrigger value="knowledge" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <BookOpen className="h-4 w-4" />
-                  Knowledge
-                </TabsTrigger>
-                <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <Database className="h-4 w-4" />
-                  Extraction
-                </TabsTrigger>
-              </>
-            )}
+            <TabsTrigger value="knowledge" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <BookOpen className="h-4 w-4" />
+              Knowledge
+            </TabsTrigger>
             <TabsTrigger value="similar" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Sparkles className="h-4 w-4" />
               Similar
@@ -1091,14 +1096,49 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Puzzle className="h-4 w-4" />
               Works Well With
             </TabsTrigger>
-            <TabsTrigger value="monitor" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Activity className="h-4 w-4" />
-              Monitor
-            </TabsTrigger>
+            {/* Admin-only tabs (after end-user tabs) */}
+            {isAdmin && (
+              <>
+                <TabsTrigger value="chunks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <FileText className="h-4 w-4" />
+                  Chunks ({chunks.length})
+                </TabsTrigger>
+                <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Database className="h-4 w-4" />
+                  Extraction
+                </TabsTrigger>
+                <TabsTrigger value="monitor" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Activity className="h-4 w-4" />
+                  Monitor
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           {/* Details Tab */}
           <TabsContent value="details" className="mt-6">
+            {/* Full description card — first thing on the Details tab so users
+                see the narrative before diving into specs. Hidden if there's no
+                description at all (keeps the UI clean for sparse products). */}
+            {(() => {
+              const longDesc = safeString(product.long_description);
+              const shortDesc = safeString(product.description);
+              const fullDesc = longDesc || shortDesc;
+              if (!fullDesc) return null;
+              return (
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mb-6">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Product Description
+                    </h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                    {fullDesc}
+                  </p>
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Image Slider (3/5 width) */}
           <div className="lg:col-span-3 space-y-4">
@@ -1188,7 +1228,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="py-2 border-b border-border/30">
                   <span className="text-xs text-muted-foreground">Size</span>
                   {size === 'N/A' ? (
-                    <span className="block text-xs font-semibold mt-1">N/A</span>
+                    <span className="block text-xs font-semibold mt-1">—</span>
                   ) : (
                     <ul className="mt-1 space-y-0.5">
                       {size.split(', ').map((s, i) => (
@@ -1202,7 +1242,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30">
                   <span className="text-xs text-muted-foreground">Thickness</span>
-                  <span className="text-xs font-semibold">{thickness}</span>
+                  <span className="text-xs font-semibold">{thickness || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs text-muted-foreground">Finish</span>
@@ -1412,24 +1452,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       )}
 
       {/* Knowledge Tab - Admin Only */}
-      {isAdmin && (
-        <TabsContent value="knowledge" className="mt-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Knowledge Base Articles</h3>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Knowledge base linking coming soon</p>
-                  <p className="text-sm mt-2">
-                    This will show cleaning instructions, maintenance guides, and related documentation
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      )}
+      {/* Knowledge Tab — visible to all users */}
+      <TabsContent value="knowledge" className="mt-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Knowledge Base Articles</h3>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8 text-muted-foreground">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Knowledge base linking coming soon</p>
+                <p className="text-sm mt-2">
+                  This will show cleaning instructions, maintenance guides, and related documentation
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
 
       {/* Extraction Tab - Admin Only */}
       {isAdmin && (
@@ -1520,14 +1559,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
       </TabsContent>
 
-      <TabsContent value="monitor" className="mt-6">
-        <ProductMonitorTab
-          productId={product.id}
-          productName={product.name}
-          currentPrice={product.pricing?.retail}
-          currency={product.pricing?.currency}
-        />
-      </TabsContent>
+      {/* Monitor Tab — Admin only (price tracking / supply monitoring) */}
+      {isAdmin && (
+        <TabsContent value="monitor" className="mt-6">
+          <ProductMonitorTab
+            productId={product.id}
+            productName={product.name}
+            currentPrice={product.pricing?.retail}
+            currency={product.pricing?.currency}
+          />
+        </TabsContent>
+      )}
     </Tabs>
 
     {/* Stacked product modal — opened when clicking a recommendation card */}
