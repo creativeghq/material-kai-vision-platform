@@ -97,19 +97,19 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
           <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
             {hasAllRequiredFields ? (
               <>
-                <CheckCircle className="h-5 w-5 text-green-600" />
+                <CheckCircle className="h-5 w-5 text-success" />
                 <span className="text-sm font-medium">All required fields present</span>
               </>
             ) : (
               <>
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <AlertTriangle className="h-5 w-5 text-warning" />
                 <span className="text-sm font-medium">Missing required fields</span>
               </>
             )}
             {!hasImages && (
               <>
                 <Separator orientation="vertical" className="h-5" />
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <AlertTriangle className="h-4 w-4 text-warning" />
                 <span className="text-sm text-muted-foreground">No images</span>
               </>
             )}
@@ -193,9 +193,9 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                     <p className="text-sm font-semibold">{product.factory_name || '—'}</p>
                   </div>
                   {product.factory_name ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-success" />
                   ) : (
-                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <AlertTriangle className="h-4 w-4 text-warning" />
                   )}
                 </div>
 
@@ -206,9 +206,9 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                     <p className="text-sm font-semibold">{product.material_category || '—'}</p>
                   </div>
                   {product.material_category ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-success" />
                   ) : (
-                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <AlertTriangle className="h-4 w-4 text-warning" />
                   )}
                 </div>
 
@@ -260,12 +260,12 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
           )}
 
           {/* Import Summary */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-[hsl(var(--info-bg))] border border-[hsl(var(--info))]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Upload className="h-5 w-5 text-blue-600 mt-0.5" />
+              <Upload className="h-5 w-5 text-[hsl(var(--info))] mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-blue-900">Ready to Import</p>
-                <p className="text-sm text-blue-700 mt-1">
+                <p className="font-semibold">Ready to Import</p>
+                <p className="text-sm text-muted-foreground mt-1">
                   This is a preview of 1 product. Clicking "Start Import" will process all{' '}
                   <strong>{totalProducts.toLocaleString()}</strong> products with the same field mappings.
                 </p>

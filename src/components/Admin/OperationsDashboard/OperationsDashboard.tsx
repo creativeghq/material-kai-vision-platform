@@ -60,6 +60,7 @@ import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
+import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 
 import type {
   UsageAnalytics,
@@ -818,6 +819,10 @@ const OperationsDashboardInner: React.FC = () => {
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
+            <TabsTrigger value="search-analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Search className="h-4 w-4 mr-2" />
+              Search Analytics
+            </TabsTrigger>
             <TabsTrigger value="services-billing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Globe className="h-4 w-4 mr-2" />
               Services & Billing
@@ -1232,6 +1237,11 @@ const OperationsDashboardInner: React.FC = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Search Analytics Tab — query performance, cache, and observability */}
+          <TabsContent value="search-analytics" className="space-y-4">
+            <SearchAnalyticsDashboard />
           </TabsContent>
 
           {/* Services & Billing Tab — 3rd Party API Services */}

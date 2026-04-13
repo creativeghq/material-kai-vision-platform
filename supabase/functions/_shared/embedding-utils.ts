@@ -87,13 +87,11 @@ function validateConfig(): void {
   const model = EMBEDDING_CONFIG.model;
   const dimensions = EMBEDDING_CONFIG.dimensions;
 
-  if (!EMBEDDING_CONFIG.supportedModels[model as keyof typeof EMBEDDING_CONFIG.supportedModels]) {
-    throw new Error(`Unsupported embedding model: ${model}`);
+  if (!model) {
+    throw new Error('EMBEDDING_CONFIG.model is required');
   }
-
-  const modelConfig = EMBEDDING_CONFIG.supportedModels[model as keyof typeof EMBEDDING_CONFIG.supportedModels];
-  if (dimensions > modelConfig.maxDimensions) {
-    throw new Error(`Model ${model} supports maximum ${modelConfig.maxDimensions} dimensions, got ${dimensions}`);
+  if (!dimensions || dimensions <= 0) {
+    throw new Error('EMBEDDING_CONFIG.dimensions must be a positive integer');
   }
 
   console.log(`✅ Embedding config validated: ${model} with ${dimensions} dimensions`);
@@ -442,7 +440,6 @@ export function getEmbeddingInfo() {
     model: EMBEDDING_CONFIG.model,
     dimensions: EMBEDDING_CONFIG.dimensions,
     maxTokens: EMBEDDING_CONFIG.maxTokens,
-    supportedModels: Object.keys(EMBEDDING_CONFIG.supportedModels),
     isMivaaEnabled: Boolean(MIVAA_CONFIG.apiKey),
     mivaaGatewayUrl: MIVAA_CONFIG.gatewayUrl,
   };

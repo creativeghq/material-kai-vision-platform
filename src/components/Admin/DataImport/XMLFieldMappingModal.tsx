@@ -114,7 +114,7 @@ const FieldMappingCombobox: React.FC<FieldMappingComboboxProps> = ({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'w-full justify-between bg-white hover:bg-gray-50',
+            'w-full justify-between',
             !value && 'text-muted-foreground',
           )}
         >
@@ -259,21 +259,21 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.9) {
       return (
-        <Badge className="bg-green-100 text-green-700 border-green-200">
+        <Badge className="bg-[hsl(var(--success-bg))] text-success border-success/30">
           <CheckCircle className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
       );
     } else if (confidence >= 0.7) {
       return (
-        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+        <Badge className="bg-[hsl(var(--warning-bg))] text-warning border-warning/30">
           <Sparkles className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
       );
     } else {
       return (
-        <Badge className="bg-red-100 text-red-700 border-red-200">
+        <Badge className="bg-[hsl(var(--error-bg))] text-destructive border-destructive/30">
           <AlertTriangle className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
@@ -533,20 +533,20 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
         {/* Manual Input for Missing Required Fields */}
         {getMissingRequiredFields().length > 0 && (
-          <div className="space-y-3 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+          <div className="space-y-3 bg-[hsl(var(--warning-bg))] border border-warning/30 p-4 rounded-lg">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-semibold text-yellow-900 mb-2">
+                <h4 className="font-semibold mb-2">
                   Missing Required Fields
                 </h4>
-                <p className="text-sm text-yellow-700 mb-3">
+                <p className="text-sm text-muted-foreground mb-3">
                   The following required fields could not be auto-detected. Please provide values manually:
                 </p>
                 <div className="space-y-3">
                   {getMissingRequiredFields().map((field) => (
                     <div key={field} className="space-y-1">
-                      <Label htmlFor={`manual-${field}`} className="text-yellow-900">
+                      <Label htmlFor={`manual-${field}`}>
                         {TARGET_FIELDS.find(f => f.value === field)?.label || field}
                         <span className="text-destructive ml-1">*</span>
                       </Label>
@@ -555,7 +555,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
                         placeholder={`Enter ${TARGET_FIELDS.find(f => f.value === field)?.label || field}`}
                         value={manualValues[field] || ''}
                         onChange={(e) => setManualValues(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="bg-white"
+                        className=""
                       />
                     </div>
                   ))}

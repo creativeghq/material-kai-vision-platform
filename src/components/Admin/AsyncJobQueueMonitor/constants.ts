@@ -9,16 +9,24 @@ import {
   CheckCircle,
   Terminal,
   Image as ImageIcon,
+  Flame,
+  Cpu,
+  Search,
 } from 'lucide-react';
 
 // Global Pipeline Definition for the Monitor (PDF Processing - default)
+// Stages map 1:1 to backend checkpoint stages from ProcessingStage enum
 export const GLOBAL_PIPELINE_FLOW = [
-  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
-  { id: 'extraction', name: 'Document Extraction', icon: FileText, checkpoint: 'pdf_extracted' },
-  { id: 'discovery', name: 'Product Discovery', icon: Zap, checkpoint: 'products_detected' },
-  { id: 'processing', name: 'Product Processing', icon: Package, checkpoint: 'products_created' },
-  { id: 'entities', name: 'Document Entities', icon: Link, checkpoint: 'document_entities_created' },
-  { id: 'quality', name: 'Quality Enhancement', icon: Activity, checkpoint: 'completed' },
+  { id: 'initialized', name: 'Initialized', icon: Clock, checkpoint: 'initialized' },
+  { id: 'warmup', name: 'AI Warmup', icon: Flame, checkpoint: 'warmup_complete' },
+  { id: 'extraction', name: 'PDF Extract', icon: FileText, checkpoint: 'pdf_extracted' },
+  { id: 'chunking', name: 'Chunking', icon: FileText, checkpoint: 'chunks_created' },
+  { id: 'text_embeddings', name: 'Embeddings', icon: Cpu, checkpoint: 'text_embeddings_generated' },
+  { id: 'images', name: 'Images', icon: ImageIcon, checkpoint: 'images_extracted' },
+  { id: 'discovery', name: 'Discovery', icon: Search, checkpoint: 'products_detected' },
+  { id: 'processing', name: 'Products', icon: Package, checkpoint: 'products_created' },
+  { id: 'relationships', name: 'Relations', icon: Link, checkpoint: 'relationships_created' },
+  { id: 'completed', name: 'Complete', icon: CheckCircle, checkpoint: 'completed' },
 ];
 
 // XML Import Pipeline Stages
@@ -55,6 +63,7 @@ export const getPipelineForJobType = (jobType: string) => {
     case 'web_scraping':
       return WEB_SCRAPING_PIPELINE_FLOW;
     case 'pdf_processing':
+    case 'product_discovery_upload':
     default:
       return GLOBAL_PIPELINE_FLOW;
   }

@@ -227,14 +227,14 @@ const ImportHistoryTab: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (jobs.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">
+      <div className="text-center py-12 text-muted-foreground">
         <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
         <p className="text-lg">No import history yet</p>
         <p className="text-sm mt-2">Import jobs will appear here once you start importing data</p>

@@ -86,7 +86,7 @@ const DataImportHub: React.FC = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
                 <TabsTrigger value="pdf" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <FileType className="h-4 w-4 mr-2" />
                   PDF Processing
@@ -109,19 +109,19 @@ const DataImportHub: React.FC = () => {
                 <div className="space-y-6">
                   {/* Active Jobs Warning */}
                   {activeJobs.length > 0 && (
-                    <Alert className="border-blue-300 bg-blue-50">
-                      <AlertCircle className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-900">
+                    <Alert className="border-[hsl(var(--info))]/30 bg-[hsl(var(--info-bg))]">
+                      <AlertCircle className="h-4 w-4 text-[hsl(var(--info))]" />
+                      <AlertDescription>
                         <div className="space-y-2">
                           <p className="font-semibold">
                             {activeJobs.length} PDF processing job{activeJobs.length > 1 ? 's' : ''} currently active
                           </p>
-                          <p className="text-sm">
+                          <p className="text-sm text-muted-foreground">
                             Please wait for existing jobs to complete or visit the Async Queue Monitor to manage them.
                           </p>
                           <div className="mt-3 space-y-2">
                             {activeJobs.map((job) => (
-                              <div key={job.id} className="flex items-center justify-between p-2 bg-white rounded border border-blue-200">
+                              <div key={job.id} className="flex items-center justify-between p-2 bg-card rounded-lg border border-border">
                                 <div>
                                   <div className="text-sm font-medium">
                                     {job.metadata?.filename || 'PDF Document'}
@@ -160,11 +160,11 @@ const DataImportHub: React.FC = () => {
                       <p>Checking for active jobs...</p>
                     </div>
                   ) : activeJobs.length > 0 ? (
-                    <Alert className="border-orange-300 bg-orange-50">
-                      <AlertCircle className="h-4 w-4 text-orange-600" />
-                      <AlertDescription className="text-orange-900">
+                    <Alert className="border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning-bg))]">
+                      <AlertCircle className="h-4 w-4 text-warning" />
+                      <AlertDescription>
                         <p className="font-semibold">PDF upload is temporarily blocked</p>
-                        <p className="text-sm mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Please complete or cancel existing jobs before uploading new PDFs.
                           This ensures proper resource management and prevents conflicts.
                         </p>

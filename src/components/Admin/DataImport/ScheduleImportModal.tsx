@@ -181,13 +181,13 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-gray-800 text-white border-gray-700">
+      <DialogContent className="max-w-2xl bg-card text-card-foreground border-border">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
             <Calendar className="h-6 w-6 text-purple-400" />
             Schedule Recurring Import
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Configure automatic imports for: <strong>{job.source_name}</strong>
           </DialogDescription>
         </DialogHeader>
@@ -202,7 +202,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
         <div className="space-y-4">
           {/* Source URL */}
           <div className="space-y-2">
-            <Label htmlFor="source-url" className="text-white">
+            <Label htmlFor="source-url" className="text-foreground">
               Source URL <span className="text-red-400">*</span>
             </Label>
             <Input
@@ -210,28 +210,28 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
               placeholder="https://example.com/catalog.xml"
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white"
+              className="bg-background border-input text-foreground"
             />
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               URL to fetch the XML file from on each scheduled run
             </p>
           </div>
 
           {/* Schedule Preset */}
           <div className="space-y-2">
-            <Label htmlFor="schedule" className="text-white">
+            <Label htmlFor="schedule" className="text-foreground">
               Schedule <span className="text-red-400">*</span>
             </Label>
             <Select value={selectedPreset} onValueChange={setSelectedPreset}>
-              <SelectTrigger id="schedule" className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger id="schedule" className="bg-background border-input text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-background border-input">
                 {CRON_PRESETS.map((preset) => (
                   <SelectItem key={preset.value} value={preset.value}>
                     <div>
                       <div className="font-medium">{preset.label}</div>
-                      <div className="text-xs text-gray-400">{preset.description}</div>
+                      <div className="text-xs text-muted-foreground">{preset.description}</div>
                     </div>
                   </SelectItem>
                 ))}
@@ -242,7 +242,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
           {/* Custom Cron Expression */}
           {selectedPreset === 'custom' && (
             <div className="space-y-2">
-              <Label htmlFor="custom-cron" className="text-white">
+              <Label htmlFor="custom-cron" className="text-foreground">
                 Custom Cron Expression
               </Label>
               <Input
@@ -250,9 +250,9 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
                 placeholder="0 */6 * * *"
                 value={customCron}
                 onChange={(e) => setCustomCron(e.target.value)}
-                className="bg-gray-700 border-gray-600 text-white font-mono"
+                className="bg-background border-input text-foreground font-mono"
               />
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Format: minute hour day month dayOfWeek (e.g., "0 */6 * * *" for every 6 hours)
               </p>
             </div>
@@ -269,7 +269,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between pt-4 border-t border-gray-700">
+        <div className="flex justify-between pt-4 border-t border-border">
           <div>
             {job.is_scheduled && (
               <Button

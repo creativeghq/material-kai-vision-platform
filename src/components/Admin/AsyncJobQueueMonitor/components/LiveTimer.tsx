@@ -8,24 +8,23 @@ const formatTime = (seconds: number) => {
   return `${(seconds / 3600).toFixed(1)}h`;
 };
 
+// Backend often doesn't set started_at, so fall back to created_at
+const getStartTime = (job: BackgroundJob): number =>
+  job.started_at ? new Date(job.started_at).getTime() : new Date(job.created_at).getTime();
+
 const getElapsedTime = (job: BackgroundJob): string => {
-  if (job.status === 'completed' && job.started_at && job.completed_at) {
-    const start = new Date(job.started_at).getTime();
-    const end = new Date(job.completed_at).getTime();
-    return formatTime(Math.floor((end - start) / 1000));
+  const start = getStartTime(job);
+
+  if (job.status === 'completed' && job.completed_at) {
+    return formatTime(Math.floor((new Date(job.completed_at).getTime() - start) / 1000));
   }
-  if (job.status === 'failed' && job.started_at && job.failed_at) {
-    const start = new Date(job.started_at).getTime();
-    const end = new Date(job.failed_at).getTime();
-    return formatTime(Math.floor((end - start) / 1000));
+  if (job.status === 'failed' && job.failed_at) {
+    return formatTime(Math.floor((new Date(job.failed_at).getTime() - start) / 1000));
   }
-  if (job.status === 'interrupted' && job.started_at && job.interrupted_at) {
-    const start = new Date(job.started_at).getTime();
-    const end = new Date(job.interrupted_at).getTime();
-    return formatTime(Math.floor((end - start) / 1000));
+  if (job.status === 'interrupted' && job.interrupted_at) {
+    return formatTime(Math.floor((new Date(job.interrupted_at).getTime() - start) / 1000));
   }
-  if ((job.status === 'processing' || job.status === 'retrying') && job.started_at) {
-    const start = new Date(job.started_at).getTime();
+  if (job.status === 'processing' || job.status === 'retrying') {
     return formatTime(Math.floor((Date.now() - start) / 1000));
   }
   if (job.status === 'pending') {

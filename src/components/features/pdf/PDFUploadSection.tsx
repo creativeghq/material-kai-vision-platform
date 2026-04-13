@@ -210,18 +210,18 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
           isDragging
-            ? 'border-primary bg-primary/5'
-            : 'border-gray-300 hover:border-gray-400 bg-gray-50'
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:border-muted-foreground/40 bg-card/50'
         }`}
       >
-        <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-gray-400'}`} />
-        <p className="text-gray-600 mb-2 font-medium">
+        <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+        <p className="text-foreground mb-2 font-medium">
           {file ? file.name : 'Drag & drop your PDF here, or click to browse'}
         </p>
         {file && (
-          <p className="text-sm text-gray-500 mb-2">
+          <p className="text-sm text-muted-foreground mb-2">
             {(file.size / 1024 / 1024).toFixed(2)} MB
           </p>
         )}
@@ -233,7 +233,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           id="pdf-upload"
         />
         <label htmlFor="pdf-upload">
-          <Button variant="outline" className="mt-2 bg-white hover:bg-primary/10 hover:text-[#3e192a]" asChild>
+          <Button variant="outline" className="mt-2" asChild>
             <span>Browse Files</span>
           </Button>
         </label>
@@ -243,9 +243,9 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       {file && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-700 mb-2 block font-medium">Material Category</label>
+            <label className="text-sm text-muted-foreground mb-2 block font-medium">Material Category</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-white border-gray-300">
+              <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
@@ -256,12 +256,10 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Select the material category for products in this PDF
             </p>
           </div>
-
-
 
           <Button
             onClick={handleUpload}

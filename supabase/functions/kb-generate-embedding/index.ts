@@ -9,24 +9,39 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const MIVAA_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
 Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Authenticate — accept any valid user or secret key
-  const auth = await authenticate(req);
-  if (!auth.success) {
-    return new Response(
-      JSON.stringify({ error: auth.error || 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  // Authenticate:
+  // 1. Check for internal service key via x-internal-key header (pg_net trigger)
+  // 2. Fall back to standard authenticate() for user JWTs / API secret keys
+  const internalKey = req.headers.get('x-internal-key') || '';
+  const isInternalCall = supabaseServiceKey && internalKey === supabaseServiceKey;
+
+  if (!isInternalCall) {
+    try {
+      const auth = await authenticate(req);
+      if (!auth.success) {
+        throw new Error(auth.error || 'Unauthorized');
+      }
+    } catch {
+      // Also accept service-role Bearer (edge-function-to-edge-function calls)
+      const authHeader = req.headers.get('Authorization') || '';
+      if (!authHeader.includes(supabaseServiceKey)) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
   }
 
   // Use service-role client so we can write embeddings regardless of RLS
@@ -79,12 +94,29 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
 
     const startMs = Date.now();
 
-    // Generate embedding via shared MIVAA / Voyage AI 3.5 infrastructure
-    const embedding = await generateStandardEmbedding(textToEmbed, 'document', {
-      operationType: 'kb_embedding',
-      jobId: doc_id,
+    // Generate embedding via MIVAA /api/embeddings/clip-text (Voyage AI 3.5, 1024D)
+    const embResponse = await fetch(`${MIVAA_URL}/api/embeddings/clip-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: textToEmbed.substring(0, 8000),
+        model: 'voyage-3.5',
+        input_type: 'document',
+        dimensions: 1024,
+      }),
     });
 
+    if (!embResponse.ok) {
+      const errBody = await embResponse.text().catch(() => '');
+      throw new Error(`MIVAA embedding API error ${embResponse.status}: ${errBody.substring(0, 200)}`);
+    }
+
+    const embResult = await embResponse.json();
+    if (!embResult.success || !embResult.embedding) {
+      throw new Error(`MIVAA embedding failed: ${embResult.error || 'no embedding returned'}`);
+    }
+
+    const embedding: number[] = embResult.embedding;
     const elapsedMs = Date.now() - startMs;
 
     // Store result
@@ -121,14 +153,17 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
 
     // Mark document as failed
     if (doc_id) {
-      await supabaseAdmin
-        .from('kb_docs')
-        .update({
-          embedding_status: 'failed',
-          embedding_error_message: err instanceof Error ? err.message : String(err),
-        })
-        .eq('id', doc_id)
-        .catch(() => {});
+      try {
+        await supabaseAdmin
+          .from('kb_docs')
+          .update({
+            embedding_status: 'failed',
+            embedding_error_message: err instanceof Error ? err.message : String(err),
+          })
+          .eq('id', doc_id);
+      } catch {
+        // ignore — best effort
+      }
     }
 
     return new Response(

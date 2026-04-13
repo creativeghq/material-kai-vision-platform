@@ -170,13 +170,13 @@ const XMLImportTab: React.FC = () => {
     <div className="space-y-6">
       {/* Source Type Tabs */}
       <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as 'file' | 'url')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-100">
-          <TabsTrigger value="file">
-            <Upload className="h-4 w-4 mr-2" />
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="file" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Upload className="h-4 w-4" />
             Upload File
           </TabsTrigger>
-          <TabsTrigger value="url">
-            <Link className="h-4 w-4 mr-2" />
+          <TabsTrigger value="url" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Link className="h-4 w-4" />
             Remote URL
           </TabsTrigger>
         </TabsList>
@@ -184,7 +184,7 @@ const XMLImportTab: React.FC = () => {
         {/* File Upload Tab */}
         <TabsContent value="file" className="mt-4">
           <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors bg-gray-50">
+            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-muted-foreground/40 transition-colors bg-card/50">
               <input
                 type="file"
                 accept=".xml"
@@ -200,17 +200,17 @@ const XMLImportTab: React.FC = () => {
                   <FileText className="h-12 w-12 text-primary" />
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                  <p className="text-lg font-semibold text-foreground mb-1">
                     {selectedFile ? selectedFile.name : 'Choose XML File'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {selectedFile
                       ? `${(selectedFile.size / 1024).toFixed(2)} KB`
                       : 'Click to browse or drag and drop'}
                   </p>
                 </div>
                 {!selectedFile && (
-                  <Button variant="outline" className="mt-2 bg-white hover:bg-primary/10 hover:text-[#3e192a]">
+                  <Button variant="outline" className="mt-2">
                     <Upload className="h-4 w-4 mr-2" />
                     Select File
                   </Button>
@@ -243,22 +243,21 @@ const XMLImportTab: React.FC = () => {
 
         {/* URL Input Tab */}
         <TabsContent value="url" className="mt-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50">
+          <div className="border-2 border-dashed border-border rounded-xl p-8 bg-card/50">
             <div className="flex flex-col items-center gap-4">
               <div className="p-4 bg-primary/10 rounded-full">
                 <Link className="h-12 w-12 text-primary" />
               </div>
               <div className="w-full max-w-xl space-y-4">
                 <div>
-                  <label className="text-sm text-gray-700 mb-2 block font-medium">XML File URL</label>
+                  <label className="text-sm text-muted-foreground mb-2 block font-medium">XML File URL</label>
                   <Input
                     type="url"
                     placeholder="https://example.com/products.xml"
                     value={remoteUrl}
                     onChange={(e) => setRemoteUrl(e.target.value)}
-                    className="bg-white border-gray-300"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Enter the direct URL to an XML file (must be publicly accessible)
                   </p>
                 </div>
@@ -300,14 +299,14 @@ const XMLImportTab: React.FC = () => {
       {/* Fields Detected - Show Summary */}
       {detectedFields.length > 0 && !showMappingModal && (
         <div className="space-y-4">
-          <Alert className="bg-green-50 border-green-200">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
+          <Alert className="border-[hsl(var(--success))]/30 bg-[hsl(var(--success-bg))]">
+            <CheckCircle className="h-4 w-4 text-success" />
+            <AlertDescription>
               Detected <strong>{detectedFields.length} fields</strong> with AI-suggested mappings
               <br />
               <Button
                 variant="link"
-                className="text-green-700 hover:text-green-600 p-0 h-auto"
+                className="text-success hover:text-success/80 p-0 h-auto"
                 onClick={() => setShowMappingModal(true)}
               >
                 Click here to review and confirm mappings
@@ -316,13 +315,13 @@ const XMLImportTab: React.FC = () => {
           </Alert>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Total Fields</p>
-              <p className="text-2xl font-bold text-gray-900">{detectedFields.length}</p>
+            <div className="dashboard-card rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-1">Total Fields</p>
+              <p className="text-2xl font-bold text-foreground">{detectedFields.length}</p>
             </div>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">High Confidence</p>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="dashboard-card rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-1">High Confidence</p>
+              <p className="text-2xl font-bold text-success">
                 {detectedFields.filter((f) => f.confidence >= 0.9).length}
               </p>
             </div>
