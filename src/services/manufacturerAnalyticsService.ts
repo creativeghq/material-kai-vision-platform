@@ -68,6 +68,10 @@ export interface ManufacturerAnalyticsEvent {
   user_country?: string;
   session_id: string;
   source_page?: string;
+  /** Upload category (one of 10 DB categories: tiles, wood, lighting, etc.) */
+  category?: string;
+  /** Fine-grained controlled-vocab type (e.g. porcelain_tile, pendant_light, radiator) */
+  material_type?: string;
   metadata?: Record<string, unknown>;
   created_at: string;
 }
@@ -178,6 +182,8 @@ class ManufacturerAnalyticsService {
     manufacturerId?: string,
     sourcePage?: string,
     metadata?: Record<string, unknown>,
+    category?: string,
+    materialType?: string,
   ): void {
     // Fire-and-forget — build the event asynchronously, never block the caller
     Promise.all([
@@ -194,6 +200,8 @@ class ManufacturerAnalyticsService {
           user_country: location?.country,
           session_id: this.sessionId,
           source_page: sourcePage ?? (typeof window !== 'undefined' ? window.location.pathname : undefined),
+          category,
+          material_type: materialType,
           metadata,
           created_at: new Date().toISOString(),
         };
@@ -258,28 +266,28 @@ class ManufacturerAnalyticsService {
   // Convenience methods
   // -------------------------------------------------------------------------
 
-  trackProductView(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_view', productId, manufacturerId, sourcePage, metadata);
+  trackProductView(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_view', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackProductSave(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_save', productId, manufacturerId, sourcePage, metadata);
+  trackProductSave(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_save', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackProductQuote(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_quote', productId, manufacturerId, sourcePage, metadata);
+  trackProductQuote(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_quote', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackSearchImpression(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_search_impression', productId, manufacturerId, sourcePage, metadata);
+  trackSearchImpression(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_search_impression', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackSearchClick(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_search_click', productId, manufacturerId, sourcePage, metadata);
+  trackSearchClick(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_search_click', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackProductCompare(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>): void {
-    this.track('product_compare', productId, manufacturerId, sourcePage, metadata);
+  trackProductCompare(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
+    this.track('product_compare', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 }
 

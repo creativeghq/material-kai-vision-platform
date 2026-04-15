@@ -4175,7 +4175,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       outputTokens: 0,
                       gpuSeconds: 0,
                       cost: (inputTokens / 1000000) * 0.02,
-                      description: `Text embeddings: ${chunksCreated} chunks → 1536D vectors`,
+                      description: `Text embeddings: ${chunksCreated} chunks → 1024D vectors`,
                     };
                   }
 

@@ -28,6 +28,12 @@ import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
+import {
+  getCategoryDisplayConfig,
+  getKnownFieldKeys,
+  resolveUploadCategory,
+  type UploadCategory,
+} from '@/lib/categoryFieldRegistry';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -91,20 +97,30 @@ const safeString = (val: unknown, fallback = ''): string => {
   return String(val);
 };
 
-// Get category-specific color theme
+// Get category-specific color theme — supports all 10 DB categories + legacy display categories
 const getCategoryTheme = (category: MaterialCategory): { primary: string; secondary: string } => {
-  const themes: Record<MaterialCategory, { primary: string; secondary: string }> = {
-    tiles: { primary: '#3b82f6', secondary: '#dbeafe' },
-    wood: { primary: '#92400e', secondary: '#fef3c7' },
-    stone: { primary: '#6b7280', secondary: '#f3f4f6' },
-    paint: { primary: '#7c3aed', secondary: '#ede9fe' },
-    fabric: { primary: '#db2777', secondary: '#fce7f3' },
-    metal: { primary: '#374151', secondary: '#e5e7eb' },
-    glass: { primary: '#0891b2', secondary: '#cffafe' },
-    composite: { primary: '#059669', secondary: '#d1fae5' },
-    other: { primary: '#6b7280', secondary: '#f3f4f6' },
+  const themes: Record<string, { primary: string; secondary: string }> = {
+    // DB categories (10)
+    tiles:             { primary: '#3b82f6', secondary: '#dbeafe' },
+    wood:              { primary: '#92400e', secondary: '#fef3c7' },
+    decor:             { primary: '#8b5cf6', secondary: '#ede9fe' },
+    furniture:         { primary: '#d97706', secondary: '#fef3c7' },
+    general_materials: { primary: '#6b7280', secondary: '#f3f4f6' },
+    paint_wall_decor:  { primary: '#10b981', secondary: '#d1fae5' },
+    heating:           { primary: '#ef4444', secondary: '#fee2e2' },
+    sanitary:          { primary: '#06b6d4', secondary: '#cffafe' },
+    kitchen:           { primary: '#f59e0b', secondary: '#fef3c7' },
+    lighting:          { primary: '#eab308', secondary: '#fef9c3' },
+    // Legacy display categories
+    stone:             { primary: '#6b7280', secondary: '#f3f4f6' },
+    paint:             { primary: '#10b981', secondary: '#d1fae5' },
+    fabric:            { primary: '#db2777', secondary: '#fce7f3' },
+    metal:             { primary: '#374151', secondary: '#e5e7eb' },
+    glass:             { primary: '#0891b2', secondary: '#cffafe' },
+    composite:         { primary: '#059669', secondary: '#d1fae5' },
+    other:             { primary: '#6b7280', secondary: '#f3f4f6' },
   };
-  return themes[category];
+  return themes[category] || themes.other;
 };
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -1209,45 +1225,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
-  // Helper function to safely render any value (handles objects, arrays, primitives)
+  // Helper function to safely render any value (handles objects, arrays, primitives).
+  // Strips internal metadata keys (confidence, source, extraction_method) that
+  // should never be shown to end users.
+  const INTERNAL_KEYS = new Set(['confidence', 'source', 'extraction_method', 'extraction_timestamp']);
+
   const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) return 'N/A';
 
-    // Handle {value, confidence} objects FIRST
+    // Handle {value, confidence} objects FIRST — extract just the value
     if (typeof value === 'object' && value !== null && 'value' in value) {
       const obj = value as Record<string, unknown>;
       const innerValue = obj.value;
-      // Recursively handle the inner value
       if (innerValue === null || innerValue === undefined) return 'N/A';
-      if (typeof innerValue === 'object') {
-        // If inner value is still an object, stringify it
-        try {
-          return JSON.stringify(innerValue);
-        } catch {
-          return String(innerValue);
-        }
-      }
-      return String(innerValue);
+      return renderValue(innerValue); // Recurse to handle nested structures
     }
 
     // Handle arrays
     if (Array.isArray(value)) {
-      return value.map(v => {
-        // For each array item, extract if it's an object
-        if (typeof v === 'object' && v !== null && 'value' in v) {
-          return String((v as Record<string, unknown>).value ?? 'N/A');
-        }
-        return String(v);
-      }).join(', ');
+      return value.map(v => renderValue(v)).filter(v => v !== 'N/A').join(', ');
     }
 
-    // Handle plain objects - stringify them
+    // Handle plain objects — format as readable key: value pairs,
+    // skipping internal/metadata keys
     if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value);
-      } catch {
-        return '[Object]';
-      }
+      const entries = Object.entries(value as Record<string, unknown>)
+        .filter(([k]) => !INTERNAL_KEYS.has(k));
+      if (entries.length === 0) return 'N/A';
+      // If only one meaningful entry, just show the value
+      if (entries.length === 1) return renderValue(entries[0][1]);
+      return entries
+        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${renderValue(v)}`)
+        .join(', ');
     }
 
     // Handle primitives
@@ -1256,7 +1265,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Helper function to render metadata category
   const renderMetadataCategory = (title: string, data: Record<string, unknown>) => {
-    const filteredData = Object.entries(data).filter(([, value]) => value && value !== 'N/A' && value !== '');
+    const filteredData = Object.entries(data).filter(([, value]) => {
+      const str = renderValue(value);
+      return str && str !== 'N/A' && str !== '';
+    });
     if (filteredData.length === 0) return null;
 
     const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
@@ -1266,45 +1278,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{title}</h3>
         </div>
-        {/* 2-column grid on all but tiny screens — product detail rows are short,
-            so 2-col uses the horizontal space well without wasting vertical. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
-            const parts = str.split(', ').filter(p => p.trim());
 
-            // Special-case: hex color values → render as color swatch + code
+            // Hex color values → render as color swatch + code
             if (HEX_RE.test(str)) {
               return (
-                <div key={key} className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span
-                      className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0"
-                      style={{ backgroundColor: str }}
-                      aria-label={`Color swatch ${str}`}
-                    />
-                    <p className="text-xs font-semibold">{str}</p>
+                <div key={key} className="flex items-center justify-between py-2 border-b border-border/20">
+                  <span className="text-xs text-muted-foreground">{key}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
+                    <span className="text-xs font-semibold">{str}</span>
                   </div>
                 </div>
               );
             }
 
             return (
-              <div key={key} className="bg-muted/30 rounded-lg p-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
-                {parts.length >= 3 ? (
-                  <ul className="space-y-0.5 mt-1">
-                    {parts.map((part, i) => (
-                      <li key={i} className="text-xs font-semibold flex items-start gap-1.5">
-                        <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
-                        {part.trim()}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs font-semibold">{str}</p>
-                )}
+              <div key={key} className="flex items-start justify-between py-2 border-b border-border/20 gap-4">
+                <span className="text-xs text-muted-foreground shrink-0">{key}</span>
+                <span className="text-xs font-semibold text-right">{str}</span>
               </div>
             );
           })}
@@ -1534,6 +1528,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 variant="default"
                 size="sm"
                 className="text-xs"
+                category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
+                materialType={product.metadata?.material_category}
               />
               <AddToMoodboardButton
                 productId={product.id}
@@ -1542,11 +1538,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 variant="outline"
                 size="sm"
                 className="text-xs"
+                category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
+                materialType={product.metadata?.material_category}
               />
             </div>
           </div>
-          <DialogDescription className="text-sm text-muted-foreground mt-3">
-            {safeString(product.description)}
+          {/* Description moved to Details tab — avoids duplication with the
+              full description card that also falls back to chunk content. */}
+          <DialogDescription className="sr-only">
+            Product details for {product.name}
           </DialogDescription>
         </DialogHeader>
 
@@ -1670,7 +1670,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             ) : images.length > 0 ? (
               <>
-                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border">
+                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border group">
                   <img
                     src={currentImage?.url}
                     alt={product.name}
@@ -1682,22 +1682,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   />
                   {images.length > 1 && (
                     <>
-                      <Button
+                      <button
                         onClick={handlePrevImage}
-                        variant="secondary"
-                        size="icon"
-                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
-                        <ChevronLeft className="h-5 w-5" />
-                      </Button>
-                      <Button
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={handleNextImage}
-                        variant="secondary"
-                        size="icon"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
-                        <ChevronRight className="h-5 w-5" />
-                      </Button>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </>
                   )}
                   <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
@@ -1706,24 +1702,52 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
                 </div>
 
-                {/* Thumbnail Strip */}
-                {images.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {images.map((image, index) => (
+                {/* Thumbnail Slider */}
+                {images.length > 1 && (() => {
+                  const thumbStripRef = React.createRef<HTMLDivElement>();
+                  const scrollBy = (dir: number) => {
+                    thumbStripRef.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
+                  };
+                  return (
+                    <div className="relative group/thumbs">
+                      {/* Left arrow */}
                       <button
-                        key={image.id}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden transition-all ${
-                          index === currentImageIndex
-                            ? 'border-primary ring-2 ring-primary ring-offset-2'
-                            : 'border-border hover:border-muted-foreground/50'
-                        }`}
+                        onClick={() => scrollBy(-1)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
-                        <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                        <ChevronLeft className="h-3.5 w-3.5" />
                       </button>
-                    ))}
-                  </div>
-                )}
+                      {/* Thumbnails */}
+                      <div
+                        ref={thumbStripRef}
+                        className="flex gap-2 overflow-x-auto px-1"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        <style>{`.thumb-strip::-webkit-scrollbar { display: none; }`}</style>
+                        {images.map((image, index) => (
+                          <button
+                            key={image.id}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
+                              index === currentImageIndex
+                                ? 'border-primary ring-1 ring-primary ring-offset-1 ring-offset-background'
+                                : 'border-border/50 hover:border-muted-foreground/50 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                          </button>
+                        ))}
+                      </div>
+                      {/* Right arrow */}
+                      <button
+                        onClick={() => scrollBy(1)}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <div className="relative aspect-square bg-muted/50 rounded-xl overflow-hidden border border-border flex items-center justify-center">
@@ -1734,159 +1758,306 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           {/* Right Column: Technical Details (2/5 width) */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Key Specifications Card */}
-            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Key Specifications
-                </h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-border/30">
-                  <span className="text-xs text-muted-foreground">Factory</span>
-                  <span className="text-xs font-semibold">{factory}</span>
-                </div>
-                {(() => {
-                  // Factory Group — only show when it is meaningfully different
-                  // from Factory (groups like "Grupo Halcón" that own multiple brands).
-                  const group = extractValue(allData?.factory_group_name);
-                  if (!group || group === factory) return null;
-                  return (
-                    <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-xs text-muted-foreground">Factory Group</span>
-                      <span className="text-xs font-semibold">{String(group)}</span>
-                    </div>
-                  );
-                })()}
-                {origin && (
-                  <div className="flex justify-between items-center py-2 border-b border-border/30">
-                    <span className="text-xs text-muted-foreground">Country of Origin</span>
-                    <span className="text-xs font-semibold">{origin}</span>
-                  </div>
-                )}
-                {collection && (
-                  <div className="flex justify-between items-center py-2 border-b border-border/30">
-                    <span className="text-xs text-muted-foreground">Collection</span>
-                    <span className="text-xs font-semibold">{collection}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center py-2 border-b border-border/30">
-                  <span className="text-xs text-muted-foreground">Material</span>
-                  <span className="text-xs font-semibold">{material}</span>
-                </div>
-                {(() => {
-                  const bodyType = extractValue(materialPropsData?.body_type);
-                  if (!bodyType) return null;
-                  return (
-                    <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-xs text-muted-foreground">Body Type</span>
-                      <span className="text-xs font-semibold capitalize">{String(bodyType)}</span>
-                    </div>
-                  );
-                })()}
-                <div className="flex justify-between items-center py-2 border-b border-border/30">
-                  <span className="text-xs text-muted-foreground">Finish</span>
-                  <span className="text-xs font-semibold capitalize">{finish}</span>
-                </div>
-                {(() => {
-                  // Material subtype (from vision): "glazed relief", "3D embossed", etc.
-                  const subtype = extractValue(materialPropsData?.material_subtype);
-                  if (!subtype) return null;
-                  return (
-                    <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-xs text-muted-foreground">Subtype</span>
-                      <span className="text-xs font-semibold capitalize">{String(subtype)}</span>
-                    </div>
-                  );
-                })()}
-                <div className="py-2 border-b border-border/30">
-                  <span className="text-xs text-muted-foreground">Size</span>
-                  {size === 'N/A' ? (
-                    <span className="block text-xs font-semibold mt-1">—</span>
-                  ) : (
-                    <ul className="mt-1 space-y-0.5">
-                      {size.split(', ').map((s, i) => (
-                        <li key={i} className="text-xs font-semibold flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
-                          {s.trim()}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30">
-                  <span className="text-xs text-muted-foreground">Thickness</span>
-                  <span className="text-xs font-semibold">{thickness || '—'}</span>
-                </div>
-                {Array.isArray(designData?.designers) && designData.designers.length > 0 && (
-                  <div className="flex justify-between items-center py-2 border-b border-border/30">
-                    <span className="text-xs text-muted-foreground">Designer</span>
-                    <span className="text-xs font-semibold">{designData.designers.join(', ')}</span>
-                  </div>
-                )}
+            {/* Key Specifications Card — category-adaptive.
+                Universal rows (Factory, Origin, Collection, Material) always show.
+                Category-specific rows are driven by the registry config.
+                Packaging subsection only shows for categories that have it. */}
+            {(() => {
+              const catConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
+              const uploadCat = resolveUploadCategory(
+                product.metadata?.material_category || product.type || product.category
+              );
 
-                {/* Packaging subsection — inside Key Specs card, below Material Properties.
-                    Only renders rows whose values are non-empty, so sparse products
-                    still show a clean card without placeholder junk. */}
-                {(() => {
-                  const pkg = (allData?.packaging || {}) as Record<string, unknown>;
-                  const pick = (k: string): string | null => {
-                    const v = pkg[k];
-                    if (v === null || v === undefined || v === '') return null;
-                    if (typeof v === 'number') return String(v);
-                    if (typeof v === 'string') return v;
-                    // {value, confidence} wrapper
-                    if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
-                      const inner = (v as Record<string, unknown>).value;
-                      return inner != null ? String(inner) : null;
-                    }
-                    return null;
-                  };
-                  const pieces = pick('pieces_per_box');
-                  const patternsCount = pick('patterns_count');
-                  const boxes = pick('boxes_per_pallet');
-                  const coverageM2 = pick('m2_per_box') ?? pick('coverage_m2');
-                  const coverageSqft = pick('sqft_per_box') ?? pick('coverage_sqft');
-                  const weightKg = pick('weight_per_box_kg') ?? pick('weight_kg');
-                  const weightLb = pick('weight_per_box_lb') ?? pick('weight_lb');
-                  const palletKg = pick('weight_per_pallet_kg');
+              // ── Universal rows (always shown) ──────────────────────────
+              const universalRows: Array<{ label: string; value: string }> = [];
+              if (factory !== '—') universalRows.push({ label: 'Factory', value: factory });
 
-                  const rows = [
-                    pieces && { label: 'Pieces / Box', value: pieces },
-                    patternsCount && { label: 'Patterns', value: patternsCount },
-                    coverageM2 && {
-                      label: 'Coverage / Box',
-                      value: coverageSqft ? `${coverageM2} m² (${coverageSqft} sqft)` : `${coverageM2} m²`,
-                    },
-                    weightKg && {
-                      label: 'Weight / Box',
-                      value: weightLb ? `${weightKg} kg (${weightLb} lb)` : `${weightKg} kg`,
-                    },
-                    boxes && { label: 'Boxes / Pallet', value: boxes },
-                    palletKg && { label: 'Pallet Weight', value: `${palletKg} kg` },
-                  ].filter(Boolean) as Array<{ label: string; value: string }>;
+              const group = extractValue(allData?.factory_group_name);
+              if (group && group !== factory) universalRows.push({ label: 'Factory Group', value: String(group) });
+              if (origin) universalRows.push({ label: 'Country of Origin', value: origin });
+              if (collection) universalRows.push({ label: 'Collection', value: collection });
+              universalRows.push({ label: 'Material', value: material });
 
-                  if (rows.length === 0) return null;
-                  return (
-                    <>
-                      <div className="pt-2 pb-1">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Packaging</p>
+              // ── Category-specific rows ─────────────────────────────────
+              // Each category defines which specs matter most in the sidebar.
+              const categorySpecRows: Array<{ label: string; value: string }> = [];
+
+              // Helper to try extracting a value from multiple possible paths
+              const tryExtract = (...paths: unknown[]): string | undefined => {
+                for (const p of paths) {
+                  const v = extractValue(p);
+                  if (v && v !== 'N/A' && v !== '—') return v;
+                }
+                return undefined;
+              };
+
+              if (uploadCat === 'tiles') {
+                const bodyType = tryExtract(materialPropsData?.body_type);
+                if (bodyType) categorySpecRows.push({ label: 'Body Type', value: bodyType });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const subtype = tryExtract(materialPropsData?.material_subtype);
+                if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
+                if (size !== 'N/A') categorySpecRows.push({ label: 'Size', value: size });
+                if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
+                const rectified = tryExtract(materialPropsData?.rectified, allData?.rectified);
+                if (rectified) categorySpecRows.push({ label: 'Rectified', value: rectified });
+              } else if (uploadCat === 'wood') {
+                const species = tryExtract(allData?.species, materialPropsData?.species);
+                if (species) categorySpecRows.push({ label: 'Species', value: species });
+                const construction = tryExtract(allData?.construction, materialPropsData?.construction);
+                if (construction) categorySpecRows.push({ label: 'Construction', value: construction });
+                const wearLayer = tryExtract(allData?.wear_layer_mm);
+                if (wearLayer) categorySpecRows.push({ label: 'Wear Layer', value: `${wearLayer} mm` });
+                if (thickness) categorySpecRows.push({ label: 'Total Thickness', value: thickness });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const clickSystem = tryExtract(allData?.click_system);
+                if (clickSystem) categorySpecRows.push({ label: 'Click System', value: clickSystem });
+                if (size !== 'N/A') categorySpecRows.push({ label: 'Plank Size', value: size });
+              } else if (uploadCat === 'lighting') {
+                const wattage = tryExtract(allData?.wattage_w, allData?.wattage);
+                if (wattage) categorySpecRows.push({ label: 'Wattage', value: `${wattage}W` });
+                const lumens = tryExtract(allData?.lumens_lm, allData?.lumens);
+                if (lumens) categorySpecRows.push({ label: 'Lumens', value: `${lumens} lm` });
+                const colorTemp = tryExtract(allData?.color_temperature_k, allData?.color_temperature);
+                if (colorTemp) categorySpecRows.push({ label: 'Color Temp', value: `${colorTemp}K` });
+                const cri = tryExtract(allData?.cri_ra, allData?.cri);
+                if (cri) categorySpecRows.push({ label: 'CRI', value: `Ra ${cri}` });
+                const dimmable = tryExtract(allData?.dimmable);
+                if (dimmable) categorySpecRows.push({ label: 'Dimmable', value: dimmable });
+                const lampType = tryExtract(allData?.lamp_type);
+                if (lampType) categorySpecRows.push({ label: 'Lamp / Socket', value: lampType });
+                const ipRating = tryExtract(allData?.ip_rating);
+                if (ipRating) categorySpecRows.push({ label: 'IP Rating', value: ipRating });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+              } else if (uploadCat === 'heating') {
+                const heatOutput = tryExtract(allData?.heat_output_watts);
+                if (heatOutput) categorySpecRows.push({ label: 'Heat Output', value: `${heatOutput}W` });
+                const btu = tryExtract(allData?.heat_output_btu);
+                if (btu) categorySpecRows.push({ label: 'BTU', value: `${btu} BTU/h` });
+                const panelType = tryExtract(allData?.panel_type);
+                if (panelType) categorySpecRows.push({ label: 'Panel Type', value: panelType });
+                const energyClass = tryExtract(allData?.energy_class);
+                if (energyClass) categorySpecRows.push({ label: 'Energy Class', value: energyClass });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const thermostat = tryExtract(allData?.thermostat_type);
+                if (thermostat) categorySpecRows.push({ label: 'Thermostat', value: thermostat });
+              } else if (uploadCat === 'sanitary') {
+                const productType = tryExtract(allData?.product_type);
+                if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
+                const bodyMat = tryExtract(allData?.body_material);
+                if (bodyMat) categorySpecRows.push({ label: 'Material', value: bodyMat });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const flowRate = tryExtract(allData?.flow_rate_l_min);
+                if (flowRate) categorySpecRows.push({ label: 'Flow Rate', value: `${flowRate} L/min` });
+                const flushVol = tryExtract(allData?.flush_volume_l);
+                if (flushVol) categorySpecRows.push({ label: 'Flush Volume', value: `${flushVol}L` });
+                const mounting = tryExtract(allData?.mounting_type);
+                if (mounting) categorySpecRows.push({ label: 'Mounting', value: mounting });
+              } else if (uploadCat === 'kitchen') {
+                const productType = tryExtract(allData?.product_type);
+                if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
+                const bodyMat = tryExtract(allData?.body_material);
+                if (bodyMat) categorySpecRows.push({ label: 'Body Material', value: bodyMat });
+                const doorMat = tryExtract(allData?.door_material);
+                if (doorMat) categorySpecRows.push({ label: 'Door Material', value: doorMat });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const worktopThk = tryExtract(allData?.worktop_thickness_mm);
+                if (worktopThk) categorySpecRows.push({ label: 'Worktop Thickness', value: `${worktopThk} mm` });
+              } else if (uploadCat === 'furniture') {
+                const frameMat = tryExtract(allData?.frame_material);
+                if (frameMat) categorySpecRows.push({ label: 'Frame', value: frameMat });
+                const upholstery = tryExtract(allData?.upholstery_material);
+                if (upholstery) categorySpecRows.push({ label: 'Upholstery', value: upholstery });
+                const topMat = tryExtract(allData?.top_material);
+                if (topMat) categorySpecRows.push({ label: 'Top Surface', value: topMat });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const seatH = tryExtract(allData?.seat_height_cm);
+                if (seatH) categorySpecRows.push({ label: 'Seat Height', value: `${seatH} cm` });
+                const weightCap = tryExtract(allData?.weight_capacity_kg);
+                if (weightCap) categorySpecRows.push({ label: 'Weight Capacity', value: `${weightCap} kg` });
+              } else if (uploadCat === 'paint_wall_decor') {
+                const productType = tryExtract(allData?.product_type);
+                if (productType) categorySpecRows.push({ label: 'Product Type', value: productType });
+                const baseType = tryExtract(allData?.base_type);
+                if (baseType) categorySpecRows.push({ label: 'Base Type', value: baseType });
+                const sheen = tryExtract(allData?.finish_sheen, allData?.finish);
+                if (sheen) categorySpecRows.push({ label: 'Finish / Sheen', value: sheen });
+                const coverage = tryExtract(allData?.coverage_per_litre_m2);
+                if (coverage) categorySpecRows.push({ label: 'Coverage', value: `${coverage} m²/L` });
+                const voc = tryExtract(allData?.voc_level_g_l, allData?.voc_class);
+                if (voc) categorySpecRows.push({ label: 'VOC', value: voc });
+                const coats = tryExtract(allData?.coats_recommended);
+                if (coats) categorySpecRows.push({ label: 'Coats', value: coats });
+              } else if (uploadCat === 'decor') {
+                const primaryMat = tryExtract(allData?.primary_material);
+                if (primaryMat) categorySpecRows.push({ label: 'Material', value: primaryMat });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const style = tryExtract(allData?.style, designData?.design_style);
+                if (style) categorySpecRows.push({ label: 'Style', value: style });
+                const handmade = tryExtract(allData?.handmade);
+                if (handmade) categorySpecRows.push({ label: 'Handmade', value: handmade });
+              } else {
+                // general_materials or unknown — show generic specs
+                const bodyType = tryExtract(materialPropsData?.body_type);
+                if (bodyType) categorySpecRows.push({ label: 'Body Type', value: bodyType });
+                categorySpecRows.push({ label: 'Finish', value: finish });
+                const subtype = tryExtract(materialPropsData?.material_subtype);
+                if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
+                if (size !== 'N/A') categorySpecRows.push({ label: 'Size', value: size });
+                if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
+              }
+
+              // Dimensions — shown for non-tile categories that have W/H/D
+              if (uploadCat !== 'tiles' && uploadCat !== 'wood') {
+                const w = tryExtract(allData?.width_mm, allData?.width_cm);
+                const h = tryExtract(allData?.height_mm, allData?.height_cm);
+                const d = tryExtract(allData?.depth_mm, allData?.depth_cm);
+                const diamVal = tryExtract(allData?.diameter_mm, allData?.diameter_cm);
+                const weightVal = tryExtract(allData?.weight_kg);
+                const dims = [w && `W: ${w}`, h && `H: ${h}`, d && `D: ${d}`].filter(Boolean);
+                if (dims.length > 0) categorySpecRows.push({ label: 'Dimensions', value: dims.join(' × ') });
+                if (diamVal) categorySpecRows.push({ label: 'Diameter', value: diamVal });
+                if (weightVal) categorySpecRows.push({ label: 'Weight', value: `${weightVal} kg` });
+              }
+
+              // Designer — universal but only if present
+              if (Array.isArray(designData?.designers) && designData.designers.length > 0) {
+                categorySpecRows.push({ label: 'Designer', value: designData.designers.join(', ') });
+              }
+
+              // ── Packaging subsection (only for categories that use it) ─
+              const packagingCategories = new Set(['tiles', 'wood', 'general_materials']);
+              const pkg = (allData?.packaging || {}) as Record<string, unknown>;
+              const pickPkg = (k: string): string | null => {
+                const v = pkg[k];
+                if (v === null || v === undefined || v === '') return null;
+                if (typeof v === 'number') return String(v);
+                if (typeof v === 'string') return v;
+                if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+                  const inner = (v as Record<string, unknown>).value;
+                  return inner != null ? String(inner) : null;
+                }
+                return null;
+              };
+
+              let packagingRows: Array<{ label: string; value: string }> = [];
+              if (packagingCategories.has(uploadCat)) {
+                const pieces = pickPkg('pieces_per_box');
+                const patternsCount = pickPkg('patterns_count');
+                const boxes = pickPkg('boxes_per_pallet');
+                const coverageM2 = pickPkg('m2_per_box') ?? pickPkg('coverage_m2');
+                const coverageSqft = pickPkg('sqft_per_box') ?? pickPkg('coverage_sqft');
+                const weightKg = pickPkg('weight_per_box_kg') ?? pickPkg('weight_kg');
+                const weightLb = pickPkg('weight_per_box_lb') ?? pickPkg('weight_lb');
+                const palletKg = pickPkg('weight_per_pallet_kg');
+                const palletLb = pickPkg('weight_per_pallet_lb');
+                const palletM2 = pickPkg('m2_per_pallet');
+                const palletSqft = pickPkg('sqft_per_pallet');
+                const palletDims = pickPkg('pallet_dimensions_cm');
+
+                packagingRows = [
+                  pieces && { label: uploadCat === 'wood' ? 'Planks / Pack' : 'Pieces / Box', value: pieces },
+                  patternsCount && { label: 'Patterns', value: patternsCount },
+                  coverageM2 && {
+                    label: 'Coverage / Box',
+                    value: coverageSqft ? `${coverageM2} m² (${coverageSqft} sqft)` : `${coverageM2} m²`,
+                  },
+                  weightKg && {
+                    label: 'Weight / Box',
+                    value: weightLb ? `${weightKg} kg (${weightLb} lb)` : `${weightKg} kg`,
+                  },
+                  boxes && { label: 'Boxes / Pallet', value: boxes },
+                  palletM2 && {
+                    label: 'Coverage / Pallet',
+                    value: palletSqft ? `${palletM2} m² (${palletSqft} sqft)` : `${palletM2} m²`,
+                  },
+                  palletKg && {
+                    label: 'Pallet Weight',
+                    value: palletLb ? `${palletKg} kg (${palletLb} lb)` : `${palletKg} kg`,
+                  },
+                  palletDims && { label: 'Pallet Dimensions', value: `${palletDims} cm` },
+                ].filter(Boolean) as Array<{ label: string; value: string }>;
+              }
+
+              // ── Warranty (shown for categories that typically have it) ──
+              const warrantyCategories = new Set(['heating', 'sanitary', 'kitchen', 'lighting', 'furniture']);
+              if (warrantyCategories.has(uploadCat)) {
+                const warranty = tryExtract(allData?.warranty_years, commercialData?.warranty_years);
+                if (warranty) categorySpecRows.push({ label: 'Warranty', value: `${warranty} years` });
+              }
+
+              // ── Render ─────────────────────────────────────────────────
+              return (
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Key Specifications
+                    </h3>
+                  </div>
+                  <div className="space-y-0">
+                    {universalRows.map((r, i) => (
+                      <div key={r.label} className="flex justify-between items-center py-2 border-b border-border/30">
+                        <span className="text-xs text-muted-foreground">{r.label}</span>
+                        <span className="text-xs font-semibold">{r.value}</span>
                       </div>
-                      {rows.map((r, i) => (
-                        <div
-                          key={r.label}
-                          className={`flex justify-between items-center py-2 ${i < rows.length - 1 ? 'border-b border-border/30' : ''}`}
-                        >
-                          <span className="text-xs text-muted-foreground">{r.label}</span>
-                          <span className="text-xs font-semibold">{r.value}</span>
+                    ))}
+                    {categorySpecRows.length > 0 && (
+                      <>
+                        <div className="pt-2 pb-1">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
+                            {catConfig.displayName} Specs
+                          </p>
                         </div>
-                      ))}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
+                        {categorySpecRows.map((r, i) => {
+                          // Multi-value size rows render as a list
+                          if (r.label === 'Size' || r.label === 'Plank Size') {
+                            const parts = r.value.split(', ');
+                            if (parts.length > 1) {
+                              return (
+                                <div key={r.label} className={`py-2 ${i < categorySpecRows.length - 1 ? 'border-b border-border/30' : ''}`}>
+                                  <span className="text-xs text-muted-foreground">{r.label}</span>
+                                  <ul className="mt-1 space-y-0.5">
+                                    {parts.map((s, j) => (
+                                      <li key={j} className="text-xs font-semibold flex items-center gap-1.5">
+                                        <span className="w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+                                        {s.trim()}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            }
+                          }
+                          return (
+                            <div key={r.label} className={`flex justify-between items-center py-2 ${i < categorySpecRows.length - 1 ? 'border-b border-border/30' : ''}`}>
+                              <span className="text-xs text-muted-foreground">{r.label}</span>
+                              <span className="text-xs font-semibold capitalize">{r.value}</span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    {packagingRows.length > 0 && (
+                      <>
+                        <div className="pt-2 pb-1">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Packaging</p>
+                        </div>
+                        {packagingRows.map((r, i) => (
+                          <div
+                            key={r.label}
+                            className={`flex justify-between items-center py-2 ${i < packagingRows.length - 1 ? 'border-b border-border/30' : ''}`}
+                          >
+                            <span className="text-xs text-muted-foreground">{r.label}</span>
+                            <span className="text-xs font-semibold">{r.value}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Pricing & Availability intentionally removed —
                 quote-based platform, retail/wholesale/stock aren't tracked.
@@ -1934,61 +2105,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Metadata Sections.
-            Layout rules:
-              - Material Properties is NOT rendered here — Material Category,
-                Body Type, Finish, Subtype, Thickness, Size, Designer all live
-                in the Key Specifications sidebar.
-              - Packaging, Dimensions, Manufacturing are NOT rendered here
-                either (also in sidebar).
-              - Appearance: full-width (colors + patterns + textures).
-              - Performance + Application share a row.
-              - Certifications + Care & Maintenance share a row.
-              - Design and Commercial follow full-width.
-              - Variants table at the very bottom. */}
-        <div className="mt-6 space-y-4">
-          {(() => {
-            // Appearance card layout:
-            //   1. Patterns chip row          (full width, if any)
-            //   2. Colors chip row            (full width, if any)
-            //   3. Observed Shades chip row   (full width, if any)
-            //   4. Remaining scalar fields    (2-column grid)
-            // Colors/Shades used to render as bulleted lists stacked vertically
-            // which wasted space. They're now compact horizontal chips,
-            // capitalized per word.
+        {/* Metadata Sections — category-conditional rendering.
+            The category display registry defines which sections each
+            category should show. Sections with no data auto-hide via
+            renderMetadataCategory returning null. The registry acts as
+            a second filter: sections not in the registry for this category
+            are never rendered even if data exists (prevents showing
+            grout codes for lighting, PEI for furniture, etc.). */}
+        {(() => {
+          const sectionCatConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
+          const activeSectionKeys = new Set(sectionCatConfig.sections.map(s => s.key));
+          const sectionUploadCat = resolveUploadCategory(
+            product.metadata?.material_category || product.type || product.category
+          );
+
+          // Appearance card — shared across all categories (colors/patterns are universal)
+          const renderAppearanceCard = () => {
             const hasAppearanceFields = Object.values(appearance).some(
               v => v && v !== 'N/A' && v !== '',
             );
             if (patternsList.length === 0 && !hasAppearanceFields) return null;
 
-            // Title-case every word: "terracotta red" → "Terracotta Red"
             const titleCase = (s: string): string =>
               s.replace(/\b\w/g, c => c.toUpperCase());
 
-            // Split a comma-separated value into clean, capitalized items.
             const splitToChips = (val: unknown): string[] => {
               const raw = typeof val === 'string' ? val : renderValue(val);
               if (!raw || raw === 'N/A') return [];
-              return raw
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean)
-                .map(titleCase);
+              return raw.split(',').map(s => s.trim()).filter(Boolean).map(titleCase);
             };
 
             const colorChips = splitToChips(appearance['Colors']);
             const shadeChips = splitToChips(appearance['Observed Shades']);
 
-            // Everything else (Primary Color hex, Pattern, Texture, etc.) still
-            // renders in the 2-col grid. Exclude the multi-value list fields
-            // that are now shown as chip rows above.
             const CHIP_ROW_KEYS = new Set(['Colors', 'Observed Shades']);
             const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
             const gridFields = Object.entries(appearance).filter(
               ([k, v]) => !CHIP_ROW_KEYS.has(k) && v && v !== 'N/A' && v !== '',
             );
 
-            // Compact chip-row block reused for Colors + Observed Shades.
             const renderChipRow = (label: string, chips: string[]) => {
               if (chips.length === 0) return null;
               return (
@@ -1998,11 +2153,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {chips.map(c => (
-                      <Badge
-                        key={c}
-                        variant="outline"
-                        className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50"
-                      >
+                      <Badge key={c} variant="outline" className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50">
                         {c}
                       </Badge>
                     ))}
@@ -2014,26 +2165,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             return (
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    Appearance
-                  </h3>
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">Appearance</h3>
                 </div>
                 {patternsList.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Available Patterns ({patternsList.length})
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {patternsList.map(p => (
-                        <Badge
-                          key={p}
-                          variant="outline"
-                          className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 border-primary/30 text-primary"
-                        >
-                          {titleCase(p)}
-                        </Badge>
-                      ))}
-                    </div>
+                  <div className="mb-4 flex items-start gap-3 py-2 border-b border-border/20">
+                    <span className="text-xs text-muted-foreground shrink-0 pt-0.5">Patterns</span>
+                    <span className="text-xs font-semibold">
+                      {patternsList.map(p => titleCase(p)).join(', ')}
+                    </span>
                   </div>
                 )}
                 {renderChipRow('Colors', colorChips)}
@@ -2047,11 +2186,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           <div key={key} className="bg-muted/30 rounded-lg p-3">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <span
-                                className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0"
-                                style={{ backgroundColor: str }}
-                                aria-label={`Color swatch ${str}`}
-                              />
+                              <span className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
                               <p className="text-xs font-semibold">{str}</p>
                             </div>
                           </div>
@@ -2068,20 +2203,209 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </div>
             );
+          };
+
+          // ── Merge Application + Design + Performance into one combined section ──
+          // Performance fields go first (most queried), then application, then design
+          const appDesignPerf: Record<string, unknown> = {};
+
+          // Performance fields (or category-specific alias)
+          const showPerf = activeSectionKeys.has('performance') || activeSectionKeys.has('thermal_performance')
+            || activeSectionKeys.has('water_performance') || activeSectionKeys.has('electrical_specs');
+          if (showPerf) {
+            Object.entries(performance).forEach(([k, v]) => {
+              if (v && renderValue(v) !== 'N/A') appDesignPerf[k] = v;
+            });
+          }
+
+          // Application fields
+          Object.entries(application).forEach(([k, v]) => {
+            if (v && renderValue(v) !== 'N/A' && !(k in appDesignPerf)) appDesignPerf[k] = v;
+          });
+          // Design fields
+          Object.entries(design).forEach(([k, v]) => {
+            if (v && renderValue(v) !== 'N/A' && !(k in appDesignPerf)) appDesignPerf[k] = v;
+          });
+
+          // Section title adapts to category
+          const mainSectionTitle = activeSectionKeys.has('thermal_performance') ? 'Specifications & Design'
+            : activeSectionKeys.has('water_performance') ? 'Specifications & Design'
+            : activeSectionKeys.has('electrical_specs') ? 'Specifications & Design'
+            : 'Specifications & Design';
+
+          // ── Features data ──
+          const featuresData: Record<string, unknown> = {};
+          if (activeSectionKeys.has('features')) {
+            const featureKeys = ['assembly_required', 'stackable', 'foldable', 'modular', 'reclining',
+              'storage', 'adjustable_height', 'indoor_outdoor', 'number_of_seats', 'removable_covers',
+              'thermostat_type', 'valve_type', 'reversible', 'dual_fuel', 'smart_compatible', 'ip_rating',
+              'rimless', 'soft_close_seat', 'quick_release_seat', 'overflow', 'thermostatic',
+              'soft_close', 'drawer_system', 'hinge_type', 'push_to_open', 'integrated_lighting',
+              'sensor', 'emergency', 'adjustable_tilt', 'number_of_lights', 'dimmable'];
+            featureKeys.forEach(k => {
+              const v = extractValue(allData?.[k]);
+              if (v) featuresData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+            });
+          }
+
+          // ── Installation data ──
+          const installData: Record<string, unknown> = {};
+          if (activeSectionKeys.has('installation')) {
+            const installKeys = ['click_system', 'installation_method', 'subfloor_requirements',
+              'expansion_gap_mm', 'acclimation_days', 'underlay_required',
+              'mounting_type', 'connection_type', 'brackets_included',
+              'trap_type', 'connection_size', 'waste_size_mm', 'concealed_cistern',
+              'frame_compatibility', 'tap_hole_config', 'cartridge_type',
+              'ceiling_type', 'installation_zone', 'installation_type', 'mounting_method'];
+            installKeys.forEach(k => {
+              const v = extractValue(allData?.[k]) || extractValue(applicationData?.[k]);
+              if (v) installData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+            });
+          }
+
+          // ── Coverage data (paint_wall_decor) ──
+          const coverageData: Record<string, unknown> = {};
+          if (activeSectionKeys.has('coverage')) {
+            ['coverage_per_litre_m2', 'coverage_per_roll_m2', 'roll_width_cm', 'roll_length_m', 'can_sizes'].forEach(k => {
+              const v = extractValue(allData?.[k]);
+              if (v) coverageData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+            });
+          }
+
+          return (
+            <div className="space-y-6 mt-6">
+              {renderAppearanceCard()}
+
+              {/* Specifications & Design (Performance + Application + Design merged) */}
+              {Object.keys(appDesignPerf).length > 0 &&
+                renderMetadataCategory(mainSectionTitle, appDesignPerf)}
+
+              {/* Features */}
+              {activeSectionKeys.has('features') && renderMetadataCategory('Features', featuresData)}
+
+              {/* Installation */}
+              {activeSectionKeys.has('installation') && renderMetadataCategory('Installation', installData)}
+
+              {/* Care & Maintenance */}
+              {activeSectionKeys.has('care') && renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
+
+              {/* Commercial */}
+              {activeSectionKeys.has('commercial') && renderMetadataCategory('Commercial Information', commercial)}
+
+              {/* Coverage (paint/wallpaper) */}
+              {activeSectionKeys.has('coverage') && renderMetadataCategory('Coverage & Dimensions', coverageData)}
+
+              {/* Variants table */}
+              {(activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable()}
+              {/* Packaging per Variant removed — packaging data is already in Key Specs sidebar */}
+
+              {/* Certifications — last section */}
+              {activeSectionKeys.has('certifications') && renderCertificationsCard()}
+            </div>
+          );
+        })()}
+
+          {/* ── Additional Properties (dynamic discovery) ──────────────────
+              Renders any metadata fields that the extraction discovered
+              but aren't part of the category's known display sections.
+              This makes the system self-extending: new fields extracted
+              from PDFs show up automatically without code changes. */}
+          {(() => {
+            const categoryConfig = getCategoryDisplayConfig(
+              product.metadata, product.type, product.category,
+            );
+            const knownKeys = getKnownFieldKeys(categoryConfig);
+
+            // Also exclude keys already rendered by the hardcoded sections above
+            const alreadyRendered = new Set([
+              // Key Specs sidebar
+              'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
+              'collection', 'material_category', 'zone_intent', 'body_type', 'finish',
+              'material_subtype', 'available_sizes', 'dimensions', 'size', 'thickness',
+              // Packaging sidebar
+              'pieces_per_box', 'patterns_count', 'm2_per_box', 'sqft_per_box',
+              'weight_per_box_kg', 'weight_per_box_lb', 'weight_kg', 'weight_lb',
+              'coverage_m2', 'coverage_sqft', 'boxes_per_pallet', 'weight_per_pallet_kg',
+              // Internal / non-display
+              'extraction_timestamp', 'extraction_method', 'confidence_scores',
+              'source_page', 'chunk_index', 'product_name', 'name', 'description',
+              'long_description', 'image_url', 'images',
+            ]);
+
+            // Collect extra key-value pairs from dynamically discovered fields.
+            //
+            // Sources (in priority order):
+            //   1. _discovered_extra — unknown_attributes the AI extracted that
+            //      weren't part of the category's known schema. Saved during
+            //      product_discovery_service merge step.
+            //   2. Top-level allData keys — any flat value in product.metadata
+            //      that isn't in the category's known display sections.
+            //
+            // This is what makes the system dynamic: the AI can discover new
+            // fields in a PDF, they get persisted to product.metadata, and they
+            // render here automatically without any code change.
+            const discoveredExtra = allData?._discovered_extra || {};
+
+            const extras: Array<{ key: string; label: string; value: string }> = [];
+            const seenKeys = new Set<string>();
+
+            const addIfUnknown = (key: string, val: unknown) => {
+              if (!key || seenKeys.has(key) || alreadyRendered.has(key) || knownKeys.has(key)) return;
+              // Skip internal/private keys
+              if (key.startsWith('_')) return;
+              const str = extractValue(val);
+              if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
+              seenKeys.add(key);
+              const label = key
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+              extras.push({ key, label, value: str });
+            };
+
+            // Source 1: _discovered_extra (unknown_attributes from AI extraction)
+            if (discoveredExtra && typeof discoveredExtra === 'object') {
+              Object.entries(discoveredExtra).forEach(([k, v]) => addIfUnknown(k, v));
+            }
+
+            // Source 2: Walk all top-level allData keys for anything not covered
+            // by the category's known sections (catches fields the AI put into
+            // "discovered" that aren't in our registry yet).
+            Object.entries(allData).forEach(([k, v]) => {
+              if (typeof v === 'object' && !Array.isArray(v) && v !== null && 'value' in (v as Record<string, unknown>)) {
+                addIfUnknown(k, v);
+              } else if (typeof v !== 'object') {
+                addIfUnknown(k, v);
+              }
+            });
+
+            if (extras.length === 0) return null;
+
+            return (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mt-6">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    Additional Properties
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {extras.length} discovered
+                    </Badge>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Automatically extracted from the source document
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {extras.map(({ key, label, value }) => (
+                    <div key={key} className="bg-muted/30 rounded-lg p-3">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                        {label}
+                      </p>
+                      <p className="text-xs font-semibold">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
           })()}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {renderMetadataCategory('Performance', performance)}
-            {renderMetadataCategory('Application & Installation', application)}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {renderCertificationsCard()}
-            {renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
-          </div>
-          {renderMetadataCategory('Design & Style', design)}
-          {renderMetadataCategory('Commercial Information', commercial)}
-          {renderVariantsTable()}
-          {renderPackagingPerVariantTable()}
-        </div>
 
       </TabsContent>
 

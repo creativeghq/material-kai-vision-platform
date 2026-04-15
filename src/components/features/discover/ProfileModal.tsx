@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Card, CardContent } from '@/components/core/ui/card';
+// Card/CardContent replaced with dashboard-card divs for dark theme compliance
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,12 +21,12 @@ import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
 const CARD_COLORS = [
-  'from-violet-100 to-indigo-100',
-  'from-blue-100 to-cyan-100',
-  'from-rose-100 to-pink-100',
-  'from-amber-100 to-orange-100',
-  'from-emerald-100 to-teal-100',
-  'from-purple-100 to-fuchsia-100',
+  'from-violet-950/60 to-indigo-950/40',
+  'from-blue-950/60 to-cyan-950/40',
+  'from-rose-950/60 to-pink-950/40',
+  'from-amber-950/60 to-orange-950/40',
+  'from-emerald-950/60 to-teal-950/40',
+  'from-purple-950/60 to-fuchsia-950/40',
 ];
 
 const DIMENSIONS = [
@@ -317,13 +317,13 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
         ) : (
           <Tabs defaultValue="about" className="flex flex-col flex-1 min-h-0">
             {/* ── White profile header — outside overflow-y so avatar isn't clipped ── */}
-            <div className="bg-white shadow-sm shrink-0 relative z-10">
+            <div className="dashboard-card border-0 border-b border-border/30 shrink-0 relative z-10">
               <div className="px-3 sm:px-6">
                 {/* Avatar + name row */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex items-start gap-4 flex-1 min-w-0">
                     {/* Avatar pulled up over banner */}
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow-xl overflow-hidden bg-primary shrink-0 -mt-10 sm:-mt-12">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-background shadow-xl overflow-hidden bg-primary shrink-0 -mt-10 sm:-mt-12 ring-2 ring-primary/30">
                       {profile.avatar_url ? (
                         <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
                       ) : (
@@ -371,7 +371,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                 </div>
 
                 {/* Stats row */}
-                <div className="flex items-center gap-4 sm:gap-8 py-4 border-t mt-4">
+                <div className="flex items-center gap-4 sm:gap-8 py-4 border-t border-border/30 mt-4">
                   <div className="text-center cursor-default">
                     <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
                     <p className="text-xs text-muted-foreground">Followers</p>
@@ -421,23 +421,20 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
             </div>
 
             {/* ── Scrollable tab content ────────────────────────────────────── */}
-            <div className="overflow-y-auto flex-1 bg-[#f7f6f4]">
+            <div className="overflow-y-auto flex-1 bg-background">
               <div className="px-3 sm:px-6 py-4">
                 {/* ── About ──────────────────────────────────────────── */}
                 <TabsContent value="about" className="mt-0 space-y-4 pb-6">
                         {profile.bio && (
-                          <Card className="rounded-2xl border-0 shadow-sm">
-                            <CardContent className="p-5">
+                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                               <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                                 <UserCircle className="h-4 w-4" /> Bio
                               </h3>
                               <p className="text-sm text-muted-foreground leading-relaxed">{profile.bio}</p>
-                            </CardContent>
-                          </Card>
+                          </div>
                         )}
                         {(profile.website_url || profile.location) && (
-                          <Card className="rounded-2xl border-0 shadow-sm">
-                            <CardContent className="p-5 space-y-2">
+                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5 space-y-2">
                               <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                                 <Globe className="h-4 w-4" /> Contact & Location
                               </h3>
@@ -454,18 +451,16 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                                   <ExternalLink className="h-3.5 w-3.5" />
                                 </a>
                               )}
-                            </CardContent>
-                          </Card>
+                          </div>
                         )}
                         {reviewStats?.summary && (
-                          <Card className="rounded-2xl border-0 shadow-sm">
-                            <CardContent className="p-5 space-y-4">
+                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5 space-y-4">
                               <h3 className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5">
                                 <Sparkles className="h-3.5 w-3.5" /> AI Summary
                               </h3>
                               <p className="text-sm text-foreground/80 leading-relaxed">{reviewStats.summary}</p>
                               {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).length > 0 && (
-                                <div className="border-t pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="border-t border-border/30 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
                                   {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).map((d) => (
                                     <div key={d.key} className="text-center space-y-1">
                                       <StarRow rating={reviewStats.dimensions[d.key]} />
@@ -475,12 +470,10 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                                   ))}
                                 </div>
                               )}
-                            </CardContent>
-                          </Card>
+                          </div>
                         )}
                         {profile.preferred_factories.length > 0 && (
-                          <Card className="rounded-2xl border-0 shadow-sm">
-                            <CardContent className="p-5">
+                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                               <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
                                 <Building2 className="h-4 w-4" /> Preferred Factories
                               </h3>
@@ -492,8 +485,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                                   </div>
                                 ))}
                               </div>
-                            </CardContent>
-                          </Card>
+                          </div>
                         )}
                         {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && profile.preferred_factories.length === 0 && (
                           <div className="py-12 text-center text-muted-foreground">
@@ -522,7 +514,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {moodboards.map((mb, i) => (
-                              <div key={mb.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+                              <div key={mb.id} className="dashboard-card rounded-2xl overflow-hidden border-0 hover:ring-1 hover:ring-primary/30 transition-all group">
                                 <div className={`aspect-[4/3] overflow-hidden relative ${!mb.preview_url ? `bg-gradient-to-br ${CARD_COLORS[i % CARD_COLORS.length]}` : ''}`}>
                                   {mb.preview_url ? (
                                     <img src={mb.preview_url} alt={mb.title}
@@ -563,8 +555,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                             <p className="text-sm">No skills listed yet.</p>
                           </div>
                         ) : (
-                          <Card className="rounded-2xl border-0 shadow-sm">
-                            <CardContent className="p-5">
+                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-4">
                                 {profile.skill_tags.map((tag, i) => {
                                   const width = 45 + ((i * 17 + 31) % 50);
@@ -581,8 +572,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                                   );
                                 })}
                               </div>
-                            </CardContent>
-                          </Card>
+                          </div>
                         )}
                       </TabsContent>
 
@@ -595,22 +585,18 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                           </div>
                         ) : (
                           <>
-                            <Card className="rounded-2xl border-0 shadow-sm">
-                              <CardContent className="p-0 divide-y">
+                            <div className="dashboard-card rounded-2xl border-0 shadow-sm divide-y divide-border/30">
                                 {richServices.map((svc, i) => (
                                   <ServiceRow key={svc.id} service={svc} onHire={openHireModal} isLast={i === richServices.length - 1} />
                                 ))}
-                              </CardContent>
-                            </Card>
-                            <Card className="rounded-2xl border-0 shadow-sm">
-                              <CardContent className="p-5">
+                            </div>
+                            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                                 <BookingWidget
                                   profileUserId={profile.user_id}
                                   profileName={displayName}
                                   services={richServices.map((s) => ({ id: s.id, name: s.name }))}
                                 />
-                              </CardContent>
-                            </Card>
+                            </div>
                           </>
                         )}
                       </TabsContent>

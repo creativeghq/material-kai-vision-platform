@@ -37,6 +37,7 @@ let extractTextContent: any;
 let authenticate: any, isAdminAccess: any;
 let getSkillsForAgent: any, getSkillContent: any;
 let emitFlowEvent: any;
+let aiCallLogger: any;
 
 async function initRuntime() {
   if (_initialized) return;
@@ -50,7 +51,7 @@ async function initRuntime() {
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
 
   // Load all shared modules + npm packages in parallel
-  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod] = await Promise.all([
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod] = await Promise.all([
     import('../_shared/credit-utils.ts'),
     import('../_shared/prompt-utils.ts'),
     import('../_shared/langgraph-core.ts'),
@@ -63,6 +64,7 @@ async function initRuntime() {
     import('zod'),
     import('@langchain/langgraph'),
     import('@langchain/core/messages'),
+    import('../_shared/ai-logger.ts'),
   ]);
 
   debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
@@ -89,6 +91,7 @@ async function initRuntime() {
   SystemMessage = msgMod.SystemMessage;
 
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  aiCallLogger = new aiLoggerMod.AICallLogger(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Initialize singletons that depend on loaded modules
   checkpointer = new SupabaseCheckpointer();
@@ -1571,6 +1574,7 @@ Deno.serve(async (req) => {
             }
           }, 1000); // Send heartbeat every 1 second (reduced from 5s)
 
+          const executeStartTime = Date.now();
           try {
             // Execute agent with streaming callback
 
@@ -1661,6 +1665,22 @@ Deno.serve(async (req) => {
               finalResult.usage,
               toolsCalled
             ).catch(err => console.error('❌ Background usage logging failed:', err));
+
+            // Log to unified ai_call_logs table (fire-and-forget)
+            aiCallLogger.logAICall({
+              job_id: conversation_id || undefined,
+              task: `agent_chat_${agentId}`,
+              model: finalResult.usage.modelName,
+              input_tokens: finalResult.usage.inputTokens,
+              output_tokens: finalResult.usage.outputTokens,
+              latency_ms: Date.now() - executeStartTime,
+              action: 'use_ai_result' as const,
+              response_data: {
+                agent_id: agentId,
+                turn_count: finalResult.usage.turnCount,
+                tools_called: toolsCalled.length,
+              },
+            }).catch((e: any) => console.warn('ai_call_logs write failed:', e));
           }
 
           const modelUsed = getModelNameForAgent(agentId);

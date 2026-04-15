@@ -84,15 +84,25 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
   };
 
   const categoryColors: Record<string, string> = {
-    tile: 'hsl(var(--primary))',
-    wood: '#8B4513',
+    // DB categories (10)
+    tiles: '#3b82f6',
+    wood: '#92400e',
+    decor: '#8b5cf6',
+    furniture: '#d97706',
+    general_materials: '#6b7280',
+    paint_wall_decor: '#10b981',
+    heating: '#ef4444',
+    sanitary: '#06b6d4',
+    kitchen: '#f59e0b',
+    lighting: '#eab308',
+    // Legacy / fine-grained fallbacks
+    tile: '#3b82f6',
+    ceramic: '#3b82f6',
     metal: '#708090',
     fabric: '#DDA0DD',
-    ceramic: '#CD853F',
-    flooring: '#D2691E',
-    wall_covering: '#BC8F8F',
-    heat_pump: '#4682B4',
-    hvac: '#5F9EA0',
+    stone: '#6b7280',
+    glass: '#06b6d4',
+    flooring: '#92400e',
   };
 
   return (

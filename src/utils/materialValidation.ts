@@ -4,9 +4,16 @@ import {
   MATERIAL_CATEGORIES,
 } from '@/types/materials';
 
+// All valid category values — legacy enum values + 10 DB upload categories
+const ALL_VALID_CATEGORIES = new Set([
+  ...Object.values(MaterialCategory),
+  'tiles', 'wood', 'decor', 'furniture', 'general_materials',
+  'paint_wall_decor', 'heating', 'sanitary', 'kitchen', 'lighting',
+]);
+
 // Helper validation functions
 function isMaterialCategory(category: string): category is MaterialCategory {
-  return Object.values(MaterialCategory).includes(category as MaterialCategory);
+  return ALL_VALID_CATEGORIES.has(category);
 }
 
 function isValidFinish(finish: string, category: MaterialCategory): boolean {

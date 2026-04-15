@@ -845,9 +845,9 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                       );
                       if (clipStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'Google SigLIP ViT-SO400M',
+                          name: 'SLIG (SigLIP2)',
                           purpose:
-                            '1152D visual embeddings for image-product similarity matching',
+                            '768D visual embeddings for image-product similarity matching',
                           status: '✓ Used',
                           icon: <Eye className="h-3 w-3 text-green-600" />,
                         });
@@ -882,9 +882,9 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         applicationStep?.status === 'completed'
                       ) {
                         aiModels.push({
-                          name: 'Specialized Embeddings',
+                          name: 'Specialized SLIG Embeddings',
                           purpose:
-                            'Color (256D), Texture (256D), Application (512D) embeddings',
+                            'Color (768D), Texture (768D), Style (768D), Material (768D)',
                           status: '✓ Generated',
                           icon: <Target className="h-3 w-3 text-orange-600" />,
                         });
@@ -1409,48 +1409,48 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
                       if (embeddingStep?.status === 'completed') {
                         embeddingTypes.push({
-                          name: 'Text Embeddings',
-                          dimensions: '1536D',
+                          name: 'Text Embeddings (Voyage AI)',
+                          dimensions: '1024D',
                           status: true,
                         });
                       }
                       if (clipStep?.status === 'completed') {
                         embeddingTypes.push({
-                          name: 'Visual Embeddings (CLIP)',
-                          dimensions: '512D',
+                          name: 'Visual Embeddings (SLIG)',
+                          dimensions: '768D',
                           status: true,
                         });
                       }
                       if (colorStep?.status === 'completed') {
                         embeddingTypes.push({
-                          name: 'Color Embeddings',
-                          dimensions: '256D',
+                          name: 'Color Embeddings (SLIG)',
+                          dimensions: '768D',
                           status: true,
                         });
                       }
                       if (textureStep?.status === 'completed') {
                         embeddingTypes.push({
-                          name: 'Texture Embeddings',
-                          dimensions: '256D',
+                          name: 'Texture Embeddings (SLIG)',
+                          dimensions: '768D',
                           status: true,
                         });
                       }
                       if (applicationStep?.status === 'completed') {
                         embeddingTypes.push({
-                          name: 'Application Embeddings',
-                          dimensions: '512D',
+                          name: 'Style/Material Embeddings (SLIG)',
+                          dimensions: '768D',
                           status: true,
                         });
                       }
 
-                      // Check for multimodal (fusion of text + visual)
+                      // Check for understanding embedding
                       if (
                         embeddingStep?.status === 'completed' &&
                         clipStep?.status === 'completed'
                       ) {
                         embeddingTypes.push({
-                          name: 'Multimodal Embeddings',
-                          dimensions: '2048D',
+                          name: 'Understanding Embeddings (Voyage AI)',
+                          dimensions: '1024D',
                           status: true,
                         });
                       }

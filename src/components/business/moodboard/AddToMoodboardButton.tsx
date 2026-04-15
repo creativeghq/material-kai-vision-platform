@@ -17,6 +17,10 @@ interface AddToMoodboardButtonProps {
   showText?: boolean;
   /** Analytics source label (e.g. 'search', 'agent', 'product_card') */
   source?: string;
+  /** Upload category for analytics (e.g. 'tiles', 'lighting') */
+  category?: string;
+  /** Fine-grained material type for analytics (e.g. 'porcelain_tile', 'pendant_light') */
+  materialType?: string;
 }
 
 /**
@@ -32,6 +36,8 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
   className = '',
   showText = true,
   source: _source,
+  category,
+  materialType,
 }) => {
   const { toast } = useToast();
   const [showModal, setShowModal] = useState(false);
@@ -43,7 +49,7 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
 
   const handleSuccess = (moodboardName: string) => {
     // Track as product save for manufacturer analytics
-    trackProductSave(productId, '', window.location.pathname);
+    trackProductSave(productId, '', window.location.pathname, undefined, category, materialType);
     // Track as click interaction (strong engagement signal)
     RecommendationsService.trackClick(productId, {
       source: 'moodboard_button',

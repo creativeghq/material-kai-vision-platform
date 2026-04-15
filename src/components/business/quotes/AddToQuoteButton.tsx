@@ -17,6 +17,10 @@ interface AddToQuoteButtonProps {
   showText?: boolean;
   /** Analytics source label (e.g. 'search', 'agent', 'product_card') */
   source?: string;
+  /** Upload category for analytics (e.g. 'tiles', 'lighting') */
+  category?: string;
+  /** Fine-grained material type for analytics (e.g. 'porcelain_tile', 'pendant_light') */
+  materialType?: string;
 }
 
 export type { AddToQuoteButtonProps };
@@ -35,6 +39,8 @@ export const AddToQuoteButton: React.FC<AddToQuoteButtonProps> = ({
   className = '',
   showText = true,
   source: _source,
+  category,
+  materialType,
 }) => {
   const { toast } = useToast();
   const [showModal, setShowModal] = useState(false);
@@ -45,7 +51,7 @@ export const AddToQuoteButton: React.FC<AddToQuoteButtonProps> = ({
   };
 
   const handleSuccess = (quoteName: string) => {
-    trackProductQuote(productId, '', window.location.pathname);
+    trackProductQuote(productId, '', window.location.pathname, undefined, category, materialType);
     toast({
       title: 'Added to Quote',
       description: `${productName || 'Product'} added to "${quoteName}"`,

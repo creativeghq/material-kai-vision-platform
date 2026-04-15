@@ -3,7 +3,15 @@
  * Creates semantically meaningful material representations for similarity search and clustering
  */
 
-import { CrossModalFeatures } from './CrossModalLearning';
+// Inlined from deleted CrossModalLearning.ts — kept for future Phase 7 integration
+export interface CrossModalFeatures {
+  visualFeatures: Float32Array;
+  spectralFeatures: Float32Array;
+  thermalFeatures: Float32Array;
+  textualFeatures: Float32Array;
+  fusedFeatures: Float32Array;
+  crossModalSimilarity: number;
+}
 
 export interface MaterialEmbedding {
   id: string;

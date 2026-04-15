@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Card, CardContent } from '@/components/core/ui/card';
+// Card/CardContent replaced with dashboard-card divs for dark theme compliance
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -75,12 +75,12 @@ const DIMENSIONS: { key: string; label: string }[] = [
 ];
 
 const CARD_COLORS = [
-  'from-violet-100 to-indigo-100',
-  'from-blue-100 to-cyan-100',
-  'from-rose-100 to-pink-100',
-  'from-amber-100 to-orange-100',
-  'from-emerald-100 to-teal-100',
-  'from-purple-100 to-fuchsia-100',
+  'from-violet-950/60 to-indigo-950/40',
+  'from-blue-950/60 to-cyan-950/40',
+  'from-rose-950/60 to-pink-950/40',
+  'from-amber-950/60 to-orange-950/40',
+  'from-emerald-950/60 to-teal-950/40',
+  'from-purple-950/60 to-fuchsia-950/40',
 ];
 
 function StarRow({ rating }: { rating: number }) {
@@ -109,7 +109,7 @@ function ServiceRow({
   const hasDetails = service.description || (service.previous_work?.length ?? 0) > 0;
 
   return (
-    <div className={`px-5 py-4 ${!isLast ? 'border-b' : ''}`}>
+    <div className={`px-5 py-4 ${!isLast ? 'border-b border-border/30' : ''}`}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -343,10 +343,10 @@ export const PublicProfilePage: React.FC = () => {
       : profile.services.map((name, i) => ({ id: String(i), name }));
 
   return (
-    <div className="min-h-screen bg-[#f7f6f4]">
+    <div className="min-h-screen bg-background">
 
       {/* ── Navbar ───────────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
+      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-sm ring-1 ring-amber-400/30">
@@ -383,15 +383,15 @@ export const PublicProfilePage: React.FC = () => {
         <div className="absolute top-8 right-16 w-40 h-40 rounded-full bg-accent/20 blur-2xl pointer-events-none" />
       </div>
 
-      {/* ── White profile card ───────────────────────────────────────────────── */}
-      <div className="bg-white shadow-sm relative z-10">
+      {/* ── Profile header card (glass) ─────────────────────────────────────── */}
+      <div className="dashboard-card border-0 border-b border-border/30 relative z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           {/* Name row — avatar inline, pulled up slightly over the banner */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pt-0 pb-4">
             {/* Left: avatar + name/meta */}
             <div className="flex items-start gap-4 flex-1 min-w-0">
               {/* Avatar — pulled up over the banner */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow-xl overflow-hidden bg-primary shrink-0 -mt-10 sm:-mt-12">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-background shadow-xl overflow-hidden bg-primary shrink-0 -mt-10 sm:-mt-12 ring-2 ring-primary/30">
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
@@ -440,7 +440,7 @@ export const PublicProfilePage: React.FC = () => {
           </div>
 
           {/* Stats row */}
-          <div className="flex items-center gap-8 pb-4 border-t pt-4">
+          <div className="flex items-center gap-8 pb-4 border-t border-border/30 pt-4">
             <div className="text-center cursor-default">
               <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
@@ -494,20 +494,17 @@ export const PublicProfilePage: React.FC = () => {
             <TabsContent value="about" className="mt-5 space-y-4">
               {/* Bio */}
               {profile.bio && (
-                <Card className="rounded-2xl border-0 shadow-sm">
-                  <CardContent className="p-5">
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                     <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                       <UserCircle className="h-4 w-4" /> Bio
                     </h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{profile.bio}</p>
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
               {/* Contact / links */}
               {(profile.website_url || profile.location) && (
-                <Card className="rounded-2xl border-0 shadow-sm">
-                  <CardContent className="p-5 space-y-2">
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5 space-y-2">
                     <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                       <Globe className="h-4 w-4" /> Contact & Location
                     </h3>
@@ -524,20 +521,18 @@ export const PublicProfilePage: React.FC = () => {
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     )}
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
               {/* AI Review Summary */}
               {reviewStats?.summary && (
-                <Card className="rounded-2xl border-0 shadow-sm">
-                  <CardContent className="p-5 space-y-4">
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5 space-y-4">
                     <h3 className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" /> AI Summary
                     </h3>
                     <p className="text-sm text-foreground/80 leading-relaxed">{reviewStats.summary}</p>
                     {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).length > 0 && (
-                      <div className="border-t pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="border-t border-border/30 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {DIMENSIONS.filter((d) => reviewStats.dimensions[d.key] != null).map((d) => (
                           <div key={d.key} className="text-center space-y-1">
                             <StarRow rating={reviewStats.dimensions[d.key]} />
@@ -547,14 +542,12 @@ export const PublicProfilePage: React.FC = () => {
                         ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
               {/* Preferred Factories */}
               {profile.preferred_factories.length > 0 && (
-                <Card className="rounded-2xl border-0 shadow-sm">
-                  <CardContent className="p-5">
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                     <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
                       <Building2 className="h-4 w-4" /> Preferred Factories
                     </h3>
@@ -566,8 +559,7 @@ export const PublicProfilePage: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
               {/* Empty about */}
@@ -609,7 +601,7 @@ export const PublicProfilePage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {moodboards.map((mb, i) => (
                     <div key={mb.id}
-                      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                      className="dashboard-card rounded-2xl overflow-hidden border-0 hover:ring-1 hover:ring-primary/30 transition-all group"
                       onClick={() => {
                         if (!trackedMoodboardsRef.current.has(mb.id)) {
                           trackedMoodboardsRef.current.add(mb.id);
@@ -669,8 +661,7 @@ export const PublicProfilePage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <Card className="rounded-2xl border-0 shadow-sm">
-                  <CardContent className="p-5">
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                       {profile.skill_tags.map((tag, i) => {
                         const width = 45 + ((i * 17 + 31) % 50);
@@ -687,8 +678,7 @@ export const PublicProfilePage: React.FC = () => {
                         );
                       })}
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               )}
             </TabsContent>
 
@@ -706,22 +696,18 @@ export const PublicProfilePage: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <Card className="rounded-2xl border-0 shadow-sm">
-                    <CardContent className="p-0 divide-y">
+                  <div className="dashboard-card rounded-2xl border-0 shadow-sm divide-y divide-border/30">
                       {richServices.map((svc, i) => (
                         <ServiceRow key={svc.id} service={svc} onHire={openHireModal} isLast={i === richServices.length - 1} />
                       ))}
-                    </CardContent>
-                  </Card>
-                  <Card className="rounded-2xl border-0 shadow-sm">
-                    <CardContent className="p-5">
+                  </div>
+                  <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                       <BookingWidget
                         profileUserId={profile.user_id}
                         profileName={displayName}
                         services={richServices.map((s) => ({ id: s.id, name: s.name }))}
                       />
-                    </CardContent>
-                  </Card>
+                  </div>
                 </>
               )}
             </TabsContent>

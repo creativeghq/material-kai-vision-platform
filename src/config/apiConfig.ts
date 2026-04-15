@@ -9,14 +9,9 @@ import { z } from 'zod';
 
 import { Singleton } from '../core/patterns/Singleton';
 
-import type { HuggingFaceApiConfig } from './apis/huggingfaceConfig';
 import { replicateConfig } from './apis/replicateConfig';
 import { supabaseConfig } from './apis/supabaseConfig';
-import { huggingfaceConfig } from './apis/huggingfaceConfig';
 import { openaiConfig } from './apis/openaiConfig';
-
-// Re-export the HuggingFaceApiConfig type for use in other modules
-export type { HuggingFaceApiConfig };
 
 // Environment configuration
 export interface EnvironmentConfig {
@@ -87,8 +82,7 @@ export interface OpenAIApiConfig extends BaseApiConfig {
 export type ApiConfig =
   | ReplicateApiConfig
   | SupabaseApiConfig
-  | OpenAIApiConfig
-  | HuggingFaceApiConfig;
+  | OpenAIApiConfig;
 
 // API Registry - centralized store for all API configurations
 export class ApiRegistry extends Singleton {
@@ -105,7 +99,6 @@ export class ApiRegistry extends Singleton {
     // Register all API configurations
     this.registerApi(replicateConfig);
     this.registerApi(supabaseConfig);
-    this.registerApi(huggingfaceConfig);
     this.registerApi(openaiConfig);
   }
 

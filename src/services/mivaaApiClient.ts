@@ -402,10 +402,10 @@ export class MivaaApiClient {
    * - Text (15%) - Voyage AI 1024D semantic understanding
    * - Visual (15%) - SLIG 768D visual similarity
    * - Understanding (20%) - Voyage AI 1024D from Qwen3-VL vision analysis
-   * - Color (12.5%) - SLIG 1152D color palette matching
-   * - Texture (12.5%) - SLIG 1152D texture pattern matching
-   * - Style (12.5%) - SLIG 1152D design style matching
-   * - Material (12.5%) - SLIG 1152D material type matching
+   * - Color (12.5%) - SLIG 768D color palette matching
+   * - Texture (12.5%) - SLIG 768D texture pattern matching
+   * - Style (12.5%) - SLIG 768D design style matching
+   * - Material (12.5%) - SLIG 768D material type matching
    *
    * All vectors stored as halfvec (float16) for 50% storage savings.
    */

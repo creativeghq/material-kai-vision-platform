@@ -43,7 +43,7 @@ export class ProductEnrichmentAgent implements AgentRunner {
     // Fetch products that need enrichment
     let query = supabase
       .from('products')
-      .select('id, name, description, category, tags, material_type')
+      .select('id, name, description, metadata')
       .order('created_at', { ascending: true })
       .limit(batchSize);
 
@@ -51,7 +51,7 @@ export class ProductEnrichmentAgent implements AgentRunner {
       query = query.or('description.is.null,description.eq.');
     }
     if (categoryFilter) {
-      query = query.eq('category', categoryFilter);
+      query = query.filter('metadata->>material_category', 'eq', categoryFilter);
     }
 
     const { data: products, error: fetchErr } = await query;
@@ -84,12 +84,12 @@ Respond with a JSON object only. No prose, no markdown fences.`;
     for (const product of products) {
       await heartbeat();
 
+      const productMeta = (product.metadata || {}) as Record<string, unknown>;
       const userMessage = `Enrich this product:
 Name: ${product.name}
-Category: ${product.category || 'unknown'}
+Material category: ${productMeta.material_category || 'unknown'}
 Current description: ${product.description || '(none)'}
-Material type: ${product.material_type || 'unknown'}
-Tags: ${(product.tags || []).join(', ') || '(none)'}
+Factory: ${productMeta.factory_name || 'unknown'}
 
 Return JSON: { "description": "...", "keywords": ["..."], "material_category": "..." }`;
 
@@ -118,11 +118,15 @@ Return JSON: { "description": "...", "keywords": ["..."], "material_category": "
           continue;
         }
 
-        // Update product
+        // Update product — material_category lives inside metadata (JSONB), not a top-level column
         const updateData: Record<string, unknown> = {};
-        if (enriched.description) updateData.description   = enriched.description;
-        if (enriched.keywords)    updateData.search_keywords = enriched.keywords;
-        if (enriched.material_category) updateData.material_type = enriched.material_category;
+        if (enriched.description) updateData.description = enriched.description;
+        if (enriched.keywords || enriched.material_category) {
+          const metaUpdate = { ...productMeta };
+          if (enriched.keywords) metaUpdate.search_keywords = enriched.keywords;
+          if (enriched.material_category) metaUpdate.material_category = enriched.material_category;
+          updateData.metadata = metaUpdate;
+        }
 
         if (Object.keys(updateData).length > 0) {
           const { error: updateErr } = await supabase

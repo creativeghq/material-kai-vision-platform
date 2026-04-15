@@ -83,36 +83,6 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Generate image using Hugging Face API
-   */
-  public async generateImageWithHuggingFace(
-    model: string,
-    prompt: string,
-  ): Promise<StandardizedApiResponse> {
-    const client = browserApiClientFactory.getClient('huggingface');
-    if (!client) {
-      return {
-        success: false,
-        error: {
-          message: 'Hugging Face client not available',
-          code: 'CLIENT_NOT_AVAILABLE',
-          retryable: false,
-        },
-        metadata: {
-          apiType: 'huggingface',
-          timestamp: new Date().toISOString(),
-          requestId: crypto.randomUUID(),
-        },
-      };
-    }
-
-    return client.generateImage({
-      model,
-      prompt,
-    });
-  }
-
-  /**
    * Call Supabase Edge Function
    */
   public async callSupabaseFunction(
@@ -253,7 +223,6 @@ export class BrowserApiIntegrationService {
   public getAllAvailableModels(): Record<string, string[]> {
     return {
       replicate: this.getAvailableModels('replicate'),
-      huggingface: this.getAvailableModels('huggingface'),
       supabase: this.getAvailableModels('supabase'),
     };
   }

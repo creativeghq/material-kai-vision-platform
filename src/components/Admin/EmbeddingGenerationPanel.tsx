@@ -98,7 +98,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
         if (!embeddingTypeCounts[embeddingType]) {
           embeddingTypeCounts[embeddingType] = {
             count: 0,
-            dimension: 1536, // Standard OpenAI embedding dimension
+            dimension: 1024, // Voyage AI embedding dimension
           };
         }
         embeddingTypeCounts[embeddingType].count++;
@@ -323,11 +323,11 @@ const EmbeddingGenerationPanel: React.FC = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold">OpenAI</h3>
-                  <Badge className="bg-green-100 text-green-800">1536D</Badge>
+                  <Badge className="bg-green-100 text-green-800">1024D</Badge>
                 </div>
                 <p className="text-2xl font-bold text-green-600">
                   {embeddingStats.find((stat) =>
-                    stat.model_name?.includes('openai'),
+                    stat.model_name?.includes('voyage') || stat.model_name?.includes('openai'),
                   )?.count || 0}
                 </p>
                 <p className="text-sm text-green-600">Active & Integrated</p>

@@ -48,7 +48,7 @@ export const SearchInterface: React.FC = () => {
       setIsSearching(true);
       const startTime = Date.now();
 
-      // Call MIVAA API for multi-vector search (enhanced search with 6 specialized CLIP embeddings)
+      // Call MIVAA API for multi-vector search (7-vector fusion: text, visual, understanding, color, texture, style, material)
       const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
         method: 'POST',
         headers: {

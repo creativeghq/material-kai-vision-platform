@@ -33,8 +33,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
   const [topDemands, setTopDemands] = useState<{ name: string; mentions: number; saves: number; in3d: number; momentum: string }[]>([]);
   const [trendingAttributes, setTrendingAttributes] = useState<{ attribute: string; count: number }[]>([]);
   const [discoveryChannels, setDiscoveryChannels] = useState<{ name: string; value: number }[]>([]);
-  const [topMoodboardItems, setTopMoodboardItems] = useState<{ name: string; category: string; boardCount: number }[]>([]);
-  const [topQuotedItems, setTopQuotedItems] = useState<{ name: string; category: string; quoteCount: number; addedFrom: string }[]>([]);
+  const [topMoodboardItems, setTopMoodboardItems] = useState<{ name: string; category: string; materialType?: string; boardCount: number }[]>([]);
+  const [topQuotedItems, setTopQuotedItems] = useState<{ name: string; category: string; materialType?: string; quoteCount: number; addedFrom: string }[]>([]);
 
   // ── Attribute picker
   const [attrSource, setAttrSource] = useState<string>('');
@@ -54,7 +54,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
 
   // ── Factory overlay (loaded on top of platform data when viewScope === 'factory')
   const [quoteFunnelData, setQuoteFunnelData] = useState<{ stage: string; count: number }[]>([]);
-  const [moodboardPairings, setMoodboardPairings] = useState<{ name: string; category: string; count: number }[]>([]);
+  const [moodboardPairings, setMoodboardPairings] = useState<{ name: string; category: string; materialType?: string; count: number }[]>([]);
   const [moodboardStats, setMoodboardStats] = useState<{ total: number; public: number }>({ total: 0, public: 0 });
   const [catalogGaps, setCatalogGaps] = useState<{ name: string; mentions: number }[]>([]);
   const [productVelocity, setProductVelocity] = useState<{ name: string; saves: number; quotes: number; trend: string }[]>([]);
@@ -153,28 +153,28 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { name: 'Product Page', value: 15 }, { name: 'Manual', value: 8 }, { name: '3D Generation', value: 4 },
     ]);
     setTopMoodboardItems([
-      { name: 'Marble Bianco 60x60', category: 'Tiles', boardCount: 34 },
-      { name: 'Natural Oak Panel', category: 'Wood', boardCount: 28 },
-      { name: 'Concrete Finish', category: 'General Materials', boardCount: 22 },
-      { name: 'Warm Linen Fabric', category: 'Textiles', boardCount: 18 },
-      { name: 'Brass Wall Light', category: 'Lighting', boardCount: 15 },
-      { name: 'Calacatta Marble Slab', category: 'Tiles', boardCount: 14 },
-      { name: 'Smoked Glass Panel', category: 'Decor', boardCount: 11 },
-      { name: 'Rattan Chair', category: 'Furniture', boardCount: 9 },
-      { name: 'Underfloor Heating Mat', category: 'Heating', boardCount: 8 },
-      { name: 'Travertine Floor', category: 'Tiles', boardCount: 7 },
+      { name: 'Marble Bianco 60x60', category: 'Tiles', materialType: 'porcelain_tile', boardCount: 34 },
+      { name: 'Natural Oak Panel', category: 'Wood', materialType: 'engineered_wood', boardCount: 28 },
+      { name: 'Concrete Finish', category: 'General Materials', materialType: 'concrete', boardCount: 22 },
+      { name: 'Warm Linen Curtain', category: 'Decor', materialType: 'curtain', boardCount: 18 },
+      { name: 'Brass Wall Light', category: 'Lighting', materialType: 'wall_light', boardCount: 15 },
+      { name: 'Calacatta Marble Slab', category: 'General Materials', materialType: 'stone_slab', boardCount: 14 },
+      { name: 'Smoked Glass Panel', category: 'Decor', materialType: 'mirror', boardCount: 11 },
+      { name: 'Rattan Chair', category: 'Furniture', materialType: 'dining_chair', boardCount: 9 },
+      { name: 'Underfloor Heating Mat', category: 'Heating', materialType: 'underfloor_heating', boardCount: 8 },
+      { name: 'Travertine Floor', category: 'Tiles', materialType: 'floor_tile', boardCount: 7 },
     ]);
     setTopQuotedItems([
-      { name: 'Marble Bianco 60x60', category: 'Tiles', quoteCount: 18, addedFrom: 'search' },
-      { name: 'Natural Oak Panel', category: 'Wood', quoteCount: 14, addedFrom: 'agent' },
-      { name: 'Underfloor Heating Mat', category: 'Heating', quoteCount: 12, addedFrom: 'search' },
-      { name: 'Warm Linen Fabric', category: 'Textiles', quoteCount: 10, addedFrom: 'moodboard' },
-      { name: 'Wall-Hung Toilet', category: 'Sanitary', quoteCount: 9, addedFrom: 'product_page' },
-      { name: 'Calacatta Marble Slab', category: 'Tiles', quoteCount: 8, addedFrom: 'search' },
-      { name: 'Oak Dining Table', category: 'Furniture', quoteCount: 7, addedFrom: 'agent' },
-      { name: 'Concrete Finish', category: 'General Materials', quoteCount: 6, addedFrom: '3d_generation' },
-      { name: 'Brass Pendant Light', category: 'Lighting', quoteCount: 5, addedFrom: 'moodboard' },
-      { name: 'Terrazzo Floor Tile', category: 'Tiles', quoteCount: 4, addedFrom: 'search' },
+      { name: 'Marble Bianco 60x60', category: 'Tiles', materialType: 'porcelain_tile', quoteCount: 18, addedFrom: 'search' },
+      { name: 'Natural Oak Panel', category: 'Wood', materialType: 'engineered_wood', quoteCount: 14, addedFrom: 'agent' },
+      { name: 'Underfloor Heating Mat', category: 'Heating', materialType: 'underfloor_heating', quoteCount: 12, addedFrom: 'search' },
+      { name: 'Warm Linen Curtain', category: 'Decor', materialType: 'curtain', quoteCount: 10, addedFrom: 'moodboard' },
+      { name: 'Wall-Hung Toilet', category: 'Sanitary', materialType: 'toilet', quoteCount: 9, addedFrom: 'product_page' },
+      { name: 'Calacatta Marble Slab', category: 'General Materials', materialType: 'stone_slab', quoteCount: 8, addedFrom: 'search' },
+      { name: 'Oak Dining Table', category: 'Furniture', materialType: 'dining_table', quoteCount: 7, addedFrom: 'agent' },
+      { name: 'Concrete Finish', category: 'General Materials', materialType: 'concrete', quoteCount: 6, addedFrom: '3d_generation' },
+      { name: 'Brass Pendant Light', category: 'Lighting', materialType: 'pendant_light', quoteCount: 5, addedFrom: 'moodboard' },
+      { name: 'Terrazzo Floor Tile', category: 'Tiles', materialType: 'floor_tile', quoteCount: 4, addedFrom: 'search' },
     ]);
     setBuyerTypeData([
       { type: 'interior_designer', saves: 285, quotes: 92 },
@@ -184,7 +184,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { type: 'sourcing_agent', saves: 62, quotes: 28 },
       { type: 'other', saves: 35, quotes: 12 },
     ]);
-    setKpis({ activeDemandSignals: 15, topDemandedMaterial: 'Marble Bianco', topCategory: 'Flooring', totalCategorySaves: 592, topBuyerType: 'Interior Designer' });
+    setKpis({ activeDemandSignals: 15, topDemandedMaterial: 'Marble Bianco', topCategory: 'Tiles', totalCategorySaves: 592, topBuyerType: 'Interior Designer' });
     if (viewScope === 'factory') {
       setProductVelocity([
         { name: 'Marble Bianco 60x60', saves: 28, quotes: 12, trend: 'up' },
@@ -200,13 +200,13 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       ]);
       setMoodboardStats({ total: 34, public: 12 });
       setMoodboardPairings([
-        { name: 'Warm Oak Panel', category: 'Wood', count: 28 },
-        { name: 'Concrete Tile', category: 'Concrete', count: 22 },
-        { name: 'Brushed Brass Fixture', category: 'Metal', count: 18 },
-        { name: 'Linen Cushion Fabric', category: 'Textiles', count: 15 },
-        { name: 'Smoked Glass Panel', category: 'Glass', count: 12 },
-        { name: 'Rattan Side Table', category: 'Natural Fiber', count: 9 },
-        { name: 'Terracotta Floor Tile', category: 'Ceramic', count: 8 },
+        { name: 'Warm Oak Panel', category: 'Wood', materialType: 'hardwood', count: 28 },
+        { name: 'Concrete Tile', category: 'General Materials', materialType: 'concrete', count: 22 },
+        { name: 'Brushed Brass Fixture', category: 'Lighting', materialType: 'wall_light', count: 18 },
+        { name: 'Linen Cushion', category: 'Decor', materialType: 'cushion', count: 15 },
+        { name: 'Smoked Glass Panel', category: 'General Materials', materialType: 'glass_panel', count: 12 },
+        { name: 'Rattan Side Table', category: 'Furniture', materialType: 'side_table', count: 9 },
+        { name: 'Terracotta Floor Tile', category: 'Tiles', materialType: 'floor_tile', count: 8 },
       ]);
       setCatalogGaps([
         { name: 'Recycled Oak Panel', mentions: 52 },
@@ -1378,6 +1378,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                     <th className="text-left px-4 py-2.5 font-medium">#</th>
                     <th className="text-left px-3 py-2.5 font-medium">Product</th>
                     <th className="text-left px-3 py-2.5 font-medium">Category</th>
+                    <th className="text-left px-3 py-2.5 font-medium">Type</th>
                     <th className="text-right px-4 py-2.5 font-medium">Board Saves</th>
                   </tr>
                 </thead>
@@ -1394,6 +1395,13 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                         </div>
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
+                      <td className="px-3 py-2">
+                        {row.materialType && (
+                          <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                            {row.materialType.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-violet-500">{row.boardCount}</td>
                     </tr>
                   ))}
@@ -1429,6 +1437,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                       <th className="text-left px-4 py-2.5 font-medium">#</th>
                       <th className="text-left px-3 py-2.5 font-medium">Product</th>
                       <th className="text-left px-3 py-2.5 font-medium">Category</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Type</th>
                       <th className="text-right px-4 py-2.5 font-medium">Quotes</th>
                     </tr>
                   </thead>
@@ -1445,6 +1454,13 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                           </div>
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
+                        <td className="px-3 py-2">
+                          {row.materialType && (
+                            <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                              {row.materialType.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-right font-mono tabular-nums font-bold text-primary">{row.quoteCount}</td>
                       </tr>
                     ))}
@@ -1828,6 +1844,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                         <th className="text-left py-2.5 pr-4 font-bold">#</th>
                         <th className="text-left py-2.5 pr-4 font-bold">Partner Product</th>
                         <th className="text-left py-2.5 pr-4 font-bold">Category</th>
+                        <th className="text-left py-2.5 pr-4 font-bold">Type</th>
                         <th className="text-right py-2.5 font-medium">Times Paired</th>
                       </tr>
                     </thead>
@@ -1837,6 +1854,13 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                           <td className="py-2 pr-4 text-muted-foreground">{i + 1}</td>
                           <td className="py-2 pr-4 font-medium">{row.name}</td>
                           <td className="py-2 pr-4 text-xs text-muted-foreground">{row.category}</td>
+                          <td className="py-2 pr-4">
+                            {row.materialType && (
+                              <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                                {row.materialType.replace(/_/g, ' ')}
+                              </span>
+                            )}
+                          </td>
                           <td className="py-2 text-right font-mono tabular-nums text-primary font-bold">{row.count}</td>
                         </tr>
                       ))}

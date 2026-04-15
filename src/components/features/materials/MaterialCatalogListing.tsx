@@ -371,11 +371,15 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {filterOptions.categories.map((category: any) => (
-                      <SelectItem key={category} value={category}>
-                        {(MATERIAL_CATEGORIES as any)[category].name}
-                      </SelectItem>
-                    ))}
+                    {filterOptions.categories.map((category: any) => {
+                      const catDef = (MATERIAL_CATEGORIES as any)[category];
+                      const label = catDef?.name || category.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      return (
+                        <SelectItem key={category} value={category}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -598,7 +602,10 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
   onSelect,
   onEdit: _onEdit,
 }) => {
-  const categoryDef = (MATERIAL_CATEGORIES as any)[material.category];
+  const rawCategoryDef = (MATERIAL_CATEGORIES as any)[material.category];
+  const categoryDef = rawCategoryDef || {
+    name: (material.category || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+  };
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Track view when card becomes visible

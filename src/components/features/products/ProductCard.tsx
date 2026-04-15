@@ -15,6 +15,7 @@ import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodb
 import { Product } from './types';
 import { trackProductView } from '@/services/manufacturerAnalyticsService';
 import { getManufacturer, getProductName } from '@/utils/productMetadata';
+import { resolveUploadCategory } from '@/lib/categoryFieldRegistry';
 
 const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').catch(() => ({ default: () => null })));
 const ARPreviewModal = lazy(() => import('@/components/features/ar/ARPreviewModal').then(m => ({ default: m.ARPreviewModal })).catch(() => ({ default: () => null })));
@@ -46,7 +47,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         if (entry.isIntersecting && !trackedRef.current) {
           trackedRef.current = true;
           const mfg = getManufacturer(product.metadata) || '';
-          trackProductView(product.id, mfg, window.location.pathname);
+          const matCat = product.metadata?.material_category;
+          trackProductView(product.id, mfg, window.location.pathname, undefined, resolveUploadCategory(matCat), matCat);
         }
       },
       { threshold: 0.5 },
@@ -171,6 +173,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 variant="outline"
                 size="sm"
                 showText={false}
+                category={resolveUploadCategory(product.metadata?.material_category)}
+                materialType={product.metadata?.material_category}
               />
               <AddToMoodboardButton
                 productId={product.id}
@@ -179,6 +183,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 variant="outline"
                 size="sm"
                 showText={false}
+                category={resolveUploadCategory(product.metadata?.material_category)}
+                materialType={product.metadata?.material_category}
               />
             </div>
 

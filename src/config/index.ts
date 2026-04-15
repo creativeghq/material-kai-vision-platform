@@ -9,8 +9,6 @@
 import { apiRegistry, ApiConfig, SupabaseApiConfig } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
-import { huggingfaceConfig } from './apis/huggingfaceConfig';
-
 // New Centralized Configuration System
 import { configFactory } from './configFactory';
 import { AppConfig } from './types';
@@ -111,8 +109,6 @@ export function initializeApiConfigurations(): void {
   // Register Supabase API configuration
   apiRegistry.registerApi(supabaseConfig);
 
-  // Register Hugging Face API configuration
-  apiRegistry.registerApi(huggingfaceConfig);
 }
 
 // Export the singleton registry instance
@@ -121,8 +117,6 @@ export { apiRegistry };
 // Export specific configurations for direct access
 export { replicateConfig } from './apis/replicateConfig';
 export { supabaseConfig } from './apis/supabaseConfig';
-export { huggingfaceConfig } from './apis/huggingfaceConfig';
-
 // Export utility classes
 export { ReplicateConfigUtils } from './apis/replicateConfig';
 export { SupabaseConfigUtils } from './apis/supabaseConfig';
@@ -134,7 +128,6 @@ export type {
   ReplicateApiConfig,
   SupabaseApiConfig,
   OpenAIApiConfig,
-  HuggingFaceApiConfig,
   EnvironmentConfig,
 } from './apiConfig';
 
