@@ -22,8 +22,10 @@ The VR World Generation feature converts any interior design image into a fully 
 
 | Model | Credits | Generation Time | Best For |
 |-------|---------|-----------------|----------|
-| `marble-0.1-mini` | 50 credits | ~30–45 seconds | Quick previews |
-| `marble-0.1-plus` | 200 credits | ~5 minutes | High-quality finals |
+| `marble-1.0-draft` | 18 credits | ~30–45 seconds | Quick previews |
+| `marble-1.1`       | 190 credits | ~5 minutes     | High-quality finals |
+
+> The legacy `marble-0.1-mini` and `marble-0.1-plus` models were deprecated by WorldLabs and are no longer accepted by the API. Pricing: $1 = 1,250 WL credits × 1.50 internal markup.
 
 ---
 
@@ -53,7 +55,7 @@ DesignCanvas (Frontend)
        ▼
 Supabase Edge Function: generate-vr-world
   1. Upload image to WorldLabs
-  2. POST /worlds/generate (mini or plus model)
+  2. POST /worlds/generate (draft or 1.1 model; pass `is_pano: true` for 360° source images)
   3. Poll /worlds/{world_id} until status = completed
   4. Store asset URLs in vr_worlds table
        │
@@ -86,7 +88,7 @@ WorldViewer component (Frontend)
 
 1. User generates an interior design image via the Interior Designer agent
 2. A "Generate VR" button appears on the image in the DesignCanvas panel
-3. User selects model (mini or plus) and clicks the button
+3. User selects model (draft or 1.1) and clicks the button
 4. Edge function uploads the image to WorldLabs and triggers world generation
 5. The UI shows an animated loading state while polling for completion
 6. Once complete, WorldViewer renders the 3D Gaussian Splat inline
@@ -133,7 +135,7 @@ The frontend polls the `vr_worlds` table via Supabase real-time subscriptions un
 
 ## Database Schema
 
-The `vr_worlds` table stores: `id`, `workspace_id`, `message_id`, `world_id` (WorldLabs world ID), `model` (marble-0.1-mini or marble-0.1-plus), `status` (generating / completed / failed), `splat_100k_url`, `splat_500k_url`, `splat_full_url`, `collider_glb_url`, `panorama_url`, `thumbnail_url`, `caption`, `credits_used`, `created_at`, and `updated_at`.
+The `vr_worlds` table stores: `id`, `workspace_id`, `message_id`, `world_id` (WorldLabs world ID), `model` (marble-1.0-draft or marble-1.1), `status` (generating / completed / failed), `splat_100k_url`, `splat_500k_url`, `splat_full_url`, `collider_glb_url`, `panorama_url`, `thumbnail_url`, `caption`, `credits_used`, `created_at`, and `updated_at`.
 
 ---
 
@@ -143,8 +145,8 @@ Credits are deducted when generation starts and **refunded automatically on fail
 
 | Model | Cost | Time |
 |-------|------|------|
-| marble-0.1-mini | 50 credits | ~30–45s |
-| marble-0.1-plus | 200 credits | ~5 min |
+| marble-1.0-draft | 18 credits  | ~30–45s |
+| marble-1.1       | 190 credits | ~5 min  |
 
 Credit balance is tracked in the internal credit system. See [internal-pricing-credit-system.md](internal-pricing-credit-system.md) for details.
 
@@ -171,7 +173,7 @@ VR worlds do not use vector embeddings, but all related product embeddings in th
 1. Check Supabase Edge Function logs for `generate-vr-world`
 2. Verify `WORLDLABS_API_KEY` is set and valid
 3. Check WorldLabs API status at their dashboard
-4. Generation can take up to 10 minutes for `plus` model under load
+4. Generation can take up to 10 minutes for the `marble-1.1` model under load
 
 ### Viewer blank / not rendering
 1. Ensure `three@0.178` is installed (not 0.160 or earlier)
@@ -194,6 +196,6 @@ VR worlds do not use vector embeddings, but all related product embeddings in th
 
 ---
 
-**Last Updated**: March 1, 2026
-**Version**: 1.0.0
+**Last Updated**: April 15, 2026
+**Version**: 1.1.0
 **Status**: Production

@@ -1293,6 +1293,58 @@ Credits are refunded on generation failure.
 
 ---
 
+## 🧨 Platform Reset (admin destructive operation)
+
+The "Reset Platform" admin action wipes the platform back to a clean install state while preserving accounts, billing, prompts, knowledge base, and CRM. Use this for staging/QA resets — **never** in production except as a last-resort recovery.
+
+**UI**: `/admin` → "Reset Platform" (admin/owner only, requires typed confirmation)
+**Edge function**: `supabase/functions/reset-platform/index.ts`
+**RPC helper**: `trim_prompt_history(keep_n)`
+
+### What gets wiped
+
+The function clears every table that holds derived/AI-produced/cached data, in FK-safe order. The list is the source of truth in `TABLES_TO_CLEAR`. Categories include: agent chat history, document/PDF processing artefacts, embeddings rows on `document_images` / `products` / `document_vectors`, image variants, generated 3D/VR worlds, virtual-staging outputs, manufacturer analytics, search analytics, audit logs, and the entire VECS image embedding collections (`image_slig_embeddings`, `image_color/texture/style/material_embeddings`, `image_understanding_embeddings`).
+
+Storage buckets cleared: `pdf-extracted-images`, `generated-images`, `vr-worlds`, `staging-outputs`, etc. (anything the platform produces; `quote-templates`, `profile-avatars`, and `pdf-documents` are preserved).
+
+### What is preserved
+
+- `profiles`, `auth.users`, `workspaces`, `workspace_members` — accounts
+- `user_credits`, `credit_transactions`, `credit_packages` — billing
+- `prompts`, `extraction_prompts` — AI configuration
+- `prompt_history` — **trimmed** to the 5 most recent rows per `prompt_id` (audit trail kept, bloat dropped)
+- `kb_docs`, `kb_categories`, `kb_doc_attachments`, `kb_search_analytics` — Knowledge Base
+- `crm_companies`, `crm_contacts`, `crm_contact_relationships`, `crm_company_contacts` — CRM
+- `flows`, `background_agents`, `roles`, `role_permissions`, `ai_model_pricing`, `subscription_plans`, `webhook_endpoints` — admin config
+- `system_settings`, `upsells`, `timeline_steps` — global config
+- Storage: `quote-templates`, `profile-avatars`, `pdf-documents`
+
+### Steps the function performs
+
+1. Truncate every table in `TABLES_TO_CLEAR` (FK-safe order)
+2. Empty the listed storage buckets
+3. Drop and recreate every VECS image embedding collection
+4. Trim `prompt_history` via `trim_prompt_history(5)` RPC
+5. **Wipe MIVAA server `/tmp` folder** by calling `POST {MIVAA_GATEWAY_URL}/api/system/cleanup-temp-files?max_age_hours=0&dry_run=false` (uses `MIVAA_API_KEY` for auth) — clears any orphan PDF extraction work directories left on the Python backend
+
+The response summary reports: rows deleted, tables affected, storage files removed, VECS embeddings dropped, prompt_history rows trimmed, and MIVAA `/tmp` cleanup status (incl. MB freed).
+
+### Required env vars
+
+| Var | Purpose |
+|-----|---------|
+| `SUPABASE_SERVICE_ROLE_KEY` | DB + storage wipe |
+| `MIVAA_GATEWAY_URL` | MIVAA `/tmp` cleanup endpoint (defaults to `https://v1api.materialshub.gr`) |
+| `MIVAA_API_KEY` | Bearer token for the MIVAA cleanup call (call is skipped silently if missing) |
+
+### Safety
+
+- Confirmation modal with typed phrase before invocation
+- Function logs every step; partial failures (e.g. one table errors out) are reported in the summary but the function continues
+- Idempotent — running it twice on a clean platform is a no-op
+
+---
+
 ## 🔗 Related Documentation
 
 - [Setup & Configuration](./setup-configuration.md) - Environment setup

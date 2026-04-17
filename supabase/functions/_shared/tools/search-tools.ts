@@ -216,9 +216,9 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
  * Searches Knowledge Base for articles, guides, and documentation
  * Returns relevant articles if found, helping the agent answer user questions
  */
-export const createKnowledgeBaseSearchTool = (workspaceId: string) => {
+export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = false) => {
   return tool(
-    async ({ query, searchTypes = ['chunks', 'products', 'kb_docs'], topK = 5 }) => {
+    async ({ query, searchTypes = ['chunks', 'products', 'kb_docs'], topK = 5, categorySlug, categoryId, priceDocType }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
@@ -231,17 +231,22 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string) => {
         const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
         try {
+          const body: Record<string, any> = {
+            query,
+            workspace_id: workspaceId,
+            search_types: searchTypes,
+            top_k: topK,
+            similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
+            caller: isAdmin ? 'admin' : 'agent',
+          };
+          if (categorySlug) body.category_slug = categorySlug;
+          if (categoryId) body.category_id = categoryId;
+          if (priceDocType) body.price_doc_type = priceDocType;
+
           const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/knowledge-base`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query,
-              workspace_id: workspaceId,
-              search_types: searchTypes,
-              top_k: topK,
-              similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
-              caller: 'agent',
-            }),
+            body: JSON.stringify(body),
             signal: controller.signal,
           });
 
@@ -269,9 +274,13 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string) => {
           if (data.chunks && data.chunks.length > 0) {
             results.found = true;
             results.articles = data.chunks.map((chunk: any) => ({
+              docId: chunk.id,
               content: chunk.content || chunk.text,
               documentTitle: chunk.document_title || chunk.metadata?.title || 'Knowledge Base Article',
               category: chunk.category || chunk.metadata?.category || 'general',
+              categorySlug: chunk.category_slug,
+              categoryName: chunk.category_name,
+              priceDocType: chunk.price_doc_type,
               relevanceScore: chunk.relevance_score || chunk.similarity_score || 0,
             }));
           }
@@ -333,11 +342,14 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string) => {
     },
     {
       name: 'knowledge_base_search',
-      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge.',
+      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs).',
       schema: z.object({
         query: z.string().describe('Search query - describe what information the user is looking for'),
         searchTypes: z.array(z.string()).default(['chunks', 'products']).describe('Types to search: chunks (articles/text), products'),
         topK: z.number().default(5).describe('Maximum number of results to return'),
+        categorySlug: z.string().optional().describe('Restrict search to a category by slug (e.g. "pricing")'),
+        categoryId: z.string().optional().describe('Restrict search to a category by UUID'),
+        priceDocType: z.enum(['price_list', 'discount_rule', 'contract_terms', 'promotion']).optional().describe('When searching pricing docs, filter by sub-type'),
       }),
     }
   );
@@ -479,10 +491,12 @@ ${scrapeResult.markdown.substring(0, 8000)}`;
           if (!searchResponse.ok) {
             console.error(`MIVAA search error: ${searchResponse.status}`);
             return JSON.stringify({
-              success: true,
+              success: false,
+              partial_success: true,
               design_tokens: designTokens,
+              search_query_used: searchQuery,
               products: [],
-              note: 'Design tokens extracted but catalog search failed. You can use material_search with the search_query to retry.',
+              error: `Catalog search failed (${searchResponse.status}). Design tokens were extracted — retry with material_search using the search_query below.`,
             });
           }
 
@@ -499,11 +513,16 @@ ${scrapeResult.markdown.substring(0, 8000)}`;
           });
         } catch (searchError) {
           clearTimeout(searchTimeoutId);
+          const isAbort = searchError instanceof Error && searchError.name === 'AbortError';
           return JSON.stringify({
-            success: true,
+            success: false,
+            partial_success: true,
             design_tokens: designTokens,
+            search_query_used: searchQuery,
             products: [],
-            note: 'Design tokens extracted but catalog search timed out.',
+            error: isAbort
+              ? 'Catalog search timed out after 300s. Design tokens were extracted — retry with material_search using the search_query below.'
+              : `Catalog search error: ${searchError instanceof Error ? searchError.message : String(searchError)}`,
           });
         }
       } catch (error) {

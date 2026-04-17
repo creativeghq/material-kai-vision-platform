@@ -27,12 +27,14 @@ export interface KBDocument {
   created_by?: string;
   updated_by?: string;
   view_count: number;
+  price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | null;
 }
 
 export interface KBCategory {
   id: string;
   workspace_id: string;
   name: string;
+  slug?: string | null;
   description?: string;
   parent_category_id?: string;
   color?: string;
@@ -43,6 +45,15 @@ export interface KBCategory {
   access_level: 'admin' | 'agent' | 'public';
   trigger_keyword?: string | null;
 }
+
+export type PriceDocType = 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion';
+
+export const PRICE_DOC_TYPE_LABELS: Record<PriceDocType, string> = {
+  price_list: 'Price list',
+  discount_rule: 'Discount rule',
+  contract_terms: 'Contract terms',
+  promotion: 'Promotion',
+};
 
 export interface KBAttachment {
   id: string;

@@ -435,15 +435,23 @@ export const createGeminiGenerationTool = (
           })()),
         };
 
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-gemini`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-          },
-          body: JSON.stringify(body),
-        });
+        const geminiController = new AbortController();
+        const geminiTimeoutId = setTimeout(() => geminiController.abort(), 300_000);
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-gemini`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            },
+            body: JSON.stringify(body),
+            signal: geminiController.signal,
+          });
+        } finally {
+          clearTimeout(geminiTimeoutId);
+        }
 
         if (!response.ok) {
           const errBody = await response.json().catch(() => null);
@@ -498,9 +506,12 @@ export const createGeminiGenerationTool = (
         });
       } catch (error) {
         console.error('Gemini generation error:', error);
+        const isAbort = error instanceof Error && error.name === 'AbortError';
         return JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : 'Generation failed',
+          error: isAbort
+            ? 'Gemini generation timed out after 300s. The backend may be overloaded — please retry.'
+            : error instanceof Error ? error.message : 'Generation failed',
         });
       }
     },
@@ -573,21 +584,29 @@ export const createVirtualStagingTool = (
           });
         }
 
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-virtual-staging`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          },
-          body: JSON.stringify({
-            source_image_url: resolvedImageUrl,
-            room,
-            furniture_style: furnitureStyle || 'Default (AI decides)',
-            furniture_items: furnitureItems,
-            workspace_id: workspaceId,
-            user_id: userId,
-          }),
-        });
+        const stagingController = new AbortController();
+        const stagingTimeoutId = setTimeout(() => stagingController.abort(), 300_000);
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/functions/v1/generate-virtual-staging`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              source_image_url: resolvedImageUrl,
+              room,
+              furniture_style: furnitureStyle || 'Default (AI decides)',
+              furniture_items: furnitureItems,
+              workspace_id: workspaceId,
+              user_id: userId,
+            }),
+            signal: stagingController.signal,
+          });
+        } finally {
+          clearTimeout(stagingTimeoutId);
+        }
 
         if (!response.ok) {
           throw new Error(`Virtual staging error: ${response.statusText}`);
@@ -621,9 +640,12 @@ export const createVirtualStagingTool = (
         });
       } catch (error) {
         console.error('Virtual staging error:', error);
+        const isAbort = error instanceof Error && error.name === 'AbortError';
         return JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : 'Virtual staging failed',
+          error: isAbort
+            ? 'Virtual staging timed out after 300s. The backend may be overloaded — please retry.'
+            : error instanceof Error ? error.message : 'Virtual staging failed',
         });
       }
     },

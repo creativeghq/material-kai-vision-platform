@@ -61,33 +61,103 @@ X-API-Key: <mivaa_api_key>
 }
 ```
 
-### Knowledge Base Routes (NEW v2.3.0)
+### Knowledge Base Routes (NEW v2.3.0 · extended 2026-04 for pricing)
 
-#### Create Document
+#### Create Document (upsert-by-title)
 ```typescript
 {
   action: 'kb_create_document',
   payload: {
+    workspace_id: string,
     title: string,
     content: string,
+    content_markdown?: string,
+    summary?: string,
     category_id?: string,
-    metadata?: object
+    seo_keywords?: string[],
+    status?: 'draft' | 'published' | 'archived',
+    visibility?: 'workspace' | 'private' | 'public',
+    metadata?: object,
+    // Only valid when category is "Pricing". Enables the price_lookup agent tool
+    // to classify how the doc contributes to a price composition.
+    price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion'
   }
 }
 ```
 
-#### Search Documents
+**Upsert semantics (2026-04):** when a doc with the same `(workspace_id, title, category_id)`
+already exists, the endpoint updates it in place and only regenerates the embedding if
+the `content` field actually changed. Re-uploading a manufacturer price list with the
+same title therefore refreshes the prices without creating duplicates.
+
+#### Update Document
+```typescript
+{
+  action: 'kb_update_document',
+  params: { doc_id: string },
+  payload: {
+    title?: string,
+    content?: string,
+    content_markdown?: string,
+    summary?: string,
+    category_id?: string,
+    seo_keywords?: string[],
+    status?: 'draft' | 'published' | 'archived',
+    visibility?: 'workspace' | 'private' | 'public',
+    metadata?: object,
+    price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion'
+  }
+}
+```
+
+#### Search Documents (admin management)
 ```typescript
 {
   action: 'kb_search',
   payload: {
+    workspace_id: string,
     query: string,
-    search_type: 'semantic' | 'full_text' | 'hybrid',
+    search_type?: 'semantic' | 'full_text' | 'hybrid',
     limit?: number,
-    category_id?: string
+    // All filters below are optional (added 2026-04)
+    category_id?: string,
+    category_slug?: string,     // e.g. "pricing" — restricts to one category
+    price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion',
+    allowed_access_levels?: ('admin' | 'agent' | 'public')[],
+    // Admin search defaults to false (drafts included); set true to exclude drafts.
+    require_published?: boolean,
+    match_threshold?: number    // 0.0-1.0 for semantic, default 0.5
   }
 }
 ```
+
+Each result now includes:
+- `category_slug`, `category_name` — resolved from the joined category
+- `price_doc_type` — the sub-type when the doc is in the Pricing category
+
+#### Search Knowledge Base (agent-facing)
+```typescript
+{
+  action: 'search_knowledge_base',
+  payload: {
+    query: string,
+    workspace_id: string,
+    search_types?: ('chunks' | 'products' | 'entities' | 'kb_docs' | 'images')[],
+    top_k?: number,
+    similarity_threshold?: number,
+    // 'admin' sees all access levels, 'agent' sees agent+public, 'public' sees public only
+    caller?: 'admin' | 'agent' | 'public',
+    // NEW 2026-04 — scope the kb_docs portion of the search
+    category_id?: string,
+    category_slug?: string,
+    price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion'
+  }
+}
+```
+
+When scoped to `category_slug: 'pricing'`, chunks include `price_doc_type`,
+`category_slug`, and `category_name` so the `price_lookup` agent tool can
+classify each match when composing a price.
 
 #### Create from PDF
 ```typescript
@@ -97,6 +167,37 @@ X-API-Key: <mivaa_api_key>
     file_url: string,
     title?: string,
     category_id?: string
+  }
+}
+```
+
+#### Create Category
+```typescript
+{
+  action: 'kb_create_category',
+  payload: {
+    workspace_id: string,
+    name: string,
+    slug?: string,                // e.g. "pricing" — used by category filters
+    description?: string,
+    icon?: string,
+    color?: string,
+    access_level?: 'admin' | 'agent' | 'public',
+    trigger_keyword?: string      // optional gate for agent-level categories
+  }
+}
+```
+
+**Creating the "Pricing" category:**
+```json
+{
+  "action": "kb_create_category",
+  "payload": {
+    "workspace_id": "<uuid>",
+    "name": "Pricing",
+    "slug": "pricing",
+    "access_level": "admin",
+    "trigger_keyword": "price"
   }
 }
 ```

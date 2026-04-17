@@ -58,6 +58,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
+import { PriceLookupsCard } from './PriceLookupsCard';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
@@ -1237,6 +1238,9 @@ const OperationsDashboardInner: React.FC = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Price Lookups — admin-triggered KB pricing tool usage */}
+            <PriceLookupsCard />
           </TabsContent>
 
           {/* Search Analytics Tab — query performance, cache, and observability */}

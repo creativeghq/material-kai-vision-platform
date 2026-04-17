@@ -52,11 +52,25 @@ Authorization: Bearer <supabase_access_token>
 ```
 
 **Response (Streaming):**
-Server-Sent Events (SSE) stream with chunks:
+Newline-delimited JSON chunks (each chunk is one JSON object followed by `\n`):
 ```typescript
-data: {"type": "chunk", "content": "partial response..."}
-data: {"type": "done", "metadata": {...}}
+{"type": "status", "message": "Initializing agent..."}
+{"type": "heartbeat", "timestamp": 1712345678901}
+{"type": "iteration", "iteration": 1, "maxIterations": 10}
+{"type": "tool_progress", "status": "Searching price knowledge base..."}
+{"type": "tool_call_ids", "mapping": [
+   { "tool_name": "price_lookup", "tool_call_id": "call_abc", "log_id": "<agent_tool_call_logs.id>" }
+]}
+{"type": "price_lookup_matches", "matches": [...], "hints": {...}}
+{"type": "price_proposal", "product_name": "...", "list_price": 85, "discount_percent": 27, "final_unit_price": 62, "reasoning_chain": [...], "source_doc_ids": [...], "confidence": "high"}
+{"type": "text", "text": "Here's the price I found..."}
+{"type": "done"}
 ```
+
+**Chunk types of interest for the pricing flow:**
+- `tool_call_ids` — emitted once after tool-call logs are inserted. Contains the `agent_tool_call_logs.id` for each tool call. Use this to populate `quote_items.price_lookup_call_id` / `product_prices.price_lookup_call_id` when committing a price.
+- `price_lookup_matches` — emitted by the `price_lookup` tool before the agent composes. Raw KB chunks grouped by `price_doc_type`.
+- `price_proposal` — emitted by the agent's final message. Full structured proposal with reasoning chain and source doc IDs. This is what the UI commits.
 
 ## Available Agents
 
@@ -212,6 +226,101 @@ Creates interior design generations (async).
 - `models` (array): Optional list of models to use
 
 **Returns:** Job ID for tracking generation progress
+
+### Price Lookup Tool (admin/owner only)
+
+Looks up a product price from the Pricing category of the Knowledge Base.
+Only registered for users with `admin` or `owner` workspace role — regular
+users never see the tool. Added 2026-04.
+
+**Tool name:** `price_lookup`
+
+**Parameters:**
+```typescript
+{
+  product_name: string,          // required — full product name
+  sku?: string,                  // strongest match signal when present
+  manufacturer?: string,         // narrows discount rule scope
+  quantity?: number,             // used for MOQ / tier math
+  unit?: string,                 // expected unit ("m²", "piece", "box")
+  product_id?: string,           // UUID — threaded into the price_proposal chunk
+  category_slug?: string,        // defaults to "pricing"
+  top_k?: number                 // max chunks to fetch (default 8)
+}
+```
+
+**Returns (JSON string passed back into the model):**
+```typescript
+{
+  success: boolean,
+  query_used: string,
+  matches: [
+    {
+      doc_id: string,
+      doc_title: string,
+      doc_type: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'unknown',
+      snippet: string,            // ≤800 chars from the matching chunk
+      relevance_score: number,
+      category_slug?: string
+    }
+  ],
+  hints: {
+    total_matches: number,
+    by_type: Record<string, number>,
+    has_price_list: boolean,
+    has_discount_rule: boolean,
+    has_contract_terms: boolean,
+    has_promotion: boolean,
+    manufacturer_hint?: string
+  },
+  guidance: string,               // reasoning instructions for the model
+  product_context: { product_name, sku, manufacturer, quantity, unit, product_id }
+}
+```
+
+**Side effects (streamed chunks):**
+- `price_lookup_matches` — emitted before the model composes, mirrors `matches`
+- `price_proposal` — emitted by the model after reasoning, shape below
+
+**`price_proposal` chunk shape:**
+```typescript
+{
+  type: 'price_proposal',
+  product_id?: string,
+  product_name?: string,
+  list_price: number | null,
+  discount_percent: number | null,
+  final_unit_price: number | null,
+  currency: 'EUR' | 'USD' | ...,
+  unit: string | null,
+  quantity_applied: number | null,
+  total: number | null,
+  source_doc_ids: string[],       // kb_docs.id values
+  source_titles: string[],
+  reasoning_chain: string[],      // step-by-step explanation for admin review
+  warnings: string[],             // conflicts, expired rules, unit mismatch
+  confidence: 'high' | 'medium' | 'low',
+  effective_through: string | null  // ISO date from the source doc
+}
+```
+
+**Provenance contract.** When the caller commits a proposal to `quote_items`
+or `product_prices`, it should:
+1. Read the `log_id` for `price_lookup` from the `tool_call_ids` chunk.
+2. Write that `log_id` into `quote_items.price_lookup_call_id` or
+   `product_prices.price_lookup_call_id`.
+3. Set `price_source` on `quote_items` to `kb:ai:<log_id>` (AI mode) or
+   `kb:quick:<doc_id>` (quick-pick direct search) or `manual`.
+
+This forms the audit chain: every price on a quote can be traced back to
+the exact AI call that produced it.
+
+### Direct Price Search (no AI, no LLM cost)
+
+For "quick pick" UIs that only want raw matches without AI reasoning,
+skip this endpoint entirely and call `mivaa-gateway` with action
+`search_knowledge_base` + `category_slug: 'pricing'` + `caller: 'admin'`.
+See [mivaa-gateway-api.md](./mivaa-gateway-api.md#search-knowledge-base-agent-facing).
 
 ## Error Handling
 

@@ -17,7 +17,9 @@ import {
   Check,
   Ruler,
   PenLine,
+  DollarSign,
 } from 'lucide-react';
+import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 
 import {
   Sheet,
@@ -128,6 +130,9 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
   // Custom product form
   const [customForm, setCustomForm] = useState<CustomProductForm>(EMPTY_CUSTOM);
+
+  // Price lookup drawer (admin) — used to fetch a price for the custom product form
+  const [customPriceLookupOpen, setCustomPriceLookupOpen] = useState(false);
 
   const [adding, setAdding] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'custom'>('search');
@@ -515,7 +520,21 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 {/* Price + Quantity */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="cp-price">Unit Price (€)</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="cp-price">Unit Price (€)</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => setCustomPriceLookupOpen(true)}
+                        disabled={!customForm.name.trim()}
+                        title={!customForm.name.trim() ? 'Enter a name first' : 'Get price from Knowledge Base'}
+                      >
+                        <DollarSign className="h-3 w-3 mr-0.5" />
+                        Get price
+                      </Button>
+                    </div>
                     <Input id="cp-price" type="number" min="0" step="0.01" value={customForm.unit_price} onChange={e => setCustomField('unit_price', e.target.value)} placeholder="0.00" />
                   </div>
                   <div className="space-y-1.5">
@@ -592,6 +611,22 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
           </TabsContent>
         </Tabs>
       </SheetContent>
+
+      <PriceLookupDrawer
+        open={customPriceLookupOpen}
+        onOpenChange={setCustomPriceLookupOpen}
+        productName={customForm.name.trim() || 'Custom product'}
+        sku={customForm.sku.trim() || undefined}
+        quantity={customForm.quantity}
+        unit={customForm.unit || undefined}
+        onConfirm={async (payload) => {
+          setCustomForm((prev) => ({
+            ...prev,
+            unit_price: String(payload.unit_price),
+          }));
+          setCustomPriceLookupOpen(false);
+        }}
+      />
     </Sheet>
   );
 };

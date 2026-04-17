@@ -55,7 +55,9 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
 
         const runId = run.id as string;
 
-        // 2. Fire-and-forget to background-agent-runner
+        // 2. Fire-and-forget to background-agent-runner.
+        // On dispatch failure we mark the agent_run as failed so the user/monitoring
+        // sees a terminal state instead of a run stuck in 'pending' forever.
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
@@ -70,7 +72,32 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
             triggered_by: 'chat',
             input_data:   { task_prompt, context_snippet, model_override },
           }),
-        }).catch(err => console.error('[dispatch_background_task] Fire-and-forget error:', err));
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              const errText = await res.text().catch(() => res.statusText);
+              console.error(`[dispatch_background_task] Runner returned ${res.status}: ${errText}`);
+              await supabase
+                .from('agent_runs')
+                .update({
+                  status: 'failed',
+                  error_message: `Runner dispatch failed (${res.status}): ${errText || res.statusText}`,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', runId);
+            }
+          })
+          .catch(async (err) => {
+            console.error('[dispatch_background_task] Fire-and-forget error:', err);
+            await supabase
+              .from('agent_runs')
+              .update({
+                status: 'failed',
+                error_message: `Runner dispatch network error: ${err instanceof Error ? err.message : String(err)}`,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', runId);
+          });
 
 
         return JSON.stringify({
@@ -117,24 +144,40 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
       try {
         onChunk?.({ type: 'tool_progress', status: `Starting ${video_type} video generation with ${model ?? 'auto-selected model'}...`, timestamp: Date.now() });
 
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-video-v2`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            workspace_id: workspaceId,
-            source_image_url,
-            video_type,
-            model,
-            prompt,
-            aspect_ratio: aspect_ratio ?? '16:9',
-            duration_seconds: duration_seconds ?? 8,
-            before_image_url,
-          }),
-        });
+        const videoController = new AbortController();
+        const videoTimeoutId = setTimeout(() => videoController.abort(), 300_000);
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-video-v2`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              workspace_id: workspaceId,
+              source_image_url,
+              video_type,
+              model,
+              prompt,
+              aspect_ratio: aspect_ratio ?? '16:9',
+              duration_seconds: duration_seconds ?? 8,
+              before_image_url,
+            }),
+            signal: videoController.signal,
+          });
+        } finally {
+          clearTimeout(videoTimeoutId);
+        }
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => response.statusText);
+          return JSON.stringify({
+            success: false,
+            error: `Video generation failed (${response.status}): ${errText || response.statusText}`,
+          });
+        }
 
         const result = await response.json();
 
@@ -151,7 +194,13 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
 
         return JSON.stringify(result);
       } catch (error) {
-        return JSON.stringify({ success: false, error: String(error) });
+        const isAbort = error instanceof Error && error.name === 'AbortError';
+        return JSON.stringify({
+          success: false,
+          error: isAbort
+            ? 'Video generation timed out after 300s. The backend may be overloaded — please retry.'
+            : String(error),
+        });
       }
     },
     {

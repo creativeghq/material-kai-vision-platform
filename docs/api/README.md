@@ -1,6 +1,8 @@
 # API Documentation
 
-This directory contains comprehensive documentation for all Supabase Edge Function APIs in the Material Kai Vision Platform.
+This directory contains per-function deep docs for Supabase Edge Function APIs.
+
+> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **68 edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 
 ## Overview
 
@@ -45,8 +47,20 @@ Company records management.
 #### [Quotes API](./quotes-api.md)
 Quote requests and proposal management.
 - **Function:** `quotes-api`
-- **Features:** Quote requests, proposals, status tracking
-- **Access:** Authenticated users
+- **Features:** Quote requests, proposals, status tracking, **price audit fields** (`price_source`, `price_lookup_call_id`), `product_prices` cache table
+- **Access:** Authenticated users (admin/owner for pricing fields)
+
+#### [Pricing API](./pricing-api.md) <span style="color:#ec4899">(NEW — 2026-04)</span>
+Admin-only API for sourcing, composing, and committing prices from the
+"Pricing" Knowledge Base category. Covers: category setup, ingesting price
+docs, AI-mode lookup via `price_lookup` agent tool, quick-pick direct
+search, commit flow, and audit trail.
+- **Endpoints used:** `agent-chat` (AI mode), `mivaa-gateway` action
+  `search_knowledge_base` (quick mode), Supabase PostgREST for commits
+- **Features:** Streaming `price_proposal` reasoning chain, `price_doc_type`
+  sub-types (price_list / discount_rule / contract_terms / promotion),
+  upsert-by-title doc ingestion, full audit trail via `agent_tool_call_logs`
+- **Access:** Admin / Owner only (every layer enforced)
 
 #### [Recommendations API](./recommendations-api.md)
 Collaborative filtering recommendations and interaction tracking.
@@ -57,10 +71,11 @@ Collaborative filtering recommendations and interaction tracking.
 ### AI & Agent APIs
 
 #### [Agent Chat API](./agent-chat-api.md)
-Multi-agent AI system powered by LangChain.js and Claude.
+Unified multi-agent AI system powered by LangChain.js and Claude.
 - **Function:** `agent-chat`
-- **Features:** Search agent, interior designer agent, product agent
-- **Access:** Role-based (varies by agent)
+- **Agents:** `kai` (default, Sonnet), `interior-designer` (Sonnet), `demo` (Haiku). Legacy aliases `search`/`insights`/`seo` resolve to `kai`.
+- **Features:** RBAC tool gating, skills system (`load_skill`), multimodal images, SSE streaming, long-term memory
+- **Access:** JWT (all users for core tools; admin/owner for B2B/SEO/sub-agents)
 
 #### [MIVAA Gateway API](./mivaa-gateway-api.md)
 Gateway to Python backend services (RAG, search, AI services).
@@ -132,11 +147,67 @@ Masked inpainting — regenerate a painted zone in a room image.
 - **Credits:** 20 per call
 - **Access:** Authenticated users
 
+#### VR World Generation
+Generate 3D Gaussian Splat worlds from interior images via WorldLabs Marble.
+- **Function:** `generate-vr-world`
+- **Models:** `marble-1.0-draft` (18 cr, ~30–45s), `marble-1.1` (190 cr, ~5min). Legacy `0.1-mini`/`0.1-plus` deprecated.
+- **Output:** SPZ splat files (100k/500k/full), collider GLB, panorama, caption — stored in `vr_worlds`
+- **Documentation:** [vr-world-generation.md](../vr-world-generation.md)
+- **Access:** JWT
+
+#### PBR Maps (AR)
+Generate PBR texture maps for AR preview rendering.
+- **Function:** `generate-pbr-maps`
+- **Outputs:** albedo, normal, roughness, metalness (Replicate)
+- **Credits:** 8 per generation
+- **Documentation:** [ar-material-preview.md](../ar-material-preview.md)
+- **Access:** JWT
+
 #### [AI Re-rank API](./ai-rerank-api.md)
 Claude-powered search result re-ordering for improved relevance.
 - **Function:** `ai-rerank`
 - **Features:** Semantic re-ranking, optional explanations, sonnet/haiku model choice
 - **Access:** Authenticated users
+
+### Knowledge Base APIs
+
+#### KB Embedding Generation
+Voyage AI 1024D embedding generation for Knowledge Base documents.
+- **Function:** `kb-generate-embedding`
+- **Features:** Auto-triggered on `kb_docs` insert/content change. Idempotent via content hash.
+- **Access:** JWT or service-role
+- **Documentation:** [knowledge-base-implementation.md](../knowledge-base-implementation.md)
+
+### Pinterest Integration
+
+#### Pinterest OAuth
+Pinterest account linking with board/pin access.
+- **Function:** `pinterest-oauth`
+- **Actions:** `get-auth-url`, `callback`, `get-boards`, `get-board-pins`, `disconnect`
+- **Storage:** `social_accounts` table (`platform='pinterest'`)
+- **Env:** `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_REDIRECT_URI`
+- **Access:** JWT
+
+#### Pinterest Import
+Import pins into moodboards (works pre-OAuth via oEmbed).
+- **Function:** `pinterest-import`
+- **Actions:** `extract-pin`, `import-pin`, `import-pins-bulk`
+- **Pipeline:** Extract → download image → MIVAA visual-search for matching catalog products
+- **Access:** JWT
+
+### SEO Pipeline (admin/owner only)
+
+Complete SEO content generation pipeline — 5 functions, all POST + JWT.
+
+| Function | Purpose |
+|----------|---------|
+| `seo-research` | DataForSEO keyword research (6 parallel API calls) |
+| `seo-plan` | Article structure + meta tags + FAQ schema |
+| `seo-write` | Full article via Claude Sonnet |
+| `seo-analyze` | 15+ SEO quality checks, auto-fix via Gemini |
+| `seo-pipeline` | Orchestrator: research → plan → write → analyze |
+
+Surfaced to the `kai` agent as sub-agent tools (admin-gated).
 
 ### Social Media APIs
 
@@ -174,6 +245,45 @@ Universal executor for all background agent types.
 SigLIP2 visual embedding generation.
 - **Function:** See [slig-inference.md](./slig-inference.md)
 - **Access:** Internal / service-role
+
+### Cron / Scheduled Functions (service-role only)
+
+Not user-callable. pg_cron invokes these on a schedule. No auth header from frontend — they use `SUPABASE_SERVICE_ROLE_KEY`.
+
+| Function | Schedule | Purpose |
+|----------|----------|---------|
+| `agent-scheduler-cron` | 1 min | Dispatch background agents whose cron is due |
+| `auto-recovery-cron` | 5 min | Re-dispatch stuck runs (>8 min no heartbeat, <3 attempts) |
+| `job-cleanup-cron` | weekly | Purge old jobs, logs, stale progress |
+| `flow-scheduler-cron` | 1 min | Run due scheduled flows |
+| `ai-pricing-updater` | weekly | Sync AI model pricing into `ai_model_pricing` |
+| `campaign-processor` | 1 min | Email campaign dispatcher (Resend, 8/min) |
+| `check-material-alerts` | daily | Run saved searches + email subscribers |
+| `scheduled-import-runner` | 5 min | Run due XML imports |
+| `messaging-processor` | 1 min | SMS/WhatsApp batch sender (Twilio, 10/batch) |
+
+### Admin / Maintenance
+
+#### Platform Reset
+Wipe derived data while preserving accounts/KB/CRM/prompts.
+- **Function:** `reset-platform`
+- **Documentation:** [deployment-guide.md § Platform Reset](../deployment-guide.md#-platform-reset-admin-destructive-operation)
+- **Access:** Service-role (admin-only, via admin UI confirmation modal)
+
+#### Health Check
+Aggregated health status across AI providers + MIVAA + external APIs.
+- **Function:** `health-check`
+- **Access:** Public (no auth)
+
+#### Field Templates
+Reusable field-mapping templates for XML/scraping imports.
+- **Function:** `field-templates`
+- **Access:** JWT
+
+#### Suggest Fields
+AI-suggested field mappings from HTML analysis.
+- **Function:** `suggest-fields`
+- **Access:** JWT
 
 ## Authentication
 

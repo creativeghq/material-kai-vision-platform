@@ -35,7 +35,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 ┌─────────────────────────────────────────────────────────────┐
 │              Supabase Edge Functions (Deno)                 │
 │  - agent-chat/index.ts                                      │
-│  - _skills/ (domain knowledge)                              │
+│  - _shared/skills/ (domain playbooks)                       │
 │  - Loads prompts from database                              │
 │  - LangGraph StateGraph orchestration                       │
 │  - Claude Sonnet 4.5 (Jarvis) / Claude Haiku 4.5 (Demo)     │
@@ -170,31 +170,95 @@ Each regional query includes native language search terms automatically. For exa
 
 ## Skills System
 
-Skills provide domain-specific knowledge that agents can load on-demand using progressive disclosure.
+Skills provide domain-specific knowledge and procedural playbooks that agents can load on-demand using progressive disclosure. The agent sees each skill's name + description in its system prompt; when a task matches, it calls the `load_skill` tool with the slug to pull the full markdown into context. This keeps the base system prompt lean and avoids paying token cost for unused playbooks on every turn.
 
 ### Structure
 
-supabase/functions/
-├── _skills/
-│   ├── types.ts              # Type definitions
-│   ├── index.ts              # Skills loader
+```
+supabase/functions/_shared/
+├── skills-types.ts              # Type definitions (SkillMetadata, Skill)
+├── skills-loader.ts             # Loader (parseSkillFile, getSkillsForAgent, getSkillContent, formatSkillsForSystemPrompt)
+├── skills/
 │   └── [skill-slug]/
-│       └── SKILL.md          # Skill definition
+│       ├── SKILL.md             # Source of truth — human/PR review copy
+│       └── skill.ts             # Re-exports SKILL.md content as a template literal (what the loader imports)
+└── tools/skills-tools.ts        # `load_skill` tool definition
+```
 
-### SKILL.md Format
+**Why two files per skill:** Supabase Edge Runtime's Deno does not enable `--unstable-raw-imports`, so the loader can't `import` a `.md` file directly. Each skill therefore has a sibling `skill.ts` whose default export is the same markdown as a `String.raw\`...\`` template literal. The `.md` file stays in the repo as the reviewable canonical copy.
 
-A SKILL.md file includes a frontmatter block with fields: `name`, `slug`, `description`, `agents` (list of agent IDs that can use this skill), and `tags`. The body contains a `## Context` section with domain expertise content and an `## Instructions` section explaining how to apply the knowledge.
+### SKILL.md format
 
-### When to Use Skills
+YAML frontmatter followed by markdown body:
 
-Skills are for **proprietary knowledge** that:
-1. Claude doesn't know (your pricing rules, supplier tiers, business logic)
-2. Isn't needed for every query (otherwise → system prompt)
+```markdown
+---
+name: Human-Readable Skill Name
+slug: skill-slug
+description: One-sentence guide to when the agent should load this skill.
+agents: [kai, interior-designer]
+tags: [optional, classification, tags]
+---
 
-### Adding New Skills
+# Skill name
 
-1. Create `_skills/[slug]/SKILL.md`
-2. Add import in `_skills/index.ts` for the new skill file and register it in the `SKILL_FILES` map.
+Body is freeform markdown. Typical structure:
+- A "Recipe" section with numbered steps
+- A "Guardrails" section listing what not to do
+- An output schema if the skill is expected to return structured data
+```
+
+### When to use skills
+
+Use a skill when all of these are true:
+1. The knowledge or procedure is **proprietary** (pricing rules, supplier tiers, internal taxonomies) OR a **domain-specific playbook** Claude would otherwise improvise
+2. It's only relevant for a subset of queries — loading it on every turn would waste tokens
+3. You want the procedure to be **auditable in git** — so SMEs can PR-review the playbook without touching agent code
+
+If the knowledge is needed on every turn, put it in the DB-stored system prompt via `/admin/ai-configs` instead.
+
+### Currently registered skills
+
+| Slug | Name | Available to | Purpose |
+|------|------|--------------|---------|
+| `b2b-manufacturer-research` | B2B Manufacturer Research | `kai` | Multi-step playbook for finding, scraping, enriching, and CRM-saving manufacturers (web search → Firecrawl → Apollo/Hunter → ZeroBounce → CRM) |
+| `interior-staging-workflow` | Interior Staging Workflow | `kai`, `interior-designer` | End-to-end procedure for staging an empty room: image analysis → material matching → 3D generation → optional VR |
+| `material-spec-extraction` | Material Spec Extraction | `kai`, `interior-designer` | Extracts structured specs (dimensions, finishes, performance ratings, certifications) from prose product descriptions |
+
+Source: [`supabase/functions/_shared/skills/`](../supabase/functions/_shared/skills/) — registered in [`skills-loader.ts`](../supabase/functions/_shared/skills-loader.ts).
+
+### How loading works at runtime
+
+1. `agent-chat/index.ts` calls `formatSkillsForSystemPrompt(agentId)` and appends the resulting `## Skills available` section to the agent's system prompt (name + slug + description per skill, filtered by `agents` frontmatter)
+2. The same file pushes the `load_skill` tool onto the agent's tool list if the agent has ≥1 skill
+3. The model, seeing the skill list, calls `load_skill({ slug })` when a task matches
+4. The tool returns the full markdown body; the model follows the recipe
+
+### Adding a new skill
+
+1. Create `supabase/functions/_shared/skills/<slug>/SKILL.md` with the frontmatter above
+2. Create `supabase/functions/_shared/skills/<slug>/skill.ts` with:
+   ```ts
+   export default String.raw`---
+   name: ...
+   slug: my-slug
+   description: ...
+   agents: [kai]
+   ---
+
+   # ... markdown body identical to SKILL.md ...
+   `;
+   ```
+3. Register in `supabase/functions/_shared/skills-loader.ts`:
+   ```ts
+   import mySkill from './skills/my-slug/skill.ts';
+
+   const SKILL_FILES: Record<string, string> = {
+     'my-slug': mySkill,
+     // ...
+   };
+   ```
+4. Deploy `agent-chat` — the skill is live. No DB migration, no UI change.
 
 ---
 
@@ -311,9 +375,10 @@ All requests require:
 2. Check that the web search beta (`web-search-2025-03-05`) is available on your Anthropic plan
 
 ### Skills Not Loading
-1. Verify SKILL.md has correct frontmatter
+1. Verify SKILL.md has correct frontmatter (and that `skill.ts` mirrors it — both files must stay in sync)
 2. Check `agents` array includes the agent ID (use `kai`, not `search`/`insights`)
-3. Verify import in `_skills/index.ts`
+3. Verify the slug is registered in `SKILL_FILES` inside `_shared/skills-loader.ts`
+4. Confirm `agent-chat` was redeployed after adding the skill (static imports require a deploy)
 
 ### Legacy agentId Not Working
 - Ensure the edge function `AGENT_CONFIGS` map contains fallthrough from `search`/`insights`/`seo` → `kai`
@@ -321,7 +386,7 @@ All requests require:
 
 ---
 
-**Last Updated**: March 1, 2026
-**Version**: 3.0.0
+**Last Updated**: April 15, 2026
+**Version**: 3.1.0
 **Status**: Production
 **Maintainer**: Development Team

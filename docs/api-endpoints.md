@@ -115,18 +115,20 @@ The response includes `status`, `timestamp`, per-service health details with res
 
 ### 2.1 POST /api/kb/documents
 
-**Purpose:** Create a new knowledge base document with automatic embedding generation
-**Used In:** Knowledge Base admin panel, Documentation editor
+**Purpose:** Create or upsert a knowledge base document with automatic embedding generation
+**Used In:** Knowledge Base admin panel, Documentation editor, Pricing doc ingestion
 **Flow:** User creates document → Generate 1024D Voyage AI embedding → Store in database
 
-**Request fields:** `workspace_id`, `title`, `content`, `content_markdown`, `summary`, `category_id`, `seo_keywords`, `status`, `visibility`, `metadata`
+**Upsert semantics (2026-04):** if a doc with the same `(workspace_id, title, category_id)` already exists, this endpoint updates it in place and only re-embeds when `content` changes. Re-uploading a quarterly price list with the same title refreshes prices without creating duplicates.
 
-**Response fields:** `id`, `workspace_id`, `title`, `content`, `text_embedding`, `embedding_status`, `embedding_generated_at`, `embedding_model`, `created_at`, `view_count`
+**Request fields:** `workspace_id`, `title`, `content`, `content_markdown`, `summary`, `category_id`, `seo_keywords`, `status`, `visibility`, `metadata`, `price_doc_type` (optional, pricing category only — one of `price_list | discount_rule | contract_terms | promotion`)
+
+**Response fields:** `id`, `workspace_id`, `title`, `content`, `text_embedding`, `embedding_status`, `embedding_generated_at`, `embedding_model`, `created_at`, `view_count`, `price_doc_type`
 
 **Database Operations:**
-- INSERT into `kb_docs` with embedding
+- INSERT (new) or UPDATE (existing with same title + category) on `kb_docs`
 - INSERT into `kb_doc_versions` (version history)
-- Generate 1024D embedding using Voyage AI voyage-3.5 (updated 2026-04)
+- Generate 1024D embedding using Voyage AI voyage-3.5 (only on new content)
 
 ---
 
@@ -147,9 +149,9 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Smart Detection:** Only regenerates embedding if content changed (title, content, summary, keywords, category)
 **Used In:** Document editor
 
-**Request fields:** `workspace_id`, `title`, `content`, `status`
+**Request fields:** `title`, `content`, `content_markdown`, `summary`, `category_id`, `seo_keywords`, `status`, `visibility`, `metadata`, `price_doc_type` (2026-04)
 
-**Response fields:** `id`, `title`, `content`, `embedding_status`, `embedding_generated_at`, `updated_at`
+**Response fields:** `id`, `title`, `content`, `embedding_status`, `embedding_generated_at`, `updated_at`, `price_doc_type`
 
 **Database Operations:**
 - UPDATE `kb_docs` with new content
@@ -208,7 +210,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 - Cannot generate embeddings in Supabase RPC (requires Voyage AI API call)
 - Uses pgvector's optimized cosine similarity for fast search
 
-**Request fields:** `workspace_id`, `query`, `search_type`, `limit`
+**Request fields:** `workspace_id`, `query`, `search_type` (default `semantic`), `limit`, `category_id` (optional), `category_slug` (optional, e.g. `"pricing"`), `price_doc_type` (optional, pricing sub-type filter), `allowed_access_levels` (optional, defaults to admin+agent+public), `require_published` (default **`false`** for admin mgmt — set `true` to exclude drafts), `match_threshold` (default 0.5 for semantic)
 
 **Search Types:**
 - `semantic` - Vector similarity using pgvector cosine distance (default)
@@ -222,7 +224,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 - `hybrid` - Combination of semantic + full-text
   - Weighted scoring for best results
 
-**Response fields:** `success`, `results` (array with id, title, content, similarity_score, created_at), `total_count`, `search_time_ms`, `search_type`
+**Response fields:** `results` (array with id, title, content, summary, category_id, `category_slug`, `category_name`, status, visibility, embedding_status, `price_doc_type`, `similarity`), `search_time_ms`, `total_results`
 
 **Database Operations:**
 - Generate query embedding (1024D, Voyage AI)
@@ -234,11 +236,13 @@ The response includes `status`, `timestamp`, per-service health details with res
 ### 2.7 POST /api/kb/categories
 
 **Purpose:** Create a new category
-**Used In:** Category management UI
+**Used In:** Category management UI, one-time Pricing category setup
 
-**Request fields:** `workspace_id`, `name`, `description`, `parent_category_id`, `color`, `icon`, `sort_order`
+**Request fields:** `workspace_id`, `name`, `slug` (recommended — used by search category filters, e.g. `"pricing"`), `description`, `parent_category_id`, `color`, `icon`, `sort_order`, `access_level` (`admin | agent | public`, default `agent`), `trigger_keyword` (optional agent gate)
 
-**Response fields:** `id`, `name`, `description`, `color`, `icon`, `created_at`
+**Response fields:** `id`, `name`, `slug`, `access_level`, `trigger_keyword`, `description`, `color`, `icon`, `created_at`
+
+**Pricing category seed:** to enable the `price_lookup` agent tool, create a category with `slug: "pricing"`, `access_level: "admin"`, `trigger_keyword: "price"`. Docs under this category accept the `price_doc_type` field on §2.1/§2.3.
 
 ---
 
@@ -1193,13 +1197,19 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 **Request fields:**
 - `query` (required)
 - `workspace_id` (required)
-- `search_types` (optional) — `["products", "entities", "chunks", "images"]` (default: all)
+- `search_types` (optional) — `["products", "entities", "chunks", "images", "kb_docs"]` (default: `["products","entities","chunks"]`)
 - `categories` (optional) — `["product", "certificate", "logo", "specification", "general"]`
 - `entity_types` (optional) — `["certificate", "logo", "specification"]`
 - `top_k` (optional, default: 10)
 - `similarity_threshold` (optional, default: 0.7)
+- `caller` (optional) — `"admin" | "agent" | "public"` — controls KB category access gating
+- `category_id` (optional, **added 2026-04**) — restrict KB search to a single category UUID
+- `category_slug` (optional, **added 2026-04**) — restrict by slug, e.g. `"pricing"`
+- `price_doc_type` (optional, **added 2026-04**) — filter to one of `price_list | discount_rule | contract_terms | promotion`
 
 **Response fields:** `query`, `total_results`, `products` array, `entities` array, `chunks` array, `images` array, `processing_time`, `search_metadata`
+
+**KB-doc chunk shape (2026-04):** each `chunks[i]` from kb_docs now includes `category_slug`, `category_name`, and `price_doc_type` alongside the existing fields.
 
 **Database Operations:**
 - SELECT FROM products (with multi-vector search)

@@ -16,6 +16,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - Content fields (title, content, markdown, summary)
    - Status & visibility control (draft/published/archived, public/private/workspace)
    - View tracking and engagement metrics
+   - **`price_doc_type`** (2026-04) — optional enum (`price_list | discount_rule | contract_terms | promotion`) for docs filed under the Pricing category; drives how the `price_lookup` agent tool combines documents
    - RLS policies for workspace isolation
 
 2. **`kb_categories`** - Category hierarchy
@@ -120,14 +121,16 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - Pagination support (default: 20 results)
    - Returns: Results with search time metrics (ms)
 
-   The request body takes `workspace_id`, `query`, `search_type` (semantic, full_text, or hybrid), and optional `limit`. The response includes `results` with similarity scores, `search_time_ms`, and `total_results`.
+   The request body takes `workspace_id`, `query`, `search_type` (semantic, full_text, or hybrid), and optional `limit`. Additional filters added 2026-04: `category_id`, `category_slug` (e.g. `"pricing"`), `price_doc_type` (`price_list | discount_rule | contract_terms | promotion`), `allowed_access_levels`, `require_published` (default `false` for admin management). The response includes `results` with `category_slug`, `category_name`, `price_doc_type`, and `similarity`, plus `search_time_ms` and `total_results`.
 
    **Architecture:**
    - Frontend → MIVAA API `/api/kb/search`
    - MIVAA generates query embedding (Voyage AI)
-   - MIVAA calls Supabase `kb_match_docs()` RPC function
+   - MIVAA calls Supabase `kb_match_docs()` RPC function (unified 2026-04; accepts `match_category_id`, `match_category_slug`, `match_price_doc_type`, `require_published`)
    - Supabase performs vector similarity search using pgvector
    - Returns ranked results with similarity scores
+
+**See also:** [Pricing API](./api/pricing-api.md) for the admin-only flow that ingests docs under a "Pricing" category with `price_doc_type` sub-types and retrieves them via either the `price_lookup` agent tool (AI reasoning mode) or `search_knowledge_base` gateway action (quick-pick direct mode).
 
 #### Categories (2 endpoints)
 

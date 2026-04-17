@@ -24,7 +24,7 @@ import { corsHeaders }        from '../_shared/cors.ts';
 import { authenticate }       from '../_shared/auth.ts';
 import { createLogHelper, createHeartbeatHelper } from '../_shared/agents/base-agent.ts';
 import { getRunner, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
-import { DelegateToMivaaError } from '../_shared/agents/types.ts';
+import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
 
 const { createClient } = await import('@supabase/supabase-js');
@@ -270,6 +270,32 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: any) {
     const duration = Date.now() - startTime;
+
+    // Cancellation signalled via heartbeat — admin flipped status to 'cancelled'.
+    // Finalize as cancelled (not failed) and skip failure notifications.
+    if (err instanceof CancelledError) {
+      await log('warn', 'Agent run cancelled by admin');
+      await supabase
+        .from('agent_runs')
+        .update({
+          status:       'cancelled',
+          completed_at: new Date().toISOString(),
+          duration_ms:  duration,
+        })
+        .eq('id', run.id);
+      await supabase
+        .from('background_agents')
+        .update({ last_run_at: new Date().toISOString(), last_run_status: 'cancelled' })
+        .eq('id', agent_id);
+      return new Response(JSON.stringify({
+        success:     false,
+        run_id:      run.id,
+        status:      'cancelled',
+        duration_ms: duration,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Delegation to Python
     if (err instanceof DelegateToMivaaError) {

@@ -132,6 +132,18 @@ export class DelegateToMivaaError extends Error {
   }
 }
 
+// ── Sentinel: heartbeat detected the run was cancelled by an admin ──────────
+// Thrown by ctx.heartbeat() when agent_runs.status has been set to 'cancelled'
+// out-of-band (typically by the admin dashboard). Runners should let it bubble;
+// the runner framework finalizes status='cancelled' without marking the run failed.
+
+export class CancelledError extends Error {
+  constructor(runId: string) {
+    super(`Run ${runId} was cancelled`);
+    this.name = 'CancelledError';
+  }
+}
+
 // ── Agent type catalog entry (used by frontend dropdowns) ───────────────────
 
 export interface AgentTypeCatalogEntry {

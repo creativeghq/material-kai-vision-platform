@@ -537,6 +537,9 @@ export class QuotesService {
       dimensions?: string;
       installation_requirements?: string;
       delivery_date?: string | null;
+      // Audit trail for admin price-lookup commits
+      price_source?: string | null;
+      price_lookup_call_id?: string | null;
     },
   ): Promise<QuoteItem> {
     // Recalculate line_total when pricing or quantity changes

@@ -1262,3 +1262,41 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 - 🔮 YOLO performance monitoring & metrics
 - 🔮 GPU acceleration (3-5× faster)
 - 🔮 Advanced chunking rules (lists, cross-references, formulas)
+
+---
+
+## 🩺 Document Health Panel (Admin Observability)
+
+A per-document health view, surfaced as a third tab on completed jobs in the Admin → Async Job Queue Monitor (alongside "Product Extraction Pipeline" and "Technical Logs"). It only appears when the job's `status === 'completed'`.
+
+**Frontend**: `src/components/Admin/AsyncJobQueueMonitor/DocumentHealthPanel.tsx`
+**Backend**: `GET /api/internal/document-extraction-status/{document_id}` (MIVAA)
+**Re-run action**: `POST /api/internal/run-catalog-knowledge/{document_id}?force=true`
+
+### What it shows
+
+| Section | Detail |
+|---------|--------|
+| **Average coverage %** | Big number, color-coded by health (green ≥75%, amber 50–75%, red <50%) |
+| **Layer 1 — Catalog Layout** | Run state + page-type breakdown (`legend_pages`, `product_spec_pages`, `product_photo_pages`, `named_products_detected`) |
+| **Layer 2 — Catalog Legends** | Run state + `legend_types_found` + `global_certifications` propagated catalog-wide |
+| **Coverage bucket bar chart** | Distribution of products across 0–25% / 25–50% / 50–75% / 75–100% buckets |
+| **Per-product drilldown** | Sample of products with their `missing_critical` fields and a source-breakdown chip set per product |
+| **Issues banner** | Detected problems + one-click "Re-run Catalog Knowledge" remediation |
+
+### Source-breakdown chips (extraction tier provenance)
+
+Each chip indicates which tier produced a given field on that product. The same labels are used throughout the admin UI:
+
+| Source key | Tier label |
+|------------|------------|
+| `pymupdf_text_dict` | PyMuPDF Tier A |
+| `claude_sonnet_vision` / `claude_spec_vision` | Claude Sonnet Tier B |
+| `catalog_legend` | Catalog Legend Tier C |
+| `chunk_regex` | Chunk Regex |
+| `vision_rollup` | Image Vision Rollup |
+| `ai_text_extraction` | AI Text (Stage 0) |
+
+### Why this exists
+
+Coverage and source mix are the two best signals for "did this catalog actually parse well?" The bucket chart spots catalogs where average coverage is fine but the long tail is empty; the source chips spot catalogs where one tier silently failed and another is doing all the work. The "Re-run Catalog Knowledge" button is the standard one-click fix when Layer 2 needs to retry.

@@ -11,6 +11,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LogLevel } from './types.ts';
+import { CancelledError } from './types.ts';
 
 // Re-export LangGraph utilities so agents that import from './base-agent.ts' continue to work.
 export type { LangGraphRunOptions, LangGraphRunOutput } from '../langgraph-core.ts';
@@ -48,18 +49,25 @@ export function createLogHelper(supabase: SupabaseClient, runId: string) {
 export function createHeartbeatHelper(supabase: SupabaseClient, runId: string) {
   return async function heartbeat(): Promise<{ ok: boolean }> {
     try {
-      const { error } = await supabase
+      // Combined update+read: bump heartbeat and read status in one round-trip.
+      // If the admin dashboard (or anyone) flipped status to 'cancelled', we throw
+      // CancelledError so the runner unwinds cleanly instead of pushing more work.
+      const { data, error } = await supabase
         .from('agent_runs')
         .update({ last_heartbeat: new Date().toISOString() })
-        .eq('id', runId);
+        .eq('id', runId)
+        .select('status')
+        .single();
       if (error) {
-        // Log at error level — a missed heartbeat means auto-recovery may re-dispatch
-        // the agent thinking it is stuck, causing duplicate runs.
         console.error('[base-agent] Failed to update heartbeat:', error.message);
         return { ok: false };
       }
+      if (data?.status === 'cancelled') {
+        throw new CancelledError(runId);
+      }
       return { ok: true };
     } catch (err) {
+      if (err instanceof CancelledError) throw err;
       console.error('[base-agent] Failed to update heartbeat (unexpected):', err);
       return { ok: false };
     }

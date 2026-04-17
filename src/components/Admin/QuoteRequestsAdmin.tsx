@@ -48,6 +48,8 @@ interface UserProfile {
   id: string;
   user_id: string;
   status: string;
+  full_name?: string | null;
+  email?: string | null;
 }
 
 export const QuoteRequestsAdmin: React.FC = () => {
@@ -112,12 +114,15 @@ export const QuoteRequestsAdmin: React.FC = () => {
       if (user) {
         const { data: currentUserProfile, error: profileError } = await supabase
           .from('user_profiles')
-          .select('id, user_id, role_id, subscription_tier, status, created_at')
+          .select('id, user_id, role_id, subscription_tier, status, created_at, full_name, email')
           .eq('user_id', user.id)
           .maybeSingle(); // Use maybeSingle to avoid 406 error when no profile exists
 
         if (currentUserProfile && !profileError) {
-          usersList.push(currentUserProfile);
+          usersList.push({
+            ...currentUserProfile,
+            email: currentUserProfile.email || user.email || '',
+          });
         }
       }
 
@@ -460,11 +465,16 @@ export const QuoteRequestsAdmin: React.FC = () => {
                   <SelectValue placeholder="Choose a user..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.user_id.substring(0, 8)}... ({user.status})
-                    </SelectItem>
-                  ))}
+                  {users.map((u) => {
+                    const displayName = u.full_name?.trim() || u.email || `${u.user_id.substring(0, 8)}…`;
+                    const displayEmail = u.email && u.full_name?.trim() ? u.email : null;
+                    return (
+                      <SelectItem key={u.user_id} value={u.user_id}>
+                        {displayName}
+                        {displayEmail ? ` (${displayEmail})` : ''}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

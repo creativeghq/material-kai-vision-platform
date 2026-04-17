@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -12,6 +12,7 @@ import {
   getProductName,
   getMaterialCategory,
 } from '@/utils/productMetadata';
+import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -30,7 +31,7 @@ interface QuoteItemsListProps {
   /** Quantity update (customer + admin) */
   onUpdateQuantity?: (itemId: string, quantity: number) => Promise<void>;
   /** Pricing + unit + FF&E update (admin only) */
-  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; notes?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null }) => Promise<void>;
+  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; notes?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null; price_source?: string | null; price_lookup_call_id?: string | null }) => Promise<void>;
   onRemoveItem?: (itemId: string) => Promise<void>;
   /** When true admin pricing fields (price, discounted, unit) are editable */
   editPricing?: boolean;
@@ -144,6 +145,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  // Price lookup drawer state — one instance, reused for any row the admin clicks.
+  const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
 
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
@@ -458,6 +461,15 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <Eye className="h-3.5 w-3.5" />
                               </Button>
                             )}
+                            {editPricing && onUpdateItem && (
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={e => { e.stopPropagation(); setLookupItem(item); }}
+                                title="Get price from Knowledge Base"
+                              >
+                                <DollarSign className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             {onRemoveItem && (
                               <Button
                                 variant="ghost" size="icon"
@@ -562,6 +574,34 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setSelectedProduct(null); }}
       />
+
+      {lookupItem && (
+        <PriceLookupDrawer
+          open={!!lookupItem}
+          onOpenChange={(v) => { if (!v) setLookupItem(null); }}
+          productId={lookupItem.product?.id}
+          productName={
+            lookupItem.custom_product_name ||
+            lookupItem.product?.name ||
+            'Unknown product'
+          }
+          sku={lookupItem.product?.sku || lookupItem.custom_sku || undefined}
+          manufacturer={(lookupItem.product?.metadata as any)?.factory?.factory_name}
+          quantity={lookupItem.quantity}
+          unit={lookupItem.custom_unit || undefined}
+          onConfirm={async (payload) => {
+            if (!onUpdateItem) return;
+            await onUpdateItem(lookupItem.id, {
+              unit_price: payload.unit_price,
+              discounted_price: payload.discount_price ?? null,
+              notes: payload.notes ?? lookupItem.notes ?? undefined,
+              price_source: payload.price_source ?? null,
+              price_lookup_call_id: payload.price_lookup_call_id ?? null,
+            });
+            setLookupItem(null);
+          }}
+        />
+      )}
     </>
   );
 };

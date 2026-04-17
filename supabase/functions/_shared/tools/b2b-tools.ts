@@ -88,19 +88,51 @@ export async function validateEmailWithZeroBounce(
  * Uses Claude's built-in web_search to find B2B manufacturers.
  * No extra API key required — uses ANTHROPIC_API_KEY.
  */
+const B2B_REGIONS: Record<string, { label: string; countries: string[] }> = {
+  cee: {
+    label: 'Central & Eastern Europe',
+    countries: ['Poland', 'Czech Republic', 'Slovakia', 'Hungary', 'Romania', 'Bulgaria', 'Ukraine'],
+  },
+  balkans: {
+    label: 'Balkans & Turkey',
+    countries: ['Turkey', 'Serbia', 'Croatia', 'Slovenia', 'Bosnia and Herzegovina', 'North Macedonia', 'Albania', 'Greece'],
+  },
+  baltic_nordic: {
+    label: 'Baltic & Nordic',
+    countries: ['Lithuania', 'Latvia', 'Estonia', 'Finland', 'Denmark'],
+  },
+  western_southern: {
+    label: 'Western & Southern Europe',
+    countries: ['Germany', 'Netherlands', 'France', 'Spain', 'Italy', 'Portugal', 'United Kingdom'],
+  },
+  global: {
+    label: 'Global Manufacturing Hubs',
+    countries: ['China', 'India', 'Morocco'],
+  },
+};
+
+const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries);
+
 export const createB2BManufacturerSearchTool = (_userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ country, region, category, limit = 30 }) => {
       try {
-        const scope = country
-          ? `in ${country}`
-          : region
-          ? `in the ${region} region (Central/Eastern Europe, Balkans & Turkey, Baltic & Nordic, Western & Southern Europe, or Global Manufacturing Hubs)`
-          : 'across Europe and major global manufacturing hubs (Poland, Turkey, Germany, Italy, Czech Republic, Romania, Bulgaria, Greece, Baltic states, Morocco, India, China)';
+        let scope: string;
+        if (country) {
+          scope = `in ${country}`;
+        } else if (region) {
+          const key = region.toLowerCase();
+          const regionEntry = B2B_REGIONS[key];
+          scope = regionEntry
+            ? `in the ${regionEntry.label} region (${regionEntry.countries.join(', ')})`
+            : `in the ${region} region`;
+        } else {
+          scope = `across these 30 markets: ${B2B_ALL_COUNTRIES.join(', ')}`;
+        }
 
         const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors or retailers) with their own manufacturing facilities. For each company provide: company name, website URL, city/country, main products, and any manufacturing indicators. Return up to ${limit} results.`;
 
-        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : ''}...`);
+        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${B2B_REGIONS[region.toLowerCase()]?.label ?? region}` : ''}...`);
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',

@@ -22,7 +22,7 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KBDocument, KBCategory, KnowledgeBaseService } from '@/services/knowledgeBaseService';
+import { KBDocument, KBCategory, KnowledgeBaseService, PRICE_DOC_TYPE_LABELS, PriceDocType } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 const knowledgeBaseService = KnowledgeBaseService.getInstance();
@@ -179,6 +179,24 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     try {
       setIsSaving(true);
 
+      // Resolve whether the chosen category is the Pricing category.
+      // If it is not, force price_doc_type back to null so it cannot leak across categories.
+      const selectedCat = categories.find((c) => c.id === document.category_id);
+      const isPricingCategory =
+        !!selectedCat &&
+        (selectedCat.slug === 'pricing' || selectedCat.name.toLowerCase() === 'pricing');
+      const priceDocTypeToSave = isPricingCategory ? (document.price_doc_type ?? null) : null;
+
+      if (isPricingCategory && !priceDocTypeToSave) {
+        toast({
+          title: 'Missing price document type',
+          description: 'Select a price document type (price_list / discount_rule / contract_terms / promotion) before saving.',
+          variant: 'destructive',
+        });
+        setIsSaving(false);
+        return;
+      }
+
       if (documentId) {
         // Update directly in Supabase — embedding already generated on create
         const { error } = await supabase
@@ -193,6 +211,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             status: document.status,
             visibility: document.visibility,
             metadata: document.metadata,
+            price_doc_type: priceDocTypeToSave,
             updated_at: new Date().toISOString(),
           })
           .eq('id', documentId)
@@ -218,6 +237,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             status: document.status,
             visibility: document.visibility,
             metadata: document.metadata,
+            price_doc_type: priceDocTypeToSave,
             workspace_id: workspaceId,
             embedding_status: 'pending',
           })
@@ -332,6 +352,40 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Pricing sub-type — only shown when the selected category is "Pricing" */}
+              {(() => {
+                const selectedCat = categories.find((c) => c.id === document.category_id);
+                const isPricing =
+                  !!selectedCat &&
+                  (selectedCat.slug === 'pricing' || selectedCat.name.toLowerCase() === 'pricing');
+                if (!isPricing) return null;
+                return (
+                  <div className="space-y-2">
+                    <Label htmlFor="price_doc_type">Price document type *</Label>
+                    <Select
+                      value={document.price_doc_type ?? undefined}
+                      onValueChange={(value: PriceDocType) =>
+                        setDocument({ ...document, price_doc_type: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sub-type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(PRICE_DOC_TYPE_LABELS) as PriceDocType[]).map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {PRICE_DOC_TYPE_LABELS[key]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Guides the agent: <span className="font-medium">price_list</span> for catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers.
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* PDF Upload */}
               {!documentId && (

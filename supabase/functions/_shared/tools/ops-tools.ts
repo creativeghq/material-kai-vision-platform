@@ -18,7 +18,7 @@ export const createCheckServerHealthTool = () => {
     async ({ checkType }) => {
       try {
 
-        const MIVAA_API_URL = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+        const MIVAA_API_URL = Deno.env.get('MIVAA_GATEWAY_URL') || Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
 
         let endpoint = '';
         switch (checkType) {

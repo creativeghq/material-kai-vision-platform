@@ -61,9 +61,12 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
           {runs.map((run) => (
             <div key={run.id} className="border rounded-lg overflow-hidden">
               {/* Run header */}
-              <button
-                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/50 text-left"
+              <div
+                role="button"
+                tabIndex={0}
+                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/50 text-left cursor-pointer"
                 onClick={() => setExpanded(expanded === run.id ? null : run.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(expanded === run.id ? null : run.id); } }}
               >
                 {expanded === run.id
                   ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -94,17 +97,25 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
                     <XCircle className="h-3 w-3 text-red-500" />
                   </Button>
                 )}
-              </button>
+              </div>
 
               {/* Expanded detail */}
               {expanded === run.id && (
                 <div className="px-3 pb-3 space-y-3 border-t">
-                  {/* Tokens + credits */}
-                  <div className="flex gap-4 text-xs text-muted-foreground pt-2">
+                  {/* Tokens + credits + model + chain */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-2">
                     <span>In: {run.input_tokens.toLocaleString()} tok</span>
                     <span>Out: {run.output_tokens.toLocaleString()} tok</span>
                     {run.credits_debited > 0 && (
                       <span>{run.credits_debited.toFixed(2)} credits</span>
+                    )}
+                    {run.model_used && <span>Model: {run.model_used}</span>}
+                    {run.trigger_event_type && <span>Event: {run.trigger_event_type}</span>}
+                    {run.parent_run_id && (
+                      <span>Chain parent: <code>{run.parent_run_id.slice(0, 8)}…</code></span>
+                    )}
+                    {run.recovery_attempts > 0 && (
+                      <Badge variant="outline" className="text-xs">recovered {run.recovery_attempts}×</Badge>
                     )}
                     {run.delegated_to_python && (
                       <Badge variant="outline" className="text-xs">Python backend</Badge>

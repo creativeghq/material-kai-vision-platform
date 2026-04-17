@@ -7,22 +7,20 @@
 
 import type { Skill, SkillMetadata } from './skills-types.ts';
 
-// Import skill files as raw text
-// Each skill is a separate import to enable tree-shaking
-// Example:
-// import mySkill from './my-skill/SKILL.md' with { type: 'text' };
+// Skills are registered statically: each skill lives in its own directory under
+// ./skills/<slug>/ with a SKILL.md (source of truth for humans / PR review) and
+// a skill.ts that re-exports the same markdown as a template literal. The .ts
+// export is what we import here — the Supabase Edge Runtime's Deno build does
+// not enable `--unstable-raw-imports`, so we cannot import the .md directly.
+// When editing a skill: edit both files OR edit SKILL.md and copy into skill.ts.
+import b2bManufacturerResearch from './skills/b2b-manufacturer-research/skill.ts';
+import interiorStagingWorkflow  from './skills/interior-staging-workflow/skill.ts';
+import materialSpecExtraction   from './skills/material-spec-extraction/skill.ts';
 
-/**
- * Registry of all available skills
- * Add new skills here after creating their SKILL.md files
- *
- * Example:
- * const SKILL_FILES: Record<string, string> = {
- *   'my-skill': mySkill,
- * };
- */
 const SKILL_FILES: Record<string, string> = {
-  // Add skills here when you have proprietary knowledge to inject
+  'b2b-manufacturer-research': b2bManufacturerResearch,
+  'interior-staging-workflow': interiorStagingWorkflow,
+  'material-spec-extraction':  materialSpecExtraction,
 };
 
 /**
@@ -150,4 +148,31 @@ export function getSkill(slug: string): Skill | null {
     console.error(`Failed to parse skill ${slug}:`, error);
     return null;
   }
+}
+
+/**
+ * Render the "Skills available" section that gets appended to an agent's system
+ * prompt. Lists only name/slug/description — the full content is loaded on
+ * demand via the `load_skill` tool (progressive disclosure, token-efficient).
+ *
+ * Returns an empty string when the agent has no skills — caller can unconditionally
+ * concatenate without a length check.
+ */
+export function formatSkillsForSystemPrompt(agentId: string): string {
+  const skills = getSkillsForAgent(agentId);
+  if (skills.length === 0) return '';
+
+  const lines = skills.map(
+    s => `- **${s.name}** (slug: \`${s.slug}\`) — ${s.description}`,
+  );
+
+  return `
+
+## Skills available
+
+You have access to the following skill playbooks. Each skill is a detailed procedure for a specific kind of task. When the user's request matches a skill's description, call the \`load_skill\` tool with the skill's slug to receive the full playbook, then follow it step-by-step.
+
+${lines.join('\n')}
+
+Do not invent skill slugs. Only the exact slugs listed above are loadable. If no skill matches, proceed with your normal reasoning and tools.`;
 }

@@ -24,6 +24,8 @@ import { formatMaterialCategory } from '@/utils/productMetadata';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
+import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
+import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,6 +157,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Modal stacking for recommendations — clicking a result opens that product
   const [stackedProductId, setStackedProductId] = useState<string | null>(null);
   const [stackedProduct, setStackedProduct] = useState<Product | null>(null);
+  // Price lookup drawer (admin-only)
+  const [priceLookupOpen, setPriceLookupOpen] = useState(false);
 
   // All hooks must be declared before any conditional return (Rules of Hooks)
 
@@ -1541,6 +1545,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
                 materialType={product.metadata?.material_category}
               />
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setPriceLookupOpen(true)}
+                  title="Get price from Pricing Knowledge Base"
+                >
+                  <DollarSign className="h-3.5 w-3.5 mr-1" />
+                  Get price
+                </Button>
+              )}
             </div>
           </div>
           {/* Description moved to Details tab — avoids duplication with the
@@ -2686,6 +2702,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         product={stackedProduct}
         isOpen={true}
         onClose={() => { setStackedProductId(null); setStackedProduct(null); }}
+      />
+    )}
+
+    {/* Price lookup drawer (admin only) — writes to product_prices on confirm */}
+    {isAdmin && (
+      <PriceLookupDrawer
+        open={priceLookupOpen}
+        onOpenChange={setPriceLookupOpen}
+        productId={product.id}
+        productName={product.name}
+        sku={safeString(product.sku) || undefined}
+        manufacturer={(product as any).manufacturer_name || (product.metadata as any)?.factory?.factory_name}
+        commitToProductPrices
       />
     )}
       </DialogContent>

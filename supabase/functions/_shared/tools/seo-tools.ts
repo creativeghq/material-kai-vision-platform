@@ -30,6 +30,10 @@ export async function callSEOFunction(functionName: string, body: any, timeoutMs
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errText = await response.text().catch(() => response.statusText);
+      return { success: false, error: `${functionName} failed (${response.status}): ${errText || response.statusText}` };
+    }
     return await response.json();
   } catch (error: any) {
     clearTimeout(timeoutId);

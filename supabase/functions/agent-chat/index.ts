@@ -35,7 +35,7 @@ let debitExternalServiceCredits: any, checkCreditBalance: any;
 let getToolPrompt: any;
 let extractTextContent: any;
 let authenticate: any, isAdminAccess: any;
-let getSkillsForAgent: any, getSkillContent: any;
+let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: any;
 let emitFlowEvent: any;
 let aiCallLogger: any;
 
@@ -76,6 +76,7 @@ async function initRuntime() {
   isAdminAccess = authMod.isAdminAccess;
   getSkillsForAgent = skillsMod.getSkillsForAgent;
   getSkillContent = skillsMod.getSkillContent;
+  formatSkillsForSystemPrompt = skillsMod.formatSkillsForSystemPrompt;
   emitFlowEvent = flowMod.emitFlowEvent;
   createClient = sbMod.createClient;
   ChatAnthropic = anthropicMod.ChatAnthropic;
@@ -601,6 +602,12 @@ function createAgentGraph(
                 resultCount = parsed.data.length;
               } else if (Array.isArray(parsed?.products)) {
                 resultCount = parsed.products.length;
+              } else if (Array.isArray(parsed?.matches)) {
+                // price_lookup returns { matches: [...] }
+                resultCount = parsed.matches.length;
+              } else if (Array.isArray(parsed?.articles)) {
+                // knowledge_base_search returns { articles: [...] }
+                resultCount = parsed.articles.length;
               }
               zeroResult = resultCount === 0;
               // Summarise but don't store full payload
@@ -635,8 +642,25 @@ function createAgentGraph(
         observability.supabase
           .from('agent_tool_call_logs')
           .insert(logRows)
+          .select('id')
           .then((res: any) => {
-            if (res?.error) console.warn('[agent-chat] tool call log insert error:', res.error.message);
+            if (res?.error) {
+              console.warn('[agent-chat] tool call log insert error:', res.error.message);
+              return;
+            }
+            const insertedIds: string[] = (res?.data || []).map((r: any) => r.id);
+            if (insertedIds.length === toolCalls.length) {
+              // Emit a mapping of tool_name → call_id so the frontend can link committed
+              // prices (quote_items, product_prices) back to the exact agent_tool_call_logs row.
+              const mapping = toolCalls.map((tc: any, i: number) => ({
+                tool_name: tc.name,
+                tool_call_id: tc.id || null,
+                log_id: insertedIds[i],
+              }));
+              try {
+                onChunk?.({ type: 'tool_call_ids', mapping });
+              } catch { /* stream may be closed */ }
+            }
           })
           .catch((e: any) => console.warn('[agent-chat] tool call log insert threw:', e));
       } catch (logErr) {
@@ -746,6 +770,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_article_writer', 'seo_content_analyzer',
       // Background task dispatch (admin/owner only)
       'dispatch_background_task',
+      // Price lookup from Pricing KB category (admin/owner only)
+      'price_lookup',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -897,6 +923,14 @@ async function executeAgent(
     // Continue without memories - not critical
   }
 
+  // 🧩 Skills: advertise available playbooks (metadata only). The agent calls
+  // `load_skill` to pull the full content on demand — progressive disclosure.
+  try {
+    systemPrompt += formatSkillsForSystemPrompt(agentId);
+  } catch (skillErr) {
+    console.warn('⚠️ Could not load skills metadata:', skillErr);
+  }
+
   // If there are previously generated images in the conversation, remind the agent to use them for follow-up edits
   if (conversationImages.length > 0) {
     systemPrompt += `\n\n[CONTEXT] There are ${conversationImages.length} previously generated image(s) in this conversation. The most recent is: ${conversationImages[conversationImages.length - 1]}. If the user asks to modify, adjust, change, or refine the design in any way — even without uploading a new image — call generate_gemini with mode=image-edit using this image as the reference. Do not respond with text only when the user is clearly asking for a visual change.`;
@@ -940,8 +974,9 @@ async function executeAgent(
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
+  const needsPrice = config.tools.includes('price_lookup') && isAdmin;
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod]: any[] = await Promise.all([
     needsSearch ? import('../_shared/tools/search-tools.ts') : null,
     needsGen    ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps    ? import('../_shared/tools/ops-tools.ts') : null,
@@ -950,6 +985,7 @@ async function executeAgent(
     needsB2b    ? import('../_shared/tools/b2b-tools.ts') : null,
     needsSeo    ? import('../_shared/tools/seo-tools.ts') : null,
     needsBg     ? import('../_shared/tools/background-tools.ts') : null,
+    needsPrice  ? import('../_shared/tools/price-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -980,12 +1016,26 @@ async function executeAgent(
   const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
+  const createPriceLookupTool = priceMod?.createPriceLookupTool;
 
   // --- Core tools (all users) ---
 
+  // 🧩 load_skill tool — injected whenever the agent has at least one skill
+  // advertised in its system prompt. Kept above the other tools so it's the
+  // first option the model considers when a task matches a skill.
+  try {
+    const skillsForAgent = getSkillsForAgent(agentId);
+    if (skillsForAgent.length > 0) {
+      const { createLoadSkillTool } = await import('../_shared/tools/skills-tools.ts');
+      tools.push(createLoadSkillTool(agentId));
+    }
+  } catch (skillToolErr) {
+    console.warn('⚠️ Could not register load_skill tool:', skillToolErr);
+  }
+
   // Knowledge Base search - always add first so agent checks KB before answering
   if (config.tools.includes('knowledge_base_search')) {
-    tools.push(createKnowledgeBaseSearchTool(workspaceId));
+    tools.push(createKnowledgeBaseSearchTool(workspaceId, isAdmin));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support
@@ -1091,6 +1141,11 @@ async function executeAgent(
     // Background task dispatch
     if (config.tools.includes('dispatch_background_task')) {
       tools.push(createDispatchBackgroundTaskTool(userId, workspaceId, conversation_id));
+    }
+
+    // Price lookup from the Pricing KB category (admin-gated)
+    if (config.tools.includes('price_lookup') && createPriceLookupTool) {
+      tools.push(createPriceLookupTool(workspaceId, onChunk));
     }
   }
 

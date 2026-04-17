@@ -127,6 +127,18 @@ Structured log entries per run. Real-time enabled.
 
 ---
 
+## Cancellation
+
+A run can be cancelled mid-flight by flipping `agent_runs.status` to `'cancelled'` (the admin dashboard's "Cancel" button does exactly this). The signal is picked up on the agent's next heartbeat:
+
+1. `ctx.heartbeat()` does a combined update+read: bumps `last_heartbeat` and reads back `status` in one round-trip
+2. If `status === 'cancelled'`, it throws `CancelledError`
+3. The runner catches `CancelledError`, finalizes the run with `status='cancelled'` (not `failed`), and skips failure notifications
+
+Agents do **not** need to handle `CancelledError` themselves — let it bubble. Just call `ctx.heartbeat()` periodically (every ~10s) inside any long loop so cancellation is detected quickly. Without heartbeats the run will only stop at completion.
+
+---
+
 ## Auto-Recovery
 
 `auto-recovery-cron` runs every 5 minutes and:
@@ -196,6 +208,41 @@ Returns the registered agent type catalog (name, description, default tools, def
 | `AgentLogsViewer` | Same page | Real-time log stream for a run |
 | `CreateAgentModal` | Same page | Form to define a new agent |
 
+The dashboard supports filtering by status / agent type, viewing real-time logs, and cancelling in-flight runs (see [Cancellation](#cancellation)). Subscribes to `agent_runs` and `agent_run_logs` via Supabase Realtime for live updates.
+
+### Status tabs
+
+The page exposes one extra synthetic status beyond the DB enum:
+
+| Tab | Definition |
+|-----|------------|
+| `all` / `pending` / `processing` / `completed` / `failed` / `cancelled` | Direct match on `agent_runs.status` |
+| `stuck` | `status='processing'` AND `last_heartbeat` older than `STUCK_MS` (8 min — same threshold the auto-recovery cron uses before re-dispatching) |
+
+`isStuck(run)` lives in [`src/services/backgroundAgents.ts`](../src/services/backgroundAgents.ts) and is the single source of truth for the threshold.
+
+### Agent-level alerts
+
+In addition to per-run rows, the list surfaces synthetic "agent alert" rows for problems that aren't tied to any single run:
+
+| Alert kind | Condition |
+|------------|-----------|
+| `disabled` | `enabled=false` AND `trigger_type` is `cron` or `event` (the agent will never fire) |
+| `never-ran` | `enabled=true` AND `trigger_type='cron'` AND `last_run_at` is null (the schedule has never produced a run) |
+
+Alerts appear under the `all`, `failed`, and `stuck` tabs (folded into the `failed`/`stuck` counters so the tab badge matches what's visible).
+
+### Service API
+
+`src/services/backgroundAgents.ts` exposes:
+
+- `listAgents()` — all agent definitions
+- `listAllRuns(limit = 100)` — server-side ordered + limited query across every agent (single round-trip; replaces the old per-agent fan-out)
+- `listRuns(agentId, limit)` — runs for one agent (used by the history drawer)
+- `cancelRun(runId)` — flips `status` to `'cancelled'`; the running agent picks it up on its next heartbeat
+- `isStuck(run)` / `STUCK_MS` — stuck detection threshold
+- `formatDuration` / `statusColor` — display helpers
+
 ---
 
-**Last Updated:** March 2026
+**Last Updated:** April 15, 2026

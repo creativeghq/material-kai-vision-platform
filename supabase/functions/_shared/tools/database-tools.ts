@@ -20,7 +20,7 @@ export const createCheckJobStatusTool = () => {
     async ({ jobId }) => {
       try {
 
-        const MIVAA_API_URL = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+        const MIVAA_API_URL = Deno.env.get('MIVAA_GATEWAY_URL') || Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
         const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/job/${jobId}`, {
           method: 'GET',
           headers: {

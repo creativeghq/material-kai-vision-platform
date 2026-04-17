@@ -125,6 +125,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           subscription_tier,
           status,
           created_at,
+          full_name,
           roles(id, name, level)
         `);
 
@@ -149,6 +150,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           id: profile?.id || authUser.id,
           user_id: authUser.id,
           email: authUser.email || '',
+          full_name: profile?.full_name || '',
           role_id: profile?.role_id,
           subscription_tier: profile?.subscription_tier || 'free',
           status: profile?.status || 'active',

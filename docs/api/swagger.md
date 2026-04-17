@@ -3,7 +3,7 @@
 > **Base URL**: `https://bgbavxtjlbvgplozizxu.supabase.co`
 > **Edge Functions Base**: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1`
 > **REST API Base**: `https://bgbavxtjlbvgplozizxu.supabase.co/rest/v1`
-> **Last Updated**: 2026-03-07
+> **Last Updated**: 2026-04-17
 
 ---
 
@@ -57,6 +57,18 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 29. [Supabase REST API Direct Table Access](#29-supabase-rest-api-direct-table-access)
 30. [Supabase Auth API](#30-supabase-auth-api)
 31. [Supabase Storage API](#31-supabase-storage-api)
+32. [Generate Interior (Gemini)](#32-generate-interior-gemini)
+33. [Generate Interior Video v2](#33-generate-interior-video-v2)
+34. [Generate PBR Maps](#34-generate-pbr-maps)
+35. [Generate Region Edit](#35-generate-region-edit)
+36. [Generate Virtual Staging](#36-generate-virtual-staging)
+37. [Social Content Generation](#37-social-content-generation)
+38. [Social Image Generation](#38-social-image-generation)
+39. [Social Video Generation](#39-social-video-generation)
+40. [Social Publishing (Late.dev)](#40-social-publishing-latedev)
+41. [Pinterest Integration](#41-pinterest-integration)
+42. [Webhook Receivers](#42-webhook-receivers)
+43. [Internal Utilities](#43-internal-utilities)
 
 ---
 
@@ -97,16 +109,39 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 | `insights` | Legacy alias resolves to `kai` | Any authenticated user |
 | `seo` | Legacy alias resolves to `kai` | Any authenticated user |
 
-> Sub-agent tools, B2B manufacturer search, and SEO tools are gated to `admin` or `owner` roles.
+> Sub-agent tools, B2B manufacturer search, SEO tools, and the `price_lookup` tool are gated to `admin` or `owner` roles.
+
+### Admin-Only Tool: price_lookup (2026-04)
+
+Searches the "Pricing" KB category and composes a price with a reasoning chain. Only available to admin/owner. See [pricing-api.md](./pricing-api.md) for the full contract.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `product_name` | string | Yes | Full product name |
+| `sku` | string | No | SKU for exact matching |
+| `manufacturer` | string | No | Narrows discount rule scope |
+| `quantity` | number | No | For MOQ/tier math |
+| `unit` | string | No | Expected unit (m², piece, box) |
+| `product_id` | string | No | UUID threaded into `price_proposal` |
+
+The agent emits these chunks during/after execution:
+- `tool_call_ids` — contains `log_id` (FK to `agent_tool_call_logs.id`) for each tool. Use the `price_lookup` entry to populate `quote_items.price_lookup_call_id` or `product_prices.price_lookup_call_id` on commit.
+- `price_lookup_matches` — raw KB chunks grouped by `price_doc_type`
+- `price_proposal` — structured result: `list_price`, `discount_percent`, `final_unit_price`, `currency`, `unit`, `reasoning_chain[]`, `source_doc_ids[]`, `warnings[]`, `confidence`
 
 ### Response
 
-Server-Sent Events stream (`text/event-stream`).
+Newline-delimited JSON stream (NOT SSE `data:` prefixed — each line is a raw JSON object followed by `\n`).
 
 ```
-data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello "}}
-data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"there!"}}
-data: [DONE]
+{"type":"status","message":"Initializing agent..."}
+{"type":"heartbeat","timestamp":1712345678901}
+{"type":"tool_progress","status":"Searching price knowledge base..."}
+{"type":"tool_call_ids","mapping":[{"tool_name":"price_lookup","log_id":"<uuid>"}]}
+{"type":"price_lookup_matches","matches":[...],"hints":{...}}
+{"type":"price_proposal","list_price":85,"discount_percent":27,"final_unit_price":62,...}
+{"type":"text","text":"Based on Factory X Q2 pricing..."}
+{"type":"done"}
 ```
 
 ### Error Responses
@@ -150,13 +185,14 @@ Send `multipart/form-data` directly — auto-routed to `POST /api/rag/documents/
 
 | Action | Method | Description | Billable |
 |--------|--------|-------------|----------|
-| `kb_create_document` | POST | Create KB document with embeddings | Yes |
+| `kb_create_document` | POST | Create/upsert KB document by (workspace, title, category) — accepts `price_doc_type` for Pricing category. Re-embeds only on content change. | Yes |
 | `kb_get_document` | GET | Get document by ID (`doc_id` required) | No |
-| `kb_update_document` | PATCH | Update document with smart re-embedding (`doc_id`) | Yes |
+| `kb_update_document` | PATCH | Update document with smart re-embedding (`doc_id`). Accepts `price_doc_type`. | Yes |
 | `kb_delete_document` | DELETE | Delete document (`doc_id`) | No |
 | `kb_create_from_pdf` | POST | Create document from PDF | Yes |
-| `kb_search` | POST | Semantic/full-text/hybrid KB search | Yes |
-| `kb_create_category` | POST | Create KB category | No |
+| `kb_search` | POST | Admin KB search (semantic/full-text/hybrid). Accepts `category_id`, `category_slug`, `price_doc_type`, `require_published` (default false), `allowed_access_levels`, `match_threshold`. Returns `category_slug`, `category_name`, `price_doc_type` per result. | Yes |
+| `search_knowledge_base` | POST | Agent-facing multi-type KB search (products/entities/chunks/kb_docs). Accepts `category_slug`, `category_id`, `price_doc_type`, `caller` (`admin`/`agent`/`public`). Use with `category_slug:"pricing"` for price lookup quick-pick mode (no LLM). **(2026-04)** | Yes |
+| `kb_create_category` | POST | Create KB category. Include `slug` (e.g. `"pricing"`), `access_level`, `trigger_keyword`. | No |
 | `kb_list_categories` | GET | List all KB categories | No |
 | `kb_create_attachment` | POST | Attach document to product | No |
 | `kb_get_doc_attachments` | GET | Get attachments for document (`doc_id`) | No |
@@ -418,6 +454,8 @@ Valid models: `"claude-sonnet-4-5"` or `"claude-haiku-4-5"`
 
 **Endpoint Base**: `/functions/v1/quotes-api`
 **Auth**: User JWT or Service Role Key
+
+> **Pricing audit fields (2026-04):** `quote_items` rows now carry `price_source` (provenance tag: `manual | catalog | kb:ai:<log_id> | kb:quick:<doc_id> | product_price:<id>`) and `price_lookup_call_id` (FK → `agent_tool_call_logs.id`). Admin can update these via `PATCH /rest/v1/quote_items` directly or through the `QuotesService.updateItem()` frontend method. See [pricing-api.md](./pricing-api.md) for full contract.
 
 ### POST /functions/v1/quotes-api/quote-requests
 Create a quote request.
@@ -1963,10 +2001,12 @@ Content-Type: application/json
 | `price_monitoring_products` | Price monitoring configuration |
 | `price_history` | Historical competitor price records |
 | `competitor_sources` | Competitor URLs for price monitoring |
+| `product_prices` | **Admin-only (RLS).** Confirmed KB-sourced prices cached per product. `(workspace_id, product_id)` unique. Includes `source_kb_doc_ids`, `price_lookup_call_id` audit link. **(2026-04)** |
 | `subscription_plans` | Available subscription plans |
 | `roles` | User role definitions |
-| `knowledge_base_categories` | KB category hierarchy |
-| `knowledge_base_documents` | KB document records |
+| `kb_categories` | KB category hierarchy (includes `slug`, `access_level`, `trigger_keyword`) |
+| `kb_docs` | KB document records (includes `price_doc_type` for Pricing category docs) |
+| `agent_tool_call_logs` | Per-tool-call logs with `tool_name`, `tool_args`, `result_summary`. Use `tool_name='price_lookup'` for pricing analytics. |
 
 ### Common Query Patterns
 
@@ -2126,6 +2166,684 @@ Authorization: Bearer <token>
 DELETE /storage/v1/object/{bucket}
 Body: { "prefixes": ["path/to/file.jpg"] }
 ```
+
+---
+
+## 32. Generate Interior (Gemini)
+
+**Endpoint**: `POST /functions/v1/generate-interior-gemini`
+**Auth**: User JWT or Service Role Key (with `user_id` in body)
+**Description**: Multi-mode interior design image generation. Supports text-to-image, image editing, redesign with style transfer, floor plan rendering, and materials boards.
+
+### Request Body
+
+```json
+{
+  "mode": "text-to-image",
+  "prompt": "Modern minimalist kitchen with marble countertops",
+  "room_type": "kitchen",
+  "style": "modern",
+  "sqm": 25,
+  "aspect_ratio": "16:9",
+  "model_tier": "fast",
+  "material_images": ["https://...product-image-1.jpg"],
+  "reference_image_url": "https://...room-photo.jpg",
+  "edit_instruction": "Replace the floor with dark oak",
+  "style_reference_url": "https://...mood-image.jpg",
+  "board_mode": "presentation-board",
+  "user_id": "uuid",
+  "workspace_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mode` | string | No | `text-to-image` \| `image-edit` \| `redesign` \| `copy-style` \| `floor-plan-render` \| `floor-plan-text` \| `materials-selection-board` |
+| `prompt` | string | No | Generation or instruction text |
+| `room_type` | string | No | Room type hint |
+| `style` | string | No | Style hint |
+| `sqm` | number | No | Square meters |
+| `aspect_ratio` | string | No | e.g. `16:9` |
+| `model_tier` | string | No | `fast` \| `pro` \| `grok` |
+| `material_images` | string[] | No | Up to 14 catalog product image URLs |
+| `reference_image_url` | string | Conditional | Required for image-edit, redesign, floor-plan-render, materials-selection-board |
+| `edit_instruction` | string | No | Edit-mode instruction |
+| `style_reference_url` | string | No | Style/mood reference image for dual-image modes |
+| `board_mode` | string | No | `presentation-board` \| `selection-board` \| `photorealistic-render` |
+| `user_id` | string | Conditional | Required when called with service role key |
+| `workspace_id` | string | No | Workspace context |
+
+### Credit Cost
+
+| Model Tier | Credits |
+|------------|---------|
+| `fast` (gemini-3.1-flash-image-preview) | 6 |
+| `pro` (gemini-3-pro-image-preview) | 15 |
+| `grok` (grok-aurora) | 20 |
+| flux-depth-pro (auto for certain modes) | 20 |
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "job_id": "uuid",
+  "mode": "text-to-image",
+  "board_mode": null,
+  "model": "gemini-3.1-flash-image-preview",
+  "image_url": "https://storage.supabase.co/...",
+  "credits_used": 6
+}
+```
+
+---
+
+## 33. Generate Interior Video v2
+
+**Endpoint**: `POST /functions/v1/generate-interior-video-v2`
+**Auth**: User JWT or Service Role Key (with `user_id` in body)
+**Description**: Multi-model interior video generation. Supports async polling for long generations.
+
+### Request Body
+
+```json
+{
+  "source_image_url": "https://...room.jpg",
+  "video_type": "walkthrough",
+  "model": "veo-2",
+  "prompt": "Slow pan through living room",
+  "aspect_ratio": "16:9",
+  "duration_seconds": 8,
+  "before_image_url": "https://...before.jpg",
+  "workspace_id": "uuid",
+  "user_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source_image_url` | string | Yes | Public URL of source image |
+| `video_type` | string | No | `walkthrough` \| `product_spotlight` \| `before_after` \| `floorplan_flythrough` \| `social_reel`. Default: `walkthrough` |
+| `model` | string | No | `veo-2` \| `kling-v3.0` \| `wan2.1-i2v-720p` \| `runway-gen4-turbo`. Auto-selected by type if omitted |
+| `prompt` | string | No | Video description |
+| `aspect_ratio` | string | No | `16:9` \| `9:16` \| `1:1`. Default: `16:9` |
+| `duration_seconds` | number | No | Default 8, max 8 (veo) or 10 (kling) |
+| `before_image_url` | string | Conditional | Required for `before_after` type |
+
+### Credit Cost
+
+| Model | Credits |
+|-------|---------|
+| `veo-2` | 30 |
+| `kling-v3.0` | 20 |
+| `wan2.1-i2v-720p` | 12 |
+| `runway-gen4-turbo` | 40 |
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "job_id": "uuid",
+  "video_url": "https://... or null (if async)",
+  "model_used": "veo-2",
+  "credits_used": 30,
+  "video_type": "walkthrough",
+  "status": "completed",
+  "async_job": true,
+  "prediction_id": "replicate-id-or-null"
+}
+```
+
+When `async_job: true`, poll the `generation_videos` table by `job_id` for `status` and `video_url`.
+
+---
+
+## 34. Generate PBR Maps
+
+**Endpoint**: `POST /functions/v1/generate-pbr-maps`
+**Auth**: User JWT or Service Role Key (with `user_id` in body)
+**Description**: Generates PBR texture maps (albedo, normal, roughness, metalness, tileable) from product images. Tries MIVAA SVBRDF extraction first, falls back to Replicate.
+
+### Request Body
+
+```json
+{
+  "product_id": "uuid",
+  "source_image_url": "https://...material.jpg",
+  "generate_tileable": true,
+  "user_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `product_id` | string | Yes | Product UUID |
+| `source_image_url` | string | Yes | Material image URL |
+| `generate_tileable` | boolean | No | Default: `true` |
+
+### Credit Cost: 8 credits (fixed)
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "product_id": "uuid",
+  "pbr_maps": {
+    "albedo_url": "https://...",
+    "normal_url": "https://...",
+    "roughness_url": "https://...",
+    "metalness_url": "https://...",
+    "tileable_url": "https://...",
+    "status": "completed",
+    "generated_at": "2026-04-17T12:00:00Z"
+  },
+  "credits_used": 8
+}
+```
+
+---
+
+## 35. Generate Region Edit
+
+**Endpoint**: `POST /functions/v1/generate-region-edit`
+**Auth**: User JWT or Service Role Key (with `user_id` in body)
+**Description**: Masked inpainting — regenerates only painted areas while preserving the rest. Uses Grok Aurora.
+
+### Request Body
+
+```json
+{
+  "image_url": "https://...room.jpg",
+  "mask_data_url": "data:image/png;base64,...",
+  "prompt": "Replace with travertine stone flooring",
+  "user_id": "uuid",
+  "workspace_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image_url` | string | Yes | Public URL of room image |
+| `mask_data_url` | string | Yes | PNG data URL (white=regenerate, black=keep) |
+| `prompt` | string | Yes | What to change in the masked area |
+
+### Credit Cost: 20 credits (fixed)
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "job_id": "uuid",
+  "image_url": "https://storage.supabase.co/...",
+  "model": "grok-2-aurora",
+  "credits_used": 20
+}
+```
+
+---
+
+## 36. Generate Virtual Staging
+
+**Endpoint**: `POST /functions/v1/generate-virtual-staging`
+**Auth**: User JWT or Service Role Key (with `user_id` in body)
+**Description**: AI-powered virtual staging — adds furniture to empty rooms. Uses Replicate proplabs/virtual-staging model (~56s).
+
+### Request Body
+
+```json
+{
+  "source_image_url": "https://...empty-room.jpg",
+  "room": "living_room",
+  "furniture_style": "Modern Minimalist",
+  "furniture_items": "sofa, coffee table, floor lamp",
+  "workspace_id": "uuid",
+  "user_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source_image_url` | string | Yes | Empty room image URL |
+| `room` | string | Yes | Room type |
+| `furniture_style` | string | No | Default: `"Default (AI decides)"` |
+| `furniture_items` | string | No | Comma-separated furniture list |
+
+### Credit Cost: 20 credits (fixed)
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "job_id": "uuid",
+  "image_url": "https://storage.supabase.co/...",
+  "credits_used": 20,
+  "room": "living_room",
+  "furniture_style": "Modern Minimalist"
+}
+```
+
+---
+
+## 37. Social Content Generation
+
+**Endpoint**: `POST /functions/v1/generate-social-content`
+**Auth**: User JWT
+**Description**: Generates 3 caption variants + hashtags + posting tips using Claude Haiku. Platform-optimized (Instagram 2200 chars, LinkedIn 3000, TikTok 2200, etc.).
+
+### Request Body
+
+```json
+{
+  "topic": "New marble collection launch",
+  "platform": "instagram",
+  "tone": "professional",
+  "product_info": "Calacatta Gold marble tiles, 60x60cm",
+  "include_hashtags": true,
+  "hashtag_count": 10,
+  "workspace_id": "uuid",
+  "post_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `topic` | string | Yes | Content topic |
+| `platform` | string | Yes | `instagram` \| `facebook` \| `linkedin` \| `tiktok` \| `pinterest` \| `youtube` \| `twitter` \| `threads` |
+| `tone` | string | No | Default: `"professional"` |
+| `product_info` | string | No | Product context |
+| `include_hashtags` | boolean | No | Default: `true` |
+| `hashtag_count` | number | No | Default: 10 |
+| `post_id` | string | No | Update existing social_posts record |
+
+### Credit Cost: 2 credits (flat)
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "post_id": "uuid",
+  "captions": [
+    { "variant": 1, "caption": "...", "char_count": 180 },
+    { "variant": 2, "caption": "...", "char_count": 195 },
+    { "variant": 3, "caption": "...", "char_count": 210 }
+  ],
+  "hashtags": ["#marble", "#interiordesign", "..."],
+  "best_time_hint": "Tuesday 10-11 AM or Thursday 7-8 PM",
+  "platform": "instagram",
+  "credits_used": 2,
+  "credits_remaining": 148
+}
+```
+
+---
+
+## 38. Social Image Generation
+
+**Endpoint**: `POST /functions/v1/generate-social-image`
+**Auth**: User JWT
+**Description**: Routes to the best image model based on content type. Uploads result to Supabase Storage.
+
+### Request Body
+
+```json
+{
+  "prompt": "Elegant bathroom with marble walls, morning light",
+  "image_type": "interior",
+  "model": "auto",
+  "aspect_ratio": "1:1",
+  "workspace_id": "uuid",
+  "post_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `prompt` | string | Yes | Image description |
+| `image_type` | string | No | `lifestyle` \| `product` \| `interior` \| `artistic`. Default: `lifestyle` |
+| `model` | string | No | `aurora` \| `gemini` \| `flux` \| `auto`. Default: `auto` |
+| `aspect_ratio` | string | No | `1:1` \| `4:5` \| `9:16` \| `16:9`. Default: `1:1` |
+
+### Credit Cost
+
+| Model | Credits | Auto-selected for |
+|-------|---------|------------------|
+| aurora (grok-2-aurora) | 10 | `lifestyle` |
+| gemini (Gemini Imagen) | 5 | `product`, `interior` |
+| flux (FLUX 2 Pro) | 6 | `artistic` |
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "image_url": "https://storage.supabase.co/...",
+  "model_used": "gemini",
+  "credits_used": 5,
+  "credits_remaining": 143,
+  "aspect_ratio": "1:1"
+}
+```
+
+---
+
+## 39. Social Video Generation
+
+**Endpoint**: `POST /functions/v1/generate-social-video`
+**Auth**: User JWT
+**Description**: Generates social reels via Replicate (Kling) or delegates veo-2 to generate-interior-video-v2. Supports async polling.
+
+### Request Body
+
+```json
+{
+  "source_image_url": "https://...room.jpg",
+  "prompt": "Slow zoom into bathroom vanity",
+  "model": "kling-3.0",
+  "aspect_ratio": "9:16",
+  "duration_seconds": 10,
+  "workspace_id": "uuid",
+  "post_id": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source_image_url` | string | Yes | Source image URL |
+| `model` | string | No | `kling-3.0` \| `kling-1.6-pro` \| `veo-2`. Default: `kling-3.0` |
+| `prompt` | string | No | Video description |
+| `aspect_ratio` | string | No | Default: `9:16` |
+| `duration_seconds` | number | No | Default: 10 |
+
+### Credit Cost
+
+| Model | Credits |
+|-------|---------|
+| `kling-3.0` | 20 |
+| `kling-1.6-pro` | 15 |
+| `veo-2` | 30 |
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "video_url": "https://... or null (if async)",
+  "job_id": "uuid",
+  "prediction_id": "replicate-id-or-null",
+  "model_used": "kling-3.0",
+  "credits_used": 20,
+  "status": "completed"
+}
+```
+
+When `status: "processing"`, poll using `prediction_id`.
+
+---
+
+## 40. Social Publishing (Late.dev)
+
+### POST /functions/v1/late-oauth
+
+**Auth**: User JWT
+**Description**: Manage social account connections via Late.dev OAuth.
+
+**GET** — List connected accounts:
+```
+GET /functions/v1/late-oauth?workspace_id=uuid&include_inactive=false
+```
+
+**POST** — Connect/disconnect:
+```json
+{
+  "action": "connect",
+  "platform": "instagram",
+  "workspace_id": "uuid"
+}
+```
+
+| Action | Description |
+|--------|-------------|
+| `connect` | Returns `oauth_url` to redirect user to |
+| `callback` | Complete OAuth (pass `code`, `state`) |
+| `disconnect` | Disconnect account (`late_account_id`) |
+
+Supported platforms: `instagram`, `facebook`, `linkedin`, `tiktok`, `pinterest`, `youtube`, `twitter`, `threads`
+
+---
+
+### POST /functions/v1/late-publish
+
+**Auth**: User JWT
+**Description**: Publish or schedule social posts via Late.dev.
+
+```json
+{
+  "post_id": "uuid",
+  "social_account_id": "uuid",
+  "action": "publish_now",
+  "workspace_id": "uuid",
+  "scheduled_at": "2026-04-20T10:00:00Z"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `post_id` | string | Yes | social_posts record ID |
+| `social_account_id` | string | Yes | Connected account ID |
+| `action` | string | Yes | `publish_now` \| `schedule` |
+| `scheduled_at` | string | Conditional | Required for `schedule` action |
+
+**Response:**
+```json
+{
+  "success": true,
+  "action": "publish_now",
+  "post_id": "uuid",
+  "late_post_id": "late-uuid",
+  "platform": "instagram",
+  "handle": "@materialkai"
+}
+```
+
+---
+
+### POST /functions/v1/late-analytics
+
+**Auth**: User JWT
+**Description**: Fetch and sync analytics from Late.dev.
+
+```json
+{
+  "action": "get_post_analytics",
+  "post_ids": ["uuid"],
+  "workspace_id": "uuid"
+}
+```
+
+| Action | Description |
+|--------|-------------|
+| `get_post_analytics` | Fetch analytics for specific post IDs |
+| `get_account_insights` | Sync account-level insights (`social_account_id`) |
+| `get_best_time` | Get best posting times for a platform |
+
+---
+
+### POST /functions/v1/late-webhook-handler
+
+**Auth**: None (validates `X-Late-Signature` HMAC-SHA256)
+**Description**: Webhook receiver from Late.dev. Updates social_posts status on publish/fail/schedule events.
+
+Event types: `post.published`, `post.failed`, `account.disconnected`, `post.scheduled`
+
+---
+
+## 41. Pinterest Integration
+
+### POST /functions/v1/pinterest-import
+
+**Auth**: User JWT
+**Description**: Extract pin metadata and import pins into moodboards. Works without OAuth via oEmbed.
+
+```json
+{
+  "action": "extract_pin",
+  "pin_url": "https://pinterest.com/pin/123..."
+}
+```
+
+| Action | Fields | Description |
+|--------|--------|-------------|
+| `extract_pin` | `pin_url` | Extract pin metadata via oEmbed |
+| `import_pin` | `pin_url`, `moodboard_id`, `auto_match?` | Import single pin to moodboard, optionally auto-match against MIVAA materials |
+| `import_pins_bulk` | `pin_urls[]`, `moodboard_id`, `auto_match?` | Bulk import pins |
+
+**Response (import_pin):**
+```json
+{
+  "success": true,
+  "pin": { "title": "...", "image_url": "...", "author": "..." },
+  "moodboard_item_id": "uuid",
+  "image_url": "https://...",
+  "matches": [{ "product_id": "...", "name": "...", "score": 0.87 }]
+}
+```
+
+---
+
+### POST /functions/v1/pinterest-oauth
+
+**Auth**: User JWT
+**Description**: Pinterest OAuth 2.0 flow for board browsing and authenticated pin import.
+
+| Action | Fields | Description |
+|--------|--------|-------------|
+| `get_auth_url` | — | Returns OAuth redirect URL + state |
+| `callback` | `code`, `state` | Complete OAuth exchange, store tokens |
+| `get_boards` | — | List user's boards (paginated) |
+| `get_board_pins` | `board_id`, `bookmark?` | List pins in a board (cursor-paginated) |
+| `disconnect` | — | Remove stored tokens |
+
+---
+
+## 42. Webhook Receivers
+
+These endpoints receive events from external services. They perform their own validation (HMAC signatures, query params) and do not require JWT auth.
+
+### POST /functions/v1/email-webhook
+
+**Source**: Resend
+**Auth**: None (Svix HMAC-SHA256 signature validation via `RESEND_WEBHOOK_SECRET`)
+**Description**: Processes email delivery events: `email.sent`, `email.delivered`, `email.bounced`, `email.complained`, `email.opened`, `email.clicked`. Updates `email_logs` and `campaign_recipients`.
+
+---
+
+### POST /functions/v1/ses-webhook
+
+**Source**: AWS SES via SNS
+**Auth**: None (SNS subscription confirmation flow)
+**Description**: Legacy SES webhook. Handles `SubscriptionConfirmation` and `Notification` (Bounce/Complaint/Delivery). Updates `email_logs` and `campaign_recipients`.
+
+---
+
+### POST /functions/v1/firecrawl-webhook
+
+**Source**: Firecrawl
+**Auth**: None (validates `session_id` + `crawl_id` query params)
+**Description**: Receives crawled pages during web scraping sessions. Events: `crawl.page` (stores pages), `crawl.completed` (triggers product creation via MIVAA), `crawl.failed`.
+
+---
+
+### POST /functions/v1/messaging-webhook
+
+**Source**: Twilio
+**Auth**: None (Twilio callback validation)
+**Description**: Handles SMS/WhatsApp delivery status updates and incoming messages. Responds with TwiML. Auto-processes opt-out/opt-in keywords (STOP, START, HELP).
+
+Query param `type`: `status` | `delivery` | `incoming`
+
+---
+
+## 43. Internal Utilities
+
+These functions are callable but intended for internal/admin use. Not part of the standard 3rd-party API surface.
+
+### POST /functions/v1/ai-pricing-updater
+
+**Auth**: None (internal cron or manual trigger)
+**Description**: Updates AI model pricing table (`ai_model_pricing`) from hardcoded reference prices for Anthropic, OpenAI, Voyage, Qwen, Google, and Firecrawl.
+
+```json
+{ "force_update": false, "provider": "anthropic" }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "stats": { "models_checked": 35, "models_updated": 3, "models_skipped": 32 }
+}
+```
+
+---
+
+### POST /functions/v1/check-material-alerts
+
+**Auth**: Service Role Key
+**Description**: Daily cron job (08:00 UTC). Finds products matching users' saved searches, inserts `material_alerts` and `user_notifications`.
+
+**Response:**
+```json
+{ "processed": 15, "new_alerts": 3 }
+```
+
+---
+
+### POST /functions/v1/trigger-factory-enrichment
+
+**Auth**: Service Role Key
+**Description**: Propagates factory metadata within a scope (document/session). Queues background enrichment agent if completeness < 90%.
+
+```json
+{
+  "workspace_id": "uuid",
+  "product_ids": ["uuid"],
+  "scope_column": "source_document_id",
+  "scope_value": "uuid",
+  "force_enrichment": false
+}
+```
+
+**Response:**
+```json
+{ "propagated": 12, "queued_job_id": "uuid" }
+```
+
+---
+
+### POST /functions/v1/messaging-processor
+
+**Auth**: None (cron-triggered)
+**Description**: Processes scheduled messaging campaigns. Sends SMS/WhatsApp batches via Twilio with opt-out handling and retries.
+
+**Response:**
+```json
+{
+  "success": true,
+  "stats": { "campaignsProcessed": 2, "messagesSent": 150, "messagesFailed": 3 }
+}
+```
+
+---
+
+### GET /functions/v1/agent-chat-debug
+
+**Auth**: None
+**Description**: Stub endpoint — returns `"ok"`. No implementation.
 
 ---
 

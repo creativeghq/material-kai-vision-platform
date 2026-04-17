@@ -237,6 +237,10 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🏗️ Architecture & Design
 
+**[design-system.md](design-system.md)** - Dark-mode theme, horizontal top nav, typography, button/tab/card/table patterns, image optimization helper. Summary + pointer to full reference at `.claude/design-system.md`.
+
+**[category-field-registry.md](category-field-registry.md)** - Frontend display config for the 10 material categories (`tiles`, `wood`, `decor`, `furniture`, `general_materials`, `paint_wall_decor`, `heating`, `sanitary`, `kitchen`, `lighting`). How sections render in `ProductDetailModal`, `controlledVocab` resolution, editing rules, drift-with-Python warnings.
+
 **[system-architecture.md](system-architecture.md)** - Complete system architecture
 - Three-tier architecture
 - Hybrid architecture pattern
@@ -430,7 +434,11 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🔌 API Reference
 
-**[api-endpoints.md](api-endpoints.md)** - Complete API reference
+**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 68 Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / SEO / KB / CRM / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns.
+
+**[api/README.md](api/README.md)** — Per-edge-function deep docs index (25 dedicated function pages).
+
+**[api-endpoints.md](api-endpoints.md)** - Complete MIVAA Python API reference
 - 114 endpoints across 14 categories
 - RAG Routes (25 endpoints)
 - Admin Routes (18 endpoints)
