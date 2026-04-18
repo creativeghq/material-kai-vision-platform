@@ -385,8 +385,7 @@ jobs:
 
           echo "Creating pull request..."
 
-          # Create a pull request using GitHub CLI
-          gh auth login --with-token <<< "$GH_TOKEN"
+          # gh CLI authenticates automatically via the GH_TOKEN env var — no login needed.
 
           # Try to create PR targeting gh-pages branch (where GitHub Pages serves from)
           if ! gh pr create \
