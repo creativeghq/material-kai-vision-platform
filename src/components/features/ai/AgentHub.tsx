@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Check,
   Globe,
+  ListChecks,
   GripVertical,
   Pencil,
 } from 'lucide-react';
@@ -68,6 +69,8 @@ import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import SEOArticleViewer from './SEOArticleViewer';
 import { InspirationUrlModal } from './InspirationUrlModal';
+import { StarterPromptsModal } from './StarterPromptsModal';
+import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { SearchSpecCard } from './SearchSpecCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
@@ -356,6 +359,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [showInspirationModal, setShowInspirationModal] = useState(false);
+  const [showStarterPrompts, setShowStarterPrompts] = useState(false);
+  const { isAdmin } = useUserRole();
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   // Elapsed time tracked by ThinkingTimer component; ref avoids re-renders in parent
@@ -1109,6 +1114,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
         if (conversation) {
           conversationId = conversation.id;
+          // Mark the URL-driven load as already handled BEFORE updating the URL.
+          // Otherwise `onConversationChange` below flips `initialConversationId`,
+          // which triggers the load effect → fetches messages from DB while we're
+          // still saving the user message → races with saveMessage → wipes the
+          // freshly-added user bubble from local state. Result: user's message
+          // appears to "disappear" until the page is refreshed.
+          initialConvLoaded.current = true;
           setCurrentConversationId(conversationId);
           onConversationChange?.(conversationId);
           newConversation = conversation;
@@ -3040,6 +3052,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </TooltipTrigger>
                     <TooltipContent side="left"><p>Design inspiration from URL</p></TooltipContent>
                   </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setShowStarterPrompts(true)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      >
+                        <ListChecks className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>Starter prompts</p></TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* Textarea — resizable */}
@@ -3104,6 +3128,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             }
             setVirtualStagingImageUrl(imageUrl || '');
           }}
+        />
+      )}
+
+      {/* Starter Prompts Modal */}
+      {showStarterPrompts && (
+        <StarterPromptsModal
+          agentId={selectedAgent}
+          isAdmin={isAdmin}
+          hasUploadedImage={attachedImages.length > 0}
+          onSubmit={(promptText) => {
+            setInput(promptText);
+            setShowStarterPrompts(false);
+          }}
+          onClose={() => setShowStarterPrompts(false)}
         />
       )}
 

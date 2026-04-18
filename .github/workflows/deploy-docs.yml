@@ -65,14 +65,83 @@ jobs:
         run: |
           echo "📚 Creating simple documentation site..."
 
-          # Create build directory
           mkdir -p docs-temp/build
 
-          # Generate dynamic index.html based on actual files
-          echo "Scanning docs folder for markdown files..."
+          # Dynamic counts
+          DOCS_COUNT=$(find docs -name "*.md" | wc -l | tr -d ' ')
+          API_COUNT=$(find docs/api -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 
-          # Start building the index.html
-          cat > docs-temp/build/index.html << 'HEADER'
+          # Map a doc path/filename to a category name.
+          # First match wins. Patterns are glob-style against the basename (no .md).
+          categorize() {
+            local name="$1"      # e.g. "agent-system"
+            local path="$2"      # e.g. "api/agent-chat-api" or "agent-system"
+            case "$path" in
+              api/*) echo "API Reference"; return ;;
+            esac
+            case "$name" in
+              README|INDEX|overview|app-details|features-guide|platform-flows|design-system)
+                echo "Getting Started" ;;
+              api-docs|api-endpoints|api-master-reference|api-configuration-examples)
+                echo "API Reference" ;;
+              ai-*|embedding-*)
+                echo "AI Models & Embeddings" ;;
+              pdf-*|modular-pipeline-*|page-aware-*|intelligent-page-*)
+                echo "PDF Processing" ;;
+              search-*|saved-searches-*|image-relevancy-*|relevancy-*|duplicate-*|collaborative-*|product-discovery-*)
+                echo "Search & Discovery" ;;
+              agent-*|background-agents|interior-designer-agent-*|flow-engine|langgraph-*|prompt-*|async-*|unified-product-*)
+                echo "Agents & Automation" ;;
+              virtual-staging|pinterest-*|ar-*|lighting-*|manufacturer-*|vr-*|interior-*|segmentation-*|campaign-*|social-*)
+                echo "Features" ;;
+              metadata-*|metafield-*|category-field-*|meta-field-*|comprehensive-metadata-*|multi-source-meta-*|extract-categories-*)
+                echo "Metadata Management" ;;
+              crm-*|email-*|professional-marketplace|quotes-*)
+                echo "Business & CRM" ;;
+              billing-*|internal-pricing-*|price-monitoring-*)
+                echo "Billing & Pricing" ;;
+              knowledge-base-*)
+                echo "Knowledge Base" ;;
+              data-import-*|scraping-*|web-scraping-*|xml-import-*)
+                echo "Data Import & Scraping" ;;
+              *)
+                echo "Infrastructure & Operations" ;;
+            esac
+          }
+
+          # Category display order + emoji. Keep in sync with categorize().
+          CATEGORIES=(
+            "Getting Started|🎯"
+            "API Reference|📡"
+            "AI Models & Embeddings|🤖"
+            "PDF Processing|📄"
+            "Search & Discovery|🔍"
+            "Agents & Automation|🧠"
+            "Features|✨"
+            "Metadata Management|🏷️"
+            "Business & CRM|💼"
+            "Billing & Pricing|💳"
+            "Knowledge Base|📚"
+            "Data Import & Scraping|📥"
+            "Infrastructure & Operations|⚙️"
+          )
+
+          # Bucket each markdown file into a per-category temp file.
+          rm -rf docs-temp/cats && mkdir -p docs-temp/cats
+          find docs -name "*.md" | sort | while read -r file; do
+            filename=$(basename "$file" .md)
+            filepath="${file#docs/}"
+            basepath="${filepath%.md}"
+            htmlpath="${basepath}.html"
+            title=$(echo "$filename" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
+            cat=$(categorize "$filename" "$basepath")
+            slug=$(echo "$cat" | tr ' &' '__')
+            echo "            <div class=\"doc-item\"><a href=\"$htmlpath\">$title</a></div>" \
+              >> "docs-temp/cats/$slug.html"
+          done
+
+          # Write index.html header (stats use shell expansion, so heredoc is unquoted).
+          cat > docs-temp/build/index.html << HEADER
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -83,13 +152,12 @@ jobs:
                   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
                   .container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
                   h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-                  h2 { color: #34495e; margin-top: 30px; }
-                  .docs-list { margin-top: 30px; }
-                  .doc-item { background: #f8f9fa; padding: 15px 20px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #3498db; }
-                  .doc-item a { color: #3498db; text-decoration: none; font-weight: 500; font-size: 16px; }
+                  h2 { color: #34495e; margin-top: 40px; border-bottom: 1px solid #ecf0f1; padding-bottom: 8px; }
+                  .docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-top: 15px; }
+                  .doc-item { background: #f8f9fa; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #3498db; }
+                  .doc-item a { color: #3498db; text-decoration: none; font-weight: 500; font-size: 15px; display: block; }
                   .doc-item a:hover { text-decoration: underline; }
-                  .doc-item .description { color: #7f8c8d; font-size: 14px; margin-top: 5px; }
-                  .api-links { display: flex; gap: 15px; margin-bottom: 30px; }
+                  .api-links { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
                   .api-link { background: #27ae60; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
                   .api-link.redoc { background: #e74c3c; }
                   .stats { background: #ecf0f1; padding: 20px; border-radius: 6px; margin-bottom: 30px; }
@@ -112,54 +180,47 @@ jobs:
                   <div class="stats">
                       <div class="stats-grid">
                           <div class="stat-item">
-                              <div class="stat-value">39</div>
+                              <div class="stat-value">${DOCS_COUNT}</div>
                               <div class="stat-label">Documentation Files</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">120+</div>
-                              <div class="stat-label">API Endpoints</div>
+                              <div class="stat-value">${API_COUNT}</div>
+                              <div class="stat-label">API Reference Pages</div>
                           </div>
                           <div class="stat-item">
                               <div class="stat-value">14</div>
                               <div class="stat-label">AI Models</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">5,000+</div>
-                              <div class="stat-label">Active Users</div>
-                          </div>
-                          <div class="stat-item">
                               <div class="stat-value">14</div>
                               <div class="stat-label">Pipeline Stages</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">6</div>
+                              <div class="stat-value">7</div>
                               <div class="stat-label">Embedding Types</div>
                           </div>
                       </div>
                   </div>
-
-                  <h2>📚 Documentation Files</h2>
-                  <div class="docs-list">
           HEADER
 
-          # Generate links for all markdown files
-          find docs -name "*.md" | sort | while read file; do
-              filename=$(basename "$file" .md)
-              filepath="${file#docs/}"
-              htmlpath="${filepath%.md}.html"
-
-              # Create friendly title from filename
-              title=$(echo "$filename" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
-
-              echo "                      <div class=\"doc-item\">" >> docs-temp/build/index.html
-              echo "                          <a href=\"$htmlpath\">$title</a>" >> docs-temp/build/index.html
-              echo "                      </div>" >> docs-temp/build/index.html
+          # Emit categorized sections in defined order.
+          for entry in "${CATEGORIES[@]}"; do
+            cat_name="${entry%%|*}"
+            cat_emoji="${entry##*|}"
+            slug=$(echo "$cat_name" | tr ' &' '__')
+            f="docs-temp/cats/$slug.html"
+            [ -f "$f" ] || continue
+            count=$(wc -l < "$f" | tr -d ' ')
+            {
+              echo "        <h2>${cat_emoji} ${cat_name} <span style=\"color:#95a5a6;font-size:14px;font-weight:normal;\">(${count})</span></h2>"
+              echo "        <div class=\"docs-grid\">"
+              cat "$f"
+              echo "        </div>"
+            } >> docs-temp/build/index.html
           done
 
-          # Close the HTML
-          cat >> docs-temp/build/index.html << 'FOOTER'
-                  </div>
-
+          # Footer
+          cat >> docs-temp/build/index.html << FOOTER
                   <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ecf0f1; color: #7f8c8d; text-align: center;">
                       <p><strong>Material Kai Vision Platform v2.5.0</strong></p>
                       <p><em>AI-Powered Material Intelligence System with Real-time Monitoring & Analytics</em></p>
@@ -171,21 +232,18 @@ jobs:
           </html>
           FOOTER
 
-          echo "✅ Dynamic index.html created with all available documentation files"
+          echo "✅ Dynamic categorized index.html created (${DOCS_COUNT} docs)"
 
           # Convert all markdown files to HTML
           npm install -g marked
 
-          # Process each markdown file
-          find docs -name "*.md" | while read file; do
-              # Get relative path and convert to HTML filename
+          find docs -name "*.md" | while read -r file; do
               rel_path=${file#docs/}
               html_file="docs-temp/build/${rel_path%.md}.html"
-
-              # Create directory if needed
               mkdir -p "$(dirname "$html_file")"
 
-              # Convert markdown to HTML with basic styling
+              # Back link: use site-root absolute path so it works from any depth.
+              # (Old value "../index.html" broke for top-level pages — resolved above the site.)
               cat > "$html_file" << 'HTMLSTART'
           <!DOCTYPE html>
           <html lang="en">
@@ -200,6 +258,7 @@ jobs:
                   h1 { border-bottom: 3px solid #3498db; padding-bottom: 10px; }
                   code { background: #f1f2f6; padding: 2px 6px; border-radius: 3px; font-family: 'Monaco', 'Consolas', monospace; }
                   pre { background: #f1f2f6; padding: 15px; border-radius: 6px; overflow-x: auto; }
+                  pre code { background: transparent; padding: 0; }
                   a { color: #3498db; text-decoration: none; }
                   a:hover { text-decoration: underline; }
                   .back-link { margin-bottom: 20px; }
@@ -207,22 +266,25 @@ jobs:
                   table { width: 100%; border-collapse: collapse; margin: 20px 0; }
                   th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
                   th { background: #f8f9fa; }
+                  img { max-width: 100%; height: auto; }
               </style>
           </head>
           <body>
               <div class="container">
-                  <div class="back-link"><a href="../index.html">← Back to Documentation Home</a></div>
+                  <div class="back-link"><a href="/index.html">← Back to Documentation Home</a></div>
           HTMLSTART
 
-              # Convert markdown content and append
               marked "$file" >> "$html_file"
-
-              # Close HTML
               echo '</div></body></html>' >> "$html_file"
+
+              # Rewrite intra-doc Markdown links (foo.md, foo.md#anchor, ./bar/baz.md)
+              # to their generated .html equivalents so navigation between docs works.
+              # Leaves external http(s) links untouched.
+              sed -i -E 's|href="([^":?#]+)\.md(#[^"]*)?"|href="\1.html\2"|g' "$html_file"
           done
 
           # Create a proper README.md for GitHub with dynamic links
-          cat > docs-temp/build/README.md << 'READMEHEADER'
+          cat > docs-temp/build/README.md << READMEHEADER
           # 🚀 Material Kai Vision Platform Documentation
 
           Welcome to the Material Kai Vision Platform documentation site!
@@ -233,35 +295,38 @@ jobs:
 
           ## 🔗 Quick Links
 
-          - **[📡 API Documentation](https://v1api.materialshub.gr/docs)** - Interactive Swagger API documentation (113 endpoints)
+          - **[📡 API Documentation](https://v1api.materialshub.gr/docs)** - Interactive Swagger API documentation
           - **[📋 ReDoc API](https://v1api.materialshub.gr/redoc)** - Alternative API documentation format
 
           ## 📊 Platform Stats
 
-          - **39** Comprehensive Documentation Files
-          - **120+** API Endpoints across **15** categories
-          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Qwen3-VL-8B/32B, CLIP, etc.)
-          - **6** Embedding Types (text, visual, color, texture, application, multimodal)
+          - **${DOCS_COUNT}** Documentation Files (${API_COUNT} in API Reference)
+          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Qwen3-VL-8B/32B, SigLIP2, Voyage AI, etc.)
+          - **7** Embedding Types (text, visual, understanding, color, texture, style, material)
           - **14-Stage** PDF Processing Pipeline with checkpoint recovery and real-time monitoring
-          - **Complete Quote System** with status tags, upsells/extras, and project timeline tracking
           - **Real-time Monitoring** with Supabase subscriptions and comprehensive analytics
-          - **5,000+** Active Users
-          - **99.5%+** Uptime
 
           ## 📋 Available Documentation
 
           READMEHEADER
 
-          # Generate dynamic list of all documentation files
-          find docs -name "*.md" | sort | while read file; do
-              filename=$(basename "$file" .md)
-              filepath="${file#docs/}"
-              htmlpath="${filepath%.md}.html"
-
-              # Create friendly title from filename
+          # Generate categorized list of all documentation files, matching the index.html.
+          for entry in "${CATEGORIES[@]}"; do
+            cat_name="${entry%%|*}"
+            cat_emoji="${entry##*|}"
+            slug=$(echo "$cat_name" | tr ' &' '__')
+            f="docs-temp/cats/$slug.html"
+            [ -f "$f" ] || continue
+            echo "" >> docs-temp/build/README.md
+            echo "### ${cat_emoji} ${cat_name}" >> docs-temp/build/README.md
+            echo "" >> docs-temp/build/README.md
+            # Re-derive title + link from the same bucketed entries.
+            grep -oE 'href="[^"]+"' "$f" | sed 's/href="//; s/"$//' | while read -r htmlpath; do
+              basepath="${htmlpath%.html}"
+              filename=$(basename "$basepath")
               title=$(echo "$filename" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
-
               echo "- [$title](https://basilakis.github.io/$htmlpath)" >> docs-temp/build/README.md
+            done
           done
 
           # Add footer

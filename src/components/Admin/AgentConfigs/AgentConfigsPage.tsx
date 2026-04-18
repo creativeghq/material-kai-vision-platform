@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign } from 'lucide-react';
+import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AIModelPricingTab } from './AIModelPricingTab';
+import { ChatStartersTab } from './ChatStartersTab';
 
 interface Prompt {
   id: string;
@@ -97,10 +98,14 @@ export const AgentConfigsPage: React.FC = () => {
   const loadPrompts = async () => {
     try {
       setLoading(true);
+      // chat_starter prompts have their own dedicated tab (ChatStartersTab) with
+      // a structured editor for the configuration fields — exclude them here to
+      // avoid showing the same rows in two places with two different editors.
       const { data, error } = await supabase
         .from('prompts')
         .select('*')
         .eq('is_active', true)
+        .neq('prompt_type', 'chat_starter')
         .order('prompt_type', { ascending: true })
         .order('stage', { ascending: true })
         .order('category', { ascending: true });
@@ -290,6 +295,10 @@ export const AgentConfigsPage: React.FC = () => {
             <TabsTrigger value="prompts" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bot className="h-4 w-4" />
               AI Prompts
+            </TabsTrigger>
+            <TabsTrigger value="starters" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ListChecks className="h-4 w-4" />
+              Chat Starters
             </TabsTrigger>
             <TabsTrigger value="pricing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <DollarSign className="h-4 w-4" />
@@ -685,6 +694,11 @@ export const AgentConfigsPage: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </TabsContent>
+
+          {/* Chat Starters Tab Content */}
+          <TabsContent value="starters">
+            <ChatStartersTab />
           </TabsContent>
 
           {/* Model Pricing Tab Content */}
