@@ -41,7 +41,7 @@ Example: A $0.15 USD API call = **15 platform credits**
 ### 4. **Embedding Models** (updated 2026-04)
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
-  - Voyage AI `voyage-3.5` (1024D) — sole production text embedder
+  - Voyage AI `voyage-4` (1024D) — sole production text embedder
   - OpenAI `text-embedding-3-small` — legacy CI changelog workflow only
 - **Cost Calculation**: USD Cost = (tokens / 1M × price). Platform Credits = USD Cost × 100.
 

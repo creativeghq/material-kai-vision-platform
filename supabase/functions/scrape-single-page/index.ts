@@ -108,6 +108,17 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
       console.log(`Extracted ${materials.length} materials from ${pageUrl}`);
       console.log(`Markdown content length: ${markdownContent?.length || 0} characters`);
 
+      // Track Firecrawl spend (1 page per call)
+      try {
+        const { debitExternalServiceCredits } = await import('../_shared/credit-utils.ts');
+        await debitExternalServiceCredits(
+          supabase, userId, 'firecrawl-scrape', 'scrape_single_page', 1,
+          { url: pageUrl, page_id: pageId, session_id: sessionId },
+        );
+      } catch (logErr) {
+        console.warn('[scrape-single-page] credit-utils logging failed:', logErr);
+      }
+
     } catch (scrapeError) {
       console.error(`Scraping error for ${pageUrl}:`, scrapeError);
       errorMessage = scrapeError.message;

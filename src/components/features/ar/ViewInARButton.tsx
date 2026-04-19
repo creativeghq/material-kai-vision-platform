@@ -7,7 +7,8 @@
  */
 
 import React, { useState } from 'react';
-import { Smartphone, QrCode, X } from 'lucide-react';
+import { Smartphone, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/core/ui/button';
 import {
   Dialog,
@@ -46,14 +47,13 @@ const ARQRCodeModal: React.FC<ARQRCodeModalProps> = ({
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-4">
-          {/* TODO: Replace with qrcode.react <QRCodeSVG> when the dependency is added */}
-          <div className="flex h-48 w-48 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/50">
-            <div className="flex flex-col items-center gap-2 px-4 text-center">
-              <QrCode className="h-12 w-12 text-muted-foreground/50" />
-              <p className="text-xs text-muted-foreground">
-                QR Code Placeholder
-              </p>
-            </div>
+          <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-white p-3">
+            <QRCodeSVG
+              value={arUrl}
+              size={168}
+              level="M"
+              includeMargin={false}
+            />
           </div>
 
           <div className="w-full space-y-2 text-center">

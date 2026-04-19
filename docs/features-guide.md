@@ -381,7 +381,7 @@ Complete reference of all platform features and capabilities.
 **External Services**:
 - Anthropic (Claude Sonnet/Haiku 4.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
-- Voyage AI (voyage-3.5 text + understanding embeddings)
+- Voyage AI (voyage-4 text + understanding embeddings)
 - HuggingFace Endpoint (Qwen3-VL 32B vision analysis)
 - SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
 - Replicate (14 interior design generation models)

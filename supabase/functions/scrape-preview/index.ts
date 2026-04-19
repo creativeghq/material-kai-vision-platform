@@ -92,6 +92,17 @@ Deno.serve(withApiLogging('scrape-preview', async (req) => {
 
     console.log(`Preview extracted ${materials.length} materials from ${url}`);
 
+    // Track Firecrawl spend (1 page per preview)
+    try {
+      const { debitExternalServiceCredits } = await import('../_shared/credit-utils.ts');
+      await debitExternalServiceCredits(
+        supabase, userId, 'firecrawl-scrape', 'scrape_preview', 1,
+        { url, workspace_id: workspaceId },
+      );
+    } catch (logErr) {
+      console.warn('[scrape-preview] credit-utils logging failed:', logErr);
+    }
+
     const response: ScrapePreviewResponse = {
       success: true,
       url,

@@ -108,7 +108,10 @@ async function createReplicatePrediction(
 
 async function pollReplicate(
   predictionId: string,
-  timeoutMs = 50_000,
+  // Edge function hard limit is ~60s. We leave ~15s margin for setup/teardown.
+  // If the prediction isn't done in time we return 'processing' and the client
+  // polls generation_videos.replicate_prediction_id (already persisted).
+  timeoutMs = 45_000,
 ): Promise<{ status: string; output?: string | string[]; error?: string }> {
   const start = Date.now();
   const url = `https://api.replicate.com/v1/predictions/${predictionId}`;

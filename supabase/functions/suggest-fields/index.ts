@@ -84,6 +84,7 @@ Page Content (first 3000 chars):
 ${pageContent.substring(0, 3000)}`;
 
     const aiResult = await generateWithClaude(prompt, {
+      task: 'suggest_fields',
       maxTokens: 2000,
     });
 

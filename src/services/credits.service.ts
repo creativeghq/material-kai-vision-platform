@@ -162,26 +162,18 @@ export const creditsAPI = {
     // Model pricing per 1M tokens (in USD) - synced with ai_model_pricing DB table
     // Last synced: 2026-02-15
     const pricing: Record<string, { input: number; output: number }> = {
-      // Claude Models
-      'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
-      'claude-haiku-4-5': { input: 1.00, output: 5.00 },
-      'claude-opus-4-5': { input: 5.00, output: 25.00 },
-      'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-      'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
+      // Claude Models — canonical 3 latest-tier
+      'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+      'claude-sonnet-4-7':          { input:  3.00, output: 15.00 },
+      'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
-      // OpenAI Models
-      'gpt-5': { input: 5.00, output: 15.00 },
-      'gpt-5.2': { input: 7.00, output: 21.00 },
-      'gpt-5.2-mini': { input: 1.00, output: 3.00 },
+      // OpenAI Embeddings (chat models removed — platform uses Claude only)
       'text-embedding-3-small': { input: 0.02, output: 0.00 },
       'text-embedding-3-large': { input: 0.13, output: 0.00 },
 
       // Voyage AI Embeddings
-      'voyage-3.5': { input: 0.06, output: 0.00 },
-      'voyage-3.5-lite': { input: 0.02, output: 0.00 },
-      'voyage-3': { input: 0.06, output: 0.00 },
-      'voyage-3-lite': { input: 0.02, output: 0.00 },
-      'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
+      'voyage-4':   { input: 0.06, output: 0.00 },
+      'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
 
       // Qwen Vision Models (HuggingFace Endpoint - 32B only)
       'qwen3-vl-32b': { input: 0.40, output: 0.40 },
@@ -206,7 +198,7 @@ export const creditsAPI = {
       };
     }
 
-    const modelPricing = pricing[modelName] || pricing['gpt-5.2-mini'];
+    const modelPricing = pricing[modelName] || pricing['claude-haiku-4-5'];
 
     const inputCost = (inputTokens / 1_000_000) * modelPricing.input;
     const outputCost = (outputTokens / 1_000_000) * modelPricing.output;

@@ -38,6 +38,79 @@ import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 import { createKlingAI } from 'npm:@ai-sdk/klingai';
 import { z, type ZodType } from 'npm:zod@3';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+// ── Background AI-call logger ────────────────────────────────────────────────
+// Every call through generateWithGemini / generateWithClaude is automatically
+// recorded in ai_call_logs and ai_usage_logs (cost + tokens). Fire-and-forget
+// so a logging failure never breaks the actual AI call. Pricing tables match
+// AI_PRICING in _shared/ai-logger.ts. Markup is applied as 1.5×.
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+const _MARKUP = 1.5;
+const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
+  // Anthropic Claude
+  'claude-opus-4-7':   { input: 15.00, output: 75.00 },
+  'claude-sonnet-4-7': { input:  3.00, output: 15.00 },
+  'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
+  // Google Gemini (per Google AI Studio pricing)
+  'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
+  'gemini-3.1-pro':         { input: 2.00, output: 12.00 },
+};
+
+async function _logTrackedCall(opts: {
+  task: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  errorMessage?: string;
+}): Promise<void> {
+  if (!_logSupabase) return;
+  try {
+    const matchKey = Object.keys(_PRICING_PER_M_TOKENS).find(
+      (k) => opts.model === k || opts.model.startsWith(k),
+    );
+    const price = matchKey ? _PRICING_PER_M_TOKENS[matchKey] : null;
+    const rawCost = price
+      ? (opts.inputTokens / 1_000_000) * price.input +
+        (opts.outputTokens / 1_000_000) * price.output
+      : 0;
+    const billedCost = rawCost * _MARKUP;
+
+    // ai_call_logs (developer-facing detail)
+    await _logSupabase.from('ai_call_logs').insert({
+      task: opts.task,
+      model: opts.model,
+      input_tokens: opts.inputTokens,
+      output_tokens: opts.outputTokens,
+      cost: billedCost,
+      latency_ms: opts.latencyMs,
+      action: opts.errorMessage ? 'fallback_to_rules' : 'use_ai_result',
+      error_message: opts.errorMessage ?? null,
+    });
+
+    // ai_usage_logs (dashboard-facing)
+    await _logSupabase.from('ai_usage_logs').insert({
+      operation_type: opts.task,
+      model_name: opts.model,
+      input_tokens: opts.inputTokens,
+      output_tokens: opts.outputTokens,
+      raw_cost_usd: rawCost,
+      billed_cost_usd: billedCost,
+      markup_multiplier: _MARKUP,
+      total_cost_usd: billedCost,
+      input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * _MARKUP : 0,
+      output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * _MARKUP : 0,
+    });
+  } catch (e) {
+    console.warn('[ai-client] _logTrackedCall failed (non-fatal):', e);
+  }
+}
 
 // ── Provider instances ──
 const google = createGoogleGenerativeAI({ apiKey: GOOGLE_API_KEY });
@@ -46,7 +119,7 @@ const klingai = createKlingAI({ accessKeyId: KLINGAI_ACCESS_KEY, secretAccessKey
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
-const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-7';
 
 // ── Types ──
 export interface AIGenerateConfig {
@@ -58,6 +131,13 @@ export interface AIGenerateConfig {
   maxTokens?: number;
   /** Gemini thinking level for reasoning tasks */
   thinkingLevel?: 'none' | 'low' | 'medium' | 'high';
+  /**
+   * Task label written to ai_call_logs / ai_usage_logs. Used by the cost
+   * dashboard to attribute spend to the originating feature (e.g.
+   * 'seo_write', 'suggest_fields', 'ai_rerank'). Defaults to a generic
+   * label if omitted, but callers should always pass one.
+   */
+  task?: string;
 }
 
 export interface AIGenerateResult<T = string> {
@@ -81,36 +161,60 @@ export async function generateWithGemini(
   config?: AIGenerateConfig & { systemPrompt?: string },
 ): Promise<AIGenerateResult<string>> {
   const modelId = config?.model || DEFAULT_GEMINI_MODEL;
+  const _start = Date.now();
 
-  const result = await generateText({
-    model: google(modelId),
-    system: config?.systemPrompt,
-    prompt,
-    temperature: config?.temperature ?? 0.7,
-    maxTokens: config?.maxTokens ?? 4096,
-    providerOptions: config?.thinkingLevel
-      ? {
-          google: {
-            thinkingConfig: {
-              thinkingLevel: config.thinkingLevel,
+  try {
+    const result = await generateText({
+      model: google(modelId),
+      system: config?.systemPrompt,
+      prompt,
+      temperature: config?.temperature ?? 0.7,
+      maxTokens: config?.maxTokens ?? 4096,
+      providerOptions: config?.thinkingLevel
+        ? {
+            google: {
+              thinkingConfig: {
+                thinkingLevel: config.thinkingLevel,
+              },
             },
-          },
-        }
-      : undefined,
-  });
+          }
+        : undefined,
+    });
 
-  const usage = await result.usage;
+    const usage = await result.usage;
+    const inputTokens = usage?.promptTokens ?? 0;
+    const outputTokens = usage?.completionTokens ?? 0;
 
-  return {
-    output: result.text,
-    text: result.text,
-    usage: {
-      inputTokens: usage?.promptTokens ?? 0,
-      outputTokens: usage?.completionTokens ?? 0,
-      totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
-    },
-    model: modelId,
-  };
+    // Auto-track every Gemini call (fire-and-forget)
+    void _logTrackedCall({
+      task: config?.task ?? 'gemini_text_generation',
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.text,
+      text: result.text,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+      },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: config?.task ?? 'gemini_text_generation',
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // ── Gemini: Structured JSON output ──
@@ -120,37 +224,60 @@ export async function generateStructuredWithGemini<T>(
   config?: AIGenerateConfig & { systemPrompt?: string },
 ): Promise<AIGenerateResult<T>> {
   const modelId = config?.model || DEFAULT_GEMINI_MODEL;
+  const _start = Date.now();
 
-  const result = await generateText({
-    model: google(modelId),
-    system: config?.systemPrompt,
-    prompt,
-    temperature: config?.temperature ?? 0.3,
-    maxTokens: config?.maxTokens ?? 4096,
-    output: Output.object({ schema }),
-    providerOptions: config?.thinkingLevel
-      ? {
-          google: {
-            thinkingConfig: {
-              thinkingLevel: config.thinkingLevel,
+  try {
+    const result = await generateText({
+      model: google(modelId),
+      system: config?.systemPrompt,
+      prompt,
+      temperature: config?.temperature ?? 0.3,
+      maxTokens: config?.maxTokens ?? 4096,
+      output: Output.object({ schema }),
+      providerOptions: config?.thinkingLevel
+        ? {
+            google: {
+              thinkingConfig: {
+                thinkingLevel: config.thinkingLevel,
+              },
             },
-          },
-        }
-      : undefined,
-  });
+          }
+        : undefined,
+    });
 
-  const usage = await result.usage;
+    const usage = await result.usage;
+    const inputTokens = usage?.promptTokens ?? 0;
+    const outputTokens = usage?.completionTokens ?? 0;
 
-  return {
-    output: result.output as T,
-    text: result.text,
-    usage: {
-      inputTokens: usage?.promptTokens ?? 0,
-      outputTokens: usage?.completionTokens ?? 0,
-      totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
-    },
-    model: modelId,
-  };
+    void _logTrackedCall({
+      task: config?.task ?? 'gemini_structured_generation',
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.output as T,
+      text: result.text,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+      },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: config?.task ?? 'gemini_structured_generation',
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // ── Claude: Text generation ──
@@ -159,27 +286,50 @@ export async function generateWithClaude(
   config?: AIGenerateConfig & { systemPrompt?: string },
 ): Promise<AIGenerateResult<string>> {
   const modelId = config?.model || DEFAULT_CLAUDE_MODEL;
+  const _start = Date.now();
 
-  const result = await generateText({
-    model: anthropic(modelId),
-    system: config?.systemPrompt,
-    prompt,
-    temperature: config?.temperature ?? 0.7,
-    maxTokens: config?.maxTokens ?? 4096,
-  });
+  try {
+    const result = await generateText({
+      model: anthropic(modelId),
+      system: config?.systemPrompt,
+      prompt,
+      temperature: config?.temperature ?? 0.7,
+      maxTokens: config?.maxTokens ?? 4096,
+    });
 
-  const usage = await result.usage;
+    const usage = await result.usage;
+    const inputTokens = usage?.promptTokens ?? 0;
+    const outputTokens = usage?.completionTokens ?? 0;
 
-  return {
-    output: result.text,
-    text: result.text,
-    usage: {
-      inputTokens: usage?.promptTokens ?? 0,
-      outputTokens: usage?.completionTokens ?? 0,
-      totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
-    },
-    model: modelId,
-  };
+    void _logTrackedCall({
+      task: config?.task ?? 'claude_text_generation',
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.text,
+      text: result.text,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+      },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: config?.task ?? 'claude_text_generation',
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // ── Claude: Structured JSON output ──
@@ -189,28 +339,51 @@ export async function generateStructuredWithClaude<T>(
   config?: AIGenerateConfig & { systemPrompt?: string },
 ): Promise<AIGenerateResult<T>> {
   const modelId = config?.model || DEFAULT_CLAUDE_MODEL;
+  const _start = Date.now();
 
-  const result = await generateText({
-    model: anthropic(modelId),
-    system: config?.systemPrompt,
-    prompt,
-    temperature: config?.temperature ?? 0.3,
-    maxTokens: config?.maxTokens ?? 4096,
-    output: Output.object({ schema }),
-  });
+  try {
+    const result = await generateText({
+      model: anthropic(modelId),
+      system: config?.systemPrompt,
+      prompt,
+      temperature: config?.temperature ?? 0.3,
+      maxTokens: config?.maxTokens ?? 4096,
+      output: Output.object({ schema }),
+    });
 
-  const usage = await result.usage;
+    const usage = await result.usage;
+    const inputTokens = usage?.promptTokens ?? 0;
+    const outputTokens = usage?.completionTokens ?? 0;
 
-  return {
-    output: result.output as T,
-    text: result.text,
-    usage: {
-      inputTokens: usage?.promptTokens ?? 0,
-      outputTokens: usage?.completionTokens ?? 0,
-      totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
-    },
-    model: modelId,
-  };
+    void _logTrackedCall({
+      task: config?.task ?? 'claude_structured_generation',
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.output as T,
+      text: result.text,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+      },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: config?.task ?? 'claude_structured_generation',
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // ── Gemini: Image generation + editing ──

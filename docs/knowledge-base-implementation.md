@@ -108,7 +108,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 
 6. **POST `/api/kb/search`** - Search documents
    - **Semantic Search:** Vector similarity using pgvector cosine distance
-     - Generates embedding for search query using Voyage AI voyage-3.5 (updated 2026-04)
+     - Generates embedding for search query using Voyage AI voyage-4 (updated 2026-04)
      - Compares against stored document embeddings using `<=>` operator
      - Returns results with similarity scores (0.0 - 1.0)
      - Minimum threshold: 0.5 (configurable)
@@ -202,7 +202,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 
 Stored in `kb_docs` table:
 - `text_embedding` - The 1024D vector
-- `embedding_model` - 'voyage-3.5' (updated 2026-04)
+- `embedding_model` - 'voyage-4' (updated 2026-04)
 - `embedding_generated_at` - Timestamp
 - `embedding_status` - 'pending', 'success', 'failed'
 - `embedding_error_message` - Error details if failed
@@ -273,7 +273,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 - **Backend:** FastAPI (Python)
 - **Database:** Supabase (PostgreSQL)
-- **Embeddings:** Voyage AI voyage-3.5 (1024D, updated 2026-04)
+- **Embeddings:** Voyage AI voyage-4 (1024D, updated 2026-04)
 - **PDF Extraction:** PyMuPDF (fitz)
 - **Vector Search:** pgvector with ivfflat index
 - **Security:** Row Level Security (RLS)

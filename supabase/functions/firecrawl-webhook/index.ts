@@ -103,6 +103,20 @@ Deno.serve(async (req: Request) => {
       } else {
         console.log(`[firecrawl-webhook] Stored ${pageRows.length} pages`);
       }
+
+      // Track Firecrawl spend (1 credit per page) — owner is the session creator
+      if (session.user_id) {
+        try {
+          const { debitExternalServiceCredits } = await import('../_shared/credit-utils.ts');
+          await debitExternalServiceCredits(
+            supabase, session.user_id, 'firecrawl-scrape', 'scrape_session_crawl',
+            pageRows.length,
+            { session_id: sessionId, crawl_id: crawlId, workspace_id: session.workspace_id },
+          );
+        } catch (logErr) {
+          console.warn('[firecrawl-webhook] credit-utils logging failed:', logErr);
+        }
+      }
     }
 
     // Update session page counts

@@ -11,40 +11,24 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// AI Pricing Configuration (synced with ai_model_pricing DB table and ai_pricing.py)
-// Last synced: 2026-03-30
+// AI Pricing Configuration (synced with ai_model_pricing DB table)
+// Canonical 3 Claude models only — legacy variants and OpenAI chat models removed.
 const AI_PRICING = {
   // Anthropic Claude Models (per 1M tokens)
   claude: {
-    'claude-haiku-4-5': { input: 1.00, output: 5.00 },
-    'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
-    'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
-    'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
-    'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
-    'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
-    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-    'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-    'claude-opus-4-5': { input: 5.00, output: 25.00 },
+    'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+    'claude-sonnet-4-7':          { input:  3.00, output: 15.00 },
+    'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   },
-  // OpenAI GPT Models (per 1M tokens)
-  gpt: {
-    'gpt-5': { input: 5.00, output: 15.00 },
-    'gpt-5.2': { input: 7.00, output: 21.00 },
-    'gpt-5.2-mini': { input: 1.00, output: 3.00 },
-  },
-  // OpenAI Embeddings (per 1M tokens)
+  // OpenAI Embeddings (per 1M tokens) — embeddings only, chat models removed
   embeddings: {
     'text-embedding-3-small': { input: 0.02, output: 0.00 },
     'text-embedding-3-large': { input: 0.13, output: 0.00 },
-    'text-embedding-ada-002': { input: 0.10, output: 0.00 },
   },
   // Voyage AI Embeddings (per 1M tokens)
   voyage: {
-    'voyage-3.5': { input: 0.06, output: 0.00 },
-    'voyage-3.5-lite': { input: 0.02, output: 0.00 },
-    'voyage-3': { input: 0.06, output: 0.00 },
-    'voyage-3-lite': { input: 0.02, output: 0.00 },
-    'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
+    'voyage-4': { input: 0.06, output: 0.00 },
+    'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical logs
   },
   // Qwen Vision Models (time-based on HuggingFace, token pricing here is approximate)
   qwen: {
@@ -103,11 +87,7 @@ export class AICallLogger {
     let pricing: { input: number; output: number } | undefined;
     
     if (provider === 'anthropic' || modelLower.includes('claude')) {
-      pricing = Object.entries(AI_PRICING.claude).find(([key]) => 
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (provider === 'openai' || modelLower.includes('gpt')) {
-      pricing = Object.entries(AI_PRICING.gpt).find(([key]) => 
+      pricing = Object.entries(AI_PRICING.claude).find(([key]) =>
         modelLower.includes(key.toLowerCase())
       )?.[1];
     } else if (provider === 'together' || modelLower.includes('qwen')) {

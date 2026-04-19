@@ -859,7 +859,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                       );
                       if (embeddingStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'Voyage AI voyage-3.5',
+                          name: 'Voyage AI voyage-4',
                           purpose: '1024D text embeddings for semantic search',
                           status: '✓ Used',
                           icon: <Zap className="h-3 w-3 text-yellow-600" />,

@@ -67,7 +67,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **AI Services**:
 - Anthropic (Claude Sonnet 4.5, Claude Haiku 4.5 + built-in web search)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
-- Voyage AI (voyage-3.5, primary text/understanding embeddings, 1024D)
+- Voyage AI (voyage-4, primary text/understanding embeddings, 1024D)
 - HuggingFace Endpoint (Qwen3-VL 32B Vision)
 - SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
@@ -91,7 +91,7 @@ MIVAA API (FastAPI) → Creates background job
   1. Focused Extraction (product pages only)
   2. Text Extraction (PyMuPDF4LLM)
   3. Semantic Chunking (Anthropic)
-  4. Text Embeddings (Voyage AI voyage-3.5, 1024D)
+  4. Text Embeddings (Voyage AI voyage-4, 1024D)
   5. Image Extraction
   6. Image Analysis (Qwen3-VL 32B → understanding embeddings via Voyage AI)
   7-10. Multi-Vector SigLIP2 Embeddings (768D halfvec: visual, color, texture, style, material)
@@ -135,7 +135,7 @@ Real-time updates → Frontend displays results
 **text-embedding-3-small** (retired 2026-04):
 - **Use Cases**: Text chunk embeddings (historical)
 - **Dimensions**: 1536
-- **Status**: Retired in 2026-04. Primary and only text embedder is now Voyage AI voyage-3.5 (1024D, stored as halfvec in VECS). OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.
+- **Status**: Retired in 2026-04. Primary and only text embedder is now Voyage AI voyage-4 (1024D, stored as halfvec in VECS). OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.
 
 #### 3. HuggingFace Endpoint - Qwen3-VL 32B Vision
 
@@ -167,7 +167,7 @@ Real-time updates → Frontend displays results
 
 The platform generates **7 types of embeddings** stored as `halfvec` (float16, 50% storage savings):
 
-1. **Text Embeddings** (1024D) - Voyage AI voyage-3.5 (primary)
+1. **Text Embeddings** (1024D) - Voyage AI voyage-4 (primary)
 2. **Visual Embeddings** (768D) - SigLIP2 via HuggingFace Endpoint
 3. **Understanding Embeddings** (1024D) - Voyage AI from Qwen3-VL structured analysis (enables spec-based search)
 4. **Color Embeddings** (768D) - SigLIP2 color-guided
@@ -219,7 +219,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - **Checkpoint**: CHUNKS_CREATED
 
 **Stage 7: Text Embedding Generation (AI)**
-- Voyage AI voyage-3.5: Generate 1024D embeddings (stored as halfvec)
+- Voyage AI voyage-4: Generate 1024D embeddings (stored as halfvec)
 - Store in pgvector for similarity search
 - Link embeddings to chunks
 - **Checkpoint**: TEXT_EMBEDDINGS_GENERATED
@@ -307,7 +307,7 @@ The platform uses **6 embedding types** for comprehensive search:
 
 **Semantic Search** (Text):
 - Query: "sustainable wood materials"
-- Embedding: Voyage AI voyage-3.5 (1024D, updated 2026-04)
+- Embedding: Voyage AI voyage-4 (1024D, updated 2026-04)
 - Similarity: Cosine similarity via pgvector (halfvec)
 - Accuracy: 85%+
 

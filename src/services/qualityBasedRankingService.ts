@@ -36,7 +36,7 @@ export interface AIReRankingRequest {
   results: SearchResult[];
   maxResults?: number;
   includeExplanations?: boolean;
-  model?: 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+  model?: 'claude-sonnet-4-7' | 'claude-haiku-4-5';
 }
 
 /**
@@ -207,7 +207,7 @@ export async function aiReRanking(
   request: AIReRankingRequest,
 ): Promise<AIReRankingResponse> {
   const startTime = Date.now();
-  const model = request.model || 'claude-sonnet-4-5';
+  const model = request.model || 'claude-sonnet-4-7';
 
   try {
     // Call Supabase Edge Function (server-side, API key never exposed to client)
@@ -345,7 +345,7 @@ export async function compareRankingMethods(
   query: string,
   results: SearchResult[],
   options: {
-    model?: 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+    model?: 'claude-sonnet-4-7' | 'claude-haiku-4-5';
     weights?: RankingWeights;
   } = {},
 ): Promise<RankingComparison> {

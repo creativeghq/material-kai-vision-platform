@@ -17,7 +17,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | GPT-4o | OpenAI | Alternative discovery | 94%+ accuracy | $2.50 input / $10 output |
 | GPT-4o Mini | OpenAI | Lightweight tasks | Fast & cheap | $0.15 input / $0.60 output |
 | **Text Embeddings** |
-| voyage-3.5 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
+| voyage-4 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
 | voyage-3 | Voyage AI | Alternative text embeddings | 1024D vectors | $0.06 input |
 | voyage-3-lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
 | text-embedding-3-small | OpenAI | **LEGACY** (CI changelog only, retired from production 2026-04) | 1536D vectors | $0.02 input |
@@ -100,7 +100,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 4. Voyage AI voyage-3.5 (updated 2026-04)
+### 4. Voyage AI voyage-4 (updated 2026-04)
 
 **Purpose**: Generate text embeddings for semantic search (sole production text embedder)
 
@@ -243,7 +243,7 @@ Additionally, an **Understanding Embedding** (1024D, Voyage AI from Qwen3-VL vis
 |-------|---------------|-----------------|---------|
 | 0 | Claude Sonnet 4.5 | GPT-4o | Product discovery |
 | 2 | Anthropic Chunking | - | Text segmentation |
-| 4 | voyage-3.5 (Voyage AI) | - | Text embeddings (1024D, updated 2026-04) |
+| 4 | voyage-4 (Voyage AI) | - | Text embeddings (1024D, updated 2026-04) |
 | 6 | Qwen3-VL 17B | - | Image analysis |
 | 7-10 | SLIG (SigLIP2, 5 types) | - | Visual embeddings (768D) |
 | 11 | Claude Haiku 4.5 | Claude Sonnet 4.5 | Product validation |
@@ -278,7 +278,7 @@ Additionally, an **Understanding Embedding** (1024D, Voyage AI from Qwen3-VL vis
 - `SLIG_ENDPOINT_URL` — HuggingFace SLIG endpoint URL
 - `SLIG_ENDPOINT_TOKEN` — HuggingFace SLIG endpoint token
 
-The model configuration maps each task to its designated model: `discovery` uses `claude-sonnet-4-5`, `validation` uses `claude-haiku-4-5`, `text_embeddings` uses `voyage-3.5`, `vision` uses `Qwen/Qwen3-VL-32B-Instruct`, and `visual_embeddings` uses `SLIG`.
+The model configuration maps each task to its designated model: `discovery` uses `claude-sonnet-4-5`, `validation` uses `claude-haiku-4-5`, `text_embeddings` uses `voyage-4`, `vision` uses `Qwen/Qwen3-VL-32B-Instruct`, and `visual_embeddings` uses `SLIG`.
 
 ---
 

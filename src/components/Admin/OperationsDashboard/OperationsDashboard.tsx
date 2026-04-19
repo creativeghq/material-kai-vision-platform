@@ -942,7 +942,7 @@ const OperationsDashboardInner: React.FC = () => {
                           <div className="text-sm text-blue-700">Est. Total Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
                             ${agentChats.reduce((sum, chat) => {
-                              const model = chat.metadata?.model || 'claude-sonnet-4-6-20260217';
+                              const model = chat.metadata?.model || 'claude-sonnet-4-7';
                               const inputTokens = estimateTokens(chat.content);
                               const outputTokens = estimateTokens(chat.content);
                               return sum + calculateCost(model, inputTokens, outputTokens).total;
@@ -1015,7 +1015,7 @@ const OperationsDashboardInner: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {agentChats.slice(0, 20).map((chat) => {
-                      const model = chat.metadata?.model || 'claude-sonnet-4-6-20260217';
+                      const model = chat.metadata?.model || 'claude-sonnet-4-7';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
@@ -1050,7 +1050,7 @@ const OperationsDashboardInner: React.FC = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                            <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
                               {model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.slice(0, 12)}
                             </code>
                           </TableCell>
@@ -1209,7 +1209,7 @@ const OperationsDashboardInner: React.FC = () => {
                             {log.endpoint}
                           </TableCell>
                           <TableCell>
-                            <Badge className="border border-gray-300 bg-white text-gray-700">
+                            <Badge variant="outline" className="font-mono text-xs">
                               {log.method}
                             </Badge>
                           </TableCell>
@@ -1220,7 +1220,7 @@ const OperationsDashboardInner: React.FC = () => {
                           </TableCell>
                           <TableCell>{log.response_time_ms || 0}ms</TableCell>
                           <TableCell>
-                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                            <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
                               {log.api_key_id
                                 ? log.api_key_id.slice(0, 8) + '...'
                                 : 'Anonymous'}
@@ -1693,7 +1693,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5.2, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP-SO400M, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models — Claude Opus 4.7, Claude Sonnet 4.7, Claude Haiku 4.5, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
@@ -1887,155 +1887,36 @@ const OperationsDashboardInner: React.FC = () => {
                       ))}
                       {modelUsage.length === 0 && (
                         <>
-                          {/* Chat/Completion Models */}
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">GPT-5</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">GPT-5.2</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">GPT-5.2-mini</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">Claude Sonnet 4.5</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">Claude Haiku 4.5</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">Qwen3-VL-8B-Instruct</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          {/* Embedding Models */}
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">text-embedding-3-small</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">SigLIP ViT-SO400M</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">CLIP ViT-Base</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">0.0%</Badge>
-                            </TableCell>
-                          </TableRow>
+                          {/* Placeholder rows — canonical 3 Claude models + vision/embedding */}
+                          {[
+                            { name: 'Claude Opus 4.7' },
+                            { name: 'Claude Sonnet 4.7' },
+                            { name: 'Claude Haiku 4.5' },
+                            { name: 'Qwen3-VL-32B' },
+                            { name: 'text-embedding-3-small' },
+                            { name: 'Voyage 3.5' },
+                            { name: 'SLIG 768D' },
+                          ].map((m) => (
+                            <TableRow key={m.name}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <Bot className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">{m.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
+                              <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary">0.0%</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                              No AI usage data yet. All models (GPT-5.2, GPT-5.2-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Qwen3-VL-8B, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
+                              No AI usage data yet. Models will show actual data once API calls are made.
                             </TableCell>
                           </TableRow>
                         </>

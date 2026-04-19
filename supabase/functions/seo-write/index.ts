@@ -91,8 +91,9 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
     const systemPrompt = buildWritingSystemPrompt(baseSystemPrompt, plan, brief);
     const userPrompt = buildWritingUserPrompt(plan, brief);
 
-    // Call Claude Sonnet for writing
+    // Call Claude Sonnet for writing (auto-tracked)
     const result = await generateWithClaude(userPrompt, {
+      task: 'seo_write',
       systemPrompt,
       temperature: 0.7,
       maxTokens: 8192,

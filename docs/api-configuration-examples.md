@@ -32,7 +32,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 - Classification: Qwen3-VL-32B-Instruct - HuggingFace endpoint
 - Discovery: Claude Sonnet 4.5
 - Metadata: Claude
-- Text Embeddings: Voyage AI voyage-3.5 (1024D) → OpenAI fallback (1024D)
+- Text Embeddings: Voyage AI voyage-4 (1024D) → OpenAI fallback (1024D)
 
 ### Custom Configuration
 

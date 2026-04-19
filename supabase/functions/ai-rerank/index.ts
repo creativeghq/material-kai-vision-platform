@@ -29,7 +29,7 @@ interface ReRankRequest {
   results: SearchResult[];
   maxResults?: number;
   includeExplanations?: boolean;
-  model?: 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+  model?: 'claude-sonnet-4-7' | 'claude-haiku-4-5';
 }
 
 interface ReRankResponse {
@@ -63,7 +63,7 @@ Deno.serve(withApiLogging('ai-rerank', async (req) => {
   }
 
   try {
-    const { query, results, maxResults, includeExplanations = false, model = 'claude-sonnet-4-5' } = requestData;
+    const { query, results, maxResults, includeExplanations = false, model = 'claude-sonnet-4-7' } = requestData;
 
     // Validate input
     if (!query || !results || !Array.isArray(results)) {
@@ -106,13 +106,12 @@ Response format:
   ${includeExplanations ? '"explanations": { "0": "explanation for result 0", "1": "explanation for result 1", ... }' : ''}
 }`;
 
-    // Map model selection to full model ID
-    const modelId = model === 'claude-sonnet-4-5'
-      ? 'claude-sonnet-4-6'
-      : 'claude-haiku-4-5-20251001';
+    // Both options are already canonical IDs
+    const modelId = model;
 
-    // Call Claude via unified AI SDK client
+    // Call Claude via unified AI SDK client (auto-tracked in ai_call_logs)
     const aiResult = await generateWithClaude(prompt, {
+      task: 'ai_rerank',
       model: modelId,
       maxTokens: 4096,
       temperature: 0.1,
@@ -140,7 +139,7 @@ Response format:
 
     // Calculate cost (approximate)
     const { inputTokens, outputTokens } = aiResult.usage;
-    const costPerMToken = model === 'claude-sonnet-4-5' ? 3.0 : 1.0;
+    const costPerMToken = model === 'claude-sonnet-4-7' ? 3.0 : 1.0;
     const cost = ((inputTokens + outputTokens) / 1_000_000) * costPerMToken;
 
     const processingTimeMs = Date.now() - startTime;

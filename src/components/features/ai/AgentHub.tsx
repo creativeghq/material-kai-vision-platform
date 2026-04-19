@@ -103,7 +103,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-6-20260217',
+    defaultModel: 'anthropic/claude-sonnet-4-7',
   },
   {
     id: 'interior-designer',
@@ -113,7 +113,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-6-20260217',
+    defaultModel: 'anthropic/claude-sonnet-4-7',
   },
   {
     id: 'demo',
@@ -123,16 +123,16 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
-    defaultModel: 'anthropic/claude-haiku-4-5-20251001',
+    defaultModel: 'anthropic/claude-haiku-4-5',
   },
 ];
 
 // AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
-  // Language Models
-  { id: 'anthropic/claude-sonnet-4-6-20260217', name: 'Claude Sonnet 4.6', provider: 'anthropic', type: 'language' },
-  { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', type: 'language' },
-  { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai', type: 'language' },
+  // Language Models — Claude only (canonical 3 latest-tier)
+  { id: 'anthropic/claude-opus-4-7',           name: 'Claude Opus 4.7',   provider: 'anthropic', type: 'language' },
+  { id: 'anthropic/claude-sonnet-4-7',         name: 'Claude Sonnet 4.7', provider: 'anthropic', type: 'language' },
+  { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5',  provider: 'anthropic', type: 'language' },
 
   // Vision Models (HuggingFace Endpoint - 32B only)
   { id: 'huggingface/Qwen/Qwen3-VL-32B-Instruct', name: 'Qwen3-VL-32B', provider: 'huggingface', type: 'vision' },
@@ -142,7 +142,7 @@ const AI_MODELS = [
   { id: 'openai/clip-vit-base-patch32', name: 'CLIP-ViT-Base', provider: 'openai', type: 'visual-embedding' },
 
   // Text Embedding Models
-  { id: 'voyage/voyage-3.5', name: 'Voyage AI 3.5', provider: 'voyage', type: 'text-embedding' },
+  { id: 'voyage/voyage-4', name: 'Voyage AI 4', provider: 'voyage', type: 'text-embedding' },
   { id: 'openai/text-embedding-3-small', name: 'OpenAI Embedding 3 Small', provider: 'openai', type: 'text-embedding' },
 ];
 
@@ -335,7 +335,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-6-20260217',
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-7',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
@@ -411,6 +411,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     roomType?: string;
     style?: string;
   } | null>(null);
+
+  // Image Lightbox State (full-size view of a generated image)
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
 
   // Voice input hook
   const {
@@ -2284,8 +2287,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           processingTimeMs={message.designData.processingTimeMs}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                           onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                          onMaterialClick={(_materialId) => {
-                            // TODO: open material detail panel
+                          onMaterialClick={(materialId) => {
+                            // Open the same materials modal pre-scoped to the clicked material.
+                            // If the id doesn't match (user clicked stale data), fall back to the full list.
+                            const all = message.designData.matchedMaterials || [];
+                            const single = all.filter((m: any) => m?.id === materialId || m?.material_id === materialId);
+                            setSelectedMaterialsData({
+                              materials: single.length > 0 ? single : all,
+                              spatialAnalysis: message.designData.spatialAnalysis,
+                              roomType: message.designData.parsedRequest?.room_type,
+                              style: message.designData.parsedRequest?.style,
+                            });
+                            setShowMaterialModal(true);
                           }}
                           onFindMaterials={async (imageUrl) => {
                             const findMaterialsPrompt = `Find materials and products that match this interior design image: ${imageUrl}`;
@@ -2531,8 +2544,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               models={message.generation_job.models}
                               workspaceId={workspaceId}
                               roomType={message.generation_job.room_type}
-                              onImageClick={(_url, _name) => {
-                                // TODO: open image lightbox
+                              onImageClick={(url, name) => {
+                                setLightboxImage({ url, name });
                               }}
                               onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                               onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
@@ -3348,6 +3361,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             });
           }}
         />
+      )}
+
+      {/* Image Lightbox — full-size view of generated images */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setLightboxImage(null)}
+          role="dialog"
+          aria-label={lightboxImage.name || 'Image preview'}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxImage.url}
+            alt={lightboxImage.name || 'Generated image'}
+            className="max-h-[92vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {lightboxImage.name && (
+            <div className="absolute bottom-6 left-1/2 max-w-[80vw] -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-sm text-white">
+              {lightboxImage.name}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

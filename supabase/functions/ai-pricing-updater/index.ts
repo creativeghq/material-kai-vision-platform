@@ -22,25 +22,18 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
   fallback_prices: Record<string, { input: number; output: number }>;
 }> = {
   anthropic: {
-    // Anthropic doesn't have a public pricing API, but we track their published prices
-    // https://www.anthropic.com/pricing (verified 2026-03-30)
+    // Anthropic published pricing — https://www.anthropic.com/pricing
+    // Canonical 3 latest-tier models only.
     fallback_prices: {
-      'claude-haiku-4-5': { input: 1.00, output: 5.00 },
-      'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
-      'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
-      'claude-opus-4-5': { input: 5.00, output: 25.00 },
-      'claude-3-haiku': { input: 0.25, output: 1.25 },
-      'claude-3-sonnet': { input: 3.00, output: 15.00 },
-      'claude-3-opus': { input: 15.00, output: 75.00 },
+      'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+      'claude-sonnet-4-7':          { input:  3.00, output: 15.00 },
+      'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
     },
   },
   openai: {
-    // OpenAI pricing (verified 2026-01-24)
+    // OpenAI embeddings only — chat models removed (platform uses Claude exclusively)
     // https://openai.com/api/pricing/
     fallback_prices: {
-      'gpt-5': { input: 5.00, output: 15.00 },
-      'gpt-5.2': { input: 7.00, output: 21.00 },
-      'gpt-5.2-mini': { input: 1.00, output: 3.00 },
       'text-embedding-3-small': { input: 0.02, output: 0.00 },
       'text-embedding-3-large': { input: 0.13, output: 0.00 },
     },
@@ -49,11 +42,8 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // Voyage AI pricing (verified 2026-01-24)
     // https://docs.voyageai.com/docs/pricing
     fallback_prices: {
-      'voyage-3.5': { input: 0.06, output: 0.06 },
-      'voyage-3.5-lite': { input: 0.02, output: 0.02 },
-      'voyage-3': { input: 0.06, output: 0.06 },
-      'voyage-3-lite': { input: 0.02, output: 0.02 },
-      'voyage-large-2': { input: 0.12, output: 0.12 },
+      'voyage-4': { input: 0.06, output: 0.00 },
+      'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
     },
   },
   qwen: {

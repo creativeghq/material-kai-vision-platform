@@ -55,11 +55,11 @@
 
 #### text-embedding-3-small (retired from production 2026-04)
 - **Status**: Retired in 2026-04 from the production path. Still used only for the legacy CI changelog workflow.
-- **Replacement**: Voyage AI `voyage-3.5` (1024D) is now the sole production text embedder. See below.
+- **Replacement**: Voyage AI `voyage-4` (1024D) is now the sole production text embedder. See below.
 - **Dimensions**: 1536D (historical)
 - **Cost**: $0.02 per 1M tokens
 
-#### Voyage AI voyage-3.5 (production text embedder, updated 2026-04)
+#### Voyage AI voyage-4 (production text embedder, updated 2026-04)
 - **Use Cases**:
   - Text chunk embeddings
   - Semantic search
@@ -193,7 +193,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 ### PDF Processing Pipeline
 - **Stage 0A (Product Discovery)**: Claude Sonnet 4.5 or GPT-4o
 - **Stage 0B (Entity Discovery)**: Claude Sonnet 4.5 or GPT-4o
-- **Stage 2 (Text Embeddings)**: Voyage AI voyage-3.5 (1024D, updated 2026-04)
+- **Stage 2 (Text Embeddings)**: Voyage AI voyage-4 (1024D, updated 2026-04)
 - **Stage 6 (Image Classification)**: Qwen3-VL 17B Vision
 - **Stage 7 (SLIG Embeddings)**: SigLIP2 via HuggingFace cloud endpoint (768D, 5 types + understanding 1024D)
 - **Stage 8 (Image Analysis)**: Qwen3-VL 17B Vision
@@ -224,7 +224,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 
 ### High-Volume Operations (Use Cheaper Models)
 - **Quick Classification**: Claude Haiku 4.5 ($0.0025/1K tokens)
-- **Text Embeddings**: Voyage AI voyage-3.5 ($0.06/1M tokens, updated 2026-04)
+- **Text Embeddings**: Voyage AI voyage-4 ($0.06/1M tokens, updated 2026-04)
 - **Visual Embeddings**: SLIG SigLIP2 cloud endpoint (auto-pause enabled)
 
 ### High-Accuracy Operations (Use Premium Models)

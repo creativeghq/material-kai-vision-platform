@@ -81,12 +81,29 @@ export const AIModelPricingTab: React.FC = () => {
   const loadPricing = async () => {
     try {
       setLoading(true);
+
       const { data, error } = await supabase
         .from('ai_model_pricing')
         .select('*')
         .order('category', { ascending: true })
         .order('provider', { ascending: true })
         .order('model_name', { ascending: true });
+
+      // Dev-only diagnostic: surface any legacy model_keys that should never appear.
+      // Keeps prod console clean while still alerting devs running locally.
+      if (import.meta.env.DEV && data) {
+        const legacyKeys = data
+          .map((r) => r.model_key)
+          .filter((k) =>
+            /^claude-(3-|4-5-|opus-4-5|sonnet-4-5)/.test(k) || /^gpt-/.test(k),
+          );
+        if (legacyKeys.length > 0) {
+          console.error(
+            '[AIModelPricingTab] Legacy model_keys arrived from API — these should not exist:',
+            legacyKeys,
+          );
+        }
+      }
 
       if (error) throw error;
       setPricing(data || []);
@@ -491,18 +508,18 @@ export const AIModelPricingTab: React.FC = () => {
       ))}
 
       {/* Auto-Update Controls */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="dashboard-card border-primary/20">
         <CardContent className="pt-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
+              <Clock className="h-5 w-5 text-primary mt-0.5" />
               <div>
-                <p className="font-medium text-blue-900">Auto-Update Schedule</p>
-                <p className="text-sm text-blue-700">
+                <p className="font-medium text-foreground">Auto-Update Schedule</p>
+                <p className="text-sm text-muted-foreground">
                   Models with auto-update enabled will have their prices checked weekly from their source URLs.
                   The edge function runs every Sunday at midnight UTC.
                 </p>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {pricing.filter(p => p.auto_update_enabled).length} of {pricing.length} models have auto-update enabled
                 </p>
               </div>
@@ -513,13 +530,9 @@ export const AIModelPricingTab: React.FC = () => {
                 size="sm"
                 onClick={() => syncPricesNow(false)}
                 disabled={syncing}
-                className="bg-white"
+                className="rounded-full"
               >
-                {syncing ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                 Sync Now
               </Button>
               <Button
@@ -527,7 +540,7 @@ export const AIModelPricingTab: React.FC = () => {
                 size="sm"
                 onClick={() => syncPricesNow(true)}
                 disabled={syncing}
-                className="bg-white"
+                className="rounded-full"
               >
                 Sync All
               </Button>

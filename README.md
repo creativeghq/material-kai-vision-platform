@@ -65,7 +65,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 1. **Anthropic**: Claude Haiku 4.5 (fast classification/B2B search), Claude Sonnet 4.5 (deep enrichment, Jarvis agent)
 2. **OpenAI**: GPT-4o (alternative discovery), GPT-4o-mini (query parsing)
 3. **HuggingFace Endpoint**: Qwen3-VL 32B Vision (69.4% MMMU, vision analysis + understanding embeddings)
-4. **Voyage AI**: voyage-3.5 (primary text embeddings, 1024D)
+4. **Voyage AI**: voyage-4 (primary text embeddings, 1024D)
 5. **SigLIP2 (HuggingFace)**: 5 visual embedding types (visual, color, texture, style, material — 768D each)
 6. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
 7. **WorldLabs Marble**: 3D Gaussian Splat world generation (mini + plus models)
@@ -504,7 +504,7 @@ This project is proprietary software owned by Creative GHQ.
 - **OpenAI**: GPT models and embeddings
 - **Anthropic**: Claude 4.5 models + built-in web search
 - **HuggingFace**: Qwen3-VL 32B Vision
-- **Voyage AI**: voyage-3.5 text embeddings
+- **Voyage AI**: voyage-4 text embeddings
 - **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure
 - **Vercel**: Frontend hosting and deployment

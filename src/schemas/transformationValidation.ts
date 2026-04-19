@@ -36,12 +36,10 @@ const ChunkSizeConfigSchema = z
  */
 const EmbeddingConfigSchema = z.object({
   model: z.enum([
+    'voyage-4',
     'voyage-3.5',
-    'voyage-3',
-    'voyage-2',
     'text-embedding-3-small',
     'text-embedding-3-large',
-    'text-embedding-ada-002',
   ]),
   dimensions: z
     .number()

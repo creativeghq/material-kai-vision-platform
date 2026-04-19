@@ -38,7 +38,7 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
   readonly name         = 'Social Analytics Sync';
   readonly description  = 'Syncs post performance metrics from Late.dev every 2 hours';
   readonly defaultTools = [];
-  readonly defaultModel = 'claude-haiku-4-5-20251001';
+  readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;

@@ -48,7 +48,7 @@ export interface UnifiedEmbeddingConfig {
  */
 export const DEFAULT_EMBEDDING_CONFIG: UnifiedEmbeddingConfig = {
   primary: {
-    name: 'voyage-3.5',
+    name: 'voyage-4',
     provider: 'voyage',
     dimensions: 1024,
     maxTokens: 8000,

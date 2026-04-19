@@ -243,7 +243,7 @@ async function checkNow(supabase: any, userId: string, productId: string) {
     .eq('id', job.id);
 
   // Scrape prices from all sources
-  const results = await scrapeCompetitorPrices(supabase, productId, sources, job.id);
+  const results = await scrapeCompetitorPrices(supabase, productId, sources, job.id, userId);
 
   // Update job with results
   await supabase
@@ -325,7 +325,8 @@ async function scrapeCompetitorPrices(
   supabase: any,
   productId: string,
   sources: CompetitorSource[],
-  jobId: string
+  jobId: string,
+  userId?: string,
 ) {
   const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
   if (!firecrawlApiKey) {
@@ -408,6 +409,19 @@ async function scrapeCompetitorPrices(
 
       // Estimate credits consumed (Firecrawl pricing)
       creditsConsumed += 1; // 1 credit per scrape
+
+      // Track Firecrawl spend in ai_usage_logs (when triggered by a user — cron jobs skip)
+      if (userId) {
+        try {
+          const { debitExternalServiceCredits } = await import('../_shared/credit-utils.ts');
+          await debitExternalServiceCredits(
+            supabase, userId, 'firecrawl-scrape', 'price_monitoring_scrape', 1,
+            { product_id: productId, source_url: source.source_url, job_id: jobId },
+          );
+        } catch (logErr) {
+          console.warn('[price-monitoring] credit-utils logging failed:', logErr);
+        }
+      }
 
     } catch (error) {
       console.error(`Error scraping ${source.source_name}:`, error);

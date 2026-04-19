@@ -103,7 +103,7 @@ async function checkVoyageAI(): Promise<ServiceResult> {
     const res = await fetch('https://api.voyageai.com/v1/embeddings', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${VOYAGE_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'voyage-3-lite', input: 'ping' }),
+      body: JSON.stringify({ model: 'voyage-4', input: 'ping' }),
       signal: AbortSignal.timeout(10000),
     });
     const latency_ms = Date.now() - start;

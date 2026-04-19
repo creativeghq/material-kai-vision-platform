@@ -14,7 +14,7 @@ This plan outlines a comprehensive strategy for extracting metadata from **multi
 
 ### Embedding Types (7 Total, updated 2026-04)
 
-1. **text_1024** - Voyage AI voyage-3.5 text embedding (1024D) — sole text embedder (was `text_1536` OpenAI)
+1. **text_1024** - Voyage AI voyage-4 text embedding (1024D) — sole text embedder (was `text_1536` OpenAI)
 2. **visual_768** - SigLIP2 SLIG primary visual embedding (768D, cloud endpoint) → `image_slig_embeddings`
 3. **color_slig_768** - Text-guided color embedding (768D) → `image_color_embeddings`
 4. **texture_slig_768** - Text-guided texture embedding (768D) → `image_texture_embeddings`

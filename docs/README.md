@@ -56,7 +56,7 @@
 - 12+ AI models across 5 providers
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-4o-mini
-- Voyage AI: voyage-3.5 (primary text + understanding embeddings, 1024D)
+- Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
 - HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (768D visual embeddings)
 - WorldLabs Marble: 3D Gaussian Splat generation
 - Model usage by stage

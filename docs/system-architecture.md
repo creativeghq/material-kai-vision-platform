@@ -251,7 +251,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 - (text-embedding-3-small retired 2026-04 — Voyage AI is the sole text embedder)
 
 **Voyage AI**:
-- voyage-3.5 (Text + understanding embeddings, 1024D)
+- voyage-4 (Text + understanding embeddings, 1024D)
 
 **SigLIP2 (SLIG)**:
 - Visual embeddings (768D) via HuggingFace Cloud Endpoint

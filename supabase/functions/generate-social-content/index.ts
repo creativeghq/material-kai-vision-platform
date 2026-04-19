@@ -100,12 +100,32 @@ Return exactly this JSON structure:
   "best_time_hint": "Brief tip on when to post this type of content"
 }`;
 
+    const claudeStart = Date.now();
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 1500,
       messages: [{ role: 'user', content: userPrompt }],
       system: systemPrompt,
     });
+    const claudeLatencyMs = Date.now() - claudeStart;
+
+    // Track Claude usage in ai_call_logs (cost + tokens) — credits already
+    // debited upfront via debitExternalServiceCredits, so this is observability only.
+    try {
+      const { AICallLogger } = await import('../_shared/ai-logger.ts');
+      const aiLogger = new AICallLogger(supabaseUrl, supabaseServiceKey);
+      await aiLogger.logClaudeCall(
+        'social_content_generation',
+        'claude-haiku-4-5',
+        message,
+        claudeLatencyMs,
+        0.9,
+        { model_confidence: 0.9, completeness: 0.9, consistency: 0.9, validation: 0.9 },
+        'use_ai_result',
+      );
+    } catch (logErr) {
+      console.warn('[generate-social-content] Logger failed:', logErr);
+    }
 
     const rawText = message.content[0].type === 'text' ? message.content[0].text : '';
     let parsed: { captions: Array<{ variant: number; caption: string; char_count: number }>; hashtags: string[]; best_time_hint: string };

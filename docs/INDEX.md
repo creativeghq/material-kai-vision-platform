@@ -314,7 +314,7 @@ Complete documentation for Material Kai Vision Platform.
 - 12+ AI models across 5 providers
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-4o-mini
-- Voyage AI: voyage-3.5 (primary text + understanding embeddings, 1024D)
+- Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
 - HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (5 visual embedding types, 768D each)
 - WorldLabs Marble: 3D Gaussian Splat generation
 - 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
@@ -539,7 +539,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-3.5), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-4), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

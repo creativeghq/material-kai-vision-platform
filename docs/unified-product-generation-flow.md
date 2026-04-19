@@ -201,7 +201,7 @@ All three methods store embeddings in the same VECS collections:
 
 | Collection | Dimension | Model | Used By |
 |-----------|-----------|-------|---------|
-| **chunks.text_embedding** | 1024D | Voyage AI (voyage-3.5) | PDF, Web, XML |
+| **chunks.text_embedding** | 1024D | Voyage AI (voyage-4) | PDF, Web, XML |
 
 #### **Visual Embeddings**
 

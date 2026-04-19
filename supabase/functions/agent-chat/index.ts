@@ -100,13 +100,13 @@ async function initRuntime() {
   buildAgentStateAnnotation();
 
   modelHaiku = new ChatAnthropic({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-haiku-4-5',
     temperature: 0.7,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
   });
   modelSonnet = new ChatAnthropic({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-4-7',
     temperature: 1,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
@@ -734,9 +734,9 @@ function getModelForAgent(agentId: string): ChatAnthropic {
 // Get model name for logging/tracking — must stay in sync with model instances above
 function getModelNameForAgent(agentId: string): string {
   if (agentId === 'demo') {
-    return 'claude-haiku-4-5-20251001';
+    return 'claude-haiku-4-5';
   }
-  return 'claude-sonnet-4-6';
+  return 'claude-sonnet-4-7';
 }
 
 interface AgentConfig {

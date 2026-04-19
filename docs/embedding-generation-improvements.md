@@ -167,7 +167,7 @@ Understanding embeddings capture the structured knowledge from Qwen3-VL's vision
 
 1. **Qwen3-VL Analysis** → Produces structured JSON (`vision_analysis`) with material type, colors, textures, properties, OCR text
 2. **JSON → Text Conversion** → Converts structured fields into descriptive text (e.g., "Material: porcelain tile. Colors: white, grey. Texture: matte. Dimensions: 60x120cm.")
-3. **Voyage AI Embedding** → Embeds the text via `voyage-3.5` with `input_type="document"` → 1024D vector
+3. **Voyage AI Embedding** → Embeds the text via `voyage-4` with `input_type="document"` → 1024D vector
 4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D, HNSW index)
 
 ### Search Flow

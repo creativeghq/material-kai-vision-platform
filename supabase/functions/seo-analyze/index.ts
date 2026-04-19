@@ -660,6 +660,7 @@ ${content}
 Return the revised article in Markdown. Only changed sections should differ from input.`;
 
   const result = await generateWithGemini(prompt, {
+    task: 'seo_analyze_revise',
     temperature: 0.3,
     maxTokens: 8192,
     thinkingLevel: 'low',

@@ -79,7 +79,8 @@ ${editContext}`.trim();
 
   try {
     const { output } = await generateWithClaude(inputPrompt, {
-      model: 'claude-haiku-4-5-20251001',
+      task: 'interior_prompt_build',
+      model: 'claude-haiku-4-5',
       systemPrompt,
       maxTokens: 250,
       temperature: 0.8,

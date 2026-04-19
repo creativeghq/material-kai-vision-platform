@@ -91,7 +91,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
       const transformedData = (textData || []).map(chunk => ({
         id: chunk.id,
         source_type: 'text',
-        model_name: 'voyage-3.5',
+        model_name: 'voyage-4',
         embedding_dimension: 1024,
         created_at: chunk.created_at,
         source_id: chunk.id,
@@ -168,7 +168,8 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Models</SelectItem>
-                  <SelectItem value="voyage-3.5">voyage-3.5 (Text)</SelectItem>
+                  <SelectItem value="voyage-4">voyage-4 (Text)</SelectItem>
+                  <SelectItem value="voyage-3.5">voyage-3.5 (Legacy Text)</SelectItem>
                   <SelectItem value="clip">CLIP (Images)</SelectItem>
                   <SelectItem value="siglip">SigLIP (Images)</SelectItem>
                 </SelectContent>

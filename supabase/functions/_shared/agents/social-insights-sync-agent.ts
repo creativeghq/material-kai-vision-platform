@@ -33,7 +33,7 @@ export class SocialInsightsSyncAgent implements AgentRunner {
   readonly name         = 'Social Insights Sync';
   readonly description  = 'Takes daily follower and engagement snapshots for connected social accounts';
   readonly defaultTools = [];
-  readonly defaultModel = 'claude-haiku-4-5-20251001';
+  readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, log, heartbeat } = ctx;

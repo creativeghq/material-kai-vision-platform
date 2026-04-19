@@ -128,7 +128,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Database Operations:**
 - INSERT (new) or UPDATE (existing with same title + category) on `kb_docs`
 - INSERT into `kb_doc_versions` (version history)
-- Generate 1024D embedding using Voyage AI voyage-3.5 (only on new content)
+- Generate 1024D embedding using Voyage AI voyage-4 (only on new content)
 
 ---
 
@@ -199,7 +199,7 @@ The response includes `status`, `timestamp`, per-service health details with res
 
 **Architecture:**
 1. Frontend calls MIVAA API with search query
-2. MIVAA generates embedding for query using Voyage AI voyage-3.5 (updated 2026-04)
+2. MIVAA generates embedding for query using Voyage AI voyage-4 (updated 2026-04)
 3. MIVAA calls Supabase `kb_match_docs()` RPC function with query embedding
 4. Supabase performs vector similarity search using pgvector `<=>` operator
 5. Returns ranked results with similarity scores

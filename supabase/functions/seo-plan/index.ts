@@ -125,8 +125,9 @@ Deno.serve(withApiLogging('seo-plan', async (req) => {
     const systemPrompt = buildPlanningSystemPrompt(baseSystemPrompt, brief, research);
     const userPrompt = buildPlanningUserPrompt(body.topic, body.target_keyword, research, brief);
 
-    // Call Gemini with structured output
+    // Call Gemini with structured output (auto-tracked)
     const result = await generateStructuredWithGemini(userPrompt, ArticlePlanSchema, {
+      task: 'seo_plan',
       systemPrompt,
       temperature: 0.4,
       maxTokens: 4096,

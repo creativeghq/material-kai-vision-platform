@@ -42,7 +42,7 @@ The `ai_config` object accepts the following optional fields:
 
 - `visual_embedding_model` — Default: "SLIG"
 - `visual_embedding_dimensions` — Default: 768
-- `text_embedding_model` — Default: "voyage-3.5"
+- `text_embedding_model` — Default: "voyage-4"
 - `text_embedding_dimensions` — Default: 1024
 - `text_embedding_input_type` — Default: "document"
 - `classification_primary_model` — Default: "Qwen/Qwen3-VL-32B-Instruct"
@@ -64,7 +64,7 @@ The `ai_config` object accepts the following optional fields:
 - Best overall accuracy and reliability
 - Uses Claude Sonnet 4.5 for discovery and metadata
 - Uses SLIG (SigLIP2) for visual embeddings (768D, HuggingFace endpoint)
-- Uses Voyage AI voyage-3.5 for text embeddings (1024D)
+- Uses Voyage AI voyage-4 for text embeddings (1024D)
 - Uses Qwen3-VL-32B-Instruct for vision classification (HuggingFace endpoint) with Claude validation
 
 **FAST_CONFIG** (Speed Optimized):
@@ -284,7 +284,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - Creates chunks of specified size with overlap
 
 - **Text Embeddings**:
-  - Model: Voyage AI `voyage-3.5`
+  - Model: Voyage AI `voyage-4`
   - Dimension: 1024D
   - Input Type: `document`
   - One embedding per chunk
@@ -370,7 +370,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 1. **Product Discovery**: Claude Sonnet 4.5 or GPT-5 (configurable)
 2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Sonnet 4.5 (validation)
 3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
-4. **Text Embeddings**: Voyage AI voyage-3.5 (1024D) — sole provider (updated 2026-04)
+4. **Text Embeddings**: Voyage AI voyage-4 (1024D) — sole provider (updated 2026-04)
 
 ### Thresholds
 - **Image Classification Confidence**: 0.7 (70% minimum)
@@ -410,7 +410,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 1. **classify-images**: AI classification (Qwen3-VL-32B → Claude) to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
 3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via HuggingFace endpoint)
-4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-3.5 1024D)
+4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-4 1024D)
 5. **create-relationships**: Chunk-image and product-image relationships via similarity
 
 ### Default Processing Flow
@@ -421,7 +421,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 4. Save ONLY **uploaded_images** to database
 5. Generate 5 visual embeddings per saved image (SLIG 768D via HuggingFace endpoint)
 6. Create semantic chunks from text
-7. Generate text embeddings for chunks (Voyage AI voyage-3.5 1024D)
+7. Generate text embeddings for chunks (Voyage AI voyage-4 1024D)
 8. Create relationships between chunks, images, and products
 
 ### Key Features
@@ -429,7 +429,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - ✅ **Focused extraction by default** (only material images)
 - ✅ **Two-stage AI classification** (Qwen3-VL-32B fast, Claude validation)
 - ✅ **5 visual embeddings per image** (SLIG 768D via HuggingFace endpoint: visual, color, texture, style, material)
-- ✅ **High-quality text embeddings** (Voyage AI voyage-3.5 1024D)
+- ✅ **High-quality text embeddings** (Voyage AI voyage-4 1024D)
 - ✅ **Semantic chunking** with product boundary respect
 - ✅ **Comprehensive progress tracking** (5% increments)
 - ✅ **Checkpoint creation** at each stage for recovery

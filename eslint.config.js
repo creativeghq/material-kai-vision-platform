@@ -77,7 +77,15 @@ export default [
       'no-unused-vars': 'off', // Handled by TypeScript
 
       // TypeScript rules - more lenient
-      '@typescript-eslint/no-unused-vars': 'off',
+      // Surface unused vars/imports as warnings (not errors so CI stays green).
+      // Convention: prefix intentionally-unused names with `_` to silence.
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

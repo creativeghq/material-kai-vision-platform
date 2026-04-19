@@ -106,19 +106,33 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     });
   }, []);
 
-  // Load docs for all categories eagerly (for FAQ sections)
+  // Load docs for all categories eagerly (for FAQ sections) — single batched query
+  // (was N+1: one query per category)
   useEffect(() => {
     if (!categories.length) return;
-    categories.forEach(async (cat) => {
-      if (docsByCategory[cat.id] !== undefined) return;
+    const missingCategoryIds = categories
+      .map((c) => c.id)
+      .filter((id) => docsByCategory[id] === undefined);
+    if (missingCategoryIds.length === 0) return;
+
+    (async () => {
       const { data } = await supabase
         .from('kb_docs')
         .select('id, title, summary, status, visibility, view_count, created_at, updated_at, workspace_id, content, content_markdown, category_id, created_by, updated_by, embedding_status, embedding_generated_at, embedding_model')
-        .eq('category_id', cat.id)
+        .in('category_id', missingCategoryIds)
         .eq('status', 'published')
         .order('created_at', { ascending: false });
-      setDocsByCategory((p) => ({ ...p, [cat.id]: (data || []) as KBDocument[] }));
-    });
+
+      // Bucket the flat result back into per-category arrays
+      const grouped: Record<string, KBDocument[]> = {};
+      missingCategoryIds.forEach((id) => { grouped[id] = []; });
+      (data || []).forEach((doc: any) => {
+        if (doc.category_id && grouped[doc.category_id]) {
+          grouped[doc.category_id].push(doc as KBDocument);
+        }
+      });
+      setDocsByCategory((p) => ({ ...p, ...grouped }));
+    })();
   }, [categories]);
 
   // Deep-link: open doc when ?doc=<id> is present

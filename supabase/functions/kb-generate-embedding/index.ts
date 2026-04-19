@@ -94,13 +94,13 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
 
     const startMs = Date.now();
 
-    // Generate embedding via MIVAA /api/embeddings/clip-text (Voyage AI 3.5, 1024D)
+    // Generate embedding via MIVAA /api/embeddings/clip-text (Voyage AI 4, 1024D)
     const embResponse = await fetch(`${MIVAA_URL}/api/embeddings/clip-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: textToEmbed.substring(0, 8000),
-        model: 'voyage-3.5',
+        model: 'voyage-4',
         input_type: 'document',
         dimensions: 1024,
       }),
@@ -125,7 +125,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
       .update({
         text_embedding: embedding,
         embedding_status: 'success',
-        embedding_model: 'voyage-3.5',
+        embedding_model: 'voyage-4',
         embedding_dimension: embedding.length,
         embedding_generated_at: new Date().toISOString(),
         embedding_generation_time_ms: elapsedMs,
@@ -142,7 +142,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
         success: true,
         doc_id,
         dimensions: embedding.length,
-        model: 'voyage-3.5',
+        model: 'voyage-4',
         generation_time_ms: elapsedMs,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

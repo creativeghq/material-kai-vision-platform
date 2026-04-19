@@ -201,15 +201,11 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
+                {/* Legacy alias — was accessible to any authenticated user; redirected
+                    to admin-gated path so non-admins can no longer view ops data. */}
                 <Route
                   path="/analytics"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <OperationsDashboard />
-                      </Layout>
-                    </AuthGuard>
-                  }
+                  element={<Navigate to="/admin/operations" replace />}
                 />
                 <Route
                   path="/admin"

@@ -96,7 +96,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Anthropic | Claude Haiku 4.5 | Fast classification, content detection, B2B web search | $0.80 input / $4 output per 1M tokens |
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
-| Voyage AI | voyage-3.5 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
+| Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
 | HuggingFace | Qwen3-VL 32B Vision | Image analysis, OCR, material recognition (69.4% MMMU, #1 OCR benchmark) | Cloud endpoint |
 | HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
@@ -115,7 +115,7 @@ Every product in the catalog is represented by **7 distinct AI embedding vectors
 
 | Embedding Type | Dimensions | Model | What It Powers |
 |----------------|-----------|-------|----------------|
-| Text | 1024D | Voyage AI voyage-3.5 | Natural language + keyword search |
+| Text | 1024D | Voyage AI voyage-4 | Natural language + keyword search |
 | Visual | 768D | SigLIP2 | "Find materials that look like this photo" |
 | Understanding | 1024D | Voyage AI (from Qwen3-VL JSON analysis) | Spec-based search (dimensions, finishes, surface properties) |
 | Color | 768D | SigLIP2 | Color palette matching |

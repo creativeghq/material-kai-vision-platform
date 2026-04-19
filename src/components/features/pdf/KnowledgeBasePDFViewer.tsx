@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import {
   FileText,
   Info,
@@ -415,7 +416,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                   <div
                     className="bg-gray-50 p-3 rounded-lg text-sm prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{
-                      __html: selectedChunk.htmlContent,
+                      __html: DOMPurify.sanitize(selectedChunk.htmlContent),
                     }}
                   />
                 </div>

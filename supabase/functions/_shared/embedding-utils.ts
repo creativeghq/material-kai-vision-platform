@@ -71,7 +71,7 @@ export const MIVAA_CONFIG = {
 // Unified embedding configuration for consistency across platform
 // Updated to use Voyage AI as primary provider
 export const EMBEDDING_CONFIG = {
-  model: 'voyage-3.5',
+  model: 'voyage-4',
   dimensions: 1024,
   maxTokens: 8000,
   inputType: 'document', // 'document' for indexing, 'query' for search
@@ -122,13 +122,13 @@ async function _logEmbeddingUsage(
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const estimatedTokens = Math.ceil(text.length / 4);
-    const costPer1M = 0.06; // voyage-3.5
+    const costPer1M = 0.06; // voyage-4 (same price as voyage-3.5)
     const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
     const billedCost = rawCost * 1.5; // platform markup
 
     await supabase.from('ai_usage_logs').insert({
       operation_type: operationType,
-      model_name: 'voyage-3.5',
+      model_name: 'voyage-4',
       input_tokens: estimatedTokens,
       output_tokens: 0,
       input_cost_usd: rawCost,

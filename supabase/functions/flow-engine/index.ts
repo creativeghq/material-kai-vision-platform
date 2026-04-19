@@ -455,7 +455,7 @@ async function executeAction(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
+            model: 'claude-haiku-4-5',
             max_tokens: 4096,
             tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
             messages: [{ role: 'user', content: query }],

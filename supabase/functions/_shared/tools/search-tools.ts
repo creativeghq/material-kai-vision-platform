@@ -389,7 +389,7 @@ export const createInspirationUrlTool = (
         // Step 2: Extract design tokens using Claude
         const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.3.10');
         const analysisModel = new ChatAnthropic({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-haiku-4-5',
           temperature: 0.2,
           maxTokens: 1500,
         });

@@ -1,7 +1,3 @@
-// import type { SupabaseClient } from '@supabase/supabase-js'; // Currently unused
-
-// Define a minimal Database type for now
-// type Database = Record<string, unknown>; // Currently unused
 type SupabaseClientType = any;
 
 // Materials Hub API Key Data Interface
