@@ -23,18 +23,16 @@ This document describes the implementation of page-aware chunking system that pr
 - **Parameters**: Added `page_number` parameter
 - **Process**: Calls appropriate chunking strategy with page number
 
-#### Updated Methods: All Chunking Strategies
+#### Updated Methods: Chunking Strategies
 - `_chunk_semantic()` - Added `page_number` parameter
 - `_chunk_fixed_size()` - Added `page_number` parameter
 - `_chunk_hybrid()` - Added `page_number` parameter
-- `_chunk_layout_aware()` - Added `page_number` parameter
-  - **NEW (Jan 2026)**: Now uses YOLO layout regions from database
-  - Reads regions from `product_layout_regions` table
-  - Respects region boundaries (TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA)
-  - Combines TITLE + TEXT intelligently
-  - Keeps tables intact
-  - Falls back to semantic chunking if no regions found
-  - See [PDF Processing Pipeline](./pdf-processing-pipeline.md#yolo-layout-aware-chunking) for details
+
+Layout-aware chunking is no longer a strategy. It is activated by passing
+`layout_regions_by_page` to `chunk_pages()`, which routes per-page content
+through `_chunk_with_layout_regions()`. That method respects YOLO region
+boundaries (TEXT, TITLE, TABLE, IMAGE, CAPTION), combines TITLE + following
+TEXT, and keeps TABLE regions atomic. See [PDF Processing Pipeline](./pdf-processing-pipeline.md#yolo-layout-aware-chunking).
 
 #### Updated Method: `_create_chunk()`
 - **New Parameter**: `page_number: Optional[int]`

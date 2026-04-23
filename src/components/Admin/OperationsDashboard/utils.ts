@@ -12,7 +12,7 @@ export const calculateCost = (model: string, inputTokens: number, outputTokens: 
   billed: number;
   markup: number;
 } => {
-  const pricing = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }; // Default to Sonnet pricing
+  const pricing = MODEL_PRICING[model] || { input: 15.00, output: 75.00 }; // Default to Opus pricing
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;
   const rawTotal = inputCost + outputCost;

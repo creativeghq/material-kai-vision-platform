@@ -73,7 +73,7 @@ Collaborative filtering recommendations and interaction tracking.
 #### [Agent Chat API](./agent-chat-api.md)
 Unified multi-agent AI system powered by LangChain.js and Claude.
 - **Function:** `agent-chat`
-- **Agents:** `kai` (default, Sonnet), `interior-designer` (Sonnet), `demo` (Haiku). Legacy aliases `search`/`insights`/`seo` resolve to `kai`.
+- **Agents:** `kai` (default, Opus), `interior-designer` (Opus), `demo` (Haiku). Legacy aliases `search`/`insights`/`seo` resolve to `kai`.
 - **Features:** RBAC tool gating, skills system (`load_skill`), multimodal images, SSE streaming, long-term memory
 - **Access:** JWT (all users for core tools; admin/owner for B2B/SEO/sub-agents)
 
@@ -166,7 +166,7 @@ Generate PBR texture maps for AR preview rendering.
 #### [AI Re-rank API](./ai-rerank-api.md)
 Claude-powered search result re-ordering for improved relevance.
 - **Function:** `ai-rerank`
-- **Features:** Semantic re-ranking, optional explanations, sonnet/haiku model choice
+- **Features:** Semantic re-ranking, optional explanations, opus/haiku model choice
 - **Access:** Authenticated users
 
 ### Knowledge Base APIs
@@ -203,7 +203,7 @@ Complete SEO content generation pipeline — 5 functions, all POST + JWT.
 |----------|---------|
 | `seo-research` | DataForSEO keyword research (6 parallel API calls) |
 | `seo-plan` | Article structure + meta tags + FAQ schema |
-| `seo-write` | Full article via Claude Sonnet |
+| `seo-write` | Full article via Claude Opus |
 | `seo-analyze` | 15+ SEO quality checks, auto-fix via Gemini |
 | `seo-pipeline` | Orchestrator: research → plan → write → analyze |
 

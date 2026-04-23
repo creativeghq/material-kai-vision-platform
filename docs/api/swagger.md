@@ -102,7 +102,7 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 
 | `agentId` | Description | Required Role |
 |-----------|-------------|--------------|
-| `kai` | Default general-purpose KAI agent (Claude Sonnet) | Any authenticated user |
+| `kai` | Default general-purpose KAI agent (Claude Opus) | Any authenticated user |
 | `interior-designer` | Interior design specialist | Any authenticated user |
 | `demo` | Demo agent (Claude Haiku, cheaper) | Any authenticated user |
 | `search` | Legacy alias resolves to `kai` | Any authenticated user |
@@ -421,7 +421,7 @@ For async file upload (202 Accepted):
   ],
   "maxResults": 10,
   "includeExplanations": false,
-  "model": "claude-sonnet-4-5"
+  "model": "claude-opus-4-7"
 }
 ```
 
@@ -431,9 +431,9 @@ For async file upload (202 Accepted):
 | `results` | `SearchResult[]` | Yes | — |
 | `maxResults` | `number` | No | All results |
 | `includeExplanations` | `boolean` | No | `false` |
-| `model` | `string` | No | `"claude-sonnet-4-5"` |
+| `model` | `string` | No | `"claude-opus-4-7"` |
 
-Valid models: `"claude-sonnet-4-5"` or `"claude-haiku-4-5"`
+Valid models: `"claude-opus-4-7"` or `"claude-haiku-4-5"`
 
 ### Response
 
@@ -442,7 +442,7 @@ Valid models: `"claude-sonnet-4-5"` or `"claude-haiku-4-5"`
   "rerankedResults": [...],
   "explanations": { "product-uuid": "Ranked #1 because..." },
   "processingTimeMs": 420,
-  "model": "claude-sonnet-4-5",
+  "model": "claude-opus-4-7",
   "cost": 0.0012,
   "usage": { "inputTokens": 1200, "outputTokens": 150 }
 }
@@ -789,7 +789,7 @@ Get user AI usage history and cost summary.
       "total_credits_debited": 367.0
     },
     "byModel": [
-      { "model": "claude-sonnet-4-6", "calls": 80, "cost": 2.10, "credits": 210 }
+      { "model": "claude-opus-4-7", "calls": 80, "cost": 2.10, "credits": 210 }
     ]
   }
 }
@@ -2917,7 +2917,7 @@ The platform uses a credit system for AI operations. Credits are debited per ope
 
 | Operation Type | Approximate Cost |
 |---------------|-----------------|
-| KAI agent message (Sonnet) | 0.5-5 credits depending on length |
+| KAI agent message (Opus) | 0.5-5 credits depending on length |
 | KAI agent message (Haiku) | 0.1-1 credit |
 | VR World generation (mini) | 75 credits |
 | VR World generation (plus) | 300 credits |

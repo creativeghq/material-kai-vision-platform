@@ -55,7 +55,6 @@ const _MARKUP = 1.5;
 const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
   // Anthropic Claude
   'claude-opus-4-7':   { input: 15.00, output: 75.00 },
-  'claude-sonnet-4-7': { input:  3.00, output: 15.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   // Google Gemini (per Google AI Studio pricing)
   'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
@@ -119,7 +118,7 @@ const klingai = createKlingAI({ accessKeyId: KLINGAI_ACCESS_KEY, secretAccessKey
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
-const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-7';
+const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-7';
 
 // ── Types ──
 export interface AIGenerateConfig {

@@ -1,10 +1,179 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
-import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+
+// ---------------------------------------------------------------------------
+// XML parser setup
+//
+// The previous implementation relied on deno_dom's DOMParser in `text/html`
+// mode, which silently accepted malformed XML and normalized all tag names to
+// lowercase. fast-xml-parser gives us a proper XML parser with explicit
+// configuration over casing, array coercion, and attribute handling.
+// ---------------------------------------------------------------------------
+const PRODUCT_ARRAY_TAGS = new Set([
+  'product', 'item', 'material', 'producto', 'articulo', 'produit',
+]);
+const CATEGORIES_CATEGORY_JPATH_SUFFIX = '.categories.category';
+
+// ---------------------------------------------------------------------------
+// Safety envelope
+//
+// Supabase Edge Functions run on Deno Deploy with a 256 MB memory cap and ~2 s
+// of synchronous CPU per invocation. fast-xml-parser builds a full DOM in JS
+// memory (~2–5× the XML byte size) and holds the parsed products array until
+// they've been chunk-inserted into data_import_job_products. That's the true
+// memory ceiling here; after chunk-insert the edge function is done and the
+// Python side page-reads products by index without ever holding all of them.
+//
+// Tunable via env vars (set on the Supabase edge-function deployment):
+//   XML_IMPORT_MAX_MB          — raw decoded XML size cap
+//   XML_IMPORT_MAX_PRODUCTS    — product count cap per import
+//   XML_IMPORT_INSERT_CHUNK    — rows per product-batch INSERT to PostgREST
+// ---------------------------------------------------------------------------
+function envInt(name: string, defaultValue: number, min: number = 1): number {
+  const raw = Deno.env.get(name);
+  if (!raw) return defaultValue;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < min) {
+    console.warn(`⚠️ ${name}=${raw} is invalid; using default ${defaultValue}`);
+    return defaultValue;
+  }
+  return Math.floor(parsed);
+}
+
+const MAX_XML_BYTES = envInt('XML_IMPORT_MAX_MB', 25) * 1024 * 1024;
+const MAX_BASE64_CHARS = MAX_XML_BYTES * 2;
+const MAX_PRODUCTS_PER_IMPORT = envInt('XML_IMPORT_MAX_PRODUCTS', 20_000);
+
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  parseTagValue: false,
+  parseAttributeValue: false,
+  trimValues: true,
+  transformTagName: (tag: string) => tag.toLowerCase(),
+  textNodeName: '#text',
+  isArray: (tagName: string, jPath: string) => {
+    if (PRODUCT_ARRAY_TAGS.has(tagName)) return true;
+    if (jPath.endsWith(CATEGORIES_CATEGORY_JPATH_SUFFIX)) return true;
+    return false;
+  },
+});
+
+type XmlNode = Record<string, any>;
+
+/** Parse an XML string into a plain-object tree with lowercased tag names. */
+function parseXmlDoc(xmlString: string): XmlNode {
+  try {
+    return xmlParser.parse(xmlString);
+  } catch (e: any) {
+    throw new Error(`XML parsing error: ${e?.message || e}`);
+  }
+}
+
+/**
+ * Walk the parsed tree and return the array of product nodes under whichever
+ * supported container tag exists first. We don't assume a specific wrapper —
+ * some catalogs put products under <products>, others under <catalog>, etc.
+ */
+function findProductNodes(doc: XmlNode): XmlNode[] {
+  const queue: any[] = [doc];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node || typeof node !== 'object') continue;
+    for (const key of Object.keys(node)) {
+      if (PRODUCT_ARRAY_TAGS.has(key)) {
+        const val = node[key];
+        if (Array.isArray(val)) return val;
+      }
+      const child = node[key];
+      if (Array.isArray(child)) {
+        for (const v of child) if (v && typeof v === 'object') queue.push(v);
+      } else if (child && typeof child === 'object') {
+        queue.push(child);
+      }
+    }
+  }
+  return [];
+}
+
+/**
+ * Read the text value of a named child element from a product node.
+ * Matches the old `getElementText` contract: returns undefined when missing
+ * or blank, returns trimmed string otherwise.
+ *
+ * Handles the four shapes fast-xml-parser can produce for a child:
+ *   - string (simple text content)
+ *   - { '#text': string, ...attrs } (element with attributes or mixed)
+ *   - array of either of the above (when multiple siblings with same tag)
+ *   - number/boolean (we disabled parseTagValue, but guard anyway)
+ */
+function getText(node: XmlNode | undefined, tagName: string): string | undefined {
+  if (!node) return undefined;
+  const val = node[tagName.toLowerCase()];
+  return coerceToText(val);
+}
+
+function coerceToText(val: unknown): string | undefined {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    return trimmed || undefined;
+  }
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) {
+    for (const item of val) {
+      const text = coerceToText(item);
+      if (text) return text;
+    }
+    return undefined;
+  }
+  if (typeof val === 'object') {
+    const text = (val as any)['#text'];
+    if (typeof text === 'string') {
+      const trimmed = text.trim();
+      return trimmed || undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Fallback image extractor: look for <img> / <picture> children, reading the
+ * `src` / `url` attribute first, then the inner text.
+ */
+function collectFallbackImages(node: XmlNode): string[] {
+  const out: string[] = [];
+  for (const key of ['img', 'picture']) {
+    const val = node[key];
+    if (!val) continue;
+    const arr = Array.isArray(val) ? val : [val];
+    for (const item of arr) {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed) out.push(trimmed);
+      } else if (item && typeof item === 'object') {
+        const candidate = item['@_src'] || item['@_url'] || item['#text'];
+        if (typeof candidate === 'string' && candidate.trim()) out.push(candidate.trim());
+      }
+    }
+  }
+  return out;
+}
+
+/** Extract nested `<categories><category>...</category></categories>` array. */
+function collectNestedCategories(node: XmlNode): string[] {
+  const cats = node.categories?.category;
+  if (!cats) return [];
+  const arr = Array.isArray(cats) ? cats : [cats];
+  return arr
+    .map((c: any) => coerceToText(c))
+    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+}
 
 interface XMLImportRequest {
   workspace_id: string;
@@ -59,63 +228,38 @@ interface XMLImportResponse {
   message?: string;
   error?: string;
   total_products?: number;
+  dropped_count?: number;  // Products skipped due to missing required fields
   detected_fields?: DetectedField[]; // For preview mode
   suggested_mappings?: Record<string, string>; // AI-suggested mappings
   preview_product?: ProductData; // For generate_preview mode
 }
 
 /**
- * Detect all unique fields in XML and collect sample values
+ * Detect all unique child fields across the first N product nodes and collect
+ * up to 3 sample values per field — used by the field-mapping preview UI.
  */
 function detectXMLFields(xmlContent: string): Map<string, string[]> {
-  const parser = new DOMParser();
-  // Note: deno_dom only supports 'text/html', but it can parse XML correctly
-  const doc = parser.parseFromString(xmlContent, 'text/html');
-
-  const parserError = doc.querySelector('parsererror');
-  if (parserError) {
-    throw new Error(`XML parsing error: ${parserError.textContent}`);
-  }
-
-  // Find product elements (support multiple languages/formats)
-  let products = doc.querySelectorAll('product');
-  if (products.length === 0) products = doc.querySelectorAll('item');
-  if (products.length === 0) products = doc.querySelectorAll('material');
-  if (products.length === 0) products = doc.querySelectorAll('producto');
-  if (products.length === 0) products = doc.querySelectorAll('articulo');
-  if (products.length === 0) products = doc.querySelectorAll('produit');
-
-  if (products.length === 0) {
+  const doc = parseXmlDoc(xmlContent);
+  const productNodes = findProductNodes(doc);
+  if (productNodes.length === 0) {
     throw new Error('No product elements found in XML');
   }
 
-  // Collect all unique fields and sample values (from first 10 products for better diversity)
   const fieldSamples = new Map<string, Set<string>>();
-
-  Array.from(products).slice(0, 10).forEach((product) => {
-    Array.from(product.children).forEach((child) => {
-      const fieldName = child.tagName.toLowerCase();
-      const value = child.textContent?.trim() || '';
-
-      if (!fieldSamples.has(fieldName)) {
-        fieldSamples.set(fieldName, new Set<string>());
-      }
-
-      const samples = fieldSamples.get(fieldName)!;
-      // Only add unique, non-empty values (Set automatically handles uniqueness)
-      if (value && samples.size < 3) {
-        samples.add(value);
-      }
-    });
-  });
-
-  // Convert Sets back to Arrays for the response
-  const fieldSamplesArray = new Map<string, string[]>();
-  for (const [field, samplesSet] of fieldSamples) {
-    fieldSamplesArray.set(field, Array.from(samplesSet));
+  for (const node of productNodes.slice(0, 10)) {
+    for (const [key, val] of Object.entries(node)) {
+      if (key.startsWith('@_') || key === '#text') continue;  // skip attributes + mixed text
+      const text = coerceToText(val);
+      if (!text) continue;
+      if (!fieldSamples.has(key)) fieldSamples.set(key, new Set<string>());
+      const samples = fieldSamples.get(key)!;
+      if (samples.size < 3) samples.add(text);
+    }
   }
 
-  return fieldSamplesArray;
+  const out = new Map<string, string[]>();
+  for (const [field, set] of fieldSamples) out.set(field, Array.from(set));
+  return out;
 }
 
 /**
@@ -151,7 +295,7 @@ ${JSON.stringify(fieldsInfo, null, 2)}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-7',
+        model: 'claude-opus-4-7',
         max_tokens: 2000,
         messages: [{
           role: 'user',
@@ -342,6 +486,17 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       throw new Error('Missing required parameters: workspace_id, xml_content');
     }
 
+    // Reject oversized uploads before we attempt to decode — holding a 20 MB
+    // base64 blob + its decoded form + parsed tree simultaneously is the
+    // fastest way to OOM this function. See MAX_XML_BYTES docstring.
+    if (typeof xml_content === 'string' && xml_content.length > MAX_BASE64_CHARS) {
+      const approxMb = (xml_content.length * 0.75 / (1024 * 1024)).toFixed(1);
+      throw new Error(
+        `XML too large: ~${approxMb} MB decoded (max ${MAX_XML_BYTES / (1024 * 1024)} MB). ` +
+        `Split the file or reduce the number of products per upload.`
+      );
+    }
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -385,6 +540,17 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       xmlString = decoder.decode(bytes);
       console.log(`✅ Decoded XML content (${xmlString.length} characters)`);
       console.log(`First 200 chars: ${xmlString.substring(0, 200)}`);
+
+      // Second-stage size check after decode (some base64 is inflated by
+      // entity-dense XML; we want the true byte count).
+      const decodedBytes = new TextEncoder().encode(xmlString).length;
+      if (decodedBytes > MAX_XML_BYTES) {
+        throw new Error(
+          `XML too large: ${(decodedBytes / (1024 * 1024)).toFixed(1)} MB decoded ` +
+          `(max ${MAX_XML_BYTES / (1024 * 1024)} MB). ` +
+          `Split the file or reduce the number of products per upload.`
+        );
+      }
     } catch (decodeError: any) {
       console.error('❌ Error decoding base64:', decodeError);
       console.error('Base64 sample (first 100 chars):', xml_content.substring(0, 100));
@@ -458,26 +624,15 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     if (generate_preview) {
       console.log('Generate preview mode: extracting sample product with applied mappings');
 
-      // Parse XML and extract first product
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlString, 'text/html');
-
-      // Find product elements
-      let productElements = xmlDoc.querySelectorAll('product');
-      if (productElements.length === 0) productElements = xmlDoc.querySelectorAll('item');
-      if (productElements.length === 0) productElements = xmlDoc.querySelectorAll('material');
-
-      if (productElements.length === 0) {
+      const previewDoc = parseXmlDoc(xmlString);
+      const productNodes = findProductNodes(previewDoc);
+      if (productNodes.length === 0) {
         throw new Error('No product elements found in XML');
       }
+      console.log(`Found ${productNodes.length} products, extracting first one for preview`);
 
-      console.log(`Found ${productElements.length} products, extracting first one for preview`);
+      let previewProduct = extractProductDataWithMappings(productNodes[0], field_mappings);
 
-      // Extract first product with field mappings applied
-      const firstElement = productElements[0];
-      let previewProduct = extractProductDataWithMappings(firstElement, field_mappings);
-
-      // Apply manual values if provided
       if (manual_values) {
         if (manual_values.factory_name) previewProduct.factory_name = manual_values.factory_name;
         if (manual_values.name) previewProduct.name = manual_values.name;
@@ -488,8 +643,8 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
         JSON.stringify({
           success: true,
           preview_product: previewProduct,
-          total_products: productElements.length,
-          message: `Preview generated from 1 of ${productElements.length} products`
+          total_products: productNodes.length,
+          message: `Preview generated from 1 of ${productNodes.length} products`,
         } as XMLImportResponse),
         {
           status: 200,
@@ -504,39 +659,53 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     }
 
     // Parse XML and extract products
-    const products = await parseXML(xmlString);
-    console.log(`Extracted ${products.length} products from XML`);
+    const { products, droppedCount } = await parseXML(xmlString);
+    console.log(`Extracted ${products.length} products from XML (${droppedCount} dropped)`);
 
-    // Validate products
+    // Hard cap on products per import — the full array is stored as one JSONB
+    // blob in data_import_jobs.metadata and held in memory by both this edge
+    // function and the downstream Python /api/import/process handler.
+    if (products.length > MAX_PRODUCTS_PER_IMPORT) {
+      throw new Error(
+        `XML contains ${products.length} products (max ${MAX_PRODUCTS_PER_IMPORT} per import). ` +
+        `Split the file into multiple smaller imports.`
+      );
+    }
+
     const validationResult = validateProducts(products);
     if (!validationResult.valid) {
       throw new Error(`Product validation failed: ${validationResult.errors.join(', ')}`);
     }
 
-    // Create import job in database
     const jobId = await createImportJob(
       supabase,
       workspace_id,
       category,
       products,
       source_name || 'xml_upload',
-      xml_content, // Store original XML for re-runs
+      xml_content,
       field_mappings,
-      mapping_template_id
+      mapping_template_id,
+      droppedCount,
     );
     console.log(`Created import job: ${jobId}`);
 
-    // Call Python API to start processing (non-blocking)
+    // Non-blocking Python handoff — failures are captured in webhook_calls + Sentry
     callPythonAPI(supabase, jobId, workspace_id, authHeader).catch((error) => {
       console.error(`Error calling Python API for job ${jobId}:`, error);
     });
+
+    const message = droppedCount > 0
+      ? `Import job created — ${products.length} products queued, ${droppedCount} dropped for missing required fields`
+      : 'Import job created, processing started';
 
     return new Response(
       JSON.stringify({
         success: true,
         job_id: jobId,
-        message: 'Import job created, processing started',
+        message,
         total_products: products.length,
+        dropped_count: droppedCount,
       } as XMLImportResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -577,147 +746,109 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 }));
 
 /**
- * Parse XML content and extract product data
+ * Parse XML content and extract product data.
+ *
+ * Returns both the extracted products and a drop count. Callers should surface
+ * the drop count so partial-failure imports are distinguishable from clean ones.
  */
-async function parseXML(xmlString: string): Promise<ProductData[]> {
+async function parseXML(xmlString: string): Promise<{ products: ProductData[]; droppedCount: number }> {
   const products: ProductData[] = [];
+  let droppedCount = 0;
 
+  let doc: XmlNode;
   try {
-    // Use DOMParser to parse XML
-    const parser = new DOMParser();
-    // Note: deno_dom only supports 'text/html', but it can parse XML correctly
-    const xmlDoc = parser.parseFromString(xmlString, 'text/html');
-
-    // Check for parsing errors
-    const parserError = xmlDoc.querySelector('parsererror');
-    if (parserError) {
-      throw new Error(`XML parsing error: ${parserError.textContent}`);
-    }
-
-    // Try to detect XML schema type and extract products
-    // Support multiple common XML formats
-
-    // Format 1: <products><product>...</product></products>
-    let productElements = xmlDoc.querySelectorAll('product');
-    
-    // Format 2: <items><item>...</item></items>
-    if (productElements.length === 0) {
-      productElements = xmlDoc.querySelectorAll('item');
-    }
-
-    // Format 3: <materials><material>...</material></materials>
-    if (productElements.length === 0) {
-      productElements = xmlDoc.querySelectorAll('material');
-    }
-
-    if (productElements.length === 0) {
-      throw new Error('No product elements found in XML. Supported tags: <product>, <item>, <material>');
-    }
-
-    console.log(`Found ${productElements.length} product elements in XML`);
-
-    // Extract data from each product element
-    for (const element of productElements) {
-      const product = extractProductData(element);
-      if (product) {
-        products.push(product);
-      }
-    }
-
-    return products;
+    doc = parseXmlDoc(xmlString);
   } catch (error: any) {
     console.error('XML parsing error:', error);
     throw new Error(`Failed to parse XML: ${error?.message || error}`);
   }
+
+  const productNodes = findProductNodes(doc);
+  if (productNodes.length === 0) {
+    const supportedList = Array.from(PRODUCT_ARRAY_TAGS).map((t) => `<${t}>`).join(', ');
+    throw new Error(`No product elements found in XML. Supported tags: ${supportedList}`);
+  }
+
+  console.log(`Found ${productNodes.length} product elements in XML`);
+
+  for (const node of productNodes) {
+    const product = extractProductData(node);
+    if (product) {
+      products.push(product);
+    } else {
+      droppedCount++;
+    }
+  }
+
+  if (droppedCount > 0) {
+    console.warn(`⚠️ Dropped ${droppedCount}/${productNodes.length} products (missing required fields)`);
+  }
+
+  return { products, droppedCount };
 }
 
 /**
  * Extract product data from XML element
  */
-function extractProductData(element: Element): ProductData | null {
+function extractProductData(node: XmlNode): ProductData | null {
   try {
-    // Extract required fields
-    const name = getElementText(element, 'name') || getElementText(element, 'title') || getElementText(element, 'product_name');
-    const factory_name = getElementText(element, 'factory') || getElementText(element, 'manufacturer') || getElementText(element, 'supplier');
-    const material_category = getElementText(element, 'category') || getElementText(element, 'material_type') || getElementText(element, 'type');
+    const name = getText(node, 'name') || getText(node, 'title') || getText(node, 'product_name');
+    const factory_name = getText(node, 'factory') || getText(node, 'manufacturer') || getText(node, 'supplier');
+    const material_category = getText(node, 'category') || getText(node, 'material_type') || getText(node, 'type');
 
-    // Validate required fields
     if (!name || !factory_name || !material_category) {
       console.warn('Skipping product - missing required fields:', { name, factory_name, material_category });
       return null;
     }
 
-    // Extract optional fields
-    const description = getElementText(element, 'description') || getElementText(element, 'desc');
-    const factory_group_name = getElementText(element, 'factory_group') || getElementText(element, 'factory_group_name') || getElementText(element, 'group') || getElementText(element, 'brand_group');
+    const description = getText(node, 'description') || getText(node, 'desc');
+    const factory_group_name = getText(node, 'factory_group') || getText(node, 'factory_group_name') || getText(node, 'group') || getText(node, 'brand_group');
 
-    // ── Expanded factory fields ───────────────────────────────────────────
-    const factory_address      = getElementText(element, 'factory_address')      || getElementText(element, 'manufacturer_address') || getElementText(element, 'address');
-    const factory_city         = getElementText(element, 'factory_city')         || getElementText(element, 'city');
-    const factory_country      = getElementText(element, 'factory_country')      || getElementText(element, 'manufacturer_country') || getElementText(element, 'country');
-    const factory_postal_code  = getElementText(element, 'factory_postal_code')  || getElementText(element, 'postal_code') || getElementText(element, 'zip');
-    const factory_phone        = getElementText(element, 'factory_phone')        || getElementText(element, 'manufacturer_phone') || getElementText(element, 'phone') || getElementText(element, 'tel');
-    const factory_email        = getElementText(element, 'factory_email')        || getElementText(element, 'manufacturer_email') || getElementText(element, 'email');
-    const factory_website      = getElementText(element, 'factory_website')      || getElementText(element, 'manufacturer_website') || getElementText(element, 'homepage');
-    const factory_country_of_origin = getElementText(element, 'country_of_origin') || getElementText(element, 'origin') || getElementText(element, 'made_in');
-    const factory_founded_year = getElementText(element, 'founded_year')         || getElementText(element, 'founded') || getElementText(element, 'established');
-    const factory_employee_count = getElementText(element, 'employee_count')     || getElementText(element, 'employees');
-    const factory_linkedin_url = getElementText(element, 'linkedin_url')         || getElementText(element, 'linkedin');
+    const factory_address            = getText(node, 'factory_address')      || getText(node, 'manufacturer_address') || getText(node, 'address');
+    const factory_city               = getText(node, 'factory_city')         || getText(node, 'city');
+    const factory_country            = getText(node, 'factory_country')      || getText(node, 'manufacturer_country') || getText(node, 'country');
+    const factory_postal_code        = getText(node, 'factory_postal_code')  || getText(node, 'postal_code') || getText(node, 'zip');
+    const factory_phone              = getText(node, 'factory_phone')        || getText(node, 'manufacturer_phone') || getText(node, 'phone') || getText(node, 'tel');
+    const factory_email              = getText(node, 'factory_email')        || getText(node, 'manufacturer_email') || getText(node, 'email');
+    const factory_website            = getText(node, 'factory_website')      || getText(node, 'manufacturer_website') || getText(node, 'homepage');
+    const factory_country_of_origin  = getText(node, 'country_of_origin')    || getText(node, 'origin') || getText(node, 'made_in');
+    const factory_founded_year       = getText(node, 'founded_year')         || getText(node, 'founded') || getText(node, 'established');
+    const factory_employee_count     = getText(node, 'employee_count')       || getText(node, 'employees');
+    const factory_linkedin_url       = getText(node, 'linkedin_url')         || getText(node, 'linkedin');
 
-    // Extract images - handle both single and multiple image fields
     const images: string[] = [];
+    const imageLink = getText(node, 'image_link') || getText(node, 'image');
+    if (imageLink) images.push(imageLink);
 
-    // Handle image_link (single image)
-    const imageLink = getElementText(element, 'image_link') || getElementText(element, 'image');
-    if (imageLink) {
-      images.push(imageLink);
-    }
-
-    // Handle additional_image_link (comma-separated multiple images)
-    const additionalImageLink = getElementText(element, 'additional_image_link') || getElementText(element, 'additional_images');
+    const additionalImageLink = getText(node, 'additional_image_link') || getText(node, 'additional_images');
     if (additionalImageLink) {
-      // Split by comma and trim whitespace
-      const additionalImages = additionalImageLink.split(',').map(url => url.trim()).filter(url => url);
-      images.push(...additionalImages);
+      images.push(...additionalImageLink.split(',').map((u) => u.trim()).filter(Boolean));
     }
 
-    // Fallback: check for generic image elements
     if (images.length === 0) {
-      const imageElements = element.querySelectorAll('img, picture');
-      for (const imgEl of imageElements) {
-        const url = imgEl.textContent?.trim() || imgEl.getAttribute('url') || imgEl.getAttribute('src');
-        if (url) {
-          images.push(url);
-        }
-      }
+      images.push(...collectFallbackImages(node));
     }
 
-    // Extract product ID for variant tracking
-    const productId = getElementText(element, 'id') || getElementText(element, 'product_id') || getElementText(element, 'sku');
+    const productId = getText(node, 'id') || getText(node, 'product_id') || getText(node, 'sku');
 
-    // Extract metadata
     const metadata: Record<string, any> = {
       source_type: 'xml',
       extraction_date: new Date().toISOString(),
       extraction_method: 'xml_import',
     };
+    if (productId) metadata.product_id = productId;
 
-    // Store product ID in metadata for variant tracking
-    if (productId) {
-      metadata.product_id = productId;
-      metadata.original_id = productId;
-    }
-
-    // Extract additional fields as metadata
     const metadataFields = ['price', 'color', 'colors', 'dimensions', 'size', 'designer', 'collection', 'finish', 'material', 'link'];
     for (const field of metadataFields) {
-      const value = getElementText(element, field);
-      if (value) {
-        metadata[field] = value;
-      }
+      const value = getText(node, field);
+      if (value) metadata[field] = value;
     }
 
-    // ── Build canonical factory nested object in metadata ─────────────────
+    // Canonical factory nested object. The flat keys alongside it
+    // (factory_name / factory_group_name / country_of_origin) are consumed
+    // directly by the frontend productMetadata helpers and edge-function
+    // database tools, so they're kept in sync here rather than relying on
+    // the Python metadata_normalizer to back-fill them post-import.
     const factoryObj: Record<string, string> = {};
     if (factory_name)              factoryObj.factory_name         = factory_name;
     if (factory_group_name)        factoryObj.factory_group_name   = factory_group_name;
@@ -735,19 +866,14 @@ function extractProductData(element: Element): ProductData | null {
 
     if (Object.keys(factoryObj).length > 0) {
       metadata.factory = factoryObj;
-      // Backward-compat flat fields
-      if (factory_name)           metadata.factory_name        = factory_name;
-      if (factory_group_name)     metadata.factory_group_name  = factory_group_name;
-      if (factory_country_of_origin) metadata.country_of_origin = factory_country_of_origin;
+      if (factory_name)              metadata.factory_name        = factory_name;
+      if (factory_group_name)        metadata.factory_group_name  = factory_group_name;
+      if (factory_country_of_origin) metadata.country_of_origin   = factory_country_of_origin;
     }
 
-    // Extract categories if present (for variant differentiation)
-    const categoryElements = element.querySelectorAll('categories > category');
-    if (categoryElements.length > 0) {
-      const categories = Array.from(categoryElements).map(cat => cat.textContent?.trim()).filter(Boolean);
-      if (categories.length > 0) {
-        metadata.categories = categories;
-      }
+    const nestedCategories = collectNestedCategories(node);
+    if (nestedCategories.length > 0) {
+      metadata.categories = nestedCategories;
     }
 
     return {
@@ -780,19 +906,17 @@ function extractProductData(element: Element): ProductData | null {
  * Extract product data with custom field mappings applied
  * Used for preview generation
  */
-function extractProductDataWithMappings(element: Element, mappings?: Record<string, string>): ProductData {
-  // If no mappings provided, use default extraction
+function extractProductDataWithMappings(node: XmlNode, mappings?: Record<string, string>): ProductData {
   if (!mappings || Object.keys(mappings).length === 0) {
-    return extractProductData(element) || {
+    return extractProductData(node) || {
       name: 'Unknown Product',
       factory_name: 'Unknown Factory',
       material_category: 'Unknown Category',
       images: [],
-      metadata: {}
+      metadata: {},
     };
   }
 
-  // Apply custom mappings
   const product: ProductData = {
     name: '',
     factory_name: '',
@@ -802,13 +926,11 @@ function extractProductDataWithMappings(element: Element, mappings?: Record<stri
       source_type: 'xml',
       extraction_date: new Date().toISOString(),
       extraction_method: 'xml_import',
-    }
+    },
   };
 
-  // Extract fields based on mappings
   for (const [xmlField, targetField] of Object.entries(mappings)) {
-    const value = getElementText(element, xmlField);
-
+    const value = getText(node, xmlField);
     if (!value) continue;
 
     switch (targetField) {
@@ -828,48 +950,32 @@ function extractProductDataWithMappings(element: Element, mappings?: Record<stri
         product.factory_group_name = value;
         break;
       case 'images':
-        // Handle both single and comma-separated images
         if (value.includes(',')) {
-          product.images = value.split(',').map(url => url.trim()).filter(url => url);
+          product.images = value.split(',').map((u) => u.trim()).filter(Boolean);
         } else {
           product.images.push(value);
         }
         break;
       default:
-        // Everything else goes to metadata
         product.metadata![xmlField] = value;
         break;
     }
   }
 
-  // Extract images from standard fields if not mapped
+  // Fall back to standard image fields when the mapping didn't populate any
   if (product.images.length === 0) {
-    const imageLink = getElementText(element, 'image_link') || getElementText(element, 'image');
+    const imageLink = getText(node, 'image_link') || getText(node, 'image');
     if (imageLink) product.images.push(imageLink);
-
-    const additionalImageLink = getElementText(element, 'additional_image_link');
+    const additionalImageLink = getText(node, 'additional_image_link');
     if (additionalImageLink) {
-      const additionalImages = additionalImageLink.split(',').map(url => url.trim()).filter(url => url);
-      product.images.push(...additionalImages);
+      product.images.push(...additionalImageLink.split(',').map((u) => u.trim()).filter(Boolean));
     }
   }
 
-  // Extract product ID for metadata
-  const productId = getElementText(element, 'id') || getElementText(element, 'product_id') || getElementText(element, 'sku');
-  if (productId) {
-    product.metadata!.product_id = productId;
-    product.metadata!.original_id = productId;
-  }
+  const productId = getText(node, 'id') || getText(node, 'product_id') || getText(node, 'sku');
+  if (productId) product.metadata!.product_id = productId;
 
   return product;
-}
-
-/**
- * Get text content from XML element by tag name
- */
-function getElementText(parent: Element, tagName: string): string | undefined {
-  const element = parent.querySelector(tagName);
-  return element?.textContent?.trim() || undefined;
 }
 
 /**
@@ -905,6 +1011,23 @@ function validateProducts(products: ProductData[]): { valid: boolean; errors: st
 /**
  * Create import job in database
  */
+/**
+ * Create the data_import_jobs row AND chunk-insert the products into the
+ * child table data_import_job_products.
+ *
+ * We do NOT store the products array on data_import_jobs.metadata anymore.
+ * That previously forced the entire array to live as a single JSONB blob
+ * which the Python side had to load into memory before batching. With a
+ * child table, the Python service pages through products with
+ * `batch_size` rows per fetch and never holds more than one batch in memory.
+ *
+ * Products are batched into chunks of PRODUCT_INSERT_CHUNK_SIZE rows per
+ * INSERT. The chunk size is a tradeoff between round-trip count and
+ * individual payload size — 100 rows × ~5 KB = ~500 KB per INSERT, well
+ * under the PostgREST default body limit.
+ */
+const PRODUCT_INSERT_CHUNK_SIZE = envInt('XML_IMPORT_INSERT_CHUNK', 100);
+
 async function createImportJob(
   supabase: any,
   workspace_id: string,
@@ -913,10 +1036,9 @@ async function createImportJob(
   source_name: string,
   original_xml_content?: string,
   field_mappings?: Record<string, string>,
-  mapping_template_id?: string
+  mapping_template_id?: string,
+  droppedCount: number = 0,
 ): Promise<string> {
-  // Create job record with products in metadata
-  // Note: background_job_id will be auto-created by trigger
   const { data: jobData, error: jobError } = await supabase
     .from('data_import_jobs')
     .insert({
@@ -933,7 +1055,7 @@ async function createImportJob(
       mapping_template_id,
       metadata: {
         created_by: 'xml-import-orchestrator',
-        products: products, // Store products for Python API to process
+        dropped_count: droppedCount,
       },
     })
     .select()
@@ -944,8 +1066,34 @@ async function createImportJob(
   }
 
   const jobId = jobData.id;
-
   console.log(`✅ Created data_import_job ${jobId} (background_job auto-created by trigger)`);
+
+  // Chunk-insert products into the child table.
+  for (let offset = 0; offset < products.length; offset += PRODUCT_INSERT_CHUNK_SIZE) {
+    const slice = products.slice(offset, offset + PRODUCT_INSERT_CHUNK_SIZE);
+    const rows = slice.map((product, i) => ({
+      job_id: jobId,
+      product_index: offset + i,
+      product_data: product,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('data_import_job_products')
+      .insert(rows);
+
+    if (insertError) {
+      // Best-effort: mark the job as failed so it doesn't hang in 'pending'.
+      await supabase
+        .from('data_import_jobs')
+        .update({ status: 'failed', error_message: `Failed to store products: ${insertError.message}` })
+        .eq('id', jobId);
+      throw new Error(`Failed to store products for job ${jobId}: ${insertError.message}`);
+    }
+  }
+
+  if (products.length > 0) {
+    console.log(`✅ Inserted ${products.length} products into data_import_job_products for job ${jobId}`);
+  }
 
   return jobId;
 }

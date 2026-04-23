@@ -81,7 +81,7 @@
 - **Legacy aliases**: `search`, `insights`, `seo` resolve to `kai` via AGENT_CONFIGS in edge function
 - **RBAC tool gating**: Core tools for all users. Sub-agents/B2B/SEO gated to admin/owner only.
 - **Multimodal**: Frontend sends `images: string[]` (data URLs) → edge function attaches as `image_url` content blocks
-- **Model selection**: KAI uses Sonnet, Demo uses Haiku
+- **Model selection**: KAI uses Opus, Demo uses Haiku
 - **DB prompt key**: `kai` in prompts table (prompt_type='agent', category='kai')
 
 ## Background Agent Framework
@@ -97,6 +97,18 @@
 - **Auto-recovery**: `auto-recovery-cron` monitors runs stuck >8min, re-dispatches up to 3 times
 - **Frontend**: `/admin/background-agents` → BackgroundAgentsPage + AgentRunHistoryDrawer + AgentLogsViewer + CreateAgentModal
 - **Service**: `src/services/backgroundAgents.ts`
+
+## Price Monitoring (Firecrawl + public lookup API)
+- **Shared client**: `mivaa-pdf-extractor/app/services/integrations/firecrawl_client.py` — single `FirecrawlClient` for competitor scraping AND the public lookup API. Pydantic schemas → `model_json_schema()` drive extraction; can't drift from code that reads the result.
+- **Extraction model**: `app/models/extraction.py::PriceExtraction` (price/currency/availability/shipping_cost/product_name). Field descriptions guide the LLM.
+- **Price parsing**: `app/utils/price_parsing.py` wraps `price-parser` lib — handles `$49.99`, `€1.299,00`, `From £29`, maps symbols → ISO-4217.
+- **Concurrency**: on-demand + cron scrape per-source loop uses `asyncio.gather` + `Semaphore(5)`.
+- **Current-price cache**: `competitor_sources.current_price`/`current_currency`/`current_availability`/`current_price_updated_at` denormalized on successful scrape. Authoritative history still in `price_history`.
+- **Source type enum**: `competitor_source_type` = `firecrawl_url` (current) | `dataforseo_shopping` (Phase 2 reserved — NOT implemented).
+- **Notifications**: `_dispatch_alert_notification` calls `NotificationService` → `notification-dispatcher` edge function → Resend (email) + `user_notifications` insert (in-app). `price_alert_history.notification_sent`/`notification_sent_at`/`notification_channels` flipped on success.
+- **JS-heavy pages**: opt-in `scraping_config.use_javascript_render = true` — adds 3s wait action + longer timeout. Default off.
+- **Public API**: `POST /api/v1/prices/lookup` ([`app/api/price_lookup_routes.py`](mivaa-pdf-extractor/app/api/price_lookup_routes.py)). Auth via `api_keys` table (Bearer). Rate-limited per key (default 60/min, cap 600). One-shot, does NOT create `competitor_sources` row. Usage logged to `price_lookups` table. Path whitelisted in JWT middleware exclude list.
+- **Schema state (2026-04 cleanup)**: all 6 price tables had 0 rows pre-migration — schema was redesigned freely. Feature is new/unused until docs are promoted.
 
 ## FF&E Specification on Quotes
 - **New fields on `quote_items`**: `room`, `dimensions`, `installation_requirements`, `delivery_date`

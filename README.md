@@ -62,7 +62,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Indexes**: Optimized ivfflat vector indexes
 
 #### **AI Models** (12+ models across 5 providers)
-1. **Anthropic**: Claude Haiku 4.5 (fast classification/B2B search), Claude Sonnet 4.5 (deep enrichment, Jarvis agent)
+1. **Anthropic**: Claude Haiku 4.5 (fast classification/B2B search), Claude Opus 4.7 (deep enrichment, Jarvis agent)
 2. **OpenAI**: GPT-4o (alternative discovery), GPT-4o-mini (query parsing)
 3. **HuggingFace Endpoint**: Qwen3-VL 32B Vision (69.4% MMMU, vision analysis + understanding embeddings)
 4. **Voyage AI**: voyage-4 (primary text embeddings, 1024D)
@@ -299,7 +299,7 @@ curl https://v1api.materialshub.gr/docs
 - 85%+ success rate
 
 **XML Import**
-- AI-powered dynamic field mapping (Claude Sonnet 4.5)
+- AI-powered dynamic field mapping (Claude Opus 4.7)
 - Batch processing (10 products at a time)
 - Concurrent image downloads (5 parallel)
 - Cron-based scheduling for recurring imports

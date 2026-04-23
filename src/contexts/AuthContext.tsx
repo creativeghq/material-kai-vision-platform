@@ -23,6 +23,7 @@ interface AuthContextType {
   signInWithOAuth: (provider: 'google') => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -238,6 +239,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        toast({
+          title: 'Password update failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Password updated',
+          description: 'Your password has been changed. You are now signed in.',
+        });
+      }
+
+      return { error };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'An unknown error occurred';
+      toast({
+        title: 'An error occurred',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      return { error: error as AuthError };
+    }
+  };
+
   const value = {
     user,
     session,
@@ -247,6 +278,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     signInWithOAuth,
     signOut,
     resetPassword,
+    updatePassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

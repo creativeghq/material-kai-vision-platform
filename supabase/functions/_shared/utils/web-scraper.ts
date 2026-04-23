@@ -43,7 +43,7 @@ export async function scrapeUrl(url: string, timeoutMs = 30000): Promise<ScrapeR
       },
       body: JSON.stringify({
         url,
-        formats: ['markdown'],
+        formats: ['markdown', 'links'],
         onlyMainContent: true,
       }),
       signal: controller.signal,
@@ -66,23 +66,22 @@ export async function scrapeUrl(url: string, timeoutMs = 30000): Promise<ScrapeR
     const markdown = data.data?.markdown || '';
     const metadata = data.data?.metadata || {};
 
-    // Extract image URLs from markdown content
-    const imageRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
-    const images: string[] = [];
-    let match;
-    while ((match = imageRegex.exec(markdown)) !== null) {
-      images.push(match[1]);
-    }
-
-    // Also include og:image if present
-    if (metadata.ogImage) {
-      images.unshift(metadata.ogImage);
-    }
+    // Firecrawl returns discovered images on the response envelope (data.images)
+    // and/or on metadata.images. Use those directly — matches the Python backend's
+    // preferred source (`scraped_materials_temp.material_data.images`) and avoids
+    // an inconsistent regex pass over markdown.
+    const firecrawlImages: string[] = Array.isArray(data.data?.images)
+      ? data.data.images
+      : Array.isArray(metadata.images)
+        ? metadata.images
+        : [];
+    const images: string[] = [...firecrawlImages];
+    if (metadata.ogImage) images.unshift(metadata.ogImage);
 
     return {
       success: true,
       markdown,
-      images: [...new Set(images)], // deduplicate
+      images: [...new Set(images.filter((u: unknown): u is string => typeof u === 'string' && u.startsWith('http')))],
       metadata: {
         title: metadata.title,
         description: metadata.description,

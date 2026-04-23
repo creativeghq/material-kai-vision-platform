@@ -114,10 +114,10 @@ Query the `products` table filtering by `source_type = 'web_scraping'` and `sour
 
 ## 🤖 AI Models
 
-### Claude Sonnet 4.5 (Default)
+### Claude Opus 4.7 (Default)
 - **Best Quality**: Most comprehensive analysis
 - **Use For**: High-value catalogs, complex products
-- **Cost**: ~$0.015 per 1K tokens
+- **Cost**: ~$0.075 per 1K tokens (blended $15 input / $75 output per 1M)
 
 ### GPT-5
 - **Fast Processing**: Good quality, faster than Claude
@@ -196,7 +196,7 @@ Query the `scraping_sessions` table by session ID to check session status. Query
 - Scale up to full catalog
 
 ### 2. Choose Right Model
-- **Claude Sonnet**: High-value products, complex catalogs
+- **Claude Opus**: High-value products, complex catalogs
 - **GPT-5**: Standard products, good balance
 - **Haiku**: Simple products, high volume
 

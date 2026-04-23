@@ -15,14 +15,14 @@
 
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0A: Product Discovery (0-10%)                             │
-│ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
+│ AI Model: Claude Opus 4.7 / GPT-4o                           │
 │ Purpose: Extract products with ALL metadata (inseparable)      │
 │ Output: Products with metadata JSONB (factory, specs, etc.)    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0B: Document Entity Discovery (10-15%) - OPTIONAL         │
-│ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
+│ AI Model: Claude Opus 4.7 / GPT-4o                           │
 │ Purpose: Extract certificates, logos, specifications           │
 │ Output: Document entities stored separately with relationships │
 └─────────────────────────────────────────────────────────────────┘
@@ -202,7 +202,7 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 9: Product Creation (90-95%)                              │
-│ Models: Claude Haiku 4.5 → Claude Sonnet 4.5                   │
+│ Models: Claude Haiku 4.5 → Claude Opus 4.7                     │
 │ Output: Product records with relationships                     │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -293,7 +293,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Purpose**: Extract products with ALL metadata (Products + Metadata = Inseparable)
 
-**AI Model**: Claude Sonnet 4.5 or GPT-4o
+**AI Model**: Claude Opus 4.7 or GPT-4o
 
 **Process**:
 1. Extract full PDF text
@@ -320,7 +320,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Purpose**: Extract certificates, logos, specifications as separate knowledge base
 
-**AI Model**: Claude Sonnet 4.5 or GPT-4o
+**AI Model**: Claude Opus 4.7 or GPT-4o
 
 **Process**:
 1. Analyze PDF for document entities
@@ -771,7 +771,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ### Stage 7 (alternate): Product Creation (85-92%)
 
-**Models**: Claude Haiku 4.5 → Claude Sonnet 4.5
+**Models**: Claude Haiku 4.5 → Claude Opus 4.7
 
 **Two-Stage Validation**:
 
@@ -781,7 +781,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 - Extract basic information
 - Processing time: 3-5 seconds
 
-**Stage 2 (Sonnet - Deep)**:
+**Stage 2 (Opus - Deep)**:
 - For each candidate, perform deep analysis
 - Validate product completeness
 - Extract detailed metadata
@@ -1067,10 +1067,10 @@ A CAPTION region chunk contains the caption text, `region_type: "CAPTION"`, a `r
 
 ### Configuration
 
-Layout-aware chunking is enabled by setting `strategy=ChunkingStrategy.LAYOUT_AWARE` in the `ChunkingConfig` passed to `UnifiedChunkingService`, with `max_chunk_size=1000` and `min_chunk_size=100`.
+Layout-aware chunking is activated by passing `layout_regions_by_page` (a dict mapping 1-based page_number → list of YOLO layout regions) into `chunk_pages()`. The chunking config stays at the default `HYBRID` strategy (`max_chunk_size=1000`, `min_chunk_size=100`); per-page, if regions are provided, `_chunk_with_layout_regions` runs instead of the strategy dispatcher.
 
 **Fallback Behavior:**
-- If no `product_id` in metadata → Falls back to semantic chunking
+- If no regions are provided for a page → falls back to the configured strategy (HYBRID by default)
 - If no layout regions found → Falls back to semantic chunking
 - If YOLO fails → Pipeline continues with semantic chunking
 
@@ -1291,7 +1291,7 @@ Each chip indicates which tier produced a given field on that product. The same 
 | Source key | Tier label |
 |------------|------------|
 | `pymupdf_text_dict` | PyMuPDF Tier A |
-| `claude_sonnet_vision` / `claude_spec_vision` | Claude Sonnet Tier B |
+| `claude_opus_vision` / `claude_spec_vision` | Claude Opus Tier B |
 | `catalog_legend` | Catalog Legend Tier C |
 | `chunk_regex` | Chunk Regex |
 | `vision_rollup` | Image Vision Rollup |

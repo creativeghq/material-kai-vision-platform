@@ -379,7 +379,7 @@ Complete reference of all platform features and capabilities.
 ## 🔄 Integration Features
 
 **External Services**:
-- Anthropic (Claude Sonnet/Haiku 4.5 + built-in web search for B2B)
+- Anthropic (Claude Opus 4.7 / Haiku 4.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
 - HuggingFace Endpoint (Qwen3-VL 32B vision analysis)

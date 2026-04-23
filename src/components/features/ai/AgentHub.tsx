@@ -103,7 +103,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-7',
+    defaultModel: 'anthropic/claude-opus-4-7',
   },
   {
     id: 'interior-designer',
@@ -113,7 +113,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-7',
+    defaultModel: 'anthropic/claude-opus-4-7',
   },
   {
     id: 'demo',
@@ -131,7 +131,6 @@ const AGENTS: AgentDefinition[] = [
 const AI_MODELS = [
   // Language Models — Claude only (canonical 3 latest-tier)
   { id: 'anthropic/claude-opus-4-7',           name: 'Claude Opus 4.7',   provider: 'anthropic', type: 'language' },
-  { id: 'anthropic/claude-sonnet-4-7',         name: 'Claude Sonnet 4.7', provider: 'anthropic', type: 'language' },
   { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5',  provider: 'anthropic', type: 'language' },
 
   // Vision Models (HuggingFace Endpoint - 32B only)
@@ -335,7 +334,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-7',
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-7',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());

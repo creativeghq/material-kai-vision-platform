@@ -9,7 +9,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 | **Google (HuggingFace)** | SigLIP2 ViT-SO400M (SLIG) | Visual embeddings (768D) - Cloud endpoint |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) - Primary for semantic search |
 | **OpenAI** | GPT-4o, GPT-5 | Chat, product discovery (OpenAI text embeddings retired 2026-04 — Voyage AI is the sole text embedder) |
-| **Anthropic** | Claude Sonnet 4.5, Claude Haiku 4.5 | Vision analysis, validation, agents |
+| **Anthropic** | Claude Opus 4.7, Claude Haiku 4.5 | Vision analysis, validation, agents |
 | **Qwen (HuggingFace)** | Qwen3-VL-32B-Instruct | Image analysis, OCR, material detection - Cloud endpoint |
 
 ---
@@ -22,7 +22,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 1: Product Discovery (BEFORE extraction)                          │
-│ Model: Claude Sonnet 4.5 OR GPT-5                                      │
+│ Model: Claude Opus 4.7 OR GPT-5                                        │
 │ Purpose: Identify products, count pages, map image-to-product          │
 │ Input: PDF pages (images)                                              │
 │ Output: Product list with page ranges                                  │
@@ -49,7 +49,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 4: Image Analysis (Validation - Optional)                        │
-│ Model: Claude 4.5 Sonnet Vision                                       │
+│ Model: Claude Opus 4.7 Vision                                         │
 │ Purpose: Validate low-quality Qwen results, enrich metadata           │
 │ Input: Images with quality_score < 0.7                                │
 │ Output: Enhanced analysis, validation                                  │
@@ -104,7 +104,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 │   - Text Embeddings: Voyage AI voyage-4 (1024D)                    │
 │   - Visual Embeddings: 5x SLIG specialized (768D each)               │
 │     • Visual, Color, Texture, Material, Style                        │
-│   - LLM: Claude Sonnet 4.5 (200K context)                            │
+│   - LLM: Claude Opus 4.7 (200K context)                              │
 │ Purpose: Multi-vector search + intelligent synthesis                  │
 │ Why: Direct vector DB queries, no intermediate indexing layer         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -112,7 +112,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ AGENTS: Mastra Framework (Agent Hub)                                   │
 │ Models Available:                                                      │
-│   - Claude Sonnet 4.5 (default for agents)                           │
+│   - Claude Opus 4.7 (default for agents)                             │
 │   - Claude Haiku 4.5 (fast responses)                                │
 │   - GPT-5 (advanced reasoning)                                        │
 │   - Qwen3-VL 17B (cost-effective)                               │
@@ -207,11 +207,11 @@ Requests are sent to the Together AI chat completions endpoint using the `Qwen/Q
 
 ---
 
-### 4. **Claude 4.5 Sonnet Vision** 🎨
+### 4. **Claude Opus 4.7 Vision** 🎨
 
 **File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-Uses the Anthropic Python client to call `claude-sonnet-4-5` with `max_tokens=4096`. The message includes an image block (base64 source, JPEG media type) followed by a text validation prompt.
+Uses the Anthropic Python client to call `claude-opus-4-7` with `max_tokens=4096`. The message includes an image block (base64 source, JPEG media type) followed by a text validation prompt.
 
 **Purpose**:
 - **Validation** of low-quality Qwen results
@@ -231,7 +231,7 @@ Uses the Anthropic Python client to call `claude-sonnet-4-5` with `max_tokens=40
 - Excellent vision capabilities
 - Used selectively to control costs
 
-**Cost**: $3.00 per 1M input tokens, $15.00 per 1M output tokens
+**Cost**: $15.00 per 1M input tokens, $75.00 per 1M output tokens
 **Speed**: 3-8 seconds per image
 **Output**: JSON with enhanced analysis
 
@@ -269,7 +269,7 @@ The frontend invokes the `agent-chat` Supabase Edge Function with `model: 'anthr
 
 **Purpose**:
 - **Fast agent responses** in Agent Hub
-- **Quick queries** that don't need Sonnet's power
+- **Quick queries** that don't need Opus's power
 - **Cost optimization** for simple tasks
 
 **Impact on Flow**:
@@ -324,11 +324,11 @@ The RAG service uses 7 specialized embedding collections for multi-vector search
 
 ### PDF Processing Pipeline
 
-Product Discovery (Stage 1): Default model is Claude Sonnet 4.5, with GPT-5 as an alternative. OCR Filtering (Stage 2) uses SLIG (SigLIP2 cloud) zero-shot classification. Image Analysis (Stage 6) uses Qwen3-VL 17B Vision for all images, with Claude 4.5 Sonnet used for validation when quality_score < 0.7. Visual Embeddings (Stages 7-10) use SLIG (SigLIP2 via HuggingFace cloud endpoint, 768D). Text Embeddings (Stage 5) use Voyage AI voyage-4 (1024D) as the only model — OpenAI text-embedding-3-small was retired in 2026-04.
+Product Discovery (Stage 1): Default model is Claude Opus 4.7, with GPT-5 as an alternative. OCR Filtering (Stage 2) uses SLIG (SigLIP2 cloud) zero-shot classification. Image Analysis (Stage 6) uses Qwen3-VL 17B Vision for all images, with Claude Opus 4.7 used for validation when quality_score < 0.7. Visual Embeddings (Stages 7-10) use SLIG (SigLIP2 via HuggingFace cloud endpoint, 768D). Text Embeddings (Stage 5) use Voyage AI voyage-4 (1024D) as the only model — OpenAI text-embedding-3-small was retired in 2026-04.
 
 ### Search & Agents
 
-Direct Vector DB RAG (Claude 4.5) uses Voyage AI 3.5 (1024D) for text embeddings, 5x SLIG specialized 768D embeddings + 1x Voyage understanding 1024D embedding for multi-vector visual search, and Claude Sonnet 4.5 (200K context) for synthesis. The Agent Hub (Mastra) supports Claude Sonnet 4.5 as default, Claude Haiku 4.5 for fast responses, GPT-5 for advanced reasoning, and Qwen3-VL 17B as a cost-effective option.
+Direct Vector DB RAG uses Voyage AI voyage-4 (1024D) for text embeddings, 5x SLIG specialized 768D embeddings + 1x Voyage understanding 1024D embedding for multi-vector visual search, and Claude Opus 4.7 (200K context) for synthesis. The Agent Hub (Mastra) supports Claude Opus 4.7 as default, Claude Haiku 4.5 for fast responses, GPT-5 for advanced reasoning, and Qwen3-VL 17B as a cost-effective option.
 
 ---
 
@@ -338,10 +338,10 @@ Direct Vector DB RAG (Claude 4.5) uses Voyage AI 3.5 (1024D) for text embeddings
 
 | Model | Usage | Cost |
 |-------|-------|------|
-| **Claude Sonnet 4.5** | Product discovery (1 call) | ~$0.05 |
+| **Claude Opus 4.7** | Product discovery (1 call) | ~$0.25 |
 | **SigLIP** | OCR filtering (50 images) | $0.00 (free) |
 | **Qwen3-VL** | Image analysis (50 images) | ~$0.02 |
-| **Claude Sonnet 4.5** | Validation (10 low-quality) | ~$0.15 |
+| **Claude Opus 4.7** | Validation (10 low-quality) | ~$0.75 |
 | **SigLIP** | Visual embeddings (250 total) | $0.00 (free) |
 | **OpenAI Embeddings** | Text chunks (500 chunks) | ~$0.01 |
 | **TOTAL** | Per PDF | **~$0.23** |

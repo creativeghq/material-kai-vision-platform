@@ -41,7 +41,7 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
   {
     id: 'chat_message',
     label: 'AI chat message',
-    description: 'Per message — billed at Sonnet rate (highest)',
+    description: 'Per message — billed at Opus rate (highest)',
     creditsPerAction: 4,
     unit: 'message',
     category: 'agent_chat',
@@ -75,7 +75,7 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
   {
     id: 'seo_write',
     label: 'Article writing',
-    description: 'Full article generation via Claude Sonnet',
+    description: 'Full article generation via Claude Opus',
     creditsPerAction: 20,
     unit: 'article',
     category: 'seo_pipeline',

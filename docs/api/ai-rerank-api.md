@@ -33,7 +33,7 @@ Content-Type: application/json
   ],
   "maxResults": 10,
   "includeExplanations": true,
-  "model": "claude-sonnet-4-5"
+  "model": "claude-opus-4-7"
 }
 ```
 
@@ -45,7 +45,7 @@ Content-Type: application/json
 | `results` | SearchResult[] | required | Up to 50 candidates |
 | `maxResults` | number | all | Trim output to N results |
 | `includeExplanations` | boolean | false | Add per-result reasoning text |
-| `model` | string | `claude-sonnet-4-5` | `claude-sonnet-4-5` or `claude-haiku-4-5` |
+| `model` | string | `claude-opus-4-7` | `claude-opus-4-7` or `claude-haiku-4-5` |
 
 ---
 
@@ -62,7 +62,7 @@ Content-Type: application/json
     "uuid-2": "Ranked #2: good material match but interior-only — not wet area rated."
   },
   "processingTimeMs": 820,
-  "model": "claude-sonnet-4-5",
+  "model": "claude-opus-4-7",
   "usage": { "inputTokens": 1240, "outputTokens": 380 }
 }
 ```

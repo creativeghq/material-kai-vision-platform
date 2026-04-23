@@ -92,7 +92,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 
 | Provider | Model | Role | Cost |
 |----------|-------|------|------|
-| Anthropic | Claude Sonnet 4.5 | Jarvis agent, deep product analysis, metadata extraction, B2B research | $3 input / $15 output per 1M tokens |
+| Anthropic | Claude Opus 4.7 | Jarvis agent, deep product analysis, metadata extraction, B2B research | $15 input / $75 output per 1M tokens |
 | Anthropic | Claude Haiku 4.5 | Fast classification, content detection, B2B web search | $0.80 input / $4 output per 1M tokens |
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
@@ -135,7 +135,7 @@ Search results are fused dynamically using **7 query-adaptive weight profiles**.
 
 The primary ingest path. A supplier uploads a product catalog PDF. The platform automatically:
 
-1. Discovers all products using Claude Haiku (fast boundary detection) + Claude Sonnet (metadata enrichment) — **95%+ detection accuracy**
+1. Discovers all products using Claude Haiku (fast boundary detection) + Claude Opus (metadata enrichment) — **95%+ detection accuracy**
 2. Extracts text with PyMuPDF4LLM (structure-preserving)
 3. Semantic chunking via Anthropic API (800 token max, 100 overlap)
 4. Generates text + understanding embeddings via Voyage AI
@@ -159,7 +159,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 Automatic product discovery from manufacturer websites via Firecrawl. Discovers product pages, extracts structured data, and runs the same full AI enrichment pipeline.
 
 **C. XML Import**
-Structured data import with AI-powered field mapping (Claude Sonnet). Supports recurring scheduled imports, batch processing (10 products at a time, 5 concurrent image downloads), and checkpoint recovery.
+Structured data import with AI-powered field mapping (Claude Opus). Supports recurring scheduled imports, batch processing (10 products at a time, 5 concurrent image downloads), and checkpoint recovery.
 
 ---
 
@@ -188,7 +188,7 @@ After retrieval, a secondary AI re-ranking pass scores results on visual, unders
 The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, multi-turn context, image uploads, and tool-use.
 
 **Jarvis — Primary Material Intelligence Agent**
-Model: Claude Sonnet 4.5 | LangGraph + Supabase checkpointer (conversations resume across sessions)
+Model: Claude Opus 4.7 | LangGraph + Supabase checkpointer (conversations resume across sessions)
 
 Tools available to all authenticated users:
 - `material_search` — 7-vector fusion search across the catalog, with **Explainable Search Spec** (structured interpretation of query across color/material/style/texture/specification dimensions, displayed as a collapsible card above results)
@@ -207,7 +207,7 @@ Tools gated to Admin/Owner only:
 - Sub-agents: `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`
 
 **Interior Designer Agent**
-Model: Claude Sonnet 4.5 | Focused on spatial design and visualization
+Model: Claude Opus 4.7 | Focused on spatial design and visualization
 
 - Analyzes room photos: layout, dimensions, natural light, spatial relationships, accessibility compliance
 - Generates interior design images (text prompt or image reference) — see Feature 4
@@ -606,7 +606,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 
 | AI Operation | Raw API Cost (approx.) | Credits Charged | Platform Margin |
 |-------------|----------------------|-----------------|-----------------|
-| Claude Sonnet analysis (1K tokens) | ~$0.003–0.015 | 1–20 credits | 20–60%+ |
+| Claude Opus analysis (1K tokens) | ~$0.015–0.075 | 2–40 credits | 20–60%+ |
 | Claude Haiku (1K tokens) | ~$0.0008–0.004 | 1–5 credits | 50–80%+ |
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |

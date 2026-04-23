@@ -379,7 +379,7 @@ function PipelineProgress({ currentStage, progress, status }: { currentStage: st
           <span>
             {currentStage === 'research' && 'Researching keywords with DataForSEO...'}
             {currentStage === 'plan' && 'Planning article structure with Gemini...'}
-            {currentStage === 'write' && 'Writing article with Claude Sonnet...'}
+            {currentStage === 'write' && 'Writing article with Claude Opus...'}
             {currentStage === 'analyze' && 'Analyzing content quality...'}
             {currentStage === 'finalize' && 'Finalizing report...'}
             {currentStage === 'done' && 'Complete!'}

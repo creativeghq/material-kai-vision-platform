@@ -4,13 +4,37 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
+## [unreleased] - 2026-04-23
+
+**Price monitoring — Phase 1 (Firecrawl consolidation + public lookup API)**
+- Added shared `FirecrawlClient` (`mivaa-pdf-extractor/app/services/integrations/firecrawl_client.py`) — Pydantic `model_json_schema()`-driven extraction, exponential backoff on retryable errors, centralized credit logging, opt-in `use_javascript_render` flag for JS-heavy pages.
+- Added `PriceExtraction` Pydantic model (`app/models/extraction.py`) with descriptive fields used as LLM hints.
+- Added locale-aware price parser (`app/utils/price_parsing.py`) via `price-parser>=0.3.4` — handles `$49.99`, `€1.299,00`, `From £29`, ISO-4217 normalization. New dep in `requirements.txt`.
+- Refactored `competitor_scraper_service.py` onto shared client (~290 → ~90 lines).
+- Parallelized per-source scraping in `price_monitoring_service.py` with `asyncio.gather` + `Semaphore(5)`.
+- Added denormalized `current_price` cache columns to `competitor_sources` (`current_price`, `current_currency`, `current_availability`, `current_price_updated_at`) for O(1) alert evaluation.
+- Added `source_type` enum to `competitor_sources` (`firecrawl_url` active, `dataforseo_shopping` reserved for Phase 2).
+- Wired notification delivery for triggered alerts: `_dispatch_alert_notification` → `NotificationService` → `notification-dispatcher` edge function → Resend (email) + `user_notifications` insert (in-app). `price_alert_history.notification_sent`/`notification_sent_at`/`notification_channels` now flipped on success.
+
+**Price monitoring — Public Lookup API (curl-callable)**
+- New endpoint `POST /api/v1/prices/lookup` (`mivaa-pdf-extractor/app/api/price_lookup_routes.py`) — one-shot price extraction for external callers.
+- Auth via `api_keys` table (`Authorization: Bearer <key>`) — validates `is_active`, `expires_at`, `allowed_endpoints`; resolves workspace via `workspace_members` for billing.
+- Per-key sliding 60s rate limit (default 60/min, configurable via `rate_limit_override`, cap 600/min).
+- New `price_lookups` usage table (api_key_id, user_id, workspace_id, url, success, price, currency, credits_used, latency_ms, raw_extract). RLS: users see their own rows only.
+- Path whitelisted in JWT middleware exclude list — route uses its own `authenticate_api_key` dependency.
+
+**Cleanup**
+- Removed Sonnet entirely; standardized on Claude Opus 4.7 as the primary model and Haiku 4.5 for fast/background tasks.
+
+---
+
 ## [2026-01-18] - Major Feature Expansion & Documentation Update
 
 ### 🚀 New Features
 
 **Web Scraping Integration**
 - Firecrawl-powered web scraping for automatic product discovery from manufacturer websites
-- AI-powered product extraction using Claude Sonnet 4.5
+- AI-powered product extraction using Claude Opus 4.7
 - Background processing with real-time progress tracking
 - Automatic image extraction and linking
 - 3 API endpoints: `/api/scraping/process-session`, `/api/scraping/session/{id}/status`, `/api/scraping/session/{id}/retry`

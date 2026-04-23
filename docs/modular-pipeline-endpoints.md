@@ -46,9 +46,9 @@ The `ai_config` object accepts the following optional fields:
 - `text_embedding_dimensions` — Default: 1024
 - `text_embedding_input_type` — Default: "document"
 - `classification_primary_model` — Default: "Qwen/Qwen3-VL-32B-Instruct"
-- `classification_validation_model` — Default: "claude-sonnet-4-6-20260217"
+- `classification_validation_model` — Default: "claude-opus-4-7"
 - `classification_confidence_threshold` — Default: 0.7
-- `discovery_model` — Default: "claude-sonnet-4-6-20260217"
+- `discovery_model` — Default: "claude-opus-4-7"
 - `metadata_extraction_model` — Default: "claude"
 - `chunking_model` — Default: "gpt-4o"
 - `discovery_temperature` — Default: 0.1
@@ -62,14 +62,14 @@ The `ai_config` object accepts the following optional fields:
 
 **DEFAULT_AI_CONFIG** (Balanced):
 - Best overall accuracy and reliability
-- Uses Claude Sonnet 4.5 for discovery and metadata
+- Uses Claude Opus 4.7 for discovery and metadata
 - Uses SLIG (SigLIP2) for visual embeddings (768D, HuggingFace endpoint)
 - Uses Voyage AI voyage-4 for text embeddings (1024D)
 - Uses Qwen3-VL-32B-Instruct for vision classification (HuggingFace endpoint) with Claude validation
 
 **FAST_CONFIG** (Speed Optimized):
 - Uses GPT-4o instead of Claude for faster processing
-- Uses Claude Haiku for validation (faster than Sonnet)
+- Uses Claude Haiku for validation (faster than Opus)
 - Reduced max tokens for faster responses
 
 **HIGH_ACCURACY_CONFIG** (Quality Optimized):
@@ -124,7 +124,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - Concurrency: 5 parallel calls
 
 - **Stage 2 - Claude Validation (High Quality)**:
-  - Model: `Claude Sonnet 4.5` (Anthropic)
+  - Model: `Claude Opus 4.7` (Anthropic)
   - Only validates images with confidence < threshold (default: 0.7)
   - Provides detailed reasoning for classification
   - Improves accuracy for edge cases
@@ -242,7 +242,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 **AI Processing**:
 - **Model**: Configurable via `ai_config.metadata_extraction_model`
-  - Default: `claude` (Claude Sonnet 4.5)
+  - Default: `claude` (Claude Opus 4.7)
   - Alternative: `gpt` (GPT-4o or GPT-5)
 - **Temperature**: Configurable via `ai_config.metadata_temperature` (default: 0.1)
 - **Max Tokens**: Configurable via `ai_config.metadata_max_tokens` (default: 4096)
@@ -367,8 +367,8 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - `all`: Process entire PDF (disables focused extraction)
 
 ### AI Models Used
-1. **Product Discovery**: Claude Sonnet 4.5 or GPT-5 (configurable)
-2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Sonnet 4.5 (validation)
+1. **Product Discovery**: Claude Opus 4.7 or GPT-5 (configurable)
+2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Opus 4.7 (validation)
 3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
 4. **Text Embeddings**: Voyage AI voyage-4 (1024D) — sole provider (updated 2026-04)
 

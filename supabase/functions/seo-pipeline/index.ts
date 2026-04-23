@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
       status: 'writing',
       progress_percentage: 45,
       current_stage: 'write',
-    }, 'Writing article with Claude Sonnet...');
+    }, 'Writing article with Claude Opus...');
 
     const writeResult = await callEdgeFunction('seo-write', {
       article_plan: plan,

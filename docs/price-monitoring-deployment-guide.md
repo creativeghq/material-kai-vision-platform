@@ -48,10 +48,14 @@ Run `supabase db push` from the project root to apply all migrations. Verify the
 Check that these tables exist:
 - `price_monitoring_products`
 - `price_history`
-- `competitor_sources`
+- `competitor_sources` (has `source_type` enum, `current_price`/`current_currency`/`current_availability`/`current_price_updated_at` cache columns)
 - `price_monitoring_jobs`
 - `price_alerts`
 - `price_alert_history`
+- `price_lookups` (external `/api/v1/prices/lookup` usage log)
+
+And the enum type:
+- `competitor_source_type` (`firecrawl_url`, `dataforseo_shopping`)
 
 ### Verify Database Functions
 
@@ -62,10 +66,15 @@ Check that these functions exist:
 
 ## Step 2: Python Backend Configuration
 
+### Dependencies
+
+The backend requires `price-parser>=0.3.4` for locale-aware price string parsing (already listed in `mivaa-pdf-extractor/requirements.txt`). Run `pip install -r requirements.txt` to pick it up.
+
 ### Environment Variables
 
 Add the following to `mivaa-pdf-extractor/.env`:
 - `FIRECRAWL_API_KEY` - Your Firecrawl API key
+- `RESEND_API_KEY` - Resend API key (used by the `notification-dispatcher` edge function for price alert emails)
 - `SUPABASE_URL` - Supabase project URL (should already exist)
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (should already exist)
 - `SUPABASE_JWT_SECRET` - JWT secret (should already exist)

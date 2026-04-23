@@ -38,7 +38,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 │  - _shared/skills/ (domain playbooks)                       │
 │  - Loads prompts from database                              │
 │  - LangGraph StateGraph orchestration                       │
-│  - Claude Sonnet 4.5 (Jarvis) / Claude Haiku 4.5 (Demo)     │
+│  - Claude Opus 4.7 (Jarvis) / Claude Haiku 4.5 (Demo)       │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -60,7 +60,7 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 **Agent ID**: `kai`
 **Legacy aliases**: `search`, `insights`, `seo` (all resolve to `kai`)
 **Access**: All users for core tools; admin/owner only for B2B, SEO, and sub-agent tools
-**Model**: Claude Sonnet 4.5
+**Model**: Claude Opus 4.7
 **DB prompt key**: `kai` in `prompts` table (`prompt_type='agent'`, `category='kai'`)
 
 **Purpose**: Primary user-facing agent combining material search, knowledge base queries, visual search, B2B manufacturer discovery, SEO analysis, and general material intelligence.
@@ -87,7 +87,7 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 
 **Agent ID**: `interior-designer`
 **Access**: All users (viewer, member, admin, owner)
-**Model**: Claude Sonnet 4.5
+**Model**: Claude Opus 4.7
 
 **Purpose**: AI-powered interior design with spatial analysis, material matching, and 3D/VR visualization.
 

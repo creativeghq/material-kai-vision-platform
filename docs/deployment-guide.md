@@ -83,7 +83,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
 | `VISION_GUIDED_ENABLED` | Public | Server ENV | Enable Vision AI Layer 3 for image extraction | `false` (default), `true` |
 | `VISION_GUIDED_PROVIDER` | Public | Server ENV | Vision AI provider (uses existing API keys) | `anthropic`, `openai`, `together` |
-| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-sonnet-4-6-20260217`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
+| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-opus-4-7`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
@@ -310,7 +310,7 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 | `DATAFORSEO_PASSWORD` | **Secret** | `seo-research` | DataForSEO API password | `xxxxxxxxxxxxxxxx` |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | **Secret** | `seo-plan`, `seo-analyze` | Google Gemini API key for article planning (structured output) and content analysis/auto-fix | `AIzaSyxxxxxxxxxxxxxxxx` |
 
-> **Note:** The SEO pipeline also uses `ANTHROPIC_API_KEY` (already listed under Core Secrets above) for article writing via Claude Sonnet. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-provided to all edge functions.
+> **Note:** The SEO pipeline also uses `ANTHROPIC_API_KEY` (already listed under Core Secrets above) for article writing via Claude Opus. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-provided to all edge functions.
 
 **How to get these keys:**
 
@@ -322,7 +322,7 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 **SEO Pipeline Credit Costs** (1 credit = $0.01, 50% markup on raw API cost):
 - Research: 18 credits (DataForSEO: 5 API calls ~$0.117 raw)
 - Planning: 2 credits (Gemini 3 Flash: ~3K in/3K out ~$0.01 raw)
-- Writing: 20 credits (Claude Sonnet 4.5: ~4K in/8K out ~$0.13 raw)
+- Writing: 20 credits (Claude Opus 4.7: ~4K in/8K out ~$0.66 raw)
 - Analysis: 2 credits (Gemini 3 Flash: ~6K in/3K out ~$0.01 raw, GEO scoring is regex-free)
 - Auto-fix: 5 credits per iteration (Gemini 3 Flash: ~10K in/8K out ~$0.03 raw)
 - **Total per article: 42 credits (no fix) — 57 credits (max 3 fixes)**
@@ -1119,9 +1119,8 @@ This section covers all third-party services used by the platform, their pricing
 
 | Model | Input | Output | Used For |
 |-------|-------|--------|---------|
-| Claude Sonnet 4.6 | $3/M tokens | $15/M tokens | KAI agent, SEO writing |
+| Claude Opus 4.7 | $15/M tokens | $75/M tokens | KAI agent, SEO writing, complex reasoning |
 | Claude Haiku 4.5 | $0.80/M tokens | $4/M tokens | Demo agent, B2B web search |
-| Claude Opus 4.6 | $15/M tokens | $75/M tokens | Complex reasoning (on demand) |
 
 ---
 

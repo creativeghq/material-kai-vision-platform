@@ -43,7 +43,7 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0: Product Discovery & Metafield Identification (0-15%)   │
-│ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
+│ AI Model: Claude Opus 4.7 / GPT-4o                           │
 │ Purpose: Identify products and metafield types                 │
 │ Output: Product catalog with metafield types                   │
 └─────────────────────────────────────────────────────────────────┘
@@ -70,7 +70,7 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 4: Product Creation & Metafield Consolidation (70-90%)   │
-│ AI: Claude Haiku 4.5 → Claude Sonnet 4.5                       │
+│ AI: Claude Haiku 4.5 → Claude Opus 4.7                         │
 │ Purpose: Create products, consolidate all metafields           │
 │ Output: Product records with consolidated metafields           │
 └─────────────────────────────────────────────────────────────────┘
@@ -89,7 +89,7 @@ PDF Upload
 ## 🔍 Stage 0: Product Discovery - Initial Metafield Identification
 
 ### AI Model & Process
-**Claude Sonnet 4.5 / GPT-4o**
+**Claude Opus 4.7 / GPT-4o**
 
 The AI analyzes the entire PDF to:
 1. **Identify product boundaries** - Detect where each product starts/ends
@@ -223,7 +223,7 @@ The AI extracts images and analyzes them for visual metafields:
 
 ### AI Models & Process
 - **Claude Haiku 4.5**: Initial product creation from chunks
-- **Claude Sonnet 4.5**: Validation, enrichment, and consolidation
+- **Claude Opus 4.7**: Validation, enrichment, and consolidation
 
 The AI creates product records and consolidates metafields from all sources:
 
@@ -440,10 +440,10 @@ Metafield values are inserted into `product_metafield_values`, `chunk_metafield_
 
 | Stage | AI Model | Input | Process | Output | Accuracy |
 |-------|----------|-------|---------|--------|----------|
-| **0** | Claude Sonnet 4.5 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
+| **0** | Claude Opus 4.7 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
 | **2** | Anthropic Claude | Product pages | Create chunks, preserve metafields | Chunks with metafield metadata | 88%+ |
 | **3** | Qwen Vision + CLIP | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
-| **4** | Claude Haiku 4.5 → Sonnet 4.5 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
+| **4** | Claude Haiku 4.5 → Opus 4.7 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
 | **12** | Extract & Link | Product metadata | Create database records, link to products/chunks/images | metafield_values linked | 100% |
 
 ### Key Metrics

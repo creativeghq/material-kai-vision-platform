@@ -60,7 +60,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[data-import-system.md](data-import-system.md)** - Data import system ✨ NEW
 - XML import with AI-powered field mapping
-- Dynamic field mapping (Claude Sonnet 4.5)
+- Dynamic field mapping (Claude Opus 4.7)
 - Batch processing (10 products at a time)
 - Concurrent image downloads (5 parallel)
 - Cron-based scheduling for recurring imports
@@ -151,7 +151,7 @@ Complete documentation for Material Kai Vision Platform.
 **[ai-reranking.md](ai-reranking.md)** - AI Search Re-ranking ✨ NEW
 - Claude-powered post-retrieval result re-ordering
 - Optional per-result explanations
-- sonnet or haiku model choice
+- opus or haiku model choice
 
 **[crm-system.md](crm-system.md)** - CRM System ✨ NEW
 - Contacts, companies, platform user management
@@ -203,7 +203,7 @@ Complete documentation for Material Kai Vision Platform.
 - 200+ metadata fields across 9 categories
 - Material Properties, Dimensions, Appearance, Performance
 - Application, Compliance, Design, Manufacturing, Commercial
-- AI-powered dynamic extraction (Claude Sonnet 4.5 / GPT-4o)
+- AI-powered dynamic extraction (Claude Opus 4.7 / GPT-4o)
 - Complete field reference with examples
 - API usage and frontend display
 - Step-by-step extraction process
@@ -312,7 +312,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
 - 12+ AI models across 5 providers
-- Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
+- Anthropic: Claude Opus 4.7, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-4o-mini
 - Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
 - HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (5 visual embedding types, 768D each)
@@ -539,7 +539,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-4), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 4.7 + Haiku 4.5), GPT-4o/mini, Voyage AI (voyage-4), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

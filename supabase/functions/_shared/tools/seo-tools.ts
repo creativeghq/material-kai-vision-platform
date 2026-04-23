@@ -155,13 +155,13 @@ export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status
 
 /**
  * SEO Tool: Article Writer
- * Calls seo-write edge function → Claude Sonnet
+ * Calls seo-write edge function → Claude Opus
  */
 export const createSEOArticleWriterTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ article_plan, content_brief }) => {
       try {
-        onProgress?.('Writing article with Claude Sonnet...');
+        onProgress?.('Writing article with Claude Opus...');
 
         const result = await callSEOFunction('seo-write', {
           article_plan,
@@ -187,7 +187,7 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
     },
     {
       name: 'seo_article_writer',
-      description: 'Write a full SEO article from an article plan. Uses Claude Sonnet to generate high-quality long-form content following the plan structure. Requires an article plan from seo_article_planner tool.',
+      description: 'Write a full SEO article from an article plan. Uses Claude Opus to generate high-quality long-form content following the plan structure. Requires an article plan from seo_article_planner tool.',
       schema: z.object({
         article_plan: z.any().describe('Full article plan from seo_article_planner tool'),
         content_brief: z.any().optional().describe('Optional content brief with brand voice and audience details'),

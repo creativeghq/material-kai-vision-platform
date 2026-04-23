@@ -105,8 +105,8 @@ async function initRuntime() {
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
   });
-  modelSonnet = new ChatAnthropic({
-    model: 'claude-sonnet-4-7',
+  modelOpus = new ChatAnthropic({
+    model: 'claude-opus-4-7',
     temperature: 1,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
@@ -719,7 +719,7 @@ let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
 
 // Claude models — initialized in initRuntime()
 let modelHaiku: any;
-let modelSonnet: any;
+let modelOpus: any;
 
 // Model selection based on agent type
 function getModelForAgent(agentId: string): ChatAnthropic {
@@ -727,8 +727,8 @@ function getModelForAgent(agentId: string): ChatAnthropic {
   if (agentId === 'demo') {
     return modelHaiku;
   }
-  // KAI, Interior, and all other agents use Sonnet for complex reasoning
-  return modelSonnet;
+  // KAI, Interior, and all other agents use Opus for complex reasoning
+  return modelOpus;
 }
 
 // Get model name for logging/tracking — must stay in sync with model instances above
@@ -736,7 +736,7 @@ function getModelNameForAgent(agentId: string): string {
   if (agentId === 'demo') {
     return 'claude-haiku-4-5';
   }
-  return 'claude-sonnet-4-7';
+  return 'claude-opus-4-7';
 }
 
 interface AgentConfig {

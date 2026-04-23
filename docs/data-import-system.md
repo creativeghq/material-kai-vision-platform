@@ -28,7 +28,7 @@ The Data Import System enables ingesting products from multiple sources includin
 
 ### Key Features
 
-- Dynamic XML field mapping with AI suggestions (Claude Sonnet 4.5)
+- Dynamic XML field mapping with AI suggestions (Claude Opus 4.7)
 - Reusable mapping templates
 - Manual re-run functionality
 - Cron-based scheduling for recurring imports
@@ -82,7 +82,7 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 ┌─────────────────────────────────────────────────────────────┐
 │ EDGE FUNCTION (xml-import-orchestrator)                     │
 │ ├─ Parse XML and detect fields                              │
-│ ├─ AI-powered field mapping (Claude Sonnet 4.5)             │
+│ ├─ AI-powered field mapping (Claude Opus 4.7)             │
 │ ├─ Create data_import_jobs record                           │
 │ └─ Call Python API (non-blocking)                           │
 └─────────────────────────────────────────────────────────────┘
@@ -110,7 +110,7 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
    ↓
 2. Edge Function parses XML and detects fields
    ↓
-3. AI suggests field mappings (Claude Sonnet 4.5)
+3. AI suggests field mappings (Claude Opus 4.7)
    ↓
 4. User reviews and confirms mappings
    ↓
@@ -173,7 +173,7 @@ Configure cron schedules for recurring imports:
 
 **Features:**
 - XML parsing with field detection
-- AI-powered field mapping using Claude Sonnet 4.5
+- AI-powered field mapping using Claude Opus 4.7
 - Fallback rule-based mapping (multi-language support)
 - Preview mode for field detection only
 - Stores products in job metadata for Python API

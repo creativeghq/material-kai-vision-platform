@@ -1707,7 +1707,7 @@ All endpoints return JSON with fields: `success` (boolean), `data` (object), `er
 
 **Features:**
 - XML parsing with field detection
-- AI-powered field mapping (Claude Sonnet 4.5)
+- AI-powered field mapping (Claude Opus 4.7)
 - Fallback rule-based mapping (multi-language support)
 - Preview mode for field detection only
 - Stores products in job metadata for Python API

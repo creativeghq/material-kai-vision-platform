@@ -42,7 +42,7 @@
 
 **[data-import-system.md](data-import-system.md)** - Data import system ✨ NEW
 - XML import with AI-powered field mapping
-- Dynamic field mapping (Claude Sonnet 4.5)
+- Dynamic field mapping (Claude Opus 4.7)
 - Batch processing (10 products at a time)
 - Concurrent image downloads (5 parallel)
 - Cron-based scheduling for recurring imports
@@ -54,7 +54,7 @@
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
 - 12+ AI models across 5 providers
-- Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
+- Anthropic: Claude Opus 4.7, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-4o-mini
 - Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
 - HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (768D visual embeddings)

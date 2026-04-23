@@ -26,8 +26,8 @@ Example: A $0.15 USD API call = **15 platform credits**
 ### 2. **Anthropic Models (Claude)**
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
-  - Claude 3.5 Sonnet (with prompt caching)
-  - Claude 3 Opus, Sonnet, Haiku
+  - Claude Opus 4.7 (with prompt caching)
+  - Claude Haiku 4.5
 - **Special Features**:
   - Prompt caching support (reduced cost for cached tokens)
 - **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price) + (cached_tokens / 1M × cached_price). Platform Credits = USD Cost × 100.
@@ -49,7 +49,7 @@ Example: A $0.15 USD API call = **15 platform credits**
 - **Pricing Unit**: Per image
 - **Models Tracked**:
   - GPT-4o vision
-  - Claude 3.5 Sonnet vision
+  - Claude Opus 4.7 vision
 - **Cost Calculation**: USD Cost = image_count × price_per_image. Platform Credits = USD Cost × 100.
 
 ### 6. **Firecrawl Web Scraping**
@@ -65,7 +65,7 @@ Example: A $0.15 USD API call = **15 platform credits**
 ## Database Schema
 
 ### `ai_usage_logs` Table
-Tracks all AI API calls with detailed cost breakdown. The table stores the following fields: a UUID primary key, `user_id` referencing `auth.users`, `model_name` (e.g., `"gpt-4o"`, `"claude-3-5-sonnet"`), `provider` (e.g., `"openai"`, `"anthropic"`, `"firecrawl"`), `operation_type` (e.g., `"chat"`, `"embedding"`, `"scrape"`), `input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`, `firecrawl_credits` (Firecrawl-specific), `cost_usd` (DECIMAL 10,6 — cost in USD), `platform_credits` (integer — cost in platform credits, i.e., USD × 100), `request_metadata` (JSONB), `response_metadata` (JSONB), and `created_at` timestamp.
+Tracks all AI API calls with detailed cost breakdown. The table stores the following fields: a UUID primary key, `user_id` referencing `auth.users`, `model_name` (e.g., `"gpt-4o"`, `"claude-opus-4-7"`), `provider` (e.g., `"openai"`, `"anthropic"`, `"firecrawl"`), `operation_type` (e.g., `"chat"`, `"embedding"`, `"scrape"`), `input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`, `firecrawl_credits` (Firecrawl-specific), `cost_usd` (DECIMAL 10,6 — cost in USD), `platform_credits` (integer — cost in platform credits, i.e., USD × 100), `request_metadata` (JSONB), `response_metadata` (JSONB), and `created_at` timestamp.
 
 ---
 

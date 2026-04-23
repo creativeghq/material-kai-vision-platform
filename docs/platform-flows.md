@@ -74,7 +74,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Semantic similarity (20%)
    - Recency (10%)
    ↓
-6. Optional AI re-ranking (Claude Sonnet 4.5)
+6. Optional AI re-ranking (Claude Opus 4.7)
    ↓
 7. Results displayed with:
    - Product cards
@@ -97,7 +97,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 2. Edge Function parses XML and detects fields
    ↓
-3. AI suggests field mappings (Claude Sonnet 4.5)
+3. AI suggests field mappings (Claude Opus 4.7)
    ↓
 4. User reviews and confirms mappings
    ↓
@@ -207,7 +207,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 **Edge Function:** `agent-chat`
 **Frontend Component:** `AgentHub.tsx`
-**AI Model:** Claude Sonnet 4.5
+**AI Model:** Claude Opus 4.7
 **Documentation:** [agent-system.md](agent-system.md)
 
 ---

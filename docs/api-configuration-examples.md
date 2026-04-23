@@ -30,7 +30,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 **Defaults Used**:
 - Visual Embeddings: SLIG (SigLIP2) - HuggingFace endpoint (768D)
 - Classification: Qwen3-VL-32B-Instruct - HuggingFace endpoint
-- Discovery: Claude Sonnet 4.5
+- Discovery: Claude Opus 4.7
 - Metadata: Claude
 - Text Embeddings: Voyage AI voyage-4 (1024D) → OpenAI fallback (1024D)
 
@@ -55,8 +55,8 @@ Faster processing with good accuracy.
 **Use When**: You need faster processing times and can accept slightly lower accuracy.
 
 **Speed Improvements**:
-- GPT-4o is ~2x faster than Claude Sonnet for discovery
-- Claude Haiku is ~3x faster than Claude Sonnet for validation
+- GPT-4o is ~2x faster than Claude Opus for discovery
+- Claude Haiku is ~3x faster than Claude Opus for validation
 - Reduced tokens = faster responses
 
 ### 3. HIGH_ACCURACY_CONFIG (Quality Optimized)
@@ -77,8 +77,8 @@ Minimize costs while maintaining acceptable quality.
 **Use When**: You need to minimize API costs.
 
 **Cost Savings**:
-- GPT-4o is cheaper than Claude Sonnet
-- Claude Haiku is ~10x cheaper than Claude Sonnet
+- GPT-4o is cheaper than Claude Opus
+- Claude Haiku is ~20x cheaper than Claude Opus
 - Lower threshold (0.6) = fewer validation calls
 - Reduced tokens = lower costs
 
@@ -148,7 +148,7 @@ For high-value catalogs requiring maximum accuracy:
 ### Estimated Costs Per PDF (100 pages, 50 images)
 
 **DEFAULT_AI_CONFIG**:
-- Discovery (Claude Sonnet): ~$0.50
+- Discovery (Claude Opus): ~$2.50
 - Classification (Qwen + Claude): ~$0.30
 - Metadata (Claude): ~$0.40
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
@@ -165,7 +165,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **HIGH_ACCURACY_CONFIG**:
 - Discovery (GPT-5): ~$1.00
-- Classification (Qwen + Sonnet): ~$0.40
+- Classification (Qwen + Opus): ~$0.40
 - Metadata (Claude): ~$0.60
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20
@@ -180,7 +180,7 @@ For high-value catalogs requiring maximum accuracy:
 **Speed Improvements**:
 - Lower threshold = fewer validation calls = faster
 - GPT-4o = 2x faster than Claude
-- Haiku = 3x faster than Sonnet
+- Haiku = 3x faster than Opus
 - Reduced tokens = faster responses
 - **Estimated**: 40-50% faster processing
 
@@ -188,7 +188,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **Benefits**:
 - Standard threshold (0.7) = good balance
-- Claude Sonnet = best quality
+- Claude Opus = best quality
 - Medium tokens = good context
 - **Estimated**: Standard processing time with best quality
 
@@ -229,7 +229,7 @@ Test two configurations side-by-side by submitting separate jobs with different 
 
 **Problem**: Too many false positives/negatives in image classification.
 
-**Solution**: Increase confidence threshold and use Claude Sonnet for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-sonnet-4-6-20260217` in your `ai_config`.
+**Solution**: Increase confidence threshold and use Claude Opus for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-opus-4-7` in your `ai_config`.
 
 ### Slow Processing
 

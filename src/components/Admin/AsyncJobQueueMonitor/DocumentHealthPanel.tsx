@@ -13,7 +13,7 @@
  *   - Average coverage across the whole document
  *   - A sample of products with missing critical fields + source breakdown
  *     (which tier populated each field: chunk_regex / vision_rollup /
- *     pymupdf_text_dict / claude_sonnet_vision / catalog_legend / ...)
+ *     pymupdf_text_dict / claude_sonnet_vision [legacy DB enum] / catalog_legend / ...)
  *   - A list of detected issues with suggested remediation
  *
  * This is a reusable admin tool — it works for any document processed by
@@ -68,7 +68,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   vision_rollup:         { label: 'Image Vision Rollup',   color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
   pymupdf_text_dict:     { label: 'PyMuPDF Tier A',        color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   claude_spec_vision:    { label: 'Claude Spec Vision',    color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  claude_sonnet_vision:  { label: 'Claude Sonnet Tier B',  color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  claude_sonnet_vision:  { label: 'Claude Opus Tier B',    color: 'bg-amber-100 text-amber-800 border-amber-200' },
   catalog_legend:        { label: 'Catalog Legend Tier C', color: 'bg-pink-100 text-pink-800 border-pink-200' },
   unknown:               { label: 'Unknown',               color: 'bg-slate-100 text-slate-800 border-slate-200' },
 };

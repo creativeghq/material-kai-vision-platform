@@ -6,7 +6,7 @@
  *
  * Features:
  * - Quality-based ranking (fast, local)
- * - Premium AI re-ranking with Claude Sonnet (optional, premium)
+ * - Premium AI re-ranking with Claude Opus (optional, premium)
  * - Relevance analysis and explanation generation
  * - Mixed query support (text + image)
  */
@@ -36,7 +36,7 @@ export interface AIReRankingRequest {
   results: SearchResult[];
   maxResults?: number;
   includeExplanations?: boolean;
-  model?: 'claude-sonnet-4-7' | 'claude-haiku-4-5';
+  model?: 'claude-opus-4-7' | 'claude-haiku-4-5';
 }
 
 /**
@@ -190,9 +190,9 @@ Quality Metrics:
 }
 
 /**
- * Premium AI Re-ranking with Claude Sonnet
+ * Premium AI Re-ranking with Claude Opus
  *
- * Uses Claude Sonnet to deeply analyze search results and re-rank them
+ * Uses Claude Opus to deeply analyze search results and re-rank them
  * based on semantic relevance, context understanding, and query intent.
  *
  * This is an optional premium feature that provides:
@@ -201,13 +201,13 @@ Quality Metrics:
  * - Detailed explanations for each result
  * - 99%+ accuracy
  *
- * Cost: ~$3/1M tokens (Claude Sonnet)
+ * Cost: ~$3/1M tokens (Claude Opus)
  */
 export async function aiReRanking(
   request: AIReRankingRequest,
 ): Promise<AIReRankingResponse> {
   const startTime = Date.now();
-  const model = request.model || 'claude-sonnet-4-7';
+  const model = request.model || 'claude-opus-4-7';
 
   try {
     // Call Supabase Edge Function (server-side, API key never exposed to client)
@@ -345,7 +345,7 @@ export async function compareRankingMethods(
   query: string,
   results: SearchResult[],
   options: {
-    model?: 'claude-sonnet-4-7' | 'claude-haiku-4-5';
+    model?: 'claude-opus-4-7' | 'claude-haiku-4-5';
     weights?: RankingWeights;
   } = {},
 ): Promise<RankingComparison> {

@@ -10,7 +10,7 @@
 
 ### 1. Anthropic (Claude)
 
-#### Claude Sonnet 4.5
+#### Claude Opus 4.7
 - **Use Cases**:
   - Product discovery from PDFs (Stage 0A)
   - Deep metadata extraction
@@ -19,7 +19,7 @@
   - XML field mapping
   - Search deduplication analysis
 - **Context**: 200,000 tokens
-- **Cost**: ~$0.015 per 1K tokens
+- **Cost**: ~$0.075 per 1K tokens (blended $15 input / $75 output per 1M)
 - **Performance**: Highest accuracy for complex reasoning
 
 #### Claude Haiku 4.5
@@ -30,7 +30,7 @@
   - Quick validation tasks
 - **Context**: 200,000 tokens
 - **Cost**: ~$0.0025 per 1K tokens
-- **Performance**: 3× faster than Sonnet, 90%+ accuracy
+- **Performance**: 3× faster than Opus, 90%+ accuracy
 
 ---
 
@@ -191,19 +191,19 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 ## 📈 Model Usage by Feature
 
 ### PDF Processing Pipeline
-- **Stage 0A (Product Discovery)**: Claude Sonnet 4.5 or GPT-4o
-- **Stage 0B (Entity Discovery)**: Claude Sonnet 4.5 or GPT-4o
+- **Stage 0A (Product Discovery)**: Claude Opus 4.7 or GPT-4o
+- **Stage 0B (Entity Discovery)**: Claude Opus 4.7 or GPT-4o
 - **Stage 2 (Text Embeddings)**: Voyage AI voyage-4 (1024D, updated 2026-04)
 - **Stage 6 (Image Classification)**: Qwen3-VL 17B Vision
 - **Stage 7 (SLIG Embeddings)**: SigLIP2 via HuggingFace cloud endpoint (768D, 5 types + understanding 1024D)
 - **Stage 8 (Image Analysis)**: Qwen3-VL 17B Vision
 
 ### Web Scraping Integration
-- **Product Discovery**: Claude Sonnet 4.5 (default), GPT-5, or Claude Haiku 4.5
+- **Product Discovery**: Claude Opus 4.7 (default), GPT-5, or Claude Haiku 4.5
 - **Content Analysis**: Same models as PDF Stage 0A
 
 ### XML Import
-- **Field Mapping**: Claude Sonnet 4.5
+- **Field Mapping**: Claude Opus 4.7
 - **Dynamic mapping with AI reasoning**
 
 ### Interior Design Generation
@@ -228,9 +228,9 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 - **Visual Embeddings**: SLIG SigLIP2 cloud endpoint (auto-pause enabled)
 
 ### High-Accuracy Operations (Use Premium Models)
-- **Product Discovery**: Claude Sonnet 4.5 ($0.015/1K tokens)
-- **Metadata Extraction**: Claude Sonnet 4.5
-- **Spatial Analysis**: Claude Sonnet 4.5 Vision
+- **Product Discovery**: Claude Opus 4.7 ($0.015/1K tokens)
+- **Metadata Extraction**: Claude Opus 4.7
+- **Spatial Analysis**: Claude Opus 4.7 Vision
 
 ### Parallel Processing
 - **Interior Design**: Process 3 models concurrently
@@ -241,7 +241,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 
 ## 🎯 Model Selection Guidelines
 
-### When to Use Claude Sonnet 4.5
+### When to Use Claude Opus 4.7
 - Complex reasoning required
 - High accuracy needed
 - Detailed metadata extraction
@@ -253,7 +253,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 - Quick validation
 - High-volume operations
 - Real-time analysis
-- **Cost**: 6× cheaper than Sonnet
+- **Cost**: ~20× cheaper than Opus
 
 ### When to Use GPT-4o/GPT-5
 - Conversational AI
@@ -279,7 +279,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 
 | Model | Use Case | Speed | Accuracy | Cost/Operation |
 |-------|----------|-------|----------|----------------|
-| Claude Sonnet 4.5 | Product Discovery | 3-5s | 95%+ | $0.05-0.15 |
+| Claude Opus 4.7 | Product Discovery | 3-5s | 95%+ | $0.05-0.15 |
 | Claude Haiku 4.5 | Classification | 0.5-1s | 90%+ | $0.01-0.03 |
 | GPT-4o | Discovery | 2-4s | 93%+ | $0.04-0.12 |
 | Qwen3-VL | Image Analysis | 2-3s | 90%+ | $0.02-0.05 |
@@ -294,7 +294,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 ### Primary → Secondary → Tertiary
 
 **Product Discovery**:
-1. Claude Sonnet 4.5 (primary)
+1. Claude Opus 4.7 (primary)
 2. GPT-4o (secondary)
 3. Claude Haiku 4.5 (tertiary, lower accuracy)
 
@@ -318,7 +318,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Qwen3-VL vision_analys
 - ✨ Added GPT-5 support (future-proofing)
 
 **December 2025**:
-- ✨ Upgraded to Claude Sonnet 4.5 (from 3.5)
+- ✨ Upgraded to Claude Opus 4.7
 - ✨ Upgraded to Claude Haiku 4.5 (from 3.5)
 - ✨ Added Google SigLIP as primary CLIP model
 

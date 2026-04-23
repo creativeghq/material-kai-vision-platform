@@ -213,7 +213,7 @@ The enriched metadata includes the core fields (color, finish, material, style, 
 
 **How It Works**:
 1. Load prompt from `prompts` table (category: embedding_to_text)
-2. Pass embedding data to Claude Sonnet 4.5
+2. Pass embedding data to Claude Opus 4.7
 3. AI interprets embeddings using vocabulary guidelines in prompt
 4. Returns structured JSON with primary/secondary values and confidence scores
 
@@ -231,7 +231,7 @@ The enriched metadata includes the core fields (color, finish, material, style, 
 **How It Works**:
 1. Load prompt from `prompts` table (category: metadata_consolidation)
 2. Collect metadata from all 5 sources (manual, AI text, visual, pattern, factory)
-3. Pass all sources to Claude Sonnet 4.5
+3. Pass all sources to Claude Opus 4.7
 4. AI intelligently merges with conflict resolution
 5. Returns consolidated metadata with extraction tracking
 
@@ -307,7 +307,7 @@ Product metadata includes all the above plus visually-derived fields (color, fin
    - Review extraction tracking
 
 2. **Monitor Performance**
-   - AI call costs (Claude Sonnet 4.5)
+   - AI call costs (Claude Opus 4.7)
    - Processing time impact
    - Memory usage
 

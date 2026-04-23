@@ -942,7 +942,7 @@ const OperationsDashboardInner: React.FC = () => {
                           <div className="text-sm text-blue-700">Est. Total Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
                             ${agentChats.reduce((sum, chat) => {
-                              const model = chat.metadata?.model || 'claude-sonnet-4-7';
+                              const model = chat.metadata?.model || 'claude-opus-4-7';
                               const inputTokens = estimateTokens(chat.content);
                               const outputTokens = estimateTokens(chat.content);
                               return sum + calculateCost(model, inputTokens, outputTokens).total;
@@ -1015,7 +1015,7 @@ const OperationsDashboardInner: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {agentChats.slice(0, 20).map((chat) => {
-                      const model = chat.metadata?.model || 'claude-sonnet-4-7';
+                      const model = chat.metadata?.model || 'claude-opus-4-7';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
@@ -1051,7 +1051,7 @@ const OperationsDashboardInner: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
-                              {model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.slice(0, 12)}
+                              {model.includes('haiku') ? 'Haiku' : model.includes('opus') ? 'Opus' : model.slice(0, 12)}
                             </code>
                           </TableCell>
                           <TableCell>
@@ -1693,7 +1693,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models — Claude Opus 4.7, Claude Sonnet 4.7, Claude Haiku 4.5, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models — Claude Opus 4.7, Claude Haiku 4.5, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
@@ -1887,10 +1887,9 @@ const OperationsDashboardInner: React.FC = () => {
                       ))}
                       {modelUsage.length === 0 && (
                         <>
-                          {/* Placeholder rows — canonical 3 Claude models + vision/embedding */}
+                          {/* Placeholder rows — canonical Claude models + vision/embedding */}
                           {[
                             { name: 'Claude Opus 4.7' },
-                            { name: 'Claude Sonnet 4.7' },
                             { name: 'Claude Haiku 4.5' },
                             { name: 'Qwen3-VL-32B' },
                             { name: 'text-embedding-3-small' },

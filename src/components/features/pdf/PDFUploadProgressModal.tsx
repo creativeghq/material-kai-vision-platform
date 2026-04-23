@@ -809,7 +809,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                       );
                       if (mivaaStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'Claude 4.5 Sonnet (RAG)',
+                          name: 'Claude Opus 4.7 (RAG)',
                           purpose:
                             'Document synthesis, semantic analysis, and intelligent Q&A',
                           status: '✓ Used',
@@ -829,7 +829,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         anthropicProductStep?.status === 'completed'
                       ) {
                         aiModels.push({
-                          name: 'Anthropic Claude 3.5 Sonnet',
+                          name: 'Anthropic Claude Opus 4.7',
                           purpose:
                             'Image validation, product enrichment, and quality assessment',
                           status: '✓ Used',

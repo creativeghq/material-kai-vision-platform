@@ -164,7 +164,7 @@ is `null`, `confidence` is `low`, and `warnings` explains the gap.
 
 ### Cost
 
-- LLM: ~1–3K input tokens + ~500–1500 output tokens (Claude Sonnet 4.6)
+- LLM: ~1–3K input tokens + ~500–1500 output tokens (Claude Opus 4.7)
 - Embedding: one query embedding via Voyage AI per call (~$0.00006)
 - No external API fees beyond the LLM call
 

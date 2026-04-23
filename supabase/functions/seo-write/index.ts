@@ -1,7 +1,7 @@
 /**
  * SEO Write Edge Function
  *
- * Generates a full SEO article from an article plan using Claude Sonnet.
+ * Generates a full SEO article from an article plan using Claude Opus.
  * Claude is chosen for writing due to superior prose quality,
  * natural tone, and stronger E-E-A-T experiential signals.
  *
@@ -91,7 +91,7 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
     const systemPrompt = buildWritingSystemPrompt(baseSystemPrompt, plan, brief);
     const userPrompt = buildWritingUserPrompt(plan, brief);
 
-    // Call Claude Sonnet for writing (auto-tracked)
+    // Call Claude Opus for writing (auto-tracked)
     const result = await generateWithClaude(userPrompt, {
       task: 'seo_write',
       systemPrompt,

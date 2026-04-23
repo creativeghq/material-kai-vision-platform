@@ -26,7 +26,6 @@ interface ChunkQualityMetrics {
   total_chunks: number;
   total_documents: number;
   exact_duplicates_prevented: number;
-  semantic_duplicates_prevented: number;
   low_quality_rejected: number;
   borderline_quality_flagged: number;
   average_quality_score: number;
@@ -160,9 +159,7 @@ export const ChunkQualityDashboard: React.FC = () => {
   const qualityPercentage = metrics
     ? (metrics.average_quality_score * 100).toFixed(1)
     : '0';
-  const totalDuplicatesPrevented =
-    (metrics?.exact_duplicates_prevented || 0) +
-    (metrics?.semantic_duplicates_prevented || 0);
+  const totalDuplicatesPrevented = metrics?.exact_duplicates_prevented || 0;
 
   return (
     <div className="space-y-6">
@@ -235,8 +232,7 @@ export const ChunkQualityDashboard: React.FC = () => {
               {totalDuplicatesPrevented.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics?.exact_duplicates_prevented || 0} exact,{' '}
-              {metrics?.semantic_duplicates_prevented || 0} semantic
+              Exact content match (MD5)
             </p>
           </CardContent>
         </Card>

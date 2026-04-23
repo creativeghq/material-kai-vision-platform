@@ -11,9 +11,8 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | Model | Provider | Purpose | Capability | Cost (per 1M tokens) |
 |-------|----------|---------|-----------|---------------------|
 | **Text Generation** |
-| Claude Sonnet 4.5 | Anthropic | Product discovery, enrichment | 95%+ accuracy | $3 input / $15 output |
+| Claude Opus 4.7 | Anthropic | Product discovery, enrichment, complex reasoning | Highest accuracy | $15 input / $75 output |
 | Claude Haiku 4.5 | Anthropic | Fast validation | Real-time | $0.80 input / $4 output |
-| Claude Opus 4.5 | Anthropic | Complex reasoning | Highest accuracy | $15 input / $75 output |
 | GPT-4o | OpenAI | Alternative discovery | 94%+ accuracy | $2.50 input / $10 output |
 | GPT-4o Mini | OpenAI | Lightweight tasks | Fast & cheap | $0.15 input / $0.60 output |
 | **Text Embeddings** |
@@ -34,7 +33,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ## Model Details
 
-### 1. Claude Sonnet 4.5 (Anthropic)
+### 1. Claude Opus 4.7 (Anthropic)
 
 **Purpose**: Product discovery, enrichment, validation
 
@@ -47,7 +46,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 **Performance**:
 - Accuracy: 95%+
 - Latency: 2-5 seconds
-- Cost: $3 per 1M input tokens
+- Cost: $15 per 1M input tokens
 
 **When to Use**:
 - Product discovery
@@ -241,13 +240,13 @@ Additionally, an **Understanding Embedding** (1024D, Voyage AI from Qwen3-VL vis
 
 | Stage | Primary Model | Secondary Model | Purpose |
 |-------|---------------|-----------------|---------|
-| 0 | Claude Sonnet 4.5 | GPT-4o | Product discovery |
+| 0 | Claude Opus 4.7 | GPT-4o | Product discovery |
 | 2 | Anthropic Chunking | - | Text segmentation |
 | 4 | voyage-4 (Voyage AI) | - | Text embeddings (1024D, updated 2026-04) |
 | 6 | Qwen3-VL 17B | - | Image analysis |
 | 7-10 | SLIG (SigLIP2, 5 types) | - | Visual embeddings (768D) |
-| 11 | Claude Haiku 4.5 | Claude Sonnet 4.5 | Product validation |
-| 13 | Claude Sonnet 4.5 | - | Quality enhancement |
+| 11 | Claude Haiku 4.5 | Claude Opus 4.7 | Product validation |
+| 13 | Claude Opus 4.7 | - | Quality enhancement |
 
 ---
 
@@ -278,7 +277,7 @@ Additionally, an **Understanding Embedding** (1024D, Voyage AI from Qwen3-VL vis
 - `SLIG_ENDPOINT_URL` — HuggingFace SLIG endpoint URL
 - `SLIG_ENDPOINT_TOKEN` — HuggingFace SLIG endpoint token
 
-The model configuration maps each task to its designated model: `discovery` uses `claude-sonnet-4-5`, `validation` uses `claude-haiku-4-5`, `text_embeddings` uses `voyage-4`, `vision` uses `Qwen/Qwen3-VL-32B-Instruct`, and `visual_embeddings` uses `SLIG`.
+The model configuration maps each task to its designated model: `discovery` uses `claude-opus-4-7`, `validation` uses `claude-haiku-4-5`, `text_embeddings` uses `voyage-4`, `vision` uses `Qwen/Qwen3-VL-32B-Instruct`, and `visual_embeddings` uses `SLIG`.
 
 ---
 
@@ -398,7 +397,7 @@ The model configuration maps each task to its designated model: `discovery` uses
 
 ### Vision Analysis
 1. **Qwen3-VL-32B-Instruct** (PRIMARY) - All production vision tasks (HuggingFace endpoint)
-2. **Claude Sonnet 4.5** - Validation for low-confidence results
+2. **Claude Opus 4.7** - Validation for low-confidence results
 
 ### Visual Embeddings
 1. **SLIG (SigLIP2)** (PRIMARY) - All visual embeddings (768D, HuggingFace endpoint)
@@ -406,7 +405,7 @@ The model configuration maps each task to its designated model: `discovery` uses
    - Text-guided (color, texture, material, style) (text_embedding mode)
 
 ### Text Generation
-1. **Claude Sonnet 4.5** (PRIMARY) - Complex reasoning
+1. **Claude Opus 4.7** (PRIMARY) - Complex reasoning
 2. **Claude Haiku 4.5** - Fast validation
 3. **GPT-4o** - Alternative/fallback
 

@@ -65,7 +65,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 30+ Edge Functions (TypeScript/Deno)
 
 **AI Services**:
-- Anthropic (Claude Sonnet 4.5, Claude Haiku 4.5 + built-in web search)
+- Anthropic (Claude Opus 4.7, Claude Haiku 4.5 + built-in web search)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4, primary text/understanding embeddings, 1024D)
 - HuggingFace Endpoint (Qwen3-VL 32B Vision)
@@ -112,7 +112,7 @@ Real-time updates → Frontend displays results
 
 #### 1. Anthropic Claude Models
 
-**Claude Sonnet 4.5** (Premium Tier):
+**Claude Opus 4.7** (Premium Tier):
 - **Use Cases**: Deep product analysis, complex metadata extraction, quality validation
 - **Context**: 200,000 tokens
 - **Performance**: Highest accuracy for complex reasoning
@@ -121,7 +121,7 @@ Real-time updates → Frontend displays results
 **Claude Haiku 4.5** (Mid Tier):
 - **Use Cases**: Fast content classification, product boundary detection
 - **Context**: 200,000 tokens
-- **Performance**: 3x faster than Sonnet, 90% accuracy
+- **Performance**: 3x faster than Opus, 90% accuracy
 - **Pipeline Stages**: Product Discovery (Stage 1), Content Classification
 
 #### 2. OpenAI Models
@@ -202,7 +202,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 **Stage 4: Product Discovery (AI)**
 - **Claude Haiku 4.5**: Fast product identification (5-15 seconds)
 - Identify product count and page ranges
-- **Claude Sonnet 4.5**: Validate and enrich metadata (10-30 seconds)
+- **Claude Opus 4.7**: Validate and enrich metadata (10-30 seconds)
 - Extract product names, dimensions, variants, designers
 - **Output**: Product list with page ranges (95%+ accuracy)
 
@@ -256,7 +256,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - Link to chunks, products, images
 
 **Stage 13: Deferred AI Analysis (Async Background Job)**
-- Claude Sonnet 4.5: Validate low-scoring images
+- Claude Opus 4.7: Validate low-scoring images
 - Generate specialized embeddings:
   - Color embeddings (256D)
   - Texture embeddings (256D)

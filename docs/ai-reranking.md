@@ -39,7 +39,7 @@ Content-Type: application/json
 | `results` | SearchResult[] | Yes | Search results to re-rank (see schema below) |
 | `maxResults` | number | No | Max results to return (default: all) |
 | `includeExplanations` | boolean | No | Include per-result reasoning (default: false) |
-| `model` | string | No | `claude-sonnet-4-5` (default) or `claude-haiku-4-5` (faster) |
+| `model` | string | No | `claude-opus-4-7` (default) or `claude-haiku-4-5` (faster) |
 
 ### SearchResult Schema
 
@@ -77,7 +77,7 @@ Content-Type: application/json
     "uuid-2": "Ranked #2 — strong material match but no slip resistance data available."
   },
   "processingTimeMs": 820,
-  "model": "claude-sonnet-4-5",
+  "model": "claude-opus-4-7",
   "cost": 0.0034,
   "usage": {
     "inputTokens": 1240,
@@ -92,7 +92,7 @@ Content-Type: application/json
 
 | Model | Speed | Quality | Use Case |
 |---|---|---|---|
-| `claude-sonnet-4-5` | ~800ms | Highest | Complex queries, full catalog search |
+| `claude-opus-4-7` | ~800ms | Highest | Complex queries, full catalog search |
 | `claude-haiku-4-5` | ~300ms | Good | Simple queries, real-time suggestions |
 
 ---

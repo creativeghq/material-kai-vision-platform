@@ -95,7 +95,7 @@ export const AIModelPricingTab: React.FC = () => {
         const legacyKeys = data
           .map((r) => r.model_key)
           .filter((k) =>
-            /^claude-(3-|4-5-|opus-4-5|sonnet-4-5)/.test(k) || /^gpt-/.test(k),
+            /^claude-(3-|4-5-|opus-4-5)/.test(k) || /^gpt-/.test(k),
           );
         if (legacyKeys.length > 0) {
           console.error(

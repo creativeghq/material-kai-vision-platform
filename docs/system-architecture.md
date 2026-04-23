@@ -242,7 +242,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 ### 12 AI Models
 
 **Anthropic**:
-- Claude Sonnet 4.5 (Product discovery, enrichment)
+- Claude Opus 4.7 (Product discovery, enrichment)
 - Claude Haiku 4.5 (Fast validation)
 - Semantic Chunking (Text segmentation)
 

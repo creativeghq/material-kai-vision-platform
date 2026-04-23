@@ -1342,23 +1342,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
-  const handleQueueUnderstanding = async (job: typeof selectedJob) => {
-    if (!job?.document_id) return;
-    setPipelineActionLoading('understanding');
-    try {
-      const result = await callPipelineAction('queue-understanding-embeddings', {
-        document_id: job.document_id,
-        workspace_id: job.workspace_id,
-        priority: 'normal',
-      });
-      toast.success(`Phase 2 queued: job ${result.job_id?.slice(0, 8) || 'started'}`);
-    } catch (e: any) {
-      toast.error(`Queue failed: ${e.message}`);
-    } finally {
-      setPipelineActionLoading(null);
-    }
-  };
-
   const handleRegenerateTextEmbeddings = async (job: typeof selectedJob) => {
     if (!job?.document_id) return;
     setPipelineActionLoading('text-embeddings');
@@ -2880,23 +2863,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         Validate Pipeline
                       </Button>
                     )}
-                    {/* Queue Phase 2 understanding embeddings */}
-                    {selectedJob.document_id && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        disabled={pipelineActionLoading !== null}
-                        onClick={() => handleQueueUnderstanding(selectedJob)}
-                      >
-                        {pipelineActionLoading === 'understanding' ? (
-                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
-                        ) : (
-                          <Zap className="h-3 w-3 mr-1.5" />
-                        )}
-                        Queue Understanding
-                      </Button>
-                    )}
                     {/* Fill missing TEXT embeddings (chunk text_embedding_1024 — Voyage AI) */}
                     {selectedJob.document_id && (
                       <Button
@@ -4061,7 +4027,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 const AI_PRICING = {
                   // Claude models (per 1M tokens)
                   'claude-haiku': { input: 0.80, output: 4.00, type: 'token' },
-                  'claude-sonnet': { input: 3.00, output: 15.00, type: 'token' },
                   'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
                   'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
                   // HuggingFace Endpoints (per GPU hour)
@@ -4154,7 +4119,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     const inputTokens = productsCreated * 3000; // ~3k tokens per product
                     const outputTokens = productsCreated * 1000; // ~1k tokens output
                     costs['claude'] = {
-                      model: 'Claude Sonnet',
+                      model: 'Claude Opus',
                       generations: productsCreated,
                       inputTokens,
                       outputTokens,
@@ -4292,7 +4257,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <div className="mt-3 p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
                       <p className="text-[10px] text-blue-400">
                         <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: Qwen ($0.60/hr), SLIG ($0.45/hr), YOLO ($0.60/hr).
-                        Token costs: Claude Sonnet ($3/$15 per 1M), Embeddings ($0.02 per 1M). Actual costs may vary.
+                        Token costs: Claude Opus ($3/$15 per 1M), Embeddings ($0.02 per 1M). Actual costs may vary.
                       </p>
                     </div>
                   </div>

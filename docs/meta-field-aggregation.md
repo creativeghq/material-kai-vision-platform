@@ -141,7 +141,7 @@ The NOVA product would have: `available_sizes` with one entry (15×38 cm), `colo
 ### **Three Sources of Metadata:**
 
 1. **AI Extraction (DynamicMetadataExtractor)** - Lines 1844-1847
-   - Uses Claude Sonnet 4.5 or GPT-4o
+   - Uses Claude Opus 4.7 or GPT-4o
    - Extracts from product-specific text
    - Returns: `enrichment_data['colors']`, `enrichment_data['materials']`, etc.
    - **Format:** Can be string, list, or dict with confidence scores

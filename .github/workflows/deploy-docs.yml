@@ -301,7 +301,7 @@ jobs:
           ## 📊 Platform Stats
 
           - **${DOCS_COUNT}** Documentation Files (${API_COUNT} in API Reference)
-          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Qwen3-VL-8B/32B, SigLIP2, Voyage AI, etc.)
+          - **14** AI Models (Claude Opus 4.7, Haiku 4.5, GPT-5, Qwen3-VL-8B/32B, SigLIP2, Voyage AI, etc.)
           - **7** Embedding Types (text, visual, understanding, color, texture, style, material)
           - **14-Stage** PDF Processing Pipeline with checkpoint recovery and real-time monitoring
           - **Real-time Monitoring** with Supabase subscriptions and comprehensive analytics

@@ -283,7 +283,7 @@ export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (sta
         let companyData;
         try {
           const analysisModel = new ChatAnthropic({
-            model: 'claude-sonnet-4-7',
+            model: 'claude-opus-4-7',
             temperature: 0.3,
             maxTokens: 2048,
           });

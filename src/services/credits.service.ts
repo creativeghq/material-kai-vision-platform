@@ -164,7 +164,6 @@ export const creditsAPI = {
     const pricing: Record<string, { input: number; output: number }> = {
       // Claude Models — canonical 3 latest-tier
       'claude-opus-4-7':            { input: 15.00, output: 75.00 },
-      'claude-sonnet-4-7':          { input:  3.00, output: 15.00 },
       'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
       // OpenAI Embeddings (chat models removed — platform uses Claude only)

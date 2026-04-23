@@ -17,7 +17,6 @@ const AI_PRICING = {
   // Anthropic Claude Models (per 1M tokens)
   claude: {
     'claude-opus-4-7':            { input: 15.00, output: 75.00 },
-    'claude-sonnet-4-7':          { input:  3.00, output: 15.00 },
     'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   },
   // OpenAI Embeddings (per 1M tokens) — embeddings only, chat models removed

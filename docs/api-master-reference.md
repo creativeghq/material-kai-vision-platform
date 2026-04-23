@@ -63,7 +63,7 @@ All POST, all JWT-authenticated.
 |----------|---------|
 | `seo-research` | Keyword research via DataForSEO (6 parallel API calls, volumes + SERP analysis) |
 | `seo-plan` | Generate article structure + meta tags + FAQ schema from research output |
-| `seo-write` | Full article generation from plan via Claude Sonnet |
+| `seo-write` | Full article generation from plan via Claude Opus |
 | `seo-analyze` | 15+ SEO quality checks; auto-fix issues via Gemini |
 | `seo-pipeline` | Orchestrator: research → plan → write → analyze in one call |
 
@@ -79,7 +79,7 @@ Reference: the KAI agent exposes `seo_*` sub-agent tools that call these.
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `ai-rerank` | POST | JWT | Claude-powered re-ordering of search results. Sonnet/Haiku model choice, optional per-item explanations. | [ai-rerank-api](api/ai-rerank-api.md) |
+| `ai-rerank` | POST | JWT | Claude-powered re-ordering of search results. Opus/Haiku model choice, optional per-item explanations. | [ai-rerank-api](api/ai-rerank-api.md) |
 
 ### 1.6 Background agents & cron jobs
 
@@ -168,6 +168,7 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `price-monitoring` | POST | JWT | Actions: `start-monitoring`, `stop-monitoring`, `check-now`, `get-status`. See [price-monitoring-cron-api](api/price-monitoring-cron-api.md) for cron variant. |
+| `POST /api/v1/prices/lookup` | POST | API key (Bearer) | **Public curl-callable** one-shot price lookup for any URL. Auth via `api_keys` table, rate-limited per key, billed to the key owner's workspace. Does NOT create a monitoring subscription. See [Price Monitoring System → Public Price Lookup API](price-monitoring-system.md#public-price-lookup-api-external--curl). |
 
 ### 1.14 Data import & scraping
 
