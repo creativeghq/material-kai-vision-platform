@@ -170,27 +170,32 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
   const dbExtractionPrompt = options.prompt || await getToolPrompt(supabase, 'material_extractor');
   const dbExtractionSystemPrompt = options.systemPrompt || await getToolPrompt(supabase, 'extraction_system');
 
-  // Build v2 API request with structured extraction
+  // Build v2 API request with structured extraction. v2 expects the extractor
+  // as a `{type: "json", ...}` entry inside `formats` — a sibling `extract`
+  // key is rejected with HTTP 400 'Unrecognized key in body'.
   const requestBody: any = {
     url: url,
-    formats: ['markdown'], // Only markdown to avoid duplicate chunks
+    formats: [
+      'markdown',
+      {
+        type: 'json',
+        schema: {
+          type: 'object',
+          properties: {
+            materials: {
+              type: 'array',
+              items: extractionSchema,
+            },
+          },
+        },
+        prompt: dbExtractionPrompt,
+        systemPrompt: dbExtractionSystemPrompt,
+      },
+    ],
     timeout: options.timeout || 30000,
     actions: [
       { type: 'wait', milliseconds: 2000 },
     ],
-    extract: {
-      schema: {
-        type: 'object',
-        properties: {
-          materials: {
-            type: 'array',
-            items: extractionSchema,
-          },
-        },
-      },
-      prompt: dbExtractionPrompt,
-      systemPrompt: dbExtractionSystemPrompt,
-    },
   };
 
   console.log('Making Firecrawl v2 preview request to:', url);
@@ -221,8 +226,10 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
   const markdown = result.data?.markdown || '';
   const materials: PreviewMaterial[] = [];
 
-  if (result.data?.extract?.materials) {
-    const extractedMaterials = result.data.extract.materials;
+  // v2 structured extraction returns data in `json` (was `extract` in v1 shape)
+  const extracted = result.data?.json ?? result.data?.extract;
+  if (extracted?.materials) {
+    const extractedMaterials = extracted.materials;
 
     for (const item of extractedMaterials) {
       if (item && typeof item === 'object' && item.name) {

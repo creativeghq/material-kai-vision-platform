@@ -89,7 +89,10 @@ async function enrichViaWebsite(website: string): Promise<Partial<FactoryObject>
     const controller = new AbortController();
     const timeout    = setTimeout(() => controller.abort(), 30_000);
 
-    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    // Upgraded to Firecrawl v2: structured extraction is now an entry inside
+    // `formats`, and the result lands at data.json. v1 top-level `extract` key
+    // is rejected by v2 with 'Unrecognized key in body'.
+    const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
@@ -97,26 +100,28 @@ async function enrichViaWebsite(website: string): Promise<Partial<FactoryObject>
       },
       body: JSON.stringify({
         url:              website,
-        formats:          ['extract'],
         onlyMainContent:  true,
-        extract: {
-          schema: {
-            type: 'object',
-            properties: {
-              address:          { type: 'string' },
-              city:             { type: 'string' },
-              country:          { type: 'string' },
-              postal_code:      { type: 'string' },
-              phone:            { type: 'string' },
-              email:            { type: 'string' },
-              founded_year:     { type: 'string' },
-              company_type:     { type: 'string' },
-              employee_count:   { type: 'string' },
-              country_of_origin:{ type: 'string' },
+        formats: [
+          {
+            type: 'json',
+            schema: {
+              type: 'object',
+              properties: {
+                address:          { type: 'string' },
+                city:             { type: 'string' },
+                country:          { type: 'string' },
+                postal_code:      { type: 'string' },
+                phone:            { type: 'string' },
+                email:            { type: 'string' },
+                founded_year:     { type: 'string' },
+                company_type:     { type: 'string' },
+                employee_count:   { type: 'string' },
+                country_of_origin:{ type: 'string' },
+              },
             },
+            prompt: 'Extract contact and company information: address, city, country, postal code, phone, email, founded year, company type, number of employees, and country of origin/manufacturing.',
           },
-          prompt: 'Extract contact and company information: address, city, country, postal code, phone, email, founded year, company type, number of employees, and country of origin/manufacturing.',
-        },
+        ],
       }),
       signal: controller.signal,
     });
@@ -125,7 +130,7 @@ async function enrichViaWebsite(website: string): Promise<Partial<FactoryObject>
     if (!response.ok) return {};
 
     const data    = await response.json();
-    const extract = data.data?.extract ?? {};
+    const extract = data.data?.json ?? data.data?.extract ?? {};
 
     const result: Partial<FactoryObject> = {};
     if (extract.address)           result.address           = extract.address;

@@ -245,26 +245,32 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
     const dbExtractionPrompt = options.prompt || await getToolPrompt(supabase, 'single_page_extractor');
     const dbExtractionSystemPrompt = options.systemPrompt || await getToolPrompt(supabase, 'extraction_system');
 
-    requestBody.extract = {
-      schema: {
-        type: 'object',
-        properties: {
-          materials: {
-            type: 'array',
-            items: extractionSchema,
+    // Firecrawl v2: structured extraction is an entry inside `formats`, not a
+    // sibling `extract` key. v2 rejects the old shape with HTTP 400
+    // 'Unrecognized key in body'. Result lands at data.json, not data.extract.
+    requestBody.formats = [
+      ...(Array.isArray(requestBody.formats) ? requestBody.formats : []),
+      {
+        type: 'json',
+        schema: {
+          type: 'object',
+          properties: {
+            materials: {
+              type: 'array',
+              items: extractionSchema,
+            },
           },
         },
+        prompt: dbExtractionPrompt,
+        systemPrompt: dbExtractionSystemPrompt,
       },
-      prompt: dbExtractionPrompt,
-      systemPrompt: dbExtractionSystemPrompt,
-    };
+    ];
   }
 
   console.log('Making Firecrawl v2 API request to:', url);
   console.log('Request config:', JSON.stringify({
-    formats: requestBody.formats,
+    formats: Array.isArray(requestBody.formats) ? requestBody.formats.map((f: any) => typeof f === 'string' ? f : f.type) : requestBody.formats,
     hasActions: !!requestBody.actions,
-    hasExtract: !!requestBody.extract
   }));
 
   const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
@@ -293,9 +299,10 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
   // Parse extracted data into our material format
   const materials: MaterialData[] = [];
 
-  // v2 structured extraction returns data in extract field
-  if (result.data?.extract?.materials) {
-    const extractedMaterials = result.data.extract.materials;
+  // v2 structured extraction returns data in `json` (was `extract` in v1 shape)
+  const extracted = result.data?.json ?? result.data?.extract;
+  if (extracted?.materials) {
+    const extractedMaterials = extracted.materials;
 
     for (const item of extractedMaterials) {
       if (item && typeof item === 'object' && item.name) {
