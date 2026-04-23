@@ -30,8 +30,6 @@ export const SubscriptionTab: React.FC = () => {
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean } | null>(null);
-  const [hintRevealed, setHintRevealed] = useState(false);
-  const [copiedHint, setCopiedHint] = useState<'auth' | 'apikey' | null>(null);
 
   const tiers = stripeService.getSubscriptionTiers();
   const hasSubscription = currentTier !== 'free';
@@ -393,53 +391,6 @@ export const SubscriptionTab: React.FC = () => {
               ) : (
                 <p className="text-sm text-muted-foreground">No API keys yet. Generate one to access the Material KAI API.</p>
               )}
-
-              {(() => {
-                const hintKey = apiKeys.find((k) => k.is_active);
-                const keyDisplay = hintKey ? (hintRevealed ? hintKey.api_key : maskKey(hintKey.api_key)) : 'kai_••••';
-                const authLine = `Authorization: Bearer ${keyDisplay}`;
-                const apiKeyLine = `X-API-Key: ${keyDisplay}`;
-                const copyLine = (kind: 'auth' | 'apikey') => {
-                  if (!hintKey) return;
-                  const text = kind === 'auth' ? `Authorization: Bearer ${hintKey.api_key}` : `X-API-Key: ${hintKey.api_key}`;
-                  navigator.clipboard.writeText(text);
-                  setCopiedHint(kind);
-                  setTimeout(() => setCopiedHint(null), 2000);
-                };
-                return (
-                  <div className="text-xs text-muted-foreground pt-1 border-t space-y-1">
-                    <p>Use your API key in requests via one of these headers:</p>
-                    {[{ kind: 'auth' as const, text: authLine }, { kind: 'apikey' as const, text: apiKeyLine }].map(({ kind, text }) => (
-                      <div key={kind} className="flex items-center gap-1 bg-muted/50 rounded px-2 py-1">
-                        <code className="flex-1 text-[11px] truncate">{text}</code>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0 shrink-0"
-                          disabled={!hintKey}
-                          title={hintRevealed ? 'Hide key' : 'Reveal key'}
-                          onClick={() => setHintRevealed((v) => !v)}
-                        >
-                          {hintRevealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0 shrink-0"
-                          disabled={!hintKey}
-                          title="Copy full header line"
-                          onClick={() => copyLine(kind)}
-                        >
-                          {copiedHint === kind ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                    ))}
-                    {!hintKey && (
-                      <p className="text-[11px] italic">Create an active API key above to populate these examples.</p>
-                    )}
-                  </div>
-                );
-              })()}
             </>
           )}
         </CardContent>
