@@ -334,16 +334,22 @@ export const SubscriptionTab: React.FC = () => {
               ) : apiKeys.length > 0 ? (
                 <div className="space-y-2">
                   {apiKeys.map((key) => (
-                    <div key={key.id} className={`flex items-center justify-between p-3 rounded-xl border ${key.is_active ? 'bg-muted/30' : 'bg-destructive/5 border-destructive/20'}`}>
+                    <div key={key.id} className={`flex items-center justify-between p-3 rounded-xl border ${key.is_active ? 'bg-muted/30' : 'bg-destructive/5 border-destructive/20 opacity-70'}`}>
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Shield className={`h-4 w-4 shrink-0 ${key.is_active ? 'text-green-600' : 'text-muted-foreground'}`} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-sm truncate">{key.key_name}</p>
-                            {!key.is_active && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Revoked</Badge>}
+                            {key.is_active ? (
+                              <Badge className="text-[10px] px-1.5 py-0 bg-green-500/20 text-green-700 border-green-500/30">Active</Badge>
+                            ) : (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Revoked</Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground font-mono">
-                            {revealedKeyId === key.id ? key.api_key : maskKey(key.api_key)}
+                            {key.is_active
+                              ? (revealedKeyId === key.id ? key.api_key : maskKey(key.api_key))
+                              : '— revoked —'}
                           </p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             Created {new Date(key.created_at).toLocaleDateString()}
@@ -352,14 +358,14 @@ export const SubscriptionTab: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
-                          {revealedKeyId === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => copyApiKey(key)}>
-                          {copiedKeyId === key.id ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-                        </Button>
-                        {key.is_active && (
+                      {key.is_active && (
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
+                            {revealedKeyId === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => copyApiKey(key)}>
+                            {copiedKeyId === key.id ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -376,13 +382,11 @@ export const SubscriptionTab: React.FC = () => {
                             )}
                             <span className="hidden sm:inline">Test</span>
                           </Button>
-                        )}
-                        {key.is_active && (
                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => revokeApiKey(key.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

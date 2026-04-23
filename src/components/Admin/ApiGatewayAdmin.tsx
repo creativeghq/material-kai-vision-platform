@@ -302,7 +302,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                             )}
                           </div>
                           <p className="text-sm font-mono text-muted-foreground">
-                            {revealedKeyId === key.id ? key.api_key : maskKey(key.api_key)}
+                            {key.is_active
+                              ? (revealedKeyId === key.id ? key.api_key : maskKey(key.api_key))
+                              : '— revoked —'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Created {new Date(key.created_at).toLocaleDateString()}
@@ -312,12 +314,16 @@ export const ApiGatewayAdmin: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-1 ml-3 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
-                            {revealedKeyId === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyKey(key)}>
-                            {copiedKeyId === key.id ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                          </Button>
+                          {key.is_active && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
+                                {revealedKeyId === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyKey(key)}>
+                                {copiedKeyId === key.id ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </>
+                          )}
                           <Sheet>
                             <SheetTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedApiKey(key)}>
