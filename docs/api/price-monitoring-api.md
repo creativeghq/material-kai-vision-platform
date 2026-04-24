@@ -453,17 +453,34 @@ A: `source` is an enum value in the DB (`competitor_source_type`) that predates 
 
 ## Server-side env vars reference (for ops)
 
-These are the env vars the MIVAA backend needs set (via GitHub Secrets → `deploy.yml` → systemd `Environment=`). No `.env` file involvement on the server — purely systemd-injected.
+These are the env vars the MIVAA backend needs set via **GitHub Secrets → `deploy.yml` → systemd `Environment=`**. No `.env` file involvement on the server — purely systemd-injected. Code reads them via `pydantic-settings` in `app/config.py`, which falls back to hardcoded defaults for any var not set.
 
 ### Price engine
 
-| Env var | Role | Required |
+| Env var | Code default | Set in Secrets? |
 |---|---|---|
-| `PERPLEXITY_API_KEY` | Perplexity Sonar-pro for web-search discovery | Yes (primary discovery engine) |
-| `FIRECRAWL_API_KEY` | URL-mode lookup + Custom Monitoring scraping | Yes (URL mode) |
-| `DATAFORSEO_BASE64` | Pre-encoded `base64(login:password)` for DataForSEO — preferred | One of these two |
-| `DATAFORSEO_LOGIN` + `DATAFORSEO_PASSWORD` | Plaintext; service base64-encodes internally | One of these two |
-| `CRON_SECRET` | Validates `x-cron-secret` on the cron-refresh endpoint | Yes (cron calls refresh) |
+| `PERPLEXITY_API_KEY` | none | **Required** (primary discovery engine) |
+| `FIRECRAWL_API_KEY` | none | **Required** for URL-mode lookup + Custom Monitoring |
+| `DATAFORSEO_BASE64` | empty | Either this **or** the login+password pair below |
+| `DATAFORSEO_LOGIN` + `DATAFORSEO_PASSWORD` | empty | Either this pair or `DATAFORSEO_BASE64` |
+| `CRON_SECRET` | none | **Required** (validates `x-cron-secret` on the cron-refresh endpoint) |
+
+### SLIG (SigLIP2 visual embeddings — separate feature, same deploy pipeline)
+
+Only one of these is actually required — the rest have sensible defaults that match your current endpoint.
+
+| Env var | Code default | Set in Secrets? |
+|---|---|---|
+| `SLIG_ENDPOINT_TOKEN` | `""` | **Required** — without it, SLIG requests get 401 |
+| `SLIG_ENDPOINT_URL` | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` | Optional — override only if endpoint changes |
+| `SLIG_ENDPOINT_NAME` | `mh-slig` | Optional |
+| `SLIG_NAMESPACE` | `basiliskan` | Optional |
+| `SLIG_MODEL_NAME` | `basiliskan/siglip2` | Optional (logs + validation only) |
+| `SLIG_EMBEDDING_DIMENSION` | `768` | Optional |
+| `SLIG_ENABLED` | `true` | Optional — set `false` to bypass SLIG entirely |
+| `SLIG_TIMEOUT` | `300` | Optional |
+| `SLIG_MAX_RETRIES` | `3` | Optional |
+| `SLIG_RETRY_DELAY` | `2` | Optional |
 
 ### Deployment pattern
 
@@ -476,10 +493,23 @@ GitHub Secrets (Settings → Secrets and variables → Actions)
     ↓
 os.environ  (injected by systemd at service start)
     ↓
-pydantic-settings / os.getenv reads it inside Python
+pydantic-settings in app/config.py reads it, falls back to defaults if absent
 ```
 
-To add a new secret: add it to GitHub Secrets, add one `Environment=KEY=${{ secrets.KEY }}` line in `deploy.yml`, redeploy.
+**To add a new secret:** add it to GitHub Secrets, add one `Environment=KEY=${{ secrets.KEY }}` line in `deploy.yml`, redeploy. Nothing else — no `.env` files, no manual drop-ins on the server.
+
+### Legacy drop-in to remove
+
+After the next successful deploy, the legacy `/etc/systemd/system/mivaa-pdf-extractor.service.d/slig-env.conf` file can be deleted — its contents are now pushed through `deploy.yml`. Cleanup:
+
+```bash
+sudo rm /etc/systemd/system/mivaa-pdf-extractor.service.d/slig-env.conf
+sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.service
+```
+
+**Note on two drifts between the legacy `.conf` and the code defaults** (worth knowing before you remove the file):
+- `SLIG_MODEL_NAME`: `.conf` says `basiliskan/slig`, code default is `basiliskan/siglip2`. Used for logs + validation only — harmless either way, but if your observability was indexed on `basiliskan/slig`, set the Secret to preserve it.
+- `SLIG_TIMEOUT`: `.conf` says `60`, code default is `300`. The 300s default is actually *preferred* (prevents HF endpoint re-warmup during long jobs). Recommend going with the code default unless you have a reason.
 
 ---
 
