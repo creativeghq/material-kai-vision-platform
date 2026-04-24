@@ -1,8 +1,27 @@
 # Price Monitoring System
 
+> **What's current (2026-04-25)**
+>
+> The pipeline has evolved past what this doc describes in detail. Today it runs:
+>
+> 1. **Discovery (parallel)**: Perplexity Sonar + DataForSEO Merchant → merged + deduped by retailer
+> 2. **URL pre-filter**: drops homepage / SERP / aggregator URLs before spending credits
+> 3. **Firecrawl verification**: re-fetches each retailer's product page and confirms the price
+> 4. **Product-identity classifier (Haiku 4.5)**: drops `mismatch`/`family` rows, labels `variant` rows
+>
+> Every row now carries `match_kind`, `match_score`, `match_note`, `product_title`, `original_price`, `verified`, `source`. Stats on `/market-check` include exact matches only.
+>
+> **Canonical references** — prefer these over the older sections below:
+> - External partner API: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md)
+> - Recent architectural shifts: [CHANGELOG.md](../CHANGELOG.md) → `[unreleased] 2026-04-25` (Phases 7 + 8 cover verification + identity)
+> - Internal architecture summary: [CLAUDE.md](../CLAUDE.md) → **Price Monitoring** section
+> - Future work queued: [docs/plans/greek-marketplaces-integration.md](plans/greek-marketplaces-integration.md)
+>
+> The sections below still accurately describe tables, RLS, cron schedule, user roles, and UI components. The "Firecrawl is the scraper" framing from the original Overview is superseded by the pipeline above — Firecrawl is now **verification**, not **discovery**.
+
 ## Overview
 
-The Price Monitoring System enables Factory and Store users to track competitor prices for their products across multiple sources. The system uses Firecrawl for web scraping and provides automated monitoring, price alerts, and comprehensive analytics.
+The Price Monitoring System enables Factory and Store users to track competitor prices for their products across multiple sources. Discovery runs against Perplexity Sonar + DataForSEO Merchant (Google Shopping) in parallel; every discovered retailer URL is re-verified by Firecrawl; and a Haiku-powered identity classifier ensures the scraped page is actually the asked product (not a different SKU on the same retailer) before results reach the UI.
 
 ## Architecture
 

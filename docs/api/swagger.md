@@ -1629,9 +1629,18 @@ Cancel a queued or processing batch job.
 
 ## 21. Price Monitoring
 
+> **Heads-up**: this section only covers the lightweight Supabase *edge function*
+> shim. The actual price monitoring pipeline (Perplexity Sonar + DataForSEO
+> Merchant discovery → Firecrawl verification → Haiku identity classification)
+> runs on the MIVAA backend and is documented in full at
+> [docs/api/price-monitoring-api.md](price-monitoring-api.md). Every row returned
+> now carries `match_kind`, `match_score`, `match_note`, `product_title`,
+> `original_price`, `verified`, and `source` — see that doc for the response
+> schema.
+
 **Endpoint**: `POST /functions/v1/price-monitoring`
 **Auth**: User JWT or Service Role Key
-**Description**: Monitor competitor prices for products using Firecrawl web scraping.
+**Description**: Entry point for Factory/Store users to toggle monitoring for a product. Delegates the actual scraping + identity verification to the MIVAA backend.
 
 ### Request Body
 

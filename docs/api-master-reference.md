@@ -176,7 +176,8 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 | `PUT /api/v1/prices/track/{id}` | PUT | API key (Bearer) | Update cadence, country, or preferred retailer domains. |
 | `POST /api/v1/prices/track/{id}/refresh` | POST | API key (Bearer) | Force refresh now (bypasses cadence). |
 | `DELETE /api/v1/prices/track/{id}` | DELETE | API key (Bearer) | Soft delete (`is_active=false`); history preserved. Hard delete by revoking the api_key. |
-| `POST /api/v1/price-monitoring/discover` | POST | User JWT | Internal: Perplexity discovery for a monitored product (UI-triggered). 6h throttle; admin `force_refresh` bypass. |
+| `POST /api/v1/price-monitoring/discover` | POST | User JWT | Internal: Perplexity + DataForSEO + Firecrawl discovery for a monitored product (UI-triggered). 6h throttle; admin `force_refresh` bypass. Every row now carries `match_kind` (product-identity verdict), `product_title`, and optional `original_price` / `verified`. |
+| `POST /api/v1/price-monitoring/market-check` | POST | User JWT (admin) | Stateless one-shot market scan used by the KB-price drawer. Reuses the monitoring snapshot when the product is already enrolled and ≤6h old (`from_monitoring_cache=true`, 0 credits). Returns `stats {min, median, max, count, verified_count, currency}` computed over exact matches only. |
 | `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` | POST | `x-cron-secret` | Internal cron: refreshes all due `tracked_queries` rows. Called hourly from the Supabase price-monitoring-cron edge function. |
 
 **Full external-API reference**: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md) — auth, schemas, error codes, curl/TypeScript/Python recipes.

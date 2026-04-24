@@ -2,11 +2,16 @@
 
 ## Overview
 
-The Price Monitoring Cron API is a scheduled Edge Function that automatically monitors product prices from competitor sources. It runs on a schedule (hourly) and orchestrates price checking through the Python backend.
+The Price Monitoring Cron API is a scheduled Edge Function that drives two backend paths:
 
-**Edge Function:** `price-monitoring-cron`  
-**Trigger:** Scheduled (hourly) or manual invocation  
-**Backend Service:** Python API at `/api/v1/price-monitoring/check-now`
+1. **Firecrawl re-scrape** of user-pasted URLs monitored under `competitor_sources` with `source_type='firecrawl_url'` (Custom Monitoring section in the UI).
+2. **Tracked-query refresh** for every `tracked_queries` row whose `last_refreshed_at + refresh_interval_hours < now()` — this runs the full Perplexity + DataForSEO + Firecrawl verification + Haiku identity pipeline.
+
+**Edge Function:** `price-monitoring-cron`
+**Trigger:** Scheduled (hourly) or manual invocation
+**Backend endpoints used:**
+- `POST /api/v1/price-monitoring/check-now` — Firecrawl-only URL rescrape
+- `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` — full pipeline, identity-verified
 
 ## Architecture
 
@@ -14,15 +19,17 @@ The Price Monitoring Cron API is a scheduled Edge Function that automatically mo
 Supabase Cron (hourly)
   ↓
 Edge Function (price-monitoring-cron)
-  ↓
-Python Backend API (/api/v1/price-monitoring/check-now)
-  ↓
-CompetitorScraperService
-  ├─→ Firecrawl API (scrape competitor pages)
-  ├─→ CreditsIntegrationService (debit credits)
-  ├─→ AICallLogger (log usage)
-  ├─→ Database (save price history)
-  └─→ PriceAlertService (check alerts)
+  ├─→ Python: /api/v1/price-monitoring/check-now
+  │     (CompetitorScraperService → Firecrawl → price_history → PriceAlertService)
+  │
+  └─→ Python: /api/v1/price-monitoring/tracked-queries/cron-refresh
+        (TrackedQueriesService.refresh() — full pipeline for every due tracked_query)
+            ├─→ Facet cache read (tracked_queries.query_facets)
+            ├─→ Perplexity Sonar + DataForSEO Merchant (parallel)
+            ├─→ URL pre-filter (drops homepages/SERPs/aggregators)
+            ├─→ Firecrawl verification (price + product_name + breadcrumb)
+            ├─→ Haiku identity classifier (match_kind per hit)
+            └─→ tracked_query_price_history insert (with match_kind, product_title, original_price)
 ```
 
 ## Authentication
