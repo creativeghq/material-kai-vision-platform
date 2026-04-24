@@ -451,6 +451,39 @@ A: `source` is an enum value in the DB (`competitor_source_type`) that predates 
 
 ---
 
+## Server-side env vars reference (for ops)
+
+These are the env vars the MIVAA backend needs set (via GitHub Secrets → `deploy.yml` → systemd `Environment=`). No `.env` file involvement on the server — purely systemd-injected.
+
+### Price engine
+
+| Env var | Role | Required |
+|---|---|---|
+| `PERPLEXITY_API_KEY` | Perplexity Sonar-pro for web-search discovery | Yes (primary discovery engine) |
+| `FIRECRAWL_API_KEY` | URL-mode lookup + Custom Monitoring scraping | Yes (URL mode) |
+| `DATAFORSEO_BASE64` | Pre-encoded `base64(login:password)` for DataForSEO — preferred | One of these two |
+| `DATAFORSEO_LOGIN` + `DATAFORSEO_PASSWORD` | Plaintext; service base64-encodes internally | One of these two |
+| `CRON_SECRET` | Validates `x-cron-secret` on the cron-refresh endpoint | Yes (cron calls refresh) |
+
+### Deployment pattern
+
+```
+GitHub Secrets (Settings → Secrets and variables → Actions)
+    ↓
+.github/workflows/deploy.yml  (adds Environment=KEY=${{ secrets.KEY }} to the systemd unit)
+    ↓
+/etc/systemd/system/mivaa-pdf-extractor.service  (rewritten on each deploy)
+    ↓
+os.environ  (injected by systemd at service start)
+    ↓
+pydantic-settings / os.getenv reads it inside Python
+```
+
+To add a new secret: add it to GitHub Secrets, add one `Environment=KEY=${{ secrets.KEY }}` line in `deploy.yml`, redeploy.
+
+---
+
 ## Changelog
 
+- **2026-04-24 (v2)** — Added DataForSEO Merchant as a second parallel discovery source alongside Perplexity. One `/prices/lookup` (search_query mode) or `/prices/track` call now returns both sources merged, deduped by domain, tagged per-hit with `source: "perplexity" | "dataforseo"`. Supports `DATAFORSEO_BASE64` env var in addition to `DATAFORSEO_LOGIN`/`DATAFORSEO_PASSWORD`.
 - **2026-04-24** — Initial external API release. `/prices/lookup` (URL + search query modes), `/prices/track/*` CRUD + refresh + history, Perplexity Sonar-pro engine, api_keys Bearer auth, preferred-domain pinning, hourly cron refresh.
