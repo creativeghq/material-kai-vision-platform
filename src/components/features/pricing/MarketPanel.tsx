@@ -189,6 +189,14 @@ const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
         </a>
       )}
       <div className="flex-1 min-w-0">
+        {hit.product_title && (
+          <div
+            className="text-[10px] text-muted-foreground/80 truncate"
+            title={hit.product_title}
+          >
+            {hit.product_title}
+          </div>
+        )}
         <div className="flex items-center gap-1.5 flex-wrap">
           <a
             href={hit.product_url}

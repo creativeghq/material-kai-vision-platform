@@ -163,6 +163,10 @@ Each entry in `results` now carries the verification + promo fields:
 | `notes` | string \| null | Free-form. Includes discrepancy flags when Firecrawl's price differed by >20% from the LLM's snippet price (e.g. `"verify: was perplexity=€45.00, actual on page=€54.90"`). |
 | `last_verified` | string (ISO date) | Date Firecrawl confirmed the price. `null` when `verified: false`. |
 | `image_url`, `rating_value`, `rating_votes` | (DataForSEO only) | Thumbnail + merchant star rating from the Google Shopping feed. |
+| `product_title` | string \| null | Exact product name on the retailer's page. Use as a subtitle to disambiguate multiple rows from the same retailer selling different variants. |
+| `match_kind` | `"exact" \| "variant" \| "unverifiable" \| null` | Product-identity verdict. `exact` = page confirmed to match the asked product. `variant` = same model but different color/finish/size (kept with a note, excluded from stats). `unverifiable` = identity couldn't be judged from the page (kept, grey badge recommended). `mismatch` and `family` are dropped server-side, so you'll never see them. `null` only on rows created before 2026-04-25. |
+| `match_score` | int 0-100 \| null | Classifier confidence. 90+ exact, 70-89 variant, <50 mismatch. |
+| `match_note` | string \| null | Human-readable facet diff, e.g. `"Color differs: asked BLACK MATT, page shows WHITE MATT"`. `null` for exact matches. |
 
 ### Rate limit
 
@@ -569,6 +573,13 @@ sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.servi
 
 ## Changelog
 
+- **2026-04-25 (v4)** — **Product-identity verification + DataForSEO merchant fixes + `product_title`.**
+  - Every retailer row now carries `match_kind` (`"exact" | "variant" | "unverifiable" | null`), `match_score` (0-100), `match_note` (e.g. *"Color differs: asked BLACK MATT, page shows WHITE MATT"*). Rows the classifier flagged as `mismatch` or `family` (wrong product, even if same brand) are dropped before the response leaves the server.
+  - Every retailer row also carries `product_title` — the exact product name as shown on the retailer page. Use as a subtitle when rendering, especially when a retailer appears multiple times for different variants.
+  - Behavioral change: DataForSEO merchant coverage ~8× higher — a dedupe bug was collapsing every Google Shopping merchant to a single `google.gr` domain row. Fixed. DataForSEO fetch depth also bumped to ≥30.
+  - Behavioral change: wrong-product rows are now dropped server-side. Clients will see FEWER rows but every row is correct.
+  - Behavioral change: variants stay in the list with their `match_note`, but `/market-check` statistics (`stats.min`, `stats.median`, `stats.max`) exclude them.
+  - Historical rows pre-dating this release have `match_kind: null`, `product_title: null`. Both are additive-safe — clients that don't read them keep working.
 - **2026-04-25 (v3)** — **Firecrawl price verification + on-page was/now pricing.**
   - New request param `verify_prices` (default `true`) on `/prices/lookup` (search mode), `POST /prices/track`, and `PUT /prices/track/{id}`. When true, every retailer hit is re-fetched via Firecrawl and the price on the live page replaces the LLM/Shopping-feed price.
   - New response fields on every retailer row: `verified: bool`, `original_price: number | null`, `source: "perplexity" | "dataforseo"`. Image + rating fields (`image_url`, `rating_value`, `rating_votes`) also surface on DataForSEO hits.

@@ -58,6 +58,13 @@ export interface PerplexityHit {
   match_score: number | null;
   /** Human-readable facet diff (e.g. "Color differs: asked BLACK MATT, page shows WHITE"). */
   match_note: string | null;
+  /**
+   * Exact product name shown on the retailer's page (DataForSEO Shopping feed
+   * title or Firecrawl product_name extraction). Use as a subtitle under
+   * retailer_name to disambiguate multiple rows from the same retailer for
+   * different variants.
+   */
+  product_title: string | null;
 }
 
 export interface DiscoverResponse {

@@ -77,6 +77,8 @@ interface CompetitorSource {
     rating_value?: number;
     rating_votes?: number;
     notes?: string;
+    /** Exact product name on the retailer page. Disambiguates variants from the same retailer. */
+    product_title?: string;
   } | null;
   /** Product-identity verdict. null = row created before identity classification shipped. */
   match_kind?: 'exact' | 'variant' | 'unverifiable' | null;
@@ -576,6 +578,14 @@ const RetailerTable: React.FC<{
                 </Badge>
               )}
             </div>
+            {meta.product_title && (
+              <div
+                className="text-[11px] text-muted-foreground/80 mt-0.5 truncate"
+                title={meta.product_title}
+              >
+                {meta.product_title}
+              </div>
+            )}
             <a
               href={r.source_url}
               target="_blank"

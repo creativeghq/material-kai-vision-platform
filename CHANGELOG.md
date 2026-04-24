@@ -34,6 +34,39 @@ Motivation: validation against real-world queries (e.g. "Απορροφητήρ�
 
 - **Backwards compatibility**: all new fields are additive. Clients that don't send `verify_prices` get verified prices by default (the correct upgrade). Old history rows keep `verified: false` — not a data-quality flag, just "predates verification."
 
+**Product-identity verification (2026-04-25 Phase 8)**
+
+Motivation: Firecrawl was confirming the price on the page but not the identity of the product. ORABELLA PRECIOSA BLACK MATT validation surfaced rows like Casasolutionsgekas returning a shower column (same brand, totally different SKU) labeled "verified." Fix: a Haiku-powered classifier that compares the asked product's facets against what the retailer page actually shows, and a URL pre-filter that drops obvious non-product URLs before spending Firecrawl credits on them.
+
+- **Query facet extraction** — Claude Haiku 4.5 decomposes each query into `{brand, model, product_type, variants, required_tokens, variant_tokens}`. Cached on `tracked_queries.query_facets jsonb` so repeated refreshes don't re-pay for decomposition. For catalog `/discover` and `/market-check`, facets come directly from `products.metadata` — no LLM call.
+- **URL pre-filter** — rules-based (no network). Drops homepage, `/search`, `/catalog`, `/brand/` paths, Google Shopping SERPs (when source isn't DataForSEO), aggregator hosts masquerading as retailers, sub-4-char slugs. Saves ~30-50% of Firecrawl credits and nukes the worst category of "wrong URL" hits.
+- **Greek/Latin model normalization** — `"7012ΜΤ"` ≡ `"7012MT"` ≡ `"7012-MT"`. Greek lookalikes (Μ/M, Τ/T, Α/A, etc.) folded to Latin. Accent/tonos stripped. Separators removed. Inside `product_identity_service.normalize_model_token`.
+- **Expanded Firecrawl extraction** — `PriceExtraction` widened with `product_name`, `product_breadcrumb`, `visible_attributes` so the classifier has identity-bearing signal alongside the price.
+- **Batched Haiku identity classifier** — one prompt-cached Haiku call classifies N scraped pages against the query facets. Verdicts per hit: `exact` / `variant` / `family` / `mismatch` / `unverifiable`. Soft on finish descriptors (MATT ≡ BLACK MATT ≡ MATTE BLACK), hard on brand + model + product_type.
+- **Policy enforcement**: `exact` + `variant` + `unverifiable` reach the UI; `mismatch` + `family` are dropped before the response leaves MIVAA. Variants carry a `match_note` like `"Color differs: asked BLACK MATT, page shows WHITE MATT"` and are **excluded from** min/median/max statistics but **shown** in the retailer list.
+- **`original_price` sanity** — reject values `≤ current_price` or `> 5× current_price`. Killed the Flobali €11,900 SKU-as-price bug.
+- **Graceful degradation** — when Haiku is unreachable, a rule-based fallback still classifies using `required_tokens` presence in the page title or URL slug so the pipeline keeps producing output.
+- **Every classifier decision** logged to `ai_usage_logs` with `operation_type='product_match_classifier'` for auditability.
+
+**Surfaces**:
+- MIVAA: new service `app/services/integrations/product_identity_service.py`. `search_prices()` pipeline: facet extraction → DataForSEO + Perplexity parallel → URL pre-filter → Firecrawl verify → identity classifier → drop mismatches.
+- DB: migration `price_monitoring_product_identity` adds `match_kind`, `match_score`, `match_note` to `competitor_sources`, `tracked_query_price_history`, `price_history`. `tracked_queries.query_facets jsonb` for cache. `idx_competitor_sources_product_match` for "exact-only" dashboards.
+- API (public): `TrackedQueryResultRow` widens with `match_kind`, `match_score`, `match_note`. `/prices/lookup` `/prices/track/*` `/price-monitoring/discover` `/price-monitoring/market-check` all return these fields on every retailer row.
+- UI: amber "Variant" and grey "Unverified" badges on `ProductMonitorTab.RetailerTable` and `MarketPanel.MarketHitRow`, with tooltips showing the facet diff. `MarketPanel` percentile callout computes against exact matches only. "X/Y exact" counter in the stats header.
+
+**Cost profile shift per discovery (~10 hits)**: today $0.044 → proposed $0.037. Small Haiku cost (+$0.002) more than offset by Firecrawl savings from pre-filter drop.
+
+**Two follow-up fixes in the same release**:
+
+1. **DataForSEO merchants were being dropped by the URL pre-filter.** Fixed by making pre-filter source-aware — DataForSEO hits bypass the SERP / aggregator checks because their Google Shopping URL is a redirect by design but the feed payload is authoritative. Firecrawl verification is also skipped for DataForSEO rows (the redirect isn't a scrapable product page); they're marked `verified=true` with provenance = Shopping feed.
+2. **Merge dedupe was collapsing every DataForSEO merchant to `google.gr`.** DataForSEO's URL field for Shopping-feed hits is always a `google.gr/search` redirect, so domain-keyed dedupe in `_merge_with_dataforseo` folded 20+ merchants into 1. Fixed by keying DataForSEO hits on `(retailer_name, product_title[:80])` instead. Bumped DataForSEO task depth from `limit` (default 10) to `max(limit, 30)` since Google Shopping routinely has 20-30 merchants per product. Net effect: 8× more merchants reach the UI.
+
+**`product_title` field (new on every row)**
+
+- Exact product name as displayed on the retailer page. Populated from DataForSEO Shopping feed title or Firecrawl `product_name`. Persisted on `tracked_query_price_history.product_title`, `price_history.product_title`, and `competitor_sources.current_metadata.product_title`.
+- UI renders it as a subtitle under `retailer_name` so multiple listings from the same retailer (different variants) disambiguate visibly.
+- Also carried on `TrackedQueryResultRow`, `PriceHit`, and `/price-monitoring/discover` + `/market-check` responses.
+
 **Price monitoring UI polish on top of Phase 7**
 
 - **Admin-only `Verify` toggle** next to `Refresh now` in `ProductMonitorTab`. Lets admins opt out of verification per-run when coverage matters more than price accuracy (e.g. bulk re-scans). `verify_prices` is also threaded through `/api/v1/price-monitoring/discover` so the backend respects the choice.
