@@ -44,7 +44,8 @@
       "ai_metrics_routes": "/api/v1/ai-metrics/* (2 endpoints) - Job metrics, summary",
       "relationship_routes": "/api/rag/product-image-relationships, /api/rag/chunk-product-relationships (2 endpoints) - Relationship queries for validation",
       "price_monitoring_routes": "/api/v1/price-monitoring/* (13 endpoints) - Competitor price tracking, alerts, history, statistics",
-      "price_lookup_routes": "/api/v1/prices/lookup (1 public endpoint) - Curl-callable one-shot price lookup, api_keys-table auth, rate-limited per key"
+      "price_lookup_routes": "/api/v1/prices/lookup (1 public endpoint) - Curl-callable one-shot price lookup, api_keys-table auth, rate-limited per key. URL mode (Firecrawl) + search_query mode (Perplexity Sonar).",
+      "tracked_queries_routes": "/api/v1/prices/track/* (7 public endpoints) - External project price tracking. POST/GET list/GET one/GET history/PUT/POST refresh/DELETE. api_keys Bearer auth, CASCADE on key deletion. Controls refresh cadence per query."
     },
     "x-platform-stats": {
       "total_endpoints": 113,

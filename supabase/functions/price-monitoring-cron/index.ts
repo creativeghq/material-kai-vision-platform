@@ -170,17 +170,48 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`\n✅ Cron job completed: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
+    console.log(`\n✅ Internal monitoring completed: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
+
+    // ── External tracked_queries refresh (Perplexity-based) ──
+    // Separate from internal price_monitoring_products. External projects
+    // register queries via POST /api/v1/prices/track with a refresh_interval_hours;
+    // MIVAA picks the due ones and runs Perplexity for each.
+    let trackedStats: any = null;
+    try {
+      const trackedResp = await fetch(
+        `${pythonBackendUrl}/api/v1/price-monitoring/tracked-queries/cron-refresh?limit=50`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-cron-secret': expectedSecret!,
+          },
+        }
+      );
+      if (trackedResp.ok) {
+        trackedStats = await trackedResp.json();
+        console.log(
+          `✅ Tracked-queries refresh: ${trackedStats.succeeded}/${trackedStats.processed} succeeded, ${trackedStats.total_credits_used} credits`
+        );
+      } else {
+        console.error(`❌ Tracked-queries refresh HTTP ${trackedResp.status}`);
+      }
+    } catch (e) {
+      console.error('❌ Tracked-queries refresh threw:', e);
+    }
 
     return new Response(JSON.stringify({
       success: true,
       message: `Price monitoring completed: ${succeeded}/${processed} succeeded`,
       stats: {
-        total: productsToMonitor.length,
-        processed,
-        succeeded,
-        failed,
-        results,
+        internal: {
+          total: productsToMonitor.length,
+          processed,
+          succeeded,
+          failed,
+          results,
+        },
+        tracked_queries: trackedStats,
       },
       timestamp: new Date().toISOString(),
     }), {

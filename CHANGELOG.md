@@ -4,7 +4,48 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
-## [unreleased] - 2026-04-23
+## [unreleased] - 2026-04-24
+
+**Price monitoring — Phase 2 rebuild (Perplexity discovery + external-project tracking API)**
+
+- **Engine swap (Claude → Perplexity Sonar-pro)**: replaced `web_search_20250305` with Perplexity. Claude's API search used Brave-based snippets that missed prices visible on retailer pages (verified: youbath.gr shows `25,00 €/m²` inline; Claude snippet didn't include it). Perplexity has deeper page reading + real `user_location` geo support.
+  - New: `app/services/integrations/perplexity_price_search_service.py`. Model: `claude-opus-4-7`-equivalent quality via `sonar-pro`, structured JSON output via `response_format.json_schema`, 6h throttle, credit logging to `ai_usage_logs`.
+  - Deleted: `app/services/integrations/claude_price_search_service.py` (dead).
+  - ~30× cheaper than Opus (+ web_search) and ~8× faster, with 6× more results on realistic queries.
+  - Strong out-of-stock inclusion: pages showing `€25 - Out of stock` (or local-language equivalents like `Εκτός διαθεσιμότητας`, `Nicht auf Lager`, `Agotado`, `Rupture de stock`) are included with `availability=out_of_stock` + the posted price.
+  - Domain pinning (Option 2): `search_domain_filter` accepts up to 10 `preferred_retailer_domains` to force-probe known retailers whose product pages rank below Perplexity's default retrieval set.
+
+- **External API for other projects** (new):
+  - `tracked_queries` + `tracked_query_price_history` tables. Hard-linked via `api_key_id → api_keys.id ON DELETE CASCADE` — deleting the key wipes the tracked query and its full history.
+  - 7 public endpoints at `/api/v1/prices/track/*` (CRUD + refresh + history), all api_keys Bearer auth, route-level `authenticate_api_key` dep.
+  - `POST /api/v1/prices/track` runs Perplexity synchronously and returns initial results; subsequent refreshes automatic via cron on `refresh_interval_hours` cadence (1–720h).
+  - `preferred_retailer_domains` param forces Perplexity to probe those domains.
+  - `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret auth) — called by Supabase cron to refresh due queries in a batch.
+  - Extended `supabase/functions/price-monitoring-cron` to call the tracked-queries refresh after the existing internal loop.
+
+- **New enum value**: `competitor_source_type` += `perplexity_web_search`. `claude_web_search` kept for historical rows only.
+
+- **Deploy workflow fix** (`mivaa-pdf-extractor/.github/workflows/deploy.yml`):
+  - Added `PERPLEXITY_API_KEY` to both the env block and the systemd `Environment=` line — was missing, so the key never reached the server even when set in GitHub Secrets. Flagged for follow-up: SLIG env vars are still manually configured via `/etc/systemd/system/mivaa-pdf-extractor.service.d/slig-env.conf` (not in GitHub Secrets).
+
+- **UI refactor** (`src/components/business/price-monitoring/ProductMonitorTab.tsx`):
+  - Per-product layout: Enable toggle + Admin "Refresh now" (role-gated) → price history chart → Discovered retailers table (Perplexity, ≤10) → Custom Monitoring section (Firecrawl URLs).
+  - New `RetailerTable` subcomponent with out-of-stock / limited / stale badges.
+  - `priceMonitoringApi.ts` — API client wrapping the MIVAA endpoints for the session-JWT path (discover, check-now, start/stop).
+
+- **Public API docs**: `docs/api/price-monitoring-api.md` — full reference for external integration (auth, every endpoint's request/response schema, error codes, rate limits, curl + TypeScript + Python recipes, FAQ).
+
+- **Cleaned up the internal /discover endpoint**: moved from Claude-specific language to Perplexity-neutral wording. `price_monitoring_routes.py` still writes `perplexity_web_search` as source_type.
+
+**Additional incidents fixed along the way (2026-04-23/24 working session):**
+- `api_keys` table had RLS enabled with zero policies, silently denying all INSERTs. Added 5 policies (`api_keys_{select,insert,update,delete}_own` + `api_keys_admin_all`). Dropped `consolidated_api_keys_SELECT_public` which referenced a non-existent `user_roles` table — it was poisoning all PostgREST queries against `api_keys` with HTTP 404.
+- `ai_usage_logs` logger was inserting `api_provider` / `operation_details` / `credits_used` as top-level columns that don't exist. Moved into `metadata` jsonb.
+- Firecrawl v2 API shape: `formats: ["markdown"]` + top-level `extract` key was being rejected with 400. Fixed `FirecrawlClient` + `scrape-single-page`, `scrape-preview`, `factory-enrichment-agent` to use `formats: [{type: "json", schema, prompt}]` shape.
+- `SubscriptionTab.tsx`: revoked API keys no longer show eye/copy buttons (were leading nowhere); always-on status badge (green Active / red Revoked); OAuth divider `bg-card` removed per visual spec.
+
+---
+
+## [2026-04-23]
 
 **Price monitoring — Phase 1 (Firecrawl consolidation + public lookup API)**
 - Added shared `FirecrawlClient` (`mivaa-pdf-extractor/app/services/integrations/firecrawl_client.py`) — Pydantic `model_json_schema()`-driven extraction, exponential backoff on retryable errors, centralized credit logging, opt-in `use_javascript_render` flag for JS-heavy pages.

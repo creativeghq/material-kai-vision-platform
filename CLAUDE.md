@@ -98,17 +98,55 @@
 - **Frontend**: `/admin/background-agents` → BackgroundAgentsPage + AgentRunHistoryDrawer + AgentLogsViewer + CreateAgentModal
 - **Service**: `src/services/backgroundAgents.ts`
 
-## Price Monitoring (Firecrawl + public lookup API)
-- **Shared client**: `mivaa-pdf-extractor/app/services/integrations/firecrawl_client.py` — single `FirecrawlClient` for competitor scraping AND the public lookup API. Pydantic schemas → `model_json_schema()` drive extraction; can't drift from code that reads the result.
-- **Extraction model**: `app/models/extraction.py::PriceExtraction` (price/currency/availability/shipping_cost/product_name). Field descriptions guide the LLM.
-- **Price parsing**: `app/utils/price_parsing.py` wraps `price-parser` lib — handles `$49.99`, `€1.299,00`, `From £29`, maps symbols → ISO-4217.
-- **Concurrency**: on-demand + cron scrape per-source loop uses `asyncio.gather` + `Semaphore(5)`.
-- **Current-price cache**: `competitor_sources.current_price`/`current_currency`/`current_availability`/`current_price_updated_at` denormalized on successful scrape. Authoritative history still in `price_history`.
-- **Source type enum**: `competitor_source_type` = `firecrawl_url` (current) | `dataforseo_shopping` (Phase 2 reserved — NOT implemented).
-- **Notifications**: `_dispatch_alert_notification` calls `NotificationService` → `notification-dispatcher` edge function → Resend (email) + `user_notifications` insert (in-app). `price_alert_history.notification_sent`/`notification_sent_at`/`notification_channels` flipped on success.
-- **JS-heavy pages**: opt-in `scraping_config.use_javascript_render = true` — adds 3s wait action + longer timeout. Default off.
-- **Public API**: `POST /api/v1/prices/lookup` ([`app/api/price_lookup_routes.py`](mivaa-pdf-extractor/app/api/price_lookup_routes.py)). Auth via `api_keys` table (Bearer). Rate-limited per key (default 60/min, cap 600). One-shot, does NOT create `competitor_sources` row. Usage logged to `price_lookups` table. Path whitelisted in JWT middleware exclude list.
-- **Schema state (2026-04 cleanup)**: all 6 price tables had 0 rows pre-migration — schema was redesigned freely. Feature is new/unused until docs are promoted.
+## Price Monitoring (2026-04-24 rebuild — Perplexity discovery + Firecrawl custom URLs)
+
+**Two parallel flows, one shared Perplexity engine:**
+
+**Flow 1 — Platform-internal (catalog products, session JWT auth):**
+- User enables monitoring on a product → `POST /api/v1/price-monitoring/discover` runs Perplexity Sonar-pro → up to 10 retailer rows written to `competitor_sources` with `source_type='perplexity_web_search'` + snapshots in `price_history`.
+- User pastes specific URLs in "Custom Monitoring" → `source_type='firecrawl_url'` via the existing `FirecrawlClient`.
+- 6h throttle on Perplexity per product; admin/super_admin `force_refresh=true` bypasses.
+- Cron at `supabase/functions/price-monitoring-cron` — hourly, runs Firecrawl on `get_products_due_for_monitoring` + calls MIVAA's `/tracked-queries/cron-refresh` (next bullet).
+
+**Flow 2 — External API (api_keys Bearer auth, for other projects):**
+- `POST /api/v1/prices/track` creates a `tracked_queries` row (search_query, dimensions, country_code, preferred_retailer_domains, refresh_interval_hours 1–720). First refresh runs synchronously; initial results in response.
+- `tracked_queries.api_key_id → api_keys.id ON DELETE CASCADE` — deleting the key wipes the tracked query AND all `tracked_query_price_history` (also cascades). Intentional blast radius.
+- 6 endpoints at `/api/v1/prices/track/*` (POST / GET list / GET one / GET /{id}/history / PUT / POST /{id}/refresh / DELETE). All route-level api_keys auth.
+- Cron endpoint `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret) picks up `due_for_refresh` rows and refreshes them. Called by Supabase price-monitoring-cron.
+
+**Engine: Perplexity Sonar-pro** (`app/services/integrations/perplexity_price_search_service.py`):
+- Replaced Claude `web_search_20250305` on 2026-04-24 — Claude API's Brave-based snippets missed prices visible on pages (e.g. YouBath €25). Perplexity has deeper page reading + real `user_location` geo support.
+- Structured JSON output via `response_format.json_schema`. `user_location.country` biases results. `search_domain_filter` (max 10) used when `preferred_retailer_domains` is set — Option 2 domain pinning.
+- ~$0.02/query, ~5-8s latency, typically 6-10 retailers with visible prices for mainstream materials.
+- Strong out-of-stock inclusion: pages showing "€25 - Out of stock" (or local-language equivalents like "Εκτός διαθεσιμότητας") are included with `availability=out_of_stock` + the posted price.
+
+**Firecrawl retained for:**
+- `POST /api/v1/prices/lookup` with `url` — specific product page scrape (external API)
+- "Custom Monitoring" section of the UI — user pastes a URL, Firecrawl tracks it
+- Shared client at `app/services/integrations/firecrawl_client.py`, Pydantic `PriceExtraction` model, locale-aware price parser (`price-parser` lib)
+
+**Source type enum** (`competitor_source_type`):
+- `firecrawl_url` — user-pasted URL, Firecrawl scrape
+- `perplexity_web_search` — auto-discovered (primary engine as of 2026-04-24)
+- `claude_web_search` — deprecated, kept for historical rows
+- `dataforseo_shopping` — reserved, NOT implemented (Claude+Firecrawl covers the use case)
+
+**Tables:**
+- `competitor_sources` — internal flow, product_id FK, has denormalized `current_price`/`current_currency`/`current_availability` cache
+- `tracked_queries` — external flow, api_key_id FK with CASCADE
+- `tracked_query_price_history` — external flow's price history, tracked_query_id FK with CASCADE
+- `price_history` — internal flow's history, product_id FK
+- `price_lookups` — external `/lookup` usage log
+- `ai_usage_logs` — every Perplexity call logged with tokens + cost + platform credits
+
+**Secrets** (required on MIVAA server via deploy.yml `Environment=`):
+- `PERPLEXITY_API_KEY` (primary engine) — get from perplexity.ai/settings/api
+- `FIRECRAWL_API_KEY` (URL mode + custom monitoring)
+- `CRON_SECRET` (validates `x-cron-secret` on cron-refresh endpoint)
+
+**UI**: `src/components/business/price-monitoring/ProductMonitorTab.tsx` — per-product view: toggle + admin Refresh → chart → discovered retailers (Perplexity) → Custom Monitoring (Firecrawl). Admin role gated via `user_profiles.role_id → roles.name IN ('admin', 'super_admin')`.
+
+**External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 
 ## FF&E Specification on Quotes
 - **New fields on `quote_items`**: `room`, `dimensions`, `installation_requirements`, `delivery_date`

@@ -1,14 +1,20 @@
 /**
- * Product Monitor Tab
- * On-demand price monitoring tab for individual product pages
- * Shows competitor prices, price history, and allows manual price checks
+ * ProductMonitorTab — per-product price monitoring view.
+ *
+ * Layout (top → bottom, per the rebuilt architecture 2026-04-24):
+ *   1. Header with Enable toggle + Admin "Refresh now" button
+ *   2. Price history chart (combines Perplexity-discovered + custom URL data points)
+ *   3. Discovered retailers table (Perplexity Sonar, auto-discovered, up to 10)
+ *      + Claude summary above the table (closest retailer, pricing anomalies)
+ *   4. Custom Monitoring section (user-pasted URLs tracked via Firecrawl)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
+import { Switch } from '@/components/core/ui/switch';
 import {
   TrendingDown,
   TrendingUp,
@@ -16,19 +22,27 @@ import {
   AlertCircle,
   ExternalLink,
   Plus,
-  Settings,
   Clock,
+  Sparkles,
+  Shield,
+  Globe,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import {
+  discoverRetailers,
+  startMonitoring,
+  stopMonitoring,
+  type PerplexityHit,
+  type DiscoverResponse,
+} from '@/services/priceMonitoringApi';
+import {
   isDemoProduct,
   getDemoCompetitorSources,
   getDemoCompetitorPrices,
   getDemoMonitoringConfig,
-  getDemoPriceHistory,
 } from '@/data/demo/price-monitoring-demo';
 
 interface ProductMonitorTabProps {
@@ -38,22 +52,17 @@ interface ProductMonitorTabProps {
   currency?: string;
 }
 
-interface CompetitorPrice {
-  id: string;
-  source_name: string;
-  source_url: string;
-  price: number;
-  currency: string;
-  availability: string;
-  scraped_at: string;
-}
-
 interface CompetitorSource {
   id: string;
   source_name: string;
   source_url: string;
+  source_type: 'firecrawl_url' | 'perplexity_web_search' | 'claude_web_search' | 'dataforseo_shopping';
+  current_price: number | null;
+  current_currency: string | null;
+  current_availability: string | null;
+  current_price_updated_at: string | null;
+  last_seen_at: string | null;
   is_active: boolean;
-  last_successful_scrape: string | null;
 }
 
 export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
@@ -62,517 +71,434 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   currentPrice,
   currency = 'USD',
 }) => {
-  const [isChecking, setIsChecking] = useState(false);
-  const [competitorPrices, setCompetitorPrices] = useState<CompetitorPrice[]>([]);
-  const [competitorSources, setCompetitorSources] = useState<CompetitorSource[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showAddSource, setShowAddSource] = useState(false);
-  const [isUpdatingTracking, setIsUpdatingTracking] = useState(false);
-  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
-  const [monitoringFrequency, setMonitoringFrequency] = useState<'hourly' | 'daily' | 'weekly' | 'on_demand'>('daily');
   const { toast } = useToast();
+  const isDemo = isDemoProduct(productId);
 
-  useEffect(() => {
-    loadCompetitorData();
-    loadMonitoringConfig();
-  }, [productId]);
+  // State
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const [sources, setSources] = useState<CompetitorSource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [throttleUntil, setThrottleUntil] = useState<string | null>(null);
+  const [lastSearchAt, setLastSearchAt] = useState<string | null>(null);
 
-  const loadMonitoringConfig = async () => {
-    try {
-      // Check if this is a demo product
-      if (isDemoProduct(productId)) {
-        const demoConfig = getDemoMonitoringConfig();
-        setMonitoringEnabled(demoConfig.monitoring_enabled);
-        setMonitoringFrequency(demoConfig.monitoring_frequency);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('price_monitoring_products')
-        .select('monitoring_enabled, monitoring_frequency')
-        .eq('product_id', productId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 is "not found" - that's okay, just means not configured yet
-        throw error;
-      }
-
-      if (data) {
-        setMonitoringEnabled(data.monitoring_enabled || false);
-        setMonitoringFrequency(data.monitoring_frequency || 'daily');
-      }
-    } catch (error) {
-      console.error('Failed to load monitoring config:', error);
+  // ─── Data loading ────────────────────────────────────────────────────────
+  const loadSources = useCallback(async () => {
+    if (isDemo) {
+      const demo = getDemoCompetitorSources(productId) as any;
+      const demoPrices = getDemoCompetitorPrices(productId, currentPrice || 45.99, currency);
+      const priceByName = new Map<string, number>(demoPrices.map((p: any) => [p.source_name, p.price]));
+      setSources(
+        demo.map((s: any) => ({
+          ...s,
+          source_type: 'firecrawl_url',
+          current_price: priceByName.get(s.source_name) ?? null,
+          current_currency: currency,
+          current_availability: 'in_stock',
+          current_price_updated_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+        }))
+      );
+      setMonitoringEnabled(getDemoMonitoringConfig().monitoring_enabled);
+      setIsLoading(false);
+      return;
     }
-  };
 
-  const loadCompetitorData = async () => {
     try {
       setIsLoading(true);
 
-      // Check if this is a demo product
-      if (isDemoProduct(productId)) {
-        // Use demo data for Demo Agent products
-        const demoSources = getDemoCompetitorSources(productId);
-        const demoPrices = getDemoCompetitorPrices(productId, currentPrice || 45.99, currency);
+      const { data: monitoring } = await supabase
+        .from('price_monitoring_products')
+        .select('monitoring_enabled, status, last_claude_search_at')
+        .eq('product_id', productId)
+        .maybeSingle();
 
-        setCompetitorSources(demoSources as any);
-        setCompetitorPrices(demoPrices as any);
-        setIsLoading(false);
-        return;
+      if (monitoring) {
+        setMonitoringEnabled(monitoring.monitoring_enabled ?? false);
+        setLastSearchAt(monitoring.last_claude_search_at ?? null);
       }
 
-      // Load competitor sources
-      const { data: sources, error: sourcesError } = await supabase
+      const { data: rows } = await supabase
         .from('competitor_sources')
-        .select('*')
+        .select(
+          'id, source_name, source_url, source_type, current_price, current_currency, current_availability, current_price_updated_at, last_seen_at, is_active'
+        )
         .eq('product_id', productId)
-        .order('created_at', { ascending: false });
+        .eq('is_active', true)
+        .order('current_price', { ascending: true, nullsFirst: false });
 
-      if (sourcesError) throw sourcesError;
-      setCompetitorSources(sources || []);
-
-      // Load latest prices
-      const { data: prices, error: pricesError } = await supabase
-        .from('price_history')
-        .select('*')
-        .eq('product_id', productId)
-        .order('scraped_at', { ascending: false })
-        .limit(10);
-
-      if (pricesError) throw pricesError;
-      setCompetitorPrices(prices || []);
-
-    } catch (error: any) {
-      console.error('Failed to load competitor data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load competitor data',
-        variant: 'destructive',
-      });
+      setSources((rows as CompetitorSource[]) || []);
+    } catch (err) {
+      console.error('Failed to load competitor sources', err);
+      toast({ title: 'Error', description: 'Could not load retailer list', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [productId, currentPrice, currency, isDemo, toast]);
 
-  const handleCheckNow = async () => {
-    // Prevent database operations for demo products
-    if (isDemoProduct(productId)) {
-      toast({
-        title: 'Demo Mode',
-        description: 'Price checking is disabled for demo products',
-        variant: 'default',
-      });
-      return;
-    }
+  const loadAdminRole = useCallback(async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role_id')
+      .eq('user_id', auth.user.id)
+      .maybeSingle();
+    if (!profile?.role_id) return;
+    const { data: role } = await supabase
+      .from('roles')
+      .select('name')
+      .eq('id', profile.role_id)
+      .maybeSingle();
+    setIsAdmin(['admin', 'super_admin'].includes((role?.name as string) || ''));
+  }, []);
 
-    try {
-      setIsChecking(true);
+  useEffect(() => {
+    loadSources();
+    loadAdminRole();
+  }, [loadSources, loadAdminRole]);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: 'Authentication Required',
-          description: 'Please sign in to check competitor prices',
-          variant: 'destructive',
-        });
+  // ─── Perplexity discovery ────────────────────────────────────────────────
+  const runDiscovery = useCallback(
+    async (forceRefresh: boolean) => {
+      if (isDemo) {
+        toast({ title: 'Demo mode', description: 'Discovery is disabled for demo products' });
         return;
       }
-
-      // Call the price monitoring Edge Function
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/price-monitoring`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: 'check_now',
-            productId: productId,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to check prices');
-      }
-
-      const result = await response.json();
-
-      toast({
-        title: 'Price Check Complete',
-        description: `Checked ${result.sourcesChecked || 0} sources, found ${result.pricesFound || 0} prices`,
-      });
-
-      // Reload data
-      await loadCompetitorData();
-
-    } catch (error: any) {
-      console.error('Failed to check prices:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to check competitor prices',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const handleUpdateTracking = async () => {
-    // Prevent database operations for demo products
-    if (isDemoProduct(productId)) {
-      toast({
-        title: 'Demo Mode',
-        description: 'Price tracking configuration is disabled for demo products',
-        variant: 'default',
-      });
-      return;
-    }
-
-    try {
-      setIsUpdatingTracking(true);
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to update price tracking',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Calculate next check time based on frequency
-      let nextCheckAt = null;
-      if (monitoringFrequency !== 'on_demand') {
-        const now = new Date();
-        switch (monitoringFrequency) {
-          case 'hourly':
-            nextCheckAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
-            break;
-          case 'daily':
-            nextCheckAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-            break;
-          case 'weekly':
-            nextCheckAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-            break;
+      try {
+        setIsDiscovering(true);
+        const result: DiscoverResponse = await discoverRetailers(productId, forceRefresh);
+        if (!result.success) {
+          toast({
+            title: 'Discovery failed',
+            description: result.error ?? 'Unknown error',
+            variant: 'destructive',
+          });
+          return;
         }
+        setThrottleUntil(result.throttle_until);
+        setLastSearchAt(result.last_search_at);
+        if (result.throttled) {
+          toast({
+            title: 'Using cached results',
+            description: `Last refresh ${timeAgo(result.last_search_at)}. Next allowed ${timeAgo(result.throttle_until)}.`,
+          });
+        } else {
+          toast({
+            title: 'Discovery complete',
+            description: `${result.total_results} retailers, ${result.credits_used} credits used.`,
+          });
+        }
+        await loadSources();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err?.message ?? 'Failed', variant: 'destructive' });
+      } finally {
+        setIsDiscovering(false);
       }
+    },
+    [productId, isDemo, loadSources, toast]
+  );
 
-      // Upsert monitoring configuration
-      const { error } = await supabase
-        .from('price_monitoring_products')
-        .upsert({
-          product_id: productId,
-          user_id: user.id,
-          monitoring_enabled: monitoringEnabled,
-          monitoring_frequency: monitoringFrequency,
-          next_check_at: nextCheckAt,
-          status: monitoringEnabled ? 'active' : 'paused',
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'product_id,user_id',
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: `Price tracking ${monitoringEnabled ? 'enabled' : 'disabled'} with ${monitoringFrequency} frequency`,
-      });
-
-      // If enabled, trigger an immediate check
-      if (monitoringEnabled) {
-        await handleCheckNow();
+  const handleToggleMonitoring = useCallback(async () => {
+    if (isDemo) return;
+    try {
+      setIsToggling(true);
+      if (!monitoringEnabled) {
+        await startMonitoring(productId, 'daily');
+        setMonitoringEnabled(true);
+        toast({ title: 'Monitoring enabled', description: 'Discovering retailers…' });
+        await runDiscovery(false);
+      } else {
+        await stopMonitoring(productId);
+        setMonitoringEnabled(false);
+        toast({ title: 'Monitoring paused' });
       }
-    } catch (error) {
-      console.error('Failed to update tracking:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update price tracking configuration',
-        variant: 'destructive',
-      });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Toggle failed', variant: 'destructive' });
     } finally {
-      setIsUpdatingTracking(false);
+      setIsToggling(false);
     }
+  }, [monitoringEnabled, productId, runDiscovery, isDemo, toast]);
+
+  // ─── Derived data ────────────────────────────────────────────────────────
+  const discovered = useMemo(
+    () =>
+      sources
+        .filter(
+          (s) => s.source_type === 'perplexity_web_search' || s.source_type === 'claude_web_search'
+        )
+        .slice(0, 10),
+    [sources]
+  );
+  const custom = useMemo(() => sources.filter((s) => s.source_type === 'firecrawl_url'), [sources]);
+
+  const priceDiff = (p: number | null) => {
+    if (!currentPrice || p == null) return null;
+    return ((p - currentPrice) / currentPrice) * 100;
   };
 
-  const getPriceDifference = (competitorPrice: number) => {
-    if (!currentPrice) return null;
-    const diff = ((competitorPrice - currentPrice) / currentPrice) * 100;
-    return diff;
-  };
-
+  // ─── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  const isDemo = isDemoProduct(productId);
-
   return (
     <div className="space-y-6">
-      {/* Demo Badge */}
       {isDemo && (
         <Alert className="border-yellow-300 bg-yellow-50">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-900">
-            <strong>Demo Mode:</strong> This is sample price monitoring data for demonstration purposes.
+            <strong>Demo Mode:</strong> Sample price monitoring data.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Header with Check Now Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Price Monitoring</h3>
-          <p className="text-sm text-gray-600">
-            Track competitor prices and get alerts on price changes
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isDemo && (
-            <>
-              <Button
-                onClick={() => setShowAddSource(true)}
-                variant="outline"
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Source
-              </Button>
-              <Button
-                onClick={handleCheckNow}
-                disabled={isChecking || competitorSources.length === 0}
-                size="sm"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-                Check Now
-              </Button>
-            </>
-          )}
-          {isDemo && (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-              Demo Data
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Price Tracking Configuration - Hide for demo products */}
-      {!isDemo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Automated Price Tracking</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-900">
-                    Enable Automated Tracking
-                  </label>
-                  <p className="text-xs text-gray-500">
-                    Automatically check competitor prices on a schedule
-                  </p>
+      {/* ─── Header: Enable + Admin Refresh ─── */}
+      <Card className="dashboard-card">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-medium">Price Monitoring</h3>
+                  {monitoringEnabled ? (
+                    <Badge className="bg-green-500/20 text-green-700 border-green-500/30 text-[10px]">
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">
+                      Paused
+                    </Badge>
+                  )}
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={monitoringEnabled}
-                    onChange={(e) => setMonitoringEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {lastSearchAt
+                    ? `Retailers last discovered ${timeAgo(lastSearchAt)}`
+                    : 'Enable to discover retailers and track prices'}
+                </p>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900">
-                  Monitoring Frequency
-                </label>
-                <select
-                  value={monitoringFrequency}
-                  onChange={(e) => setMonitoringFrequency(e.target.value as any)}
-                  disabled={!monitoringEnabled}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdmin && monitoringEnabled && !isDemo && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runDiscovery(true)}
+                  disabled={isDiscovering}
+                  title="Admin: bypass 6h throttle and force a fresh discovery"
                 >
-                  <option value="hourly">Hourly</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="on_demand">On-Demand Only</option>
-                </select>
+                  <Shield className="h-3.5 w-3.5 mr-1.5" />
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isDiscovering ? 'animate-spin' : ''}`} />
+                  Refresh now
+                </Button>
+              )}
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-xs text-muted-foreground">Enable</span>
+                <Switch
+                  checked={monitoringEnabled}
+                  onCheckedChange={handleToggleMonitoring}
+                  disabled={isToggling || isDemo}
+                />
               </div>
-
-              <Button
-                onClick={handleUpdateTracking}
-                disabled={isUpdatingTracking}
-                className="w-full"
-                size="sm"
-              >
-                <Clock className={`h-4 w-4 mr-2 ${isUpdatingTracking ? 'animate-spin' : ''}`} />
-              {isUpdatingTracking ? 'Updating...' : 'Update Price Tracking'}
-            </Button>
+            </div>
           </div>
+          {throttleUntil && !isDiscovering && monitoringEnabled && (
+            <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Next auto-refresh allowed {timeAgo(throttleUntil)}.
+              {isAdmin ? ' Admins can override above.' : ''}
+            </p>
+          )}
         </CardContent>
       </Card>
+
+      {/* ─── Chart (top) ─── */}
+      {monitoringEnabled && sources.length > 0 && (
+        <PriceHistoryChart productId={productId} productName={productName} timeRange="30d" />
       )}
 
-      {/* No Sources Alert */}
-      {competitorSources.length === 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            No competitor sources configured. Add competitor URLs to start tracking prices.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Competitor Sources */}
-      {competitorSources.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Competitor Sources ({competitorSources.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {competitorSources.map((source) => (
-                <div
-                  key={source.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{source.source_name}</span>
-                      <Badge variant={source.is_active ? 'default' : 'secondary'}>
-                        {source.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                    <a
-                      href={source.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
-                    >
-                      {source.source_url}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                    {source.last_successful_scrape && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Last checked: {new Date(source.last_successful_scrape).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-4 w-4" />
-                  </Button>
+      {/* ─── Discovered retailers (Perplexity) ─── */}
+      {monitoringEnabled && (
+        <Card className="dashboard-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Discovered retailers
+                {discovered.length > 0 && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {discovered.length}
+                  </Badge>
+                )}
+              </CardTitle>
+              {isDiscovering && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Searching the web…
                 </div>
-              ))}
+              )}
             </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {summary && (
+              <div className="px-6 pb-3 text-xs text-muted-foreground italic border-b">
+                {summary}
+              </div>
+            )}
+            {discovered.length === 0 && !isDiscovering && (
+              <div className="px-6 py-6 text-sm text-muted-foreground text-center">
+                No retailers discovered yet. {isAdmin && 'Click Refresh now above to try.'}
+              </div>
+            )}
+            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} />}
           </CardContent>
         </Card>
       )}
 
-      {/* Latest Competitor Prices */}
-      {competitorPrices.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Latest Prices</CardTitle>
+      {/* ─── Custom Monitoring (Firecrawl) ─── */}
+      {monitoringEnabled && (
+        <Card className="dashboard-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Custom Monitoring
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setShowAddSource(true)} disabled={isDemo}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add URL
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {competitorPrices.map((price) => {
-                const priceDiff = getPriceDifference(price.price);
-                return (
-                  <div
-                    key={price.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{price.source_name}</span>
-                        <Badge
-                          variant={
-                            price.availability === 'in_stock'
-                              ? 'default'
-                              : price.availability === 'out_of_stock'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                        >
-                          {price.availability.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {new Date(price.scraped_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900">
-                        {price.currency === 'EUR' ? '€' : '$'}
-                        {price.price.toFixed(2)}
-                      </div>
-                      {priceDiff !== null && (
-                        <div className="flex items-center gap-1 text-xs">
-                          {priceDiff > 0 ? (
-                            <>
-                              <TrendingUp className="h-3 w-3 text-red-600" />
-                              <span className="text-red-600">+{priceDiff.toFixed(1)}%</span>
-                            </>
-                          ) : priceDiff < 0 ? (
-                            <>
-                              <TrendingDown className="h-3 w-3 text-green-600" />
-                              <span className="text-green-600">{priceDiff.toFixed(1)}%</span>
-                            </>
-                          ) : (
-                            <span className="text-gray-500">Same price</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {custom.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Paste a specific retailer URL to track its price via Firecrawl. Useful when the auto-discovery
+                missed a retailer you know sells this product.
+              </p>
+            ) : (
+              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} />
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Price History Chart - Only show for demo products */}
-      {isDemo && (
-        <PriceHistoryChart
-          productId={productId}
-          productName={productName}
-          timeRange="30d"
-        />
-      )}
-
-      {/* Empty State */}
-      {competitorSources.length > 0 && competitorPrices.length === 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            No price data available yet. Click "Check Now" to fetch the latest prices.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Add Source Dialog */}
       <CompetitorSourceManager
         productId={productId}
         isOpen={showAddSource}
         onClose={() => setShowAddSource(false)}
-        onSourceAdded={loadCompetitorData}
+        onSourceAdded={loadSources}
       />
     </div>
   );
 };
 
+// ─── RetailerTable subcomponent ──────────────────────────────────────────────
+
+const RetailerTable: React.FC<{
+  rows: CompetitorSource[];
+  currentPrice?: number;
+  priceDiff: (p: number | null) => number | null;
+}> = ({ rows, priceDiff }) => (
+  <div className="divide-y">
+    {rows.map((r) => {
+      const diff = priceDiff(r.current_price);
+      const currSym = r.current_currency === 'EUR' ? '€' : r.current_currency === 'GBP' ? '£' : '$';
+      const stale = r.last_seen_at && Date.now() - new Date(r.last_seen_at).getTime() > 1000 * 60 * 60 * 24 * 7;
+      return (
+        <div key={r.id} className={`flex items-center justify-between px-6 py-3 ${stale ? 'opacity-60' : ''}`}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <a
+                href={r.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-sm hover:underline truncate"
+              >
+                {r.source_name}
+              </a>
+              {r.current_availability === 'out_of_stock' && (
+                <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700">
+                  Out of stock
+                </Badge>
+              )}
+              {r.current_availability === 'limited' && (
+                <Badge variant="outline" className="text-[10px] border-yellow-300 text-yellow-700">
+                  Limited
+                </Badge>
+              )}
+              {stale && (
+                <Badge variant="outline" className="text-[10px]">
+                  Stale
+                </Badge>
+              )}
+            </div>
+            <a
+              href={r.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-muted-foreground hover:underline flex items-center gap-1 mt-0.5 truncate"
+            >
+              {new URL(r.source_url).host.replace(/^www\./, '')}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          </div>
+          <div className="text-right shrink-0 ml-4">
+            {r.current_price != null ? (
+              <>
+                <div className="text-base font-semibold">
+                  {currSym}
+                  {Number(r.current_price).toFixed(2)}
+                </div>
+                {diff !== null && (
+                  <div className="flex items-center justify-end gap-1 text-[11px]">
+                    {diff > 0 ? (
+                      <>
+                        <TrendingUp className="h-3 w-3 text-red-600" />
+                        <span className="text-red-600">+{diff.toFixed(1)}%</span>
+                      </>
+                    ) : diff < 0 ? (
+                      <>
+                        <TrendingDown className="h-3 w-3 text-green-600" />
+                        <span className="text-green-600">{diff.toFixed(1)}%</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Same</span>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground">No price</span>
+            )}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'never';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) {
+    const mins = Math.round(-diff / 60000);
+    if (mins < 60) return `in ${mins}m`;
+    const hrs = Math.round(mins / 60);
+    return `in ${hrs}h`;
+  }
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}

@@ -168,7 +168,18 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `price-monitoring` | POST | JWT | Actions: `start-monitoring`, `stop-monitoring`, `check-now`, `get-status`. See [price-monitoring-cron-api](api/price-monitoring-cron-api.md) for cron variant. |
-| `POST /api/v1/prices/lookup` | POST | API key (Bearer) | **Public curl-callable** one-shot price lookup for any URL. Auth via `api_keys` table, rate-limited per key, billed to the key owner's workspace. Does NOT create a monitoring subscription. See [Price Monitoring System → Public Price Lookup API](price-monitoring-system.md#public-price-lookup-api-external--curl). |
+| `POST /api/v1/prices/lookup` | POST | API key (Bearer) | **Public curl-callable** one-shot price lookup. Two modes: `url` (Firecrawl) or `search_query` (Perplexity Sonar). Rate-limited per key. Does NOT create a monitoring subscription. |
+| `POST /api/v1/prices/track` | POST | API key (Bearer) | **External project integration** — register a tracked query (search_query + country_code + refresh_interval_hours). First refresh runs synchronously; subsequent refreshes via cron on the caller's cadence. CASCADE-deletes on api_key deletion. |
+| `GET /api/v1/prices/track` | GET | API key (Bearer) | List all tracked queries owned by this api_key. |
+| `GET /api/v1/prices/track/{id}` | GET | API key (Bearer) | Get one tracked query + latest retailer results. |
+| `GET /api/v1/prices/track/{id}/history` | GET | API key (Bearer) | Full price-point history across all refresh runs. |
+| `PUT /api/v1/prices/track/{id}` | PUT | API key (Bearer) | Update cadence, country, or preferred retailer domains. |
+| `POST /api/v1/prices/track/{id}/refresh` | POST | API key (Bearer) | Force refresh now (bypasses cadence). |
+| `DELETE /api/v1/prices/track/{id}` | DELETE | API key (Bearer) | Soft delete (`is_active=false`); history preserved. Hard delete by revoking the api_key. |
+| `POST /api/v1/price-monitoring/discover` | POST | User JWT | Internal: Perplexity discovery for a monitored product (UI-triggered). 6h throttle; admin `force_refresh` bypass. |
+| `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` | POST | `x-cron-secret` | Internal cron: refreshes all due `tracked_queries` rows. Called hourly from the Supabase price-monitoring-cron edge function. |
+
+**Full external-API reference**: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md) — auth, schemas, error codes, curl/TypeScript/Python recipes.
 
 ### 1.14 Data import & scraping
 
