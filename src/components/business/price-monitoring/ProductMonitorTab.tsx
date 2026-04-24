@@ -26,6 +26,7 @@ import {
   Sparkles,
   Shield,
   Globe,
+  ShoppingBag,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,6 +64,8 @@ interface CompetitorSource {
   current_price_updated_at: string | null;
   last_seen_at: string | null;
   is_active: boolean;
+  // Optional DataForSEO enrichment stored in metadata jsonb (image, rating)
+  metadata?: { image_url?: string; rating_value?: number; rating_votes?: number } | null;
 }
 
 export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
@@ -234,6 +237,10 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         .slice(0, 10),
     [sources]
   );
+  const merchants = useMemo(
+    () => sources.filter((s) => s.source_type === 'dataforseo_shopping').slice(0, 10),
+    [sources]
+  );
   const custom = useMemo(() => sources.filter((s) => s.source_type === 'firecrawl_url'), [sources]);
 
   const priceDiff = (p: number | null) => {
@@ -359,6 +366,27 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
               </div>
             )}
             {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} />}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Merchants (Google Shopping via DataForSEO) ─── */}
+      {monitoringEnabled && merchants.length > 0 && (
+        <Card className="dashboard-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4 text-primary" />
+                Merchants
+                <Badge variant="outline" className="text-[10px]">
+                  {merchants.length}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground font-normal">via Google Shopping</span>
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} />
           </CardContent>
         </Card>
       )}
