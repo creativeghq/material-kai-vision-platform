@@ -8,7 +8,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-const MIVAA_BASE = import.meta.env.VITE_MIVAA_BASE_URL || 'https://mivaa.materialshub.gr';
+const MIVAA_BASE = import.meta.env.VITE_MIVAA_BASE_URL || 'https://v1api.materialshub.gr';
 
 async function authHeader(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();

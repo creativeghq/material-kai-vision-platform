@@ -140,7 +140,7 @@ All Firecrawl calls go through a single shared client: `app/services/integration
 
 Request:
 ```bash
-curl -X POST https://<mivaa-host>/api/v1/prices/lookup \
+curl -X POST https://v1api.materialshub.gr/api/v1/prices/lookup \
   -H "Authorization: Bearer <api_key>" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com/products/oak","product_name":"White oak 8mm","use_javascript_render":false}'

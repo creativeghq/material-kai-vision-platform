@@ -2,7 +2,9 @@
 
 External integration reference for the price lookup + price tracking endpoints.
 
-**Base URL:** `https://<your-mivaa-host>` (the MIVAA FastAPI backend, e.g. `https://mivaa.materialshub.gr`)
+**Base URL:** `https://v1api.materialshub.gr`
+
+All paths below are relative to this host (e.g. `POST /api/v1/prices/track` → `POST https://v1api.materialshub.gr/api/v1/prices/track`).
 
 ---
 
@@ -60,7 +62,7 @@ One-shot. Not stored as a tracked query. Two modes; pass exactly one of `url` or
 Scrape one specific product page.
 
 ```bash
-curl -X POST https://<host>/api/v1/prices/lookup \
+curl -X POST https://v1api.materialshub.gr/api/v1/prices/lookup \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -93,7 +95,7 @@ Response:
 Find retailers across the web. Up to 25 results, sorted cheapest first.
 
 ```bash
-curl -X POST https://<host>/api/v1/prices/lookup \
+curl -X POST https://v1api.materialshub.gr/api/v1/prices/lookup \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -165,7 +167,7 @@ Every call writes a row to `price_lookups` (tables in Supabase) with `api_key_id
 Register a product for ongoing price tracking. The first refresh runs **synchronously** and the response contains the initial results. Subsequent refreshes happen automatically on your `refresh_interval_hours` cadence via our cron.
 
 ```bash
-curl -X POST https://<host>/api/v1/prices/track \
+curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -227,7 +229,7 @@ curl -X POST https://<host>/api/v1/prices/track \
 ## 3. List tracked queries — `GET /api/v1/prices/track`
 
 ```bash
-curl https://<host>/api/v1/prices/track \
+curl https://v1api.materialshub.gr/api/v1/prices/track \
   -H "Authorization: Bearer $KEY"
 ```
 
@@ -240,7 +242,7 @@ Returns an array of tracked queries **owned by the key in the request**. Other k
 ## 4. Get one tracked query — `GET /api/v1/prices/track/{tracking_id}`
 
 ```bash
-curl https://<host>/api/v1/prices/track/220f05d1-eca7-45e6-af9c-d2ca1370fb2d \
+curl https://v1api.materialshub.gr/api/v1/prices/track/220f05d1-eca7-45e6-af9c-d2ca1370fb2d \
   -H "Authorization: Bearer $KEY"
 ```
 
@@ -254,7 +256,7 @@ Returns the tracked query row + the **latest refresh's retailer results** (cheap
 ## 5. Full history — `GET /api/v1/prices/track/{tracking_id}/history`
 
 ```bash
-curl "https://<host>/api/v1/prices/track/$TID/history?limit=200" \
+curl "https://v1api.materialshub.gr/api/v1/prices/track/$TID/history?limit=200" \
   -H "Authorization: Bearer $KEY"
 ```
 
@@ -282,7 +284,7 @@ Each entry:
 Change cadence, country, or preferred retailers. All fields optional; only the ones you send are updated.
 
 ```bash
-curl -X PUT https://<host>/api/v1/prices/track/$TID \
+curl -X PUT https://v1api.materialshub.gr/api/v1/prices/track/$TID \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -300,7 +302,7 @@ Returns the full tracked-query row post-update.
 Run Perplexity *now*, regardless of when the last refresh happened.
 
 ```bash
-curl -X POST https://<host>/api/v1/prices/track/$TID/refresh \
+curl -X POST https://v1api.materialshub.gr/api/v1/prices/track/$TID/refresh \
   -H "Authorization: Bearer $KEY"
 ```
 
@@ -325,7 +327,7 @@ Respects per-key rate limits. Use sparingly — normal cadence is always cheaper
 ## 8. Stop tracking — `DELETE /api/v1/prices/track/{tracking_id}`
 
 ```bash
-curl -X DELETE https://<host>/api/v1/prices/track/$TID \
+curl -X DELETE https://v1api.materialshub.gr/api/v1/prices/track/$TID \
   -H "Authorization: Bearer $KEY"
 ```
 
