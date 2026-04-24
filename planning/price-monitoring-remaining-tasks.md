@@ -1,7 +1,33 @@
 # Price Monitoring System - Remaining Tasks
 
-**Last Updated:** December 25, 2024  
+**Last Updated:** December 25, 2024
 **Status:** In Progress - Core functionality complete, UI and advanced features remaining
+
+> ⚠️ **Historical planning document — largely superseded (2026-04-25).**
+>
+> This file is the pre-implementation task tracker from Dec 2024. The system has since
+> shipped two major evolutions that this doc does NOT describe:
+>
+> - **Phase 7 (verification)** — Firecrawl moved from *discovery* to *verification*.
+>   Actual discovery now runs Perplexity Sonar + DataForSEO Merchant in parallel.
+>   New response fields: `original_price`, `verified`, `source`, `image_url`,
+>   `rating_value`, `rating_votes`, plus `verify_prices` request opt-out.
+> - **Phase 8 (product-identity)** — a Claude Haiku 4.5 classifier validates each
+>   scraped page against the asked product's brand / model / type / variants.
+>   Wrong-product rows are dropped server-side; variants are kept with a
+>   match_note and excluded from stats. New fields: `match_kind`, `match_score`,
+>   `match_note`, `product_title`. New endpoint: `POST /api/v1/price-monitoring/market-check`.
+>   New enum values: `perplexity_web_search`, `dataforseo_shopping`.
+>
+> Canonical current-state references:
+> - [CHANGELOG.md](../CHANGELOG.md) → `[unreleased] 2026-04-25` (Phases 7 + 8)
+> - [docs/api/price-monitoring-api.md](../docs/api/price-monitoring-api.md) — external API schema
+> - [docs/price-monitoring-system.md](../docs/price-monitoring-system.md) — internal architecture
+> - [CLAUDE.md](../CLAUDE.md) → **Price Monitoring** section
+> - [docs/plans/greek-marketplaces-integration.md](../docs/plans/greek-marketplaces-integration.md) — Skroutz/Bestdeals/Shopflix queued
+>
+> The sections below are preserved as historical context. They still accurately
+> describe tables, RLS, cron schedule, and original UI components.
 
 ---
 

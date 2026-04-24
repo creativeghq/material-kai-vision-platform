@@ -6,20 +6,33 @@ This Edge Function runs on a schedule (hourly) to check products that are due fo
 
 ## Architecture
 
+This edge function drives **two** backend paths on each tick:
+
 ```
 Supabase Cron (hourly)
   ↓
 Edge Function (price-monitoring-cron)
-  ↓
-Python Backend API (/api/v1/price-monitoring/check-now)
-  ↓
-CompetitorScraperService
-  ├─→ Firecrawl API (scrape competitor pages)
-  ├─→ CreditsIntegrationService (debit credits)
-  ├─→ AICallLogger (log usage)
-  ├─→ Database (save price history)
-  └─→ PriceAlertService (check alerts)
+  ├─→ Python: /api/v1/price-monitoring/check-now
+  │     (Firecrawl re-scrape of user-pasted URLs in competitor_sources
+  │      with source_type='firecrawl_url' — the "Custom Monitoring" UI.)
+  │
+  └─→ Python: /api/v1/price-monitoring/tracked-queries/cron-refresh
+        (Full pipeline for every due tracked_queries row.)
+            ├─→ Facet cache read (tracked_queries.query_facets)
+            ├─→ Perplexity Sonar + DataForSEO Merchant (parallel discovery)
+            ├─→ URL pre-filter (drops homepages/SERPs/aggregator masquerades)
+            ├─→ Firecrawl verification (per retailer URL — price + product_name
+            │     + breadcrumb + visible_attributes)
+            ├─→ Haiku 4.5 identity classifier (match_kind per hit —
+            │     drops mismatch/family, keeps exact/variant/unverifiable)
+            └─→ Writes tracked_query_price_history with match_kind, match_score,
+                  match_note, product_title, original_price, verified
 ```
+
+Every row returned from either path carries the Phase-8 identity fields
+(`match_kind`, `match_score`, `match_note`, `product_title`). See
+[docs/api/price-monitoring-api.md](../../../docs/api/price-monitoring-api.md)
+for the full response schema.
 
 ## Why This Architecture?
 

@@ -60,6 +60,28 @@ Example: A $0.15 USD API call = **15 platform credits**
 - **Cost Calculation**: USD Cost = firecrawl_credits × cost_per_credit. Platform Credits = USD Cost × 100.
 - **Default Estimate**: $0.001 per Firecrawl credit
 
+### 7. **Perplexity Sonar** (price discovery engine, 2026-04)
+- **Pricing Unit**: Tokens + per-search fee
+- **Model**: `sonar-pro` — $3/M input, $15/M output, plus $5 per 1K high-context searches.
+- **Cost Calculation**: USD = (input/1M × $3) + (output/1M × $15) + ($0.005 × search_calls). Platform credits = USD × 100.
+- **Typical**: ~$0.02/query, ~5-8s latency, 6-10 retailers.
+- **Logged as**: `operation_type='price_search'`, `provider='perplexity'` in `ai_usage_logs`.
+
+### 8. **DataForSEO Merchant** (Google Shopping feed, 2026-04)
+- **Pricing Unit**: Flat per task (~$0.002 regardless of depth)
+- **Endpoint**: async `task_post` → `task_get/advanced`. Depth defaults to ≥30 for broad merchant coverage.
+- **Cost Calculation**: USD = $0.002 × tasks_posted. Platform credits = USD × 100.
+- **Logged as**: `operation_type='price_search'`, `provider='dataforseo'`.
+
+### 9. **Claude Haiku 4.5** (identity classifier + query facet extractor, 2026-04-25)
+- **Pricing Unit**: Per million tokens
+- **Model**: `claude-haiku-4-5-20251001` — cheap, fast, cache-aware
+- **Two operation types in price monitoring**:
+  - `operation_type='price_search'` (query facet extraction) — ~$0.0005/call. Cached on `tracked_queries.query_facets` so repeated refreshes don't re-pay.
+  - `operation_type='product_match_classifier'` (batched identity verdict over N hits per discovery) — ~$0.002 per batch.
+- **Cost Calculation**: standard token-based — (input/1M × $0.80) + (output/1M × $4.00). Cache hits reduce input cost by ~90%.
+- **Logged as**: `provider='anthropic'`. Full `{query_facets, candidates, verdicts}` payload stored in `metadata` jsonb for auditability.
+
 ---
 
 ## Database Schema
