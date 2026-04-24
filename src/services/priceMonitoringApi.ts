@@ -125,3 +125,63 @@ export async function stopMonitoring(productId: string): Promise<void> {
   );
   if (!res.ok) throw new Error(`stop monitoring failed: ${res.status}`);
 }
+
+export interface MarketStats {
+  count: number;
+  verified_count: number;
+  min: number | null;
+  max: number | null;
+  median: number | null;
+  currency: string | null;
+}
+
+export interface MarketCheckResponse {
+  success: boolean;
+  product_id: string | null;
+  query: string;
+  country_code: string;
+  results: PerplexityHit[];
+  total_results: number;
+  stats: MarketStats;
+  summary: string | null;
+  credits_used: number;
+  latency_ms: number;
+  /** True when the product was already enrolled in monitoring and the cached snapshot was reused (≤6h old). */
+  from_monitoring_cache: boolean;
+  cache_age_seconds: number | null;
+  error: string | null;
+}
+
+export interface MarketCheckParams {
+  productId?: string;
+  productName?: string;
+  dimensions?: string;
+  manufacturer?: string;
+  verifyPrices?: boolean;
+}
+
+/**
+ * One-shot stateless market scan. Admin-only. Used by the "Check market" button
+ * in PriceLookupDrawer so admins can compare the KB-proposed price against live
+ * retailer range/median before committing. Does NOT enroll the product into
+ * monitoring — if the product is already enrolled and its last refresh is ≤6h
+ * old, the cached competitor_sources snapshot is returned (from_monitoring_cache=true).
+ */
+export async function marketCheck(params: MarketCheckParams): Promise<MarketCheckResponse> {
+  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/market-check`, {
+    method: 'POST',
+    headers: await authHeader(),
+    body: JSON.stringify({
+      product_id: params.productId,
+      product_name: params.productName,
+      dimensions: params.dimensions,
+      manufacturer: params.manufacturer,
+      verify_prices: params.verifyPrices ?? true,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`market-check failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}

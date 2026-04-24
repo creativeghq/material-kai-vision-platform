@@ -34,6 +34,25 @@ Motivation: validation against real-world queries (e.g. "Απορροφητήρ�
 
 - **Backwards compatibility**: all new fields are additive. Clients that don't send `verify_prices` get verified prices by default (the correct upgrade). Old history rows keep `verified: false` — not a data-quality flag, just "predates verification."
 
+**Price monitoring UI polish on top of Phase 7**
+
+- **Admin-only `Verify` toggle** next to `Refresh now` in `ProductMonitorTab`. Lets admins opt out of verification per-run when coverage matters more than price accuracy (e.g. bulk re-scans). `verify_prices` is also threaded through `/api/v1/price-monitoring/discover` so the backend respects the choice.
+- **Perplexity summary** ("closest retailer, manufacturer showroom presence, pricing outliers to question") is now returned on `DiscoverSourcesResponse.summary` and rendered above the retailer table.
+- **DataForSEO enrichment rendering**: merchant rows show a 48×48 thumbnail, star rating, and review count. Backed by a new `competitor_sources.current_metadata jsonb` column populated on every upsert (`image_url`, `rating_value`, `rating_votes`, plus the verification discrepancy `notes` string).
+- **"Corrected" badge**: when Firecrawl overrode the LLM price by >20%, a standalone amber `Corrected` badge appears alongside the green `Verified` badge. The `Verified` badge tooltip includes the full discrepancy string when present.
+- **DB**: migration `price_monitoring_current_metadata` adds `competitor_sources.current_metadata jsonb`.
+
+**Check Market button (stateless market scan for pricing decisions)**
+
+Admin-only companion to the KB-based AI price proposal in `PriceLookupDrawer`. Click runs Perplexity + DataForSEO + Firecrawl verification scoped to the admin's country, and surfaces min / median / max / verified-count alongside the KB proposal so admins can price against real retailers.
+
+- **Stateless**: does NOT enroll the product into continuous monitoring, does NOT write to `competitor_sources` or `price_history`.
+- **Monitoring-aware cache**: if the product is already enrolled and the last monitoring refresh is ≤6h old, the cached snapshot is reused (credits_used=0, `from_monitoring_cache: true`).
+- **Percentile callout**: renders "Your KB price sits at the Nth percentile of the market" with green (middle 50%), amber (>75th percentile), or red (<25th or >100th) tone so pricing outliers surface at a glance.
+- **New surfaces**:
+  - MIVAA: `POST /api/v1/price-monitoring/market-check` (session JWT, admin/super_admin only). Request: `{product_id, product_name, dimensions, manufacturer, verify_prices}`. Response: `{stats: {count, verified_count, min, max, median, currency}, results: PriceHit[], summary, from_monitoring_cache, cache_age_seconds}`.
+  - Frontend: `src/components/features/pricing/MarketPanel.tsx` (new), `marketCheck()` + `MarketCheckResponse` in `priceMonitoringApi.ts`.
+
 ---
 
 ## [previous] - 2026-04-24

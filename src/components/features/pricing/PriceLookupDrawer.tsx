@@ -19,7 +19,10 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, Sparkles, X, Zap } from 'lucide-react';
+import { AlertTriangle, FileText, Globe2, Loader2, Sparkles, X, Zap } from 'lucide-react';
+
+import { MarketPanel } from './MarketPanel';
+import { marketCheck, type MarketCheckResponse } from '@/services/priceMonitoringApi';
 
 import {
   Sheet,
@@ -141,6 +144,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
   const [finalUnit, setFinalUnit] = useState<string>(unit || '');
   const [notes, setNotes] = useState('');
   const [committing, setCommitting] = useState(false);
+  const [market, setMarket] = useState<MarketCheckResponse | null>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
@@ -156,6 +161,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     setFinalCurrency('EUR');
     setFinalUnit(unit || '');
     setNotes('');
+    setMarket(null);
+    setMarketLoading(false);
     abortRef.current?.abort();
     abortRef.current = null;
   }, [unit]);
@@ -364,6 +371,48 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     return mode === 'quick' ? runQuickLookup() : runAILookup();
   }, [mode, runQuickLookup, runAILookup]);
 
+  /**
+   * Stateless one-shot retailer market scan. Parallel to the KB lookup — the
+   * admin can run either or both. Reuses the monitoring snapshot if the
+   * product is already enrolled and the last refresh is ≤6h old.
+   */
+  const runMarketCheck = useCallback(async () => {
+    if (marketLoading) return;
+    setMarketLoading(true);
+    try {
+      const res = await marketCheck({
+        productId,
+        productName,
+        manufacturer,
+        verifyPrices: true,
+      });
+      if (!res.success) {
+        toast({
+          title: 'Market check failed',
+          description: res.error ?? 'Unknown error',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setMarket(res);
+      if ((res.total_results ?? 0) === 0) {
+        toast({
+          title: 'No retailers found',
+          description: 'Perplexity + DataForSEO returned nothing for this product in your market.',
+        });
+      }
+    } catch (err) {
+      console.error('Market check failed:', err);
+      toast({
+        title: 'Market check failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarketLoading(false);
+    }
+  }, [marketLoading, productId, productName, manufacturer, toast]);
+
   // Auto-run on open — uses whatever mode is currently selected
   useEffect(() => {
     if (open && !loading && matches.length === 0 && !proposal) {
@@ -511,6 +560,22 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
           <span className="text-xs text-muted-foreground">
             {mode === 'ai' ? 'Agent composes a price with reasoning.' : 'Direct search · no AI cost.'}
           </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={runMarketCheck}
+            disabled={marketLoading}
+            title="Run a live retailer scan (Perplexity + DataForSEO + Firecrawl) to compare your KB price against the market. Stateless — does not enroll into monitoring."
+          >
+            {marketLoading ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Globe2 className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Check market
+          </Button>
         </div>
 
         <div className="mt-6 space-y-6">
@@ -530,6 +595,19 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
                 </Button>
               </CardContent>
             </Card>
+          )}
+
+          {market && (
+            <MarketPanel
+              market={market}
+              kbPrice={
+                proposal?.final_unit_price != null
+                  ? Number(proposal.final_unit_price)
+                  : parsedPrice && !Number.isNaN(parsedPrice)
+                    ? parsedPrice
+                    : null
+              }
+            />
           )}
 
           {proposal && (
