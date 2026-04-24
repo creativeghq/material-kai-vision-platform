@@ -67,8 +67,17 @@ interface CompetitorSource {
   current_price_updated_at: string | null;
   last_seen_at: string | null;
   is_active: boolean;
-  // Optional DataForSEO enrichment stored in metadata jsonb (image, rating)
-  metadata?: { image_url?: string; rating_value?: number; rating_votes?: number } | null;
+  /**
+   * Per-row enrichment cache refreshed on each discovery:
+   *  - image_url / rating_value / rating_votes: DataForSEO Shopping feed only
+   *  - notes: verification discrepancy string when Firecrawl disagreed with the LLM
+   */
+  current_metadata?: {
+    image_url?: string;
+    rating_value?: number;
+    rating_votes?: number;
+    notes?: string;
+  } | null;
 }
 
 export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
@@ -91,6 +100,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [summary, setSummary] = useState<string | null>(null);
   const [throttleUntil, setThrottleUntil] = useState<string | null>(null);
   const [lastSearchAt, setLastSearchAt] = useState<string | null>(null);
+  const [verifyPrices, setVerifyPrices] = useState<boolean>(true);
 
   // ─── Data loading ────────────────────────────────────────────────────────
   const loadSources = useCallback(async () => {
@@ -133,7 +143,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       const { data: rows } = await supabase
         .from('competitor_sources')
         .select(
-          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_price_updated_at, last_seen_at, is_active'
+          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_metadata, current_price_updated_at, last_seen_at, is_active'
         )
         .eq('product_id', productId)
         .eq('is_active', true)
@@ -179,7 +189,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       }
       try {
         setIsDiscovering(true);
-        const result: DiscoverResponse = await discoverRetailers(productId, forceRefresh);
+        const result: DiscoverResponse = await discoverRetailers(productId, forceRefresh, verifyPrices);
         if (!result.success) {
           toast({
             title: 'Discovery failed',
@@ -190,6 +200,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         }
         setThrottleUntil(result.throttle_until);
         setLastSearchAt(result.last_search_at);
+        setSummary(result.summary ?? null);
         if (result.throttled) {
           toast({
             title: 'Using cached results',
@@ -208,7 +219,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         setIsDiscovering(false);
       }
     },
-    [productId, isDemo, loadSources, toast]
+    [productId, isDemo, loadSources, toast, verifyPrices]
   );
 
   const handleToggleMonitoring = useCallback(async () => {
@@ -300,17 +311,34 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
             <div className="flex items-center gap-2">
               {isAdmin && monitoringEnabled && !isDemo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => runDiscovery(true)}
-                  disabled={isDiscovering}
-                  title="Admin: bypass 6h throttle and force a fresh discovery"
-                >
-                  <Shield className="h-3.5 w-3.5 mr-1.5" />
-                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isDiscovering ? 'animate-spin' : ''}`} />
-                  Refresh now
-                </Button>
+                <>
+                  <label
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+                    title={
+                      verifyPrices
+                        ? 'Every retailer URL will be re-fetched via Firecrawl to confirm the price on the live page. More accurate, ~30s slower, ~3× credits.'
+                        : 'Skip the Firecrawl verification pass. Faster and cheaper, but prices come only from Perplexity/DataForSEO snippets — may be stale or hallucinated.'
+                    }
+                  >
+                    <Switch
+                      checked={verifyPrices}
+                      onCheckedChange={setVerifyPrices}
+                      disabled={isDiscovering}
+                    />
+                    <span>Verify</span>
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => runDiscovery(true)}
+                    disabled={isDiscovering}
+                    title="Admin: bypass 6h throttle and force a fresh discovery"
+                  >
+                    <Shield className="h-3.5 w-3.5 mr-1.5" />
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isDiscovering ? 'animate-spin' : ''}`} />
+                    Refresh now
+                  </Button>
+                </>
               )}
               <div className="flex items-center gap-2 ml-2">
                 <span className="text-xs text-muted-foreground">Enable</span>
@@ -446,10 +474,28 @@ const RetailerTable: React.FC<{
       const diff = priceDiff(r.current_price);
       const currSym = r.current_currency === 'EUR' ? '€' : r.current_currency === 'GBP' ? '£' : '$';
       const stale = r.last_seen_at && Date.now() - new Date(r.last_seen_at).getTime() > 1000 * 60 * 60 * 24 * 7;
+      const meta = r.current_metadata ?? {};
+      const discrepancy = typeof meta.notes === 'string' && meta.notes.includes('verify:') ? meta.notes : null;
+      const thumb = typeof meta.image_url === 'string' ? meta.image_url : null;
+      const rating = typeof meta.rating_value === 'number' ? meta.rating_value : null;
+      const ratingVotes = typeof meta.rating_votes === 'number' ? meta.rating_votes : null;
       return (
-        <div key={r.id} className={`flex items-center justify-between px-6 py-3 ${stale ? 'opacity-60' : ''}`}>
+        <div key={r.id} className={`flex items-center justify-between px-6 py-3 gap-3 ${stale ? 'opacity-60' : ''}`}>
+          {thumb && (
+            <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+              <img
+                src={thumb}
+                alt={r.source_name}
+                loading="lazy"
+                className="h-12 w-12 rounded object-cover bg-muted"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </a>
+          )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={r.source_url}
                 target="_blank"
@@ -462,11 +508,35 @@ const RetailerTable: React.FC<{
                 <Badge
                   variant="outline"
                   className="text-[10px] border-green-400 text-green-700 flex items-center gap-0.5"
-                  title="Price confirmed by fetching the retailer's live page"
+                  title={
+                    discrepancy
+                      ? `Price confirmed by Firecrawl — ${discrepancy}`
+                      : "Price confirmed by fetching the retailer's live page"
+                  }
                 >
                   <BadgeCheck className="h-3 w-3" />
                   Verified
                 </Badge>
+              )}
+              {discrepancy && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-amber-400 text-amber-700"
+                  title={discrepancy}
+                >
+                  Corrected
+                </Badge>
+              )}
+              {rating !== null && (
+                <span
+                  className="text-[11px] text-muted-foreground flex items-center gap-0.5"
+                  title={ratingVotes ? `${rating.toFixed(1)} / 5 — ${ratingVotes.toLocaleString()} reviews` : `${rating.toFixed(1)} / 5`}
+                >
+                  ★ {rating.toFixed(1)}
+                  {ratingVotes !== null && (
+                    <span className="ml-0.5">({ratingVotes.toLocaleString()})</span>
+                  )}
+                </span>
               )}
               {r.current_availability === 'out_of_stock' && (
                 <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700">

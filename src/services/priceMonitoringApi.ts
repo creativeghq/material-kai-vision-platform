@@ -49,6 +49,8 @@ export interface DiscoverResponse {
   total_results: number;
   credits_used: number;
   latency_ms: number;
+  /** 2-3 sentence Perplexity summary: closest retailer, pricing outliers, etc. */
+  summary: string | null;
   throttled: boolean;
   throttle_until: string | null;
   last_search_at: string | null;
