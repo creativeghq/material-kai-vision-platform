@@ -95,6 +95,10 @@ const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
 const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
+const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
+
+// Module system — registers module routes declared in src/modules/*/index.ts
+import { buildModuleRoutes } from './modules/_core';
 
 // ── Loading fallback ────────────────────────────────────────────────
 const PageLoader = () => (
@@ -832,6 +836,23 @@ const App = () => (
                 <Route path="/coverage/*" element={<CoveragePage />} />
                 {/* AR Material Preview (public, no layout — for QR handoff from desktop) */}
                 <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
+
+                {/* Admin: Modules registry */}
+                <Route
+                  path="/admin/modules"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <ModulesPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+
+                {/* Routes contributed by registered modules (see src/modules/*) */}
+                {buildModuleRoutes()}
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

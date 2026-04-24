@@ -32,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
 import { AdminStatCard } from './AdminStatCard';
@@ -49,6 +50,15 @@ type SystemMetrics = {
 const adminSections = {
   'Core Systems': [
     {
+      title: 'Materials Data',
+      description:
+        'View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources',
+      icon: DatabaseIcon,
+      path: '/admin/materials-data',
+      status: 'active',
+      count: 'All Sources',
+    },
+    {
       title: 'Knowledge Base & Documentation',
       description:
         'User-created guides, manuals, and documentation with AI embeddings',
@@ -58,13 +68,12 @@ const adminSections = {
       count: 'User Docs',
     },
     {
-      title: 'Materials Data',
-      description:
-        'View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources',
-      icon: DatabaseIcon,
-      path: '/admin/materials-data',
+      title: 'Modules',
+      description: 'Enable or disable platform features. First-class modules that can be toggled on/off and later sold as add-ons.',
+      icon: Package,
+      path: '/admin/modules',
       status: 'active',
-      count: 'All Sources',
+      count: 'Module Registry',
     },
   ],
   'Data Management': [
@@ -305,36 +314,22 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen page-container">
-      {/* Header with Navigation */}
-      <div className="section-spacing">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-                className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-                variant="ghost"
-              >
+    <div>
+      <PageHeader
+        icon={Settings}
+        title="Admin Dashboard"
+        subtitle="System administration and management tools"
+        actions={
+          <>
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/">
                 <Home className="h-4 w-4" />
                 Back to Main
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-white/20" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                Admin Dashboard
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                System administration and management tools
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
+              </Link>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 px-3 py-1 text-sm rounded-full">
+                <Button variant="outline" size="sm" className="gap-2 rounded-full">
                   Tools
                   <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
@@ -366,9 +361,9 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Loading / error states */}
       {loading && (

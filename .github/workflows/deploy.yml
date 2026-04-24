@@ -84,6 +84,12 @@ jobs:
           npm ci
           echo "✅ Dependencies installed successfully"
 
+      - name: 🔎 Typecheck
+        run: |
+          echo "🔎 Running TypeScript typecheck..."
+          npm run typecheck
+          echo "✅ Typecheck passed"
+
       - name: 🏗️ Build frontend
         run: |
           echo "🏗️ Building frontend application..."

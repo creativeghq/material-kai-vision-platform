@@ -145,6 +145,16 @@ const EXTERNAL_SERVICES = [
   { name: 'xAI Aurora',  url: 'https://api.x.ai',              category: 'social',    icon: '✨' },
 ];
 
+// Module-gated external services: included only when the listed module is enabled.
+// Keyed by module slug → service definitions (same shape as EXTERNAL_SERVICES).
+const MODULE_SERVICES: Record<string, { name: string; url: string; category: string; icon: string }[]> = {
+  'greek-marketplaces': [
+    { name: 'Skroutz',      url: 'https://api.skroutz.gr',    category: 'marketplace', icon: '🛒' },
+    { name: 'Bestdeals.gr', url: 'https://www.bestdeals.gr',  category: 'marketplace', icon: '🛍️' },
+    { name: 'Shopflix.gr',  url: 'https://www.shopflix.gr',   category: 'marketplace', icon: '🏬' },
+  ],
+};
+
 async function checkExternalService(url: string): Promise<ExternalResult> {
   const start = Date.now();
   try {
@@ -181,8 +191,26 @@ serve(withApiLogging('health-check', async (req) => {
     });
   }
 
+  // Resolve which module-gated services are live (e.g. Skroutz/Bestdeals/Shopflix
+  // only appear when `greek-marketplaces` is enabled).
+  let enabledModuleSlugs: string[] = [];
+  try {
+    const { data: moduleRows } = await supabase
+      .from('modules')
+      .select('slug')
+      .eq('enabled', true);
+    enabledModuleSlugs = (moduleRows || []).map((r: { slug: string }) => r.slug);
+  } catch {
+    // If the query fails, silently skip module-gated checks.
+  }
+
+  const activeServices = [
+    ...EXTERNAL_SERVICES,
+    ...enabledModuleSlugs.flatMap((slug) => MODULE_SERVICES[slug] || []),
+  ];
+
   // Run every check in parallel
-  const externalChecks = EXTERNAL_SERVICES.map(svc => checkExternalService(svc.url));
+  const externalChecks = activeServices.map(svc => checkExternalService(svc.url));
 
   const [
     claude, openai, huggingface, voyage_ai,
@@ -198,7 +226,7 @@ serve(withApiLogging('health-check', async (req) => {
     ...externalChecks,
   ]);
 
-  const external = EXTERNAL_SERVICES.map((svc, i) => ({
+  const external = activeServices.map((svc, i) => ({
     name: svc.name,
     category: svc.category,
     icon: svc.icon,

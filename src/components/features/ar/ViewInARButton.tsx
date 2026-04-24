@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { Smartphone, X } from 'lucide-react';
+import { QrCode, Smartphone, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/core/ui/button';
 import {

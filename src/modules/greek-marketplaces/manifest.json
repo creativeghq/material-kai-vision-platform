@@ -1,0 +1,9 @@
+{
+  "slug": "greek-marketplaces",
+  "name": "Greek Marketplaces",
+  "description": "Skroutz, Bestdeals, and Shopflix as always-on discovery sources for price monitoring. Gives first-party retailer URLs with verified prices for Greek-market products.",
+  "category": "pricing",
+  "priceTier": "pro",
+  "icon": "ShoppingCart",
+  "version": "0.1.0"
+}

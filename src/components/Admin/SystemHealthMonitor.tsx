@@ -110,6 +110,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string
   vr: { bg: 'from-teal-50 to-teal-100', border: 'border-teal-200', text: 'text-teal-900' },
   payments: { bg: 'from-indigo-50 to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-900' },
   social: { bg: 'from-pink-50 to-pink-100', border: 'border-pink-200', text: 'text-pink-900' },
+  marketplace: { bg: 'from-emerald-50 to-emerald-100', border: 'border-emerald-200', text: 'text-emerald-900' },
 };
 
 export const SystemHealthMonitor: React.FC = () => {

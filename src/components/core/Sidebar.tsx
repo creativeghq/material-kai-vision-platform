@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Palette, Settings, MessageSquare, User, FileText, Users, BarChart3, Menu } from 'lucide-react';
+import { User, Menu } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
+import { useEnabledModules } from '@/modules/_core';
 import { Button } from '@/components/core/ui/button';
 import {
   Sheet,
@@ -11,29 +13,27 @@ import {
   SheetTrigger,
 } from '@/components/core/ui/sheet';
 
-const BASE_NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
-  { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
-  { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
-  { id: 'discover', label: 'Discover', path: '/discover', icon: Users },
-  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText },
-];
+function filterNavItems(
+  items: readonly SidebarNavItem[],
+  ctx: { isFactory: boolean; isAdmin: boolean; enabledSlugs: Set<string> },
+): SidebarNavItem[] {
+  return items.filter((item) => {
+    if (item.requireRole === 'factory' && !(ctx.isFactory || ctx.isAdmin)) return false;
+    if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
+    if (item.moduleSlug && !ctx.enabledSlugs.has(item.moduleSlug)) return false;
+    return true;
+  });
+}
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
   const { isFactory, isAdmin } = useFactoryRole();
+  const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigationItems = [
-    ...BASE_NAV_ITEMS,
-    ...(isFactory || isAdmin
-      ? [{ id: 'factory-analytics', label: 'Factory Analytics', path: '/factory-analytics', icon: BarChart3 }]
-      : []),
-    { id: 'admin', label: 'Admin', path: '/admin', icon: Settings },
-  ];
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, enabledSlugs });
 
-  // Close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
@@ -43,7 +43,6 @@ export const Sidebar: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
-  // Mobile: top bar with hamburger + sheet drawer
   if (isMobile) {
     return (
       <>
@@ -114,10 +113,8 @@ export const Sidebar: React.FC = () => {
     );
   }
 
-  // Desktop: horizontal top navigation bar
   return (
     <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-[hsl(0,0%,9%)] border-b border-white/8">
-      {/* Logo */}
       <Link to="/" className="flex items-center gap-2.5 mr-8 flex-shrink-0">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
           <span className="text-primary-foreground font-light text-sm">J</span>
@@ -128,7 +125,6 @@ export const Sidebar: React.FC = () => {
         </div>
       </Link>
 
-      {/* Nav Items - Center */}
       <nav className="flex items-center gap-1 flex-1">
         {navigationItems.map((item) => (
           <Link
@@ -146,7 +142,6 @@ export const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      {/* Profile - Right */}
       <Link
         to="/profile"
         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${

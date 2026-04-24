@@ -7,9 +7,11 @@ import {
   Building2, LayoutDashboard, Star, Users, Eye, Package, Loader2,
   Search, Target, Zap, Award, Globe, Layers, DollarSign, Cpu,
   Database, FileText, Clock, TrendingUp, Bell, Mail, MessageSquare, Monitor,
+  ShoppingCart, CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { useModule } from '@/modules/_core';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
 
@@ -154,7 +156,32 @@ export function PlatformOverviewTab() {
   const [notifKpis, setNotifKpis] = useState({ totalSent: 0, email: 0, sms: 0, webPush: 0, inApp: 0 });
   const [notifTrend, setNotifTrend] = useState<{ week: string; email: number; sms: number; web: number; inapp: number }[]>([]);
 
+  // ── Pricing Intelligence (gated on `greek-marketplaces` module) ───────
+  const { enabled: greekModuleEnabled } = useModule('greek-marketplaces');
+  const [pricingKpis, setPricingKpis] = useState({
+    refreshes12w: 0,
+    marketplaceHits12w: 0,
+    moduleCredits12w: 0,
+    trackedQueries: 0,
+  });
+  const [pricingWeekly, setPricingWeekly] = useState<{ week: string; internal: number; tracked: number; marketplace: number }[]>([]);
+  const [marketplaceBySource, setMarketplaceBySource] = useState<{ source: string; count: number }[]>([]);
+  const [pricingSourceDist, setPricingSourceDist] = useState<{ name: string; value: number }[]>([]);
+
   useEffect(() => { load(); }, []);
+
+  // Reload pricing panel when the module toggle flips mid-session.
+  useEffect(() => {
+    if (!greekModuleEnabled) {
+      setPricingKpis({ refreshes12w: 0, marketplaceHits12w: 0, moduleCredits12w: 0, trackedQueries: 0 });
+      setPricingWeekly([]);
+      setMarketplaceBySource([]);
+      setPricingSourceDist([]);
+      return;
+    }
+    void loadPricingIntelligence();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [greekModuleEnabled]);
 
 
   const loadDemoPlatformData = () => {
@@ -759,6 +786,88 @@ export function PlatformOverviewTab() {
       loadDemoPlatformData();
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Pricing Intelligence loader — runs only when the Greek Marketplaces
+   * module is enabled. Keeps queries scoped to rows that would exist
+   * because the module is producing them.
+   */
+  const loadPricingIntelligence = async () => {
+    try {
+      const ago12 = new Date(); ago12.setDate(ago12.getDate() - 84);
+      const wks12 = buildWeeks(12);
+      const MARKETPLACE_SOURCES = ['marketplace_skroutz', 'marketplace_bestdeals', 'marketplace_shopflix'];
+
+      const [priceHistory, trackedHistory, marketplaceRows, allSourceRows, moduleUsage, trackedActive] = await Promise.all([
+        supabase.from('price_history').select('created_at').gte('created_at', ago12.toISOString()).limit(5000),
+        supabase.from('tracked_query_price_history').select('created_at').gte('created_at', ago12.toISOString()).limit(5000),
+        supabase.from('competitor_sources').select('source_type, created_at').in('source_type', MARKETPLACE_SOURCES).gte('created_at', ago12.toISOString()).limit(5000),
+        supabase.from('competitor_sources').select('source_type').gte('created_at', ago12.toISOString()).limit(5000),
+        supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'greek-marketplaces').gte('created_at', ago12.toISOString()).limit(5000),
+        supabase.from('tracked_queries').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      ]);
+
+      const internal = (priceHistory.data ?? []).length;
+      const tracked = (trackedHistory.data ?? []).length;
+      const marketplaceHits = (marketplaceRows.data ?? []).length;
+      const totalCredits = (moduleUsage.data ?? []).reduce((sum, r: { credits_debited?: number | null }) =>
+        sum + Number(r.credits_debited ?? 0), 0);
+      const trackedCount = trackedActive.count ?? 0;
+
+      setPricingKpis({
+        refreshes12w: internal + tracked,
+        marketplaceHits12w: marketplaceHits,
+        moduleCredits12w: Math.round(totalCredits * 100) / 100,
+        trackedQueries: trackedCount,
+      });
+
+      // Weekly trend: three series (internal, external-tracked, marketplace hits)
+      const weekMap = new Map<string, { internal: number; tracked: number; marketplace: number }>(
+        wks12.map(w => [w, { internal: 0, tracked: 0, marketplace: 0 }]),
+      );
+      (priceHistory.data ?? []).forEach((r: { created_at: string }) => {
+        const l = weekLabel(new Date(r.created_at));
+        const entry = weekMap.get(l);
+        if (entry) entry.internal += 1;
+      });
+      (trackedHistory.data ?? []).forEach((r: { created_at: string }) => {
+        const l = weekLabel(new Date(r.created_at));
+        const entry = weekMap.get(l);
+        if (entry) entry.tracked += 1;
+      });
+      (marketplaceRows.data ?? []).forEach((r: { created_at: string }) => {
+        const l = weekLabel(new Date(r.created_at));
+        const entry = weekMap.get(l);
+        if (entry) entry.marketplace += 1;
+      });
+      setPricingWeekly(Array.from(weekMap.entries()).map(([week, d]) => ({ week, ...d })));
+
+      // Per-marketplace breakdown (counts only the 3 module sources)
+      const sourceMap = new Map<string, number>(MARKETPLACE_SOURCES.map(s => [s, 0]));
+      (marketplaceRows.data ?? []).forEach((r: { source_type: string }) => {
+        sourceMap.set(r.source_type, (sourceMap.get(r.source_type) ?? 0) + 1);
+      });
+      setMarketplaceBySource(
+        Array.from(sourceMap.entries()).map(([source, count]) => ({
+          source: source.replace('marketplace_', ''),
+          count,
+        })),
+      );
+
+      // All source types distribution (shows where marketplace rows sit vs perplexity/dataforseo/firecrawl)
+      const allMap = new Map<string, number>();
+      (allSourceRows.data ?? []).forEach((r: { source_type: string }) => {
+        allMap.set(r.source_type, (allMap.get(r.source_type) ?? 0) + 1);
+      });
+      setPricingSourceDist(
+        Array.from(allMap.entries())
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value),
+      );
+    } catch (err) {
+      console.error('PlatformOverviewTab pricing load error:', err);
     }
   };
 
@@ -1552,7 +1661,93 @@ export function PlatformOverviewTab() {
         </Card>
       )}
 
-      {/* ─── 10. Notifications & Messaging ──────────────────────── */}
+      {/* ─── 10. Pricing Intelligence — gated on Greek Marketplaces module ─ */}
+      {greekModuleEnabled && (
+        <>
+          <SectionHeader
+            title="Pricing Intelligence"
+            desc="Greek Marketplaces module activity: price refresh volume, marketplace source coverage, and credits consumed by the module. Visible only while the module is enabled."
+            icon={ShoppingCart}
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiCard label="Price Refreshes (12w)" value={pricingKpis.refreshes12w.toLocaleString()} icon={TrendingUp} />
+            <KpiCard label="Marketplace Hits (12w)" value={pricingKpis.marketplaceHits12w.toLocaleString()} icon={ShoppingCart} color="text-emerald-600" />
+            <KpiCard label="Module Credits (12w)" value={pricingKpis.moduleCredits12w.toFixed(2)} icon={DollarSign} color="text-amber-500" />
+            <KpiCard label="Active Tracked Queries" value={pricingKpis.trackedQueries.toLocaleString()} icon={CheckCircle2} color="text-violet-600" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <Card className="rounded-2xl">
+              <CardHeader><CardTitle className="text-sm">Weekly Price Refresh Activity (12w)</CardTitle></CardHeader>
+              <CardContent>
+                {pricingWeekly.some(w => w.internal + w.tracked + w.marketplace > 0) ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={pricingWeekly} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="internal" name="Internal refresh" fill={COLORS[0]} stackId="a" />
+                      <Bar dataKey="tracked" name="External tracked" fill={COLORS[1]} stackId="a" />
+                      <Bar dataKey="marketplace" name="Marketplace hits" fill={COLORS[2]} stackId="a" radius={[4,4,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState message="No price refreshes in the last 12 weeks." />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader><CardTitle className="text-sm">Hits by Marketplace Source (12w)</CardTitle></CardHeader>
+              <CardContent>
+                {marketplaceBySource.some(s => s.count > 0) ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={marketplaceBySource} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="source" tick={{ fontSize: 11 }} width={80} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill={COLORS[2]} radius={[0,4,4,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState message="Skroutz / Bestdeals / Shopflix have no recorded hits yet." />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {pricingSourceDist.length > 0 && (
+            <Card className="rounded-2xl mt-4">
+              <CardHeader>
+                <CardTitle className="text-sm">All Competitor Sources Distribution (12w)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={pricingSourceDist}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={85}
+                      label={(e) => `${e.name}: ${e.value}`}
+                    >
+                      {pricingSourceDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ─── 11. Notifications & Messaging ──────────────────────── */}
       <SectionHeader title="Notifications & Messaging" desc="All-time sends across Email, SMS, Web Push, and In-App notification channels" icon={Bell} />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <KpiCard label="Total Sent (12w)" value={notifKpis.totalSent.toLocaleString()} icon={Bell} />

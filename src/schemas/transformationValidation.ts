@@ -187,13 +187,6 @@ export const TransformationConfigSchema = z
     (data) => {
       // Custom validation: ensure embedding dimensions are compatible with model
       if (
-        data.embedding.model === 'text-embedding-ada-002' &&
-        data.embedding.dimensions &&
-        data.embedding.dimensions !== 1536
-      ) {
-        return false;
-      }
-      if (
         data.embedding.model === 'text-embedding-3-small' &&
         data.embedding.dimensions &&
         data.embedding.dimensions > 1536
