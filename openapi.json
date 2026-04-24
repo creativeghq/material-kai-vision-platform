@@ -43,13 +43,13 @@
       "web_scraping_routes": "/api/scraping/* (2 NEW endpoints) - Firecrawl integration, web content to products",
       "ai_metrics_routes": "/api/v1/ai-metrics/* (2 endpoints) - Job metrics, summary",
       "relationship_routes": "/api/rag/product-image-relationships, /api/rag/chunk-product-relationships (2 endpoints) - Relationship queries for validation",
-      "price_monitoring_routes": "/api/v1/price-monitoring/* (13 endpoints) - Competitor price tracking, alerts, history, statistics",
-      "price_lookup_routes": "/api/v1/prices/lookup (1 public endpoint) - Curl-callable one-shot price lookup, api_keys-table auth, rate-limited per key. URL mode (Firecrawl) + search_query mode (Perplexity Sonar).",
-      "tracked_queries_routes": "/api/v1/prices/track/* (7 public endpoints) - External project price tracking. POST/GET list/GET one/GET history/PUT/POST refresh/DELETE. api_keys Bearer auth, CASCADE on key deletion. Controls refresh cadence per query."
+      "price_monitoring_routes": "/api/v1/price-monitoring/* (14 endpoints) - Internal price tracking for catalog products (session JWT auth): start/stop monitoring, on-demand check, discover retailers via Perplexity+DataForSEO, price history + statistics, competitor sources, alerts, cron-refresh endpoint for tracked_queries.",
+      "price_lookup_routes": "/api/v1/prices/lookup (1 public endpoint) - Curl-callable one-shot price lookup, api_keys-table Bearer auth, rate-limited per key. URL mode (Firecrawl scrape) + search_query mode (Perplexity Sonar-pro + DataForSEO Google Shopping merged).",
+      "tracked_queries_routes": "/api/v1/prices/track/* (7 public endpoints) - External project price tracking. POST/GET list/GET one/GET history/PUT/POST refresh/DELETE. api_keys Bearer auth, CASCADE on key deletion. Caller controls refresh cadence per query. Backed by Perplexity + DataForSEO parallel discovery."
     },
     "x-platform-stats": {
-      "total_endpoints": 113,
-      "endpoint_categories": 17,
+      "total_endpoints": 212,
+      "endpoint_categories": 19,
       "ai_models": 13,
       "processing_stages": 14,
       "embedding_types": 6,
