@@ -19,14 +19,23 @@ function notify() {
 }
 
 async function fetchRows(): Promise<ModuleRow[]> {
-  const { data, error } = await supabase
-    .from('modules')
-    .select('slug, name, description, category, price_tier, icon, version, enabled, created_at, updated_at');
-  if (error) {
-    console.error('[useEnabledModules] fetch failed:', error);
+  // Supabase JS throws on network failures (Failed to fetch) instead of
+  // returning { error } — wrap the whole call so the caller always gets
+  // [] and the loading state can resolve cleanly.
+  try {
+    const { data, error } = await supabase
+      .from('modules')
+      .select('slug, name, description, category, price_tier, icon, version, enabled, created_at, updated_at');
+    if (error) {
+      console.error('[useEnabledModules] fetch failed:', error.message || error);
+      return [];
+    }
+    return (data ?? []) as ModuleRow[];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[useEnabledModules] fetch threw:', message);
     return [];
   }
-  return (data ?? []) as ModuleRow[];
 }
 
 async function loadIfStale(force = false): Promise<void> {
@@ -40,9 +49,14 @@ async function loadIfStale(force = false): Promise<void> {
   try {
     const rows = await inflight;
     cache = { rows, isLoading: false, fetchedAt: Date.now() };
-    notify();
+  } catch (err) {
+    // fetchRows is designed not to throw, but defense-in-depth —
+    // never leave the cache stuck at isLoading=true.
+    console.error('[useEnabledModules] loader threw:', err);
+    cache = { rows: [], isLoading: false, fetchedAt: Date.now() };
   } finally {
     inflight = null;
+    notify();
   }
 }
 
