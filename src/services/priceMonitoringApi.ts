@@ -17,6 +17,19 @@ async function authHeader(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
+/**
+ * Product-identity verdict from Haiku batched classifier.
+ *   exact        — brand + model + product_type all match. Include in stats.
+ *   variant      — same model, different color/finish/size. Keep with note,
+ *                  EXCLUDE from price statistics.
+ *   unverifiable — Firecrawl couldn't extract product_name (blocked, 404,
+ *                  ad-wall). Keep with grey badge, EXCLUDE from stats.
+ *   null         — legacy row created before identity classification shipped.
+ *
+ * 'mismatch' and 'family' never reach the UI — dropped at verification time.
+ */
+export type MatchKind = 'exact' | 'variant' | 'unverifiable' | null;
+
 export interface PerplexityHit {
   retailer_name: string;
   product_url: string;
@@ -39,6 +52,12 @@ export interface PerplexityHit {
   image_url: string | null;
   rating_value: number | null;
   rating_votes: number | null;
+  /** Product-identity verdict — see MatchKind. */
+  match_kind: MatchKind;
+  /** 0-100 identity-match confidence from the classifier. */
+  match_score: number | null;
+  /** Human-readable facet diff (e.g. "Color differs: asked BLACK MATT, page shows WHITE"). */
+  match_note: string | null;
 }
 
 export interface DiscoverResponse {

@@ -78,6 +78,10 @@ interface CompetitorSource {
     rating_votes?: number;
     notes?: string;
   } | null;
+  /** Product-identity verdict. null = row created before identity classification shipped. */
+  match_kind?: 'exact' | 'variant' | 'unverifiable' | null;
+  match_score?: number | null;
+  match_note?: string | null;
 }
 
 export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
@@ -143,7 +147,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       const { data: rows } = await supabase
         .from('competitor_sources')
         .select(
-          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_metadata, current_price_updated_at, last_seen_at, is_active'
+          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_metadata, match_kind, match_score, match_note, current_price_updated_at, last_seen_at, is_active'
         )
         .eq('product_id', productId)
         .eq('is_active', true)
@@ -516,6 +520,24 @@ const RetailerTable: React.FC<{
                 >
                   <BadgeCheck className="h-3 w-3" />
                   Verified
+                </Badge>
+              )}
+              {r.match_kind === 'variant' && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-amber-400 text-amber-700"
+                  title={r.match_note ?? 'Different variant (color/finish/size). Excluded from price statistics.'}
+                >
+                  Variant
+                </Badge>
+              )}
+              {r.match_kind === 'unverifiable' && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-gray-400 text-gray-600"
+                  title={r.match_note ?? 'Product identity could not be confirmed from the page.'}
+                >
+                  Unverified
                 </Badge>
               )}
               {discrepancy && (

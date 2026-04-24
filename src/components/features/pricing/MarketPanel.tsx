@@ -52,9 +52,13 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
     () => [...results].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity)),
     [results]
   );
-  const priced = hits.map((h) => h.price).filter((p): p is number => p != null);
+  // Percentile is only meaningful against the same set that powers the stats —
+  // exact matches (or legacy null match_kind rows that predate identity verification).
+  const exactPriced = hits
+    .filter((h) => (h.match_kind === 'exact' || h.match_kind == null) && h.price != null)
+    .map((h) => h.price as number);
 
-  const pct = kbPrice != null && priced.length > 0 ? percentile(priced, kbPrice) : null;
+  const pct = kbPrice != null && exactPriced.length > 0 ? percentile(exactPriced, kbPrice) : null;
   const calloutTone =
     pct == null
       ? null
@@ -66,28 +70,45 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
 
   return (
     <div className="rounded-md border bg-muted/10 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Globe2 className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-sm">Market (live)</span>
-          {from_monitoring_cache && (
-            <Badge
-              variant="outline"
-              className="text-[10px]"
+      {/* How many of the rendered rows actually fed the min/median/max.
+          Variants + unverifiable are excluded from stats but still shown
+          in the expandable list so admins have context. */}
+      {(() => {
+        const exactCount = hits.filter(
+          (h) => h.match_kind === 'exact' || h.match_kind == null
+        ).length;
+        return (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Globe2 className="h-4 w-4 text-primary" />
+              <span className="font-semibold text-sm">Market (live)</span>
+              {from_monitoring_cache && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px]"
+                  title={
+                    cache_age_seconds != null
+                      ? `Reused from continuous monitoring snapshot — ${Math.round(cache_age_seconds / 60)} min old. No credits spent.`
+                      : 'Reused from continuous monitoring snapshot.'
+                  }
+                >
+                  Cached
+                </Badge>
+              )}
+            </div>
+            <span
+              className="text-[11px] text-muted-foreground"
               title={
-                cache_age_seconds != null
-                  ? `Reused from continuous monitoring snapshot — ${Math.round(cache_age_seconds / 60)} min old. No credits spent.`
-                  : 'Reused from continuous monitoring snapshot.'
+                exactCount === hits.length
+                  ? `All ${hits.length} hits are exact matches.`
+                  : `${exactCount} exact matches feed the stats. Variants and unverified rows are shown but excluded from min/median/max.`
               }
             >
-              Cached
-            </Badge>
-          )}
-        </div>
-        <span className="text-[11px] text-muted-foreground">
-          {stats.verified_count}/{stats.count} verified · {market.country_code}
-        </span>
-      </div>
+              {exactCount}/{hits.length} exact · {stats.verified_count}/{stats.count} verified · {market.country_code}
+            </span>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-3 gap-3 text-sm">
         <div>
@@ -151,8 +172,9 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
 const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
   const sym = CURRENCY_SYMBOL[hit.currency ?? ''] ?? '';
   const discrepancy = hit.notes && hit.notes.includes('verify:') ? hit.notes : null;
+  const rowDimmed = hit.match_kind === 'variant' || hit.match_kind === 'unverifiable';
   return (
-    <div className="flex items-center gap-2 px-3 py-2 text-xs">
+    <div className={`flex items-center gap-2 px-3 py-2 text-xs ${rowDimmed ? 'opacity-75' : ''}`}>
       {hit.image_url && (
         <a href={hit.product_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
           <img
@@ -182,6 +204,22 @@ const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
               title={discrepancy ?? "Price confirmed from the retailer's live page"}
             >
               <BadgeCheck className="h-3 w-3" />
+            </span>
+          )}
+          {hit.match_kind === 'variant' && (
+            <span
+              className="text-[9px] px-1 rounded border border-amber-400 text-amber-500"
+              title={hit.match_note ?? 'Different variant (color/finish/size). Excluded from stats.'}
+            >
+              Variant
+            </span>
+          )}
+          {hit.match_kind === 'unverifiable' && (
+            <span
+              className="text-[9px] px-1 rounded border border-gray-400 text-gray-400"
+              title={hit.match_note ?? "Product identity could not be confirmed — price shown is indicative."}
+            >
+              ?
             </span>
           )}
           {hit.rating_value != null && (
