@@ -146,6 +146,23 @@ Response:
 | `product_name` | string (optional) | Hint for URL mode to pick the main product on a multi-item page |
 | `use_javascript_render` | boolean (default false) | URL mode only. Adds 3s wait + longer timeout. Costs ~2 extra credits |
 | `limit` | int 1–25 (default 10) | Search mode only. Max retailers to return |
+| `verify_prices` | boolean (default `true`) | Search mode only. When `true`, every hit is re-fetched via Firecrawl to confirm the price on the live page. Adds latency (~N × 1–3s parallel) and ~1 credit per hit, but eliminates LLM-hallucinated prices. Set `false` for speed-over-accuracy workloads. |
+
+### Result fields (search mode)
+
+Each entry in `results` now carries the verification + promo fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `price` | number \| null | Current numeric price. When `verified: true` this is the price Firecrawl read from the live page. |
+| `original_price` | number \| null | On-page "was" price if the retailer displays a promo (e.g. `€89` strikethrough → `€79`). `null` if no markdown is shown. Do NOT assume — only set when the retailer displays both values. |
+| `currency` | string \| null | ISO 4217 currency code (`EUR`, `USD`, `GBP`, …). |
+| `availability` | `in_stock` \| `out_of_stock` \| `limited` \| `unknown` | Out-of-stock listings **are included** as long as a numeric price is printed on the page. |
+| `verified` | boolean | `true` if Firecrawl fetched the retailer URL and confirmed the price. `false` when verification was skipped or the page couldn't be re-fetched. Treat `verified: false` rows as indicative only. |
+| `source` | `perplexity` \| `dataforseo` | Which engine surfaced this retailer. |
+| `notes` | string \| null | Free-form. Includes discrepancy flags when Firecrawl's price differed by >20% from the LLM's snippet price (e.g. `"verify: was perplexity=€45.00, actual on page=€54.90"`). |
+| `last_verified` | string (ISO date) | Date Firecrawl confirmed the price. `null` when `verified: false`. |
+| `image_url`, `rating_value`, `rating_votes` | (DataForSEO only) | Thumbnail + merchant star rating from the Google Shopping feed. |
 
 ### Rate limit
 
@@ -176,7 +193,8 @@ curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
     "country_code": "GR",
     "manufacturer": "Keros Ceramica",
     "preferred_retailer_domains": ["youbath.gr", "fshome.gr"],
-    "refresh_interval_hours": 12
+    "refresh_interval_hours": 12,
+    "verify_prices": true
   }'
 ```
 
@@ -190,22 +208,39 @@ curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
   "manufacturer": "Keros Ceramica",
   "preferred_retailer_domains": ["youbath.gr", "fshome.gr"],
   "refresh_interval_hours": 12,
+  "verify_prices": true,
   "last_refreshed_at": "2026-04-24T07:01:15.799Z",
   "last_error": null,
   "is_active": true,
-  "total_credits_used": 2,
+  "total_credits_used": 14,
   "created_at": "2026-04-24T07:01:04.300Z",
   "results": [
     {
       "retailer_name": "leffetto.gr",
       "product_url": "https://leffetto.gr/product/ferrara-beige-60x120cm/",
       "price": 21.4,
+      "original_price": null,
       "currency": "EUR",
       "price_unit": "m2",
       "availability": "in_stock",
       "city": "Athens",
       "ships_from_abroad": false,
+      "verified": true,
       "notes": null,
+      "scraped_at": "2026-04-24T07:01:15.799Z"
+    },
+    {
+      "retailer_name": "youbath.gr",
+      "product_url": "https://youbath.gr/shop/keros-ferrara-beige-60x120/",
+      "price": 25.0,
+      "original_price": 32.0,
+      "currency": "EUR",
+      "price_unit": "m2",
+      "availability": "out_of_stock",
+      "city": null,
+      "ships_from_abroad": false,
+      "verified": true,
+      "notes": "verify: was perplexity=€28.50, actual on page=€25.00",
       "scraped_at": "2026-04-24T07:01:15.799Z"
     }
     // …
@@ -221,8 +256,9 @@ curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
 | `manufacturer` | string (optional) | Disambiguates generic product names |
 | `preferred_retailer_domains` | string[] (optional, max 10) | Forces Perplexity to probe these domains too. Closes retailer-coverage gaps |
 | `refresh_interval_hours` | int 1–720, default 24 | How often our cron re-runs the query. 1h minimum, 30d maximum |
+| `verify_prices` | boolean (default `true`) | Persists on the tracked query row. Every refresh (initial + cron) will re-fetch each retailer URL via Firecrawl to confirm the price on the live page. Set to `false` if you value refresh speed / cost over accuracy. Can be toggled later via `PUT`. |
 
-**Caveat**: the initial POST blocks for ~15–30 seconds while Perplexity runs. If your integration needs a non-blocking path, create the tracked query with `refresh_interval_hours: 1`, ignore the initial results, and `GET` a minute later.
+**Caveat**: the initial POST blocks for ~15–30 seconds while Perplexity runs (or ~30–60 seconds when `verify_prices: true`, because Firecrawl verifies each hit in parallel). If your integration needs a non-blocking path, create the tracked query with `refresh_interval_hours: 1`, ignore the initial results, and `GET` a minute later.
 
 ---
 
@@ -270,12 +306,16 @@ Each entry:
   "retailer_name": "leffetto.gr",
   "product_url": "https://leffetto.gr/product/ferrara-beige-60x120cm/",
   "price": 21.4,
+  "original_price": null,
+  "verified": true,
   "currency": "EUR",
   "price_unit": "m2",
   "availability": "in_stock",
   "city": "Athens"
 }
 ```
+
+`original_price` and `verified` are populated on refreshes run after 2026-04-25 (the verification release). Older history rows have `original_price: null` and `verified: false` — that doesn't mean the price was wrong at the time, just that verification wasn't available yet.
 
 ---
 
@@ -289,9 +329,12 @@ curl -X PUT https://v1api.materialshub.gr/api/v1/prices/track/$TID \
   -H "Content-Type: application/json" \
   -d '{
     "refresh_interval_hours": 6,
-    "preferred_retailer_domains": ["youbath.gr", "fshome.gr", "artiles.gr"]
+    "preferred_retailer_domains": ["youbath.gr", "fshome.gr", "artiles.gr"],
+    "verify_prices": false
   }'
 ```
+
+Accepted fields: `refresh_interval_hours`, `country_code`, `preferred_retailer_domains`, `dimensions`, `manufacturer`, `verify_prices`. All optional — only fields present in the body are updated.
 
 Returns the full tracked-query row post-update.
 
@@ -448,6 +491,15 @@ A: Not in this API. Alerts are part of the internal platform's price-monitoring 
 **Q: How is this billed?**
 A: Each Perplexity refresh logs to `ai_usage_logs` with `api_provider: "perplexity"` tagged to your `workspace_id`. Each Firecrawl scrape similarly logged as `operation_type: "scrape"`. Check your platform's usage dashboard for spend.
 
+**Q: What does `verified: true` actually mean — and why would I turn it off?**
+A: When `verify_prices` is `true` (default), we take each retailer URL the LLM / Shopping feed surfaced and actually fetch it through Firecrawl to read the price off the rendered page. This is the single biggest accuracy improvement in the system — LLMs will occasionally hallucinate a lower price from stale training data or misread a related-product price. The cost: **~3× total credits per refresh** (1 Perplexity + ~N Firecrawl scrapes, where N is the number of hits) and **~30s extra latency on the synchronous POST**. Turn it off if you need the cheaper/faster path and can tolerate stale prices — e.g. rough market-coverage surveys where exact figures don't matter.
+
+**Q: What's `original_price` and when should I display it?**
+A: It's the retailer's own "was" price shown next to a promo (e.g. `€89` strikethrough, `€79` current). Only populated when the retailer prints both values on the page. Display it as strikethrough next to `price` to communicate the discount. Never infer it from price history — that's tracked separately in `/history`.
+
+**Q: When `verified: false` what does that mean exactly?**
+A: Either (a) `verify_prices` was `false` on the request, (b) Firecrawl couldn't fetch the page (timeout, bot-detection, 404), or (c) the page loaded but no price could be extracted from it. In all three cases we leave the LLM/shopping-feed price in place and flag it so you can treat it as indicative rather than authoritative.
+
 **Q: The `source` field in lookup responses says `claude_web_search` — didn't you switch to Perplexity?**
 A: `source` is an enum value in the DB (`competitor_source_type`) that predates the Perplexity migration. Under the hood it's Perplexity; we kept the enum value stable to avoid breaking existing consumers. A future version may add `perplexity_web_search` as the canonical name and migrate — we'll deprecate with notice.
 
@@ -517,5 +569,13 @@ sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.servi
 
 ## Changelog
 
+- **2026-04-25 (v3)** — **Firecrawl price verification + on-page was/now pricing.**
+  - New request param `verify_prices` (default `true`) on `/prices/lookup` (search mode), `POST /prices/track`, and `PUT /prices/track/{id}`. When true, every retailer hit is re-fetched via Firecrawl and the price on the live page replaces the LLM/Shopping-feed price.
+  - New response fields on every retailer row: `verified: bool`, `original_price: number | null`, `source: "perplexity" | "dataforseo"`. Image + rating fields (`image_url`, `rating_value`, `rating_votes`) also surface on DataForSEO hits.
+  - `GET /prices/track/{id}/history` now includes `original_price` and `verified` on each row.
+  - `TrackedQueryResponse` now includes `verify_prices` so clients can read the current setting.
+  - `notes` field may include discrepancy tags like `"verify: was perplexity=€45.00, actual on page=€54.90"` when Firecrawl disagreed with the LLM by >20%.
+  - Billing: verification adds ~1 credit per hit and ~30s latency on synchronous POST. Set `verify_prices: false` to opt out for speed/cost-sensitive workloads.
+  - **Backwards compatible.** All new fields are additive. Omitting `verify_prices` defaults to `true`, matching the improved-accuracy behavior.
 - **2026-04-24 (v2)** — Added DataForSEO Merchant as a second parallel discovery source alongside Perplexity. One `/prices/lookup` (search_query mode) or `/prices/track` call now returns both sources merged, deduped by domain, tagged per-hit with `source: "perplexity" | "dataforseo"`. Supports `DATAFORSEO_BASE64` env var in addition to `DATAFORSEO_LOGIN`/`DATAFORSEO_PASSWORD`.
 - **2026-04-24** — Initial external API release. `/prices/lookup` (URL + search query modes), `/prices/track/*` CRUD + refresh + history, Perplexity Sonar-pro engine, api_keys Bearer auth, preferred-domain pinning, hourly cron refresh.

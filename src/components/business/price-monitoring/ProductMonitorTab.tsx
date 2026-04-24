@@ -27,6 +27,7 @@ import {
   Shield,
   Globe,
   ShoppingBag,
+  BadgeCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,6 +60,8 @@ interface CompetitorSource {
   source_url: string;
   source_type: 'firecrawl_url' | 'perplexity_web_search' | 'claude_web_search' | 'dataforseo_shopping';
   current_price: number | null;
+  current_original_price: number | null;
+  current_price_verified: boolean;
   current_currency: string | null;
   current_availability: string | null;
   current_price_updated_at: string | null;
@@ -100,6 +103,8 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
           ...s,
           source_type: 'firecrawl_url',
           current_price: priceByName.get(s.source_name) ?? null,
+          current_original_price: null,
+          current_price_verified: true,
           current_currency: currency,
           current_availability: 'in_stock',
           current_price_updated_at: new Date().toISOString(),
@@ -128,7 +133,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       const { data: rows } = await supabase
         .from('competitor_sources')
         .select(
-          'id, source_name, source_url, source_type, current_price, current_currency, current_availability, current_price_updated_at, last_seen_at, is_active'
+          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_price_updated_at, last_seen_at, is_active'
         )
         .eq('product_id', productId)
         .eq('is_active', true)
@@ -453,6 +458,16 @@ const RetailerTable: React.FC<{
               >
                 {r.source_name}
               </a>
+              {r.current_price_verified && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-green-400 text-green-700 flex items-center gap-0.5"
+                  title="Price confirmed by fetching the retailer's live page"
+                >
+                  <BadgeCheck className="h-3 w-3" />
+                  Verified
+                </Badge>
+              )}
               {r.current_availability === 'out_of_stock' && (
                 <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700">
                   Out of stock
@@ -482,9 +497,21 @@ const RetailerTable: React.FC<{
           <div className="text-right shrink-0 ml-4">
             {r.current_price != null ? (
               <>
-                <div className="text-base font-semibold">
-                  {currSym}
-                  {Number(r.current_price).toFixed(2)}
+                <div className="flex items-baseline justify-end gap-2">
+                  {r.current_original_price != null &&
+                    r.current_original_price > (r.current_price ?? 0) && (
+                      <span
+                        className="text-xs text-muted-foreground line-through"
+                        title="Retailer's 'was' / pre-promo price on the page"
+                      >
+                        {currSym}
+                        {Number(r.current_original_price).toFixed(2)}
+                      </span>
+                    )}
+                  <div className="text-base font-semibold">
+                    {currSym}
+                    {Number(r.current_price).toFixed(2)}
+                  </div>
                 </div>
                 {diff !== null && (
                   <div className="flex items-center justify-end gap-1 text-[11px]">

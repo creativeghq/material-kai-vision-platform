@@ -4,7 +4,39 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
-## [unreleased] - 2026-04-24
+## [unreleased] - 2026-04-25
+
+**Price monitoring — Firecrawl price verification + on-page was/now pricing (Phase 7)**
+
+Motivation: validation against real-world queries (e.g. "Απορροφητήρας Συρόμενος inox Maidtec 7012ΜΤ") showed Perplexity/DataForSEO hallucinating prices €9–16 below the actual retailer-posted price for 6 of 8 results. Root cause: both engines read snippets / feed aggregations, not the rendered product page. Fix: a second, Firecrawl-powered verification pass that actually fetches every retailer URL and confirms the price against what the user sees on the page.
+
+- **Two-stage discovery → verification pipeline**:
+  1. Stage A (unchanged): Perplexity Sonar + DataForSEO Merchant run in parallel, merged + deduped by domain.
+  2. Stage B (new): each hit's `product_url` is fetched via Firecrawl with a `PriceExtraction` schema; the extracted price replaces the LLM price and `verified: true` is set.
+  - `verify_prices: false` opts out when latency / cost matter more than accuracy.
+  - Discrepancy rule: if the Firecrawl price differs by >20% from the Perplexity/DataForSEO price, we trust Firecrawl (read the page) and append a diagnostic to `notes` (e.g. `"verify: was perplexity=€45.00, actual on page=€54.90"`).
+  - Parallel verification via `asyncio.gather` — N hits verify in roughly the wall-time of a single scrape (~1–3s), so verification adds ~30s to a synchronous POST regardless of `N`.
+
+- **On-page was/now pricing**:
+  - Every `PriceHit` / tracked_query_price_history / price_history row now carries `original_price: number | null` alongside `price`. Populated only when the retailer displays both on the page (e.g. `€89` strikethrough → `€79`).
+  - UI renders `original_price` as strikethrough next to the current price.
+  - Distinct from historical price change (`/history`) — `original_price` is the retailer's own promo callout.
+
+- **New / changed surfaces**:
+  - **MIVAA**: `perplexity_price_search_service._verify_hits_with_firecrawl`, `DiscoverSourcesRequest.verify_prices`, `CreateTrackRequest.verify_prices`, `UpdateTrackRequest.verify_prices`, `TrackedQueryResponse.verify_prices`, `TrackedQueryResultRow.original_price + verified`.
+  - **DB**: migration `price_monitoring_verify_and_original_price`:
+    - `tracked_queries` += `verify_prices boolean NOT NULL DEFAULT true`
+    - `tracked_query_price_history` += `original_price numeric`, `verified boolean NOT NULL DEFAULT false`
+    - `price_history` += `original_price numeric`, `verified boolean NOT NULL DEFAULT false`
+    - `competitor_sources` += `current_original_price numeric`, `current_price_verified boolean NOT NULL DEFAULT false`
+  - **UI**: `RetailerTable` (in `ProductMonitorTab.tsx`) adds a green `Verified` badge when `current_price_verified = true` and renders `current_original_price` as strikethrough. `priceMonitoringApi.ts` types extend `PerplexityHit` with `original_price`, `verified`, `source`, image/rating fields.
+  - **Public docs**: `docs/api/price-monitoring-api.md` updated with verification semantics, new response fields, FAQ entries, changelog v3.
+
+- **Backwards compatibility**: all new fields are additive. Clients that don't send `verify_prices` get verified prices by default (the correct upgrade). Old history rows keep `verified: false` — not a data-quality flag, just "predates verification."
+
+---
+
+## [previous] - 2026-04-24
 
 **Price monitoring — Phase 2 rebuild (Perplexity discovery + external-project tracking API)**
 

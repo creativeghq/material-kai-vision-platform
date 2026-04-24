@@ -21,6 +21,8 @@ export interface PerplexityHit {
   retailer_name: string;
   product_url: string;
   price: number | null;
+  /** On-page "was" price when the retailer displays a promo (e.g. "Was €89, Now €79"). */
+  original_price: number | null;
   currency: string | null;
   price_unit: string | null;
   availability: string | null;
@@ -29,6 +31,14 @@ export interface PerplexityHit {
   is_quote_only: boolean;
   last_verified: string | null;
   notes: string | null;
+  /** 'perplexity' = web search retailer, 'dataforseo' = Google Shopping merchant. */
+  source: 'perplexity' | 'dataforseo';
+  /** True when Firecrawl actually fetched the page and confirmed the price. */
+  verified: boolean;
+  /** DataForSEO-only enrichment. */
+  image_url: string | null;
+  rating_value: number | null;
+  rating_votes: number | null;
 }
 
 export interface DiscoverResponse {
@@ -52,12 +62,17 @@ export interface DiscoverResponse {
  */
 export async function discoverRetailers(
   productId: string,
-  forceRefresh = false
+  forceRefresh = false,
+  verifyPrices = true
 ): Promise<DiscoverResponse> {
   const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/discover`, {
     method: 'POST',
     headers: await authHeader(),
-    body: JSON.stringify({ product_id: productId, force_refresh: forceRefresh }),
+    body: JSON.stringify({
+      product_id: productId,
+      force_refresh: forceRefresh,
+      verify_prices: verifyPrices,
+    }),
   });
   if (!res.ok) {
     const body = await res.text();

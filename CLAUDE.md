@@ -98,9 +98,17 @@
 - **Frontend**: `/admin/background-agents` → BackgroundAgentsPage + AgentRunHistoryDrawer + AgentLogsViewer + CreateAgentModal
 - **Service**: `src/services/backgroundAgents.ts`
 
-## Price Monitoring (2026-04-24 rebuild — Perplexity discovery + Firecrawl custom URLs)
+## Price Monitoring (2026-04-25 — Perplexity + DataForSEO discovery → Firecrawl verification)
 
-**Two parallel flows, one shared Perplexity engine:**
+**Two-stage pipeline on every price refresh:**
+1. **Discovery (Stage A)**: Perplexity Sonar-pro + DataForSEO Merchant run in parallel, merged + deduped by domain. Each hit tagged `source: "perplexity" | "dataforseo"`.
+2. **Verification (Stage B)**: every discovered URL is re-fetched via Firecrawl (`PriceExtraction` schema, parallel `asyncio.gather`). The live-page price replaces the LLM/feed price and `verified: true` is set. Opt out per-request with `verify_prices: false`.
+3. Discrepancy rule: if Stage B price differs from Stage A by >20%, trust Stage B (it read the page) and append a diagnostic to `notes`.
+4. On-page was/now: every row carries `original_price` (nullable) — set only when the retailer displays both on the page.
+
+**DB columns added 2026-04-25**: `tracked_queries.verify_prices`, `tracked_query_price_history.{original_price,verified}`, `price_history.{original_price,verified}`, `competitor_sources.{current_original_price,current_price_verified}`.
+
+**Two parallel flows, one shared discovery+verification engine:**
 
 **Flow 1 — Platform-internal (catalog products, session JWT auth):**
 - User enables monitoring on a product → `POST /api/v1/price-monitoring/discover` runs Perplexity Sonar-pro → up to 10 retailer rows written to `competitor_sources` with `source_type='perplexity_web_search'` + snapshots in `price_history`.
@@ -127,9 +135,9 @@
 
 **Source type enum** (`competitor_source_type`):
 - `firecrawl_url` — user-pasted URL, Firecrawl scrape
-- `perplexity_web_search` — auto-discovered (primary engine as of 2026-04-24)
+- `perplexity_web_search` — auto-discovered via Perplexity Sonar-pro
+- `dataforseo_shopping` — auto-discovered via DataForSEO Merchant (Google Shopping feed) — added 2026-04-24, runs in parallel with Perplexity
 - `claude_web_search` — deprecated, kept for historical rows
-- `dataforseo_shopping` — reserved, NOT implemented (Claude+Firecrawl covers the use case)
 
 **Tables:**
 - `competitor_sources` — internal flow, product_id FK, has denormalized `current_price`/`current_currency`/`current_availability` cache
@@ -140,8 +148,9 @@
 - `ai_usage_logs` — every Perplexity call logged with tokens + cost + platform credits
 
 **Secrets** (required on MIVAA server via deploy.yml `Environment=`):
-- `PERPLEXITY_API_KEY` (primary engine) — get from perplexity.ai/settings/api
-- `FIRECRAWL_API_KEY` (URL mode + custom monitoring)
+- `PERPLEXITY_API_KEY` (primary discovery engine) — get from perplexity.ai/settings/api
+- `FIRECRAWL_API_KEY` (URL mode + custom monitoring + verification pass on every discovery refresh)
+- `DATAFORSEO_BASE64` (or `DATAFORSEO_LOGIN` + `DATAFORSEO_PASSWORD`) — Merchant API credentials, parallel discovery source
 - `CRON_SECRET` (validates `x-cron-secret` on cron-refresh endpoint)
 
 **UI**: `src/components/business/price-monitoring/ProductMonitorTab.tsx` — per-product view: toggle + admin Refresh → chart → discovered retailers (Perplexity) → Custom Monitoring (Firecrawl). Admin role gated via `user_profiles.role_id → roles.name IN ('admin', 'super_admin')`.
