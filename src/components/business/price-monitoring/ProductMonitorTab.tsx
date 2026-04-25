@@ -27,6 +27,7 @@ import {
   Shield,
   Globe,
   ShoppingBag,
+  ShoppingCart,
   BadgeCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +59,14 @@ interface CompetitorSource {
   id: string;
   source_name: string;
   source_url: string;
-  source_type: 'firecrawl_url' | 'perplexity_web_search' | 'claude_web_search' | 'dataforseo_shopping';
+  source_type:
+    | 'firecrawl_url'
+    | 'perplexity_web_search'
+    | 'claude_web_search'
+    | 'dataforseo_shopping'
+    | 'marketplace_skroutz'
+    | 'marketplace_bestprice'
+    | 'marketplace_shopflix';
   current_price: number | null;
   current_original_price: number | null;
   current_price_verified: boolean;
@@ -259,6 +267,15 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         .slice(0, 10),
     [sources]
   );
+  const marketplaces = useMemo(
+    () => sources.filter((s) =>
+      s.source_type === 'marketplace_skroutz' ||
+      s.source_type === 'marketplace_bestprice' ||
+      s.source_type === 'marketplace_shopflix'
+    ),
+    [sources],
+  );
+
   const merchants = useMemo(
     () => sources.filter((s) => s.source_type === 'dataforseo_shopping').slice(0, 10),
     [sources]
@@ -426,6 +443,29 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
           </CardHeader>
           <CardContent className="p-0">
             <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Marketplaces (Greek Marketplaces module) ─── */}
+      {monitoringEnabled && marketplaces.length > 0 && (
+        <Card className="dashboard-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-emerald-500" />
+                Marketplaces
+                <Badge variant="outline" className="text-[10px]">
+                  {marketplaces.length}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  via Skroutz / Bestprice / Shopflix
+                </span>
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} />
           </CardContent>
         </Card>
       )}
