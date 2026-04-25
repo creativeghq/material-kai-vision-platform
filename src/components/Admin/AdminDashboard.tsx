@@ -36,6 +36,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
 import { AdminStatCard } from './AdminStatCard';
+import { useAdminDashboardCards } from '@/modules/_core';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -127,14 +128,8 @@ const adminSections = {
     },
   ],
   'CRM & User Management': [
-    {
-      title: 'User Management',
-      description: 'Manage users, roles, subscriptions, and access control',
-      icon: Users,
-      path: '/admin/crm',
-      status: 'active',
-      count: 'CRM System',
-    },
+    // 'User Management' (CRM) is now contributed by the `crm` module via
+    // its admin-dashboard navItems[]. See useModuleAdminCards() below.
     {
       title: 'Quote Requests',
       description: 'View and manage customer quote requests with pricing',
@@ -234,6 +229,7 @@ const adminSections = {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const moduleCards = useAdminDashboardCards();
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
     processedDocuments: 0,
     knowledgeEntries: 0,
@@ -392,9 +388,28 @@ const AdminDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Admin Sections by Category */}
+        {/* Admin Sections by Category — static config + module-contributed cards merged */}
         <div className="space-y-6 sm:space-y-8">
-              {Object.entries(adminSections).map(([category, sections]) => (
+              {Object.entries(
+                (() => {
+                  const merged: Record<string, typeof adminSections['Core Systems']> = {};
+                  for (const [cat, items] of Object.entries(adminSections)) {
+                    merged[cat] = [...items];
+                  }
+                  for (const card of moduleCards) {
+                    if (!merged[card.category]) merged[card.category] = [];
+                    merged[card.category].push({
+                      title: card.title,
+                      description: card.description,
+                      icon: card.icon,
+                      path: card.path,
+                      status: card.status,
+                      count: card.count,
+                    });
+                  }
+                  return merged;
+                })()
+              ).map(([category, sections]) => (
                 <div key={category}>
                   <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-800">
                     {category}

@@ -51,10 +51,7 @@ const QuotesPage = lazy(() => import('./pages/QuotesPage').then(m => ({ default:
 const QuoteDetailCustomerPage = lazy(() => import('./pages/QuoteDetailCustomerPage').then(m => ({ default: m.QuoteDetailCustomerPage })));
 const QuotePreviewPage = lazy(() => import('./pages/QuotePreviewPage').then(m => ({ default: m.QuotePreviewPage })));
 
-// CRM detail pages
-const ContactDetailPage = lazy(() => import('./pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
-const CompanyDetailPage = lazy(() => import('./pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
-const UserDetailPage = lazy(() => import('./pages/UserDetailPage').then(m => ({ default: m.UserDetailPage })));
+// CRM pages live in `src/modules/crm/` — registered through buildModuleRoutes().
 
 // ── Admin pages (only loaded for admin users) ───────────────────────
 const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard'));
@@ -74,7 +71,6 @@ const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebugging
 const PackagesPanel = lazy(() => import('./components/Admin/PackagesPanel'));
 const MetadataManagement = lazy(() => import('./components/Admin/MetadataManagement').then(m => ({ default: m.MetadataManagement })));
 const RelevancyManagement = lazy(() => import('./components/Admin/RelevancyManagement').then(m => ({ default: m.RelevancyManagement })));
-const CRMManagement = lazy(() => import('./components/Admin/CRMManagement').then(m => ({ default: m.CRMManagement })));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -553,54 +549,8 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                <Route
-                  path="/admin/crm"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <CRMManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/crm/contacts/:id"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <ContactDetailPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/crm/companies/:id"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <CompanyDetailPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/crm/users/:id"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <UserDetailPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* CRM routes (/admin/crm, /contacts/:id, /companies/:id, /users/:id)
+                    are registered by the `crm` module via buildModuleRoutes(). */}
                 <Route
                   path="/billing/subscriptions"
                   element={

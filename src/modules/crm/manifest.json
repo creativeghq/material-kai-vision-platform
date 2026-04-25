@@ -1,0 +1,9 @@
+{
+  "slug": "crm",
+  "name": "CRM",
+  "description": "Customer relationship management — users, contacts, companies, role assignments, billing.",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "Users",
+  "version": "0.1.0"
+}

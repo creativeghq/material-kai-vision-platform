@@ -23,3 +23,8 @@ export {
 } from './subscribers';
 
 export type { ModuleSubscriber } from './ModuleDefinition';
+
+export {
+  useAdminDashboardCards,
+  type AdminDashboardCard,
+} from './useAdminDashboardCards';

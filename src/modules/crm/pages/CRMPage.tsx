@@ -31,8 +31,8 @@ import {
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { AdminStatCard } from './AdminStatCard';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { AdminStatCard } from '@/components/Admin/AdminStatCard';
 import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
 
 interface UserWithAuth {
