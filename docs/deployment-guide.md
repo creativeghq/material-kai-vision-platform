@@ -74,8 +74,6 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
-| `GOOGLE_SHOPPING_API_KEY` | **Secret** | Server ENV | Google Shopping API key (optional) | `AIzaSyxxxxxxxxxxxxxxxx` |
-| `GOOGLE_SHOPPING_CX` | **Secret** | Server ENV | Google Custom Search Engine ID (optional) | `xxxxxxxxxxxxxxxx` |
 | `SENTRY_DSN` | **Secret** | Server ENV | Sentry error tracking DSN | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
 | `CORS_ORIGINS` | Public | Server ENV | Allowed CORS origins | `https://your-domain.com,https://preview.vercel.app` |
 | `ENVIRONMENT` | Public | Server ENV | Environment name | `production`, `staging`, `development` |
@@ -87,8 +85,8 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR Inference Endpoint URL | `https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud` |
-| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra OCR Inference Endpoint name for pause/resume | `mh-chandra` (default) |
+| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR v2 Inference Endpoint URL (defaults to live v2 endpoint, env override optional) | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` |
+| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra OCR v2 Inference Endpoint name for pause/resume | `chandra-ocr-2` (default) |
 | `CHANDRA_NAMESPACE` | Public | Server ENV | HuggingFace namespace/username for endpoint management | `basiliskan` (default) |
 | `CHANDRA_ENABLED` | Public | Server ENV | Enable Chandra OCR fallback when EasyOCR confidence is low | `true` (default), `false` |
 | `CHANDRA_CONFIDENCE_THRESHOLD` | Public | Server ENV | EasyOCR confidence threshold - use Chandra if below this value | `0.7` (default, range: 0.0-1.0) |
@@ -163,23 +161,24 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 
 ---
 
-### **Chandra OCR Inference Endpoint Configuration**
+### **Chandra OCR v2 Inference Endpoint Configuration**
 
-**Chandra OCR** is a high-accuracy OCR model deployed as a serverless HuggingFace Inference Endpoint. It provides GPU-accelerated OCR with automatic pause/resume for cost control.
+**Chandra OCR v2** (model `chandra-ocr-2.Q8_0.gguf`) is a state-of-the-art OCR model deployed as a serverless HuggingFace Inference Endpoint. It returns structured bbox-JSON: each output entry is `{"text", "x", "y", "w", "h"}` with pixel coordinates on the source image. The strict response parser in `chandra_endpoint_manager.py` raises `ChandraResponseError` on unparseable output rather than writing empty/garbage text downstream.
 
 #### **How It Works:**
-1. **EasyOCR Primary**: Fast, local, free OCR (runs first)
-2. **Chandra Fallback**: If EasyOCR confidence < 0.7, use Chandra endpoint (GPU, high accuracy)
-3. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
-4. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused
+1. **Chandra v2 Primary**: GPU-accelerated, structured bbox-JSON OCR (runs first)
+2. **EasyOCR Fallback**: Local, CPU-only fallback if Chandra is unreachable or returns unparseable output
+3. **Tesseract Last Resort**: Only used when both Chandra and EasyOCR fail
+4. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
+5. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused (T4 GPU at $0.50/hr while running)
 
 #### **Required Secrets:**
 
 | Secret Name | Type | Default | Description |
 |------------|------|---------|-------------|
 | `HF_TOKEN` | **Secret** | *(required)* | HuggingFace API token with **write** permissions |
-| `CHANDRA_ENDPOINT_URL` | Public | `https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud` | Chandra OCR Inference Endpoint URL |
-| `CHANDRA_ENDPOINT_NAME` | Public | `mh-chandra` | Endpoint name for pause/resume operations |
+| `CHANDRA_ENDPOINT_URL` | Public | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` | Chandra OCR v2 Inference Endpoint URL |
+| `CHANDRA_ENDPOINT_NAME` | Public | `chandra-ocr-2` | Endpoint name for pause/resume operations |
 | `CHANDRA_NAMESPACE` | Public | `basiliskan` | HuggingFace namespace/username |
 | `CHANDRA_ENABLED` | Public | `true` | Enable/disable Chandra OCR fallback |
 | `CHANDRA_CONFIDENCE_THRESHOLD` | Public | `0.7` | EasyOCR confidence threshold (0.0-1.0) |
@@ -200,10 +199,10 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 2. **Create Inference Endpoint** (if not already created):
    - Go to: https://ui.endpoints.huggingface.co/
    - Click "New endpoint"
-   - Model: `datalab-to/chandra`
-   - Instance: GPU (e.g., `nvidia-a10g`)
+   - Model: `prithivMLmods/chandra-ocr-2-GGUF` (community Q8 quant of `datalab-to/chandra-ocr-2`)
+   - Instance: GPU (`nvidia-t4` recommended; v2 is 4B params and runs comfortably on T4)
    - Region: `us-east-1`
-   - Name: `mh-chandra`
+   - Name: `chandra-ocr-2`
    - Click "Create"
    - Copy endpoint URL
 
@@ -246,8 +245,17 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 | Service | Secret Name | Where Used | How to Get | Required? |
 |---------|------------|------------|------------|-----------|
 | **Firecrawl** | `FIRECRAWL_API_KEY` | Backend, Edge Functions | https://firecrawl.dev → Dashboard → API Keys | ✅ **Required** |
-| **Google Shopping** | `GOOGLE_SHOPPING_API_KEY` | Backend | https://console.cloud.google.com → Enable Custom Search API | ⭕ Optional |
-| **Google Shopping** | `GOOGLE_SHOPPING_CX` | Backend | https://programmablesearchengine.google.com → Create Search Engine | ⭕ Optional |
+
+### **Oxygen Pre-Invoice (Greek e-Invoicing)**
+
+| Service | Secret Name | Where Used | How to Get | Required? |
+|---------|------------|------------|------------|-----------|
+| **Oxygen** | `OXYGEN_API_KEY` | Edge Function `oxygen-create-pre-invoice` | https://www.oxygen.gr → Dashboard → API settings → generate key | ✅ Required if `oxygen` module enabled |
+| **Oxygen** | `OXYGEN_API_BASE_URL` | Edge Function `oxygen-create-pre-invoice` | Optional override; defaults to `https://api.oxygen.gr/v1` | Optional |
+| **Oxygen** | `OXYGEN_DEFAULT_TAX_ID_24` | Edge Function `oxygen-create-pre-invoice` | `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/taxes` → copy the 24% VAT row's numeric `id` | ✅ Required if `oxygen` module enabled |
+| **Oxygen** | `OXYGEN_DEFAULT_WAREHOUSE_ID` | Edge Function `oxygen-create-pre-invoice` | `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/warehouses` → copy the warehouse's numeric `id` | ✅ Required if `oxygen` module enabled |
+
+See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)** below for the full table.
 
 ### **Supabase Edge Functions Secrets**
 
@@ -368,6 +376,21 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 | `VAPID_SUBJECT` | Public | `notification-dispatcher` | VAPID subject email (default: `mailto:admin@materialkai.com`) | `mailto:admin@materialkai.com` |
 
 > **Generate VAPID keys**: Run `npx web-push generate-vapid-keys` to create a new key pair.
+
+#### **Oxygen Pre-Invoice (Greek e-Invoicing)**
+
+Used by the `oxygen` module (`src/modules/oxygen/`) and the `oxygen-create-pre-invoice` Edge Function. The module pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)** — never as final invoices.
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `OXYGEN_API_KEY` | **Secret** | `oxygen-create-pre-invoice` | Oxygen API bearer token. Generate from Oxygen dashboard → API settings | `oxy_xxxxxxxxxxxxxxxxxxxx` |
+| `OXYGEN_API_BASE_URL` | Public | `oxygen-create-pre-invoice` | Optional base URL override. Defaults to `https://api.oxygen.gr/v1` | `https://api.oxygen.gr/v1` |
+| `OXYGEN_DEFAULT_TAX_ID_24` | **Secret** | `oxygen-create-pre-invoice` | Numeric Oxygen tax id for Greek 24% VAT. Look up via `GET /taxes` once with your key, copy the 24% row's `id` | `1` (numeric) |
+| `OXYGEN_DEFAULT_WAREHOUSE_ID` | **Secret** | `oxygen-create-pre-invoice` | Numeric Oxygen warehouse id (single-warehouse setup). Look up via `GET /warehouses` once, copy the warehouse `id` | `1` (numeric) |
+
+> **Endpoints touched at Oxygen**: `POST /notices` (pre-invoice creation), `GET /contacts?vat=…` and `POST /contacts` (customer lookup or create-if-missing), `POST /products` (catalog create-if-missing). The function never calls `POST /invoices`.
+
+> **One-time bootstrap**: With `OXYGEN_API_KEY` set, run `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/taxes` and `…/warehouses` to discover the numeric ids you need for the two `_DEFAULT_*` secrets. Set both before enabling the module on `/admin/modules`.
 
 #### **Cron Jobs & Backend URLs**
 
@@ -819,8 +842,6 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
      - SLIG_ENDPOINT_URL (for visual embeddings)
      - SLIG_ENDPOINT_TOKEN (for visual embeddings)
      - FIRECRAWL_API_KEY (for price monitoring)
-     - GOOGLE_SHOPPING_API_KEY (optional)
-     - GOOGLE_SHOPPING_CX (optional)
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
@@ -1221,7 +1242,7 @@ This section covers all third-party services used by the platform, their pricing
 |----------|----------|------|-----------|
 | Qwen3-VL-32B (Qwen analysis) | GPU (A100) | ~$3-5/hour | Yes (15 min idle) |
 | SigLIP2 (SLIG visual embeddings) | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
-| Chandra OCR | GPU (A10G) | ~$0.60/hour | Yes (60 sec idle) |
+| Chandra OCR v2 (`chandra-ocr-2.Q8_0.gguf`) | GPU (T4) | ~$0.50/hour | Yes (60 sec idle) |
 
 **Cost control**: All endpoints use auto-pause — billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
 
