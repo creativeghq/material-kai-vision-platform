@@ -92,7 +92,7 @@ Admins can update the expiration days via:
 
 ### Services
 
-**`QuotesService`** (`src/services/quotes/QuotesService.ts`)
+**`QuotesService`** (`src/modules/quotes/services/QuotesService.ts`)
 
 **Core Quote Operations:**
 - `createQuote()` - Create new quote

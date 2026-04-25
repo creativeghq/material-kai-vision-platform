@@ -143,7 +143,7 @@ Both registered in `supabase/functions/_shared/agents/registry.ts`.
 
 Users connect their own accounts from **My Profile → Social Accounts** (`/profile?tab=social-accounts`).
 
-The `SocialAccountsTab` component (`src/components/core/Profile/SocialAccountsTab.tsx`):
+The `SocialAccountsTab` component (`src/modules/social-media/components/SocialAccountsTab.tsx`):
 - Shows connected platforms with handle, follower count, last synced
 - Connect button → calls `late-oauth` → opens Late.dev OAuth in new tab
 - Disconnect button → marks account inactive in DB + notifies Late.dev

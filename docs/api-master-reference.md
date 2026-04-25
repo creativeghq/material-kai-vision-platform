@@ -249,6 +249,36 @@ Full endpoint-by-endpoint reference: [api-endpoints.md](api-endpoints.md) (1940 
 | Internal | `/api/internal/*` | Admin observability. Incl. `GET /api/internal/document-extraction-status/{document_id}` (Document Health panel) and `POST /api/internal/run-catalog-knowledge/{document_id}?force=true` (re-run Layer 1/2) |
 | Data Import | `/api/import/*` | XML import with AI field mapping, web scraping, field templates |
 | Messaging | `/api/messaging/*` | SMS/WhatsApp (backend Twilio bridge) |
+| Modules | `/api/v1/modules/*` | Module-system control + per-module routers — see §2.1 below |
+
+### 2.1 Module system
+
+The platform is divided into 7 toggleable modules. Frontend modules live in `src/modules/<slug>/`; MIVAA-backed modules live in `mivaa-pdf-extractor/app/modules/<slug>/`. Each module's row in `public.modules` controls whether its routes/agents/tools/cards appear at runtime. Toggle from `/admin/modules`.
+
+| Module slug | Frontend | MIVAA backend | Edge tier |
+|---|---|---|---|
+| `greek-marketplaces` | yes | yes (3 routes mounted at `/api/v1/modules/greek-marketplaces/*`) | no |
+| `crm` | yes | no | edge fns: `crm-{users,contacts,companies,stripe}-api` |
+| `email` | yes | no | edge fns: `email-api`, `email-webhook(s)`, `campaign-processor`, `ses-webhook` |
+| `messaging` | yes | yes (`/api/messaging/*`) | edge fns: `messaging-api`, `messaging-processor`, `messaging-webhook` |
+| `quotes` | yes | no | edge fns: `quotes-api`, `generate-quote-pdf` |
+| `notifications` | yes (header bell-icon) | no | edge fn: `notification-dispatcher` |
+| `social-media` | yes | no | edge fns: `late-{oauth,publish,analytics,webhook-handler}`, `generate-social-{content,image,video}` + 11 LLM tool factories under `_shared/modules/social-media/` |
+
+**Top-level MIVAA endpoints owned by the module system (always present, regardless of which modules are enabled):**
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/api/v1/modules/_invalidate` | JWT (admin) | Drop the in-process enabled-flag cache. Called by `/admin/modules` toggle UI so backend picks up the change in ~1s instead of waiting up to 5min for the cache TTL. |
+
+**Greek Marketplaces module** (only mounted when `slug='greek-marketplaces'` is enabled):
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/v1/modules/greek-marketplaces/status` | JWT (admin) | Source credential check + 7-day usage stats (Skroutz / Bestprice / Shopflix) |
+| `POST` | `/api/v1/modules/greek-marketplaces/search` | JWT (admin) | One-off admin test query against all 3 adapters in parallel |
+
+For the platform-wide architecture (manifest contract, slot patterns, agent gating), see [.claude/plans/modular-architecture.md](../.claude/plans/modular-architecture.md) and [.claude/plans/modules-extraction-roadmap.md](../.claude/plans/modules-extraction-roadmap.md).
 
 ---
 

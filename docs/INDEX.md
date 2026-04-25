@@ -590,9 +590,14 @@ All documentation follows these standards:
 ## Documentation Updates
 
 **Last Updated**: April 2026
-**Version**: 3.6.0
+**Version**: 3.7.0
 **Status**: Production
 **Maintainer**: Development Team
+
+**Recent Changes (2026-04-25):**
+- ✨ **NEW**: **Modular Architecture** — platform now ships as 7 toggleable modules. Each module owns its routes/services/agents/admin-cards and is gated by a row in `public.modules`. Toggle from `/admin/modules`. Modules: `greek-marketplaces`, `crm`, `email`, `messaging`, `quotes`, `notifications`, `social-media`. See `.claude/plans/modular-architecture.md` + `.claude/plans/modules-extraction-roadmap.md`.
+- ✨ **NEW**: `POST /api/v1/modules/_invalidate` — admin endpoint that drops MIVAA's enabled-flag cache so toggle changes propagate in ~1s. Documented in `api-master-reference.md` §2.1.
+- ✨ **CHANGED**: Frontend module file paths — Email moved to `src/modules/email/`, Messaging to `src/modules/messaging/`, CRM to `src/modules/crm/`, Quotes to `src/modules/quotes/`, In-App Notifications panel to `src/modules/notifications/`, Social Media admin UI + the 11 KAI agent tools + 2 background agents to `src/modules/social-media/` and `supabase/functions/_shared/modules/social-media/`. Old paths under `src/services/email/`, `src/services/messaging/`, `src/components/Admin/{CRMManagement,EmailManagement,MessagingManagement,SocialMedia}/`, etc. are deleted.
 
 **Recent Changes (2026-04):**
 - ✨ **NEW**: AR Material Preview — WebXR + 3D swatch + PBR maps (`ar-material-preview.md`)

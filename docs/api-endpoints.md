@@ -1,13 +1,20 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2026-01-21
-**API Version:** v2.6.0
+**Last Updated:** 2026-04-25
+**API Version:** v2.7.0
 **Total Endpoints:** 140+
 
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (v2.6.0 - January 2026):**
+**Recent Updates (v2.7.0 - April 2026):**
+- **MODULAR ARCHITECTURE:** Platform converted to module-based runtime. 7 modules (`greek-marketplaces`, `crm`, `email`, `messaging`, `quotes`, `notifications`, `social-media`), each gated by a row in `public.modules`. Module routes auto-mount/unmount based on the toggle.
+  - `POST /api/v1/modules/_invalidate` — admin cache-invalidation hook called by `/admin/modules` toggle UI to drop the in-process enabled-flag cache without waiting for the 5-min TTL. Returns 204.
+  - `GET /api/v1/modules/greek-marketplaces/status` — admin status of Skroutz / Bestprice / Shopflix adapters + 7-day usage stats (only mounted when module enabled).
+  - `POST /api/v1/modules/greek-marketplaces/search` — admin one-off test query against all 3 adapters (only mounted when module enabled).
+- **Sentry hygiene:** 4xx codes 401/403/404 are no longer captured to Sentry. Auth-token-expiry noise filtered out of frontend Sentry init too. See `.claude/plans/modular-architecture.md` for the full module system design.
+
+**Previous Updates (v2.6.0 - January 2026):**
 - **MULTI-CHANNEL MESSAGING:** 10+ endpoints for SMS, WhatsApp via Twilio (NEW)
   - `POST /functions/v1/messaging-api` - Unified messaging API (action-based routing)
   - Send single/bulk messages across SMS, WhatsApp
