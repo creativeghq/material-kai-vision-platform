@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
-import { NotificationsPanel } from '@/components/core/NotificationsPanel';
+import { ModuleHeaderActions } from '@/modules/_core';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PageHeaderProps {
@@ -29,7 +29,6 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -42,33 +41,6 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
         if (data?.avatar_url) setAvatarUrl(data.avatar_url);
       })
       .catch((err) => console.warn('[PageHeader] Failed to load avatar:', err));
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('user_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-      setUnreadCount(count ?? 0);
-    };
-
-    fetchUnread();
-
-    const channel = supabase
-      .channel('pageheader-notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, fetchUnread)
-      .subscribe();
-
-    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
   }, [user]);
 
   const getInitials = (name: string) =>
@@ -94,7 +66,7 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
         <div className="flex items-center gap-3 shrink-0">
           {actions && <div className="flex items-center gap-2">{actions}</div>}
 
-          <NotificationsPanel unreadCount={unreadCount} onCountChange={setUnreadCount} />
+          <ModuleHeaderActions />
 
           {user && (
             <DropdownMenu>

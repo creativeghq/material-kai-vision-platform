@@ -38,6 +38,18 @@ export interface ModuleSubscriber {
   listener: () => Promise<(payload: unknown) => void | Promise<void>>;
 }
 
+/**
+ * A component the module wants rendered in the platform-wide Header
+ * action row (right-aligned cluster next to the avatar). Auto-mounted
+ * when the module is enabled, removed when disabled.
+ */
+export interface ModuleHeaderAction {
+  /** Stable id used as React key. Must be unique per module. */
+  id: string;
+  /** Lazy-loaded component. Mounted with no props — read its own state internally. */
+  component: LazyExoticComponent<ComponentType<unknown>>;
+}
+
 export interface ModuleDefinition {
   manifest: ModuleManifest;
   routes: ModuleRoute[];
@@ -48,6 +60,12 @@ export interface ModuleDefinition {
    * module toggle. Set to `undefined` for modules that don't subscribe.
    */
   subscribers?: ModuleSubscriber[];
+  /**
+   * Optional: components contributed to the platform Header action row.
+   * Used by the In-App Notifications module to inject the bell-icon panel,
+   * but available to any module that needs a global header surface.
+   */
+  headerActions?: ModuleHeaderAction[];
 }
 
 export interface ModuleRow {

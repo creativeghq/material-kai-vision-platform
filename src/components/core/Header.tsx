@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
 import { SemanticSearchInput } from '@/components/features/search/SemanticSearchInput';
 import UnifiedProductDetailModal from '@/components/features/products/ProductDetailModal';
-import { NotificationsPanel } from '@/components/core/NotificationsPanel';
+import { ModuleHeaderActions } from '@/modules/_core';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,7 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -47,33 +46,6 @@ export const Header: React.FC<HeaderProps> = ({
         if (data?.avatar_url) setAvatarUrl(data.avatar_url);
       })
       .catch((err) => console.warn('[Header] Failed to load avatar:', err));
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('user_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-      setUnreadCount(count ?? 0);
-    };
-
-    fetchUnread();
-
-    const channel = supabase
-      .channel('header-notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, () => { fetchUnread(); })
-      .subscribe();
-
-    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
   }, [user]);
 
   const handleSignOut = async () => {
@@ -249,10 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right actions */}
           <div className="ml-auto flex items-center space-x-3">
-            <NotificationsPanel
-              unreadCount={unreadCount}
-              onCountChange={setUnreadCount}
-            />
+            <ModuleHeaderActions />
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

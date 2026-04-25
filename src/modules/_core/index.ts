@@ -28,3 +28,5 @@ export {
   useAdminDashboardCards,
   type AdminDashboardCard,
 } from './useAdminDashboardCards';
+
+export { ModuleHeaderActions } from './ModuleHeaderActions';

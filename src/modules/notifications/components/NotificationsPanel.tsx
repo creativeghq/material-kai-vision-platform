@@ -58,23 +58,54 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-interface NotificationsPanelProps {
-  unreadCount: number;
-  onCountChange: (n: number) => void;
-}
-
-export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
-  unreadCount,
-  onCountChange,
-}) => {
+export const NotificationsPanel: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
+
+  // Pull unread count on mount; subscribe to realtime changes on
+  // user_notifications for this user — refresh badge when rows arrive
+  // or get marked read elsewhere.
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      const { count } = await supabase
+        .from('user_notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+      if (!cancelled) setUnreadCount(count ?? 0);
+    };
+    refresh();
+    const channel = supabase
+      .channel(`notifications-bell-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => { refresh(); },
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   // Close on outside click
   useEffect(() => {
@@ -113,7 +144,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
       .eq('user_id', user.id)
       .eq('is_read', false);
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    onCountChange(0);
+    setUnreadCount(0);
   };
 
   const handleClick = async (n: UserNotification) => {
@@ -126,7 +157,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
       setNotifications((prev) =>
         prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x),
       );
-      onCountChange(Math.max(0, unreadCount - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
     setOpen(false);
     if (n.action_url) navigate(n.action_url);
@@ -136,7 +167,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
     e.stopPropagation();
     await supabase.from('user_notifications').update({ is_read: true }).eq('id', id);
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
-    onCountChange(Math.max(0, unreadCount - 1));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   const handleToggle = () => {

@@ -1,0 +1,9 @@
+{
+  "slug": "notifications",
+  "name": "In-App Notifications",
+  "description": "Bell-icon panel + user_notifications inbox. Users see realtime alerts (quote updates, agent runs, payments, factory approvals, VR/video readiness, etc.).",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "Bell",
+  "version": "0.1.0"
+}
