@@ -126,16 +126,9 @@ const adminSections = {
     },
   ],
   'CRM & User Management': [
-    // 'User Management' (CRM) is now contributed by the `crm` module via
-    // its admin-dashboard navItems[]. See useModuleAdminCards() below.
-    {
-      title: 'Quote Requests',
-      description: 'View and manage customer quote requests with pricing',
-      icon: FileText,
-      path: '/admin/quote-requests',
-      status: 'active',
-      count: 'Quote System',
-    },
+    // 'User Management' (CRM) and 'Quote Requests' (Quotes) are contributed by
+    // the `crm` and `quotes` modules via their admin-dashboard navItems[].
+    // See useAdminDashboardCards().
   ],
   'Communications': [
     // 'Email Management' and 'Messaging (SMS/WhatsApp)' are contributed by the

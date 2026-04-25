@@ -24,7 +24,7 @@ import {
   SheetTitle,
 } from '@/components/core/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, Quote, QuoteWithItems } from '@/services/quotes/QuotesService';
+import { quotesService, Quote, QuoteWithItems } from '../services/QuotesService';
 import { QuoteBuilderView } from './QuoteBuilderView';
 import { CreateQuoteModal } from './CreateQuoteModal';
 

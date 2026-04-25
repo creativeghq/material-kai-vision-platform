@@ -10,7 +10,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { ChevronRight, Sun, Smartphone } from 'lucide-react';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { Product } from './types';
 import { trackProductView } from '@/services/manufacturerAnalyticsService';

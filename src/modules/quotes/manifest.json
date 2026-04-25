@@ -1,0 +1,9 @@
+{
+  "slug": "quotes",
+  "name": "Quotes",
+  "description": "Customer quote requests, builder, FF&E specifications, status tags, upsells, project timelines, PDF generation.",
+  "category": "core",
+  "priceTier": "pro",
+  "icon": "FileText",
+  "version": "0.1.0"
+}

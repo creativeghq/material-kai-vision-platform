@@ -21,8 +21,8 @@ import {
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, StatusTag } from '@/services/quotes/QuotesService';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { quotesService, StatusTag } from '../services/QuotesService';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 export const StatusTagsManagement: React.FC = () => {
   const { toast } = useToast();

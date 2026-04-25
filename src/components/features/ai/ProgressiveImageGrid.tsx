@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
-import { AddToQuoteModal } from '@/components/business/quotes/AddToQuoteModal';
+import { AddToQuoteModal } from '@/modules/quotes/components/AddToQuoteModal';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
 

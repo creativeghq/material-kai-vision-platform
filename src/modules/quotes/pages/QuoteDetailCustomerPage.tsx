@@ -8,13 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
-import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
-import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
+import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '../services/QuotesService';
+import { AddProductsSheet } from '../components/AddProductsSheet';
+import { QuoteItemsList } from '../components/QuoteItemsList';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
-import { QuoteDownloadButtons } from '@/components/quotes/QuoteDownloadButtons';
-import { useQuoteDocument } from '@/hooks/useQuoteDocument';
+import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
+import { useQuoteDocument } from '../hooks/useQuoteDocument';
 
 /**
  * Customer-facing Quote Detail Page

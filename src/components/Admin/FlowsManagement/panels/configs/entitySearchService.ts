@@ -1,5 +1,5 @@
 import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
-import { quotesService } from '@/services/quotes/QuotesService';
+import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import { agentChatHistoryService } from '@/services/agents/agentChatHistoryService';
 import { supabase } from '@/integrations/supabase/client';

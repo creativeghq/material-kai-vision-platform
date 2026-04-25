@@ -9,14 +9,14 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
-import { quotePDFService } from '@/services/quotes/QuotePDFService';
-import { QuoteDownloadButtons } from '@/components/quotes/QuoteDownloadButtons';
-import { useQuoteDocument } from '@/hooks/useQuoteDocument';
+import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
+import { quotePDFService } from '../services/QuotePDFService';
+import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
+import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
-import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { QuoteItemsList } from '../components/QuoteItemsList';
+import { AddProductsSheet } from '../components/AddProductsSheet';
 import {
   Select,
   SelectContent,

@@ -24,7 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/core/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { RecommendationsService } from '@/services/recommendationsService';
 

@@ -12,7 +12,7 @@
  */
 
 import React, { forwardRef } from 'react';
-import { QuoteDocumentData, QuoteDocumentItem } from '@/hooks/useQuoteDocument';
+import { QuoteDocumentData, QuoteDocumentItem } from '../hooks/useQuoteDocument';
 
 // ─── Output dimensions ────────────────────────────────────────────────────────
 

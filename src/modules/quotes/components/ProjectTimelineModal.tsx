@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteTimeline, TimelineStep } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteTimeline, TimelineStep } from '../services/QuotesService';
 
 interface ProjectTimelineModalProps {
   quoteId: string;

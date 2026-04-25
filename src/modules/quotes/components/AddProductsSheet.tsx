@@ -50,7 +50,7 @@ import {
 } from '@/components/core/ui/select';
 import { ScrollArea } from '@/components/core/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService } from '@/services/quotes/QuotesService';
+import { quotesService } from '../services/QuotesService';
 import {
   getAvailableSizes,
   getManufacturer,

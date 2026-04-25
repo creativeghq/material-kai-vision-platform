@@ -4,7 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
+import { QuoteItemWithProduct } from '../services/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product, SimpleProduct } from '@/components/features/products/types';
 import {

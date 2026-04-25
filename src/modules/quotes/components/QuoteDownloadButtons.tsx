@@ -17,7 +17,7 @@ import React, { useRef, useState } from 'react';
 import { Download, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { QuoteDocumentData } from '@/hooks/useQuoteDocument';
+import { QuoteDocumentData } from '../hooks/useQuoteDocument';
 import { QuoteDocument } from './QuoteDocument';
 
 interface QuoteDownloadButtonsProps {

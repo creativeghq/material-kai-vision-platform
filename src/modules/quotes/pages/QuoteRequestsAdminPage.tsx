@@ -36,13 +36,13 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, StatusTag } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
 import { usersAPI } from '@/services/crm.service';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { TimelineStepsManagement } from './TimelineStepsManagement';
-import { UpsellsManagement } from './UpsellsManagement';
+import { TimelineStepsManagement } from './TimelineStepsManagementPage';
+import { UpsellsManagement } from './UpsellsManagementPage';
 
 interface UserProfile {
   id: string;

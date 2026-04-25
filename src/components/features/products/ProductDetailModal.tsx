@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { isAdmin as isAdminRole } from '@/auth/roles';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';

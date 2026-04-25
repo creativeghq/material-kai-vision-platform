@@ -32,8 +32,8 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, TimelineStep } from '@/services/quotes/QuotesService';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { quotesService, TimelineStep } from '../services/QuotesService';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 interface TimelineStepsManagementProps {
   embedded?: boolean;

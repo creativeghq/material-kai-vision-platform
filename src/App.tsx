@@ -46,10 +46,7 @@ const ARPage = lazy(() => import('./components/features/ar/ARPage').then(m => ({
 // Billing & quotes (customer-facing)
 const SubscriptionPlansPage = lazy(() => import('./components/business/billing/SubscriptionPlansPage').then(m => ({ default: m.SubscriptionPlansPage })));
 const CreditPackagesPage = lazy(() => import('./components/business/billing/CreditPackagesPage').then(m => ({ default: m.CreditPackagesPage })));
-const QuoteRequestsPage = lazy(() => import('./components/business/quotes/QuoteRequestsPage').then(m => ({ default: m.QuoteRequestsPage })));
-const QuotesPage = lazy(() => import('./pages/QuotesPage').then(m => ({ default: m.QuotesPage })));
-const QuoteDetailCustomerPage = lazy(() => import('./pages/QuoteDetailCustomerPage').then(m => ({ default: m.QuoteDetailCustomerPage })));
-const QuotePreviewPage = lazy(() => import('./pages/QuotePreviewPage').then(m => ({ default: m.QuotePreviewPage })));
+// Quote pages live in `src/modules/quotes/` — registered through buildModuleRoutes().
 
 // CRM pages live in `src/modules/crm/` — registered through buildModuleRoutes().
 
@@ -75,11 +72,8 @@ const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueue
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 const SystemSettingsPage = lazy(() => import('./components/Admin/SystemSettingsPage').then(m => ({ default: m.SystemSettingsPage })));
-const QuoteRequestsAdmin = lazy(() => import('./components/Admin/QuoteRequestsAdmin').then(m => ({ default: m.QuoteRequestsAdmin })));
-const QuoteDetailPage = lazy(() => import('./components/Admin/QuoteDetailPage').then(m => ({ default: m.QuoteDetailPage })));
-const StatusTagsManagement = lazy(() => import('./components/Admin/StatusTagsManagement').then(m => ({ default: m.StatusTagsManagement })));
-const UpsellsManagement = lazy(() => import('./components/Admin/UpsellsManagement').then(m => ({ default: m.UpsellsManagement })));
-const TimelineStepsManagement = lazy(() => import('./components/Admin/TimelineStepsManagement').then(m => ({ default: m.TimelineStepsManagement })));
+// QuoteRequestsAdmin + QuoteDetailPage live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
+// StatusTagsManagement, UpsellsManagement, TimelineStepsManagement live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
 // Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
@@ -570,95 +564,10 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/quotes"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <QuotesPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/quotes/:id"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <QuoteDetailCustomerPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
-                {/* Quote preview — full-screen, no Layout chrome */}
-                <Route
-                  path="/quotes/:id/preview"
-                  element={
-                    <AuthGuard>
-                      <QuotePreviewPage />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/quote-requests"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <QuoteRequestsAdmin />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/quotes/:id"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <QuoteDetailPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/status-tags"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <StatusTagsManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/upsells"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <UpsellsManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/timeline-steps"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <TimelineStepsManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Quote routes (/quotes, /quotes/:id, /quotes/:id/preview,
+                    /quotes/requests, /admin/quote-requests, /admin/quotes/:id,
+                    /admin/status-tags, /admin/upsells, /admin/timeline-steps)
+                    are registered by the `quotes` module via buildModuleRoutes(). */}
                 {/* Email routes (/admin/emails, /admin/email-templates/:id/edit)
                     are registered by the `email` module via buildModuleRoutes().
                     Messaging route (/admin/messaging) is registered by the
@@ -689,17 +598,6 @@ const App = () => (
                 />
                 {/* Social Media Routes */}
                 <Route path="/admin/social-media/accounts" element={<AuthGuard><AdminGuard><Layout><SocialMediaAccountsPage /></Layout></AdminGuard></AuthGuard>} />
-
-                <Route
-                  path="/quotes/requests"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <QuoteRequestsPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
 
                 {/* Factory Analytics — factory users + admins */}
                 <Route

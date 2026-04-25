@@ -11,8 +11,8 @@ import React, { useEffect, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { useQuoteDocument } from '@/hooks/useQuoteDocument';
-import { QuoteDocument } from '@/components/quotes/QuoteDocument';
+import { useQuoteDocument } from '../hooks/useQuoteDocument';
+import { QuoteDocument } from '../components/QuoteDocument';
 
 export function QuotePreviewPage() {
   const { id } = useParams<{ id: string }>();

@@ -30,8 +30,8 @@ import {
   CommandList,
 } from '@/components/core/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { CreateQuoteModal } from '@/components/business/quotes/CreateQuoteModal';
-import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
+import { CreateQuoteModal } from '../components/CreateQuoteModal';
+import { quotesService, QuoteWithItems } from '../services/QuotesService';
 
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
 

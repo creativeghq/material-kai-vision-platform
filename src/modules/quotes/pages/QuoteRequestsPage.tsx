@@ -13,9 +13,9 @@ import {
   TableRow,
 } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
-import { QuoteRequestModal } from './QuoteRequestModal';
-import { CreateQuoteModal } from './CreateQuoteModal';
+import { quotesService, QuoteWithItems } from '../services/QuotesService';
+import { QuoteRequestModal } from '../components/QuoteRequestModal';
+import { CreateQuoteModal } from '../components/CreateQuoteModal';
 
 export const QuoteRequestsPage: React.FC = () => {
   const { toast } = useToast();

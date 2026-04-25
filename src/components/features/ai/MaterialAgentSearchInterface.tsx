@@ -26,7 +26,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { MarkdownRenderer } from './MarkdownRenderer';
 // import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup

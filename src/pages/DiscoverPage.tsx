@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
+import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product } from '@/components/features/products/types';

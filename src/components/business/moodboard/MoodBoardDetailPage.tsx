@@ -31,7 +31,7 @@ import { ProductDetailModal } from '@/components/features/products/ProductDetail
 import type { Product } from '@/components/features/products/types';
 import { PinterestImportModal } from './PinterestImportModal';
 import { RecommendationsService } from '@/services/recommendationsService';
-import { quotesService } from '@/services/quotes/QuotesService';
+import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { supabase } from '@/integrations/supabase/client';
 import { getProductName, getManufacturer } from '@/utils/productMetadata';
 

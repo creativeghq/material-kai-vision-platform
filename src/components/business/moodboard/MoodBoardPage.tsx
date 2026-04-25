@@ -31,7 +31,7 @@ import {
   type CreateMoodBoardData,
 } from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
-import { quotesService } from '@/services/quotes/QuotesService';
+import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { useNavigate } from 'react-router-dom';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
 import { PageHeader } from '@/components/shared/PageHeader';

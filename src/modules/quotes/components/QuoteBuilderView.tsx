@@ -39,7 +39,7 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '../services/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { getProductName, getProductImageUrl } from '@/utils/productMetadata';
 

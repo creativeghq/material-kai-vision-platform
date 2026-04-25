@@ -12,7 +12,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '../services/QuotesService';
 import { ProjectTimelineModal } from './ProjectTimelineModal';
 
 interface QuoteRequestModalProps {

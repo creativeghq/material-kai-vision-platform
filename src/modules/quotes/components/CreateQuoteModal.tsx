@@ -13,7 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService } from '@/services/quotes/QuotesService';
+import { quotesService } from '../services/QuotesService';
 
 interface CreateQuoteModalProps {
   open: boolean;
