@@ -9,15 +9,15 @@ import { Phone, MessageCircle, Send, FileText, BarChart3, Settings, Users, TestT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import { MessagingChannelsTab } from './MessagingChannelsTab';
-import { MessagingTemplatesTab } from './MessagingTemplatesTab';
-import { MessagingLogsTab } from './MessagingLogsTab';
-import { MessagingAnalyticsTab } from './MessagingAnalyticsTab';
-import { MessagingCampaignsTab } from './MessagingCampaignsTab';
-import { MessagingOptoutsTab } from './MessagingOptoutsTab';
-import { PushNotificationsTab } from './PushNotificationsTab';
-import { messagingService } from '@/services/messaging';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { MessagingChannelsTab } from '../components/MessagingChannelsTab';
+import { MessagingTemplatesTab } from '../components/MessagingTemplatesTab';
+import { MessagingLogsTab } from '../components/MessagingLogsTab';
+import { MessagingAnalyticsTab } from '../components/MessagingAnalyticsTab';
+import { MessagingCampaignsTab } from '../components/MessagingCampaignsTab';
+import { MessagingOptoutsTab } from '../components/MessagingOptoutsTab';
+import { PushNotificationsTab } from '../components/PushNotificationsTab';
+import { messagingService } from '../services';
 import { useToast } from '@/hooks/use-toast';
 
 export const MessagingManagement: React.FC = () => {

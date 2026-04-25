@@ -12,7 +12,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingOptout, MessagingChannelType } from '@/services/messaging';
+import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
 import { format } from 'date-fns';
 
 const channelIcons: Record<string, React.ReactNode> = {

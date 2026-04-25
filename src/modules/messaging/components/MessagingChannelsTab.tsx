@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingChannel, MessagingChannelType } from '@/services/messaging';
+import { messagingService, MessagingChannel, MessagingChannelType } from '../services';
 
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-5 w-5" />,

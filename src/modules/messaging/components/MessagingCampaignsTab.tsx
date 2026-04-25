@@ -8,8 +8,8 @@ import { Plus, Send, Calendar, Users, Play, Pause, Trash2, Phone, MessageCircle 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { messagingCampaignService, MessagingCampaign } from '@/services/messaging/messagingCampaignService';
-import { MessagingChannelType } from '@/services/messaging';
+import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
+import { MessagingChannelType } from '../services';
 import { format } from 'date-fns';
 
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {

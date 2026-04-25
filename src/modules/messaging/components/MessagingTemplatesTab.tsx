@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingTemplate, MessagingChannelType } from '@/services/messaging';
-import type { MessageType } from '@/services/messaging/types';
+import { messagingService, MessagingTemplate, MessagingChannelType } from '../services';
+import type { MessageType } from '../services/types';
 
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-4 w-4" />,

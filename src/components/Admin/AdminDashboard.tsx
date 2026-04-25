@@ -138,16 +138,9 @@ const adminSections = {
     },
   ],
   'Communications': [
-    // 'Email Management' is now contributed by the `email` module via its
-    // admin-dashboard navItems[]. See useAdminDashboardCards().
-    {
-      title: 'Messaging (SMS/WhatsApp)',
-      description: 'Send SMS and WhatsApp campaigns with Twilio integration',
-      icon: MessageSquare,
-      path: '/admin/messaging',
-      status: 'active',
-      count: 'Twilio',
-    },
+    // 'Email Management' and 'Messaging (SMS/WhatsApp)' are contributed by the
+    // `email` and `messaging` modules via their admin-dashboard navItems[].
+    // See useAdminDashboardCards().
     {
       title: 'Flows',
       description: 'Build visual workflow automations with triggers, conditions, and actions',

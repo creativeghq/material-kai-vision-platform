@@ -8,7 +8,7 @@ import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign, Phone, MessageC
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingAnalyticsResponse, MessagingChannelType } from '@/services/messaging';
+import { messagingService, MessagingAnalyticsResponse, MessagingChannelType } from '../services';
 
 interface StatCardProps {
   title: string;

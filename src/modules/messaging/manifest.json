@@ -1,0 +1,9 @@
+{
+  "slug": "messaging",
+  "name": "Messaging",
+  "description": "SMS / WhatsApp / Push — channels, templates, campaigns, logs, analytics, opt-outs (Twilio + Web Push).",
+  "category": "communications",
+  "priceTier": "pro",
+  "icon": "MessageSquare",
+  "version": "0.1.0"
+}

@@ -81,7 +81,7 @@ const StatusTagsManagement = lazy(() => import('./components/Admin/StatusTagsMan
 const UpsellsManagement = lazy(() => import('./components/Admin/UpsellsManagement').then(m => ({ default: m.UpsellsManagement })));
 const TimelineStepsManagement = lazy(() => import('./components/Admin/TimelineStepsManagement').then(m => ({ default: m.TimelineStepsManagement })));
 // Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
-const MessagingManagement = lazy(() => import('./components/Admin/MessagingManagement').then(m => ({ default: m.MessagingManagement })));
+// Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const SocialMediaAccountsPage  = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaAccountsPage })));
@@ -660,19 +660,9 @@ const App = () => (
                   }
                 />
                 {/* Email routes (/admin/emails, /admin/email-templates/:id/edit)
-                    are registered by the `email` module via buildModuleRoutes(). */}
-                <Route
-                  path="/admin/messaging"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <MessagingManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                    are registered by the `email` module via buildModuleRoutes().
+                    Messaging route (/admin/messaging) is registered by the
+                    `messaging` module via buildModuleRoutes(). */}
                 <Route
                   path="/admin/flows"
                   element={

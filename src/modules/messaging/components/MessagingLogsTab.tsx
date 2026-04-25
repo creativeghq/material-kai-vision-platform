@@ -10,7 +10,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '@/services/messaging';
+import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
 import { format } from 'date-fns';
 
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {

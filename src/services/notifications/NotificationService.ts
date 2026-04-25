@@ -5,7 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { emailService } from '@/modules/email/services/emailService';
-import { messagingService } from '@/services/messaging';
+import { messagingService } from '@/modules/messaging/services';
 
 // =====================================================
 // TYPES
