@@ -798,7 +798,7 @@ export function PlatformOverviewTab() {
     try {
       const ago12 = new Date(); ago12.setDate(ago12.getDate() - 84);
       const wks12 = buildWeeks(12);
-      const MARKETPLACE_SOURCES = ['marketplace_skroutz', 'marketplace_bestdeals', 'marketplace_shopflix'];
+      const MARKETPLACE_SOURCES = ['marketplace_skroutz', 'marketplace_bestprice', 'marketplace_shopflix'];
 
       const [priceHistory, trackedHistory, marketplaceRows, allSourceRows, moduleUsage, trackedActive] = await Promise.all([
         supabase.from('price_history').select('created_at').gte('created_at', ago12.toISOString()).limit(5000),

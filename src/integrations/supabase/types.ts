@@ -13262,7 +13262,7 @@ export type Database = {
         | "claude_web_search"
         | "perplexity_web_search"
         | "marketplace_skroutz"
-        | "marketplace_bestdeals"
+        | "marketplace_bestprice"
         | "marketplace_shopflix"
       detection_method:
         | "visual"
@@ -13508,7 +13508,7 @@ export const Constants = {
         "claude_web_search",
         "perplexity_web_search",
         "marketplace_skroutz",
-        "marketplace_bestdeals",
+        "marketplace_bestprice",
         "marketplace_shopflix",
       ],
       detection_method: [
