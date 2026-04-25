@@ -1,0 +1,9 @@
+{
+  "slug": "email",
+  "name": "Email",
+  "description": "Transactional + marketing email — domains, templates, campaigns, delivery analytics, action triggers (Resend).",
+  "category": "communications",
+  "priceTier": "pro",
+  "icon": "Mail",
+  "version": "0.1.0"
+}

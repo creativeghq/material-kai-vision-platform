@@ -10,7 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { emailService } from '@/services/email/emailService';
+import { emailService } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
 
 interface TestEmailDialogProps {

@@ -9,14 +9,12 @@ import {
   Settings,
   Home,
   FileText,
-  Users,
   Package,
   Bot,
   ExternalLink,
   Book,
   AlertTriangle,
   ScrollText,
-  Mail,
   MessageSquare,
   Workflow,
   ChevronDown,
@@ -140,14 +138,8 @@ const adminSections = {
     },
   ],
   'Communications': [
-    {
-      title: 'Email Management',
-      description: 'Manage email domains, templates, and monitor delivery analytics with Resend',
-      icon: Mail,
-      path: '/admin/emails',
-      status: 'active',
-      count: 'Resend',
-    },
+    // 'Email Management' is now contributed by the `email` module via its
+    // admin-dashboard navItems[]. See useAdminDashboardCards().
     {
       title: 'Messaging (SMS/WhatsApp)',
       description: 'Send SMS and WhatsApp campaigns with Twilio integration',

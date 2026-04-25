@@ -8,16 +8,16 @@ import { Mail, Send, Database, BarChart3, Settings, TestTube, Zap, Megaphone } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { emailService } from '@/services/email/emailService';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { EmailDomainsTab } from './EmailManagement/EmailDomainsTab';
-import { EmailLogsTab } from './EmailManagement/EmailLogsTab';
-import { EmailAnalyticsTab } from './EmailManagement/EmailAnalyticsTab';
-import { EmailTemplatesTab } from './EmailManagement/EmailTemplatesTab';
-import { EmailActionsTab } from './EmailManagement/EmailActionsTab';
-import { CampaignsTab } from './EmailManagement/CampaignsTab';
-import { TestEmailDialog } from './EmailManagement/TestEmailDialog';
-import { EmailSettingsModal } from './EmailManagement/EmailSettingsModal';
+import { emailService } from '../services/emailService';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { EmailDomainsTab } from '../components/EmailDomainsTab';
+import { EmailLogsTab } from '../components/EmailLogsTab';
+import { EmailAnalyticsTab } from '../components/EmailAnalyticsTab';
+import { EmailTemplatesTab } from '../components/EmailTemplatesTab';
+import { EmailActionsTab } from '../components/EmailActionsTab';
+import { CampaignsTab } from '../components/CampaignsTab';
+import { TestEmailDialog } from '../components/TestEmailDialog';
+import { EmailSettingsModal } from '../components/EmailSettingsModal';
 
 export const EmailManagement: React.FC = () => {
   const [analytics, setAnalytics] = useState({

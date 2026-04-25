@@ -13,7 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { campaignService } from '@/services/email/campaignService';
+import { campaignService } from '../services/campaignService';
 import { RecipientsTab } from './RecipientsTab';
 import { format } from 'date-fns';
 

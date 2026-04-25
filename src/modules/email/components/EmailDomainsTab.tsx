@@ -11,7 +11,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/core/ui/dialog';
-import { emailService, EmailDomain } from '@/services/email/emailService';
+import { emailService, EmailDomain } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
 
 interface EmailDomainsTabProps {

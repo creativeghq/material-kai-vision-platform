@@ -80,8 +80,7 @@ const QuoteDetailPage = lazy(() => import('./components/Admin/QuoteDetailPage').
 const StatusTagsManagement = lazy(() => import('./components/Admin/StatusTagsManagement').then(m => ({ default: m.StatusTagsManagement })));
 const UpsellsManagement = lazy(() => import('./components/Admin/UpsellsManagement').then(m => ({ default: m.UpsellsManagement })));
 const TimelineStepsManagement = lazy(() => import('./components/Admin/TimelineStepsManagement').then(m => ({ default: m.TimelineStepsManagement })));
-const EmailManagement = lazy(() => import('./components/Admin/EmailManagement').then(m => ({ default: m.EmailManagement })));
-const EmailTemplateBuilder = lazy(() => import('./pages/Admin/EmailTemplateBuilder').then(m => ({ default: m.EmailTemplateBuilder })));
+// Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
 const MessagingManagement = lazy(() => import('./components/Admin/MessagingManagement').then(m => ({ default: m.MessagingManagement })));
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
@@ -660,18 +659,8 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/admin/emails"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <EmailManagement />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Email routes (/admin/emails, /admin/email-templates/:id/edit)
+                    are registered by the `email` module via buildModuleRoutes(). */}
                 <Route
                   path="/admin/messaging"
                   element={
@@ -711,18 +700,6 @@ const App = () => (
                 {/* Social Media Routes */}
                 <Route path="/admin/social-media/accounts" element={<AuthGuard><AdminGuard><Layout><SocialMediaAccountsPage /></Layout></AdminGuard></AuthGuard>} />
 
-                <Route
-                  path="/admin/email-templates/:id/edit"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <EmailTemplateBuilder />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
                 <Route
                   path="/quotes/requests"
                   element={
