@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -216,7 +217,7 @@ export function DuplicateDetectionPage() {
     setScanning(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL;
+      const apiUrl = MIVAA_API_URL;
       const res = await fetch(`${apiUrl}/api/duplicates/batch-detect`, {
         method: 'POST',
         headers: {
@@ -252,7 +253,7 @@ export function DuplicateDetectionPage() {
     setMerging(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL;
+      const apiUrl = MIVAA_API_URL;
       const res = await fetch(`${apiUrl}/api/duplicates/merge`, {
         method: 'POST',
         headers: {

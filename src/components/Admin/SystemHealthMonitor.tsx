@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -125,7 +126,7 @@ export const SystemHealthMonitor: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      const apiUrl = MIVAA_API_URL;
 
       // Run all checks in parallel:
       // - Python backend health (optional, for detailed DB metrics)

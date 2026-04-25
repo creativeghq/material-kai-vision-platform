@@ -8,6 +8,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Trash2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { useToast } from '@/hooks/use-toast';
 
 interface TempFileCleanupModalProps {
@@ -41,7 +42,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_GATEWAY_URL}/api/admin/system/cleanup-temp-files?max_age_hours=${maxAgeHours}&dry_run=true`,
+        `${MIVAA_API_URL}/api/admin/system/cleanup-temp-files?max_age_hours=${maxAgeHours}&dry_run=true`,
         {
           method: 'POST',
           headers: {
@@ -72,7 +73,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_GATEWAY_URL}/api/admin/system/cleanup-temp-files?max_age_hours=${maxAgeHours}&dry_run=false`,
+        `${MIVAA_API_URL}/api/admin/system/cleanup-temp-files?max_age_hours=${maxAgeHours}&dry_run=false`,
         {
           method: 'POST',
           headers: {

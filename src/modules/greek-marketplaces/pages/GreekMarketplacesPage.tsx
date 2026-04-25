@@ -21,8 +21,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
-
-const MIVAA_BASE_URL = import.meta.env.VITE_MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
+import { MIVAA_API_URL as MIVAA_BASE_URL } from '@/config/mivaa';
 
 interface SourceStatus {
   key: string;

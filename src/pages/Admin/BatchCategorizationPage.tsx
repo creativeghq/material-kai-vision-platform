@@ -8,6 +8,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -50,7 +51,7 @@ export const BatchCategorizationPage = () => {
   const [apiUrl, setApiUrl] = useState('');
 
   useEffect(() => {
-    setApiUrl(import.meta.env.VITE_MIVAA_API_URL || '');
+    setApiUrl(MIVAA_API_URL);
   }, []);
 
   // Fetch workspace and uncategorized count

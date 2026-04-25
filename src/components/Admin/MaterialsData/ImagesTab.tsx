@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -230,7 +231,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
   const handleReclassify = async (imageId: string) => {
     setIsReclassifying(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_MIVAA_API_URL}/api/images/reclassify/${imageId}`, {
+      const response = await fetch(`${MIVAA_API_URL}/api/images/reclassify/${imageId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

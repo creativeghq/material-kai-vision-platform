@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 
 // =====================================================
 // INTERFACES
@@ -349,7 +350,7 @@ export class QuotesService {
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', quote.workspace_id)
-          .in('role', ['owner', 'admin'])
+          .in('role', ADMIN_ROLES as unknown as string[])
           .then(({ data: admins }) => {
             if (admins?.length) {
               supabase.from('user_notifications').insert(
@@ -377,7 +378,7 @@ export class QuotesService {
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', quote.workspace_id)
-          .in('role', ['owner', 'admin'])
+          .in('role', ADMIN_ROLES as unknown as string[])
           .then(({ data: admins }) => {
             if (admins?.length) {
               supabase.from('user_notifications').insert(
@@ -713,7 +714,7 @@ export class QuotesService {
       .eq('user_id', user.id)
       .single();
 
-    const isAdmin = userProfile?.roles?.name === 'admin';
+    const isAdmin = isAdminRole(userProfile?.roles?.name as string | undefined);
 
     // If not admin, verify quote ownership
     if (!isAdmin) {

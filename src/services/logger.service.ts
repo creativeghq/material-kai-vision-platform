@@ -15,6 +15,8 @@
  * ```
  */
 
+import { MIVAA_API_URL } from '@/config/mivaa';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -327,7 +329,7 @@ class LoggerService {
       };
 
       // Send to MIVAA backend (non-blocking)
-      const backendUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      const backendUrl = MIVAA_API_URL;
       fetch(`${backendUrl}/api/admin/logs/frontend`, {
         method: 'POST',
         headers: {

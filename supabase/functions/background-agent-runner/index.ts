@@ -23,7 +23,7 @@ const MIVAA_API_KEY            = Deno.env.get('MIVAA_API_KEY') || '';
 import { corsHeaders }        from '../_shared/cors.ts';
 import { authenticate }       from '../_shared/auth.ts';
 import { createLogHelper, createHeartbeatHelper } from '../_shared/agents/base-agent.ts';
-import { getRunner, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
+import { getRunnerGated, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
 import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
 
@@ -109,12 +109,25 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── Look up runner ───────────────────────────────────────────────────────
-  const runner = getRunner(agentConfig.agent_type);
-  if (!runner) {
-    return new Response(JSON.stringify({ error: `No runner registered for agent_type "${agentConfig.agent_type}"` }), {
-      status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  // Use the module-aware variant so disabled-module agents fail closed —
+  // disabling a feature module (e.g. Social Media) really stops its agents.
+  const gated = await getRunnerGated(agentConfig.agent_type);
+  if (gated.runner === undefined) {
+    if (gated.skipped === 'unknown_agent_type') {
+      return new Response(JSON.stringify({ error: `No runner registered for agent_type "${agentConfig.agent_type}"` }), {
+        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(
+      JSON.stringify({
+        error: `Agent skipped: module "${gated.moduleSlug}" is disabled`,
+        skipped: gated.skipped,
+        module_slug: gated.moduleSlug,
+      }),
+      { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
+  const runner = gated.runner;
 
   // ── Create or load run record ────────────────────────────────────────────
   let run: AgentRunRecord;

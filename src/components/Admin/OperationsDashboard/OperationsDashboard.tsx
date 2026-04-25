@@ -27,6 +27,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   PieChart,
   Pie,
@@ -682,7 +683,7 @@ const OperationsDashboardInner: React.FC = () => {
   const fetchExtServiceUsage = useCallback(async (period: string) => {
     try {
       setExtServiceLoading(true);
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000';
+      const apiUrl = MIVAA_API_URL;
       const response = await fetch(
         `${apiUrl}/api/v1/ai-metrics/external-service-usage?time_period=${period}`,
       );

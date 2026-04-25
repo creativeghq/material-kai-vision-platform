@@ -10,6 +10,7 @@ import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { EmbeddingsTab } from './EmbeddingsTab';
 import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,7 +63,7 @@ export const MaterialsDataPage: React.FC = () => {
   const loadStats = async (wsId: string) => {
     try {
       // ✅ NEW: Use MIVAA API endpoint that counts VECS embeddings
-      const MIVAA_API_URL = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      // Using shared MIVAA_API_URL constant from @/config/mivaa
       const response = await fetch(
         `${MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
       );

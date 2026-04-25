@@ -65,6 +65,7 @@ import type { ProductProgress, BackgroundJob, XMLImportJob, JobCheckpoint, JobTy
 import { GLOBAL_PIPELINE_FLOW, XML_IMPORT_PIPELINE_FLOW, WEB_SCRAPING_PIPELINE_FLOW, PRODUCT_STAGES, getPipelineForJobType } from './constants';
 import { LiveTimer } from './components/LiveTimer';
 import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
+import { MIVAA_API_URL } from '@/config/mivaa';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -1293,7 +1294,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // PIPELINE ACTION HANDLERS
   // ============================================================================
 
-  const MIVAA_API_URL = import.meta.env.VITE_MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
 
   const callPipelineAction = async (action: string, body: Record<string, any>) => {
     const { data: { session } } = await supabase.auth.getSession();

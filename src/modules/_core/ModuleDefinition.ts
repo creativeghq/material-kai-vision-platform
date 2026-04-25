@@ -27,10 +27,27 @@ export interface ModuleManifest {
   version: string;
 }
 
+/**
+ * Lazy subscription to a notification-bus event.
+ * Wired up at module-registry init when the module is enabled.
+ */
+export interface ModuleSubscriber {
+  /** Event name (matches keys of `NotificationEvents`). */
+  event: string;
+  /** Lazy import → returns the listener fn that gets attached to the bus. */
+  listener: () => Promise<(payload: unknown) => void | Promise<void>>;
+}
+
 export interface ModuleDefinition {
   manifest: ModuleManifest;
   routes: ModuleRoute[];
   navItems: ModuleNavItem[];
+  /**
+   * Optional: notification-bus subscriptions this module wants registered
+   * when it's enabled. Auto-attached + auto-detached by the registry on
+   * module toggle. Set to `undefined` for modules that don't subscribe.
+   */
+  subscribers?: ModuleSubscriber[];
 }
 
 export interface ModuleRow {

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { isAdmin as isAdminRole } from '@/auth/roles';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import {
@@ -186,7 +187,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       .select('name')
       .eq('id', profile.role_id)
       .maybeSingle();
-    setIsAdmin(['admin', 'super_admin'].includes((role?.name as string) || ''));
+    setIsAdmin(isAdminRole(role?.name as string | null));
   }, []);
 
   useEffect(() => {

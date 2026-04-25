@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   Dialog,
   DialogContent,
@@ -152,7 +153,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/internal/create-chunks/${jobId}`,
+        `${MIVAA_API_URL}/api/internal/create-chunks/${jobId}`,
         {
           method: 'POST',
           headers: {
@@ -203,7 +204,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/internal/generate-product-embeddings/${jobId}`,
+        `${MIVAA_API_URL}/api/internal/generate-product-embeddings/${jobId}`,
         {
           method: 'POST',
           headers: {
@@ -248,7 +249,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       if (job?.id) {
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/job/${job.id}`,
+            `${MIVAA_API_URL}/api/v1/ai-metrics/job/${job.id}`,
           );
           if (response.ok) {
             const data = await response.json();

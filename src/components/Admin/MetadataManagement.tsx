@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -391,7 +392,7 @@ export const MetadataManagement: React.FC = () => {
   const [batchApiUrl, setBatchApiUrl] = useState('');
 
   useEffect(() => {
-    setBatchApiUrl(import.meta.env.VITE_MIVAA_API_URL || '');
+    setBatchApiUrl(MIVAA_API_URL);
   }, []);
 
   useEffect(() => {

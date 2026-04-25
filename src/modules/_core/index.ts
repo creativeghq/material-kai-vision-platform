@@ -15,3 +15,11 @@ export {
 } from './useEnabledModules';
 
 export { buildModuleRoutes } from './ModuleRoutes';
+
+export {
+  attachModuleSubscribers,
+  detachModuleSubscribers,
+  syncSubscribersToEnabledSet,
+} from './subscribers';
+
+export type { ModuleSubscriber } from './ModuleDefinition';

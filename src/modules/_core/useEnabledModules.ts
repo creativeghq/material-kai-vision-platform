@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { ModuleRow } from './ModuleDefinition';
+import { syncSubscribersToEnabledSet } from './subscribers';
 
 interface RegistryState {
   rows: ModuleRow[];
@@ -57,6 +58,12 @@ async function loadIfStale(force = false): Promise<void> {
   } finally {
     inflight = null;
     notify();
+    // Reconcile bus subscribers with the new enabled set. Fire-and-forget;
+    // logging any failure but not blocking the loader's resolve.
+    const enabledSlugs = new Set<string>(cache.rows.filter((m) => m.enabled).map((m) => m.slug));
+    void syncSubscribersToEnabledSet(enabledSlugs).catch((err) =>
+      console.error('[useEnabledModules] subscriber sync failed:', err),
+    );
   }
 }
 

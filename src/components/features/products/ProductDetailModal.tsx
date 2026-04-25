@@ -21,6 +21,7 @@ import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, 
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
+import { isAdmin as isAdminRole } from '@/auth/roles';
 import { AddToQuoteButton } from '@/components/business/quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
@@ -185,7 +186,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
-      setIsAdmin(data?.role === 'admin' || data?.role === 'owner');
+      setIsAdmin(isAdminRole(data?.role));
     };
     checkAdmin();
   }, [user]);

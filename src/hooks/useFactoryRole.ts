@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdmin as isAdminRole } from '@/auth/roles';
 
 interface FactoryRole {
   isFactory: boolean;
@@ -52,7 +53,7 @@ export function useFactoryRole(): FactoryRole {
 
       setState({
         isFactory: !!(profile?.factory_verified && FACTORY_TYPES.includes(profile?.professional_type ?? '')),
-        isAdmin: member?.role === 'admin' || member?.role === 'owner',
+        isAdmin: isAdminRole(member?.role),
         factoryClaimedName: profile?.factory_claimed_name ?? null,
         professionalType: profile?.professional_type ?? null,
         loading: false,

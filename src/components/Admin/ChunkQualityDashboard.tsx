@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   BarChart3,
   CheckCircle,
@@ -75,7 +76,7 @@ export const ChunkQualityDashboard: React.FC = () => {
   const fetchMetrics = async () => {
     try {
       setLoading(true);
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      const apiUrl = MIVAA_API_URL;
       const response = await fetch(
         `${apiUrl}/admin/chunk-quality/metrics?days=30`,
       );
@@ -95,7 +96,7 @@ export const ChunkQualityDashboard: React.FC = () => {
 
   const fetchFlaggedChunks = async (reviewed: boolean) => {
     try {
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      const apiUrl = MIVAA_API_URL;
       const response = await fetch(
         `${apiUrl}/admin/chunk-quality/flagged?reviewed=${reviewed}&limit=50`,
       );
@@ -111,7 +112,7 @@ export const ChunkQualityDashboard: React.FC = () => {
 
   const reviewChunk = async (flagId: string, action: string) => {
     try {
-      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      const apiUrl = MIVAA_API_URL;
       const response = await fetch(
         `${apiUrl}/admin/chunk-quality/flagged/${flagId}/review`,
         {
