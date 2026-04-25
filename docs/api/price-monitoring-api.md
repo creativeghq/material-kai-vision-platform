@@ -178,8 +178,26 @@ Default **60 requests/minute** per key. 429 response if exceeded, with `Retry-Af
 |---|---|
 | `firecrawl_url` | ~1 Firecrawl credit (≈ $0.01) |
 | `claude_web_search` (Perplexity under the hood) | ~2 platform credits (≈ $0.02) |
+| `dataforseo_shopping` | per-task DataForSEO Merchant cost, baked into the same call |
+| `marketplace_skroutz` / `marketplace_bestprice` / `marketplace_shopflix` | ~1 Firecrawl credit each (≈ $0.01) when the Greek Marketplaces module is active and `country_code='GR'`. Returns 0 cost when off. |
 
 Every call writes a row to `price_lookups` (tables in Supabase) with `api_key_id`, inputs, results, credits, latency. Use that for audit.
+
+### Source values you may see on a hit
+
+The `source` field on each retailer hit identifies which engine produced it. Treat this as an open enumeration — we add new sources without notice, all values are non-breaking strings:
+
+| `source` | Where it comes from | When it appears |
+|---|---|---|
+| `firecrawl_url` | Direct page scrape via Firecrawl | When you submit a `url` to `/lookup`, or when we re-verify a discovered URL |
+| `claude_web_search` | Perplexity Sonar-pro web search (legacy enum name, still used) | Default discovery for any query without a URL |
+| `perplexity_web_search` | Same as above, future canonical name | Reserved — currently rows are still written as `claude_web_search` |
+| `dataforseo_shopping` | DataForSEO Merchant (Google Shopping feed) | Runs in parallel with Perplexity on every discovery |
+| `marketplace_skroutz` | Skroutz.gr (price-comparison aggregator) | Greek-market queries (`country_code='GR'`) when the platform's Greek Marketplaces module is enabled |
+| `marketplace_bestprice` | Bestprice.gr (price-comparison aggregator) | Same condition as above |
+| `marketplace_shopflix` | Shopflix.gr (3rd-party seller marketplace) | Same condition as above |
+
+**You don't need to opt in to the new marketplace sources** — when the module is on, your `country_code='GR'` queries automatically receive the extra hits in the same `hits[]` array. If you want to filter or weight the marketplace sources differently in your UI, switch on the `source` field. Otherwise no change is required.
 
 ---
 
@@ -506,6 +524,9 @@ A: Either (a) `verify_prices` was `false` on the request, (b) Firecrawl couldn't
 
 **Q: The `source` field in lookup responses says `claude_web_search` — didn't you switch to Perplexity?**
 A: `source` is an enum value in the DB (`competitor_source_type`) that predates the Perplexity migration. Under the hood it's Perplexity; we kept the enum value stable to avoid breaking existing consumers. A future version may add `perplexity_web_search` as the canonical name and migrate — we'll deprecate with notice.
+
+**Q: I'm seeing new `marketplace_skroutz` / `marketplace_bestprice` / `marketplace_shopflix` source values on my Greek queries — what changed?**
+A: Greek-market queries (`country_code='GR'`) now also pull the cheapest available offer from Skroutz, Bestprice, and Shopflix when the platform's Greek Marketplaces module is enabled. **No request change required on your side** — the new hits show up in the same `hits[]` array. They use the existing `PriceHit` schema with the new `source` values listed in the table above. `marketplace_skroutz` returns an aggregator URL (skroutz.gr product page) where users can see every merchant; the other two return a direct merchant URL on bestprice.gr / shopflix.gr. Treat them as additional discovery — same `verified: false` semantics as Perplexity hits, same Firecrawl re-verification flow if `verify_prices: true`.
 
 ---
 
