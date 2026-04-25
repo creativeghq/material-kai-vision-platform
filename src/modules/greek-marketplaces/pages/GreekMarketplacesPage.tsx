@@ -161,7 +161,7 @@ const GreekMarketplacesPage: React.FC = () => {
               <div>
                 <CardTitle>How it works</CardTitle>
                 <CardDescription className="mt-2">
-                  When enabled, this module runs Skroutz + Bestdeals + Shopflix in parallel with Perplexity and
+                  When enabled, this module runs Skroutz + Bestprice + Shopflix in parallel with Perplexity and
                   DataForSEO on every price discovery refresh — only for products with{' '}
                   <code>country_code = "GR"</code>. Their hits override Perplexity/DataForSEO rows for the same
                   retailer domain.
@@ -219,7 +219,7 @@ const GreekMarketplacesPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(status?.sources ?? [
             { key: 'skroutz', name: 'Skroutz', configured: false, details: 'Loading…' },
-            { key: 'bestdeals', name: 'Bestdeals.gr', configured: false, details: 'Loading…' },
+            { key: 'bestprice', name: 'Bestprice.gr', configured: false, details: 'Loading…' },
             { key: 'shopflix', name: 'Shopflix.gr', configured: false, details: 'Loading…' },
           ]).map((source) => (
             <Card key={source.key}>

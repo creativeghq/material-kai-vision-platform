@@ -191,7 +191,7 @@ serve(withApiLogging('health-check', async (req) => {
     });
   }
 
-  // Resolve which module-gated services are live (e.g. Skroutz/Bestdeals/Shopflix
+  // Resolve which module-gated services are live (e.g. Skroutz/Bestprice/Shopflix
   // only appear when `greek-marketplaces` is enabled).
   let enabledModuleSlugs: string[] = [];
   try {

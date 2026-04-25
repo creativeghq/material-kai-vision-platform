@@ -1713,7 +1713,7 @@ export function PlatformOverviewTab() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <EmptyState message="Skroutz / Bestdeals / Shopflix have no recorded hits yet." />
+                  <EmptyState message="Skroutz / Bestprice / Shopflix have no recorded hits yet." />
                 )}
               </CardContent>
             </Card>
