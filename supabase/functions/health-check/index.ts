@@ -149,7 +149,7 @@ const EXTERNAL_SERVICES = [
 // Keyed by module slug → service definitions (same shape as EXTERNAL_SERVICES).
 const MODULE_SERVICES: Record<string, { name: string; url: string; category: string; icon: string }[]> = {
   'greek-marketplaces': [
-    { name: 'Skroutz',      url: 'https://api.skroutz.gr',    category: 'marketplace', icon: '🛒' },
+    { name: 'Skroutz',      url: 'https://www.skroutz.gr',    category: 'marketplace', icon: '🛒' },
     { name: 'Bestdeals.gr', url: 'https://www.bestdeals.gr',  category: 'marketplace', icon: '🛍️' },
     { name: 'Shopflix.gr',  url: 'https://www.shopflix.gr',   category: 'marketplace', icon: '🏬' },
   ],
