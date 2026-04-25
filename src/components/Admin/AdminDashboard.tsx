@@ -364,10 +364,18 @@ const AdminDashboard: React.FC = () => {
               {Object.entries(
                 (() => {
                   const merged: Record<string, typeof adminSections['Core Systems']> = {};
+                  const seenPaths = new Set<string>();
                   for (const [cat, items] of Object.entries(adminSections)) {
-                    merged[cat] = [...items];
+                    merged[cat] = [];
+                    for (const item of items) {
+                      if (seenPaths.has(item.path)) continue;
+                      seenPaths.add(item.path);
+                      merged[cat].push(item);
+                    }
                   }
                   for (const card of moduleCards) {
+                    if (seenPaths.has(card.path)) continue;
+                    seenPaths.add(card.path);
                     if (!merged[card.category]) merged[card.category] = [];
                     merged[card.category].push({
                       title: card.title,
