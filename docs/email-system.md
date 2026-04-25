@@ -57,9 +57,9 @@ The Email System provides enterprise-grade email capabilities using **Resend** w
 
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (React)                                            │
-│ ├─ Email Service (src/services/email/emailService.ts)      │
+│ ├─ Email Service (src/modules/email/services/emailService.ts) │
 │ ├─ Admin Dashboard (/admin/emails)                         │
-│ └─ React Email Templates (src/services/email/templates/)   │
+│ └─ React Email Templates (src/modules/email/services/templates/) │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -88,7 +88,7 @@ The Email System provides enterprise-grade email capabilities using **Resend** w
 ### Components
 
 #### 1. Frontend Service Layer
-**Location:** `src/services/email/emailService.ts`
+**Location:** `src/modules/email/services/emailService.ts`
 
 - Calls Supabase Edge Functions (NO direct AWS SDK)
 - Type-safe interfaces for all operations
@@ -113,7 +113,7 @@ The Email System provides enterprise-grade email capabilities using **Resend** w
 - Track email lifecycle
 
 #### 3. React Email Templates
-**Location:** `src/services/email/templates/`
+**Location:** `src/modules/email/services/templates/`
 
 - `BaseEmailTemplate.tsx` - Base layout with branding
 - `WelcomeEmail.tsx` - Welcome email template
@@ -121,7 +121,7 @@ The Email System provides enterprise-grade email capabilities using **Resend** w
 - Template registry in `index.ts`
 
 #### 4. Admin Dashboard
-**Location:** `src/components/Admin/EmailManagement/`
+**Location:** `src/modules/email/components/`
 
 - **Analytics Tab** - Delivery rates, charts, recommendations
 - **Email Logs Tab** - View all sent emails with filtering

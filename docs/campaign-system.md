@@ -58,7 +58,7 @@ The Campaign System provides enterprise-grade email marketing capabilities with 
 
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (React)                                            │
-│ ├─ Campaign Service (src/services/email/campaignService.ts)│
+│ ├─ Campaign Service (src/modules/email/services/campaignService.ts) │
 │ ├─ Admin Dashboard (/admin/emails → Campaigns tab)         │
 │ └─ Campaign Components (CampaignsTab, CreateCampaignModal) │
 └─────────────────────────────────────────────────────────────┘
@@ -87,7 +87,7 @@ The Campaign System provides enterprise-grade email marketing capabilities with 
 ### Components
 
 #### 1. Frontend Service Layer
-**Location:** `src/services/email/campaignService.ts`
+**Location:** `src/modules/email/services/campaignService.ts`
 
 Complete campaign management service with methods:
 - Campaign CRUD operations
@@ -97,7 +97,7 @@ Complete campaign management service with methods:
 - Statistics and analytics
 
 #### 2. Admin Dashboard
-**Location:** `src/components/Admin/EmailManagement/`
+**Location:** `src/modules/email/components/`
 
 **CampaignsTab.tsx** - Main campaigns list
 - View all campaigns with status
@@ -258,7 +258,7 @@ Default actions are pre-seeded for: welcome_email, password_reset, email_verific
 ## Campaign Service API
 
 ### Location
-`src/services/email/campaignService.ts`
+`src/modules/email/services/campaignService.ts`
 
 ### Methods
 

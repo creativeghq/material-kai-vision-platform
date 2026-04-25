@@ -10,6 +10,21 @@ import { Switch } from '@/components/core/ui/switch';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { registeredModules, useEnabledModules, refreshModuleRegistry } from '@/modules/_core';
+import { MIVAA_API_URL } from '@/config/mivaa';
+
+async function invalidateMivaaCache(): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return;
+  try {
+    await fetch(`${MIVAA_API_URL}/api/v1/modules/_invalidate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Best-effort: backend will pick up the change within 5 minutes via TTL.
+  }
+}
 
 const TIER_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   free: 'secondary',
@@ -48,7 +63,7 @@ const ModulesPage: React.FC = () => {
         variant: 'destructive',
       });
     } else {
-      await refreshModuleRegistry();
+      await Promise.all([refreshModuleRegistry(), invalidateMivaaCache()]);
       toast({
         title: next ? 'Module enabled' : 'Module disabled',
         description: slug,
