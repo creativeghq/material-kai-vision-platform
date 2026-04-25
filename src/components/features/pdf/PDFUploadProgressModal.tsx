@@ -281,11 +281,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       const startPolling = () => {
         const interval = setInterval(async () => {
           try {
-            // Use MIVAA API endpoint directly - correct endpoint path
-            const mivaaApiUrl =
-              import.meta.env?.VITE_MIVAA_SERVICE_URL ||
-              'https://v1api.materialshub.gr';
-            const jobStatusEndpoint = `${mivaaApiUrl}/api/rag/documents/job/${job.id}`;
+            const jobStatusEndpoint = `${MIVAA_API_URL}/api/rag/documents/job/${job.id}`;
 
             const response = await fetch(jobStatusEndpoint, {
               method: 'GET',

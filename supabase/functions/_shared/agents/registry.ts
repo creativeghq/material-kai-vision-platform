@@ -50,19 +50,14 @@ export const AGENT_REGISTRY: ReadonlyMap<string, AgentRunner> = new Map(
   RUNNERS.map(r => [r.agentType, r]),
 );
 
-/** Returns the runner for a given agent_type, or undefined if not registered */
-export function getRunner(agentType: string): AgentRunner | undefined {
-  return AGENT_REGISTRY.get(agentType);
-}
-
 /**
- * Module-aware variant of `getRunner`. Returns undefined if the agent's
- * owning module is disabled. Use this from the background-agent runner
- * and the scheduler so disabled-module agents never execute.
+ * Module-aware runner lookup. Returns the runner for `agentType`, or
+ * `{ runner: undefined, skipped: ... }` when the agent doesn't exist
+ * or its owning module is disabled. Callers should record the
+ * `skipped` reason in `agent_runs.status_reason` for observability.
  *
- * Returns `{ runner, skipped: 'module_disabled' }` for the disabled
- * case so callers can record the reason in `agent_runs.status_reason`
- * for observability.
+ * Direct `AGENT_REGISTRY.get(...)` is intentionally not exposed via
+ * a wrapper — every consumer must respect the module gate.
  */
 export async function getRunnerGated(
   agentType: string,

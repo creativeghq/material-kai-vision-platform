@@ -350,7 +350,7 @@ export class QuotesService {
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', quote.workspace_id)
-          .in('role', ADMIN_ROLES as unknown as string[])
+          .in('role', ADMIN_ROLES)
           .then(({ data: admins }) => {
             if (admins?.length) {
               supabase.from('user_notifications').insert(
@@ -378,7 +378,7 @@ export class QuotesService {
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', quote.workspace_id)
-          .in('role', ADMIN_ROLES as unknown as string[])
+          .in('role', ADMIN_ROLES)
           .then(({ data: admins }) => {
             if (admins?.length) {
               supabase.from('user_notifications').insert(

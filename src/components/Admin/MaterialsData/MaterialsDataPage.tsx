@@ -63,7 +63,6 @@ export const MaterialsDataPage: React.FC = () => {
   const loadStats = async (wsId: string) => {
     try {
       // ✅ NEW: Use MIVAA API endpoint that counts VECS embeddings
-      // Using shared MIVAA_API_URL constant from @/config/mivaa
       const response = await fetch(
         `${MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
       );

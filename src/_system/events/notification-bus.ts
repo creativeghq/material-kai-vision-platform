@@ -119,11 +119,4 @@ export async function emit<E extends NotificationEventName>(
   await Promise.allSettled(Array.from(set, (listener) => Promise.resolve(listener(payload))));
 }
 
-/** Test-only: clear all subscribers. Never call from production code. */
-export function _resetForTests(): void {
-  for (const key of Object.keys(listeners)) {
-    delete listeners[key as NotificationEventName];
-  }
-}
-
 export const notificationBus = { on, emit };

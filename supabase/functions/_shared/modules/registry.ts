@@ -88,11 +88,6 @@ export async function isModuleEnabled(supabase: SupabaseClient, slug: string): P
   }
 }
 
-/** Test-only: clear the enabled cache between runs. */
-export function _resetModuleEnabledCacheForTests(): void {
-  enabledCache.clear();
-}
-
 /**
  * Helper to build a Supabase client from env vars at edge runtime.
  * Service role only — module gating is a server-side decision.
