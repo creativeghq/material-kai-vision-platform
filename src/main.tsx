@@ -39,9 +39,11 @@ Sentry.init({
       levels: ['error', 'assert'],
     }),
 
-    // Capture HTTP client errors (fetch, XHR)
+    // Capture HTTP client errors (fetch, XHR). 401/403/404/503 are
+    // excluded — bad token / no permission / not found / upstream busy
+    // are user-facing flows the UI handles with toasts, not bugs.
     Sentry.httpClientIntegration({
-      failedRequestStatusCodes: [[400, 599]], // Capture 4xx and 5xx errors
+      failedRequestStatusCodes: [[400, 400], [402, 402], [405, 499], [500, 502], [504, 599]],
     }),
   ],
 
@@ -50,10 +52,25 @@ Sentry.init({
 
   // Automatically capture unhandled errors and promise rejections
   beforeSend(event, hint) {
+    const ex = (hint?.originalException ?? hint?.syntheticException) as
+      | { name?: string; message?: string }
+      | undefined;
+
+    // Drop Supabase auth refresh-token noise. Happens whenever a session
+    // expires; the SDK retries silently and the UI redirects to /login.
+    // Not a bug, not actionable — just fills the dashboard.
+    const message = ex?.message ?? event.message ?? '';
+    if (
+      ex?.name === 'AuthApiError' &&
+      typeof message === 'string' &&
+      /Refresh Token Not Found|Invalid Refresh Token/i.test(message)
+    ) {
+      return null;
+    }
+
     // Log errors to console in development
-    if (import.meta.env.MODE === 'development' && event.exception) {
-      const ex = hint.originalException ?? hint.syntheticException;
-      if (ex != null) console.debug('[Sentry] Error captured:', ex);
+    if (import.meta.env.MODE === 'development' && event.exception && ex) {
+      console.debug('[Sentry] Error captured:', ex);
     }
     return event;
   },
@@ -73,6 +90,9 @@ Sentry.init({
     // Vite HMR transient errors (dev only, not actionable)
     /\[vite\] Failed to reload/,
     'Failed to fetch dynamically imported module',
+    // Supabase auth refresh-token noise (session expired, SDK retries silently)
+    'Invalid Refresh Token',
+    'Refresh Token Not Found',
   ],
 });
 
