@@ -18,7 +18,6 @@ import {
   MessageSquare,
   Workflow,
   ChevronDown,
-  Share2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -142,14 +141,8 @@ const adminSections = {
       status: 'active',
       count: 'Visual Builder',
     },
-    {
-      title: 'Social Media Accounts',
-      description: 'View all workspace social accounts connected via Late.dev. Users connect their own accounts from their profile.',
-      icon: Share2,
-      path: '/admin/social-media/accounts',
-      status: 'active',
-      count: 'Late.dev',
-    },
+    // 'Social Media Accounts' is contributed by the `social-media` module
+    // via its admin-dashboard navItems[]. See useAdminDashboardCards().
   ],
   'System Monitoring': [
     {

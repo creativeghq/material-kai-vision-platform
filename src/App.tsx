@@ -78,7 +78,7 @@ const SystemSettingsPage = lazy(() => import('./components/Admin/SystemSettingsP
 // Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
-const SocialMediaAccountsPage  = lazy(() => import('./components/Admin/SocialMedia').then(m => ({ default: m.SocialMediaAccountsPage })));
+// Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
@@ -596,9 +596,6 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Social Media Routes */}
-                <Route path="/admin/social-media/accounts" element={<AuthGuard><AdminGuard><Layout><SocialMediaAccountsPage /></Layout></AdminGuard></AuthGuard>} />
-
                 {/* Factory Analytics — factory users + admins */}
                 <Route
                   path="/factory-analytics"

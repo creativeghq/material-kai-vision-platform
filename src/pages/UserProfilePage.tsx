@@ -8,7 +8,7 @@ import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
 import { InboxTab } from '@/components/core/Profile/InboxTab';
-import { SocialAccountsTab } from '@/components/core/Profile/SocialAccountsTab';
+import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccountsTab';
 import { AppointmentsPage } from './AppointmentsPage';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { useAuth } from '@/contexts/AuthContext';
