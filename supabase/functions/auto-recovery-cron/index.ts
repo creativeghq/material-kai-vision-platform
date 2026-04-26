@@ -132,15 +132,14 @@ async function detectStuckAgentRuns(supabase: any): Promise<StuckJob[]> {
 }
 
 async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from('background_jobs')
-    .select('*')
-    .eq('status', 'processing')
-    .eq('job_type', 'product_discovery_upload')
-    .lt('last_heartbeat', tenMinutesAgo)
-    .limit(100);
+  // Heartbeat threshold matches MIVAA settings.job_stuck_threshold_seconds
+  // (default 480s = 8 min) — tight enough to catch a dead orchestrator
+  // before users notice, loose enough to not false-positive on a slow
+  // Stage 0 vision call.
+  const { data, error } = await supabase.rpc('detect_stuck_pdf_jobs', {
+    stuck_threshold_seconds: 480,
+    max_attempts: 3,
+  });
 
   if (error) {
     console.error('[AutoRecoveryCron] Error detecting stuck PDF jobs:', error);
@@ -150,12 +149,16 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
   return (data || []).map((job: any) => ({
     id: job.id,
     type: 'pdf_processing' as const,
-    status: job.status,
+    status: 'processing',
     lastHeartbeat: job.last_heartbeat,
     stuckDuration: calculateStuckDuration(job.last_heartbeat),
     recoveryAttempts: job.recovery_attempts || 0,
     canRecover: (job.recovery_attempts || 0) < 3,
-    metadata: { filename: job.filename, document_id: job.document_id },
+    metadata: {
+      filename: job.filename,
+      document_id: job.document_id,
+      last_recovery_at: job.last_recovery_at,
+    },
   }));
 }
 
@@ -324,11 +327,36 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
 }
 
 async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
-  const { error } = await supabase
-    .from('background_jobs')
-    .update({ status: 'pending', last_heartbeat: new Date().toISOString() })
-    .eq('id', job.id);
-  return !error;
+  // Atomic claim via mark_pdf_job_for_recovery — guards against two cron
+  // ticks both flipping the same job to 'pending'. Returns true only if
+  // status was still 'processing' when the update ran.
+  const { data, error } = await supabase.rpc('mark_pdf_job_for_recovery', {
+    p_job_id: job.id,
+    p_max_attempts: 3,
+  });
+  if (error) {
+    console.error(`[AutoRecoveryCron] mark_pdf_job_for_recovery failed for ${job.id}:`, error);
+    return false;
+  }
+
+  // Phase 1 shadow-write: log the recovery attempt to background_jobs.recovery_history.
+  // Phase 2 readers will surface this in the consolidated /full-status payload.
+  try {
+    await supabase.rpc('append_recovery_history', {
+      p_job_id: job.id,
+      p_event: {
+        attempted_at: new Date().toISOString(),
+        from_stage: job.metadata?.last_checkpoint_stage || null,
+        reason: 'heartbeat_stale',
+        stuck_minutes: job.stuckDuration,
+        attempt_number: (job.recoveryAttempts || 0) + 1,
+        succeeded: Boolean(data),
+      },
+    });
+  } catch (e) {
+    console.warn(`[AutoRecoveryCron] append_recovery_history failed for ${job.id}:`, e);
+  }
+  return Boolean(data);
 }
 
 async function recoverScrapingJob(supabase: any, job: StuckJob): Promise<boolean> {
@@ -364,5 +392,26 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
       error: `Job stuck for ${job.stuckDuration} minutes. Max recovery attempts (3) exceeded.`,
     })
     .eq('id', job.id);
+
+  // Phase 1 shadow-write — record the exhaustion event so the consolidated
+  // job-status view can show "auto-recovery gave up after N attempts".
+  if (table === 'background_jobs') {
+    try {
+      await supabase.rpc('append_recovery_history', {
+        p_job_id: job.id,
+        p_event: {
+          attempted_at: new Date().toISOString(),
+          from_stage: job.metadata?.last_checkpoint_stage || null,
+          reason: 'max_attempts_exceeded',
+          stuck_minutes: job.stuckDuration,
+          attempt_number: job.recoveryAttempts,
+          succeeded: false,
+          exhausted: true,
+        },
+      });
+    } catch (e) {
+      console.warn(`[AutoRecoveryCron] append_recovery_history (exhausted) failed for ${job.id}:`, e);
+    }
+  }
 }
 

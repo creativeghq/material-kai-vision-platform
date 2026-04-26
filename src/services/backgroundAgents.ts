@@ -154,6 +154,67 @@ export function subscribeToLogs(
   return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
 }
 
+// ── Chat agent tool-call queries (different table — `agent_tool_call_logs`) ─
+
+export interface ChatToolCall {
+  id:              string;
+  conversation_id: string | null;
+  user_id:         string | null;
+  workspace_id:    string | null;
+  agent_id:        string | null;
+  tool_name:       string;
+  tool_args:       Record<string, unknown> | null;
+  result_summary:  Record<string, unknown> | null;
+  result_count:    number | null;
+  zero_result:     boolean | null;
+  duration_ms:     number | null;
+  success:         boolean;
+  error_message:   string | null;
+  created_at:      string;
+  // Enriched in listChatToolCalls — not stored on the row
+  user_name?:      string | null;
+  user_email?:     string | null;
+}
+
+/**
+ * Recent chat-agent tool calls across all conversations (newest first).
+ * These are the tool invocations made inline in agent-chat (e.g. b2b_manufacturer_search,
+ * material_search, generate_gemini, load_skill) — distinct from the cron-driven
+ * background agents tracked in agent_runs.
+ */
+export async function listChatToolCalls(limit = 200): Promise<ChatToolCall[]> {
+  const { data, error } = await supabase
+    .from('agent_tool_call_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const rows = (data ?? []) as ChatToolCall[];
+
+  // Enrich with display name + email from user_profiles (one round-trip for all
+  // unique user_ids — no per-row lookup). Fail-soft: if the lookup errors,
+  // rows still render with no user name rather than the whole list breaking.
+  const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean) as string[])];
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('user_id, full_name, email')
+      .in('user_id', userIds);
+    type Profile = { name: string | null; email: string | null };
+    const byId = new Map<string, Profile>(
+      ((profiles ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>)
+        .map(p => [p.user_id, { name: p.full_name, email: p.email }]),
+    );
+    for (const r of rows) {
+      if (!r.user_id) continue;
+      const p = byId.get(r.user_id);
+      r.user_name  = p?.name  ?? null;
+      r.user_email = p?.email ?? null;
+    }
+  }
+  return rows;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function formatDuration(ms: number | null): string {

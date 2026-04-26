@@ -9,16 +9,17 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Bot, RefreshCw, CheckCircle, XCircle, Clock, Loader2,
   ChevronDown, ChevronRight, XCircle as CancelIcon, Eye,
-  AlertTriangle, Link2,
+  AlertTriangle, Link2, MessageSquare,
 } from 'lucide-react';
 import { Button }  from '@/components/core/ui/button';
 import { Badge }   from '@/components/core/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { AgentLogsViewer }     from './AgentLogsViewer';
 import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
+import { ChatActivityTab }     from './ChatActivityTab';
 import {
   listAgents, listAllRuns, cancelRun,
   formatDuration, statusColor, isStuck,
@@ -157,6 +158,21 @@ export function BackgroundAgentsPage() {
 
   return (
     <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Top-level mode selector — Background runs vs Chat agent activity */}
+      <Tabs defaultValue="background" className="space-y-4 sm:space-y-6">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="background" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Bot className="h-4 w-4" />
+            Background Tasks
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <MessageSquare className="h-4 w-4" />
+            Chat Activity
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="background" className="space-y-4 sm:space-y-6 mt-0">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -472,6 +488,14 @@ export function BackgroundAgentsPage() {
         open={!!historyAgent}
         onClose={() => setHistoryAgent(null)}
       />
+
+        </TabsContent>
+
+        {/* Chat Activity Tab — tool calls executed inline by agent-chat */}
+        <TabsContent value="chat" className="mt-0">
+          <ChatActivityTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

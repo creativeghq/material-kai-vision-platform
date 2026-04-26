@@ -272,15 +272,35 @@ curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
 
 | Field | Type | Notes |
 |---|---|---|
-| `search_query` | string, required | Product name, e.g. `"Ferrara Beige Keros"` |
+| `search_query` | string, required | **RECOMMENDED format**: `{ProductName} {Model/Series} {SKU}` concatenated, e.g. `"ORABELLA PRECIOSA 10202 Modern Chrome Single Lever Basin Mixer"`. The SKU is the strongest identity disambiguator — when present, our classifier drops sibling SKUs in the same series. Brand/series-only queries still work but return wider sets and may include sibling-SKU rows flagged as `family` (dropped) or `variant` (kept, excluded from price stats). |
 | `dimensions` | string (optional) | Size spec |
 | `country_code` | ISO-3166 α-2 (optional) | Biases Perplexity toward local retailers |
 | `manufacturer` | string (optional) | Disambiguates generic product names |
 | `preferred_retailer_domains` | string[] (optional, max 10) | Forces Perplexity to probe these domains too. Closes retailer-coverage gaps |
 | `refresh_interval_hours` | int 1–720, default 24 | How often our cron re-runs the query. 1h minimum, 30d maximum |
 | `verify_prices` | boolean (default `true`) | Persists on the tracked query row. Every refresh (initial + cron) will re-fetch each retailer URL via Firecrawl to confirm the price on the live page. Set to `false` if you value refresh speed / cost over accuracy. Can be toggled later via `PUT`. |
+| `alert_channels` | string[] (optional) | Delivery channels for price alerts on this query. Allowed values: `bell`, `email`, `webhook`. Default `['bell']` for external API consumers. Bell + webhook are free; email costs 1 credit per send. |
+| `alert_on_price_drop` | boolean (default `false`) | Fire an alert when the trailing 7-day median drops ≥10% week-over-week (per retailer). |
+| `alert_on_new_retailer` | boolean (default `false`) | Fire an alert when discovery surfaces a retailer domain we have never tracked for this query. |
+| `alert_on_promo` | boolean (default `false`) | Fire an alert when `original_price` becomes non-null on a row that previously had it null. |
+| `alert_webhook_url` | string (optional, requires `webhook` in `alert_channels`) | Per-tracked-query webhook destination. Receives `POST` with JSON `{alert_type, title, body, retailer_name, retailer_domain, payload, fired_at}`. Idempotency window: 24h dedupe per (alert_type, retailer_domain). |
 
 **Caveat**: the initial POST blocks for ~15–30 seconds while Perplexity runs (or ~30–60 seconds when `verify_prices: true`, because Firecrawl verifies each hit in parallel). If your integration needs a non-blocking path, create the tracked query with `refresh_interval_hours: 1`, ignore the initial results, and `GET` a minute later.
+
+### Result row fields (added 2026-04-26)
+
+Every result row now carries identity-classification and sanity-band fields. Non-null even on legacy rows after the next refresh.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `match_kind` | `'exact' \| 'variant' \| 'unverifiable' \| null` | Identity verdict from our classifier. `family` and `mismatch` rows are dropped before they reach you. |
+| `match_score` | int 0–100 | Confidence of the verdict. Treat ≥90 as `exact`-grade, 70–89 as `variant`. |
+| `match_note` | string \| null | One-line human-readable explanation when `match_kind` ≠ `exact`. |
+| `product_title` | string \| null | The exact product name as shown on the retailer page. Use to disambiguate multiple rows from the same retailer (different colors / sizes). |
+| `is_anomaly` | boolean | `true` when the reading was outside the 7-day rolling-median sanity band (>3× or <0.33× the median for the same retailer). The price is still surfaced for transparency, but it is not used to compute medians until reviewed. |
+| `anomaly_reason` | string \| null | When `is_anomaly=true`, a one-line explanation. |
+| `rolling_median_at_check` | number \| null | The trailing 7-day median we compared against. |
+| `verified` | boolean | `true` when Firecrawl confirmed the price on the live retailer page. Pure-Perplexity / pure-DataForSEO rows surface as `false`. |
 
 ---
 

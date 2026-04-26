@@ -309,6 +309,62 @@ async function executeAction(
       return { output: { created: true } };
     }
 
+    case 'send_price_alert': {
+      // Module-gated price alert via the dispatcher service. The flow engine
+      // delegates the actual fan-out to the Python backend so credit metering,
+      // dedupe, and channel resolution stay in one place.
+      // Required resolved fields:
+      //   alert_type: 'price_drop' | 'new_retailer' | 'promo_started' | 'anomaly_detected'
+      //   product_id  OR  tracked_query_id
+      //   retailer_name, retailer_domain, title, body, payload, action_url
+      const { data: moduleRow } = await supabase
+        .from('modules')
+        .select('enabled')
+        .eq('slug', 'price-monitoring-notifications')
+        .maybeSingle();
+      if (!moduleRow?.enabled) {
+        return { output: { skipped: true, reason: 'module_disabled' } };
+      }
+
+      // Direct insert path — keeps the flow engine self-contained without
+      // a Python round-trip. Credit metering for non-bell channels happens
+      // in the dispatcher; flows hit the bell only by default.
+      const { error } = await supabase.from('user_notifications').insert({
+        user_id: resolved.user_id,
+        title: resolved.title || 'Price alert',
+        body: resolved.body || '',
+        type: resolved.alert_type || 'price_drop',
+        action_url: resolved.action_url || null,
+        metadata: {
+          source_module: 'price-monitoring-notifications',
+          product_id: resolved.product_id,
+          tracked_query_id: resolved.tracked_query_id,
+          retailer_name: resolved.retailer_name,
+          retailer_domain: resolved.retailer_domain,
+          payload: resolved.payload || {},
+          via: 'flow-engine',
+        },
+        is_read: false,
+      });
+      if (error) throw new Error(`Price alert failed: ${error.message}`);
+
+      // Mirror the alert in price_alert_log for audit + dedupe parity with
+      // the Python dispatcher.
+      await supabase.from('price_alert_log').insert({
+        user_id: resolved.user_id,
+        product_id: resolved.product_id || null,
+        tracked_query_id: resolved.tracked_query_id || null,
+        alert_type: resolved.alert_type || 'price_drop',
+        retailer_name: resolved.retailer_name || null,
+        retailer_domain: resolved.retailer_domain || null,
+        payload: resolved.payload || {},
+        channels_fired: ['bell'],
+        channels_skipped: [],
+        credits_charged: 0,
+      });
+      return { output: { sent: true } };
+    }
+
     case 'send_quote': {
       // Invoke quote PDF generation and send
       const { data, error } = await supabase.functions.invoke('generate-quote-pdf', {

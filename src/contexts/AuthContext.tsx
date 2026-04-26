@@ -45,7 +45,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST — handles SIGNED_IN, SIGNED_OUT,
+    // TOKEN_REFRESHED, USER_UPDATED. Multi-tab sync flows through here too.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_: any, session: any) => {
@@ -54,12 +55,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     });
 
-    // THEN check for existing session
+    // THEN check for existing session. If the stored refresh token is stale
+    // (rotated by another tab, revoked, or simply gone), Supabase throws
+    // `AuthApiError: Invalid Refresh Token: Refresh Token Not Found`.
+    // We swallow it, clear the dead session, and let the user re-auth — no
+    // unhandled rejection, no Sentry noise (KAI-8P).
     supabase.auth
       .getSession()
       .then(({ data: { session } }: { data: { session: any } }) => {
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(false);
+      })
+      .catch(async (err: any) => {
+        const msg = err?.message || '';
+        if (msg.includes('Refresh Token') || msg.includes('refresh_token')) {
+          await supabase.auth.signOut().catch(() => {});
+        }
+        setSession(null);
+        setUser(null);
         setLoading(false);
       });
 

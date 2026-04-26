@@ -381,8 +381,14 @@ function createAgentGraph(
       : model;
     const invokeStartTime = Date.now();
 
+    // Prompt caching: ephemeral cache marker enables Anthropic prompt caching
+    // for the system prompt AND the bound tool definitions. Anthropic returns
+    // the cached blocks at 10% of input cost (90% discount) for cached hits
+    // within the 5-minute TTL. System + ~15 tools is ~10K tokens of stable
+    // preamble that previously re-billed every turn — biggest single win.
     const response = await modelWithTools.invoke(state.messages, {
       system: state.systemPrompt,
+      cache_control: { type: 'ephemeral' },
     });
 
     const invokeElapsed = Date.now() - invokeStartTime;
@@ -721,22 +727,59 @@ let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
 let modelHaiku: any;
 let modelOpus: any;
 
-// Model selection based on agent type
-function getModelForAgent(agentId: string): ChatAnthropic {
-  // Demo uses Haiku for cost efficiency
-  if (agentId === 'demo') {
-    return modelHaiku;
-  }
-  // KAI, Interior, and all other agents use Opus for complex reasoning
-  return modelOpus;
+// Two-tier router: route simple queries to Haiku (~15× cheaper than Opus),
+// reserve Opus for complex reasoning. Heuristic gate — no extra LLM call,
+// no added latency. Errs toward Opus when uncertain (recall over precision).
+//
+// Routes to Haiku when ALL of:
+//   - last user message ≤ 80 chars
+//   - no images attached on this turn
+//   - no @-mentions or quoted strings
+//   - history < 4 turns (early-conversation triage)
+//   - agent isn't `interior-designer` (always needs Opus for design tasks)
+//   - agent isn't admin-tier (B2B / SEO sub-agents need Opus)
+function shouldRouteToHaiku(
+  agentId: string,
+  messages: any[],
+  images: string[],
+): boolean {
+  if (agentId === 'demo') return true;
+  if (agentId === 'interior-designer') return false;
+
+  if (images && images.length > 0) return false;
+
+  const lastUserMsg = [...messages]
+    .reverse()
+    .find((m: any) => m.role === 'user');
+  const text: string = (typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '') || '';
+
+  if (text.length > 80) return false;
+  if (text.includes('@') || text.includes('"') || text.includes("'")) return false;
+
+  const turnCount = messages.filter((m: any) => m.role === 'user').length;
+  if (turnCount >= 4) return false;
+
+  return true;
 }
 
-// Get model name for logging/tracking — must stay in sync with model instances above
-function getModelNameForAgent(agentId: string): string {
-  if (agentId === 'demo') {
-    return 'claude-haiku-4-5';
-  }
-  return 'claude-opus-4-7';
+// Model selection — agent type + per-turn complexity heuristic
+function getModelForAgent(
+  agentId: string,
+  messages: any[] = [],
+  images: string[] = [],
+): ChatAnthropic {
+  return shouldRouteToHaiku(agentId, messages, images) ? modelHaiku : modelOpus;
+}
+
+// Get model name for logging/tracking — must stay in sync with router above
+function getModelNameForAgent(
+  agentId: string,
+  messages: any[] = [],
+  images: string[] = [],
+): string {
+  return shouldRouteToHaiku(agentId, messages, images)
+    ? 'claude-haiku-4-5'
+    : 'claude-opus-4-7';
 }
 
 interface AgentConfig {
@@ -788,7 +831,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'generate_3d', 'analyze_inspiration_url'],
+    tools: [
+      'material_search', 'generate_3d', 'analyze_inspiration_url',
+      // Image-driven post-processing tools (require an existing room image in the conversation)
+      'apply_lighting_preset', 'generate_vr_world',
+    ],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
@@ -835,6 +882,7 @@ async function executeAgent(
   pinnedMaterialImages: string[] = [], // Catalog product images pinned by user for Gemini multi-reference
   generationMode?: string, // Explicit mode override from UI chip selection
   conversation_id?: string | null, // Supabase conversation ID for background task dispatch
+  selectedTools?: string[] | null, // Per-turn user-selected tool filter (subset of agent's allowed tools)
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -864,6 +912,14 @@ async function executeAgent(
   if (config.id !== agentId) {
     agentId = config.id;
     config = AGENT_CONFIGS[agentId];
+  }
+
+  // Per-turn tool filter: when the UI sends `selected_tools`, intersect with
+  // the agent's allowed tool list. RBAC gating still applies after this — a
+  // viewer asking for `b2b_manufacturer_search` won't get it, even if selected.
+  if (selectedTools && selectedTools.length > 0) {
+    const filtered = config.tools.filter((t) => selectedTools.includes(t));
+    config = { ...config, tools: filtered };
   }
 
   // Extract previously generated image URLs from assistant messages (for edit mode).
@@ -996,6 +1052,8 @@ async function executeAgent(
   const createGeminiGenerationTool = generationMod?.createGeminiGenerationTool;
   const createVirtualStagingTool = generationMod?.createVirtualStagingTool;
   const createGenerationStatusTool = generationMod?.createGenerationStatusTool;
+  const createApplyLightingPresetTool = generationMod?.createApplyLightingPresetTool;
+  const createGenerateVRWorldTool = generationMod?.createGenerateVRWorldTool;
   const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
   const createQuerySentryTool = opsMod?.createQuerySentryTool;
   const createCostEstimationTool = opsMod?.createCostEstimationTool;
@@ -1069,6 +1127,16 @@ async function executeAgent(
     tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages, generationMode));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk));
     tools.push(createGenerationStatusTool());
+  }
+
+  // Lighting variants — re-render an existing room under a different lighting preset
+  if (config.tools.includes('apply_lighting_preset') && createApplyLightingPresetTool) {
+    tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk));
+  }
+
+  // VR world generation — turn a room image into an explorable 3D Gaussian Splat
+  if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
+    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk));
   }
 
   // --- Admin-only tools (gated by RBAC) ---
@@ -1164,9 +1232,9 @@ async function executeAgent(
   }
 
 
-  // Select model based on agent type
-  const selectedModel = getModelForAgent(agentId);
-  const modelName = getModelNameForAgent(agentId);
+  // Select model based on agent + per-turn complexity heuristic
+  const selectedModel = getModelForAgent(agentId, messages, images);
+  const modelName = getModelNameForAgent(agentId, messages, images);
 
   // 🔷 LangGraph StateGraph-based execution with checkpointing
 
@@ -1184,6 +1252,57 @@ async function executeAgent(
     agentId,
     supabase, // module-level service-role client
   });
+
+  // ── Conversation compaction ─────────────────────────────────────────────────
+  // For long conversations (> 12 messages), summarize the older turns via Haiku
+  // into a single SystemMessage, keeping the last 6 messages intact. The
+  // summary call is ~$0.001 against Haiku rates; the savings on subsequent
+  // Opus turns (where each old turn re-bills 200-2000 input tokens) pay for it
+  // many times over. Skipped when the user attaches images on this turn —
+  // we don't want to paraphrase image-anchored context.
+  const COMPACT_THRESHOLD = 12;
+  const KEEP_RECENT = 6;
+  if (
+    messages.length > COMPACT_THRESHOLD &&
+    images.length === 0 &&
+    modelHaiku
+  ) {
+    try {
+      const olderMessages = messages.slice(0, messages.length - KEEP_RECENT);
+      const recentMessages = messages.slice(messages.length - KEEP_RECENT);
+
+      const transcript = olderMessages
+        .map((m: any) => {
+          const text =
+            typeof m.content === 'string'
+              ? m.content
+              : Array.isArray(m.content)
+                ? m.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join(' ')
+                : '';
+          return `${m.role === 'user' ? 'User' : 'Assistant'}: ${text}`;
+        })
+        .filter((line: string) => line.length > line.indexOf(': ') + 2)
+        .join('\n');
+
+      const summaryPrompt = `Summarize the conversation below in <=200 tokens. Preserve: named entities (products, people, companies, materials), explicit user constraints, decisions made, and unresolved questions. Drop pleasantries and reasoning chains.\n\n---\n${transcript}\n---\nSummary:`;
+
+      const summaryResp = await modelHaiku.invoke([
+        new HumanMessage(summaryPrompt),
+      ]);
+      const summary =
+        typeof summaryResp.content === 'string'
+          ? summaryResp.content
+          : extractTextContent(summaryResp.content);
+
+      messages = [
+        { role: 'system', content: `Earlier conversation summary:\n${summary}` },
+        ...recentMessages,
+      ];
+    } catch (e) {
+      // Compaction is best-effort; on failure, fall through with full history
+      console.warn('[agent-chat] compaction failed, using full history:', e);
+    }
+  }
 
   // Convert messages to LangChain format, with multimodal support for images
   const lastUserMsgIndex = messages.reduce((last: number, msg: any, i: number) =>
@@ -1270,7 +1389,7 @@ async function executeAgent(
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         totalTokens: result.inputTokens + result.outputTokens,
-        modelName: getModelNameForAgent(agentId),
+        modelName,
         turnCount: result.turnCount
       }
     };
@@ -1284,7 +1403,7 @@ async function executeAgent(
         inputTokens: 0,
         outputTokens: 0,
         totalTokens: 0,
-        modelName: getModelNameForAgent(agentId),
+        modelName,
         turnCount: 0
       }
     };
@@ -1501,7 +1620,11 @@ Deno.serve(async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_tools = null } = await req.json();
+    // selected_tools: string[] | null — when provided (non-empty), filters the
+    // bound tool list to only these IDs (intersected with the agent's allowed
+    // tools + RBAC). Reduces input tokens by ~200-500 per omitted tool. When
+    // null/empty, the full agent tool set is used.
     // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
     // conversation_id: string | null — Supabase conversation ID, used to post background task results back
     // pinned_material_images: string[] — catalog product image URLs pinned by user for Gemini multi-reference generation
@@ -1650,6 +1773,7 @@ Deno.serve(async (req) => {
               pinned_material_images, // Catalog product images pinned by user
               generation_mode || undefined, // Explicit mode override from UI chip
               conversation_id, // Supabase conversation ID for background task dispatch
+              selected_tools, // Per-turn user-selected tool filter
             );
             if (finalResult) {
             }
@@ -1738,7 +1862,7 @@ Deno.serve(async (req) => {
             }).catch((e: any) => console.warn('ai_call_logs write failed:', e));
           }
 
-          const modelUsed = getModelNameForAgent(agentId);
+          const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-7';
           const finalChunk = {
             type: 'final_result',
             text: finalResult.text,
@@ -1793,7 +1917,7 @@ Deno.serve(async (req) => {
               type: 'final_result',
               text: `Error: ${errorMessage}`,
               agentId,
-              model: getModelNameForAgent(agentId),
+              model: 'claude-opus-4-7',
               error: true,
               errorMessage: errorMessage
             });

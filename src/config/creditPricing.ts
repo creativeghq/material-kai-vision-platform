@@ -8,7 +8,7 @@
  * - supabase/functions/_shared/credit-utils.ts (external services)
  * - mivaa-pdf-extractor/app/config/ai_pricing.py (Python backend)
  *
- * Last synced: 2026-02-15
+ * Last synced: 2026-04-24 (verified against Python AIPricingConfig — Claude/Voyage prices last verified 2026-04-18/19)
  */
 
 export interface ActionPricingEntry {

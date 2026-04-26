@@ -172,33 +172,12 @@ Deno.serve(async (req) => {
 
     console.log(`\n✅ Internal monitoring completed: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
 
-    // ── External tracked_queries refresh (Perplexity-based) ──
-    // Separate from internal price_monitoring_products. External projects
-    // register queries via POST /api/v1/prices/track with a refresh_interval_hours;
-    // MIVAA picks the due ones and runs Perplexity for each.
-    let trackedStats: any = null;
-    try {
-      const trackedResp = await fetch(
-        `${pythonBackendUrl}/api/v1/price-monitoring/tracked-queries/cron-refresh?limit=50`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-cron-secret': expectedSecret!,
-          },
-        }
-      );
-      if (trackedResp.ok) {
-        trackedStats = await trackedResp.json();
-        console.log(
-          `✅ Tracked-queries refresh: ${trackedStats.succeeded}/${trackedStats.processed} succeeded, ${trackedStats.total_credits_used} credits`
-        );
-      } else {
-        console.error(`❌ Tracked-queries refresh HTTP ${trackedResp.status}`);
-      }
-    } catch (e) {
-      console.error('❌ Tracked-queries refresh threw:', e);
-    }
+    // External tracked_queries (`tracked_queries` table) are intentionally NOT
+    // refreshed here. External API consumers control their own refresh
+    // cadence by calling POST /api/v1/prices/track/{id}/refresh themselves.
+    // Our internal cron does not touch their data — this is contractual:
+    // they pay per-call, and unsolicited refreshes would surprise their
+    // billing. (Decision 2026-04-25.)
 
     return new Response(JSON.stringify({
       success: true,
@@ -211,7 +190,6 @@ Deno.serve(async (req) => {
           failed,
           results,
         },
-        tracked_queries: trackedStats,
       },
       timestamp: new Date().toISOString(),
     }), {

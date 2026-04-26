@@ -15,11 +15,13 @@ interface ModelPricing {
   model_key: string;
   model_name: string;
   provider: string;
-  billing_type: 'token_based' | 'time_based' | 'per_generation';
+  billing_type: 'token_based' | 'time_based' | 'per_generation' | 'per_unit';
   input_price_per_million: number;
   output_price_per_million: number;
   hourly_rate_usd: number;
   cost_per_generation: number;
+  cost_per_unit: number;
+  unit_label: string | null;
   markup_multiplier: number;
   auto_update_enabled: boolean;
   auto_update_source_url: string | null;
@@ -38,6 +40,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   embedding: Cpu,
   vision: Image,
   generation: Image,
+  external_service: ExternalLink,
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -45,6 +48,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   embedding: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   vision: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   generation: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+  external_service: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -53,6 +57,14 @@ const PROVIDER_COLORS: Record<string, string> = {
   voyage: 'bg-purple-100 text-purple-700',
   huggingface: 'bg-yellow-100 text-yellow-700',
   replicate: 'bg-pink-100 text-pink-700',
+  twilio: 'bg-red-100 text-red-700',
+  apollo: 'bg-cyan-100 text-cyan-700',
+  hunter: 'bg-yellow-100 text-yellow-700',
+  zerobounce: 'bg-blue-100 text-blue-700',
+  firecrawl: 'bg-orange-100 text-orange-700',
+  xai: 'bg-slate-100 text-slate-700',
+  runway: 'bg-pink-100 text-pink-700',
+  late: 'bg-emerald-100 text-emerald-700',
 };
 
 // Display names for categories (handles acronyms properly)
@@ -61,6 +73,7 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   embedding: 'Embedding',
   vision: 'Vision',
   generation: 'Generation',
+  external_service: 'External Services',
   other: 'Other',
 };
 
@@ -122,6 +135,7 @@ export const AIModelPricingTab: React.FC = () => {
       output_price_per_million: model.output_price_per_million,
       hourly_rate_usd: model.hourly_rate_usd,
       cost_per_generation: model.cost_per_generation,
+      cost_per_unit: model.cost_per_unit,
       markup_multiplier: model.markup_multiplier,
       auto_update_enabled: model.auto_update_enabled,
     });
@@ -249,6 +263,8 @@ export const AIModelPricingTab: React.FC = () => {
       rawCost = (5 / 3600) * model.hourly_rate_usd; // 5 seconds
     } else if (model.billing_type === 'per_generation') {
       rawCost = model.cost_per_generation;
+    } else if (model.billing_type === 'per_unit') {
+      rawCost = model.cost_per_unit;
     }
     return rawCost * model.markup_multiplier;
   };
@@ -264,7 +280,7 @@ export const AIModelPricingTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
@@ -300,6 +316,19 @@ export const AIModelPricingTab: React.FC = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Vision Models</p>
                 <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'vision').length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-slate-100">
+                <ExternalLink className="h-5 w-5 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">External Services</p>
+                <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'external_service').length}</p>
               </div>
             </div>
           </CardContent>
@@ -384,25 +413,37 @@ export const AIModelPricingTab: React.FC = () => {
                         {model.billing_type === 'token_based' && 'Token'}
                         {model.billing_type === 'time_based' && `Time (${model.gpu_type || 'GPU'})`}
                         {model.billing_type === 'per_generation' && 'Per Gen'}
+                        {model.billing_type === 'per_unit' && `Per ${model.unit_label || 'unit'}`}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       {editingId === model.id ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editValues.input_price_per_million ?? model.input_price_per_million}
-                          onChange={e => setEditValues({ ...editValues, input_price_per_million: parseFloat(e.target.value) })}
-                          className="w-20 h-7 text-right"
-                        />
+                        model.billing_type === 'per_unit' ? (
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            value={editValues.cost_per_unit ?? model.cost_per_unit}
+                            onChange={e => setEditValues({ ...editValues, cost_per_unit: parseFloat(e.target.value) })}
+                            className="w-20 h-7 text-right"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editValues.input_price_per_million ?? model.input_price_per_million}
+                            onChange={e => setEditValues({ ...editValues, input_price_per_million: parseFloat(e.target.value) })}
+                            className="w-20 h-7 text-right"
+                          />
+                        )
                       ) : (
                         model.billing_type === 'token_based' ? formatPrice(model.input_price_per_million, 2) :
                         model.billing_type === 'time_based' ? `${formatPrice(model.hourly_rate_usd, 2)}/hr` :
+                        model.billing_type === 'per_unit' ? `${formatPrice(model.cost_per_unit, 4)}/${model.unit_label || 'unit'}` :
                         formatPrice(model.cost_per_generation, 3)
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {editingId === model.id ? (
+                      {editingId === model.id && model.billing_type === 'token_based' ? (
                         <Input
                           type="number"
                           step="0.01"

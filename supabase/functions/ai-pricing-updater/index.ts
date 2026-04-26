@@ -38,7 +38,7 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     },
   },
   voyage: {
-    // Voyage AI pricing (verified 2026-01-24)
+    // Voyage AI pricing (verified 2026-04-19)
     // https://docs.voyageai.com/docs/pricing
     fallback_prices: {
       'voyage-4': { input: 0.06, output: 0.00 },

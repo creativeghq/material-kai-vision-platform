@@ -1,67 +1,145 @@
-# Interior Design AI Models - Complete List
+# Interior Design AI Models — Complete List
 
-## 📊 Model Inventory
+This is the canonical inventory of every model the Interior Designer / KAI agent can call, and what each is for. Source of truth for the variations grid is `mivaa-pdf-extractor/app/api/interior_design_routes.py` (`TEXT_TO_IMAGE_MODELS` + `IMAGE_TO_IMAGE_MODELS`). Source of truth for pricing is `mivaa-pdf-extractor/app/config/ai_pricing.py` (`REPLICATE_PRICING`).
 
-### Text-to-Image Models (7 models)
-Used when user provides **only a text prompt** (no reference image)
+There are two distinct entry points:
 
-| Model ID | Name | Provider | Status |
-|----------|------|----------|--------|
-| `flux-dev` | FLUX.1-dev | Replicate | ✅ Working |
-| `flux-schnell` | FLUX.1-schnell | Replicate | ✅ Working |
-| `sdxl` | SDXL | Replicate | ✅ Working |
-| `playground-v2.5` | Playground v2.5 | Replicate | ✅ Working |
-| `stable-diffusion-3` | Stable Diffusion 3 | Replicate | ✅ Working |
-| `kandinsky-2.2` | Kandinsky 2.2 | Replicate | ✅ Working |
-| `proteus-v0.2` | Proteus v0.2 | Replicate | ✅ Working |
+1. **Variations Grid** — `/api/interior` on MIVAA, fan-out across many models in parallel, results stream into the generation panel.
+2. **Single inline result** — `generate_gemini` tool → `generate-interior-gemini` Supabase edge function. Returns one image inline in chat, used for chip-mode flows (image-edit, redesign, copy-style, floor-plan, materials-board).
 
-### Image-to-Image Models (7 models)
-Used when user provides **reference image + prompt** for interior transformation
+The grid and the single-result path **must not both run for the same user request** — the grid already includes a Gemini tile, so calling both would double-bill.
 
-| Model ID | Name | Provider | Status |
-|----------|------|----------|--------|
-| `jschoormans/comfyui-interior-remodel` | ComfyUI Interior Remodel | Replicate | ✅ Working |
-| `julian-at/interiorly-gen1-dev` | Interiorly Gen1 Dev | Replicate | ✅ Working |
-| `davisbrown/designer-architecture` | Designer Architecture | Replicate | ✅ Working |
-| `erayyavuz/interior-ai` | Interior AI | Replicate | ❌ Failing |
-| `jschoormans/interior-v2` | Interior V2 | Replicate | ❌ Failing |
-| `adirik/interior-design` | Adirik Interior Design | Replicate | ❌ Failing |
-| `rocketdigitalai/interior-design-sdxl` | Interior Design SDXL | Replicate | ❌ Failing |
+---
 
-## 🎯 Smart Model Selection Logic
+## 1. Variations Grid (`/api/interior`)
 
-### Scenario 1: Text-to-Image Request
+### Text-to-Image (no uploaded image)
 
-When the user provides only a text prompt (e.g., "Generate a modern minimalist bedroom with oak flooring"), all 7 text-to-image models are used: FLUX.1-dev, FLUX.1-schnell, SDXL, Playground v2.5, Stable Diffusion 3, Kandinsky 2.2, and Proteus v0.2. This produces 7 different variations.
+| Model ID | Backing model | Provider | Cost (raw) | Purpose |
+|---|---|---|---|---|
+| `gemini-interior` | `gemini-3.1-flash-image-preview` (fast tier) via `generate-interior-gemini` edge function | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Photorealistic interior render via Gemini 3 Flash Image. Edge fn handles credits + uploads internally. |
+| `flux-2-pro` | `black-forest-labs/flux-2-pro` | Replicate | $0.05 | Production-grade 4MP photoreal text-to-image. Best overall quality for new rooms from scratch. |
+| `playground-v2.5` | `playgroundai/playground-v2.5-1024px-aesthetic` | Replicate | $0.01 | Aesthetic-tuned SD model — soft, magazine-style interiors. |
+| `sd3` | `stability-ai/stable-diffusion-3` | Replicate | $0.055 | SD 3 baseline — strong prompt adherence, neutral aesthetic. |
 
-### Scenario 2: Image-to-Image Request
+### Image-to-Image (uploaded room photo)
 
-When the user provides a reference image along with a prompt (e.g., "Transform this into a modern minimalist style"), only the 3 working image-to-image models are used: ComfyUI Interior Remodel, Interiorly Gen1 Dev, and Designer Architecture. This produces 3 transformed variations.
+| Model ID | Backing model | Provider | Cost (raw) | Schema / Notes |
+|---|---|---|---|---|
+| `gemini-interior` | `gemini-3.1-flash-image-preview` (fast tier, image-edit mode) | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Image-edit / redesign on the uploaded room. |
+| `comfyui-interior-remodel` | `jschoormans/comfyui-interior-remodel` | Replicate | $0.02 | `comfyui_interior` schema. Minimal: image + prompt only — sending standard SD params triggers 422. Strong remodel results. |
+| `interiorly-gen1-dev` | `julian-at/interiorly-gen1-dev` | Replicate | $0.015 | `flux_lora_interior` schema. Flux LoRA tuned on interiors, supports `prompt_strength` for img2img. |
+| `designer-architecture` | `davisbrown/designer-architecture` | Replicate | $0.018 | Generic schema. Architecture-focused, holds structure tightly. |
+| `interior-v2` | `jschoormans/interior-v2` | Replicate | $0.02 | `interior_v2` schema. Minimal — only prompt + image. |
+| `adirik-interior-design` | `adirik/interior-design` | Replicate | $0.02 | `adirik_interior` schema. Uses `prompt_strength` (not `strength`), 25 inference steps. |
+| `erayyavuz-interior-ai` | `erayyavuz/interior-ai` | Replicate | $0.02 | `interior_ai` schema. Image param is `input` (not `image`). 30 inference steps to avoid Replicate polling timeout. |
+| `interor-2` | `doobls-ai/interor-2` | Replicate | $0.014 | `flux_lora_interior` schema. Colorful, contemporary interiors. |
+| `colourful-interiors` | `rihan-a/colourful_interiors` | Replicate | $0.014 | `flux_lora_interior` schema. Requires `INTR` trigger word. Vibrant palettes. |
+| `stable-interiors-v2-pb` | `pointblack/stable-interiors-v2` | Replicate | $0.011 | `stable_interiors` schema. SD-based img2img. High guidance (15) — sharp output. |
+| `stable-interiors-v2-yz` | `youzu/stable-interiors-v2` | Replicate | $0.011 | `stable_interiors` schema. Same family as above, fast variant. |
+| `interior-design-sdxl` | `rocketdigitalai/interior-design-sdxl` | Replicate | $0.14 | `sdxl_interior` schema. SDXL with depth/ControlNet. Most expensive but most structurally faithful. |
 
-### Scenario 3: Custom Model Selection
+### Smart Selection Logic
 
-When the user specifies particular models in the request (e.g., `"models": ["flux-dev", "sdxl"]`), only those specified models are used, producing the corresponding number of variations.
+- **No `models` array, no reference image** → all `TEXT_TO_IMAGE_MODELS` run in parallel.
+- **No `models` array, reference image present** → all `IMAGE_TO_IMAGE_MODELS` whose `status != "failing"` run in parallel.
+- **`models` array provided** → exact filter against `ALL_MODELS` (`TEXT_TO_IMAGE_MODELS + IMAGE_TO_IMAGE_MODELS`).
+- **`exclude_models` array provided** → those IDs are removed from the resolved set after the above (kept as a defensive escape hatch).
+- Concurrency is capped to 3 simultaneous Replicate jobs (`asyncio.Semaphore(3)`); Gemini runs separately via the edge function.
+- Per-model failures don't break the job — they just record `status: "failed"` on that model row in `generation_3d.models_results`. Other tiles still complete.
+- 10-minute total job timeout. Per-model retry with exponential backoff (3 attempts, 1s/2s/4s).
 
-## 🔧 API Behavior
+### Provider Branching in `process_one_model`
 
-### Default Behavior (No Models Specified)
+When the registry entry has `provider == "gemini"`:
+- Calls `generate_with_gemini_edge` (which posts to `generate-interior-gemini` with `mode: "image-edit"` if a reference image is set, else `mode: "text-to-image"`).
+- The edge function bills credits internally and returns a permanent Supabase Storage URL — no re-upload, no `debit_credits_for_replicate` call.
+- `cost_per_generation: 0.0` on the registry entry because credits are accounted for downstream.
 
-When no models are specified in the request:
-- If there is no reference image, all text-to-image models are used (all 7 models).
-- If a reference image is provided, only the working image-to-image models are used (filtering out any with status "failing"), resulting in 3 models.
+When `provider == "replicate"`:
+- Calls `generate_with_replicate` → polls Replicate prediction → downloads + re-uploads to Supabase Storage.
+- Calls `credits_service.debit_credits_for_replicate` with the registry `id` (matches `REPLICATE_PRICING` keys).
+- `job_id` is intentionally **not** passed to the credit-debit metadata FK column — `ai_usage_logs.job_id` references `background_jobs`, but interior jobs live in `generation_3d`. The `generation_3d` job id is stashed in metadata instead.
 
-### Custom Model Selection
+---
 
-When a models array is provided in the request, the API filters the full model list to include only those whose IDs appear in the request array.
+## 2. Single Inline Result (`generate_gemini` tool / `generate-interior-gemini` edge fn)
 
-## 📈 Expected Results
+Used when the variations grid is **not** appropriate — chip modes, iterative edits, floor plans, materials boards.
 
-| Request Type | Models Used | Expected Images |
-|--------------|-------------|-----------------|
-| Text-to-image (default) | 7 | 7 variations |
-| Image-to-image (default) | 3 | 3 transformations |
-| Custom selection | Variable | As specified |
+| Backing model | Tier | Cost (credits) | Mode(s) |
+|---|---|---|---|
+| `gemini-3.1-flash-image-preview` | `fast` | 6 cr | `text-to-image`, `image-edit`, `floor-plan-render`, `floor-plan-text` |
+| `gemini-3-pro-image-preview` | `pro` | 15 cr | Same modes at 4K quality. **Forced for `materials-selection-board`.** |
+| `black-forest-labs/flux-depth-pro` (called inside the edge fn) | implied by mode | 15 cr | `redesign` (1 image, locks room geometry), `copy-style` (2 images: inspiration + your room — copy aesthetic via depth/ControlNet) |
+| `aurora` (Grok image model, called inside edge fn when `model_tier=grok`) | `grok` | 15 cr | Best spatial accuracy alternative to Flux Depth Pro for `redesign` / `copy-style` |
 
-## ✅ Complete Model Count: 14 Total
-- 7 Text-to-Image
-- 7 Image-to-Image (3 working, 4 failing)
+### Modes (auto-detected by `generate_gemini` if not forced by chip)
+
+| Mode | Trigger | Backing model |
+|---|---|---|
+| `text-to-image` | No image, free-form description | Gemini Flash/Pro |
+| `image-edit` | Targeted change on uploaded or most-recent generated image (e.g. "change the floor", "make it warmer") | Gemini Flash/Pro |
+| `redesign` | 1 uploaded image + style change ("redesign in Scandinavian") | Flux Depth Pro |
+| `copy-style` | 2 uploaded images (inspiration + room) | Gemini Vision (extracts spec) → Flux Depth Pro (applies it) |
+| `floor-plan-render` | Floor plan image uploaded → photorealistic eye-level render | Gemini |
+| `floor-plan-text` | No image, text describes layout or `sqm` provided → 2D floor plan diagram | Gemini |
+| `materials-selection-board` | Reference design + material swatches → professional materials board | Gemini Pro (forced) |
+
+UI chips (`Image Edit`, `Redesign`, `Copy Style`, `Floor Plan`, `Materials Board`) override auto-detection via `forcedMode` in the edge function.
+
+---
+
+## 3. Adjacent Generation Tools (separate from the grid)
+
+These are called by the agent independently and do **not** participate in the variations grid.
+
+| Tool | Backing model | Cost | Purpose |
+|---|---|---|---|
+| `virtual_staging` | `proplabs/virtual-staging` | per-generation Replicate billing | Stage an empty room with AI furniture (uses `room` + `furniture_style` enums). Triggered when the user has an empty room photo. |
+| `generate_pbr_maps` | Replicate (multi-step) | 8 cr | Generate PBR texture maps (albedo, normal, roughness, metalness) for AR / 3D viewer. |
+| `generate_vr_world` | WorldLabs Marble | 18 cr (`marble-1.0-draft`, ~30-45s) / 190 cr (`marble-1.1`, ~5min) | 3D Gaussian Splat VR world from a room image. |
+| Lighting Variants (in ProgressiveImageGrid) | Gemini (same edit pipeline) | per-edit | Re-renders the same room under 6 lighting presets (Natural Daylight, Golden Hour, Overcast, Showroom Spots, Warm Evening, Night). |
+
+---
+
+## 4. Tool-Selection Rules for the Agent
+
+The agent (`KAI` / `Interior Designer`) picks tools per user request using these rules — encoded in the tool descriptions in `supabase/functions/_shared/tools/generation-tools.ts`:
+
+- **Pure text-to-image (no images, no chip)** → `generate_3d` only. The grid includes the Gemini tile, so do **not** also call `generate_gemini`.
+- **Uploaded image, no chip** → `generate_3d` (image-to-image grid).
+- **Chip selected** (`image-edit`, `redesign`, `copy-style`, `floor-plan-render`, `floor-plan-text`, `materials-selection-board`) → `generate_gemini` only. Server-side enforces this.
+- **Iterative edit on a previously generated image** ("change the floor to marble") → `generate_gemini` (mode auto-detects to `image-edit`).
+- **Floor plan request** (sqm or "draw me a floor plan") → `generate_gemini` (mode `floor-plan-text` or `floor-plan-render`).
+- **Materials selection board** → `generate_gemini` with `mode=materials-selection-board` (forced to Pro tier).
+- **Empty room with intent to furnish** → `virtual_staging` tool.
+
+---
+
+## 5. Cost Cheat-Sheet
+
+A typical text-to-image variations request runs 4 tiles in parallel:
+- `gemini-interior` (6 cr ≈ $0.04 internal)
+- `flux-2-pro` ($0.05)
+- `playground-v2.5` ($0.01)
+- `sd3` ($0.055)
+- **Replicate raw total: ~$0.115** + Gemini (6 cr) — billed at 50% markup via `MARKUP_MULTIPLIER`.
+
+A typical image-to-image variations request runs up to 12 tiles in parallel:
+- 1× Gemini (6 cr) + 11× Replicate ($0.014–$0.14 each, ~$0.30 total raw)
+
+Single inline (`generate_gemini`) is always cheapest: 6 cr (fast) or 15 cr (pro/grok).
+
+---
+
+## 6. Related Docs
+
+- [docs/interior-design-data-flow.md](interior-design-data-flow.md) — request lifecycle through the system
+- [docs/api/generate-interior-gemini-api.md](api/generate-interior-gemini-api.md) — Gemini edge function API spec
+- [docs/virtual-staging.md](virtual-staging.md) — virtual staging tool
+- [docs/ar-material-preview.md](ar-material-preview.md) — PBR generation + AR
+- [docs/lighting-simulation.md](lighting-simulation.md) — lighting variants + 3D viewer
+- [docs/vr-world-generation.md](vr-world-generation.md) — WorldLabs Marble VR pipeline
+- [docs/billing-credits-system.md](billing-credits-system.md) — credit/markup model and `ai_usage_logs`
+- [docs/ai-models-complete-list.md](ai-models-complete-list.md) — cross-platform AI model inventory

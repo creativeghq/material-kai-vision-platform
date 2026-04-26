@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock, Megaphone } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { StripeService } from '@/services/stripe.service';
 import { apiGatewayService, type ApiKey } from '@/services/apiGateway/apiGatewayService';
+import { ChangelogList } from './ChangelogList';
 
 const stripeService = new StripeService();
 
 export const SubscriptionTab: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const changelogSlug = searchParams.get('changelog');
+  // When the bell deep-links us with ?changelog=<slug>, default to the
+  // Changes Log sub-tab so the entry is visible without an extra click.
+  const [devTab, setDevTab] = useState<'api-keys' | 'changelog'>(
+    changelogSlug ? 'changelog' : 'api-keys'
+  );
   const [loading, setLoading] = useState(false);
   const [currentTier, setCurrentTier] = useState<string>('free');
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
@@ -71,7 +81,8 @@ export const SubscriptionTab: React.FC = () => {
       const keys = await apiGatewayService.getUserApiKeys(user.id);
       setApiKeys(keys);
     } catch (err) {
-      console.error('Failed to load API keys:', err);
+      const detail = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error(`Failed to load API keys: ${detail}`);
     } finally {
       setApiKeysLoading(false);
     }
@@ -283,7 +294,33 @@ export const SubscriptionTab: React.FC = () => {
         ))}
       </div>
 
-      {/* API Keys */}
+      {/* Developer Resources — API Keys + Changes Log nested tabs */}
+      <Tabs
+        value={devTab}
+        onValueChange={(v) => {
+          setDevTab(v as 'api-keys' | 'changelog');
+          // When the user navigates AWAY from the Changes Log tab clear the
+          // deep-link param so a refresh doesn't keep snapping them back.
+          if (v !== 'changelog' && changelogSlug) {
+            const next = new URLSearchParams(searchParams);
+            next.delete('changelog');
+            setSearchParams(next, { replace: true });
+          }
+        }}
+        className="space-y-4"
+      >
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsTrigger value="api-keys" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Key className="h-4 w-4" />
+            API Keys
+          </TabsTrigger>
+          <TabsTrigger value="changelog" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Megaphone className="h-4 w-4" />
+            Changes Log
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="api-keys" className="mt-0">
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -395,6 +432,12 @@ export const SubscriptionTab: React.FC = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="changelog" className="mt-0">
+          <ChangelogList highlightSlug={changelogSlug} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

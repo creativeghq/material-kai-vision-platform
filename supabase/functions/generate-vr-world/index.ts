@@ -22,11 +22,10 @@ const worldlabsApiKey = Deno.env.get('WORLDLABS_API_KEY') || '';
 
 const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
-// Credit costs per model (raw cost × 1.50 markup × 100 credits/$)
+// Credit costs per model (raw cost × MARKUP_MULTIPLIER × 100 credits/$)
 // WorldLabs pricing: $1 = 1,250 WL credits
 // marble-1.0-draft: 230 WL cr = $0.184 raw × 1.50 = $0.276 → 18 credits
 // marble-1.1:      1580 WL cr = $1.264 raw × 1.50 = $1.896 → 190 credits
-const MARKUP_MULTIPLIER = 1.50;
 const CREDIT_COSTS: Record<string, number> = {
   'marble-1.0-draft': 18,  // 230 WL cr = $0.184 × 1.50 markup
   'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
@@ -45,6 +44,7 @@ interface GenerateVRRequest {
   style?: string;
   model?: string;
   is_pano?: boolean;  // Set true for panoramic source images
+  user_id?: string;   // Required when called server-to-server with the service role key
 }
 
 Deno.serve(withApiLogging('generate-vr-world', async (req) => {
@@ -59,17 +59,40 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
   }
 
-  // Authenticate
-  const auth = await authenticate(req);
-  if (!auth.success || !auth.userId) {
-    return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+  // Auth: accept service role key (internal call from agent-chat) OR user JWT.
+  // Internal callers must pass user_id in the body since there's no JWT to derive it from.
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  let userId: string;
+  let body: GenerateVRRequest;
+
+  if (token === supabaseServiceKey) {
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
+    }
+    if (!body.user_id) {
+      return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
+    }
+    userId = body.user_id;
+  } else {
+    const auth = await authenticate(req);
+    if (!auth.success || !auth.userId) {
+      return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+    }
+    userId = auth.userId;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
+    }
   }
 
-  const userId = auth.userId;
   let vrWorldId: string | null = null;
 
   try {
-    const body: GenerateVRRequest = await req.json();
 
     if (!body.source_image_url) {
       return jsonResponse({ success: false, error: 'Missing source_image_url' }, 400);

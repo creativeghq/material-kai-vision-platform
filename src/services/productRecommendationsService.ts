@@ -125,7 +125,7 @@ export const productRecommendationsService = {
     });
 
     if (error) {
-      console.error('[recommendations] getSimilar error:', error);
+      console.error(`[recommendations] getSimilar error: ${error.message ?? JSON.stringify(error)}`);
       return [];
     }
 
@@ -140,7 +140,7 @@ export const productRecommendationsService = {
     });
 
     if (error) {
-      console.error('[recommendations] getComplementary error:', error);
+      console.error(`[recommendations] getComplementary error: ${error.message ?? JSON.stringify(error)}`);
       return [];
     }
 

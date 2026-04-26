@@ -146,23 +146,28 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         return;
       }
 
-      // Fallback: If no products in processing status table, check job_checkpoints
-      // This is useful during Stage 0 discovery when products are discovered but not yet in processing
-      const { data: checkpointData, error: checkpointError } = await supabase
-        .from('job_checkpoints')
-        .select('checkpoint_data, metadata')
-        .eq('job_id', jobId)
-        .eq('stage', 'products_detected')
+      // Fallback: pull the products_detected stage event from
+      // background_jobs.stage_history. Useful during Stage 0 when products
+      // are discovered but not yet in product_processing_status.
+      const { data: jobRow, error: jobErr } = await supabase
+        .from('background_jobs')
+        .select('stage_history')
+        .eq('id', jobId)
         .single();
 
-      if (checkpointError || !checkpointData) {
-        // No checkpoint found either, set empty array
+      if (jobErr || !jobRow?.stage_history) {
         setProductProgress([]);
         return;
       }
 
-      // Extract product names from checkpoint data
-      const productNames = checkpointData.checkpoint_data?.product_names || [];
+      const history = (jobRow.stage_history as Array<{ stage?: string; data?: { product_names?: string[] } }>) || [];
+      const detected = [...history].reverse().find(e => e.stage === 'products_detected');
+      const productNames = detected?.data?.product_names || [];
+
+      if (productNames.length === 0) {
+        setProductProgress([]);
+        return;
+      }
       const discoveredProducts = productNames.map((name: string, index: number) => ({
         id: `discovered-${jobId}-${index}`,
         job_id: jobId,
@@ -225,27 +230,25 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         });
       }
 
-      // Fetch all checkpoints for this job
-      const { data: checkpoints, error } = await supabase
-        .from('job_checkpoints')
-        .select('*')
-        .eq('job_id', job.id)
-        .order('created_at', { ascending: true });
+      // Stage history lives on background_jobs.stage_history. Map it to
+      // the shape the rest of this component expects (job_id/stage/
+      // checkpoint_data/metadata/created_at) so downstream renderers and
+      // diff logic don't need to change.
+      const history = ((jobData as { stage_history?: Array<Record<string, unknown>> })?.stage_history) || [];
+      const checkpoints = history.map((entry, idx) => ({
+        id: `${job.id}-${idx}`,
+        job_id: job.id,
+        stage: entry.stage,
+        checkpoint_data: entry.data || {},
+        metadata: entry.metadata || {},
+        created_at: entry.completed_at || entry.started_at,
+      }));
 
-      if (error) {
-        console.error('Error fetching checkpoints:', error);
-        throw error;
-      }
-
-
-      // Update checkpoints with deep comparison to prevent unnecessary re-renders
       setJobCheckpoints(prev => {
-        const newCheckpoints = checkpoints || [];
-        // Only update if checkpoints actually changed
-        if (JSON.stringify(prev) === JSON.stringify(newCheckpoints)) {
-          return prev; // No change, keep same reference
+        if (JSON.stringify(prev) === JSON.stringify(checkpoints)) {
+          return prev;
         }
-        return newCheckpoints;
+        return checkpoints;
       });
 
       // Fetch product progress for PDF processing jobs
@@ -570,21 +573,25 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           return typedJobData;
         });
 
-        // Refresh checkpoints with deep comparison
-        const { data: checkpoints } = await supabase
-          .from('job_checkpoints')
-          .select('*')
-          .eq('job_id', selectedJob.id)
-          .order('created_at', { ascending: true });
+        // Refresh checkpoints from background_jobs.stage_history (single
+        // source of truth post-cutover). Mapping mirrors the shape used
+        // elsewhere in this component so renderers don't change.
+        const history = ((typedJobData as { stage_history?: Array<Record<string, unknown>> })?.stage_history) || [];
+        const checkpoints = history.map((entry, idx) => ({
+          id: `${selectedJob.id}-${idx}`,
+          job_id: selectedJob.id,
+          stage: entry.stage,
+          checkpoint_data: entry.data || {},
+          metadata: entry.metadata || {},
+          created_at: entry.completed_at || entry.started_at,
+        }));
 
-        if (checkpoints) {
-          setJobCheckpoints(prev => {
-            if (JSON.stringify(prev) === JSON.stringify(checkpoints)) {
-              return prev;
-            }
-            return checkpoints;
-          });
-        }
+        setJobCheckpoints(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(checkpoints)) {
+            return prev;
+          }
+          return checkpoints;
+        });
 
         // 🚀 PROACTIVE PRODUCT REFRESH
         const isPdfJob = typedJobData.job_type === 'pdf_processing' ||
@@ -604,7 +611,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
     };
 
-    // Realtime subscription for this specific job — fires instantly on DB change
+    // Realtime subscription — every checkpoint write now updates
+    // background_jobs.stage_history, so a single channel on that row is
+    // sufficient. The old separate subscription on job_checkpoints is
+    // gone with the table.
     const jobSub = supabase
       .channel(`selected_job_${selectedJob.id}`)
       .on(
@@ -614,18 +624,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           schema: 'public',
           table: 'background_jobs',
           filter: `id=eq.${selectedJob.id}`,
-        },
-        () => {
-          refreshSelectedJob();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'job_checkpoints',
-          filter: `job_id=eq.${selectedJob.id}`,
         },
         () => {
           refreshSelectedJob();
@@ -890,13 +888,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .select('*', { count: 'exact', head: true });
       stats.processing_status_deleted = statusCount || 0;
 
-      // 6. Delete job_checkpoints
-      const { count: checkpointCount } = await supabase
-        .from('job_checkpoints')
-        .delete()
-        .eq('job_id', jobId)
-        .select('*', { count: 'exact', head: true });
-      stats.checkpoints_deleted = checkpointCount || 0;
+      // 6. Stage history is on background_jobs.stage_history; nothing to
+      //    delete separately — the job DELETE below removes it.
+      stats.checkpoints_deleted = 0;
 
       // 7. Finally delete the job record
       const { error: jobError } = await supabase
@@ -1064,11 +1058,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .delete()
         .in('job_id', jobIds);
 
-      // Delete job_checkpoints for these jobs
-      await supabase
-        .from('job_checkpoints')
-        .delete()
-        .in('job_id', jobIds);
+      // Stage history travels with background_jobs, no separate cleanup.
 
       // Delete the job records (but NOT the related products, chunks, images, etc.)
       const { error: deleteError } = await supabase
@@ -2641,7 +2631,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 // 1. metadata.stage (set by progress tracker during processing)
                 // 2. metadata.current_stage (alias)
                 // 3. metadata.sub_stage (fine-grained step)
-                // 4. Last checkpoint stage (from job_checkpoints table)
+                // 4. Last entry of background_jobs.stage_history
                 // 5. Progress percentage as hint
                 const metaStage = selectedJob?.metadata?.stage
                   || (selectedJob?.metadata as any)?.current_stage

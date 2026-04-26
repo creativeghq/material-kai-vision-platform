@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { OxygenPreInvoiceButton } from '@/modules/oxygen';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -597,6 +598,12 @@ export const QuoteDetailPage: React.FC = () => {
                 )}
               </Button>
             )}
+
+            {/* Oxygen module: Pre-Invoice (notice) — renders only when status === 'accepted' */}
+            <OxygenPreInvoiceButton
+              quote={quote as unknown as import('@/modules/oxygen').QuoteOxygenView}
+              onSynced={loadQuoteDetails}
+            />
           </div>
         </div>
 

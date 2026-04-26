@@ -98,6 +98,66 @@
 - **Frontend**: `/admin/background-agents` → BackgroundAgentsPage + AgentRunHistoryDrawer + AgentLogsViewer + CreateAgentModal
 - **Service**: `src/services/backgroundAgents.ts`
 
+## Job Tracking (PDF / XML / scraping) — single-table design (2026-04-25)
+- **Source of truth**: `background_jobs`. The legacy `job_progress` and `job_checkpoints` tables were dropped — all stage and recovery audit data now lives as JSONB arrays on the job row itself.
+- **`background_jobs.stage_history jsonb`**: append-only audit log; one entry per stage transition (`{stage, status, started_at, completed_at, attempt, data, metadata, source}`). Capped at 100 most recent entries by `append_stage_history(uuid, jsonb)` so pathological loops cannot grow the row unbounded.
+- **`background_jobs.recovery_history jsonb`**: append-only log written by `auto-recovery-cron` whenever it claims a stuck job (`{attempted_at, from_stage, reason, attempt_number, succeeded, exhausted}`). Replaces the previous "scattered in metadata" pattern.
+- **`background_jobs.last_checkpoint jsonb`**: still the snapshot the auto-recovery cron uses to know which stage to resume from. Updated alongside every `append_stage_history` call.
+- **SQL helpers** (atomic `||` UPDATE — race-safe): `append_stage_history(p_job_id uuid, p_event jsonb)`, `append_recovery_history(p_job_id uuid, p_event jsonb)`, `cleanup_invalid_stage_history(p_job_id uuid, p_invalid_stages text[])`, `match_document_chunks_semantic(...)`, `detect_stuck_pdf_jobs(...)`, `mark_pdf_job_for_recovery(...)`, `fail_exhausted_pdf_jobs(...)`.
+- **Consolidated read**: `GET /api/rag/documents/job/{job_id}/full-status` returns `{core, stage_history, recovery_history, products, memory}` in a single round trip — replaces the prior pattern of querying three tables.
+- **Per-product state**: `product_processing_status` stays as a child table (1 job → N products) — different cardinality from job state, deserves its own row.
+- **Writers** (every code path that emits a stage event uses `append_stage_history` only): `checkpoint_recovery_service.create_checkpoint`, `progress_tracker._sync_to_database`, `data_import_service._update_job_progress` (XML), `web_scraping_service.update_job_progress`, `scrape-session-manager` edge function.
+- **Heartbeat**: `JobHeartbeat` (in `app/services/tracking/job_heartbeat.py`) writes `last_heartbeat` every `JOB_HEARTBEAT_INTERVAL_SECONDS` (default 60s) for the entire orchestrator lifetime, so a job stalled inside a single stage is still detectable.
+- **Frontend**: `AsyncJobQueueMonitor.tsx` reads `stage_history` straight off the job row and uses a single realtime channel on `background_jobs` (the old `job_checkpoints` channel is gone).
+
+## Email integration for price alerts (2026-04-26)
+
+- **Sender** comes from `public.email_settings` keys `default_from_email` + `default_from_name` (currently `Basilis Kanonids - MaterialsHub <no-reply@coms.ikigaihub.io>`). Configurable through `EmailSettingsModal` in the email module — no code change needed to switch domains. The `email-api` edge function reads these on every send (no caching), so changes take effect immediately.
+- **Templates** for price-monitoring live in `email_templates` and ARE picked up by `EmailTemplatesTab`. Topic grouping: the templates tab now derives a `Price Monitoring` group from slug prefixes (`price_alert.*`, `api_broadcast.price_*`). Filter dropdown lets admins narrow the list. The default sender is shown read-only above the templates list so admins always know which `from:` Resend will use.
+- Templates seeded:
+  - `price_alert.price_drop` / `price_alert.new_retailer` / `price_alert.promo_started` / `price_alert.anomaly_detected` — per-row alerts to product owners.
+  - `api_broadcast.price_tracking_v2` — one-shot announcement for API-key owners.
+- **Broadcasting to API consumers** — `POST /api/v1/price-monitoring/broadcast-api-announcement` (admin session JWT). Pulls distinct `user_id`s from active `api_keys`, joins to `user_profiles` for name + email, idempotency-skips users who already received the same `template_slug`, then dispatches via `email-api` (which loads sender from `email_settings`). Defaults to dry-run; pass `"dry_run": false` to actually send.
+- **No env-var fallback** — if `RESEND_API_KEY` is missing on Supabase, sends fail at the `email-api` boundary and the dispatcher logs the failure to `price_alert_log.channels_skipped` as `email_send_failed`. Bell delivery is unaffected.
+
+## Price Monitoring v2.1 (2026-04-26 — Resend email, anomaly override UI, classifier feedback UI)
+
+- Email channel wired via the platform's existing `email-api` edge function (Resend-backed via `RESEND_API_KEY`). Default `alert_channels` for newly-tracked products = `['bell','email']`. Templates seeded into `email_templates` (slugs: `price_alert.price_drop` / `.new_retailer` / `.promo_started` / `.anomaly_detected`, all `category='notification'`). Dispatcher invokes `email-api?action=send` with `templateSlug` + `variables`; passes a fallback `html` so emails still go out if a template is missing or the renderer fails. User email pulled from `user_profiles.email`.
+- Anomaly override UI: rows where `is_anomaly=true` render with a yellow left border + an inline banner showing the rejected reading, the trailing 7d median, and (admin only) two buttons:
+  - **Trust this reading**: flips the latest anomaly row's `manual_override=true` AND back-fills `competitor_sources.current_price` with the rejected price. Use when the retailer genuinely changed price by >3× (rare but legitimate — clearance sales, wholesaler-to-retail conversion).
+  - **Dismiss**: clears `is_anomaly=false` so the banner disappears + the data point joins the median window from the next refresh onward. Use when the reading was a transient bug that's already resolved.
+  - Implemented inline in `RetailerTable` ([ProductMonitorTab.tsx](src/components/business/price-monitoring/ProductMonitorTab.tsx)). Uses direct Supabase client writes — no API round-trip needed since these are admin-only writes governed by RLS.
+- Classifier correction UI: admin sees a `Wrong match` button (thumbs-down icon) on every classified row. Click prompts for a reason, POSTs to `/api/v1/price-monitoring/classifier-correction` with `corrected_match_kind: 'should_drop'`. The next classify call (5min cache) prepends the most recent corrections as few-shot examples to the system prompt. Service helper at [priceMonitoringApi.ts → submitClassifierCorrection](src/services/priceMonitoringApi.ts).
+
+## Price Monitoring v2 (2026-04-26 — sanity bands, alerts, discrepancies, adaptive discovery)
+
+**Module:** `price-monitoring-notifications` — credit-metered alert dispatcher. Slug must be enabled in `public.modules` for any alert to fire. Channels: bell (0 credits), email (1 credit), webhook (0 credits). Insufficient credits skip the channel silently and log to `price_alert_log.channels_skipped`. 24h dedupe per (alert_type, product/tracked_query, retailer_domain). Webhook URL is per-tracked-query (`tracked_queries.alert_webhook_url`) — internal product flow has no per-product webhook today.
+
+**Sanity band (PR 1):** Every price reading checked against trailing 7d median per (subject, retailer). Outside `[median × 0.33, median × 3.0]` ⇒ row written with `is_anomaly=true` + `anomaly_reason`, `competitor_sources.current_price` NOT overwritten until admin sets `manual_override=true`. UI shows yellow banner with rejected reading + median side by side. Min 3 samples to fire — below that we trust the new reading. See `app/modules/price_monitoring_notifications/service.py:check_sanity`.
+
+**Alerts (PR 1):** Three opt-in types — `price_drop` (median drops ≥10% W/W), `new_retailer` (domain never seen for this product), `promo_started` (`original_price` becomes non-null). `anomaly_detected` always fires regardless of opt-in. Detection runs in the persistence chokepoints — `tracked_queries_service.refresh()` + `price_monitoring_routes./discover` — after rows commit. Fan-out goes through the module dispatcher.
+
+**Discrepancy logging (PR 2a):** `price_discrepancies` table captures cross-source disagreements >20%. Two sites: Firecrawl-vs-Perplexity inside `_verify_hits_with_firecrawl` (Firecrawl wins), and Perplexity-vs-DataForSEO inside `_merge_with_dataforseo` (Perplexity wins, direct page beats feed). `notes` column carries the resolution rationale.
+
+**First-refresh double-read (PR 2b):** `tracked_queries.first_refresh_verified` flag — first refresh of a tracked query runs Firecrawl twice with a 30s gap. Disagreement >5% ⇒ `verified=false` + note "double-read inconsistent". Subsequent refreshes single-read. Internal product flow does NOT double-read (per-source first-refresh tracking would slow `/discover`).
+
+**Adaptive Stage A re-issue (PR 3a):** When initial Perplexity returned ≥1 exact match AND we can extract a SKU from the surviving titles AND query had no SKU anchor, fire ONE additional Perplexity call with the SKU prepended. Capped at one extra call per refresh. ~$0.02/refresh, typically doubles keep rate. See `perplexity_price_search_service.search_prices` step 6.
+
+**Retailer-list memory (PR 3b):** Caller passes `known_retailer_domains` to `search_prices`; the prompt asks for ADDITIONAL retailers beyond that list. Sourced from `competitor_sources` (internal flow) or `tracked_query_price_history` (external flow), capped at 25 retailers in the prompt. Stabilizes the long tail across refreshes.
+
+**Idealo module (PR 4a):** New module `idealo` — DACH/IT/UK/ES/FR price comparison. Same Firecrawl-scrape shape as `greek_marketplaces`. Locales: DE/AT→idealo.de, IT→idealo.it, UK/GB→idealo.co.uk, ES→idealo.es, FR→idealo.fr. Disabled by default; admin enables in `/admin/modules` when ready to spend Firecrawl credits in those markets. Wired into the orchestrator parallel to the Greek marketplaces task.
+
+**Classifier feedback loop (PR 4b):** `match_corrections` table — admin clicks "this is wrong" in the UI (route `POST /api/v1/price-monitoring/classifier-correction`). The next classify call (5min cache) prepends the most recent 5 corrections to the system prompt as few-shot examples. Closes the loop without retraining a model. See `product_identity_service._build_few_shot_block`.
+
+**Flow engine integration:** New action node `send_price_alert` in `supabase/functions/flow-engine/index.ts`. Module-gated. Writes to `user_notifications` + mirrors to `price_alert_log` for parity with the Python dispatcher. Required resolved fields: `user_id`, `alert_type`, `product_id` OR `tracked_query_id`, `title`, `body`. Optional: `action_url`, `retailer_name`, `retailer_domain`, `payload`.
+
+**New / modified DB columns:**
+- `price_monitoring_products`: `alert_on_price_drop`, `alert_on_new_retailer`, `alert_on_promo`, `alert_channels`
+- `tracked_queries`: same four + `alert_webhook_url`, `first_refresh_verified`
+- `price_history` + `tracked_query_price_history`: `is_anomaly`, `anomaly_reason`, `rolling_median_at_check`, `manual_override`
+- `competitor_sources`: `source_domain`, `first_seen_at`, `first_refresh_verified`
+- New tables: `price_discrepancies`, `match_corrections`, `price_alert_log`
+
 ## Price Monitoring (2026-04-25 — Perplexity + DataForSEO discovery → Firecrawl verification)
 
 **Two-stage pipeline on every price refresh:**
@@ -120,13 +180,15 @@
 - User enables monitoring on a product → `POST /api/v1/price-monitoring/discover` runs Perplexity Sonar-pro → up to 10 retailer rows written to `competitor_sources` with `source_type='perplexity_web_search'` + snapshots in `price_history`.
 - User pastes specific URLs in "Custom Monitoring" → `source_type='firecrawl_url'` via the existing `FirecrawlClient`.
 - 6h throttle on Perplexity per product; admin/super_admin `force_refresh=true` bypasses.
-- Cron at `supabase/functions/price-monitoring-cron` — hourly, runs Firecrawl on `get_products_due_for_monitoring` + calls MIVAA's `/tracked-queries/cron-refresh` (next bullet).
+- **Single-tier 24h cadence** (2026-04-25): every monitored product refreshes once per day measured from its last refresh. `monitoring_frequency` column is forced to `'daily'`; `update_next_check_time()` ignores the input frequency and always sets `NOW() + INTERVAL '1 day'`. UI dropdown was collapsed to a single "Every 24h" line.
+- Cron at `supabase/functions/price-monitoring-cron` — pg_cron `price-monitoring-refresh-hourly` fires at `:15` every hour, queries `get_products_due_for_monitoring()`, refreshes each via MIVAA's `/api/v1/price-monitoring/check-now`. The hourly cron tick is fine-grained — it just picks up any product whose 24h window has elapsed since its last refresh.
 
 **Flow 2 — External API (api_keys Bearer auth, for other projects):**
 - `POST /api/v1/prices/track` creates a `tracked_queries` row (search_query, dimensions, country_code, preferred_retailer_domains, refresh_interval_hours 1–720). First refresh runs synchronously; initial results in response.
 - `tracked_queries.api_key_id → api_keys.id ON DELETE CASCADE` — deleting the key wipes the tracked query AND all `tracked_query_price_history` (also cascades). Intentional blast radius.
 - 6 endpoints at `/api/v1/prices/track/*` (POST / GET list / GET one / GET /{id}/history / PUT / POST /{id}/refresh / DELETE). All route-level api_keys auth.
-- Cron endpoint `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret) picks up `due_for_refresh` rows and refreshes them. Called by Supabase price-monitoring-cron.
+- **No automated refresh** (2026-04-25 policy change): external consumers control their own refresh cadence. Each tracked query is refreshed only when the consumer calls `POST /api/v1/prices/track/{id}/refresh`. Our internal cron does NOT touch `tracked_queries` — unsolicited refreshes would surprise per-call billing.
+- Manual admin endpoint `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret auth) still exists in MIVAA as an escape hatch for emergency batch refreshes after a bug fix or data backfill, but is NOT invoked by any cron. The price-monitoring-cron edge function intentionally does NOT call it.
 
 **Engine: Perplexity Sonar-pro** (`app/services/integrations/perplexity_price_search_service.py`):
 - Replaced Claude `web_search_20250305` on 2026-04-24 — Claude API's Brave-based snippets missed prices visible on pages (e.g. YouBath €25). Perplexity has deeper page reading + real `user_location` geo support.
@@ -171,6 +233,20 @@
 - **AddProductsSheet**: FF&E section in custom product form, room field in catalog product selection
 - **PDF generation**: Room column in items table, dimensions in product name, "SPECIFICATIONS & DELIVERY" section at bottom
 - **Service**: `QuotesService.addItem()`, `addCustomItem()`, `updateItem()` all accept FF&E fields
+
+## Oxygen Pre-Invoice Module (Greek e-Invoicing — 2026-04-22)
+Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.
+
+- **Single endpoint hit at Oxygen**: `POST /notices` (plus `/contacts` lookup-or-create and `/products` create-if-missing as side effects). We never call `/invoices`.
+- **Auth**: `Authorization: Bearer <OXYGEN_API_KEY>` via `_shared/oxygen/client.ts`.
+- **Trigger**: admin clicks "Make Pre-Invoice" on a quote where `status='accepted'`. Hard idempotent — once `quotes.oxygen_notice_id` is set, button permanently disabled and edge function early-returns.
+- **Customer model**: `quotes.customer_company_id` (B2B → `crm_companies`, type=2) OR `quotes.customer_contact_id` (private/B2C → `crm_contacts`, type=1). XOR check enforces at most one. `quotes.user_id` is the operator/designer, NOT the bill-to.
+- **Customer create-if-missing**: lookup by `vat_number` (companies) or `email` (private), then `POST /contacts` if not found. Result cached on our side as `crm_*.oxygen_contact_id`.
+- **Product create-if-missing**: same pattern, cached as `products.oxygen_product_id`.
+- **Single warehouse**: `OXYGEN_DEFAULT_WAREHOUSE_ID` secret, no per-product column.
+- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`.
+- **Required Edge secrets**: `OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL` (optional, defaults to `https://api.oxygen.gr/v1`), `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`.
+- **Mount point**: single `<OxygenPreInvoiceButton />` in `src/modules/quotes/pages/QuoteDetailAdminPage.tsx`. Removable by deleting the module folders + that one import.
 
 ## Manufacturer Analytics (Enhanced)
 - **Tracking service**: `src/services/manufacturerAnalyticsService.ts` — batched fire-and-forget event tracking (flush every 5s or 20 events)

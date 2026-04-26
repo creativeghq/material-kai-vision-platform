@@ -495,8 +495,8 @@ async function processIndividualPage(
 }
 
 /**
- * Update job_progress table with current scraping progress.
- * Called after each page is processed to provide real-time updates.
+ * Append scraping progress to background_jobs.stage_history (single source
+ * of truth) after each page is processed.
  */
 async function updateJobProgress(supabase: any, sessionId: string) {
   try {
@@ -516,23 +516,24 @@ async function updateJobProgress(supabase: any, sessionId: string) {
     const completedPages = session.completed_pages || 0;
     const progressPercent = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
 
-    // Update job_progress table (upsert)
-    await supabase
-      .from('job_progress')
-      .upsert({
-        job_id: session.background_job_id,
+    // Append the stage event to background_jobs.stage_history.
+    await supabase.rpc('append_stage_history', {
+      p_job_id: session.background_job_id,
+      p_event: {
         stage: 'scraping_pages',
-        progress_percent: progressPercent,
-        current_step: `Page ${completedPages}/${totalPages}`,
-        details: {
+        status: 'in_progress',
+        progress: progressPercent,
+        completed_at: new Date().toISOString(),
+        data: {
           completed_pages: completedPages,
           failed_pages: session.failed_pages || 0,
           materials_found: session.materials_processed || 0,
           current_url: session.current_page_url,
+          current_step: `Page ${completedPages}/${totalPages}`,
         },
-      }, {
-        onConflict: 'job_id,stage',
-      });
+        source: 'scrape_session_manager',
+      },
+    });
 
     // Update background_jobs progress and heartbeat
     await supabase

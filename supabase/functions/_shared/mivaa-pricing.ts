@@ -6,7 +6,7 @@
  * - src/config/creditPricing.ts (frontend calculator)
  * - mivaa-pdf-extractor/app/config/ai_pricing.py (Python backend)
  *
- * Last synced: 2026-02-15
+ * Last synced: 2026-04-24
  */
 
 export interface MivaaRoutePricing {

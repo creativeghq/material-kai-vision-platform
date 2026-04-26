@@ -85,6 +85,37 @@ export interface DiscoverResponse {
 }
 
 /**
+ * Submit a classifier correction. Admin clicks "Wrong match" on a row whose
+ * match_kind verdict was wrong; the correction lands in `match_corrections`
+ * and the next classifier run pulls it in as a few-shot example.
+ *
+ * Pass either competitor_source_id (internal flow) OR tracked_query_history_id
+ * (external flow). corrected_match_kind is what the row SHOULD have been —
+ * use 'should_drop' when the row should not have appeared at all.
+ */
+export async function submitClassifierCorrection(args: {
+  competitorSourceId?: string;
+  trackedQueryHistoryId?: string;
+  correctedMatchKind: 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop';
+  correctionNote?: string;
+}): Promise<void> {
+  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/classifier-correction`, {
+    method: 'POST',
+    headers: await authHeader(),
+    body: JSON.stringify({
+      competitor_source_id: args.competitorSourceId,
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      corrected_match_kind: args.correctedMatchKind,
+      correction_note: args.correctionNote,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`classifier-correction failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}
+
+/**
  * Trigger Perplexity discovery for a monitored product. Respects 6h throttle
  * unless force_refresh=true (admin/super_admin only).
  */

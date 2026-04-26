@@ -7,9 +7,21 @@ This document explains how the platform tracks and converts AI service costs int
 
 **1 Platform Credit = $0.01 USD**
 
-All AI service costs are converted to platform credits using the formula: `Platform Credits = USD Cost × 100`.
+Platform billing applies a **50% markup** on top of the raw provider cost before converting to credits:
 
-Example: A $0.15 USD API call = **15 platform credits**
+```
+billed_cost_usd = raw_cost_usd × 1.50         # MARKUP_MULTIPLIER
+platform_credits = billed_cost_usd × 100      # 1 credit = $0.01
+```
+
+Example: A raw $0.15 Anthropic API call → billed $0.225 → **22.5 platform credits** (rounded up to 23).
+
+The markup constant is centralized to keep ecosystems aligned:
+- Edge functions: [`supabase/functions/_shared/pricing-constants.ts`](../supabase/functions/_shared/pricing-constants.ts) → `MARKUP_MULTIPLIER`
+- Python backend: [`mivaa-pdf-extractor/app/config/ai_pricing.py`](../mivaa-pdf-extractor/app/config/ai_pricing.py) → `AIPricingConfig.MARKUP_MULTIPLIER`
+- Frontend admin dashboard: [`src/components/Admin/OperationsDashboard/constants.ts`](../src/components/Admin/OperationsDashboard/constants.ts) → `MARKUP_MULTIPLIER`
+
+All three MUST be updated together.
 
 ---
 
@@ -93,17 +105,19 @@ Tracks all AI API calls with detailed cost breakdown. The table stores the follo
 
 ## Usage Examples
 
-### Example 1: GPT-4o API Call
+### Example 1: Claude Opus 4.7 API Call (with markup)
 
-For 1,000 input tokens at $2.50/1M and 500 output tokens at $10.00/1M:
-- USD cost = (1,000/1,000,000 × $2.50) + (500/1,000,000 × $10.00) = $0.0025 + $0.005 = $0.0075
-- Platform credits = $0.0075 × 100 = 0.75 credits (rounded up to 1)
+For 1,000 input tokens at $15.00/1M and 500 output tokens at $75.00/1M:
+- Raw USD cost = (1,000/1,000,000 × $15.00) + (500/1,000,000 × $75.00) = $0.015 + $0.0375 = $0.0525
+- Billed USD = $0.0525 × 1.50 (markup) = $0.07875
+- Platform credits = $0.07875 × 100 = 7.875 credits (rounded up to **8**)
 
-### Example 2: Firecrawl Scrape
+### Example 2: Firecrawl Scrape (with markup)
 
 For 5 Firecrawl credits at an estimated $0.001 per credit:
-- USD cost = 5 × $0.001 = $0.005
-- Platform credits = $0.005 × 100 = 0.5 credits (rounded up to 1)
+- Raw USD cost = 5 × $0.001 = $0.005
+- Billed USD = $0.005 × 1.50 = $0.0075
+- Platform credits = $0.0075 × 100 = 0.75 credits (rounded up to **1**)
 
 ---
 
@@ -121,10 +135,25 @@ To see which models are consuming the most credits over the last 7 days, query `
 
 ## Configuration
 
-All pricing is centralized in `app/config/ai_pricing.py`:
-- Prices are stored as `Decimal` for precision
-- Each model includes `last_verified` date and `source` URL
-- Prices should be updated when providers change rates
+Pricing is split across two layers:
+
+| Layer | What it covers | Storage | How to update |
+|-------|----------------|---------|---------------|
+| **AI model + external service pricing** | Claude / OpenAI embeddings / Voyage / Qwen + Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
+| **MIVAA gateway action pricing** | RAG search, image analysis (flat per-action credits) | Hardcoded TypeScript in [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) | Manual — these are platform-internal action-level prices, not third-party costs |
+
+### Runtime behaviour
+The edge-function billing path ([`credit-utils.ts`](../supabase/functions/_shared/credit-utils.ts)) reads `ai_model_pricing` rows where `billing_type='per_unit'` AND `category='external_service'` at runtime, caches the result in memory for **5 minutes**, and falls back to a small embedded constant only if the DB query fails. Admin price edits propagate within 5 minutes (or immediately via `invalidatePricingCache()`).
+
+The Python mirror in [`ai_pricing.py`](../mivaa-pdf-extractor/app/config/ai_pricing.py) `EXTERNAL_SERVICE_PRICING` is a **fallback for standalone Python use only** — the DB row is canonical.
+
+### Per-model metadata
+Each row in `ai_model_pricing` carries:
+- `cost_per_unit` / `cost_per_generation` / `input_price_per_million` + `output_price_per_million` / `hourly_rate_usd` (depending on `billing_type`)
+- `unit_label` (per-unit rows only — e.g. `message`, `enrichment`, `image`, `second`)
+- `markup_multiplier` (default 1.50)
+- `source_url` and `last_verified_at`
+- `auto_update_enabled` flag and optional `auto_update_source_url`
 
 ## Credit Purchase Volume Discounts
 
@@ -143,5 +172,8 @@ Stripe setup: A single "Material KAI Credits" product (`STRIPE_CREDITS_PRODUCT_I
 
 ## Notes
 - Platform credits are always rounded up to nearest integer
-- Firecrawl pricing is estimated and should be adjusted based on actual plan
-- All costs are logged in both USD and platform credits for transparency
+- All billed amounts include the **50% platform markup** described above
+- Firecrawl pricing is an estimate ($0.001/credit) — adjust against the active plan if usage scales (editable from the admin UI)
+- External service pricing lives in `ai_model_pricing` and is editable from the admin UI; edits propagate to live billing within 5 minutes via the edge-function cache
+- MIVAA gateway action pricing (RAG search, image analysis) is hardcoded in `mivaa-pricing.ts` because these are platform-internal action-level credits, not third-party provider costs
+- All costs are logged in both raw USD, billed USD, markup multiplier, and platform credits for transparency (`ai_usage_logs`)

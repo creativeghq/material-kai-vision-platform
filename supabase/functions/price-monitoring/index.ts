@@ -101,7 +101,12 @@ async function startMonitoring(
   productId: string,
   settings?: any
 ) {
-  const frequency = settings?.frequency || 'weekly';
+  // Per-product monitoring is fixed at a 24h cadence — every enrolled product
+  // refreshes once per day measured from its last refresh. We previously
+  // exposed hourly/weekly options but those caused confusing behavior (hourly
+  // burns Firecrawl credits without much price-change signal; weekly is too
+  // stale to detect competitor moves). Daily is the only useful tradeoff.
+  const frequency = 'daily';
   const enabled = settings?.enabled !== false;
 
   // Get user's workspace
@@ -115,16 +120,10 @@ async function startMonitoring(
     throw new Error('User workspace not found');
   }
 
-  // Calculate next check time
-  let nextCheckAt = null;
-  if (frequency !== 'on_demand') {
-    const intervals = {
-      hourly: 1 * 60 * 60 * 1000,
-      daily: 24 * 60 * 60 * 1000,
-      weekly: 7 * 24 * 60 * 60 * 1000,
-    };
-    nextCheckAt = new Date(Date.now() + intervals[frequency]).toISOString();
-  }
+  // Next check = 24h from now. The hourly cron picks up any product whose
+  // next_check_at <= NOW() so a product added at 14:30 will refresh at 14:30
+  // the next day, not at a fixed clock time.
+  const nextCheckAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   // Insert or update monitoring record
   const { data, error } = await supabase

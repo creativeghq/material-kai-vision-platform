@@ -14,6 +14,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { checkCreditBalance } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -202,8 +203,8 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         api_provider: 'replicate',
         input_tokens: 0, output_tokens: 0,
         input_cost_usd: 0, output_cost_usd: 0,
-        raw_cost_usd: creditCost * 0.01 / 1.5,
-        markup_multiplier: 1.5,
+        raw_cost_usd: creditCost * 0.01 / MARKUP_MULTIPLIER,
+        markup_multiplier: MARKUP_MULTIPLIER,
         billed_cost_usd: creditCost * 0.01,
         total_cost_usd: creditCost * 0.01,
         credits_debited: creditCost,

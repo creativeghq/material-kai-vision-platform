@@ -47,7 +47,6 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
-  const [monitoringFrequency, setMonitoringFrequency] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   const { toast } = useToast();
 
   // Search products when query changes
@@ -119,13 +118,10 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
 
       if (!profile) throw new Error('Profile not found');
 
-      // Calculate next check time
-      const intervals = {
-        hourly: 1 * 60 * 60 * 1000,
-        daily: 24 * 60 * 60 * 1000,
-        weekly: 7 * 24 * 60 * 60 * 1000,
-      };
-      const nextCheckAt = new Date(Date.now() + intervals[monitoringFrequency]).toISOString();
+      // Single-tier 24h cadence: every monitored product refreshes once per
+      // day from its last check. The hourly cron picks up products whose
+      // 24h window has elapsed.
+      const nextCheckAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
       // Add product to monitoring
       const { error } = await supabase
@@ -135,7 +131,7 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
           user_id: user.user.id,
           workspace_id: profile.workspace_id,
           monitoring_enabled: true,
-          monitoring_frequency: monitoringFrequency,
+          monitoring_frequency: 'daily',
           next_check_at: nextCheckAt,
           status: 'active',
         }, {
@@ -146,7 +142,7 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
 
       toast({
         title: 'Success',
-        description: `Product added to monitoring with ${monitoringFrequency} frequency`,
+        description: 'Product added to monitoring — refreshes every 24h',
       });
 
       setIsOpen(false);
@@ -228,21 +224,13 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
             </div>
           )}
 
-          {/* Monitoring Frequency */}
+          {/* Refresh cadence — fixed 24h, surfaced for transparency. */}
           <div className="space-y-2">
-            <Label htmlFor="frequency">Monitoring Frequency</Label>
-            <Select value={monitoringFrequency} onValueChange={(value: any) => setMonitoringFrequency(value)}>
-              <SelectTrigger id="frequency">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hourly">Hourly (High frequency)</SelectItem>
-                <SelectItem value="daily">Daily (Recommended)</SelectItem>
-                <SelectItem value="weekly">Weekly (Low frequency)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Refresh cadence</Label>
+            <p className="text-sm">Every 24h, measured from the last refresh.</p>
             <p className="text-xs text-muted-foreground">
-              Higher frequencies consume more credits but provide more up-to-date pricing data
+              Products refresh once per day. The cron picks up each product whose
+              24h window has elapsed — added at 14:00 → refreshes at 14:00 the next day.
             </p>
           </div>
 

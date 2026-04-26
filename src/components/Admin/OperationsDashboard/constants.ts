@@ -1,6 +1,9 @@
 import type { ModelConfig } from './types';
 
-// Platform markup multiplier (50% markup for user billing)
+// Platform markup multiplier (50% markup for user billing).
+// MUST stay in sync with:
+//   - supabase/functions/_shared/pricing-constants.ts → MARKUP_MULTIPLIER
+//   - mivaa-pdf-extractor/app/config/ai_pricing.py → AIPricingConfig.MARKUP_MULTIPLIER
 export const MARKUP_MULTIPLIER = 1.50;
 
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {

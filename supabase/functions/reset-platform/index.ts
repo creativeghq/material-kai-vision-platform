@@ -136,8 +136,8 @@ const TABLES_TO_CLEAR = [
   'material_metadata_relevancy',   // Material metadata relevancy
 
   // ── PDF Processing & Chunking (derivative data) ─────────────────────
-  'job_checkpoints',               // Job checkpoints
-  'job_progress',                  // Job progress tracking
+  // job_checkpoints + job_progress dropped — history is now stored as
+  // JSONB arrays on background_jobs (stage_history, recovery_history).
   'ai_analysis_queue',             // AI analysis queue
   'image_processing_queue',        // Image processing queue
   'claude_validation_queue',       // Claude validation queue

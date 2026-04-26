@@ -160,7 +160,7 @@ export const creditsAPI = {
     outputTokens: number,
   ): { inputCost: number; outputCost: number; totalCost: number; credits: number } {
     // Model pricing per 1M tokens (in USD) - synced with ai_model_pricing DB table
-    // Last synced: 2026-02-15
+    // Last synced: 2026-04-24 (Claude/Voyage prices verified 2026-04-18/19 via Python AIPricingConfig)
     const pricing: Record<string, { input: number; output: number }> = {
       // Claude Models — canonical 3 latest-tier
       'claude-opus-4-7':            { input: 15.00, output: 75.00 },

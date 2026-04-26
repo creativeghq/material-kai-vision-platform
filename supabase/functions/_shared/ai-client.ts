@@ -39,6 +39,7 @@ import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 import { createKlingAI } from 'npm:@ai-sdk/klingai';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -51,7 +52,6 @@ const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
-const _MARKUP = 1.5;
 const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
   // Anthropic Claude
   'claude-opus-4-7':   { input: 15.00, output: 75.00 },

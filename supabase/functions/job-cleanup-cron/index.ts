@@ -8,13 +8,13 @@
  * - background_jobs         completed/failed > 5 days old
  * - scraping_sessions       completed/failed > 5 days old
  * - data_import_jobs        completed/failed, non-scheduled > 5 days old
- * - job_checkpoints         > 7 days old
+ * - job_checkpoints         (legacy, dropped — history now on background_jobs.stage_history)
  * - data_import_history     > 30 days old
  * - agent_checkpoints       > 30 days old  (conversation snapshots, not needed after)
  * - flow_run_steps          steps belonging to completed/failed runs > 30 days old
  * - flow_runs               completed/failed > 30 days old
  * - vr_worlds (failed)      status=failed > 7 days old
- * - job_progress            not updated > 7 days old  (stale progress records from completed/failed jobs)
+ * - job_progress            (legacy, dropped — progress events now on background_jobs.stage_history)
  * - system_logs             > 30 days old  (operational Python API logs, ~77k rows/day)
  * - ai_call_logs            > 30 days old  (per-call AI API debug logs, distinct from ai_usage_logs)
  * - search_query_tracking   > 90 days old  (search analytics)
@@ -126,18 +126,9 @@ serve(async (req) => {
       console.log(`[JobCleanupCron] data_import_jobs: ${stats.dataImportJobs} deleted`);
     }
 
-    // ── 4. job_checkpoints ──────────────────────────────────────────────────
-    {
-      const { data, error } = await supabase
-        .from('job_checkpoints')
-        .delete()
-        .lt('created_at', sevenDaysAgo)
-        .limit(1000)
-        .select('id');
-      if (error) console.error('[JobCleanupCron] job_checkpoints error:', error);
-      else stats.jobCheckpoints = data?.length ?? 0;
-      console.log(`[JobCleanupCron] job_checkpoints: ${stats.jobCheckpoints} deleted`);
-    }
+    // ── 4. job_checkpoints — table dropped, history now lives on
+    //       background_jobs.stage_history and disappears with the job row.
+    stats.jobCheckpoints = 0;
 
     // ── 5. data_import_history ──────────────────────────────────────────────
     {
@@ -265,21 +256,9 @@ serve(async (req) => {
       console.log(`[JobCleanupCron] generation_3d (unsaved >15d): ${stats.generation3d} deleted`);
     }
 
-    // ── 11. job_progress — stale progress records > 7 days ──────────────────
-    // Progress rows are only useful while the job runs. Once the parent job
-    // completes/fails (and is cleaned above), these become orphaned. Delete any
-    // record not updated in 7 days. Uses updated_at (no created_at column).
-    {
-      const { data, error } = await supabase
-        .from('job_progress')
-        .delete()
-        .lt('updated_at', sevenDaysAgo)
-        .limit(1000)
-        .select('id');
-      if (error) console.error('[JobCleanupCron] job_progress error:', error);
-      else stats.jobProgress = data?.length ?? 0;
-      console.log(`[JobCleanupCron] job_progress: ${stats.jobProgress} deleted`);
-    }
+    // ── 11. job_progress — table dropped (Phase 3c). Progress events now
+    //        live as JSONB array entries on background_jobs.stage_history.
+    stats.jobProgress = 0;
 
     // ── 12. system_logs — Python API operational logs > 30 days ─────────────
     // High-volume table (~77k rows/day). A dedicated daily pg_cron SQL job

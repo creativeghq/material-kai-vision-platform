@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles, FileText, Building2,
   Globe, Video, Layers, Cpu, Download, CreditCard, XCircle, UserPlus, CheckCircle,
+  Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +47,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   new_follower:           <UserPlus className="h-4 w-4 text-blue-500" />,
   payment_success:        <CreditCard className="h-4 w-4 text-green-500" />,
   payment_failed:         <CreditCard className="h-4 w-4 text-destructive" />,
+  changelog_published:    <Megaphone className="h-4 w-4 text-primary" />,
 };
 
 function timeAgo(iso: string) {
@@ -226,10 +228,13 @@ export const NotificationsPanel: React.FC = () => {
               </div>
             ) : (
               notifications.map((n) => (
-                <button
+                <div
                   key={n.id}
-                  className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-accent/50 transition-colors group ${!n.is_read ? 'bg-primary/5' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-accent/50 transition-colors group cursor-pointer ${!n.is_read ? 'bg-primary/5' : ''}`}
                   onClick={() => handleClick(n)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(n); } }}
                 >
                   {/* Icon */}
                   <div className="mt-0.5 shrink-0">
@@ -266,7 +271,7 @@ export const NotificationsPanel: React.FC = () => {
                   {!n.is_read && (
                     <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
                   )}
-                </button>
+                </div>
               ))
             )}
           </div>

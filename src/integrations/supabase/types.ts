@@ -1191,6 +1191,8 @@ export type Database = {
           parent_job_id: string | null
           progress: number | null
           recovery_attempts: number | null
+          recovery_history: Json
+          stage_history: Json
           started_at: string | null
           status: string
           total_ai_cost_usd: number | null
@@ -1217,6 +1219,8 @@ export type Database = {
           parent_job_id?: string | null
           progress?: number | null
           recovery_attempts?: number | null
+          recovery_history?: Json
+          stage_history?: Json
           started_at?: string | null
           status: string
           total_ai_cost_usd?: number | null
@@ -1243,6 +1247,8 @@ export type Database = {
           parent_job_id?: string | null
           progress?: number | null
           recovery_attempts?: number | null
+          recovery_history?: Json
+          stage_history?: Json
           started_at?: string | null
           status?: string
           total_ai_cost_usd?: number | null
@@ -4869,94 +4875,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      job_checkpoints: {
-        Row: {
-          checkpoint_data: Json
-          created_at: string | null
-          id: string
-          job_id: string
-          metadata: Json | null
-          product_id: string | null
-          product_index: number | null
-          product_name: string | null
-          stage: string
-        }
-        Insert: {
-          checkpoint_data?: Json
-          created_at?: string | null
-          id?: string
-          job_id: string
-          metadata?: Json | null
-          product_id?: string | null
-          product_index?: number | null
-          product_name?: string | null
-          stage: string
-        }
-        Update: {
-          checkpoint_data?: Json
-          created_at?: string | null
-          id?: string
-          job_id?: string
-          metadata?: Json | null
-          product_id?: string | null
-          product_index?: number | null
-          product_name?: string | null
-          stage?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_checkpoints_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "background_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      job_progress: {
-        Row: {
-          completed_items: number | null
-          current_item_id: string | null
-          document_id: string
-          id: string
-          metadata: Json | null
-          progress: number | null
-          stage: string
-          total_items: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          completed_items?: number | null
-          current_item_id?: string | null
-          document_id: string
-          id?: string
-          metadata?: Json | null
-          progress?: number | null
-          stage: string
-          total_items?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          completed_items?: number | null
-          current_item_id?: string | null
-          document_id?: string
-          id?: string
-          metadata?: Json | null
-          progress?: number | null
-          stage?: string
-          total_items?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_progress_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "processed_documents"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       jwt_tokens_log: {
         Row: {
@@ -12364,8 +12282,6 @@ export type Database = {
         }[]
       }
       cleanup_expired_similarity_cache: { Args: never; Returns: number }
-      cleanup_old_checkpoints: { Args: never; Returns: number }
-      cleanup_old_jobs: { Args: { p_days?: number }; Returns: number }
       cleanup_old_mivaa_api_logs: {
         Args: { days_to_keep?: number }
         Returns: number
@@ -12431,18 +12347,6 @@ export type Database = {
         }[]
       }
       deduct_generation_credits: { Args: { p_job_id: string }; Returns: Json }
-      detect_stuck_jobs: {
-        Args: { p_timeout_minutes?: number }
-        Returns: {
-          filename: string
-          job_id: string
-          last_checkpoint_stage: string
-          progress: number
-          status: string
-          stuck_duration_minutes: number
-          updated_at: string
-        }[]
-      }
       embedding_performance_stats: {
         Args: never
         Returns: {
@@ -12620,7 +12524,6 @@ export type Database = {
           status: string
         }[]
       }
-      get_job_with_checkpoints: { Args: { p_job_id: string }; Returns: Json }
       get_latest_price: {
         Args: { p_product_id: string; p_source_name: string }
         Returns: {

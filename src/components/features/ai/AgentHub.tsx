@@ -33,6 +33,7 @@ import {
   ListChecks,
   GripVertical,
   Pencil,
+  Wrench,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -70,6 +71,7 @@ import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import SEOArticleViewer from './SEOArticleViewer';
 import { InspirationUrlModal } from './InspirationUrlModal';
 import { StarterPromptsModal } from './StarterPromptsModal';
+import { ToolPickerModal } from './ToolPickerModal';
 import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { SearchSpecCard } from './SearchSpecCard';
@@ -359,6 +361,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [showInspirationModal, setShowInspirationModal] = useState(false);
   const [showStarterPrompts, setShowStarterPrompts] = useState(false);
+  const [showToolPicker, setShowToolPicker] = useState(false);
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const { isAdmin } = useUserRole();
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
@@ -1179,11 +1183,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           agentId: selectedAgent,
           model: selectedModel,
           images: resolvedImageUrls,
-          conversation_id: currentConversationId,
+          // Use the local `conversationId` (already includes a freshly-created id),
+          // not the React state `currentConversationId` — state updates from
+          // setCurrentConversationId above haven't committed yet on the first
+          // message, so reading state would send null and tool-call logs would
+          // land with conversation_id=null ("no conversation id" in the admin).
+          conversation_id: conversationId,
           ...(selectedGenerationMode ? { generation_mode: selectedGenerationMode } : {}),
           ...(pinnedMaterials.length > 0 && selectedAgent === 'interior-designer'
             ? { pinned_material_images: pinnedMaterials.filter(m => m.imageUrl).map(m => m.imageUrl!) }
             : {}),
+          ...(selectedTools.length > 0 ? { selected_tools: selectedTools } : {}),
         };
 
         // REMOVED: PDF data attachment - PDF processing moved to /admin/data-import page
@@ -1387,6 +1397,42 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 // Don't add a message here — it will be merged into the final assistant message
                 // so the agent's explanation text and the image appear in a single bubble.
+              // Handle vr_world_ready — agent-triggered VR world generation
+              } else if (chunk.type === 'vr_world_ready') {
+                const vrMsg: Message = {
+                  id: `msg-vr-${Date.now()}`,
+                  role: 'assistant',
+                  content: 'Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  worldData: {
+                    vrWorldId: chunk.vr_world_id,
+                    status: (chunk.status as 'pending' | 'uploading' | 'generating' | 'completed' | 'failed') || 'completed',
+                    splatUrl100k: chunk.splat_url_100k,
+                    splatUrl500k: chunk.splat_url_500k,
+                    splatUrlFull: chunk.splat_url_full,
+                    colliderGlbUrl: chunk.collider_glb_url,
+                    caption: chunk.caption,
+                    sourceImageUrl: chunk.source_image_url,
+                    prompt: chunk.prompt,
+                  },
+                };
+                setMessages(prev => [...prev, vrMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: vrMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, worldData: vrMsg.worldData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: vrMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
               // Handle virtual_staging_ready — virtual staging result
               } else if (chunk.type === 'virtual_staging_ready') {
                 const stagingMsg: Message = {
@@ -3076,6 +3122,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </TooltipTrigger>
                     <TooltipContent side="left"><p>Starter prompts</p></TooltipContent>
                   </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setShowToolPicker(true)}
+                        className={cn(
+                          'p-1.5 rounded-lg transition-colors relative',
+                          selectedTools.length > 0
+                            ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                        )}
+                      >
+                        <Wrench className="h-4 w-4" />
+                        {selectedTools.length > 0 && (
+                          <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center">
+                            {selectedTools.length}
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>
+                        {selectedTools.length > 0
+                          ? `${selectedTools.length} tool${selectedTools.length === 1 ? '' : 's'} selected`
+                          : 'Select tools'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* Textarea — resizable */}
@@ -3140,6 +3214,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             }
             setVirtualStagingImageUrl(imageUrl || '');
           }}
+        />
+      )}
+
+      {/* Tool Picker Modal — multi-select per-message tool filter */}
+      {showToolPicker && (
+        <ToolPickerModal
+          agentId={selectedAgent}
+          isAdmin={isAdmin}
+          selectedTools={selectedTools}
+          onChange={setSelectedTools}
+          onClose={() => setShowToolPicker(false)}
         />
       )}
 

@@ -29,16 +29,22 @@ import {
   ShoppingBag,
   ShoppingCart,
   BadgeCheck,
+  ThumbsDown,
+  Check,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { isAdmin as isAdminRole } from '@/auth/roles';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import { PriceAlertPreferences } from './PriceAlertPreferences';
 import {
   discoverRetailers,
   startMonitoring,
   stopMonitoring,
+  submitClassifierCorrection,
   type PerplexityHit,
   type DiscoverResponse,
 } from '@/services/priceMonitoringApi';
@@ -93,6 +99,13 @@ interface CompetitorSource {
   match_kind?: 'exact' | 'variant' | 'unverifiable' | null;
   match_score?: number | null;
   match_note?: string | null;
+  /** Sanity-band fields. is_anomaly=true means the latest reading was rejected and current_price wasn't overwritten. */
+  is_anomaly?: boolean | null;
+  anomaly_reason?: string | null;
+  rolling_median_at_check?: number | null;
+  manual_override?: boolean | null;
+  /** Latest price_history row's rejected reading — surfaced for the "Trust this reading" override flow. */
+  pending_reading_price?: number | null;
 }
 
 export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
@@ -115,6 +128,8 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [summary, setSummary] = useState<string | null>(null);
   const [throttleUntil, setThrottleUntil] = useState<string | null>(null);
   const [lastSearchAt, setLastSearchAt] = useState<string | null>(null);
+  const [nextCheckAt, setNextCheckAt] = useState<string | null>(null);
+  const [monitoringFrequency, setMonitoringFrequency] = useState<string | null>(null);
   const [verifyPrices, setVerifyPrices] = useState<boolean>(true);
 
   // ─── Data loading ────────────────────────────────────────────────────────
@@ -146,13 +161,18 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
 
       const { data: monitoring } = await supabase
         .from('price_monitoring_products')
-        .select('monitoring_enabled, status, last_claude_search_at')
+        .select('monitoring_enabled, status, last_claude_search_at, next_check_at, monitoring_frequency')
         .eq('product_id', productId)
         .maybeSingle();
 
       if (monitoring) {
         setMonitoringEnabled(monitoring.monitoring_enabled ?? false);
         setLastSearchAt(monitoring.last_claude_search_at ?? null);
+        setNextCheckAt(monitoring.next_check_at ?? null);
+        setMonitoringFrequency(monitoring.monitoring_frequency ?? null);
+      } else {
+        setNextCheckAt(null);
+        setMonitoringFrequency(null);
       }
 
       const { data: rows } = await supabase
@@ -331,6 +351,16 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                     ? `Retailers last discovered ${timeAgo(lastSearchAt)}`
                     : 'Enable to discover retailers and track prices'}
                 </p>
+                {monitoringEnabled && nextCheckAt && (
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Next automated refresh{' '}
+                    {new Date(nextCheckAt) <= new Date()
+                      ? 'on the next cron tick (within the hour)'
+                      : timeAgo(nextCheckAt)}
+                    {monitoringFrequency ? ` · ${monitoringFrequency}` : ''}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -389,6 +419,9 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <PriceHistoryChart productId={productId} productName={productName} timeRange="30d" />
       )}
 
+      {/* ─── Notification preferences (module-gated) ─── */}
+      {monitoringEnabled && <PriceAlertPreferences productId={productId} />}
+
       {/* ─── Discovered retailers (Perplexity) ─── */}
       {monitoringEnabled && (
         <Card className="dashboard-card">
@@ -422,7 +455,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 No retailers discovered yet. {isAdmin && 'Click Refresh now above to try.'}
               </div>
             )}
-            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} />}
+            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />}
           </CardContent>
         </Card>
       )}
@@ -443,7 +476,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} />
+            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
           </CardContent>
         </Card>
       )}
@@ -466,7 +499,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} />
+            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
           </CardContent>
         </Card>
       )}
@@ -493,7 +526,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 missed a retailer you know sells this product.
               </p>
             ) : (
-              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} />
+              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
             )}
           </CardContent>
         </Card>
@@ -511,23 +544,90 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
 
 // ─── RetailerTable subcomponent ──────────────────────────────────────────────
 
+/**
+ * Per-row admin actions:
+ *   - Thumb-down: posts to /api/v1/price-monitoring/classifier-correction so
+ *     the next classifier run pulls this row in as a few-shot example.
+ *   - "Trust this reading": flips manual_override=true on the latest
+ *     anomaly-flagged price_history row + back-fills competitor_sources.current_price
+ *     with the rejected reading, opting into the new value as truth.
+ *   - "Dismiss reading": leaves the row anomaly-flagged but acknowledges it
+ *     so the yellow banner goes away.
+ */
+const correctClassifier = async (sourceId: string, kind: string, note?: string) => {
+  await submitClassifierCorrection({
+    competitorSourceId: sourceId,
+    correctedMatchKind: kind as 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop',
+    correctionNote: note,
+  });
+};
+
+const trustAnomalyReading = async (productId: string, sourceUrl: string, productPrice: number) => {
+  // Flip manual_override on the most recent anomaly row + push the price
+  // back into competitor_sources.current_price.
+  const { error: histErr } = await supabase
+    .from('price_history')
+    .update({ manual_override: true })
+    .eq('product_id', productId)
+    .eq('source_url', sourceUrl)
+    .eq('is_anomaly', true)
+    .order('scraped_at', { ascending: false })
+    .limit(1);
+  if (histErr) throw histErr;
+  const { error: csErr } = await supabase
+    .from('competitor_sources')
+    .update({ current_price: productPrice, current_price_updated_at: new Date().toISOString() })
+    .eq('product_id', productId)
+    .eq('source_url', sourceUrl);
+  if (csErr) throw csErr;
+};
+
+const dismissAnomalyReading = async (productId: string, sourceUrl: string) => {
+  // We don't delete the row; just clear is_anomaly so the banner disappears
+  // and the median sees the data on the next refresh.
+  await supabase
+    .from('price_history')
+    .update({ is_anomaly: false, manual_override: false })
+    .eq('product_id', productId)
+    .eq('source_url', sourceUrl)
+    .eq('is_anomaly', true);
+};
+
 const RetailerTable: React.FC<{
   rows: CompetitorSource[];
   currentPrice?: number;
   priceDiff: (p: number | null) => number | null;
-}> = ({ rows, priceDiff }) => (
+  isAdmin: boolean;
+  productId: string;
+  onChange?: () => void;
+}> = ({ rows, priceDiff, isAdmin, productId, onChange }) => (
   <div className="divide-y">
     {rows.map((r) => {
       const diff = priceDiff(r.current_price);
       const currSym = r.current_currency === 'EUR' ? '€' : r.current_currency === 'GBP' ? '£' : '$';
       const stale = r.last_seen_at && Date.now() - new Date(r.last_seen_at).getTime() > 1000 * 60 * 60 * 24 * 7;
       const meta = r.current_metadata ?? {};
-      const discrepancy = typeof meta.notes === 'string' && meta.notes.includes('verify:') ? meta.notes : null;
+      const notesStr = typeof meta.notes === 'string' ? meta.notes : null;
+      const discrepancy = notesStr && notesStr.includes('verify:') ? notesStr : null;
+      const viaMarketplace = notesStr?.match(/via (Skroutz|Bestprice|Shopflix|Google Shopping)/i)?.[1] ?? null;
       const thumb = typeof meta.image_url === 'string' ? meta.image_url : null;
       const rating = typeof meta.rating_value === 'number' ? meta.rating_value : null;
       const ratingVotes = typeof meta.rating_votes === 'number' ? meta.rating_votes : null;
+      let favicon: string | null = null;
+      try {
+        favicon = `https://www.google.com/s2/favicons?domain=${new URL(r.source_url).hostname}&sz=64`;
+      } catch {
+        favicon = null;
+      }
+      const isAnomaly = Boolean(r.is_anomaly);
+      const rowClasses = [
+        'flex items-start justify-between px-6 py-3 gap-3',
+        stale ? 'opacity-60' : '',
+        isAnomaly ? 'bg-amber-500/5 border-l-4 border-amber-400 -ml-1 pl-5' : '',
+      ].filter(Boolean).join(' ');
+
       return (
-        <div key={r.id} className={`flex items-center justify-between px-6 py-3 gap-3 ${stale ? 'opacity-60' : ''}`}>
+        <div key={r.id} className={rowClasses}>
           {thumb && (
             <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
               <img
@@ -547,9 +647,21 @@ const RetailerTable: React.FC<{
                 href={r.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-sm hover:underline truncate"
+                className="font-medium text-sm hover:underline truncate flex items-center gap-1.5"
               >
-                {r.source_name}
+                {favicon && (
+                  <img
+                    src={favicon}
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="h-4 w-4 rounded-sm shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <span className="truncate">{r.source_name}</span>
               </a>
               {r.current_price_verified && (
                 <Badge
@@ -592,6 +704,15 @@ const RetailerTable: React.FC<{
                   Corrected
                 </Badge>
               )}
+              {viaMarketplace && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-blue-400 text-blue-700"
+                  title={`Discovered through ${viaMarketplace}`}
+                >
+                  via {viaMarketplace}
+                </Badge>
+              )}
               {rating !== null && (
                 <span
                   className="text-[11px] text-muted-foreground flex items-center gap-0.5"
@@ -627,6 +748,63 @@ const RetailerTable: React.FC<{
                 {meta.product_title}
               </div>
             )}
+            {isAnomaly && (
+              <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-400/40 px-3 py-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-700 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-amber-900">Anomalous reading flagged</p>
+                    {r.anomaly_reason && (
+                      <p className="text-amber-800/80 mt-0.5">{r.anomaly_reason}</p>
+                    )}
+                    {r.rolling_median_at_check != null && (
+                      <p className="text-amber-800/70 mt-0.5">
+                        7-day median: {currSym}{Number(r.rolling_median_at_check).toFixed(2)}
+                        {r.pending_reading_price != null && (
+                          <> · rejected reading: {currSym}{Number(r.pending_reading_price).toFixed(2)}</>
+                        )}
+                      </p>
+                    )}
+                    {isAdmin && (
+                      <div className="flex gap-2 mt-2">
+                        {r.pending_reading_price != null && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px] gap-1 border-amber-500 text-amber-900"
+                            onClick={async () => {
+                              try {
+                                await trustAnomalyReading(productId, r.source_url, r.pending_reading_price!);
+                                onChange?.();
+                              } catch (e) {
+                                console.error('Trust reading failed', e);
+                              }
+                            }}
+                          >
+                            <Check className="h-3 w-3" /> Trust this reading
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-[11px] gap-1 text-amber-800"
+                          onClick={async () => {
+                            try {
+                              await dismissAnomalyReading(productId, r.source_url);
+                              onChange?.();
+                            } catch (e) {
+                              console.error('Dismiss reading failed', e);
+                            }
+                          }}
+                        >
+                          <X className="h-3 w-3" /> Dismiss
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <a
               href={r.source_url}
               target="_blank"
@@ -637,7 +815,31 @@ const RetailerTable: React.FC<{
               <ExternalLink className="h-3 w-3 shrink-0" />
             </a>
           </div>
-          <div className="text-right shrink-0 ml-4">
+          <div className="text-right shrink-0 ml-4 flex flex-col items-end gap-1">
+            {isAdmin && r.match_kind && r.match_kind !== 'unverifiable' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-destructive"
+                title="Mark this match as wrong — feeds into classifier as a correction example."
+                onClick={async () => {
+                  const note = window.prompt(
+                    `Why is this row classified incorrectly?\n\nCurrent: ${r.match_kind}\nProduct: ${meta.product_title || r.source_name}`,
+                    '',
+                  );
+                  if (note === null) return;
+                  try {
+                    await correctClassifier(r.id, 'should_drop', note || undefined);
+                    onChange?.();
+                  } catch (e) {
+                    console.error('Correction failed', e);
+                  }
+                }}
+              >
+                <ThumbsDown className="h-3 w-3" />
+                Wrong match
+              </Button>
+            )}
             {r.current_price != null ? (
               <>
                 <div className="flex items-baseline justify-end gap-2">

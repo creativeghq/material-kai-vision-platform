@@ -172,7 +172,14 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
 const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
   const sym = CURRENCY_SYMBOL[hit.currency ?? ''] ?? '';
   const discrepancy = hit.notes && hit.notes.includes('verify:') ? hit.notes : null;
+  const viaMarketplace = hit.notes?.match(/via (Skroutz|Bestprice|Shopflix|Google Shopping)/i)?.[1] ?? null;
   const rowDimmed = hit.match_kind === 'variant' || hit.match_kind === 'unverifiable';
+  let favicon: string | null = null;
+  try {
+    favicon = `https://www.google.com/s2/favicons?domain=${new URL(hit.product_url).hostname}&sz=64`;
+  } catch {
+    favicon = null;
+  }
   return (
     <div className={`flex items-center gap-2 px-3 py-2 text-xs ${rowDimmed ? 'opacity-75' : ''}`}>
       {hit.image_url && (
@@ -202,10 +209,30 @@ const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
             href={hit.product_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium hover:underline truncate"
+            className="font-medium hover:underline truncate flex items-center gap-1"
           >
-            {hit.retailer_name}
+            {favicon && (
+              <img
+                src={favicon}
+                alt=""
+                width={14}
+                height={14}
+                className="h-3.5 w-3.5 rounded-sm shrink-0"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
+            <span className="truncate">{hit.retailer_name}</span>
           </a>
+          {viaMarketplace && (
+            <span
+              className="text-[9px] px-1 rounded border border-blue-400 text-blue-500"
+              title={`Discovered through ${viaMarketplace}`}
+            >
+              via {viaMarketplace}
+            </span>
+          )}
           {hit.verified && (
             <span
               className="inline-flex items-center text-emerald-500"

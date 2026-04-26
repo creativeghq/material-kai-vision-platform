@@ -108,9 +108,7 @@ export const create3DGenerationTool = (
               room_type: roomType,
               style,
               image: resolvedImageUrl, // triggers image-to-image mode when set
-              // Exclude gemini-interior: generate_gemini handles Gemini separately to avoid duplication
               models: models || undefined,
-              exclude_models: ['gemini-interior'],
               user_id: userId,
               workspace_id: workspaceId,
               width: 768,
@@ -171,8 +169,8 @@ export const create3DGenerationTool = (
     },
     {
       name: 'generate_3d',
-      description: `Generate multiple interior design style variations in parallel using Replicate AI models. Results appear progressively in the generation panel grid.
-Call generate_gemini alongside this tool ONLY for free-form text-to-image requests. Do NOT call both tools when editing an existing image.
+      description: `Generate multiple interior design style variations in parallel using Replicate AI models + Gemini. Results appear progressively in the generation panel grid.
+The grid already includes a Gemini tile, so do NOT also call generate_gemini for the same request — that would double-bill the user.
 
 Good for:
 - Text-to-image: user describes a room from scratch with no uploaded image
@@ -181,7 +179,8 @@ Good for:
 Do NOT call this tool when:
 - A chip mode was explicitly selected (floor-plan-render, image-edit, floor-plan-text) — those are Gemini-only precise operations. This is enforced server-side; do not call generate_3d in those cases.
 - Iterative edits on a previously generated image — use generate_gemini alone.
-- Floor plan requests — use generate_gemini alone with mode=floor-plan-text.`,
+- Floor plan requests — use generate_gemini alone with mode=floor-plan-text.
+- Materials selection board — use generate_gemini alone with mode=materials-selection-board.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
@@ -524,8 +523,7 @@ PARAMETER EXTRACTION — always do this before calling:
 2. Extract style from user message (modern, scandinavian, minimalist, industrial, japandi, luxury, etc.)
 3. Set prompt to the user's full design description or edit instruction verbatim
 
-WHEN TO CALL ALONGSIDE generate_3d:
-- Pure text-to-image (no uploaded images) → call BOTH for variations + immediate result.
+DO NOT call alongside generate_3d — the variations grid already includes a Gemini tile, and double-calling will double-bill.
 
 WHEN TO call this tool ALONE — do NOT call generate_3d in any of these cases:
 - User has uploaded one or more images — call generate_gemini ONLY
@@ -733,6 +731,253 @@ export const createGenerationStatusTool = () => {
       schema: z.object({
         jobId: z.string().describe('The generation job ID (UUID) to check status for')
       })
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Apply Lighting Preset
+ *
+ * Re-renders the same room under a different lighting preset via Gemini image-edit.
+ * Mirrors the 6 preset options exposed in ProgressiveImageGrid's "Lighting Variants"
+ * dropdown so chat-driven and click-driven flows produce identical results.
+ */
+export const createApplyLightingPresetTool = (
+  userId: string,
+  workspaceId: string,
+  conversationImages: string[],
+  onChunk?: (chunk: any) => void,
+) => {
+  const PRESET_PROMPTS: Record<string, string> = {
+    golden_hour:    'golden hour — warm amber sunlight at a low angle, long soft shadows, cosy',
+    bright_midday:  'bright midday daylight — crisp, even natural light, no harsh shadows',
+    soft_overcast:  'soft overcast daylight — diffused natural light, calm serene mood',
+    warm_evening:   'warm evening ambiance — soft warm artificial lighting, cosy glow, no daylight',
+    night:          'night time interior — dark outside, warm interior lights on, atmospheric',
+    dramatic_spots: 'dramatic spotlight / accent lighting — targeted beams on key surfaces',
+  };
+
+  return tool(
+    async ({ sourceImageUrl, preset }) => {
+      try {
+        const resolvedImageUrl = sourceImageUrl || conversationImages[conversationImages.length - 1];
+        if (!resolvedImageUrl) {
+          return JSON.stringify({
+            success: false,
+            error: 'No image available. Generate or upload a room photo first, then ask for a lighting variant.',
+          });
+        }
+
+        const presetPrompt = PRESET_PROMPTS[preset];
+        if (!presetPrompt) {
+          return JSON.stringify({ success: false, error: `Unknown preset: ${preset}` });
+        }
+
+        const editInstruction =
+          `Change the lighting to: ${presetPrompt}. Keep all furniture positions, fixtures, walls, ` +
+          `windows, doors, and architecture exactly where they are. Only modify the lighting and shadows. ` +
+          `Photorealistic result. 24mm architectural lens, corrected verticals, no fisheye.`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300_000);
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/functions/v1/generate-interior-gemini`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              workspace_id: workspaceId,
+              mode: 'image-edit',
+              prompt: editInstruction,
+              edit_instruction: editInstruction,
+              reference_image_url: resolvedImageUrl,
+              model_tier: 'fast',
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          throw new Error(errBody?.error || `Lighting variant error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Lighting variant failed');
+
+        // Reuse the existing gemini_image_ready chunk so the frontend renders this
+        // exactly like any other Gemini image-edit result (no new card needed).
+        onChunk?.({
+          type: 'gemini_image_ready',
+          job_id: result.job_id,
+          image_url: result.image_url,
+          mode: 'image-edit',
+          model: result.model,
+          credits_used: result.credits_used,
+        });
+
+        return JSON.stringify({
+          success: true,
+          job_id: result.job_id,
+          image_url: result.image_url,
+          preset,
+          credits_used: result.credits_used,
+          message: `Re-lit the room with the "${preset.replace(/_/g, ' ')}" preset. ${result.credits_used} credits used.`,
+        });
+      } catch (error) {
+        console.error('Lighting preset error:', error);
+        const isAbort = error instanceof Error && error.name === 'AbortError';
+        return JSON.stringify({
+          success: false,
+          error: isAbort
+            ? 'Lighting variant timed out after 300s. Please retry.'
+            : error instanceof Error ? error.message : 'Lighting variant failed',
+        });
+      }
+    },
+    {
+      name: 'apply_lighting_preset',
+      description: `Re-render the same room under a different lighting condition without changing furniture, walls, or layout. Use this when the user asks things like:
+- "show this room at night" / "golden hour" / "sunset" / "bright daylight"
+- "make it warmer / dimmer / brighter"
+- "what does it look like at evening / overcast / with spotlights"
+
+Picks one of 6 presets (golden_hour, bright_midday, soft_overcast, warm_evening, night, dramatic_spots).
+Requires an existing room image — uses the most recent conversation image if no URL is given. ~6 credits.`,
+      schema: z.object({
+        preset: z.enum(['golden_hour', 'bright_midday', 'soft_overcast', 'warm_evening', 'night', 'dramatic_spots'])
+          .describe('Lighting preset. Map natural language: sunset/sunrise→golden_hour, daylight/noon→bright_midday, cloudy/diffused→soft_overcast, evening/lamps/cosy→warm_evening, night/moonlit→night, showroom/dramatic/accent→dramatic_spots.'),
+        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated/uploaded image.'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Generate VR World
+ *
+ * Wraps the generate-vr-world edge function (WorldLabs Marble API) so the agent can
+ * turn a generated/uploaded room image into an explorable 3D Gaussian Splat world.
+ * Emits a vr_world_ready chunk that AgentHub renders via WorldViewer.
+ */
+export const createGenerateVRWorldTool = (
+  userId: string,
+  workspaceId: string,
+  conversationImages: string[],
+  onChunk?: (chunk: any) => void,
+) => {
+  // Mirror CREDIT_COSTS in generate-vr-world/index.ts
+  const VR_CREDIT_COSTS: Record<string, number> = {
+    'marble-1.0-draft': 18,
+    'marble-1.1': 190,
+  };
+
+  return tool(
+    async ({ sourceImageUrl, prompt, roomType, style, model }) => {
+      try {
+        const resolvedImageUrl = sourceImageUrl || conversationImages[conversationImages.length - 1];
+        if (!resolvedImageUrl) {
+          return JSON.stringify({
+            success: false,
+            error: 'No image available. Generate or upload a room photo first, then ask to explore it in VR.',
+          });
+        }
+
+        const resolvedPrompt = prompt || `Interior design: ${roomType || 'room'} in ${style || 'modern'} style`;
+        const resolvedModel = model || 'marble-1.0-draft';
+        const creditsUsed = VR_CREDIT_COSTS[resolvedModel] ?? VR_CREDIT_COSTS['marble-1.0-draft'];
+
+        // marble-1.1 takes ~5min — bump timeout accordingly
+        const timeoutMs = resolvedModel === 'marble-1.1' ? 480_000 : 240_000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/functions/v1/generate-vr-world`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              source_image_url: resolvedImageUrl,
+              prompt: resolvedPrompt,
+              room_type: roomType,
+              style,
+              model: resolvedModel,
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          throw new Error(errBody?.error || `VR world error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (!result.success || !result.data) throw new Error(result.error || 'VR world generation failed');
+
+        const world = result.data;
+        onChunk?.({
+          type: 'vr_world_ready',
+          vr_world_id: world.id,
+          status: world.status || 'completed',
+          splat_url_100k: world.splat_url_100k,
+          splat_url_500k: world.splat_url_500k,
+          splat_url_full: world.splat_url_full,
+          collider_glb_url: world.collider_glb_url,
+          caption: world.caption,
+          source_image_url: resolvedImageUrl,
+          prompt: resolvedPrompt,
+          credits_used: creditsUsed,
+          model: resolvedModel,
+        });
+
+        return JSON.stringify({
+          success: true,
+          vr_world_id: world.id,
+          model: resolvedModel,
+          credits_used: creditsUsed,
+          message: `Your VR world is ready. ${creditsUsed} credits used. Open the WorldViewer to walk through it.`,
+        });
+      } catch (error) {
+        console.error('VR world generation error:', error);
+        const isAbort = error instanceof Error && error.name === 'AbortError';
+        return JSON.stringify({
+          success: false,
+          error: isAbort
+            ? 'VR world generation timed out. Marble-1.1 can take 5+ minutes — please retry.'
+            : error instanceof Error ? error.message : 'VR world generation failed',
+        });
+      }
+    },
+    {
+      name: 'generate_vr_world',
+      description: `Turn a room image into an explorable 3D VR world (Gaussian Splat) the user can walk through. Use this when the user asks to:
+- "explore this in VR" / "walk through it" / "see it in 3D"
+- "make this into a VR world" / "turn this room into something I can navigate"
+
+Requires an existing room image — uses the most recent conversation image if no URL is given.
+Models: marble-1.0-draft (~30-45s, 18 credits, default for quick previews) or marble-1.1 (~5min, 190 credits, higher quality).`,
+      schema: z.object({
+        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated/uploaded image.'),
+        prompt: z.string().optional().describe('Optional caption for the world (e.g. "Modern Scandinavian living room"). Auto-derived from roomType+style if omitted.'),
+        roomType: z.string().optional().describe('Room type for caption (bedroom, living_room, kitchen, etc.)'),
+        style: z.string().optional().describe('Design style for caption (modern, scandinavian, etc.)'),
+        model: z.enum(['marble-1.0-draft', 'marble-1.1']).optional().describe('Model. marble-1.0-draft (default, fast, 18cr) or marble-1.1 (slow but higher quality, 190cr). Use 1.1 only when the user explicitly asks for "high quality" or "final" VR.'),
+      }),
     }
   );
 };

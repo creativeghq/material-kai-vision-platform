@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import { getToolPrompt } from './prompt-utils.ts';
+import { MARKUP_MULTIPLIER } from './pricing-constants.ts';
 
 /**
  * Shared MIVAA Embedding Utilities for Supabase Functions
@@ -124,7 +125,7 @@ async function _logEmbeddingUsage(
     const estimatedTokens = Math.ceil(text.length / 4);
     const costPer1M = 0.06; // voyage-4 (same price as voyage-3.5)
     const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
-    const billedCost = rawCost * 1.5; // platform markup
+    const billedCost = rawCost * MARKUP_MULTIPLIER;
 
     await supabase.from('ai_usage_logs').insert({
       operation_type: operationType,
@@ -135,7 +136,7 @@ async function _logEmbeddingUsage(
       output_cost_usd: 0,
       total_cost_usd: rawCost,
       raw_cost_usd: rawCost,
-      markup_multiplier: 1.5,
+      markup_multiplier: MARKUP_MULTIPLIER,
       billed_cost_usd: billedCost,
       job_id: jobId || null,
       metadata: { latency_ms: latencyMs, source: 'edge_function' },
