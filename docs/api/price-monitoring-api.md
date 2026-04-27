@@ -164,7 +164,7 @@ Each entry in `results` now carries the verification + promo fields:
 | `last_verified` | string (ISO date) | Date Firecrawl confirmed the price. `null` when `verified: false`. |
 | `image_url`, `rating_value`, `rating_votes` | (DataForSEO only) | Thumbnail + merchant star rating from the Google Shopping feed. |
 | `product_title` | string \| null | Exact product name on the retailer's page. Use as a subtitle to disambiguate multiple rows from the same retailer selling different variants. |
-| `match_kind` | `"exact" \| "variant" \| "unverifiable" \| null` | Product-identity verdict. `exact` = page confirmed to match the asked product. `variant` = same model but different color/finish/size (kept with a note, excluded from stats). `unverifiable` = identity couldn't be judged from the page (kept, grey badge recommended). `mismatch` and `family` are dropped server-side, so you'll never see them. `null` only on rows created before 2026-04-25. |
+| `match_kind` | `"exact" \| "variant" \| "family" \| "unverifiable" \| null` | Product-identity verdict. `exact` = page confirmed to match the asked product. `variant` = same model, different color/finish/size (kept with a note, excluded from stats). `family` = **same brand+series, different SKU** (kept since 2026-04-27 — render under "Similar products in this series", do **not** include in chart/median/alerts). `unverifiable` = identity couldn't be judged from the page (kept, grey badge recommended). `mismatch` is dropped server-side, you'll never see it. `null` only on rows created before 2026-04-25. |
 | `match_score` | int 0-100 \| null | Classifier confidence. 90+ exact, 70-89 variant, <50 mismatch. |
 | `match_note` | string \| null | Human-readable facet diff, e.g. `"Color differs: asked BLACK MATT, page shows WHITE MATT"`. `null` for exact matches. |
 
@@ -613,6 +613,66 @@ sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.servi
 ---
 
 ## Changelog
+
+<details>
+<summary><b>2026-04-27 (v5)</b> — <b>Family-kept policy + Greek marketplaces (Skroutz / Bestprice / Shopflix) + manual promotion + cost overhaul.</b> Click to expand.</summary>
+
+#### What's new
+
+- **`match_kind` enum extended.** Was `"exact" | "variant" | "unverifiable" | null`. Now also includes `"family"`. Same-brand-and-series rows where the SKU differs are no longer dropped — they come back to you as `family` so you can render them under a *Similar products in this series* section. They're inert downstream (excluded from price-drop / new-retailer / promo / anomaly alerts and from rolling-median stats).
+- **Three new `source` values.** `tracked_query_price_history.source` (and `competitor_sources.source_type`) can now be `"marketplace_skroutz"`, `"marketplace_bestprice"`, `"marketplace_shopflix"` in addition to `"perplexity_web_search"` and `"dataforseo_shopping"`. Rows from these sources are first-party retailer data (post-fanout from the marketplace's product page).
+- **Idealo source value.** `competitor_source_type` enum gained `"idealo"` for DACH/IT/UK/ES/FR refreshes. Module is opt-in per workspace.
+- **Manual promotion endpoints (admin-only, session JWT).**
+  - `POST /api/v1/price-monitoring/promote-family-row` — flip a row's `match_kind` from `family`/`mismatch`/`unverifiable` to `exact` or `variant`. Sticky: every future refresh of the same URL keeps the override until you demote it. Body: `{competitor_source_id?, tracked_query_history_id?, override_kind: "exact"|"variant", reason?}`.
+  - `POST /api/v1/price-monitoring/demote-to-family` — undo a prior promotion.
+  - Both endpoints write to `match_corrections`, so the few-shot classifier loop learns from the correction globally.
+- **API response split (recommended).** New `latest_results_split()` returns `{ "results": [...], "family_results": [...] }` instead of one mixed array. Existing `latest_results()` still works for back-compat (family rows interleaved by price). UI consumers should prefer the split form. Same approach is recommended on your side: render the `family_results` section collapsed by default, no chart contribution.
+- **Source-label fix.** Before this release, every non-DataForSEO hit was forced to `"perplexity_web_search"` on persist — marketplace hits were invisible by source filter. Now `source` reflects the real adapter that produced the row. **Backwards-compatible**: rows persisted before today still have the old label; new rows have the correct one.
+- **Cost optimizations (~60% cut on stable refreshes).**
+  - Tier-skip: marketplace adapters only run on first refresh / admin force-refresh / when known retailer set is sparse.
+  - Sonar model downgrade: `sonar` (cheaper) on stable cron refreshes, `sonar-pro` on first refresh + admin force-refresh.
+  - Classifier verdict cache (7-day TTL per URL+facets-hash) — repeat retailers across daily refreshes are ~95% cache hits.
+  - Volatility-based cadence: `tracked_queries.next_check_at` is auto-extended to 48h / 72h after consecutive stable refreshes (≤2% move). Any ≥5% move snaps cadence back to 24h. **No client change required** — the cron picks it up automatically.
+  - Brand-level retailer cache: when one SKU in a brand has been discovered, future SKUs in the same brand seed `known_retailer_domains` from the cached set.
+  - Recipe-driven httpx fallback: validated retailers can be re-scraped via cheap `httpx + selectolax` instead of Firecrawl. Recipes start unseeded; activation grows over time.
+
+#### ⚠️ Recommended request change for partners — **send the SKU**
+
+The single most impactful thing you can do: include the SKU in the `search_query` string. Without it, marketplace search engines (Skroutz / Bestprice / Shopflix) sort by price-asc and return the cheapest item in the brand line, which is usually a wrong-product accessory like a spout/εκροή — those rows then get correctly filtered out as wrong-product-type, and you get fewer marketplace results.
+
+**Recommended format** — `"{Brand} {Model/Series} {SKU}"` (with optional finish/colour after):
+```
+✅  "ORABELLA PRECIOSA 10356 Brushed Nickel"
+✅  "MAIDTEC 7012MT Stainless Steel"
+✅  "Ferrara Beige Keros 60x120"
+
+⚠️  "ORABELLA PRECIOSA"                  ← works, but marketplaces will mostly miss
+⚠️  "ORABELLA PRECIOSA Μπαταρία Νιπτήρα" ← works, no SKU disambiguation
+```
+
+When `search_query` carries a SKU, our facet extractor populates `sku_tokens=["10356"]` and the marketplace adapters build a tight `"{BRAND} {MODEL} {SKU}"` query that finds the right product page directly (validated end-to-end against ORABELLA PRECIOSA 10356 — Skroutz + Bestprice both land at €155, the actual basin-faucet price).
+
+Note: the `Νυπτήρα` (with **Υ**, upsilon) typo we sometimes see should be `Νιπτήρα` (with **Ι**, iota). The pipeline tolerates the typo via SKU anchoring, but the right Greek spelling improves recall.
+
+#### Verified results table (✅ good / ⚠️ caveat / ❌ won't work)
+
+| Scenario | Result | Notes |
+|---|---|---|
+| `search_query` includes SKU | ✅ | All applicable marketplaces find the exact SKU page. Rows tagged `exact`. Same-series different-SKU rows tagged `family` and returned in `family_results`. |
+| `search_query` is brand+model only (no SKU) | ⚠️ | DataForSEO + Perplexity work fine. Marketplaces often return wrong-product-type rows (spouts) that get filtered out — you'll see fewer marketplace rows. |
+| `search_query` in Greek script | ✅ | Best recall. Perplexity + DataForSEO both index Greek pages directly. |
+| `search_query` in Greeklish (`Mpataria Niptiros`) | ✅ | Works. Marginally lower ranking on Greek-locale results vs native Greek. |
+| Shopflix specifically | ⚠️ | Their fuzzy search prioritises numeric token matches, so without a brand+model+SKU triplet they often return unrelated products that share the digit (a phone case with `10356` in its slug, etc.). Our plausibility filter rejects these — net result: zero false positives, but Shopflix may yield no rows when their catalog doesn't carry that SKU. |
+| Bestprice with `{BRAND} {SKU}` only | ❌ | Returns zero. Their search needs `{BRAND} {MODEL} {SKU}` (validated). Our adapters now build this automatically. |
+| `casasolutionsgekas.com` appearing twice in results | ✅ | One row from `dataforseo_shopping` (Google Shopping feed entry), one from `perplexity_web_search` (real retailer page with the on-page promo `original_price`). Both are correct and useful — the DataForSEO row gives you the verified feed price + image + rating; the Perplexity row gives you the on-page was/now price (`original_price` populated). UI tip: render one row per retailer-domain and surface both data points. |
+
+#### What stays the same
+
+- Endpoint URLs, auth (api_keys Bearer), request bodies — **fully back-compat**. No partner integrations need to change.
+- `latest_results()` still returns the mixed array if you don't migrate to the split form.
+- Existing rows with `match_kind = null` keep working — clients that don't read it are unaffected.
+
+</details>
 
 - **2026-04-25 (v4)** — **Product-identity verification + DataForSEO merchant fixes + `product_title`.**
   - Every retailer row now carries `match_kind` (`"exact" | "variant" | "unverifiable" | null`), `match_score` (0-100), `match_note` (e.g. *"Color differs: asked BLACK MATT, page shows WHITE MATT"*). Rows the classifier flagged as `mismatch` or `family` (wrong product, even if same brand) are dropped before the response leaves the server.
