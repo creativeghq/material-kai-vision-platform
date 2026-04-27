@@ -96,7 +96,7 @@ interface CompetitorSource {
     product_title?: string;
   } | null;
   /** Product-identity verdict. null = row created before identity classification shipped. */
-  match_kind?: 'exact' | 'variant' | 'unverifiable' | null;
+  match_kind?: 'exact' | 'variant' | 'unverifiable' | 'family' | null;
   match_score?: number | null;
   match_note?: string | null;
   /** Sanity-band fields. is_anomaly=true means the latest reading was rejected and current_price wasn't overwritten. */
@@ -279,29 +279,35 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   }, [monitoringEnabled, productId, runDiscovery, isDemo, toast]);
 
   // ─── Derived data ────────────────────────────────────────────────────────
+  // Family rows split out: they're the same series but different SKU and live
+  // under "Similar Products in this series". They never feed the chart/median.
+  const isFamily = (s: CompetitorSource) => (s.match_kind as string | null) === 'family';
+  const trackedSources = useMemo(() => sources.filter((s) => !isFamily(s)), [sources]);
+  const familySources = useMemo(() => sources.filter(isFamily), [sources]);
+
   const discovered = useMemo(
     () =>
-      sources
+      trackedSources
         .filter(
           (s) => s.source_type === 'perplexity_web_search' || s.source_type === 'claude_web_search'
         )
         .slice(0, 10),
-    [sources]
+    [trackedSources]
   );
   const marketplaces = useMemo(
-    () => sources.filter((s) =>
+    () => trackedSources.filter((s) =>
       s.source_type === 'marketplace_skroutz' ||
       s.source_type === 'marketplace_bestprice' ||
       s.source_type === 'marketplace_shopflix'
     ),
-    [sources],
+    [trackedSources],
   );
 
   const merchants = useMemo(
-    () => sources.filter((s) => s.source_type === 'dataforseo_shopping').slice(0, 10),
-    [sources]
+    () => trackedSources.filter((s) => s.source_type === 'dataforseo_shopping').slice(0, 10),
+    [trackedSources]
   );
-  const custom = useMemo(() => sources.filter((s) => s.source_type === 'firecrawl_url'), [sources]);
+  const custom = useMemo(() => trackedSources.filter((s) => s.source_type === 'firecrawl_url'), [trackedSources]);
 
   const priceDiff = (p: number | null) => {
     if (!currentPrice || p == null) return null;
@@ -532,6 +538,15 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         </Card>
       )}
 
+      {/* ─── Similar Products in this series (family rows) ─── */}
+      {monitoringEnabled && familySources.length > 0 && (
+        <SimilarProductsSection
+          rows={familySources}
+          isAdmin={isAdmin}
+          onChange={loadSources}
+        />
+      )}
+
       <CompetitorSourceManager
         productId={productId}
         isOpen={showAddSource}
@@ -539,6 +554,144 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         onSourceAdded={loadSources}
       />
     </div>
+  );
+};
+
+// ─── SimilarProductsSection — shows family rows (different SKU, same series) ──
+//
+// Family rows are kept after the 2026-04-27 policy change but rendered
+// separately so they don't pollute the price chart / median / alerts. Admin
+// can promote a family row to tracked if the classifier was wrong.
+//
+// For internal product flow (competitor_sources). The tracked-query flow
+// has the same UI rendered by the external API consumer.
+
+const SimilarProductsSection: React.FC<{
+  rows: CompetitorSource[];
+  isAdmin: boolean;
+  onChange: () => void;
+}> = ({ rows, isAdmin, onChange }) => {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const handlePromote = useCallback(
+    async (row: CompetitorSource, kind: 'exact' | 'variant') => {
+      const reason = window.prompt(
+        kind === 'exact'
+          ? 'Why is this an exact match? (optional)'
+          : 'Why is this a variant? (optional)'
+      );
+      // null = cancelled
+      if (reason === null) return;
+      try {
+        setPendingId(row.id);
+        const { promoteFamilyRow } = await import('@/services/priceMonitoringApi');
+        await promoteFamilyRow({
+          competitorSourceId: row.id,
+          overrideKind: kind,
+          reason: reason || undefined,
+        });
+        toast({ title: 'Promoted', description: `${row.source_name} now tracked as ${kind}.` });
+        onChange();
+      } catch (e: any) {
+        toast({ title: 'Promote failed', description: e?.message || 'Try again', variant: 'destructive' });
+      } finally {
+        setPendingId(null);
+      }
+    },
+    [onChange, toast]
+  );
+
+  return (
+    <Card className="dashboard-card border-yellow-500/30">
+      <CardHeader className="pb-3">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            Similar Products in this series
+            <Badge variant="outline" className="text-[10px]">
+              {rows.length}
+            </Badge>
+          </CardTitle>
+          <span className="text-xs text-muted-foreground">
+            {expanded ? 'Collapse' : 'Expand'}
+          </span>
+        </button>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          Same brand &amp; series but a different SKU. These don&apos;t feed the price chart or
+          alerts. {isAdmin ? 'If a row was misclassified, click "Promote to tracked" to fold it back into the main list.' : ''}
+        </p>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {rows.map((row) => (
+              <div key={row.id} className="px-6 py-3 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {row.source_name}
+                    {row.current_metadata?.product_title && (
+                      <span className="ml-2 text-xs text-muted-foreground italic">
+                        {row.current_metadata.product_title}
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={row.source_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    {new URL(row.source_url).host.replace(/^www\./, '')}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  {row.match_note && (
+                    <div className="text-[11px] text-yellow-600 mt-0.5">{row.match_note}</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <div className="text-sm font-medium">
+                      {row.current_price != null
+                        ? `${row.current_currency || '€'}${row.current_price.toFixed(2)}`
+                        : '—'}
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pendingId === row.id}
+                        onClick={() => handlePromote(row, 'exact')}
+                        className="text-xs h-6 px-2"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Exact
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pendingId === row.id}
+                        onClick={() => handlePromote(row, 'variant')}
+                        className="text-xs h-6 px-2"
+                      >
+                        Variant
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 };
 

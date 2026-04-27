@@ -120,6 +120,36 @@
 - **Broadcasting to API consumers** — `POST /api/v1/price-monitoring/broadcast-api-announcement` (admin session JWT). Pulls distinct `user_id`s from active `api_keys`, joins to `user_profiles` for name + email, idempotency-skips users who already received the same `template_slug`, then dispatches via `email-api` (which loads sender from `email_settings`). Defaults to dry-run; pass `"dry_run": false` to actually send.
 - **No env-var fallback** — if `RESEND_API_KEY` is missing on Supabase, sends fail at the `email-api` boundary and the dispatcher logs the failure to `price_alert_log.channels_skipped` as `email_send_failed`. Bell delivery is unaffected.
 
+## Price Monitoring v3 (2026-04-27 — family-kept, manual promotion, cost overhaul)
+
+**Family-kept policy** — overturns the 2026-04-25 "drop family" rule. The Haiku identity classifier still tags rows as `exact` / `variant` / `family` / `mismatch` / `unverifiable`, but only `mismatch` is dropped. `family` rows (same brand+series but different SKU) are persisted with `match_kind='family'` and rendered under a collapsed "Similar Products in this series" section in the UI. They're **inert downstream**: never feed the chart, never feed the rolling median (sanity band excludes them), never trigger price-drop / new-retailer / promo / anomaly alerts (`detect_after_refresh` filters them out).
+
+**Manual promotion** — `POST /api/v1/price-monitoring/promote-family-row` (admin-only) flips a family/mismatch row to `exact` or `variant`. Two-layered persistence: (a) updates the current row + `manual_override=true` on `tracked_query_price_history` / `competitor_sources` so chart updates immediately, (b) inserts a sticky URL override into `tracked_query_promoted_urls` / `competitor_source_promoted_urls` so every future refresh of the same URL keeps the override (the orchestrator passes `promoted_urls={url: override_kind}` into `_classify_and_filter`, which short-circuits Haiku's verdict). Also writes to `match_corrections` so the few-shot classifier loop learns globally. Reverse: `POST /api/v1/price-monitoring/demote-to-family`.
+
+**Adapter facet pass-through** (PR-A) — all three Greek adapters + Idealo now accept `facets: QueryFacets` and:
+1. Prepend `facets.sku_tokens[0]` to the search-engine query string when present (otherwise Bestprice/Shopflix/Skroutz price-asc sort returns the cheapest accessory in the series, not the user's actual SKU).
+2. Post-filter results via `app.modules.greek_marketplaces.facet_filter.matches_facets()` — drops candidates whose URL slug carries no SKU match when SKU anchors are known. Cheap (no LLM); falls through to the classifier when facets are loose.
+
+**Source-label fix** — `tracked_queries_service._map_source_label()` translates `PriceHit.source` ∈ {dataforseo, skroutz, bestprice, shopflix, idealo} into the canonical `competitor_source_type` enum value. Previously every non-DataForSEO hit was forced to `perplexity_web_search`, which made marketplace hits invisible by source filter.
+
+**API split** — internal product flow: `GET /api/v1/price-monitoring/sources/{product_id}` returns sources with `match_kind` so the UI can split. External flow: new `latest_results_split()` returns `{results, family_results}` arrays for API consumers; existing `latest_results()` retained for back-compat. UI consumers should prefer the split form going forward.
+
+**Cost optimizations (~60% cut for stable refreshes)**:
+
+- **Tier-skip** (PR-C #1): `search_prices()` runs Tier 2 (Greek + Idealo, ~$0.005-0.010/refresh) only when `force_full_discovery=True` or `len(known_retailer_domains) < 5`. Established tracked queries with healthy retailer sets skip Tier 2 entirely.
+- **Sonar model downgrade** (PR-C #8): Perplexity calls switch to `sonar` (cheaper, ~50% off) instead of `sonar-pro` when `force_full_discovery=False`, `known_retailer_domains >= 3`, and `double_read=False`. First refresh + admin force-refresh stay on sonar-pro for accuracy. Pass via `_perplexity_call(model_override="sonar")`.
+- **Classifier verdict cache** (PR-C #4 / `classifier_verdict_cache` table): 7-day TTL keyed on `(product_url, sha1(brand|model|sku_tokens|product_type))`. `_classify_and_filter` looks up cached verdicts first, batches only the misses to Haiku, persists the new verdicts. Repeat retailers across daily refreshes hit ~95% cache rate.
+- **Rule-based pre-classifier** (PR-D #10): `_rule_shortcut(facets, candidate)` returns deterministic verdicts when (a) page slug+name contains a known SKU token → `exact`, or (b) all required brand/model tokens are missing → `mismatch`, or (c) page is empty → `unverifiable`. Only ambiguous cases hit Haiku.
+- **Volatility cadence** (PR-C #3 / `tracked_queries.next_check_at`): SQL helper `update_tracked_query_cadence(query_id, max_pct_change)` runs after every refresh. ≥5% move resets cadence to 24h. ≤2% move bumps `consecutive_stable_refreshes` and stretches cadence to 48h (after 3) / 72h (after 7). Cron picks rows by `next_check_at < now()` instead of fixed-interval check.
+- **Brand-level retailer cache** (PR-E #12 / `brand_retailer_index` table): every refresh upserts the `(brand, retailer_domain, country_code)` triples it saw. Future SKUs in the same brand seed `known_retailer_domains` from this index — works alongside the Tier-skip gate so 1K-SKU catalogs converge to free Tier 2 after the first few brand discoveries.
+- **Recipe-driven httpx fallback** (PR-F / `retailer_extraction_recipes` + `app/services/integrations/extraction_recipes.py`): when a recipe row has confidence ≥ 0.8 and selectors set, `_verify_hits_with_firecrawl` tries `httpx + selectolax` first (essentially free). Falls back to Firecrawl on miss. Per-recipe `success_count` / `failure_count` self-heal selector drift; 3 consecutive failures + confidence <0.5 auto-disables the recipe. Recipes start unseeded — production use either hand-seeds top-20 retailers or waits for a future selector-discovery worker.
+
+**New tables**: `tracked_query_promoted_urls`, `competitor_source_promoted_urls`, `classifier_verdict_cache`, `brand_retailer_index`, `retailer_extraction_recipes`.
+
+**New columns on `tracked_queries`**: `volatility_score`, `consecutive_stable_refreshes`, `next_check_at`. **On `competitor_sources`**: `verification_count`, `verification_skips_remaining`, `last_price_change_at`.
+
+**`PriceSearchService.search_prices()` signature additions**: `promoted_urls: Optional[Dict[str, str]]`, `force_full_discovery: bool = False`, `skip_verification_urls: Optional[List[str]] = None`.
+
 ## Price Monitoring v2.1 (2026-04-26 — Resend email, anomaly override UI, classifier feedback UI)
 
 - Email channel wired via the platform's existing `email-api` edge function (Resend-backed via `RESEND_API_KEY`). Default `alert_channels` for newly-tracked products = `['bell','email']`. Templates seeded into `email_templates` (slugs: `price_alert.price_drop` / `.new_retailer` / `.promo_started` / `.anomaly_detected`, all `category='notification'`). Dispatcher invokes `email-api?action=send` with `templateSlug` + `variables`; passes a fallback `html` so emails still go out if a template is missing or the renderer fails. User email pulled from `user_profiles.email`.

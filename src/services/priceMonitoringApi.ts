@@ -22,13 +22,16 @@ async function authHeader(): Promise<Record<string, string>> {
  *   exact        — brand + model + product_type all match. Include in stats.
  *   variant      — same model, different color/finish/size. Keep with note,
  *                  EXCLUDE from price statistics.
+ *   family       — same brand + series, DIFFERENT SKU. Shown under
+ *                  "Similar Products in this series". Inert: never feeds
+ *                  chart, median, alerts. Admin can promote to tracked.
  *   unverifiable — Firecrawl couldn't extract product_name (blocked, 404,
  *                  ad-wall). Keep with grey badge, EXCLUDE from stats.
  *   null         — legacy row created before identity classification shipped.
  *
- * 'mismatch' and 'family' never reach the UI — dropped at verification time.
+ * 'mismatch' never reaches the UI — dropped at classification time.
  */
-export type MatchKind = 'exact' | 'variant' | 'unverifiable' | null;
+export type MatchKind = 'exact' | 'variant' | 'family' | 'unverifiable' | null;
 
 export interface PerplexityHit {
   retailer_name: string;
@@ -112,6 +115,56 @@ export async function submitClassifierCorrection(args: {
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`classifier-correction failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}
+
+/**
+ * Promote a family/mismatch row to tracked. Admin-only. The override is
+ * sticky — every future refresh of the same URL keeps the override until
+ * the admin demotes it back.
+ */
+export async function promoteFamilyRow(args: {
+  competitorSourceId?: string;
+  trackedQueryHistoryId?: string;
+  overrideKind: 'exact' | 'variant';
+  reason?: string;
+}): Promise<void> {
+  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/promote-family-row`, {
+    method: 'POST',
+    headers: await authHeader(),
+    body: JSON.stringify({
+      competitor_source_id: args.competitorSourceId,
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      override_kind: args.overrideKind,
+      reason: args.reason,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`promote-family-row failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}
+
+/**
+ * Demote a previously-promoted row back to family. Admin-only.
+ */
+export async function demoteToFamily(args: {
+  competitorSourceId?: string;
+  trackedQueryHistoryId?: string;
+  reason?: string;
+}): Promise<void> {
+  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/demote-to-family`, {
+    method: 'POST',
+    headers: await authHeader(),
+    body: JSON.stringify({
+      competitor_source_id: args.competitorSourceId,
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      reason: args.reason,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`demote-to-family failed: ${res.status} ${body.slice(0, 200)}`);
   }
 }
 
