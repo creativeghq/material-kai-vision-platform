@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CronJobsPanel } from '@/components/Admin/CronJobsPanel';
 
 interface AIServiceHealth {
   status: 'healthy' | 'unhealthy';
@@ -784,6 +785,8 @@ export const SystemHealthMonitor: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <CronJobsPanel />
 
       <p className="text-xs text-muted-foreground text-center">
         Last updated: {new Date(health.timestamp).toLocaleString()} • Auto-refreshes every 30s

@@ -33,6 +33,7 @@ import {
   Check,
   X,
   AlertTriangle,
+  Ban,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,8 +46,13 @@ import {
   startMonitoring,
   stopMonitoring,
   submitClassifierCorrection,
+  excludeProductResult,
+  includeProductResult,
+  listProductExclusions,
+  verifyProductSources,
   type PerplexityHit,
   type DiscoverResponse,
+  type ProductExclusion,
 } from '@/services/priceMonitoringApi';
 import {
   isDemoProduct,
@@ -131,6 +137,22 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [nextCheckAt, setNextCheckAt] = useState<string | null>(null);
   const [monitoringFrequency, setMonitoringFrequency] = useState<string | null>(null);
   const [verifyPrices, setVerifyPrices] = useState<boolean>(true);
+  const [exclusions, setExclusions] = useState<ProductExclusion[]>([]);
+  const [showExclusions, setShowExclusions] = useState(false);
+
+  const loadExclusions = useCallback(async () => {
+    if (isDemo) return;
+    try {
+      const data = await listProductExclusions(productId);
+      setExclusions(data);
+    } catch (e) {
+      console.error('Failed to load exclusions', e);
+    }
+  }, [productId, isDemo]);
+
+  useEffect(() => {
+    loadExclusions();
+  }, [loadExclusions]);
 
   // ─── Data loading ────────────────────────────────────────────────────────
   const loadSources = useCallback(async () => {
@@ -398,6 +420,78 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                     <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isDiscovering ? 'animate-spin' : ''}`} />
                     Refresh now
                   </Button>
+                  {(() => {
+                    const unverifiedUrls = sources
+                      .filter((s) => !s.current_price_verified)
+                      .map((s) => s.source_url);
+                    return (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isDiscovering || unverifiedUrls.length === 0}
+                          title={
+                            unverifiedUrls.length === 0
+                              ? 'Every retailer row is already verified.'
+                              : `Re-fetch only the ${unverifiedUrls.length} retailer row${unverifiedUrls.length === 1 ? '' : 's'} that came back unverified. ~1 Firecrawl credit per row.`
+                          }
+                          onClick={async () => {
+                            if (unverifiedUrls.length === 0) return;
+                            try {
+                              const out = await verifyProductSources({
+                                productId,
+                                urls: unverifiedUrls,
+                              });
+                              toast({
+                                title: 'Re-verified',
+                                description: `${out.verified_count}/${out.rows_processed} now verified · ${out.credits_used} credits`,
+                              });
+                              loadSources();
+                            } catch (e) {
+                              console.error('Verify unverified failed', e);
+                              toast({
+                                title: 'Verify failed',
+                                description: e instanceof Error ? e.message : 'Unknown error',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />
+                          Verify unverified
+                          {unverifiedUrls.length > 0 && (
+                            <span className="ml-1 text-[10px] opacity-75">({unverifiedUrls.length})</span>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isDiscovering}
+                          title="Re-verify ALL current retailer rows by re-fetching each URL via Firecrawl. Cheaper than a full Refresh — no new retailers, just price + verified flag updates. ~1 Firecrawl credit per row."
+                          onClick={async () => {
+                            try {
+                              const out = await verifyProductSources({ productId });
+                              toast({
+                                title: 'Verified',
+                                description: `${out.verified_count}/${out.rows_processed} rows verified · ${out.credits_used} credits`,
+                              });
+                              loadSources();
+                            } catch (e) {
+                              console.error('Verify all failed', e);
+                              toast({
+                                title: 'Verify failed',
+                                description: e instanceof Error ? e.message : 'Unknown error',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />
+                          Verify all
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </>
               )}
               <div className="flex items-center gap-2 ml-2">
@@ -461,7 +555,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 No retailers discovered yet. {isAdmin && 'Click Refresh now above to try.'}
               </div>
             )}
-            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />}
+            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />}
           </CardContent>
         </Card>
       )}
@@ -482,7 +576,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
+            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -505,7 +599,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
+            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -532,7 +626,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 missed a retailer you know sells this product.
               </p>
             ) : (
-              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={loadSources} />
+              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
             )}
           </CardContent>
         </Card>
@@ -543,8 +637,88 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <SimilarProductsSection
           rows={familySources}
           isAdmin={isAdmin}
-          onChange={loadSources}
+          onChange={() => { loadSources(); loadExclusions(); }}
         />
+      )}
+
+      {/* ─── Exclusions section ─── */}
+      {monitoringEnabled && isAdmin && exclusions.length > 0 && (
+        <Card className="dashboard-card">
+          <CardHeader className="pb-3">
+            <button
+              type="button"
+              className="flex items-center justify-between gap-3 w-full text-left"
+              onClick={() => setShowExclusions((s) => !s)}
+            >
+              <div className="flex items-center gap-2">
+                <Ban className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">
+                  Excluded Results
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px]">
+                  {exclusions.length}
+                </Badge>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {showExclusions ? 'Hide' : 'Show'}
+              </span>
+            </button>
+          </CardHeader>
+          {showExclusions && (
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {exclusions.map((ex) => (
+                  <div
+                    key={ex.id}
+                    className="flex items-start justify-between gap-3 px-6 py-2.5 text-xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">
+                        {ex.url ? new URL(ex.url).host.replace(/^www\./, '') : ex.domain}
+                      </div>
+                      {ex.url && (
+                        <div className="text-[10px] text-muted-foreground truncate">{ex.url}</div>
+                      )}
+                      {ex.reason && (
+                        <div className="text-[10px] text-muted-foreground italic mt-0.5">
+                          {ex.reason}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        Excluded {timeAgo(ex.excluded_at)}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[10px] gap-1"
+                      onClick={async () => {
+                        try {
+                          await includeProductResult({
+                            productId,
+                            url: ex.url ?? undefined,
+                            domain: ex.domain ?? undefined,
+                          });
+                          await loadExclusions();
+                          await loadSources();
+                        } catch (e) {
+                          console.error('Re-include failed', e);
+                        }
+                      }}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Restore
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="px-6 py-3 text-[10px] text-muted-foreground border-t bg-muted/20">
+                Excluded URLs and domains never appear in this product's chart, median,
+                alerts, or refreshes. Other products tracking the same retailer are unaffected.
+              </div>
+            </CardContent>
+          )}
+        </Card>
       )}
 
       <CompetitorSourceManager
@@ -816,7 +990,7 @@ const RetailerTable: React.FC<{
                 )}
                 <span className="truncate">{r.source_name}</span>
               </a>
-              {r.current_price_verified && (
+              {r.current_price_verified ? (
                 <Badge
                   variant="outline"
                   className="text-[10px] border-green-400 text-green-700 flex items-center gap-0.5"
@@ -828,6 +1002,19 @@ const RetailerTable: React.FC<{
                 >
                   <BadgeCheck className="h-3 w-3" />
                   Verified
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-orange-400 text-orange-700 flex items-center gap-0.5"
+                  title={
+                    'Price could not be confirmed from the retailer\'s live page on the last refresh. ' +
+                    'Possible causes: page blocked, captcha, 404, JS-only price that didn\'t hydrate, ' +
+                    'or (on first refresh) two scrapes 30s apart disagreed by >5%. ' +
+                    'Click "Verify" on this row to retry on demand.'
+                  }
+                >
+                  Unverified
                 </Badge>
               )}
               {r.match_kind === 'variant' && (
@@ -991,6 +1178,53 @@ const RetailerTable: React.FC<{
               >
                 <ThumbsDown className="h-3 w-3" />
                 Wrong match
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                title="Re-fetch this URL via Firecrawl now to refresh price + verified flag. Costs 1 Firecrawl credit."
+                onClick={async () => {
+                  try {
+                    await verifyProductSources({ productId, urls: [r.source_url] });
+                    onChange?.();
+                  } catch (e) {
+                    console.error('Verify failed', e);
+                  }
+                }}
+              >
+                <BadgeCheck className="h-3 w-3" />
+                Verify
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-destructive"
+                title="Exclude this URL from this product's monitoring (won't reappear on refresh, doesn't affect other products)."
+                onClick={async () => {
+                  const reason = window.prompt(
+                    `Exclude ${r.source_name} from this product's monitoring?\n\nThe row will disappear from the chart, median, and alerts. It won't be re-fetched on refreshes. Other products tracking the same retailer are unaffected.\n\nOptional reason (audit trail):`,
+                    '',
+                  );
+                  if (reason === null) return;
+                  try {
+                    await excludeProductResult({
+                      productId,
+                      url: r.source_url,
+                      reason: reason || undefined,
+                    });
+                    onChange?.();
+                  } catch (e) {
+                    console.error('Exclude failed', e);
+                  }
+                }}
+              >
+                <Ban className="h-3 w-3" />
+                Exclude
               </Button>
             )}
             {r.current_price != null ? (

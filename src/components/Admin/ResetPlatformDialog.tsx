@@ -136,6 +136,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li><strong>System Settings &amp; Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
               <li><strong>Uploaded Template Images</strong> (cover, back cover, items background in quote-templates)</li>
               <li><strong>User Avatars</strong> (profile pictures in profile-avatars)</li>
+              <li><strong>Price Monitoring</strong> (tracked queries, competitor sources, price history, alert log, classifier cache, brand-retailer index, extraction recipes — long-running trend data and customer-facing API state)</li>
             </ul>
 
             <div className="pt-4 space-y-2">

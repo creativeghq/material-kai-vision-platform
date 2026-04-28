@@ -55,11 +55,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     });
 
-    // THEN check for existing session. If the stored refresh token is stale
-    // (rotated by another tab, revoked, or simply gone), Supabase throws
-    // `AuthApiError: Invalid Refresh Token: Refresh Token Not Found`.
-    // We swallow it, clear the dead session, and let the user re-auth — no
-    // unhandled rejection, no Sentry noise (KAI-8P).
+    // THEN check for existing session. If getSession() throws (transient
+    // network, multi-tab refresh-token race, etc.), we ONLY clear local UI
+    // state — never call signOut(), which destroys the stored refresh token
+    // and prevents recovery. autoRefreshToken handles real refreshes via
+    // onAuthStateChange above; if the token is genuinely dead the next
+    // request will surface a 401 and the user can re-auth manually.
     supabase.auth
       .getSession()
       .then(({ data: { session } }: { data: { session: any } }) => {
@@ -67,11 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser(session?.user ?? null);
         setLoading(false);
       })
-      .catch(async (err: any) => {
-        const msg = err?.message || '';
-        if (msg.includes('Refresh Token') || msg.includes('refresh_token')) {
-          await supabase.auth.signOut().catch(() => {});
-        }
+      .catch(() => {
         setSession(null);
         setUser(null);
         setLoading(false);

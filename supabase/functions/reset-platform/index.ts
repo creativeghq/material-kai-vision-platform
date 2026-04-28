@@ -40,6 +40,26 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - extraction_prompts       ← PDF extraction prompt configurations
 //   - prompt_history           ← audit trail — TRIMMED to 5 most recent per prompt_id (not wiped)
 //
+//   ── Price Monitoring (DO NOT WIPE — long-running observational state) ──
+//   Price-history series are only useful when contiguous; a reset would
+//   destroy weeks/months of trend data and invalidate sanity bands,
+//   volatility scoring, classifier learnings, and brand-retailer cache.
+//   Customer-facing tracked_queries (external API consumers) MUST survive.
+//   - price_monitoring_products       ← per-product monitoring opt-in + alert prefs
+//   - competitor_sources              ← discovered retailer rows + current price cache
+//   - competitor_source_promoted_urls ← sticky admin URL overrides
+//   - price_history                   ← internal flow's price snapshots
+//   - tracked_queries                 ← external API tracked queries (api_keys FK)
+//   - tracked_query_price_history     ← external flow's price snapshots
+//   - tracked_query_promoted_urls     ← sticky admin URL overrides (external)
+//   - price_lookups                   ← external /lookup usage log
+//   - price_discrepancies             ← cross-source disagreement log
+//   - price_alert_log                 ← dispatched alert audit + dedupe
+//   - match_corrections               ← admin "wrong match" feedback (few-shot)
+//   - classifier_verdict_cache        ← Haiku product-identity verdict cache (7d TTL)
+//   - brand_retailer_index            ← (brand, retailer_domain, country) cache
+//   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
+//
 // Storage Buckets:
 //   - quote-templates          ← cover.png / backcover.png / items-background.png
 //   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
@@ -211,6 +231,13 @@ const TABLES_TO_CLEAR = [
   //   upsells, timeline_steps, flows, background_agents, roles,
   //   ai_model_pricing, subscription_plans, webhook_endpoints, etc.
   // - prompt_history — trimmed separately (keep 5 most recent per prompt)
+  // - Price Monitoring (price_monitoring_products, competitor_sources,
+  //   price_history, tracked_queries, tracked_query_price_history,
+  //   price_lookups, price_discrepancies, price_alert_log,
+  //   match_corrections, classifier_verdict_cache, brand_retailer_index,
+  //   retailer_extraction_recipes, *_promoted_urls)
+  //   ⚠️ DO NOT add price-monitoring tables here — long-running
+  //   observational data, customer-facing API state, and learned caches.
   // ============================================================
 ];
 
@@ -270,6 +297,12 @@ async function listAllFiles(bucketName: string, folderPath = ''): Promise<string
  *            crm_companies, crm_contacts, profiles/auth.users,
  *            user_credits, credit_transactions, credit_packages,
  *            prompts, extraction_prompts, prompt_history,
+ *            price-monitoring tables (price_monitoring_products,
+ *            competitor_sources, price_history, tracked_queries,
+ *            tracked_query_price_history, price_lookups,
+ *            price_discrepancies, price_alert_log, match_corrections,
+ *            classifier_verdict_cache, brand_retailer_index,
+ *            retailer_extraction_recipes, *_promoted_urls),
  *            quote-templates bucket, pdf-documents bucket, profile-avatars bucket
  */
 Deno.serve(withApiLogging('reset-platform', async (req) => {

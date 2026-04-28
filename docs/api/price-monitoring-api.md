@@ -50,6 +50,10 @@ Either set `is_active = false` (soft) or delete the row entirely (hard). **Delet
 | 6 | `PUT` | `/api/v1/prices/track/{id}` | Update cadence / country / preferred retailers |
 | 7 | `POST` | `/api/v1/prices/track/{id}/refresh` | Force refresh now (bypasses cadence) |
 | 8 | `DELETE` | `/api/v1/prices/track/{id}` | Stop tracking (soft delete — keeps history) |
+| 9 | `POST` | `/api/v1/prices/track/{id}/exclude` | Exclude a URL or domain from this tracked query (NEW v6) |
+| 10 | `POST` | `/api/v1/prices/track/{id}/include` | Undo a previous exclusion (NEW v6) |
+| 11 | `GET` | `/api/v1/prices/track/{id}/exclusions` | List all exclusions on this tracked query (NEW v6) |
+| 12 | `POST` | `/api/v1/prices/track/{id}/verify` | Re-verify the latest results by re-scraping each URL via Firecrawl — refreshes the `verified` flag + price without doing a full discovery (NEW v6) |
 
 ---
 
@@ -287,16 +291,25 @@ curl -X POST https://v1api.materialshub.gr/api/v1/prices/track \
 
 **Caveat**: the initial POST blocks for ~15–30 seconds while Perplexity runs (or ~30–60 seconds when `verify_prices: true`, because Firecrawl verifies each hit in parallel). If your integration needs a non-blocking path, create the tracked query with `refresh_interval_hours: 1`, ignore the initial results, and `GET` a minute later.
 
-### Result row fields (added 2026-04-26)
+### Result row fields (added 2026-04-26, updated 2026-04-27)
 
 Every result row now carries identity-classification and sanity-band fields. Non-null even on legacy rows after the next refresh.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `match_kind` | `'exact' \| 'variant' \| 'unverifiable' \| null` | Identity verdict from our classifier. `family` and `mismatch` rows are dropped before they reach you. |
+| `match_kind` | `'exact' \| 'variant' \| 'family' \| 'unverifiable' \| null` | Identity verdict from our classifier. **`family` (since 2026-04-27)** = same brand+series, different SKU — render under "Similar products in this series", exclude from chart/median/alerts. **`mismatch`** is dropped server-side, you'll never see it. **`variant`** = same SKU, different colour/finish (kept with note, excluded from stats). **`unverifiable`** = page didn't load enough info (kept, grey badge). |
 | `match_score` | int 0–100 | Confidence of the verdict. Treat ≥90 as `exact`-grade, 70–89 as `variant`. |
 | `match_note` | string \| null | One-line human-readable explanation when `match_kind` ≠ `exact`. |
 | `product_title` | string \| null | The exact product name as shown on the retailer page. Use to disambiguate multiple rows from the same retailer (different colors / sizes). |
+| `manual_override` | boolean | `true` when an admin promoted this row from `family`/`mismatch` via the platform's [promote-family-row](#manual-promotion-endpoints-admin-only) endpoint. The override sticks across refreshes. |
+
+#### Recommended split rendering (since 2026-04-27)
+
+In your UI we recommend two sections:
+1. **Main retailers list** — every row whose `match_kind` is `'exact'`, `'variant'`, or `'unverifiable'`. Feed the chart, the median, and price-drop alerts from this list.
+2. **"Similar products in this series" (collapsed by default)** — every row whose `match_kind` is `'family'`. These are real retailer prices but for **different SKUs** in the same brand+series. They never feed the chart, median, or alerts.
+
+If you want a server-side split rather than filtering client-side, we expose `latest_results_split()` on `GET /api/v1/prices/track/{id}` (response: `{ "results": [...], "family_results": [...] }`). The legacy mixed-array form remains for back-compat.
 | `is_anomaly` | boolean | `true` when the reading was outside the 7-day rolling-median sanity band (>3× or <0.33× the median for the same retailer). The price is still surfaced for transparency, but it is not used to compute medians until reviewed. |
 | `anomaly_reason` | string \| null | When `is_anomaly=true`, a one-line explanation. |
 | `rolling_median_at_check` | number \| null | The trailing 7-day median we compared against. |
@@ -612,7 +625,190 @@ sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.servi
 
 ---
 
+## Result confidence — when a row comes back as "non-confirmed"
+
+Every row in the response carries **two independent confidence flags**. They mean different things and can be `true`/`false` in any combination.
+
+### Flag 1 — `verified` (price-level confirmation)
+
+Whether the price came from a fresh fetch of the retailer's live page.
+
+#### `verified: true` is set when:
+- A successful Firecrawl scrape (or a high-confidence extraction-recipe httpx fetch) of `product_url` returned a parseable price; AND
+- For first-refresh queries: the 30-second double-read scrape returned a price within 5% of the first reading; OR
+- The row came from the DataForSEO Shopping feed (auto-stamped — feed payload is authoritative).
+
+#### `verified: false` is set when ANY of these triggers fire:
+
+| # | Trigger | Why it happens |
+|---|---|---|
+| 1 | Caller set `verify_prices: false` on the request | Verification step skipped entirely. Price comes from the discovery snippet, not a confirmed page fetch. |
+| 2 | Firecrawl request crashed or threw an exception | Network blip, Firecrawl timeout, etc. |
+| 3 | Firecrawl returned `success=false` or `data=null` | 404, captcha, JS-only render that timed out, ad-wall, anti-bot block. |
+| 4 | Firecrawl loaded the page but no price was extractable | "Call for price", login-gated price, JS-only price that hydrated after the snapshot, missing price tag. |
+| 5 | **Double-read inconsistency** (first refresh only) | Two Firecrawl scrapes 30 seconds apart returned prices >5% apart — signals A/B testing or transient promo. Row is reset to `verified=false` and `notes` carries `"double-read inconsistent: €X vs €Y"`. |
+| 6 | Extraction-recipe (httpx fast path) matched the URL but selectors returned no price text | Selector drift — recipe self-heals over consecutive failures. Falls through to Firecrawl, which then itself fails. |
+
+When `verified: false`, the `price` field still has whatever the upstream engine reported — we just can't confirm it's still on the page right now.
+
+### Flag 2 — `match_kind` (identity-level confirmation)
+
+Whether the page actually shows the product you asked for. Set by the Haiku batched classifier.
+
+| Value | Meaning | Stats inclusion |
+|---|---|---|
+| `exact` | Brand + model + product_type all match. Fully confirmed identity. | Included |
+| `variant` | Same model, different finish/color/size (chrome vs matte black). | Excluded |
+| `family` | Same brand+series, different SKU within that series. | Excluded (inert) |
+| `unverifiable` | Couldn't confirm identity from the page. | Excluded |
+| `mismatch` | Wrong brand or wrong product type entirely. | Dropped server-side — never returned to API consumers. |
+
+#### `match_kind: unverifiable` is set when ANY of these triggers fire:
+
+| # | Trigger | Source |
+|---|---|---|
+| 1 | **Page extraction was empty** — both `product_name` AND `url_slug_tokens` came back blank. The classifier literally has nothing to judge identity from. | Classifier rule: *"unverifiable: page_name is empty AND url_slug_tokens is empty. Can't judge."* |
+| 2 | Brand-only query, no SKU, no explicit variant — extraction also failed | `classify_hits` early-return |
+| 3 | Haiku timeout / API error / malformed response → fallback to rule-based classifier, which defaults to `unverifiable` for any page with empty name + empty slug | `_rule_based_verdict` fallback |
+| 4 | Rule-based fallback sees a query with no `required_tokens` AND no `sku_tokens` (catalog product had no brand/model/SKU at all) | `_rule_based_verdict` early-return |
+| 5 | Sanitization fallback — Haiku returned an unrecognized `match_kind` string (model misbehavior); clamped to `unverifiable` | `_sanitize_verdicts` |
+
+Once a row is `unverifiable`:
+- **Excluded** from price statistics (min/median/max/percentile).
+- **Excluded** from price-drop / new-retailer / promo / anomaly alerts.
+- **Shown** to the consumer with an "Unverified" / "?" badge — we keep it because dropping every row we couldn't classify would silently shrink result counts, and most "can't extract" cases are temporary (CDN blip, captcha, slow JS render).
+
+### Combining the two flags
+
+| `match_kind` | `verified` | What it means | UI / data treatment |
+|---|---|---|---|
+| `exact` | `true` | Fully confirmed — right product, fresh price. | Default — included in stats. |
+| `exact` | `false` | Right product, but price couldn't be re-fetched (page blocked, double-read disagreed, or you set `verify_prices: false`). | Same product, "stale price" indicator. Still in stats — `match_kind` filter wins. |
+| `variant` | `true` | Same model, different finish — fresh price. | "Variant" badge. Excluded from stats, kept for context. |
+| `family` | any | Different SKU in the same series. | "Similar Products in this series" collapsed section. Inert. |
+| `unverifiable` | `true` | Couldn't extract product name from the page, but a price was readable. Rare — happens on heavily JS-rendered pages. | Grey "?" badge. Excluded from stats. |
+| `unverifiable` | `false` | Couldn't extract anything — page broken, blocked, 404. Lowest-confidence row. | Grey "?" badge. Excluded from stats. |
+| `mismatch` | any | Brand or product type wrong. | **Dropped before reaching you — never returned via the API.** |
+
+### Recovering from `verified: false` rows — `POST /track/{id}/verify`
+
+If a row comes back unverified because the page was transiently blocked / captcha'd / 404'd, you can re-trigger Firecrawl on demand without doing a full discovery. See endpoint #12 in the table above and the v6 changelog accordion below for full details. Cost: 1 Firecrawl credit per URL re-verified.
+
+---
+
 ## Changelog
+
+<details>
+<summary><b>2026-04-28 (v6)</b> — <b>Per-tracked-query result exclusions + 24h cadence + cron-controlled refreshes.</b> Click to expand.</summary>
+
+#### What's new
+
+**Three new endpoints** for excluding noisy or wrong-product results from a specific `tracking_id`. Exclusions are scoped to the tracking_id you create them on — they do NOT affect any other tracked query (yours or any other consumer's).
+
+- **`POST /api/v1/prices/track/{tracking_id}/exclude`** — body `{url?, domain?, reason?}`. Either `url` (specific page) OR `domain` (whole retailer wildcard) is required. Returns `{id, url?, domain?, reason?, excluded_at}` with HTTP 201. Idempotent: re-excluding the same URL just updates the `reason` field.
+- **`POST /api/v1/prices/track/{tracking_id}/include`** — body `{url?, domain?}`. Removes a previous exclusion. Returns `{success, removed_count}`.
+- **`GET  /api/v1/prices/track/{tracking_id}/exclusions`** — returns the current exclusion list for this tracking_id, newest first.
+
+**Behaviour after exclusion:**
+- The next `/refresh` call drops matching hits BEFORE persistence. They never enter `tracked_query_price_history`, never feed the rolling median, never trigger price-drop / new-retailer / promo / anomaly alerts.
+- `GET /track/{id}` and `GET /track/{id}/history` filter out excluded rows by default. If you need to see what's hidden (audit / debugging), pass `?include_excluded=true` (server-side support landed in this release).
+- The exclusion is persistent — survives across refreshes — until you call `/include` to undo it.
+- Per-call billing is unchanged. You're only billed for the actual refreshes you trigger.
+
+**When to use it (vs. `preferred_retailer_domains` you already had):**
+- `preferred_retailer_domains` is a positive bias ("probe these"), not a filter. It can't suppress unwanted results.
+- The new exclusion endpoints are subtractive: surgically remove specific URLs you've reviewed and don't want, or blanket-block a whole noisy aggregator domain. Combine both for fine-grained control.
+
+**Use cases that motivated this:**
+- Marketplace returned a sibling-SKU page that the classifier scored as `unverifiable`/`variant` — exclude the URL so it stops re-appearing.
+- An aggregator subdomain you don't want to track (e.g. "aggregator-blog.example.com" while keeping "shop.example.com").
+- Wrong-product page that consistently scores `exact` because the brand+model match by accident.
+
+**Curl example:**
+```bash
+# Exclude a specific page
+curl -X POST "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/exclude" \
+  -H "Authorization: Bearer mhub_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://retailer.com/wrong-sku","reason":"sibling SKU, classifier false-positive"}'
+
+# Block a whole domain
+curl -X POST "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/exclude" \
+  -H "Authorization: Bearer mhub_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"aggregator.com","reason":"noise"}'
+
+# Undo
+curl -X POST "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/include" \
+  -H "Authorization: Bearer mhub_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://retailer.com/wrong-sku"}'
+
+# List
+curl "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/exclusions" \
+  -H "Authorization: Bearer mhub_live_..."
+```
+
+**Other changes in v6:**
+- **Caller-controlled refresh cadence is now strict.** Our internal cron no longer touches `tracked_queries`. Each tracked query is refreshed only when you call `POST /api/v1/prices/track/{tracking_id}/refresh`. The previously-documented "automatic cron refresh on `refresh_interval_hours` cadence" is removed — `refresh_interval_hours` now ONLY drives the throttle response when you call `/refresh` too soon (returns `status: "throttled"` with `throttle_until`). This eliminates surprise per-call billing.
+- **24h single-tier cadence** for the platform's own internal monitoring (does not apply to your tracked queries — caller controls cadence).
+
+#### On-demand re-verification — `POST /api/v1/prices/track/{tracking_id}/verify`
+
+Re-runs Firecrawl verification on every URL (or just the URLs you specify) in the latest refresh run for this tracked query. Refreshes the `verified` flag, the on-page price, the `original_price` (was/now), the availability label, and the `notes` field — in place, on the existing rows.
+
+**Different from `/refresh`:** does NOT re-run discovery. No Perplexity, no DataForSEO, no marketplace adapters. Cheaper, faster, narrower scope. Use this when:
+- You see a row with `verified=false` and want to retry the page (transient blocked / 404 / captcha)
+- You suspect a price changed but don't want to spend the full discovery cost
+- You want to refresh just a few specific URLs without re-fetching the whole list
+
+**Body:**
+```json
+{
+  "urls": ["https://retailer.com/sku-1", "https://retailer.com/sku-2"]
+}
+```
+- `urls` (optional) — whitelist of URLs to re-verify. Each must already exist in the latest refresh run for this tracking_id (URLs not in the run are silently dropped).
+- Omit `urls` entirely to re-verify every URL in the latest run.
+
+**Response:**
+```json
+{
+  "tracking_id": "...",
+  "status": "verified",
+  "rows_processed": 12,
+  "verified_count": 10,
+  "unverified_count": 2,
+  "credits_used": 12,
+  "latency_ms": 8421,
+  "results": [ ...freshly-updated TrackedQueryResultRow objects, exclusion filter applied... ]
+}
+```
+
+`status` values: `"verified"` (success), `"no_results"` (no prior refresh — call `/refresh` first), `"no_match"` (none of the supplied URLs belong to the latest run), `"inactive"` (tracking deactivated), `"error"` (Firecrawl pipeline crashed).
+
+**Cost:** 1 Firecrawl credit per URL re-verified. No LLM cost. Tallied into `total_credits_used` so partner dashboards reflect the spend.
+
+**Curl:**
+```bash
+# Re-verify everything in the latest run
+curl -X POST "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/verify" \
+  -H "Authorization: Bearer mhub_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Re-verify just one URL
+curl -X POST "https://v1api.materialshub.gr/api/v1/prices/track/{tracking_id}/verify" \
+  -H "Authorization: Bearer mhub_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["https://retailer.com/specific-sku"]}'
+```
+
+#### Backwards compatibility
+- All v5 endpoints, response shapes, and field names unchanged.
+- `preferred_retailer_domains` continues to work alongside the new exclusion endpoints.
+- Tracked queries with `refresh_interval_hours` set continue to validate the value, but as documented above the value no longer triggers automatic refreshes.
+</details>
 
 <details>
 <summary><b>2026-04-27 (v5)</b> — <b>Family-kept policy + Greek marketplaces (Skroutz / Bestprice / Shopflix) + manual promotion + cost overhaul.</b> Click to expand.</summary>

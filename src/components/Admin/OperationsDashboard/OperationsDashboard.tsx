@@ -1928,11 +1928,7 @@ const OperationsDashboardInner: React.FC = () => {
             </Card>
 
             {/* Chunk Quality Dashboard - Consolidated from /admin/chunk-quality */}
-            <Card style={{ background: 'none', backdropFilter: 'none', boxShadow: 'none' }}>
-              <CardContent className="p-0">
-                <ChunkQualityDashboard />
-              </CardContent>
-            </Card>
+            <ChunkQualityDashboard />
           </TabsContent>
 
           {/* Data Processing Tab - PDF, XML, Scraping */}

@@ -168,6 +168,121 @@ export async function demoteToFamily(args: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Per-product result exclusions (2026-04-28)
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ProductExclusion {
+  id: string;
+  url?: string | null;
+  domain?: string | null;
+  reason?: string | null;
+  excluded_at: string;
+}
+
+/**
+ * Mark a competitor URL or whole domain as excluded for THIS product.
+ * Admin-only. Idempotent — re-excluding updates the reason field.
+ * The next discover/refresh will not persist hits matching the exclusion,
+ * and the row's `is_active` flag flips false so it disappears immediately.
+ */
+export async function excludeProductResult(args: {
+  productId: string;
+  url?: string;
+  domain?: string;
+  reason?: string;
+}): Promise<ProductExclusion> {
+  const res = await fetch(
+    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/exclude`,
+    {
+      method: 'POST',
+      headers: await authHeader(),
+      body: JSON.stringify({ url: args.url, domain: args.domain, reason: args.reason }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`product-exclude failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/** Undo a previous exclusion. */
+export async function includeProductResult(args: {
+  productId: string;
+  url?: string;
+  domain?: string;
+}): Promise<{ success: boolean; removed_count: number }> {
+  const res = await fetch(
+    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/include`,
+    {
+      method: 'POST',
+      headers: await authHeader(),
+      body: JSON.stringify({ url: args.url, domain: args.domain }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`product-include failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/**
+ * Re-verify retailer prices on demand. Re-runs Firecrawl on selected (or all
+ * active) retailer URLs and refreshes current_price + verified flag in place.
+ * Does NOT call Perplexity / DataForSEO / marketplace adapters — narrower
+ * scope than discoverRetailers, cheaper, faster.
+ *
+ * Cost: 1 Firecrawl credit per URL re-verified.
+ */
+export interface VerifyProductSourcesResponse {
+  success: boolean;
+  status: 'verified' | 'no_results' | string;
+  rows_processed: number;
+  verified_count: number;
+  unverified_count: number;
+  credits_used: number;
+  latency_ms: number;
+  results: unknown[];
+  message?: string;
+}
+
+export async function verifyProductSources(args: {
+  productId: string;
+  urls?: string[];
+}): Promise<VerifyProductSourcesResponse> {
+  const res = await fetch(
+    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/verify`,
+    {
+      method: 'POST',
+      headers: await authHeader(),
+      body: JSON.stringify({ urls: args.urls }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`product-verify failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/** List every exclusion attached to this product. */
+export async function listProductExclusions(productId: string): Promise<ProductExclusion[]> {
+  const res = await fetch(
+    `${MIVAA_BASE}/api/v1/price-monitoring/products/${productId}/exclusions`,
+    {
+      method: 'GET',
+      headers: await authHeader(),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`product-exclusions failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
 /**
  * Trigger Perplexity discovery for a monitored product. Respects 6h throttle
  * unless force_refresh=true (admin/super_admin only).
