@@ -412,6 +412,61 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
     } catch (e) {
       console.warn(`[AutoRecoveryCron] append_recovery_history (exhausted) failed for ${job.id}:`, e);
     }
+
+    // P0-1 cost watchdog: when we give up on a PDF job, force-scale every HF
+    // endpoint to zero so we don't keep paying for replicas the dead worker
+    // never cleaned up.
+    if (job.type === 'pdf_processing') {
+      await scaleAllHfEndpointsToZero(`exhausted job ${job.id}`);
+    }
+  }
+}
+
+async function scaleAllHfEndpointsToZero(reason: string): Promise<void> {
+  const hfToken = Deno.env.get('HUGGINGFACE_API_KEY') || Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+  const namespace = Deno.env.get('HF_NAMESPACE') || 'basiliskan';
+  if (!hfToken) {
+    console.warn('[AutoRecoveryCron] HF token not configured — cannot scale endpoints to zero');
+    return;
+  }
+  const endpoints = ['mh-qwen332binstruct', 'mh-slig', 'mh-yolo', 'mh-chandra'];
+  for (const ep of endpoints) {
+    try {
+      // Read current scaling config so we preserve maxReplica
+      const getResp = await fetch(
+        `https://api.endpoints.huggingface.cloud/v2/endpoint/${namespace}/${ep}`,
+        { headers: { Authorization: `Bearer ${hfToken}` } }
+      );
+      if (!getResp.ok) {
+        console.warn(`[AutoRecoveryCron] Could not fetch ${ep}: ${getResp.status}`);
+        continue;
+      }
+      const cfg = await getResp.json();
+      const maxRep = cfg?.compute?.scaling?.maxReplica ?? 2;
+      const updResp = await fetch(
+        `https://api.endpoints.huggingface.cloud/v2/endpoint/${namespace}/${ep}`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${hfToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            compute: {
+              ...cfg.compute,
+              scaling: { ...cfg.compute?.scaling, minReplica: 0, maxReplica: maxRep },
+            },
+          }),
+        }
+      );
+      if (updResp.ok) {
+        console.log(`[AutoRecoveryCron] ✅ Scaled ${ep} to 0 replicas (${reason})`);
+      } else {
+        console.warn(`[AutoRecoveryCron] ⚠️ Failed to scale ${ep}: ${updResp.status}`);
+      }
+    } catch (e) {
+      console.warn(`[AutoRecoveryCron] Failed to scale ${ep}: ${e}`);
+    }
   }
 }
 

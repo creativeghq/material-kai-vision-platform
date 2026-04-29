@@ -59,12 +59,20 @@ export interface SegmentationResponse {
 
 /**
  * PDF Upload Response - returned by /api/rag/documents/upload
+ *
+ * Backend returns a flat dict (no DataResponse envelope). Keep these field
+ * names exactly aligned with rag_routes.py upload_document return dict.
  */
 export interface PDFUploadResponse {
   job_id: string;
-  document_id?: string;
+  document_id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   message?: string;
+  status_url?: string;
+  categories?: string[];
+  discovery_model?: string;
+  prompt_enhancement_enabled?: boolean;
+  source?: 'url' | 'upload';
 }
 
 /**

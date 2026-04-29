@@ -631,10 +631,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       )
       .subscribe();
 
-    // Also poll every 3s as backup (only for active jobs; terminal jobs just use realtime)
+    // P3-2: realtime is the primary; backup poll every 30s (was 3s).
+    // The 3s poll was making ~20 reads/min per open admin tab — wasteful
+    // when the realtime channel already pushes updates within milliseconds.
     let interval: NodeJS.Timeout | null = null;
     if (!isTerminal) {
-      interval = setInterval(refreshSelectedJob, 3000);
+      interval = setInterval(refreshSelectedJob, 30000);
     }
 
     return () => {
