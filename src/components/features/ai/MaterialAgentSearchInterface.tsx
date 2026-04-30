@@ -29,7 +29,6 @@ import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIn
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { MarkdownRenderer } from './MarkdownRenderer';
-// import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 
@@ -509,7 +508,7 @@ export const MaterialAgentSearchInterface: React.FC<
                 },
               );
 
-              // ✅ Handle standardized visual search response format
+              // Handle standardized visual search response format
               if (visualResponse.success && visualResponse.data) {
                 const responseData = visualResponse.data as any;
 
@@ -654,8 +653,7 @@ export const MaterialAgentSearchInterface: React.FC<
         hybridConfig.primary &&
         hybridConfig.fallback
       ) {
-        // REMOVED: HybridAIService deleted during cleanup
-        // Fallback to standard API integration via agent-chat Edge Function
+        // HybridAIService no longer exists — call agent-chat directly.
         console.log('⚠️ Hybrid AI Service removed - using standard API integration');
         try {
           const { data: mivaaData, error: mivaaError } = await supabase.functions.invoke(

@@ -3,12 +3,10 @@
  * Single source of truth for action-to-credit-cost mappings.
  * Used by the Credits Calculator UI and documentation.
  *
- * Synced with:
+ * Must stay in sync with:
  * - supabase/functions/_shared/mivaa-pricing.ts (backend billing)
  * - supabase/functions/_shared/credit-utils.ts (external services)
  * - mivaa-pdf-extractor/app/config/ai_pricing.py (Python backend)
- *
- * Last synced: 2026-04-24 (verified against Python AIPricingConfig — Claude/Voyage prices last verified 2026-04-18/19)
  */
 
 export interface ActionPricingEntry {

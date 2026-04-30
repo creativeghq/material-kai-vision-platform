@@ -38,7 +38,7 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     },
   },
   voyage: {
-    // Voyage AI pricing (verified 2026-04-19)
+    // Voyage AI pricing
     // https://docs.voyageai.com/docs/pricing
     fallback_prices: {
       'voyage-4': { input: 0.06, output: 0.00 },
@@ -54,7 +54,7 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     },
   },
   google: {
-    // Google AI pricing (verified 2026-03-30)
+    // Google AI pricing
     // https://ai.google.dev/gemini-api/docs/pricing
     fallback_prices: {
       'gemini-3-flash-preview': { input: 0.50, output: 3.00 },

@@ -1,7 +1,7 @@
 /**
  * ProductMonitorTab — per-product price monitoring view.
  *
- * Layout (top → bottom, per the rebuilt architecture 2026-04-24):
+ * Layout (top → bottom):
  *   1. Header with Enable toggle + Admin "Refresh now" button
  *   2. Price history chart (combines Perplexity-discovered + custom URL data points)
  *   3. Discovered retailers table (Perplexity Sonar, auto-discovered, up to 10)
@@ -733,12 +733,10 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
 
 // ─── SimilarProductsSection — shows family rows (different SKU, same series) ──
 //
-// Family rows are kept after the 2026-04-27 policy change but rendered
-// separately so they don't pollute the price chart / median / alerts. Admin
-// can promote a family row to tracked if the classifier was wrong.
-//
-// For internal product flow (competitor_sources). The tracked-query flow
-// has the same UI rendered by the external API consumer.
+// Family rows are rendered separately so they don't pollute the price chart /
+// median / alerts. Admin can promote a family row to tracked if the classifier
+// was wrong. Internal product flow (competitor_sources); the tracked-query
+// flow has the same UI rendered by the external API consumer.
 
 const SimilarProductsSection: React.FC<{
   rows: CompetitorSource[];

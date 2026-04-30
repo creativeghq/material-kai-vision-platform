@@ -150,7 +150,7 @@ export class UnifiedSearchService {
    */
   static async search(request: UnifiedSearchRequest): Promise<UnifiedSearchResponse> {
     try {
-      const strategy = request.strategy || 'multi_vector';  // ✅ Changed default to multi_vector
+      const strategy = request.strategy || 'multi_vector';
 
       // Build request payload matching Python backend schema
       const payload = {

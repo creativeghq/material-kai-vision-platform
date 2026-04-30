@@ -13,8 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Progress } from '@/components/core/ui/progress';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
-// REMOVED: savedSearchesService deleted during cleanup
-// import { MergeSuggestion } from '@/services/savedSearchesService';
+// savedSearchesService no longer exists — placeholder type until merge UX is rebuilt.
 type MergeSuggestion = any;
 
 interface MergeSearchModalProps {

@@ -5,7 +5,6 @@ import {
   MaterialChangePayload,
   MaterialSubscriptionCallbacks,
 } from '../services/realtime/materialRealtimeService';
-// import { supabase } from '../lib/supabase'; // Fixed: Using window.supabase instead
 
 interface UseMaterialRealtimeOptions {
   materialId?: string;

@@ -193,7 +193,7 @@ const TABLES_TO_CLEAR = [
   'documents',                     // PDF documents metadata
   'processed_documents',           // Processed document records
 
-  // ── Materials & Catalog (user-populated per 2026-04 decision) ───────
+  // ── Materials & Catalog (user-populated) ────────────────────────────
   'material_images',               // Material images
   'material_properties',           // Material properties
   'material_categories',           // Material categories

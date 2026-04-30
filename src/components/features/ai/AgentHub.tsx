@@ -351,7 +351,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [geminiEditRoomType, setGeminiEditRoomType] = useState<string | null>(null);
   const [geminiEditStyle, setGeminiEditStyle] = useState<string | null>(null);
   const [regionEditImageUrl, setRegionEditImageUrl] = useState<string | null>(null);
-  // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [editingConvoId, setEditingConvoId] = useState<string | null>(null);
@@ -379,7 +378,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // REMOVED: pdfInputRef - PDF processing moved to /admin/data-import page
 
   // Track previous agent to detect actual agent switches
   const previousAgentRef = useRef<string | null>(null);
@@ -1196,8 +1194,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           ...(selectedTools.length > 0 ? { selected_tools: selectedTools } : {}),
         };
 
-        // REMOVED: PDF data attachment - PDF processing moved to /admin/data-import page
-
         // Call Supabase Edge Function for agent execution with STREAMING
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
@@ -1770,7 +1766,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      // REMOVED: setAttachedPDF(null) - PDF processing moved to /admin/data-import page
     }
   }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
 
@@ -1819,8 +1814,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       });
     });
   }, []);
-
-  // REMOVED: handlePDFUpload - PDF processing moved to /admin/data-import page
 
   const handleVoiceInput = useCallback(() => {
     if (!isVoiceSupported) {

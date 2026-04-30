@@ -129,10 +129,10 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing product quality for ${productId}...`);
 
-      // Get product data with quality scores.
-      // Post 2026-04 cleanup, the only product-level embedding column is text_embedding_1024.
-      // Image-level embeddings live in vecs.image_*_embeddings collections, accessed
-      // via image_product_associations + the has_*_slig flags on document_images.
+      // Get product data with quality scores. The only product-level embedding
+      // column is text_embedding_1024; image embeddings live in
+      // vecs.image_*_embeddings, accessed via image_product_associations +
+      // the has_*_slig flags on document_images.
       const { data: product, error: productError } = await supabase
         .from('products')
         .select(
@@ -228,9 +228,8 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing chunk quality for ${chunkId}...`);
 
-      // Get chunk data with quality scores.
-      // Post 2026-04 cleanup, document_vectors only carries text_embedding_1024.
-      // Visual embeddings live in vecs.image_*_embeddings collections, not here.
+      // Get chunk data with quality scores. document_vectors only carries
+      // text_embedding_1024; visual embeddings live in vecs.image_*_embeddings.
       const { data: chunk, error: chunkError } = await supabase
         .from('document_vectors')
         .select(
@@ -324,10 +323,9 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing image quality for ${imageId}...`);
 
-      // Get image data with validation results.
-      // Post 2026-04 cleanup, embedding columns are dropped from document_images.
-      // Presence of embeddings is now tracked via has_*_slig boolean flags;
-      // the actual vectors live in vecs.image_*_embeddings collections.
+      // Get image data with validation results. document_images carries no
+      // embedding columns — presence is tracked via has_*_slig boolean flags
+      // and the actual vectors live in vecs.image_*_embeddings.
       const { data: image, error: imageError } = await supabase
         .from('document_images')
         .select(
@@ -519,10 +517,10 @@ export class QualityControlService {
   /**
    * Calculate embedding coverage for a product.
    *
-   * Post 2026-04 cleanup, the only product-level embedding is text_embedding_1024.
-   * All visual embeddings (SLIG, color, texture, style, material, understanding)
-   * live on associated images in vecs.image_*_embeddings — image-level coverage
-   * is computed separately by the backend RPC `get_product_embedding_status`.
+   * The only product-level embedding is text_embedding_1024. All visual
+   * embeddings (SLIG, color, texture, style, material, understanding) live on
+   * associated images in vecs.image_*_embeddings — image-level coverage is
+   * computed separately by the backend RPC `get_product_embedding_status`.
    */
   private static calculateEmbeddingCoverage(product: any): number {
     return product.text_embedding_1024 && product.text_embedding_1024.length > 0
@@ -554,9 +552,9 @@ export class QualityControlService {
   /**
    * Calculate embedding coverage for an image.
    *
-   * Post 2026-04 cleanup, the actual vectors live in vecs.image_*_embeddings
-   * collections. document_images carries boolean presence flags instead — we
-   * compute coverage as the fraction of expected embedding types that are present.
+   * The actual vectors live in vecs.image_*_embeddings collections;
+   * document_images carries boolean presence flags only. Coverage is the
+   * fraction of expected embedding types that are present.
    */
   private static calculateImageEmbeddingCoverage(image: any): number {
     const flags = [

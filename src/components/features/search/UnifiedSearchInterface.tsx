@@ -103,7 +103,6 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
-  // ✅ NEW: Add specialized search type state
   const [searchType, setSearchType] = useState<'text' | 'image' | 'hybrid' | 'color' | 'texture' | 'style' | 'material'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -307,7 +306,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   }, [results, applyEntityFilters]);
 
   const performSearch = useCallback(async () => {
-    // ✅ UPDATED: Validate input based on search type
+    // Validate input based on search type
     if (searchType === 'text' && !query.trim()) {
       toast({
         title: 'Search Input Required',
@@ -360,8 +359,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         });
       }
 
-      // ✅ All search types now use multi_vector strategy (the only supported strategy)
-      // multi_vector automatically handles text, image, color, texture, style, and material searches
+      // multi_vector is the only supported strategy — it handles text, image,
+      // color, texture, style, and material searches.
       searchResponse = await UnifiedSearchService.searchMultiVector({
         query: searchType === 'text' ? query.trim() : (selectedImage?.name || `${searchType}_search`),
         workspace_id: workspaceData.workspace_id,
@@ -549,7 +548,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             </Button>
           </div>
 
-          {/* ✅ NEW: Search Type Selector */}
+          {/* Search Type Selector */}
           <div className="flex items-center gap-4">
             <Label className="text-sm font-medium">Search Type:</Label>
             <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>

@@ -314,7 +314,7 @@ export function LogViewer() {
                 </CardTitle>
                 <CardDescription>
                   Showing {logs.length} of {total} logs from database
-                  {loading && <span className="ml-2 text-blue-500">Loading...</span>}
+                  {loading && <span className="ml-2 text-primary">Loading...</span>}
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -368,7 +368,7 @@ export function LogViewer() {
             {/* Filters */}
             <div className="flex gap-4 mb-4 flex-wrap">
               <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search logs..."
@@ -449,15 +449,15 @@ export function LogViewer() {
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-[600px] overflow-y-auto">
                 {logs.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-muted-foreground">
                     {loading ? (
                       <>
-                        <RefreshCw className="h-12 w-12 mx-auto mb-4 text-gray-300 animate-spin" />
+                        <RefreshCw className="h-12 w-12 mx-auto mb-4 text-muted-foreground/60 animate-spin" />
                         <p className="font-medium">Loading logs...</p>
                       </>
                     ) : (
                       <>
-                        <Database className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground/60" />
                         <p className="font-medium">No logs available</p>
                         <p className="text-sm">Logs will appear here as your backend processes run</p>
                       </>
@@ -468,22 +468,22 @@ export function LogViewer() {
                     <table className="w-full">
                       <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Logger</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Time</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Level</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Logger</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Message</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Details</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {logs.map((log) => (
-                          <tr key={log.id} className="hover:bg-gray-50">
+                          <tr key={log.id} className="hover:bg-muted/50 transition-colors">
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex flex-col gap-1">
-                                <span className="text-xs font-mono text-gray-900">
+                                <span className="text-xs font-mono text-foreground">
                                   {formatTime(log.timestamp)}
                                 </span>
-                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {getRelativeTime(log.timestamp)}
                                 </span>
@@ -502,7 +502,7 @@ export function LogViewer() {
                                 {log.message}
                               </div>
                               {log.context?.exception && (
-                                <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
+                                <div className="flex items-center gap-1 mt-1 text-xs text-destructive">
                                   <AlertCircle className="h-3 w-3" />
                                   {log.context.exception.message}
                                 </div>
@@ -528,7 +528,7 @@ export function LogViewer() {
                       className="h-16 flex items-center justify-center"
                     >
                       {loadingMore && (
-                        <div className="flex items-center gap-2 text-gray-500">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           <span className="text-sm">Loading more logs...</span>
                         </div>
@@ -538,13 +538,13 @@ export function LogViewer() {
                           variant="ghost"
                           size="sm"
                           onClick={loadMoreLogs}
-                          className="text-gray-500"
+                          className="text-muted-foreground"
                         >
                           Load more ({logs.length} of {total})
                         </Button>
                       )}
                       {!hasMore && logs.length > 0 && (
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-muted-foreground">
                           All {logs.length} logs loaded
                         </span>
                       )}
@@ -571,40 +571,40 @@ export function LogViewer() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Timestamp</label>
+                  <label className="text-sm font-medium text-muted-foreground">Timestamp</label>
                   <p className="text-sm font-mono">{new Date(selectedLog.timestamp).toLocaleString()}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Level</label>
+                  <label className="text-sm font-medium text-muted-foreground">Level</label>
                   <div className="mt-1">{getLevelBadge(selectedLog.level)}</div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Logger</label>
+                  <label className="text-sm font-medium text-muted-foreground">Logger</label>
                   <p className="text-sm">{selectedLog.logger_name}</p>
                 </div>
                 {selectedLog.job_id && (
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Job ID</label>
+                    <label className="text-sm font-medium text-muted-foreground">Job ID</label>
                     <p className="text-sm font-mono">{selectedLog.job_id}</p>
                   </div>
                 )}
                 {selectedLog.request_id && (
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Request ID</label>
+                    <label className="text-sm font-medium text-muted-foreground">Request ID</label>
                     <p className="text-sm font-mono">{selectedLog.request_id}</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Message</label>
-                <p className="text-sm mt-1 p-3 bg-gray-50 rounded border">{selectedLog.message}</p>
+                <label className="text-sm font-medium text-muted-foreground">Message</label>
+                <p className="text-sm mt-1 p-3 bg-muted text-foreground rounded border border-border">{selectedLog.message}</p>
               </div>
 
               {selectedLog.context && Object.keys(selectedLog.context).length > 0 && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Context</label>
-                  <pre className="text-xs mt-1 p-3 bg-gray-50 rounded border overflow-x-auto">
+                  <label className="text-sm font-medium text-muted-foreground">Context</label>
+                  <pre className="text-xs mt-1 p-3 bg-muted text-foreground rounded border border-border overflow-x-auto">
                     {JSON.stringify(selectedLog.context, null, 2)}
                   </pre>
                 </div>

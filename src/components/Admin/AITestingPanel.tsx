@@ -24,9 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-// import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
-
-// ✅ Standardized AI Test Response Interface
+// Standardized AI Test Response Interface
 interface UnifiedAITestResponse {
   success: boolean;
   data?: {
@@ -57,7 +55,7 @@ interface UnifiedAITestResponse {
   };
 }
 
-// ✅ Response standardization utility
+// Response standardization utility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   // Handle standardized response format
@@ -298,7 +296,6 @@ export const AITestingPanel: React.FC = () => {
         payload: payload,
       });
 
-      // ✅ Use standardized response handler
       const standardizedResponse = standardizeAIResponse(result);
 
       if (!standardizedResponse.success) {
@@ -508,8 +505,7 @@ export const AITestingPanel: React.FC = () => {
         );
       }
 
-      // REMOVED: HybridAIService deleted during cleanup
-      // This test function is deprecated - use MIVAA API directly instead
+      // Deprecated — use MIVAA API endpoints directly for material analysis.
       throw new Error(
         'Hybrid AI testing is deprecated. Use MIVAA API endpoints directly for material analysis.',
       );
@@ -527,9 +523,8 @@ export const AITestingPanel: React.FC = () => {
     }
   };
 
-  // REMOVED: test3DGeneration function
-  // 3D generation is now handled via MaterialAgent3DGenerationAPI on frontend
-  // which uses BrowserApiIntegrationService.generateInteriorDesign()
+  // 3D generation is handled by MaterialAgent3DGenerationAPI on the frontend
+  // (BrowserApiIntegrationService.generateInteriorDesign).
 
   const getSampleImageUrls = () => [
     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800',

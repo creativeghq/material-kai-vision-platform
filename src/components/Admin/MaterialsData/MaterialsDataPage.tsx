@@ -62,7 +62,7 @@ export const MaterialsDataPage: React.FC = () => {
 
   const loadStats = async (wsId: string) => {
     try {
-      // ✅ NEW: Use MIVAA API endpoint that counts VECS embeddings
+      // MIVAA endpoint counts VECS embeddings server-side
       const response = await fetch(
         `${MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
       );
@@ -78,7 +78,7 @@ export const MaterialsDataPage: React.FC = () => {
         products: statsData.products || 0,
         chunks: statsData.chunks || 0,
         images: statsData.images || 0,
-        embeddings: statsData.embeddings?.total || 0, // ✅ NEW: Total includes text + image embeddings from VECS
+        embeddings: statsData.embeddings?.total || 0, // total includes text + image embeddings from VECS
       });
     } catch (error) {
       console.error('Failed to load stats:', error);

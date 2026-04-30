@@ -66,7 +66,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
       if (materialError) throw materialError;
       if (knowledgeError) throw knowledgeError;
 
-      // ✅ FIXED: Load real embedding model statistics from database
+      // Load real embedding model statistics from database
       const { data: embeddingModelStats, error: embeddingError } =
         await supabase
           .from('embeddings')

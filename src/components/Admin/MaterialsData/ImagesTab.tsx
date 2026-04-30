@@ -105,9 +105,8 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
   const loadImageEmbeddings = async (imageId: string) => {
     try {
-      // Post 2026-04 cleanup: embedding columns dropped from document_images.
-      // Presence is now tracked via has_*_slig boolean flags; the actual vectors
-      // live in vecs.image_*_embeddings collections.
+      // document_images carries no embedding columns — presence is tracked
+      // via has_*_slig boolean flags; vectors live in vecs.image_*_embeddings.
       const { data: imageData, error: imageError } = await supabase
         .from('document_images')
         .select(
@@ -203,8 +202,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
         `)
         .eq('image_id', image.id);
 
-      // Load product relationships
-      // ✅ UPDATED: Use image_product_associations table
+      // Load product relationships from image_product_associations
       const { data: productRels } = await supabase
         .from('image_product_associations')
         .select(`

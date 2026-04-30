@@ -165,14 +165,14 @@ export class QuotesService {
     notes?: string;
     custom_request_text?: string;
   }): Promise<Quote> {
-    // ✅ FIX (KAI-1M): Get current user_id for RLS policy
+    // user_id is required by the RLS policy on quotes
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
     const { data: quote, error } = await supabase
       .from('quotes')
       .insert({
-        user_id: user.id, // ✅ Required for RLS policy
+        user_id: user.id, // required for RLS policy
         name: data?.name,
         workspace_id: data?.workspace_id,
         notes: data?.notes,
@@ -286,7 +286,6 @@ export class QuotesService {
     const productImageMap: Record<string, string> = {};
 
     if (productIds.length > 0) {
-      // ✅ UPDATED: Use image_product_associations table
       const { data: imageRelations } = await supabase
         .from('image_product_associations')
         .select('product_id, image:document_images(image_url)')
@@ -652,8 +651,7 @@ export class QuotesService {
   }
 
   /**
-   * Get all quote requests (ALL quotes for admin view)
-   * ✅ FIX: Show all quotes, not just those with quote_requests entries
+   * Get all quotes for the admin view (not just those with a quote_requests entry).
    */
   async getQuoteRequests(): Promise<QuoteWithItems[]> {
     // Get ALL quotes (admin view shows everything)
@@ -1281,8 +1279,7 @@ export class QuotesService {
       const productsNeedingImages = products.filter(p => !productDataMap[p.id]?.image_url).map(p => p.id);
 
       if (productsNeedingImages.length > 0) {
-        // ✅ UPDATED: Use image_product_associations table
-        const { data: relationships } = await supabase
+          const { data: relationships } = await supabase
           .from('image_product_associations')
           .select('product_id, image:document_images(image_url)')
           .in('product_id', productsNeedingImages)
@@ -1353,7 +1350,6 @@ export class QuotesService {
     if (!products || products.length === 0) return [];
 
     // Get images for these products from image_product_associations
-    // ✅ UPDATED: Use image_product_associations table
     const productIds = products.map(p => p.id);
     const { data: relationships } = await supabase
       .from('image_product_associations')

@@ -167,9 +167,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     }
   }, [config, toast]);
 
-  // REMOVED: test3DIntegration function
-  // 3D generation is now handled via MaterialAgent3DGenerationAPI on frontend
-  // Use /agent-hub to test 3D generation with material suggestions
+  // 3D generation is handled by MaterialAgent3DGenerationAPI on the frontend;
+  // use /agent-hub to test 3D generation with material suggestions.
 
   const getSourceIcon = (source: string) => {
     switch (source) {

@@ -169,7 +169,7 @@ export async function demoteToFamily(args: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Per-product result exclusions (2026-04-28)
+// Per-product result exclusions
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface ProductExclusion {

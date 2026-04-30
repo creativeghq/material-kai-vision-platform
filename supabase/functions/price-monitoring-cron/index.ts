@@ -175,9 +175,8 @@ Deno.serve(async (req) => {
     // External tracked_queries (`tracked_queries` table) are intentionally NOT
     // refreshed here. External API consumers control their own refresh
     // cadence by calling POST /api/v1/prices/track/{id}/refresh themselves.
-    // Our internal cron does not touch their data — this is contractual:
-    // they pay per-call, and unsolicited refreshes would surprise their
-    // billing. (Decision 2026-04-25.)
+    // Our internal cron does not touch their data — they pay per-call, and
+    // unsolicited refreshes would surprise their billing.
 
     return new Response(JSON.stringify({
       success: true,

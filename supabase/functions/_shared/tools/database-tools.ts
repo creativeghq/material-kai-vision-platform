@@ -368,8 +368,7 @@ export const createGetRelationshipCountsTool = () => {
     async ({ documentId }) => {
       try {
 
-        // Query all relationship tables
-        // ✅ UPDATED: Use image_product_associations table
+        // Query all relationship tables.
         const [chunkProductRels, productImageRels, chunkImageRels, productDocRels] = await Promise.all([
           supabase.from('chunk_product_relationships').select('id', { count: 'exact', head: true }).eq('chunk_id', documentId),
           supabase.from('image_product_associations').select('id', { count: 'exact', head: true }),

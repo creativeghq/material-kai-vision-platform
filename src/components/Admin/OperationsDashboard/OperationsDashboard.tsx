@@ -1493,7 +1493,7 @@ const OperationsDashboardInner: React.FC = () => {
                 <RefreshCw className="h-5 w-5 animate-spin mr-2" />
                 Loading usage data...
               </div>
-            ) : !extServiceData || extServiceData.summary.total_operations === 0 ? (
+            ) : !extServiceData?.summary || extServiceData.summary.total_operations === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                   <Activity className="h-10 w-10 mb-3 opacity-30" />

@@ -3,8 +3,6 @@
  *
  * Aggregates quality metrics from Product Enrichment and Validation Rules services
  * to provide comprehensive quality insights.
- *
- * ✅ UPDATED: Removed ImageValidationService (image_validations table dropped)
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -69,7 +67,6 @@ export interface QualityDashboardData {
 }
 
 class QualityDashboardServiceImpl extends BaseService {
-  // ✅ REMOVED: imageValidationService (image_validations table dropped)
   private productEnrichmentService: ProductEnrichmentService;
   private validationRulesService: ValidationRulesService;
 
@@ -97,7 +94,6 @@ class QualityDashboardServiceImpl extends BaseService {
    */
   protected async doInitialize(): Promise<void> {
     // Initialize dependent services
-    // ✅ REMOVED: imageValidationService initialization
     await this.productEnrichmentService.initialize();
     await this.validationRulesService.initialize();
   }
@@ -107,8 +103,6 @@ class QualityDashboardServiceImpl extends BaseService {
    */
   async getQualityMetrics(workspaceId: string): Promise<QualityMetrics> {
     return this.executeOperation(async () => {
-      // ✅ REMOVED: Image validation stats (image_validations table dropped)
-
       // Get product enrichment stats
       const enrichmentStats =
         await this.productEnrichmentService.getEnrichmentStats(workspaceId);
@@ -117,8 +111,8 @@ class QualityDashboardServiceImpl extends BaseService {
       const validationStats =
         await this.validationRulesService.getValidationStats(workspaceId);
 
-      // Calculate overall quality score (weighted average)
-      // ✅ UPDATED: Removed image quality weight, redistributed
+      // Calculate overall quality score (weighted average — image weight
+      // was removed when the image_validations table was dropped).
       const enrichmentQualityWeight = 0.5;
       const validationQualityWeight = 0.5;
 
@@ -135,7 +129,7 @@ class QualityDashboardServiceImpl extends BaseService {
       const metrics: QualityMetrics = {
         timestamp: new Date().toISOString(),
         workspace_id: workspaceId,
-        // ✅ REMOVED: Image validation metrics (set to 0)
+        // image validation metrics are zeroed out (table dropped)
         total_images_validated: 0,
         valid_images: 0,
         invalid_images: 0,
