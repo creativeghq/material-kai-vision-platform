@@ -64,14 +64,22 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for text embeddings | `pa-xxxxxxxxxxxxxxxx` |
-| `QWEN_ENDPOINT_URL` | Public | Server ENV | Qwen HuggingFace endpoint URL | `https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud` |
-| `QWEN_ENDPOINT_TOKEN` | **Secret** | Server ENV | Qwen HuggingFace endpoint token | `hf_xxxxxxxxxxxxxxxx` |
-| `QWEN_ENDPOINT_NAME` | Public | Server ENV | Qwen endpoint service name | `mh-qwen332binstruct` |
+| `QWEN_ENDPOINT_URL` | Public | Server ENV | Qwen HF endpoint URL | `https://lv7trhkha3b5757r.us-east-1.aws.endpoints.huggingface.cloud` |
+| `QWEN_ENDPOINT_NAME` | Public | Server ENV | Qwen endpoint service name | `qwen3-6-35b-fp8` |
 | `QWEN_NAMESPACE` | Public | Server ENV | Qwen endpoint namespace | `basiliskan` |
-| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL | `https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud` |
-| `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token | `hf_xxxxxxxxxxxxxxxx` |
-| `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-siglip2` |
+| `QWEN_MODEL` | Public | Server ENV | Qwen model id served by the endpoint — **must match `/v1/models` response or vLLM 404s** | `Qwen/Qwen3.6-35B-A3B-FP8` |
+| `YOLO_ENDPOINT_URL` | Public | Server ENV | YOLO HF endpoint URL | `https://f763mkb5o68lmwtu.us-east-1.aws.endpoints.huggingface.cloud` |
+| `YOLO_ENDPOINT_NAME` | Public | Server ENV | YOLO endpoint service name | `mh-yolo` |
+| `YOLO_NAMESPACE` | Public | Server ENV | YOLO endpoint namespace | `basiliskan` |
+| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR HF endpoint URL | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` |
+| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra endpoint service name | `chandra-ocr-2` |
+| `CHANDRA_NAMESPACE` | Public | Server ENV | Chandra endpoint namespace | `basiliskan` |
+| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` |
+| `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token (usually same as `HUGGING_FACE_ACCESS_TOKEN`) | `hf_xxxxxxxxxxxxxxxx` |
+| `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-slig` |
 | `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | Single HF token used for ALL four endpoints (Qwen / YOLO / Chandra / SLIG resume + inference) — get from https://huggingface.co/settings/tokens | `hf_xxxxxxxxxxxxxxxx` |
+| `MAX_CONCURRENT_PRODUCTS` | Public | Server ENV | How many products process in parallel inside one PDF job. **Set to `1` on a 4 GB droplet** (anything higher hits cgroup MemoryHigh). Bump to 2-3 on 8 GB+ | `1` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
 | `SENTRY_DSN` | **Secret** | Server ENV | Sentry error tracking DSN | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
@@ -131,7 +139,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | **Later.com** | `LATE_API_KEY` | Edge Functions (`late-analytics`, `late-oauth`, `late-publish`, social background agents) | https://app.later.com/ → Settings → API | Social media scheduling |
 | **Later.com** | `LATE_WEBHOOK_SECRET` | Edge Functions (`late-webhook-handler`) | Later.com webhook settings | HMAC-SHA256 signature verification |
 | **HuggingFace** | `HF_TOKEN` | Backend (Chandra, YOLO endpoint management) | https://huggingface.co/settings/tokens — needs **write** permission | Inference Endpoints pause/resume — auto-pause enabled |
-| **HuggingFace** | `QWEN_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Can be same token as `HF_TOKEN` |
+| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. Qwen / YOLO / Chandra all read `HUGGING_FACE_ACCESS_TOKEN` directly — no per-endpoint token vars needed. |
 | **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | Set as GitHub repo secret — same value as `HF_TOKEN` |
 | **HuggingFace** | `HUGGINGFACE_API_KEY` | Edge Functions (`health-check`) | https://huggingface.co/settings/tokens | Health status checks — same token, different name |
 
@@ -139,19 +147,44 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 
 The platform uses HuggingFace Inference Endpoints for vision models and visual embeddings:
 
-**Qwen3-VL-32B-Instruct Endpoint:**
-- **URL**: `https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `mh-qwen332binstruct`
+**Qwen Vision Endpoint** (current — renamed 2026-04-29 from `mh-qwen332binstruct` after the 4×T4 cluster was replaced with a single A100 hosting `Qwen/Qwen3.6-35B-A3B-FP8`):
+- **URL**: `https://lv7trhkha3b5757r.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `qwen3-6-35b-fp8`
 - **Namespace**: `basiliskan`
-- **Auto-pause**: Enabled (pauses after 15 minutes of inactivity)
+- **Model id (vLLM)**: `Qwen/Qwen3.6-35B-A3B-FP8` ← **must match what `/v1/models` returns or every request 404s**
+- **Instance**: 1 × nvidia-a100, vLLM v0.18.1, FP8 quantization
+- **Auto-pause**: Enabled (paused state when idle, resumed on first request)
 
 **SLIG (SigLIP2) Endpoint:**
-- **URL**: `https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `mh-siglip2`
+- **URL**: `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-slig`
 - **Namespace**: `basiliskan`
-- **Auto-pause**: Enabled (pauses after 15 minutes of inactivity)
+- **Auto-pause**: Enabled
 
-**Required Environment Variables:** Set `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_TOKEN`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `SLIG_ENDPOINT_URL`, `SLIG_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_NAME`, and `SLIG_NAMESPACE` in the server environment.
+**YOLO Layout Detection Endpoint:**
+- **URL**: `https://f763mkb5o68lmwtu.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-yolo`
+- **Namespace**: `basiliskan`
+
+**Chandra OCR v2 Endpoint:**
+- **URL**: `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `chandra-ocr-2`
+- **Namespace**: `basiliskan`
+
+**Required GitHub Secrets** (the deploy workflow writes them as systemd `Environment=` lines into `mivaa-pdf-extractor.service` on every deploy — see `.github/workflows/deploy.yml` lines 793-823):
+
+```
+HUGGING_FACE_ACCESS_TOKEN  ← single token used for all 4 endpoints
+QWEN_ENDPOINT_URL          QWEN_ENDPOINT_NAME      QWEN_NAMESPACE      QWEN_MODEL
+YOLO_ENDPOINT_URL          YOLO_ENDPOINT_NAME      YOLO_NAMESPACE
+CHANDRA_ENDPOINT_URL       CHANDRA_ENDPOINT_NAME   CHANDRA_NAMESPACE
+SLIG_ENDPOINT_URL          SLIG_ENDPOINT_NAME      SLIG_NAMESPACE      SLIG_ENDPOINT_TOKEN
+MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
+```
+
+> When you rename or replace an endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain like `lv7trhkha3b5757r…`), update the corresponding `*_ENDPOINT_URL` and `*_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. The next push rewrites the systemd unit with the new values. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values, making config drift hard to debug. The drop-in `qwen-endpoint.conf` was used as an emergency override on 2026-04-29; remove it once the GH Secrets are populated.
+
+> **vLLM model-name rule**: the `model` field in every chat-completion request body must equal what the endpoint's `/v1/models` route returns. Mismatch → 404 from the inference engine, not from HF. Health checks + image classification + spec extraction all post this field — if you swap the endpoint to a different repo, update `QWEN_MODEL` to match.
 
 **Benefits:**
 - ✅ Auto-pause reduces costs during inactivity
