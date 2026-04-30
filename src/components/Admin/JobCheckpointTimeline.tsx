@@ -8,6 +8,9 @@ interface JobCheckpoint {
   id: string;
   job_id: string;
   stage: string;
+  // Optional — present when the source row carried a status field
+  // (in_progress / completed / failed). Old rows leave it undefined.
+  status?: string;
   checkpoint_data: any;
   metadata: any;
   created_at: string;
@@ -22,6 +25,7 @@ const STAGE_LABELS: Record<string, string> = {
   'initialized': 'Job Registration',
   'pdf_extracted': 'Document Text Extraction',
   'products_detected': 'AI Product Discovery',
+  'stage_1_5_layout_precompute': 'Layout Cache Precompute',
   'chunks_created': 'Semantic Chunking',
   'text_embeddings_generated': 'Vector Vectorization',
   'images_extracted': 'Visual Asset Extraction',
@@ -78,11 +82,23 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
 
                 {/* Checkpoint Item */}
                 <div className="flex gap-4">
-                  {/* Icon */}
+                  {/* Icon — status-aware so in_progress / failed events
+                      stand out in the audit log. Stages without a status
+                      (legacy rows) keep the green check. */}
                   <div className="flex-shrink-0 mt-1">
-                    <div className="w-6 h-6 rounded-full bg-green-50 border border-green-200 flex items-center justify-center">
-                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                    </div>
+                    {checkpoint.status === 'failed' ? (
+                      <div className="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+                      </div>
+                    ) : checkpoint.status === 'in_progress' ? (
+                      <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+                        <Clock className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-green-50 border border-green-200 flex items-center justify-center">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}

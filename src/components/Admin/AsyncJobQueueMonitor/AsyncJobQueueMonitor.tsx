@@ -239,6 +239,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         id: `${job.id}-${idx}`,
         job_id: job.id,
         stage: entry.stage,
+        // `status` lets renderers distinguish in_progress / completed / failed
+        // events for the same stage (Stage 1.5 emits both started + completed).
+        status: entry.status,
         checkpoint_data: entry.data || {},
         metadata: entry.metadata || {},
         created_at: entry.completed_at || entry.started_at,
@@ -535,7 +538,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     };
   }, [fetchQueueData, autoRefresh]);
 
-  // 🔧 FIX: Realtime subscription + polling for selected job — ALWAYS active when modal is open
+  // Realtime subscription + polling for selected job — always active while modal is open
   useEffect(() => {
     if (!selectedJob) return;
 
@@ -581,6 +584,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           id: `${selectedJob.id}-${idx}`,
           job_id: selectedJob.id,
           stage: entry.stage,
+          // Same status field carried as in fetchJobDetails — keeps the
+          // renderers consistent regardless of which path filled the array.
+          status: entry.status,
           checkpoint_data: entry.data || {},
           metadata: entry.metadata || {},
           created_at: entry.completed_at || entry.started_at,
@@ -644,9 +650,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [selectedJob?.id, selectedJob?.status]);
-
-  // ✅ REMOVED: Duplicate polling interval that was causing modal blink
-  // The refreshSelectedJob interval (lines 505-553) already handles this with proper deep comparison
 
   // Handle jobId query parameter - auto-open modal for specific job
   useEffect(() => {
@@ -3604,6 +3607,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           if (stage === 'initialized') return { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: '🚀' };
                           // Discovery
                           if (stage === 'products_detected') return { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', icon: '🔍' };
+                          // Stage 1.5 - Doc-level layout precompute
+                          if (stage === 'stage_1_5_layout_precompute') return { bg: 'bg-sky-500/10', border: 'border-sky-500/20', text: 'text-sky-400', icon: '📐' };
                           // Stage 1 - PDF Extraction
                           if (stage === 'pdf_extracted' || stage === 'pdf_pages_numbered') return { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', icon: '📄' };
                           // Stage 2 - Chunking & Text Embeddings
@@ -3668,6 +3673,36 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Processing Time', value: meta.processing_time_ms ? `${(meta.processing_time_ms / 1000).toFixed(1)}s` : 'N/A' },
                                 ],
                               };
+                            // Stage 1.5: doc-level layout precompute (YOLO + bbox merge cache)
+                            case 'stage_1_5_layout_precompute': {
+                              const paths = (data.extraction_paths || {}) as Record<string, number>;
+                              const pathsLine = Object.entries(paths)
+                                .filter(([, n]) => Number(n) > 0)
+                                .map(([k, n]) => `${k}=${n}`)
+                                .join(', ') || 'N/A';
+                              const status = (cp as any).status || 'completed';
+                              const skipped = data.skipped_reason as string | undefined;
+                              return {
+                                title:
+                                  status === 'failed'
+                                    ? 'Layout Precompute Failed'
+                                    : status === 'in_progress'
+                                      ? 'Layout Precompute Running'
+                                      : skipped
+                                        ? `Layout Precompute Skipped (${skipped})`
+                                        : 'Layout Precompute Complete',
+                                details: [
+                                  { label: 'Status', value: status },
+                                  { label: 'Total Physical Pages', value: data.pages_total },
+                                  { label: 'Already Cached', value: data.pages_cached_already },
+                                  { label: 'Pages Processed', value: data.pages_processed },
+                                  { label: 'Pages Persisted', value: data.pages_persisted },
+                                  { label: 'Extraction Paths', value: pathsLine },
+                                  { label: 'Duration', value: data.duration_ms ? `${(Number(data.duration_ms) / 1000).toFixed(1)}s` : 'N/A' },
+                                  ...(data.error ? [{ label: 'Error', value: String(data.error) }] : []),
+                                ],
+                              };
+                            }
                             case 'completed':
                               return {
                                 title: 'Processing Pipeline Complete',
