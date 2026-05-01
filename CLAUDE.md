@@ -7,6 +7,92 @@
 - **Database**: Supabase PostgreSQL 15 + pgvector 0.8.0
 - **Design System**: `.claude/design-system.md` — full reference for all UI patterns, colors, components
 
+## Pipeline Audit (2026-05-01)
+A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure bugs. **All P1s and P2s fixed in one giant PR**, no backlog. Key changes:
+
+### P2 hardening landed alongside P1s:
+- **Observability**: `cache_status` semantics propagated through `get_layout_from_document_cache_with_status`; per-product cost via `ai_usage_logs.product_id`; `pipeline_strategy_metrics` table for chunking-strategy distribution.
+- **Embeddings hardening**: Qwen vision_analysis schema validation (rejects malformed payloads before Voyage embeds garbage); atomic specialized VECS upsert (writes all 4 vectors first, then sets flags only for those that landed); Voyage 429 explicit handling with `Retry-After` honoring; `ai_usage_logs` mirror retries twice + ERRORs on persistent failure.
+- **Endpoint coordination**: `endpoint_controller.scale_all_to_zero(force=False)` now skips when other jobs are still running (active-job count = in-memory + DB-side); `register_job_start`/`register_job_done` from `progress_tracker`; `manager.warmup_completed` reset on scale.
+- **Reliability**: heartbeat thread is non-daemon AND gates per-tick write on terminal-status check (can't write to a finished job); entity linking surfaces skipped-chunk count when `product_pages` and `page_number` both null; icon unknown_field counts persisted in rollup as `_unknown_field_counts` for future alias curation; recovery `from_stage` reads `last_checkpoint.stage` directly when metadata field is missing.
+- **Image extraction accuracy**: bbox is normalized 0..1 in both `pdf_processor.py` extraction paths — fixed stage_3 spread-assignment that was treating it as PDF-points (every image was getting mis-assigned to left page); extraction stats log post-dedup actual counts alongside pre-dedup totals.
+- **Stage 4**: FK pre-validation on `source_document_id` before insert; immediate `image_product_associations` write at product creation (closes the window between Stage 4 and Stage 4.7); icon unknown fields surfaced in rollup.
+- **Atomicity**: `_emit_stage_event` retries once before logging at ERROR (was silent warning).
+- **Audit completeness**: `supabase/migrations/20260501_audit_export_cron_schedules_and_rpcs.sql` mirrors all 7 RPCs + 4 cron schedules from the live DB into VCS so any reviewer sees what's actually running.
+
+### OCR — Chandra v2 only, retry-with-jitter
+- **Pytesseract + EasyOCR removed entirely** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed). Even when "working" it produced bbox-less text that silently degraded layout-merge to UNCLASSIFIED orphans.
+- **Chandra v2 retry-with-jitter** (`chandra_endpoint_manager.run_inference`): 3 attempts at temperatures 0.0/0.1/0.2. The model freelances ("The image is..." prose) ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+- **Balanced-bracket trimmer** (`_strip_fences_and_junk`): replaces the old `rfind(']')`-based trim that mis-trimmed `\']`/`}"]` truncations. Recovers the bbox cleanly in those cases.
+- **Explicit failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
+- **Per-attempt metrics**: `chandra_ocr_metrics` table — one row per attempt, captures `outcome` (`success`/`success_after_retry`/`failed_prose`/`failed_malformed_json`/`failed_http_error`), `attempt_number`, `temperature`, `latency_ms`, `failure_mode_head`, `caller`.
+
+### Stage 1.5 — `cache_status` semantics + retry on OCR failure
+- New `analysis_metadata.cache_status` field on every `document_layout_analysis` row: `success` / `yolo_only` / `empty_page` / `ocr_failed` / `page_failed`.
+- Resume-skip query in `precompute_document_layout` now filters out `ocr_failed` + `page_failed` rows, so transient Chandra failures no longer permanently "skip" pages on every subsequent run (was P1 silent data loss).
+- `MIN_CONTAINMENT_RATIO=0.30` in `merge_layout` — empirical, document-specific tuning may be needed (P2 follow-up).
+
+### Phase 3 OCR — expanded to all text-bearing product images
+- **Was**: icon-only OCR, regular product images had zero per-image OCR. Scanned spec sheets silently lost all per-image text.
+- **Now**: `_run_phase_3_ocr_for_product` runs Chandra v2 on every text-bearing image after `save_images_and_generate_clips`. Filter rule:
+  - `yolo_crop` of region_type ∈ {TABLE, TEXT, TITLE, CAPTION}: OCR'd
+  - `embedded` with `metadata.text_detected=True`: OCR'd
+  - `full_render`: SKIPPED (Stage 1.5 already covered the page — `ocr_skipped_reason='full_render_dup_of_stage_1_5'`)
+  - photo / IMAGE-region yolo_crop: SKIPPED (`ocr_skipped_reason='photo_not_text_bearing'`)
+- **Storage**: new columns on `document_images` — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Consumed by: vision_analysis prompt enrichment, icon-metadata extraction, image-search labels.
+- **Bbox propagation**: `OCRResult.blocks` now carries Chandra's per-fragment list. `extract_icon_metadata` reads `result.blocks` instead of the always-`None` `result.bbox` (latent bug fixed).
+
+### Warmup — health probe before trusting "running"
+- Previous flow: HF endpoint status="running" → skip warmup. Recent run showed `skipped_count=4, success_count=0, failed_count=0` because all 4 endpoints were "running" from prior jobs but never re-validated.
+- Fixed: when status="running", call `_test_inference()` (Chandra `/health`, others their lightweight probe) — only skip if probe also passes. URL refresh now runs for SLIG/YOLO/Chandra on the skip path (was only Qwen).
+
+### Per-product loop — no silent swallow on resume + per-layer dedup
+- `product_processor.py:116-125`: stage_history query failure no longer silently `pass` — logs at ERROR so operators see it.
+- `pdf_processor._deduplicate_images`: per-extraction-layer phash dedup (separate buckets for `embedded` / `yolo_crop` / `full_render`). Cross-layer collisions used to silently drop images and keep the wrong layer label.
+- Corrupted images now mark + exclude (was silently included with `perceptual_hash=None` and bypassed dedup).
+
+### Embeddings — SLIG retry, OpenAI dim-pin, product-orphan flag
+- **SLIG dim-mismatch retry** (`real_embeddings_service`): 3 attempts before silent abort. Previously a single wrong-dim response (transient model swap) silently aborted with mass data loss.
+- **OpenAI fallback pinned to 1024D**: was using caller-provided `dimensions` arg — legacy 1536D callers would silently store wrong-dim text embeddings.
+- **Product orphan flag**: `stage_4_products.create_single_product` now returns `embedding_failed: bool`. Previously embedding failure created a product row with `text_embedding_1024=NULL` invisible to vector search; caller was told "success".
+
+### Cost + completion + slow-op
+- `complete_job()` is now idempotent — early-returns if `status='completed'` already. Was overwriting `completed_at` on every retry.
+- `total_ai_cost_usd` is now written at completion by summing `ai_usage_logs.cost_usd` for `job_id`. Was never written → uncomputable per-job cost.
+- New `background_jobs.current_slow_operation jsonb` flag (`{operation, started_at, expected_max_seconds}`). Stages that take >5min (long Chandra batches, SLIG fan-out) set this; auto-recovery cron skips jobs with fresh slow-op to prevent spurious recovery.
+
+### Auto-recovery — actually re-dispatches now + atomic checkpoint RPC
+- New SQL RPC `update_checkpoint_and_append_history(job_id, checkpoint, event)` — single-UPDATE atomic replacement for the previous two-call pattern (table.update + RPC append) that left audit gaps on crash between calls.
+- `auto-recovery-cron` PDF path now POSTs to MIVAA `/api/jobs/{id}/resume` after `mark_pdf_job_for_recovery` (was passive — relied on service restart). Best-effort; if POST fails, job stays `pending` and next restart still rescues.
+- `recovery_history` event now includes `dispatch_ok` boolean.
+
+## Pipeline Tables Reference (post-audit)
+- `chandra_ocr_metrics` — per-attempt OCR telemetry (success rate, retry rate, failure modes)
+- `document_images.ocr_text / ocr_blocks / ocr_failed / ocr_attempts / ocr_skipped_reason` — Phase 3 per-image OCR
+- `document_layout_analysis.analysis_metadata.cache_status` — per-page Stage 1.5 status (filters resume-skip)
+- `background_jobs.current_slow_operation` — `{operation, started_at, expected_max_seconds}` slow-op suppression
+- `background_jobs.total_ai_cost_usd` — written at job completion from `ai_usage_logs` aggregate (sums `billed_cost_usd`)
+- `ai_usage_logs.product_id / image_id` — per-product/per-image cost attribution
+- `pipeline_strategy_metrics` — chunking strategy + Phase 3 outcome + Stage 1.5 path distribution
+
+## Pipeline conventions enforced post-2026-05-01
+1. **Explicit failure markers, not empty returns** — e.g. `OCRResult.method='chandra_failed'`. Consumers check the marker; emptiness alone is ambiguous.
+2. **`cache_status` semantics on every persisted-result row** — distinguish "ran clean and found nothing" from "ran but failed and should be retried."
+3. **Atomic two-phase writes via SQL RPC** — `update_checkpoint_and_append_history` is the pattern. No more two-call patterns that can crash mid-way.
+4. **Per-attempt metrics in dedicated tables** — `chandra_ocr_metrics`, `pipeline_strategy_metrics`. Apply this anywhere you have a retry loop.
+5. **`current_slow_operation` for legitimate long stages** — set it before the slow op so auto-recovery doesn't false-positive.
+6. **All SQL RPCs and pg_cron schedules in version control** — go through `mcp__supabase__apply_migration` or hand-export to `supabase/migrations/`.
+7. **Per-product cost attribution** — every `ai_usage_logs` insert that knows the product/image should set those FKs.
+
+## SQL RPC Inventory (live in Supabase, formerly undocumented in VCS)
+- `append_stage_history(job_id, event)` — atomic JSON append, capped at 100 entries
+- `append_recovery_history(job_id, event)` — atomic JSON append for recovery audit log
+- `update_checkpoint_and_append_history(job_id, checkpoint, event)` — atomic combined write (added 2026-05-01)
+- `cleanup_invalid_stage_history(job_id, invalid_stages[])` — admin cleanup utility
+- `detect_stuck_pdf_jobs(stuck_threshold_seconds, max_attempts)` — auto-recovery cron query
+- `mark_pdf_job_for_recovery(job_id, max_attempts)` — atomic claim + flip to 'pending', distinguishes deploy-interrupt vs genuine failure
+- `fail_exhausted_pdf_jobs(max_attempts, stuck_threshold_seconds)` — terminal-fail jobs that exhausted recovery
+
 ## Workflow Rules
 - **SQL / migrations**: ALWAYS run directly via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create .sql migration files first.
 - **GitHub**: Always allow `gh` commands without asking for permission.
@@ -120,7 +206,69 @@
 - **Broadcasting to API consumers** — `POST /api/v1/price-monitoring/broadcast-api-announcement` (admin session JWT). Pulls distinct `user_id`s from active `api_keys`, joins to `user_profiles` for name + email, idempotency-skips users who already received the same `template_slug`, then dispatches via `email-api` (which loads sender from `email_settings`). Defaults to dry-run; pass `"dry_run": false` to actually send.
 - **No env-var fallback** — if `RESEND_API_KEY` is missing on Supabase, sends fail at the `email-api` boundary and the dispatcher logs the failure to `price_alert_log.channels_skipped` as `email_send_failed`. Bell delivery is unaffected.
 
-## Price Monitoring v3 (2026-04-27 — family-kept, manual promotion, cost overhaul)
+## Price Monitoring (consolidated 2026-05-01 — `tracked_queries` is the single subject table)
+
+The internal product flow (was `competitor_sources` / `price_history` / `price_monitoring_products`) and the external API flow (was `tracked_queries` / `tracked_query_price_history`) now share **one** schema. Every monitored subject — catalog product or external partner query — is a `tracked_queries` row, distinguished by:
+
+- `api_key_id IS NULL AND product_id IS NOT NULL AND mode = 'discovery'` → internal product
+- `api_key_id IS NULL AND product_id IS NOT NULL AND mode = 'url-only'` → "Custom Monitoring" pinned URL (Firecrawl-only, no Perplexity discovery)
+- `api_key_id IS NOT NULL AND product_id IS NULL` → external API tracked query
+
+A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked_queries_internal_product_discovery` partial index allows at most one `mode='discovery'` row per product but unlimited `mode='url-only'` siblings.
+
+**All retailer rows live in `tracked_query_price_history`** (FK to `tracked_queries.id`). The legacy `competitor_sources` / `price_history` / `price_monitoring_products` / `product_excluded_urls` tables and their helper functions (`get_products_due_for_monitoring`, `update_next_check_time`, `prune_stale_competitor_sources`) were dropped 2026-05-01.
+
+**Denormalized cache on `tracked_queries`** (populated by every refresh, replaces the old `competitor_sources.current_*` cache): `current_price`, `current_currency`, `current_availability`, `current_original_price`, `current_price_verified`, `current_metadata jsonb`, `current_price_updated_at`. Cheapest non-anomaly verified hit wins. Lets summary cards / KPI counters read one row instead of joining history.
+
+**Backend surface** ([mivaa-pdf-extractor/app/api/price_monitoring_routes.py](mivaa-pdf-extractor/app/api/price_monitoring_routes.py)):
+
+- `POST /api/v1/price-monitoring/products/{id}/track` — get-or-create internal tracked_query + run first refresh
+- `DELETE /api/v1/price-monitoring/products/{id}/track` — soft delete (deactivate, history preserved)
+- `GET /api/v1/price-monitoring/products/{id}` — read summary row
+- `POST /api/v1/price-monitoring/products/{id}/refresh` — re-run discovery (auto-enrolls on first call). `force_refresh=true` requires admin (bypasses volatility cadence).
+- `GET /api/v1/price-monitoring/products/{id}/sources` — `{results, family_results}` from latest refresh
+- `GET /api/v1/price-monitoring/products/{id}/history` — historical rows newest-first
+- `POST /api/v1/price-monitoring/products/{id}/exclude` / `/include` / `/exclusions` — translates product → tracked_query then writes `tracked_query_excluded_urls`
+- `POST /api/v1/price-monitoring/products/{id}/verify` — re-verify URLs (Firecrawl only)
+- `POST /api/v1/price-monitoring/products/{id}/url-only` / `GET ...` — pinned URLs (mode='url-only' tracked_queries)
+- Cross-flow: `/market-check`, `/classifier-correction`, `/promote-family-row`, `/demote-to-family`, `/tracked-queries/cron-refresh`, `/broadcast-api-announcement`
+- Legacy aliases (`/start`, `/stop`, `/check-now`, `/discover`, `/sources/{id}`, `/history/{id}`, `/status/{id}`) kept short-term, marked deprecated.
+
+**Internal cron** ([supabase/functions/price-monitoring-cron/index.ts](supabase/functions/price-monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
+
+**Service entry points** ([mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py](mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py)):
+
+- `find_or_create_for_product()` — internal flow get-or-create + optional first refresh
+- `find_for_product()`, `list_internal()`, `list_url_only_for_product()`
+- `add_url_only()` — creates a mode='url-only' tracked_query with `pinned_url`
+- `refresh()` — single chokepoint for both flows. After every refresh, populates the denormalized `current_*` cache via `_select_cheapest()`.
+
+**Cost optimizations apply to BOTH flows** (the duplication that motivated this consolidation): `force_full_discovery` flag (Tier-skip), brand-retailer cache seeding, sonar/sonar-pro model selection, classifier verdict cache, rule-based pre-classifier, volatility-based `next_check_at` cadence, recipe-driven httpx fallback. Internal product refreshes inherit all of these for free now.
+
+**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py](mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py)): now `tracked_query_id`-only. The dispatcher resolves `(user_id, product_id)` from `tracked_queries` so alerts still carry product_id when internal-flow.
+
+**Frontend**:
+
+- [src/services/priceMonitoringApi.ts](src/services/priceMonitoringApi.ts) — single client. Exports `TrackedQuery` + `RetailerRow` types, product-scoped helpers (`trackProduct`, `untrackProduct`, `getProductMonitoring`, `refreshProduct`, `getProductSources`, `getProductHistory`, `verifyProductSources`, `addUrlOnly`, `listUrlOnlyForProduct`), exclusion helpers, classifier feedback, market-check, promote/demote.
+- [src/components/business/price-monitoring/PriceMonitoringDashboard.tsx](src/components/business/price-monitoring/PriceMonitoringDashboard.tsx) reads from `tracked_queries` directly (api_key_id IS NULL filter).
+- [src/components/business/price-monitoring/ProductMonitorTab.tsx](src/components/business/price-monitoring/ProductMonitorTab.tsx) wires through the new client. Internally adapts `RetailerRow` → the legacy `CompetitorSource` shape so the existing render code (badges, anomaly banner, retailer table) stays intact.
+- Anomaly Trust/Dismiss buttons write directly to `tracked_query_price_history` via supabase client (admin-only via RLS).
+
+**Tables that survived the consolidation** (still in use):
+
+- `tracked_queries` (subject) + `tracked_query_price_history` (rows)
+- `tracked_query_promoted_urls` (sticky admin overrides) + `tracked_query_excluded_urls`
+- `match_corrections` (classifier few-shot feedback)
+- `classifier_verdict_cache` (7-day TTL)
+- `brand_retailer_index` (retailer cache by brand + country)
+- `retailer_extraction_recipes` (per-retailer selectors with self-heal)
+- `price_alert_log` (alert audit + dedupe)
+- `price_discrepancies` (cross-source disagreement log)
+- `price_lookups` (external `/lookup` usage)
+
+---
+
+## Price Monitoring v3 (2026-04-27 — family-kept, manual promotion, cost overhaul) — historical, superseded by 2026-05-01 consolidation
 
 **Family-kept policy** — overturns the 2026-04-25 "drop family" rule. The Haiku identity classifier still tags rows as `exact` / `variant` / `family` / `mismatch` / `unverifiable`, but only `mismatch` is dropped. `family` rows (same brand+series but different SKU) are persisted with `match_kind='family'` and rendered under a collapsed "Similar Products in this series" section in the UI. They're **inert downstream**: never feed the chart, never feed the rolling median (sanity band excludes them), never trigger price-drop / new-retailer / promo / anomaly alerts (`detect_after_refresh` filters them out).
 

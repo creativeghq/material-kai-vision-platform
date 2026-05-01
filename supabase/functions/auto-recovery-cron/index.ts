@@ -146,7 +146,35 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
     return [];
   }
 
-  return (data || []).map((job: any) => ({
+  // Audit fix #43: skip jobs with current_slow_operation flag set within
+  // the last 2 minutes. Stages that legitimately take 5+ min (long Chandra
+  // batches, SLIG embedding fan-out) set this flag so heartbeat staleness
+  // doesn't trigger spurious recovery while real work is in progress.
+  const candidates = data || [];
+  if (candidates.length === 0) return [];
+
+  const ids = candidates.map((j: any) => j.id);
+  const { data: slowOpRows } = await supabase
+    .from('background_jobs')
+    .select('id, current_slow_operation')
+    .in('id', ids);
+  const slowOpMap = new Map<string, any>();
+  for (const row of (slowOpRows || [])) {
+    slowOpMap.set(row.id, row.current_slow_operation);
+  }
+  const filtered = candidates.filter((job: any) => {
+    const slowOp = slowOpMap.get(job.id);
+    if (!slowOp || !slowOp.started_at) return true;
+    const age = (Date.now() - new Date(slowOp.started_at).getTime()) / 1000;
+    const cap = slowOp.expected_max_seconds || 300;
+    if (age <= cap + 120) {
+      console.log(`[AutoRecoveryCron] Skipping ${job.id}: slow_op '${slowOp.operation}' age=${age.toFixed(0)}s within cap=${cap}+120`);
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.map((job: any) => ({
     id: job.id,
     type: 'pdf_processing' as const,
     status: 'processing',
@@ -339,6 +367,58 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
     return false;
   }
 
+  // Audit fix #20: actively re-dispatch the PDF job to MIVAA. Previously the
+  // RPC just flipped status='pending' and we relied on the orchestrator
+  // restart hook to pick it up — which only fires on full service restart.
+  // Now we POST to MIVAA's /api/jobs/{id}/resume so recovery is immediate.
+  // Best-effort: if the POST fails, the job stays 'pending' and the next
+  // service restart still rescues it (preserving the old behavior).
+  let dispatchOk = false;
+  if (data) {
+    const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
+    const cronSecret = Deno.env.get('CRON_SECRET') || '';
+    try {
+      // Real MIVAA endpoint is POST /api/rag/documents/job/{job_id}/resume
+      // (verified 2026-05-01 against rag_routes.py:1486). No auth header
+      // required — the endpoint is open. cron-secret kept for future-proofing.
+      const resp = await fetch(`${mivaaBaseUrl}/api/rag/documents/job/${job.id}/resume`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': cronSecret,
+        },
+        body: JSON.stringify({ trigger: 'auto_recovery_cron' }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      dispatchOk = resp.ok;
+      if (!resp.ok) {
+        console.warn(`[AutoRecoveryCron] MIVAA resume POST returned ${resp.status} for ${job.id}`);
+      }
+    } catch (e) {
+      console.warn(`[AutoRecoveryCron] MIVAA resume POST failed for ${job.id} (best-effort, job stays pending):`, e);
+    }
+  }
+
+  // Audit fix #45: read last_checkpoint directly when metadata.last_checkpoint_stage
+  // is missing. Without this, every recovery_history row had from_stage:null because
+  // the metadata field is a recently-added denormalization that older jobs lack.
+  let resolvedFromStage = job.metadata?.last_checkpoint_stage || null;
+  if (!resolvedFromStage) {
+    try {
+      const { data: checkpointRow } = await supabase
+        .from('background_jobs')
+        .select('last_checkpoint')
+        .eq('id', job.id)
+        .single();
+      const lastCheckpoint = checkpointRow?.last_checkpoint;
+      if (lastCheckpoint && typeof lastCheckpoint === 'object') {
+        resolvedFromStage = lastCheckpoint.stage || null;
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
   // Phase 1 shadow-write: log the recovery attempt to background_jobs.recovery_history.
   // Phase 2 readers will surface this in the consolidated /full-status payload.
   try {
@@ -346,11 +426,12 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
       p_job_id: job.id,
       p_event: {
         attempted_at: new Date().toISOString(),
-        from_stage: job.metadata?.last_checkpoint_stage || null,
+        from_stage: resolvedFromStage,
         reason: 'heartbeat_stale',
         stuck_minutes: job.stuckDuration,
         attempt_number: (job.recoveryAttempts || 0) + 1,
         succeeded: Boolean(data),
+        dispatch_ok: dispatchOk,
       },
     });
   } catch (e) {
