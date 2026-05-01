@@ -41,10 +41,8 @@ export const PriceMonitoringDashboard: React.FC = () => {
       if (!user) throw new Error('Not authenticated');
 
       // Internal-flow rows: api_key_id IS NULL + product_id NOT NULL.
-      // Cast through unknown — the generated types haven't been refreshed
-      // with the new product_id / mode / current_* columns yet.
-      const { data: rows, error: rowsError } = await (supabase
-        .from('tracked_queries') as any)
+      const { data: rows, error: rowsError } = await supabase
+        .from('tracked_queries')
         .select('*')
         .eq('user_id', user.id)
         .is('api_key_id', null)
@@ -52,7 +50,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (rowsError) throw rowsError;
-      const products = (rows ?? []) as TrackedQuery[];
+      const products = (rows ?? []) as unknown as TrackedQuery[];
       setMonitoredProducts(products);
 
       const activeCount = products.filter((p) => p.is_active).length;

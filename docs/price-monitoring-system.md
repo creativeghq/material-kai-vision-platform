@@ -1,387 +1,171 @@
 # Price Monitoring System
 
-> **What's current (2026-04-25)**
->
-> The pipeline has evolved past what this doc describes in detail. Today it runs:
->
-> 1. **Discovery (parallel)**: Perplexity Sonar + DataForSEO Merchant → merged + deduped by retailer
-> 2. **URL pre-filter**: drops homepage / SERP / aggregator URLs before spending credits
-> 3. **Firecrawl verification**: re-fetches each retailer's product page and confirms the price
-> 4. **Product-identity classifier (Haiku 4.5)**: drops `mismatch`/`family` rows, labels `variant` rows
->
-> Every row now carries `match_kind`, `match_score`, `match_note`, `product_title`, `original_price`, `verified`, `source`. Stats on `/market-check` include exact matches only.
->
-> **Canonical references** — prefer these over the older sections below:
-> - External partner API: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md)
-> - Recent architectural shifts: [CHANGELOG.md](../CHANGELOG.md) → `[unreleased] 2026-04-25` (Phases 7 + 8 cover verification + identity)
-> - Internal architecture summary: [CLAUDE.md](../CLAUDE.md) → **Price Monitoring** section
-> - Future work queued: [docs/plans/greek-marketplaces-integration.md](plans/greek-marketplaces-integration.md)
->
-> The sections below still accurately describe tables, RLS, cron schedule, user roles, and UI components. The "Firecrawl is the scraper" framing from the original Overview is superseded by the pipeline above — Firecrawl is now **verification**, not **discovery**.
+> **Schema consolidated 2026-05-01.** Internal product monitoring + external API tracked queries now share a single subject table (`tracked_queries`) and a single history table (`tracked_query_price_history`). The legacy tables (`competitor_sources`, `price_history`, `price_monitoring_products`, `product_excluded_urls`) and the legacy edge function `price-monitoring` are gone. See [CLAUDE.md → Price Monitoring](../CLAUDE.md) for the canonical reference.
 
 ## Overview
 
-The Price Monitoring System enables Factory and Store users to track competitor prices for their products across multiple sources. Discovery runs against Perplexity Sonar + DataForSEO Merchant (Google Shopping) in parallel; every discovered retailer URL is re-verified by Firecrawl; and a Haiku-powered identity classifier ensures the scraped page is actually the asked product (not a different SKU on the same retailer) before results reach the UI.
+Material KAI Vision Platform users (Factory + Store + admins) can enroll a catalog product into price monitoring. The platform discovers retailers selling that product, verifies the live price, classifies the result against the catalog identity, persists the rows for trend tracking, and dispatches alerts when meaningful change is observed.
 
-## Architecture
+The exact same engine serves external API consumers via `POST /api/v1/prices/track/...`. The only difference is **who owns the row**: internal rows have `api_key_id IS NULL` + `product_id NOT NULL`; external rows have `api_key_id IS NOT NULL` + `product_id IS NULL`.
 
-### Database Schema
+## Pipeline
 
-#### Core Tables
+Every refresh runs:
 
-1. **price_monitoring_products**
-   - Tracks which products are being monitored
-   - Stores monitoring settings (frequency, enabled/disabled)
-   - Manages scheduling (next_check_at, last_check_at)
-   - Status tracking (active, paused, error)
+1. **Discovery (parallel)** — Perplexity Sonar + DataForSEO Merchant + (when enabled) Greek marketplaces (Skroutz, Bestprice, Shopflix) + Idealo (DACH/IT/UK/ES/FR). Hits merged + deduped.
+2. **URL pre-filter** — drops homepages, SERPs, aggregator masquerades before Firecrawl spend.
+3. **Sticky promotion overrides** — pre-loaded from `tracked_query_promoted_urls`; their classifier verdict is short-circuited to the admin's choice.
+4. **Firecrawl verification** — re-fetches each retailer URL, extracts `price + product_name + breadcrumb + visible_attributes`. Live-page price replaces LLM/feed price; sets `verified: true`.
+5. **Sanity-band check** — rolling 7d median per (tracked_query, retailer). Outside `[median × 0.33, median × 3.0]` → `is_anomaly: true`, `anomaly_reason` set, denormalized `current_price` NOT overwritten until admin clicks "Trust this reading".
+6. **Identity classifier (Haiku 4.5)** — labels each hit `exact / variant / family / mismatch / unverifiable`. `mismatch` dropped; `family` kept inert (rendered under "Similar Products in this series" in the UI, never feeds chart/median/alerts).
+7. **Persistence** — one row per retailer in `tracked_query_price_history`, plus the cheapest non-anomaly verified hit goes into `tracked_queries.current_*` cache columns.
+8. **Alerts** — module-gated dispatcher fires bell/email/webhook for `price_drop`, `new_retailer`, `promo_started`, `anomaly_detected` based on `tracked_queries.alert_on_*` opt-ins.
+9. **Cadence** — `update_tracked_query_cadence` bumps `next_check_at` based on observed volatility (24h / 48h / 72h).
 
-2. **price_history**
-   - Historical price data from all sources
-   - Includes price, currency, availability
-   - Metadata for additional information (shipping, discounts)
-   - Indexed for fast queries by product and date
+## Database Schema
 
-3. **competitor_sources**
-   - Competitor website URLs and configurations
-   - `source_type` enum (`firecrawl_url` = URL scrape via Firecrawl, `dataforseo_shopping` = Google Shopping via DataForSEO Merchant API — reserved for Phase 2)
-   - Firecrawl-specific scraping settings (`scraping_config.use_javascript_render` opts into JS-rendered pages)
-   - Denormalized "current price" cache (`current_price`, `current_currency`, `current_availability`, `current_price_updated_at`) for O(1) alert evaluation and dashboard reads — authoritative history remains in `price_history`
-   - Error tracking and success metrics
-   - Active/inactive status
+### `tracked_queries` (single subject table)
 
-4. **price_monitoring_jobs**
-   - Tracks scheduled and on-demand monitoring jobs
-   - Records sources checked, prices found, credits consumed
-   - Job status (pending, running, completed, failed)
-   - Performance metrics
+Routing:
+- `api_key_id IS NULL AND product_id IS NOT NULL AND mode = 'discovery'` → internal product
+- `api_key_id IS NULL AND product_id IS NOT NULL AND mode = 'url-only'` → "Custom Monitoring" pinned URL (Firecrawl-only, no Perplexity)
+- `api_key_id IS NOT NULL AND product_id IS NULL` → external API tracked query
 
-5. **price_alerts**
-   - User notification preferences
-   - Alert types (price_drop, price_increase, any_change, availability)
-   - Thresholds (percentage or absolute amount)
-   - Notification channels (email, in-app)
+Enforced by a `CHECK (api_key_id XOR product_id)` constraint. The partial unique index `uniq_tracked_queries_internal_product_discovery` allows at most one `mode='discovery'` row per product but unlimited `mode='url-only'` siblings.
 
-6. **product_usage_stats** (ADMIN ONLY)
-   - Product usage across platform features
-   - MoodBoard, Quote, Search, View counts
-   - Engagement metrics
-   - Protected by RLS policies
+Key columns:
+- Identity: `id`, `product_id`, `api_key_id`, `user_id`, `workspace_id`, `search_query`, `dimensions`, `country_code`, `manufacturer`, `mode`, `pinned_url`, `query_facets`
+- Cadence + activity: `is_active`, `refresh_interval_hours`, `last_refreshed_at`, `next_check_at`, `volatility_score`, `consecutive_stable_refreshes`, `first_refresh_verified`
+- Cache (cheapest verified hit): `current_price`, `current_currency`, `current_availability`, `current_original_price`, `current_price_verified`, `current_metadata`, `current_price_updated_at`
+- Alerts: `alert_on_price_drop`, `alert_on_new_retailer`, `alert_on_promo`, `alert_channels`, `alert_webhook_url`
+- Cost tracking: `last_refresh_credits_used`, `total_credits_used`, `last_error`, `verify_prices`
 
-7. **price_alert_history**
-   - History of triggered alerts
-   - Price change details
-   - `notification_sent`, `notification_sent_at`, `notification_channels` — flipped on successful dispatch via `NotificationService` → `notification-dispatcher` edge function (Resend for email, `user_notifications` insert for in-app)
+### `tracked_query_price_history` (every retailer row, every refresh)
 
-8. **price_lookups** (external API usage log)
-   - One row per `POST /api/v1/prices/lookup` call
-   - Tracks `api_key_id`, `user_id`, `workspace_id`, `url`, `success`, extracted fields, `credits_used`, `latency_ms`
-   - RLS: users see their own rows only; inserts via service role from the Python backend
+Columns include `tracked_query_id` (FK), `refresh_run_id`, `retailer_name`, `product_url`, `price`, `original_price`, `currency`, `availability`, `source` (enum: `perplexity` / `dataforseo` / `skroutz` / `bestprice` / `shopflix` / `idealo`), `verified`, `match_kind`, `match_score`, `match_note`, `product_title`, `is_anomaly`, `anomaly_reason`, `rolling_median_at_check`, `manual_override`, `scraped_at`.
 
-### Database Functions
+### Supporting tables
 
-- `get_latest_price()` - Get most recent price for a product/source
-- `calculate_price_change()` - Calculate percentage change between prices
-- `should_trigger_alert()` - Determine if alert conditions are met
-- `get_products_due_for_monitoring()` - Find products needing price checks
-- `update_next_check_time()` - Schedule next monitoring check
-- `get_price_statistics()` - Calculate min/max/avg prices and trends
-- `increment_product_usage()` - Track product usage (admin only)
+- `tracked_query_promoted_urls` — sticky admin URL overrides (per tracked_query)
+- `tracked_query_excluded_urls` — per-tracked-query URL/domain exclusions
+- `match_corrections` — admin classifier-feedback few-shot pool
+- `classifier_verdict_cache` — 7-day TTL Haiku verdict cache
+- `brand_retailer_index` — `(brand, retailer_domain, country_code)` cache that seeds `known_retailer_domains` for new SKUs in the same brand
+- `retailer_extraction_recipes` — per-retailer selector recipes with self-heal stats (httpx fallback before Firecrawl when confidence ≥ 0.8)
+- `price_alert_log` — alert audit + dedupe
+- `price_discrepancies` — cross-source disagreement log
+- `price_lookups` — external `/lookup` usage log
+- `ai_usage_logs` — every Perplexity / Haiku / Firecrawl / DataForSEO call
 
-### Row Level Security (RLS)
+### Database functions
 
-All tables have RLS enabled with role-based policies:
+- `get_internal_tracked_queries_due()` — cron-target SELECT (returns up to 100 internal rows whose `next_check_at` has elapsed)
+- `update_tracked_query_cadence(p_tracked_query_id, p_max_pct_change)` — bumps `next_check_at` and `consecutive_stable_refreshes` after each refresh
 
-- **Users** can view/manage their own monitoring products and alerts
-- **Factory/Store users** have access to price monitoring features
-- **Admin/Owner** have full access to all data
-- **product_usage_stats** is ADMIN-ONLY (strictly enforced)
-- System/backend can insert price history and job records
+### Row Level Security
 
-### Edge Functions
+All tables have RLS enabled. Users see their own rows (matched on `user_id` for internal, `api_key_id` ownership for external). Admin/Owner see everything via `has_price_monitoring_access()` or role-name checks. The Python backend writes via the service role.
 
-#### 1. price-monitoring
-**Endpoint:** `/functions/v1/price-monitoring`
+## Backend
 
-**Actions:**
-- `start_monitoring` - Enable monitoring for a product
-- `stop_monitoring` - Pause monitoring for a product
-- `check_now` - Trigger immediate price check (on-demand)
-- `get_status` - Get monitoring status and recent data
+### Routes — `mivaa-pdf-extractor/app/api/price_monitoring_routes.py`
 
-**Request format:** JSON body with an `action` field and a `productId` field. For `start_monitoring`, also include a `monitoringSettings` object with `frequency` and `enabled` fields.
+Product-scoped (preferred surface):
 
-**Response format:** JSON with `success` (boolean), `message` (string), and for `start_monitoring` a `monitoring` object containing id, product_id, monitoring_frequency, and next_check_at.
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/products/{product_id}/track` | Get-or-create internal tracked_query + run first refresh |
+| `DELETE` | `/products/{product_id}/track` | Soft delete (deactivate, history preserved) |
+| `GET` | `/products/{product_id}` | Read summary row (denormalized cache included) |
+| `POST` | `/products/{product_id}/refresh` | Re-run discovery (auto-enrolls). `force_refresh` requires admin. |
+| `GET` | `/products/{product_id}/sources` | `{results, family_results, tracked_query_id}` from latest refresh |
+| `GET` | `/products/{product_id}/history` | Historical rows newest-first |
+| `POST` | `/products/{product_id}/exclude` | Exclude URL/domain |
+| `POST` | `/products/{product_id}/include` | Undo exclusion |
+| `GET` | `/products/{product_id}/exclusions` | List exclusions |
+| `POST` | `/products/{product_id}/verify` | Re-verify URLs (Firecrawl only — no new discovery) |
+| `POST` | `/products/{product_id}/url-only` | Add a pinned URL (mode='url-only' tracked_query) |
+| `GET` | `/products/{product_id}/url-only` | List pinned URLs |
 
-#### 2. price-monitoring-cron
-**Endpoint:** `/functions/v1/price-monitoring-cron`
+Cross-flow (also serve external API consumers):
 
-**Purpose:** Scheduled job that runs hourly to check products due for monitoring
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/market-check` | Stateless one-shot market scan (admin-only) |
+| `POST` | `/classifier-correction` | Feed few-shot classifier loop |
+| `POST` | `/promote-family-row` | Sticky admin override (admin-only) |
+| `POST` | `/demote-to-family` | Undo promotion (admin-only) |
+| `POST` | `/tracked-queries/cron-refresh` | Admin batch-refresh escape hatch |
+| `POST` | `/broadcast-api-announcement` | Admin email broadcast |
 
-**Security:** Requires `x-cron-secret` header
+Legacy aliases (`/start`, `/stop`, `/check-now`, `/discover`, `/sources/{id}`, `/history/{id}`, `/status/{id}`) are kept short-term and marked deprecated. New callers should use the product-scoped surface.
 
-**Process:**
-1. Fetch products due for monitoring
-2. Create monitoring jobs
-3. Scrape competitor sources using Firecrawl
-4. Save price history
-5. Check and trigger price alerts
-6. Update next check times
+### Service — `mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py`
 
-**Response:** JSON with success, message, and stats (total, processed, succeeded, failed).
+Single chokepoint for both flows. Methods of interest:
 
-### Firecrawl Integration
+- `find_or_create_for_product(...)` — internal flow get-or-create + first refresh
+- `find_for_product(product_id)` — read internal row
+- `list_internal(...)` — admin dashboard product list
+- `add_url_only(...)` / `list_url_only_for_product(...)` — Custom Monitoring
+- `refresh(tracking_id, force=...)` — single shared refresh path; populates the denormalized cache via `_select_cheapest()`
+- `latest_results_split(tracking_id)` → `{results, family_results}`
+- `history(tracking_id, limit)` — historical rows
+- `add_exclusion(...)` / `remove_exclusion(...)` / `list_exclusions(...)`
+- `reverify(tracking_id, urls?)` — Firecrawl-only re-verify
+- `due_for_refresh(limit)` — used by the manual cron-refresh escape hatch
 
-All Firecrawl calls go through a single shared client: `app/services/integrations/firecrawl_client.py` (`FirecrawlClient`). Used by:
-- Competitor price monitoring (`competitor_scraper_service.py`)
-- Public price lookup API (`/api/v1/prices/lookup`)
-- Future consumers that need structured extraction from a URL
+### Edge Function — `supabase/functions/price-monitoring-cron/index.ts`
 
-**Design**:
-- Pydantic schemas → `model_json_schema()` drives extraction — the schema can't drift from the code that reads it. `PriceExtraction` lives in `app/models/extraction.py`.
-- Exponential backoff on retryable errors (HTTP 429/5xx, timeouts). 4xx fails fast.
-- Credit logging + debit centralized via `AICallLogger.log_firecrawl_call`.
-- Opt-in `use_javascript_render=True` flag — adds a 3s wait action and extends timeout for JS-heavy / single-page-app sites. Costs slightly more Firecrawl credits. Configured per-source via `scraping_config.use_javascript_render`.
+Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/refresh` for each row. Service-role auth. Does NOT touch external API tracked queries. See [docs/api/price-monitoring-cron-api.md](api/price-monitoring-cron-api.md).
 
-**Price Parsing:** Raw extracted strings (e.g. `"$49.99"`, `"€1.299,00"`, `"From £29"`) are parsed to `(Decimal, ISO-4217-code)` via `app/utils/price_parsing.py`, which wraps the `price-parser` library. Handles US/EU decimal conventions and maps currency symbols to ISO codes.
+## Cost Optimizations (apply to BOTH flows after consolidation)
 
-**Credits:** Each scrape consumes ~1 Firecrawl credit (standard), ~2 when `use_javascript_render=True`.
+- **Tier-skip** — `search_prices()` runs Tier 2 (Greek + Idealo) only when `force_full_discovery=True` or `len(known_retailer_domains) < 5`.
+- **Sonar model downgrade** — Perplexity drops to `sonar` (cheaper) when `force_full_discovery=False`, `known_retailer_domains >= 3`, and `double_read=False`.
+- **Classifier verdict cache** — 7-day TTL keyed on `(product_url, sha1(brand|model|sku_tokens|product_type))`.
+- **Rule-based pre-classifier** — deterministic `exact`/`mismatch` shortcuts before Haiku.
+- **Volatility cadence** — `next_check_at` stretches 24h → 48h → 72h on stable products.
+- **Brand-level retailer cache** — `brand_retailer_index` seeds `known_retailer_domains` for new SKUs in the same brand.
+- **Recipe-driven httpx fallback** — `retailer_extraction_recipes` with confidence ≥ 0.8 try `httpx + selectolax` before Firecrawl.
 
-**Concurrency:** The hourly cron and on-demand price checks scrape sources in parallel via `asyncio.gather` + `Semaphore(5)` — keeps us under Firecrawl rate limits and out of Supabase client contention.
+## Frontend
 
-### Public Price Lookup API (external / curl)
-
-`POST /api/v1/prices/lookup` — one-shot price extraction for external callers.
-
-- **Auth**: `Authorization: Bearer <key>` validated against the `api_keys` table. Checks `is_active`, `expires_at`, and `allowed_endpoints`. Billing is derived from the key owner's user → workspace via `workspace_members`.
-- **Rate limit**: per-key sliding 60s window; default 60 req/min, configurable via `api_keys.rate_limit_override` (hard cap 600/min).
-- **One-shot**: does NOT create a `competitor_sources` row. For ongoing tracking, users still go through the monitoring flow.
-- **Usage logged** to `price_lookups`.
-
-Request:
-```bash
-curl -X POST https://v1api.materialshub.gr/api/v1/prices/lookup \
-  -H "Authorization: Bearer <api_key>" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com/products/oak","product_name":"White oak 8mm","use_javascript_render":false}'
-```
-
-Response: `{success, price, currency, availability, shipping_cost, product_name, scraped_at, credits_used, latency_ms, source}`.
-
-## Frontend Components
-
-### PriceMonitoringDashboard
-Main dashboard showing:
-- Statistics cards (total monitored, price drops, credits used)
-- Tabs for products, alerts, history, jobs
-- Refresh and add product actions
-
-### MonitoredProductsList
-Table view of monitored products with:
-- Product name and current price
-- Price trend indicators (up/down/stable)
-- Monitoring frequency and status
-- Toggle monitoring on/off
-- Check now button for on-demand checks
-
-### PriceAlertsPanel
-Manage price alerts:
-- Create new alerts
-- Configure thresholds
-- Set notification channels
-- View alert history
-
-### PriceHistoryChart
-Visualize price trends:
-- Line charts showing price over time
-- Multiple sources comparison
-- Date range selection
-
-### AddProductToMonitoring
-Modal to add products:
-- Product search/selection
-- Configure monitoring frequency
-- Add competitor sources
+- [src/services/priceMonitoringApi.ts](../src/services/priceMonitoringApi.ts) — single client. Exports `TrackedQuery`, `RetailerRow`, `MatchKind`, and helpers (`trackProduct`, `untrackProduct`, `getProductMonitoring`, `refreshProduct`, `getProductSources`, `getProductHistory`, `verifyProductSources`, `addUrlOnly`, `listUrlOnlyForProduct`, `marketCheck`, `submitClassifierCorrection`, `promoteFamilyRow`, `demoteToFamily`, `excludeProductResult`, `includeProductResult`, `listProductExclusions`).
+- [src/components/business/price-monitoring/PriceMonitoringDashboard.tsx](../src/components/business/price-monitoring/PriceMonitoringDashboard.tsx) — KPI cards + product list (queries `tracked_queries` directly with `api_key_id IS NULL` filter).
+- [src/components/business/price-monitoring/MonitoredProductsList.tsx](../src/components/business/price-monitoring/MonitoredProductsList.tsx) — table with toggle/refresh per row.
+- [src/components/business/price-monitoring/ProductMonitorTab.tsx](../src/components/business/price-monitoring/ProductMonitorTab.tsx) — per-product detail (chart, retailer table with anomaly banners, exclusions, custom URLs, alert prefs).
+- [src/components/business/price-monitoring/PriceHistoryChart.tsx](../src/components/business/price-monitoring/PriceHistoryChart.tsx) — chart over `tracked_query_price_history` filtered by tracked_query_id.
+- [src/components/business/price-monitoring/PriceAlertPreferences.tsx](../src/components/business/price-monitoring/PriceAlertPreferences.tsx) — module-gated alert opt-in, writes to `tracked_queries.alert_*`.
+- [src/components/business/price-monitoring/CompetitorSourceManager.tsx](../src/components/business/price-monitoring/CompetitorSourceManager.tsx) — Custom Monitoring add-URL dialog (calls `addUrlOnly`).
+- [src/components/features/pricing/MarketPanel.tsx](../src/components/features/pricing/MarketPanel.tsx) + `PriceLookupDrawer` — admin one-shot market scan UI.
 
 ## User Roles and Access
 
-### Factory Users
-- Monitor their own products
-- Track competitor prices
-- Set up price alerts
-- View price history and trends
-- Access to all monitoring features
+- **Factory / Store users** — monitor their own products, configure alerts, view history.
+- **Admin / Owner** — see everything, force-refresh, promote/demote family rows, override anomaly readings, market-check.
+- **Architect / Designer** — no access; UI is hidden.
 
-### Store Users
-- Monitor products they're interested in
-- Track supplier prices
-- Set up price drop alerts
-- Compare prices across suppliers
+## Required Secrets (MIVAA backend)
 
-### Admin/Owner
-- Full access to all monitoring data
-- View product usage statistics
-- Monitor system health
-- Manage all users' monitoring settings
+- `PERPLEXITY_API_KEY` — primary discovery
+- `FIRECRAWL_API_KEY` — verification + Custom Monitoring
+- `DATAFORSEO_BASE64` (or `DATAFORSEO_LOGIN` + `DATAFORSEO_PASSWORD`) — Google Shopping merchant feed
+- `ANTHROPIC_API_KEY` — Haiku identity classifier + facet extraction
+- `RESEND_API_KEY` — email channel for alerts
+- `CRON_SECRET` — cron-refresh authentication
 
-### Architect/Designer
-- No access to price monitoring features
-- Feature is hidden from their interface
+## Deployment
 
-## Deployment Instructions
+1. **Database migrations** — `supabase db push` (or apply via `mcp__supabase__apply_migration`). The 2026-05-01 consolidation migration is `consolidate_price_monitoring_into_tracked_queries`.
+2. **Edge function** — `supabase functions deploy price-monitoring-cron`.
+3. **Cron schedule** — see [docs/api/price-monitoring-cron-api.md](api/price-monitoring-cron-api.md).
+4. **Backend secrets** — set on the MIVAA `systemd` unit's `Environment=` lines.
 
-### 1. Database Migration
+## Related
 
-Apply migrations using `supabase db push` or apply each migration file manually using psql. The migrations create all price monitoring tables, alert tables, RLS policies, and database functions.
-
-### 2. Deploy Edge Functions
-
-Deploy the price-monitoring and price-monitoring-cron functions using the Supabase CLI. Set the required environment secrets: `FIRECRAWL_API_KEY` and `CRON_SECRET`.
-
-### 3. Configure Cron Job
-
-Set up a cron job in the Supabase Dashboard under Database → Cron Jobs to call the price-monitoring-cron function on an hourly schedule (`0 * * * *`), passing the cron secret in the request headers.
-
-### 4. Frontend Integration
-
-Add the `/price-monitoring` route to your app router and render the `PriceMonitoringDashboard` component. Apply an auth guard so only Factory and Store users can access this route.
-
-## Usage Guide
-
-### For Factory Users
-
-#### 1. Add Product to Monitoring
-
-1. Navigate to Price Monitoring dashboard
-2. Click "Add Product" button
-3. Search and select your product
-4. Configure monitoring settings:
-   - Frequency: hourly, daily, weekly, or on-demand
-   - Enable/disable monitoring
-5. Add competitor sources:
-   - Enter competitor website URLs
-   - Configure scraping settings (optional)
-6. Click "Start Monitoring"
-
-#### 2. Add Competitor Sources
-
-1. Go to monitored product
-2. Click "Add Source"
-3. Enter:
-   - Source name (e.g., "Amazon", "TileBar")
-   - Source URL (product page URL)
-   - Scraping configuration (optional)
-4. Save source
-
-#### 3. Set Up Price Alerts
-
-1. Navigate to "Price Alerts" tab
-2. Click "New Alert"
-3. Select product
-4. Configure alert:
-   - Alert type: price drop, price increase, any change
-   - Threshold: percentage or dollar amount
-   - Notification channels: email, in-app
-5. Save alert
-
-#### 4. Check Prices On-Demand
-
-1. Go to "Monitored Products" tab
-2. Find product in list
-3. Click "Check Now" button
-4. Wait for results (usually 10-30 seconds)
-5. View updated prices in price history
-
-### For Store Users
-
-#### 1. Monitor Supplier Prices
-
-1. Add products from your suppliers
-2. Set monitoring frequency to daily or weekly
-3. Set up price drop alerts to catch deals
-4. Compare prices across multiple suppliers
-
-#### 2. Track Price Trends
-
-1. Navigate to "Price History" tab
-2. Select product
-3. View price chart over time
-4. Identify best times to purchase
-
-## API Reference
-
-### Start Monitoring
-
-Call `POST /functions/v1/price-monitoring` with Authorization header, Content-Type application/json, and a body containing `action: 'start_monitoring'`, `productId`, and `monitoringSettings` with `frequency` and `enabled` fields.
-
-### Check Now
-
-Call `POST /functions/v1/price-monitoring` with Authorization header and a body containing `action: 'check_now'` and `productId`.
-
-### Get Status
-
-Call `POST /functions/v1/price-monitoring` with Authorization header and a body containing `action: 'get_status'` and `productId`.
-
-## Monitoring and Maintenance
-
-### Health Checks
-
-Monitor these metrics:
-- Job success rate (should be >90%)
-- Average scraping time per source
-- Credits consumed per day
-- Alert trigger rate
-
-### Error Handling
-
-Common errors and solutions:
-
-1. **Firecrawl API errors**
-   - Check API key validity
-   - Verify credit balance
-   - Review rate limits
-
-2. **Scraping failures**
-   - Update competitor source URLs
-   - Adjust scraping configuration
-   - Check website accessibility
-
-3. **Alert not triggering**
-   - Verify alert thresholds
-   - Check notification channels
-   - Review price history data
-
-### Performance Optimization
-
-- Batch process products in cron job (100 at a time)
-- Cache product details to reduce database queries
-- Use database indexes for fast price history queries
-- Implement exponential backoff for failed scrapes
-
-## Future Enhancements
-
-1. **Advanced Analytics**
-   - Price prediction using ML
-   - Seasonal trend analysis
-   - Competitor pricing strategies
-
-2. **Bulk Operations**
-   - Import competitor sources from CSV
-   - Bulk enable/disable monitoring
-   - Export price data
-
-3. **Integrations**
-   - Slack/Discord notifications
-   - Webhook support for custom integrations
-   - API for third-party tools
-
-4. **UI Improvements**
-   - Interactive price charts with zoom
-   - Price comparison matrix
-   - Mobile app support
-
-## Support
-
-For issues or questions:
-- Check logs in Supabase Dashboard
-- Review error messages in price_monitoring_jobs table
-- Contact support with job ID for troubleshooting
+- [CLAUDE.md → Price Monitoring](../CLAUDE.md)
+- [Price Monitoring API (external consumers)](api/price-monitoring-api.md)
+- [Cron API](api/price-monitoring-cron-api.md)
+- [Edge Function README](../supabase/functions/price-monitoring-cron/README.md)
+- [CHANGELOG](../CHANGELOG.md)

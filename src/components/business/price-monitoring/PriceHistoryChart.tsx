@@ -108,8 +108,8 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
       }
 
       // Find this product's internal tracked_query (if any).
-      const { data: tq } = await (supabase
-        .from('tracked_queries') as any)
+      const { data: tq } = await supabase
+        .from('tracked_queries')
         .select('id')
         .eq('product_id', productId)
         .is('api_key_id', null)

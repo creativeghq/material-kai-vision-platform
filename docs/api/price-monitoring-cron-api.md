@@ -2,16 +2,13 @@
 
 ## Overview
 
-The Price Monitoring Cron API is a scheduled Edge Function that drives two backend paths:
+Hourly Edge Function that refreshes every internal-flow `tracked_queries` row whose `next_check_at` has elapsed. After the 2026-05-01 consolidation, every monitored catalog product is a `tracked_queries` row (`api_key_id IS NULL` + `product_id NOT NULL`) — the legacy `competitor_sources` / `price_history` / `price_monitoring_products` tables and the `check-now` / `tracked-queries/cron-refresh` endpoints are gone.
 
-1. **Firecrawl re-scrape** of user-pasted URLs monitored under `competitor_sources` with `source_type='firecrawl_url'` (Custom Monitoring section in the UI).
-2. **Tracked-query refresh** for every `tracked_queries` row whose `last_refreshed_at + refresh_interval_hours < now()` — this runs the full Perplexity + DataForSEO + Firecrawl verification + Haiku identity pipeline.
+External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched by this cron — they pay per call and control their own refresh cadence by hitting `POST /api/v1/prices/track/{id}/refresh` themselves.
 
 **Edge Function:** `price-monitoring-cron`
-**Trigger:** Scheduled (hourly) or manual invocation
-**Backend endpoints used:**
-- `POST /api/v1/price-monitoring/check-now` — Firecrawl-only URL rescrape
-- `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` — full pipeline, identity-verified
+**Trigger:** scheduled (hourly) or manual invocation
+**Backend endpoint used:** `POST /api/v1/price-monitoring/products/{product_id}/refresh` (one call per due row)
 
 ## Architecture
 
@@ -19,159 +16,107 @@ The Price Monitoring Cron API is a scheduled Edge Function that drives two backe
 Supabase Cron (hourly)
   ↓
 Edge Function (price-monitoring-cron)
-  ├─→ Python: /api/v1/price-monitoring/check-now
-  │     (CompetitorScraperService → Firecrawl → price_history → PriceAlertService)
+  ├─→ DB RPC: get_internal_tracked_queries_due()
+  │     (Returns rows where api_key_id IS NULL AND product_id IS NOT NULL
+  │      AND is_active AND (next_check_at IS NULL OR next_check_at < now()),
+  │      ordered by oldest next_check_at first, capped at 100.)
   │
-  └─→ Python: /api/v1/price-monitoring/tracked-queries/cron-refresh
-        (TrackedQueriesService.refresh() — full pipeline for every due tracked_query)
+  └─→ For each row → Python: POST /api/v1/price-monitoring/products/{id}/refresh
+        (TrackedQueriesService.refresh() — full pipeline)
             ├─→ Facet cache read (tracked_queries.query_facets)
-            ├─→ Perplexity Sonar + DataForSEO Merchant (parallel)
-            ├─→ URL pre-filter (drops homepages/SERPs/aggregators)
+            ├─→ Perplexity Sonar (sonar/sonar-pro depending on cost gates)
+            │   + DataForSEO Merchant (parallel) + optional Greek/Idealo
+            ├─→ Excluded URL filter (tracked_query_excluded_urls)
+            ├─→ Sticky promotion overrides (tracked_query_promoted_urls)
+            ├─→ URL pre-filter (drops homepages/SERPs/aggregator masquerades)
             ├─→ Firecrawl verification (price + product_name + breadcrumb)
-            ├─→ Haiku identity classifier (match_kind per hit)
-            └─→ tracked_query_price_history insert (with match_kind, product_title, original_price)
+            ├─→ Haiku 4.5 identity classifier (match_kind per hit)
+            ├─→ Sanity-band check (rolling 7d median per retailer)
+            ├─→ tracked_query_price_history insert (one row per retailer)
+            ├─→ tracked_queries cache columns updated (current_price, etc.)
+            └─→ update_tracked_query_cadence() bumps next_check_at based on
+                  observed volatility (≥5% move → 24h; ≤2% → 48h/72h)
 ```
 
 ## Authentication
 
-This is a cron job that requires a secret header for security:
+Cron secret header required:
 
-```typescript
-X-Cron-Secret: <cron_secret>
+```
+X-Cron-Secret: <CRON_SECRET>
 ```
 
-The secret must match the `CRON_SECRET` environment variable.
+Must match the `CRON_SECRET` environment variable on the edge function.
 
 ## Manual Invocation
 
-While this function is designed to run on a schedule, it can be manually triggered:
-
-**Method:** `POST`  
-**Path:** `/`
-
-**Headers:**
-```typescript
-X-Cron-Secret: <cron_secret>
+```bash
+curl -X POST https://your-project.supabase.co/functions/v1/price-monitoring-cron \
+  -H "x-cron-secret: your-cron-secret" \
+  -H "Content-Type: application/json"
 ```
 
 **Response:**
+
 ```typescript
 {
   success: true,
   message: string,
-  processed: number,      // Total products processed
-  succeeded: number,      // Successfully monitored
-  failed: number,         // Failed to monitor
-  results: Array<{
-    product_id: string,
-    product_name: string,
-    status: 'success' | 'failed',
-    price_changes: number,
-    alerts_triggered: number,
-    error?: string
-  }>
+  stats: {
+    internal: {
+      total: number,        // rows returned by get_internal_tracked_queries_due
+      processed: number,    // rows actually refreshed
+      succeeded: number,    // refreshes that wrote new history rows
+      failed: number,       // refreshes that errored or were throttled
+      results: Array<{
+        product_id: string,
+        success: boolean,
+        credits_used?: number,
+        results_count?: number,
+        status?: string,
+        error?: string,
+      }>,
+    }
+  },
+  timestamp: string
 }
 ```
 
 ## How It Works
 
-### 1. Query Products Due for Monitoring
+### 1. Pick due tracked_queries
 
-The function calls the database function `get_products_due_for_monitoring()` which returns products where:
-- `next_check_at <= NOW()`
-- `is_active = true`
-- Has valid competitor sources
+Calls `get_internal_tracked_queries_due()` (SQL function). Returns at most 100 rows, oldest `next_check_at` first.
 
-### 2. Process Each Product
+### 2. Refresh each row
 
-For each product, the function:
-1. Calls Python backend API: `POST /api/v1/price-monitoring/check-now`
-2. Python backend handles:
-   - Scraping competitor pages via Firecrawl
-   - Debiting credits via CreditsIntegrationService
-   - Logging AI usage via AICallLogger
-   - Saving price history to database
-   - Creating price monitoring jobs
-   - Checking and triggering price alerts
+For each row, POSTs to `/api/v1/price-monitoring/products/{product_id}/refresh` with body `{force_refresh: false, verify_prices: true}`. The Python backend handles the entire discovery + verification + classifier + persistence pipeline, plus credit debit + AI usage logging.
 
-### 3. Update Next Check Time
+### 3. Cadence is automatic
 
-After processing, the `next_check_at` is updated based on the monitoring frequency:
-- `hourly` → +1 hour
-- `daily` → +1 day
-- `weekly` → +7 days
-- `monthly` → +30 days
+The Python backend calls `update_tracked_query_cadence(p_tracked_query_id, p_max_pct_change)` after every refresh. The cadence is volatility-aware:
 
-## Monitoring Frequencies
+- ≥ 5% week-over-week move → `next_check_at = now() + 24h` and `consecutive_stable_refreshes = 0`
+- ≤ 2% move → `consecutive_stable_refreshes += 1` and cadence stretches:
+  - 3+ stable refreshes → 48h
+  - 7+ stable refreshes → 72h
 
-| Frequency | Check Interval | Use Case |
-|-----------|---------------|----------|
-| `hourly` | Every hour | High-priority products |
-| `daily` | Every 24 hours | Standard monitoring |
-| `weekly` | Every 7 days | Low-priority products |
-| `monthly` | Every 30 days | Occasional checks |
+The hourly cron tick is fine-grained — it just picks up rows whose `next_check_at` has elapsed.
 
-## Price Alerts
+## Alerts
 
-When price changes are detected, the system checks for active alerts:
+Alert detection runs inside `TrackedQueriesService.refresh()` via the `price-monitoring-notifications` module (separate dispatcher). Alert prefs live on `tracked_queries.alert_on_*` columns and `alert_channels` (`bell` / `email` / `webhook`). See [docs/api/price-monitoring-api.md](./price-monitoring-api.md) for the full alert reference.
 
-**Alert Types:**
-- `price_drop` - Price decreased by X%
-- `price_increase` - Price increased by X%
-- `threshold_below` - Price fell below threshold
-- `threshold_above` - Price rose above threshold
+## Database Tables Touched
 
-**Alert Actions:**
-- Email notification
-- In-app notification
-- Webhook call (if configured)
+After a successful cron tick:
 
-## Database Tables
-
-### price_monitoring_jobs
-Tracks each monitoring execution:
-```typescript
-{
-  id: string,
-  product_id: string,
-  status: 'pending' | 'processing' | 'completed' | 'failed',
-  sources_checked: number,
-  prices_found: number,
-  credits_used: number,
-  started_at: string,
-  completed_at: string,
-  error_message?: string
-}
-```
-
-### price_history
-Stores historical price data:
-```typescript
-{
-  id: string,
-  product_id: string,
-  source_id: string,
-  price: number,
-  currency: string,
-  availability: boolean,
-  scraped_at: string,
-  metadata: object
-}
-```
-
-### price_alerts
-User-configured price alerts:
-```typescript
-{
-  id: string,
-  user_id: string,
-  product_id: string,
-  alert_type: string,
-  threshold_value: number,
-  is_active: boolean,
-  last_triggered_at?: string
-}
-```
+- `tracked_queries` — `last_refreshed_at`, `last_refresh_credits_used`, `total_credits_used`, `last_error`, `current_price`, `current_currency`, `current_availability`, `current_original_price`, `current_price_verified`, `current_metadata`, `current_price_updated_at`, `next_check_at`, `consecutive_stable_refreshes`, `volatility_score`, `first_refresh_verified`
+- `tracked_query_price_history` — one new row per retailer per refresh
+- `brand_retailer_index` — upserted per `(brand, retailer_domain, country_code)` triple seen
+- `classifier_verdict_cache` — populated for new (URL, facet-signature) pairs
+- `price_alert_log` — one row per alert dispatched (24h dedupe per alert_type/retailer)
+- `ai_usage_logs` — one row per Perplexity / Haiku / Firecrawl call
 
 ## Error Handling
 
@@ -179,29 +124,29 @@ User-configured price alerts:
 {
   success: false,
   error: string,
-  processed: number,
-  succeeded: number,
-  failed: number
+  timestamp: string
 }
 ```
 
-**Common Errors:**
-- `401` - Invalid cron secret
-- `500` - Database query failed
-- `503` - Python backend unavailable
+Per-row errors are caught and logged inline; the cron never aborts mid-batch. A failed row stays at its current `next_check_at` so the next tick will retry it.
 
-## Monitoring & Logs
+**Common HTTP responses from this endpoint:**
 
-The function logs detailed information:
-- Products found for monitoring
-- Processing status for each product
-- Price changes detected
-- Alerts triggered
-- Errors encountered
+- `401` — invalid or missing `x-cron-secret`
+- `500` — top-level fetch from `get_internal_tracked_queries_due` failed (check Postgres logs)
+
+## Logs
+
+Supabase Dashboard → Edge Functions → `price-monitoring-cron` → Logs.
+
+```
+🔄 Price monitoring cron job started
+📊 Found 10 internal tracked_queries due
+✅ Internal monitoring completed: 10 processed, 8 succeeded, 2 failed
+```
 
 ## Related Documentation
 
-- [Price Monitoring System](../price-monitoring-system.md)
-- [Price Monitoring Deployment Guide](../price-monitoring-deployment-guide.md)
-- [Credits System](../internal-pricing-credit-system.md)
-
+- [Price Monitoring API](./price-monitoring-api.md)
+- [Edge Function README](../../supabase/functions/price-monitoring-cron/README.md)
+- [Internal Pricing & Credit System](../internal-pricing-credit-system.md)
