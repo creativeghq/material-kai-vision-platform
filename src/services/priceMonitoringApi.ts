@@ -81,6 +81,10 @@ export interface RetailerRow {
   manual_override?: boolean;
   scraped_at?: string;
   refresh_run_id?: string;
+  /** DataForSEO Shopping enrichment (optional — only present on dataforseo-sourced rows). */
+  image_url?: string | null;
+  rating_value?: number | null;
+  rating_votes?: number | null;
 }
 
 /** The denormalized summary row on tracked_queries. */
@@ -119,6 +123,9 @@ export interface TrackedQuery {
   volatility_score: number | null;
   consecutive_stable_refreshes: number;
   first_refresh_verified: boolean;
+  /** When false, refresh skips the Firecrawl Stage B verification pass.
+   *  Default true. Surfaced in the per-product UI as a toggle. */
+  verify_prices: boolean;
 }
 
 export interface ProductSourcesPayload {

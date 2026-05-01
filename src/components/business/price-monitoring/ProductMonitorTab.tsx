@@ -838,8 +838,11 @@ const SimilarProductsSection: React.FC<{
       try {
         setPendingId(row.id);
         const { promoteFamilyRow } = await import('@/services/priceMonitoringApi');
+        // CompetitorSource.id is sourced from RetailerRow.id, which IS the
+        // tracked_query_price_history.id (see adaptRow at line ~231). Pass it
+        // through under the API's expected key.
         await promoteFamilyRow({
-          competitorSourceId: row.id,
+          trackedQueryHistoryId: row.id,
           overrideKind: kind,
           reason: reason || undefined,
         });
