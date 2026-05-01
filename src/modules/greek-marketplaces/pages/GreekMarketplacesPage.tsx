@@ -251,8 +251,8 @@ const GreekMarketplacesPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-base">Test search</CardTitle>
             <CardDescription>
-              Run a one-off query against all three sources. Does not write to <code>competitor_sources</code> or{' '}
-              <code>price_history</code>. Credits debit normally.
+              Run a one-off query against all three sources. Does not write to <code>tracked_queries</code> or{' '}
+              <code>tracked_query_price_history</code>. Credits debit normally.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

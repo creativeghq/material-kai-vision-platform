@@ -164,7 +164,7 @@ export function PlatformOverviewTab() {
     moduleCredits12w: 0,
     trackedQueries: 0,
   });
-  const [pricingWeekly, setPricingWeekly] = useState<{ week: string; internal: number; tracked: number; marketplace: number }[]>([]);
+  const [pricingWeekly, setPricingWeekly] = useState<{ week: string; refreshes: number; marketplace: number }[]>([]);
   const [marketplaceBySource, setMarketplaceBySource] = useState<{ source: string; count: number }[]>([]);
   const [pricingSourceDist, setPricingSourceDist] = useState<{ name: string; value: number }[]>([]);
 
@@ -824,22 +824,21 @@ export function PlatformOverviewTab() {
       });
 
       // Weekly trend: two series (all refreshes, marketplace-only subset).
-      // The pre-consolidation breakdown of "internal vs tracked" is no longer
-      // meaningful — every row lives on the same table now.
-      const weekMap = new Map<string, { tracked: number; marketplace: number }>(
-        wks12.map(w => [w, { tracked: 0, marketplace: 0 }]),
+      // After 2026-05-01 consolidation every row lives on tracked_query_price_history.
+      const weekMap = new Map<string, { refreshes: number; marketplace: number }>(
+        wks12.map(w => [w, { refreshes: 0, marketplace: 0 }]),
       );
       (allHistory.data ?? []).forEach((r: { created_at: string }) => {
         const l = weekLabel(new Date(r.created_at));
         const entry = weekMap.get(l);
-        if (entry) entry.tracked += 1;
+        if (entry) entry.refreshes += 1;
       });
       (marketplaceRows.data ?? []).forEach((r: { created_at: string }) => {
         const l = weekLabel(new Date(r.created_at));
         const entry = weekMap.get(l);
         if (entry) entry.marketplace += 1;
       });
-      setPricingWeekly(Array.from(weekMap.entries()).map(([week, d]) => ({ week, internal: 0, ...d })));
+      setPricingWeekly(Array.from(weekMap.entries()).map(([week, d]) => ({ week, ...d })));
 
       // Per-marketplace breakdown (counts the 3 module sources).
       const sourceMap = new Map<string, number>(MARKETPLACE_SOURCES.map(s => [s, 0]));
@@ -1674,7 +1673,7 @@ export function PlatformOverviewTab() {
             <Card className="rounded-2xl">
               <CardHeader><CardTitle className="text-sm">Weekly Price Refresh Activity (12w)</CardTitle></CardHeader>
               <CardContent>
-                {pricingWeekly.some(w => w.internal + w.tracked + w.marketplace > 0) ? (
+                {pricingWeekly.some(w => w.refreshes + w.marketplace > 0) ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={pricingWeekly} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1682,9 +1681,8 @@ export function PlatformOverviewTab() {
                       <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="internal" name="Internal refresh" fill={COLORS[0]} stackId="a" />
-                      <Bar dataKey="tracked" name="External tracked" fill={COLORS[1]} stackId="a" />
-                      <Bar dataKey="marketplace" name="Marketplace hits" fill={COLORS[2]} stackId="a" radius={[4,4,0,0]} />
+                      <Bar dataKey="refreshes" name="Total refresh rows" fill={COLORS[0]} radius={[4,4,0,0]} />
+                      <Bar dataKey="marketplace" name="Greek marketplace hits" fill={COLORS[2]} radius={[4,4,0,0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

@@ -259,7 +259,7 @@ const IdealoPage: React.FC = () => {
             <CardTitle className="text-base">Test search</CardTitle>
             <CardDescription>
               Run a one-off query against the chosen locale. Does not write to{' '}
-              <code>competitor_sources</code> or <code>price_history</code>. Firecrawl credits debit normally.
+              <code>tracked_queries</code> or <code>tracked_query_price_history</code>. Firecrawl credits debit normally.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
