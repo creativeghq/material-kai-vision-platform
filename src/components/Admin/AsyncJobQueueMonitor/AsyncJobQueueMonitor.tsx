@@ -213,15 +213,21 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         throw jobError;
       }
 
-      // Update selected job with fresh data using deep comparison to prevent modal blinking
+      // Update selected job with fresh data using deep comparison to prevent modal blinking.
+      //
+      // last_heartbeat MUST be in the comparison set — without it, silent
+      // post-processing phases (heartbeat ticks but status/progress/metadata
+      // stay constant) keep returning the stale reference, and the heartbeat
+      // freshness indicator shows old timestamps that look like the job is
+      // hung when it isn't. updated_at covers any other field-level change.
       if (jobData) {
         setSelectedJob(prev => {
-          // If no previous job, set the new one
           if (!prev) return jobData as BackgroundJob;
 
-          // Deep comparison of relevant fields to prevent unnecessary re-renders
           if (prev.status === jobData.status &&
               prev.progress === jobData.progress &&
+              prev.last_heartbeat === (jobData as BackgroundJob).last_heartbeat &&
+              prev.updated_at === (jobData as BackgroundJob).updated_at &&
               JSON.stringify(prev.metadata) === JSON.stringify(jobData.metadata)) {
             return prev; // No change, keep same reference to prevent modal blink
           }
@@ -2647,25 +2653,65 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     statusText += ` — ${subStage.replace(/_/g, ' ')}`;
                   }
 
-                  // Stale heartbeat detection — warn if no update in 5+ minutes
+                  // Two-signal liveness check:
+                  //   1. process-alive  — `last_heartbeat` freshness (the
+                  //      orchestrator writes this every ~30s as long as it's
+                  //      running; staleness >2min = process likely dead).
+                  //   2. visible-activity — latest stage_history event
+                  //      timestamp (silent post-processing phases like
+                  //      vision-analysis catchup don't emit stage events,
+                  //      so this can be old without the job being stuck).
+                  // The previous single-flag approach treated silent
+                  // post-processing as "stuck" and produced false-positive
+                  // "no heartbeat for 8m" warnings.
+                  const now = Date.now();
                   const lastHeartbeat = selectedJob.last_heartbeat ? new Date(selectedJob.last_heartbeat).getTime() : 0;
-                  const staleMinutes = lastHeartbeat ? Math.floor((Date.now() - lastHeartbeat) / 60000) : 0;
-                  const isStale = lastHeartbeat > 0 && staleMinutes >= 5;
+                  const heartbeatStaleMin = lastHeartbeat ? Math.floor((now - lastHeartbeat) / 60000) : 0;
+                  const processDead = lastHeartbeat > 0 && heartbeatStaleMin >= 2;
+
+                  const latestStageTs = (() => {
+                    const history = jobCheckpoints || [];
+                    if (history.length === 0) return 0;
+                    const last = history[history.length - 1];
+                    const ts = last?.created_at;
+                    return ts ? new Date(ts as string).getTime() : 0;
+                  })();
+                  const activityStaleMin = latestStageTs ? Math.floor((now - latestStageTs) / 60000) : 0;
+                  const activityIdle = latestStageTs > 0 && activityStaleMin >= 5;
+
+                  // Color severity:
+                  //   processDead → orange (real problem, intervention may be needed)
+                  //   activityIdle but processAlive → blue + muted info badge (silent post-processing, normal)
+                  //   neither → blue (active and emitting)
+                  const tone = processDead
+                    ? { bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'text-orange-400', text: 'text-orange-400' }
+                    : { bg: 'bg-blue-500/10 border border-blue-500/20',     icon: 'text-blue-400',   text: 'text-blue-400' };
 
                   return (
-                    <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg ${isStale ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-blue-500/10 border border-blue-500/20'}`}>
-                      <RefreshCw className={`h-4 w-4 shrink-0 animate-spin ${isStale ? 'text-orange-400' : 'text-blue-400'}`} />
-                      <p className={`text-sm font-medium ${isStale ? 'text-orange-400' : 'text-blue-400'}`}>
+                    <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg ${tone.bg}`}>
+                      <RefreshCw className={`h-4 w-4 shrink-0 animate-spin ${tone.icon}`} />
+                      <p className={`text-sm font-medium ${tone.text}`}>
                         {statusText}
                         {selectedJob.progress > 0 && selectedJob.progress < 100 && (
                           <span className="ml-2 opacity-80">({selectedJob.progress}%)</span>
                         )}
                       </p>
-                      {isStale && (
-                        <Badge variant="outline" className="ml-auto bg-orange-500/15 text-orange-300 border-orange-500/30 text-[10px]">
-                          No heartbeat for {staleMinutes}m — may be stuck
-                        </Badge>
-                      )}
+                      <div className="ml-auto flex items-center gap-1.5">
+                        {processDead ? (
+                          <Badge variant="outline" className="bg-orange-500/15 text-orange-300 border-orange-500/30 text-[10px]">
+                            Heartbeat stale {heartbeatStaleMin}m — process may be dead
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[10px]">
+                            Heartbeat {heartbeatStaleMin === 0 ? '<1m' : `${heartbeatStaleMin}m`} ago · alive
+                          </Badge>
+                        )}
+                        {activityIdle && !processDead && (
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[10px]">
+                            Last event {activityStaleMin}m ago · silent stage
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   );
                 }
