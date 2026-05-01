@@ -796,6 +796,12 @@ export class MivaaApiClient {
         workspace_id: payload.workspace_id,
         top_k: payload.top_k ?? 8,
         strategy: 'multi_vector',
+        // Segmentation flow renders only the direct match cards — skip the
+        // expensive per-result related_products enrichment that fans out
+        // ~24 sequential Supabase queries per call (workspace-wide product
+        // scan + image_product_associations joins) and is the dominant
+        // latency contributor when the modal fires 12 of these in parallel.
+        include_related_products: false,
       }),
     });
   }

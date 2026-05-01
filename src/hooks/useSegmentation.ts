@@ -53,14 +53,18 @@ export function useSegmentation({
   const runRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   // ── Load existing segments from DB ──────────────────────────────────────
+  // Cache key is the set of source_image_urls — survives across regenerated
+  // jobs and direct uploads. Falls back to generation_id only when no
+  // completedImages are passed (legacy callers).
   useEffect(() => {
-    if (!generationId) return;
+    if (!generationId && completedImages.length === 0) return;
 
-    supabase
-      .from('generation_3d_segments')
-      .select('*')
-      .eq('generation_id', generationId)
-      .order('segment_index')
+    const urls = completedImages.map((c) => c.image_url);
+    const query = urls.length > 0
+      ? supabase.from('generation_3d_segments').select('*').in('source_image_url', urls).order('segment_index')
+      : supabase.from('generation_3d_segments').select('*').eq('generation_id', generationId!).order('segment_index');
+
+    query
       .then(({ data, error: dbErr }) => {
         if (dbErr) {
           console.error('[useSegmentation] Failed to load existing segments:', dbErr.message);
@@ -92,7 +96,10 @@ export function useSegmentation({
       .catch((err) => {
         console.error('[useSegmentation] Unexpected error loading segments:', err);
       });
-  }, [generationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally
+    // re-run on completedImages length change so cache lookup widens as
+    // images stream in, but stable enough not to thrash on URL identity.
+  }, [generationId, completedImages.length]);
 
   // ── Run segmentation once when images are ready ──────────────────────────
   const run = useCallback(async () => {
@@ -120,44 +127,52 @@ export function useSegmentation({
 
         const { width: imgW, height: imgH } = await getImageDimensions(image_url);
 
-        let segIndex = allSegments.length;
+        // Cap at 12 most confident zones — see ProgressiveImageGrid for rationale
+        const rankedZones = [...segRes.data.zones]
+          .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+          .slice(0, 12);
 
-        for (const zone of segRes.data.zones) {
-          // 2. Crop via Canvas API
-          const cropDataUrl = await cropZone(image_url, zone.bbox, imgW, imgH);
+        const baseIndex = allSegments.length;
+        const processed = await Promise.all(
+          rankedZones.map(async (zone, i) => {
+            const segIndex = baseIndex + i;
+            const cropDataUrl = await cropZone(image_url, zone.bbox, imgW, imgH);
 
-          // 3. Search for similar materials
-          let searchResults: any[] = [];
-          if (cropDataUrl) {
-            const cropBase64 = cropDataUrl.split(',')[1];
-            const searchRes = await mivaaApi.searchByImageCrop({
-              image_base64: cropBase64,
-              query: zone.search_query || `${zone.material_type} ${zone.finish} ${zone.label}`.trim(),
-              workspace_id: workspaceId,
-              top_k: 8,
-            });
-            searchResults = searchRes.data?.results ?? [];
-          }
+            let searchResults: any[] = [];
+            let cropStorageUrl: string | undefined;
 
-          // 4. Upload crop to Supabase Storage
-          let cropStorageUrl: string | undefined;
-          if (cropDataUrl) {
-            cropStorageUrl = await uploadCrop(cropDataUrl, generationId, segIndex);
-          }
+            if (cropDataUrl) {
+              const cropBase64 = cropDataUrl.split(',')[1];
+              const [searchRes, uploadedUrl] = await Promise.all([
+                mivaaApi.searchByImageCrop({
+                  image_base64: cropBase64,
+                  query: zone.search_query || `${zone.material_type} ${zone.finish} ${zone.label}`.trim(),
+                  workspace_id: workspaceId,
+                  top_k: 8,
+                }).catch((err) => {
+                  console.warn(`[useSegmentation] zone ${segIndex} search failed:`, err);
+                  return { success: false, data: { results: [] } } as any;
+                }),
+                uploadCrop(cropDataUrl, generationId, image_url, segIndex),
+              ]);
+              searchResults = searchRes?.data?.results ?? [];
+              cropStorageUrl = uploadedUrl;
+            }
 
-          const seg: SegmentWithResults = {
-            ...zone,
-            segment_index: segIndex,
-            model_id,
-            source_image_url: image_url,
-            crop_data_url: cropDataUrl ?? undefined,
-            crop_storage_url: cropStorageUrl,
-            search_results: searchResults,
-          };
+            const seg: SegmentWithResults = {
+              ...zone,
+              segment_index: segIndex,
+              model_id,
+              source_image_url: image_url,
+              crop_data_url: cropDataUrl ?? undefined,
+              crop_storage_url: cropStorageUrl,
+              search_results: searchResults,
+            };
+            return seg;
+          }),
+        );
 
-          allSegments.push(seg);
-          segIndex++;
-        }
+        allSegments.push(...processed);
       }
 
       // 5. Persist to DB
@@ -274,15 +289,30 @@ async function cropZone(
   });
 }
 
+function hashUrlKey(url: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) {
+    h ^= url.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
 async function uploadCrop(
   dataUrl: string,
-  generationId: string,
+  bucketKey: string | null | undefined,
+  fallbackUrl: string,
   index: number,
 ): Promise<string | undefined> {
   try {
+    // See ProgressiveImageGrid.uploadCrop — null generationId would otherwise
+    // produce `generation-segments//N.jpg` and break agent image references.
+    const safeKey = (bucketKey && bucketKey.length > 0)
+      ? bucketKey
+      : `direct-${hashUrlKey(fallbackUrl)}`;
     const base64 = dataUrl.split(',')[1];
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `generation-segments/${generationId}/${index}.jpg`;
+    const path = `generation-segments/${safeKey}/${index}.jpg`;
 
     const { error } = await supabase.storage
       .from('product-images')

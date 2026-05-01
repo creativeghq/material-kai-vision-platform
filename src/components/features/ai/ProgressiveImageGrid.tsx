@@ -99,6 +99,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   const [modalSegmentsLoaded, setModalSegmentsLoaded] = useState(false);
   const [modalSegmentError, setModalSegmentError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Synchronous race guard — `setModalSegmenting(true)` is async (queued for
+  // next render), so two effects can both see modalSegmenting=false in the
+  // same tick and both fire loadModalSegments. The ref flips synchronously
+  // and dedupes them.
+  const segmentationInFlightRef = useRef(false);
 
   // ── Phase 5: Edit mode ───────────────────────────────────────────────────────
   const [editMode, setEditMode] = useState<'none' | 'zone-select' | 'freehand'>('none');
@@ -221,6 +226,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
     setModalSegmenting(false);
     setModalSegmentsLoaded(false);
     setModalSegmentError(null);
+    segmentationInFlightRef.current = false;
     setModalActiveTab(pendingTabRef.current ?? 'image');
     setEditMode(pendingEditModeRef.current ?? 'none');
     pendingTabRef.current = null;
@@ -242,18 +248,23 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   // Load segments on demand — called when user opens the Products tab
   const loadModalSegments = useCallback(async () => {
     if (!selectedImage || modalSegmentsLoaded || modalSegmenting) return;
+    // Synchronous race guard — see comment on segmentationInFlightRef above.
+    if (segmentationInFlightRef.current) return;
+    segmentationInFlightRef.current = true;
 
     setModalSegmenting(true);
     setModalSegmentError(null);
 
     try {
-      // 1. Check DB for cached segments — skip for direct images (no jobId / model_id)
-      const isDirect = selectedImage.model_id === 'direct' || !jobId;
-      const existing = isDirect ? null : await supabase
+      // 1. Check DB for cached segments. Primary cache key is source_image_url
+      // — the URL uniquely identifies an image regardless of how the user
+      // arrived at it (job-bound generation, direct upload, edited variant).
+      // This way the second time the modal opens for the same image we skip
+      // the entire ~40s segmentation + ~40s search pipeline.
+      const existing = await supabase
         .from('generation_3d_segments')
         .select('*')
-        .eq('generation_id', jobId)
-        .eq('model_id', selectedImage.model_id)
+        .eq('source_image_url', selectedImage.url)
         .order('segment_index')
         .then(r => r.data);
 
@@ -333,49 +344,97 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       }
 
       const { width: imgW, height: imgH } = await getImageDimensions(selectedImage.url);
-      const allSegments: SegmentWithResults[] = [];
 
-      for (let i = 0; i < segRes.data.zones.length; i++) {
-        const zone = segRes.data.zones[i];
+      // Render EVERY zone the model returned — sorted by confidence so the
+      // most-likely ones are first, but no cap. Earlier we capped at 8 which
+      // dropped legitimate zones (glass separators, wall tiles, faucets,
+      // etc.) the user needs for the editor's zone-replace flow. Search is
+      // bounded separately below so server load stays sane.
+      const rankedZones = [...segRes.data.zones]
+        .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 
-        // Crop via Canvas API
-        const cropDataUrl = await cropZone(selectedImage.url, zone.bbox, imgW, imgH);
+      // Phase A: render zones IMMEDIATELY (no matches yet) so the user sees
+      // something at the 40s segmentation mark instead of waiting another
+      // 40s+ for all RAG searches to fan in. Each zone gets its crop + label
+      // + dominant color; matches stream in as Phase B completes.
+      const initialSegments: SegmentWithResults[] = await Promise.all(
+        rankedZones.map(async (zone, i) => {
+          const cropDataUrl = await cropZone(selectedImage.url, zone.bbox, imgW, imgH);
+          return {
+            ...zone,
+            segment_index: i,
+            model_id: selectedImage.model_id,
+            source_image_url: selectedImage.url,
+            crop_data_url: cropDataUrl ?? undefined,
+            crop_storage_url: undefined,
+            search_results: [], // filled in progressively
+            // _searching is a transient render flag so the row shows
+            // "Searching catalog…" until Phase B completes for this zone
+            // (instead of misleading "No matches above 70%").
+            _searching: true,
+          } as SegmentWithResults & { _searching: boolean };
+        }),
+      );
+      setModalSegments(initialSegments);
+      setModalSegmentsLoaded(true);
+      setModalSegmenting(false);
 
-        // Search for similar materials
-        let searchResults: any[] = [];
-        if (cropDataUrl) {
+      // Phase B: per-zone search + storage upload, bounded concurrency.
+      // Many simultaneous calls to /api/rag/search swamps the SLIG endpoint
+      // and Supabase REST pool — limit to 3 in-flight so each one gets fresh
+      // capacity instead of all of them fighting for it for 40s.
+      const CONCURRENCY = 3;
+      const queue = initialSegments.map((seg, i) => ({ seg, i }));
+      let cursor = 0;
+
+      const runOne = async (): Promise<void> => {
+        while (cursor < queue.length) {
+          const slot = cursor++;
+          const { seg, i } = queue[slot];
+          const cropDataUrl = seg.crop_data_url;
+          if (!cropDataUrl) continue;
           const cropBase64 = cropDataUrl.split(',')[1];
-          const searchRes = await mivaaApi.searchByImageCrop({
-            image_base64: cropBase64,
-            query: zone.search_query || `${zone.material_type} ${zone.finish} ${zone.label}`.trim(),
-            workspace_id: workspaceId,
-            top_k: 8,
-          });
-          searchResults = searchRes.data?.results ?? [];
+
+          const [searchRes, uploadedUrl] = await Promise.all([
+            mivaaApi.searchByImageCrop({
+              image_base64: cropBase64,
+              query: seg.search_query || `${seg.material_type} ${seg.finish} ${seg.label}`.trim(),
+              workspace_id: workspaceId,
+              top_k: 8,
+            }).catch((err) => {
+              console.warn(`[ProgressiveImageGrid] zone ${i} search failed:`, err);
+              return { success: false, data: { results: [] } } as any;
+            }),
+            uploadCrop(cropDataUrl, jobId, selectedImage.url, i),
+          ]);
+
+          const results = searchRes?.data?.results ?? [];
+          // Update this zone in place so the row populates as soon as its
+          // own search finishes. Other zones keep their existing state.
+          setModalSegments((prev) =>
+            prev.map((s) =>
+              s.segment_index === i
+                ? { ...s, search_results: results, crop_storage_url: uploadedUrl, _searching: false } as SegmentWithResults & { _searching: boolean }
+                : s,
+            ),
+          );
         }
+      };
 
-        // Upload crop to Supabase Storage
-        let cropStorageUrl: string | undefined;
-        if (cropDataUrl) {
-          cropStorageUrl = await uploadCrop(cropDataUrl, jobId, i);
-        }
+      await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
 
-        allSegments.push({
-          ...zone,
-          segment_index: i,
-          model_id: selectedImage.model_id,
-          source_image_url: selectedImage.url,
-          crop_data_url: cropDataUrl ?? undefined,
-          crop_storage_url: cropStorageUrl,
-          search_results: searchResults,
-        });
-      }
+      // Phase C: enrich (image_product_associations → product image URLs)
+      // THEN persist. Enrichment must run before the cache write so cache
+      // hits next time include image_url on every result — otherwise the
+      // user sees blank product thumbnails after a reload.
+      let snapshot: SegmentWithResults[] = [];
+      setModalSegments((latest) => { snapshot = latest; return latest; });
 
-      // 3. Enrich search results with product image URLs (from image_product_associations → document_images)
       const allProductIds = [...new Set(
-        allSegments.flatMap(s => (s.search_results ?? []).map((r: any) => r.id)),
+        snapshot.flatMap(s => (s.search_results ?? []).map((r: any) => r.id)),
       )].filter(Boolean);
 
+      let enriched = snapshot;
       if (allProductIds.length > 0) {
         try {
           const { data: imageAssocs } = await supabase
@@ -391,21 +450,27 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
             }
           });
 
-          for (const seg of allSegments) {
-            seg.search_results = (seg.search_results ?? []).map((r: any) => ({
+          enriched = snapshot.map((seg) => ({
+            ...seg,
+            search_results: (seg.search_results ?? []).map((r: any) => ({
               ...r,
-              image_url: productImageMap[r.id] || null,
-            }));
-          }
+              image_url: productImageMap[r.id] || r.image_url || null,
+            })),
+          }));
+          setModalSegments(enriched);
         } catch (imgErr) {
           console.warn('[ProgressiveImageGrid] Could not fetch product images:', imgErr);
         }
       }
 
-      // 4. Persist to DB
-      if (allSegments.length > 0) {
-        const rows = allSegments.map((s) => ({
-          generation_id: jobId,
+      // Persist for cache. generation_id may be null for direct/edited
+      // images — the source_image_url is the real cache key on lookup, so a
+      // NULL generation_id row still serves cache hits cleanly. If the
+      // column is NOT NULL the insert fails gracefully and we simply
+      // re-segment next time (no error surfaced to the user).
+      if (enriched.length > 0) {
+        const rows = enriched.map((s) => ({
+          generation_id: jobId ?? null,
           model_id: s.model_id,
           source_image_url: s.source_image_url,
           segment_index: s.segment_index,
@@ -420,42 +485,40 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           search_query: (s as any).search_query ?? null,
         }));
 
-        const { data: inserted } = await supabase
-          .from('generation_3d_segments')
-          .insert(rows)
-          .select('id, segment_index');
-
-        if (inserted) {
-          for (const s of allSegments) {
-            const match = inserted.find((r: any) => r.segment_index === s.segment_index);
-            if (match) s.id = match.id;
+        try {
+          const { error: insErr } = await supabase
+            .from('generation_3d_segments')
+            .insert(rows);
+          if (insErr) {
+            console.warn('[ProgressiveImageGrid] Cache persist failed:', insErr.message);
           }
+        } catch (dbErr) {
+          console.warn('[ProgressiveImageGrid] Cache persist error:', dbErr);
         }
       }
-
-      setModalSegments(allSegments);
-      setModalSegmentsLoaded(true);
     } catch (err: any) {
       console.error('[ProgressiveImageGrid] Segmentation error:', err);
       setModalSegmentError(err?.message ?? 'Unexpected error during segmentation');
       setModalSegmentsLoaded(true);
     } finally {
       setModalSegmenting(false);
+      segmentationInFlightRef.current = false;
     }
   }, [selectedImage, jobId, workspaceId, modalSegmentsLoaded, modalSegmenting]);
 
-  // Delete cached DB rows then trigger a fresh segmentation run
+  // Delete cached DB rows then trigger a fresh segmentation run.
+  // Match the same key the lookup uses (source_image_url) so regenerate
+  // also clears cache rows that have null generation_id (direct/edited).
   const handleRegenerate = useCallback(async () => {
-    if (!selectedImage || !jobId) return;
+    if (!selectedImage) return;
     await supabase
       .from('generation_3d_segments')
       .delete()
-      .eq('generation_id', jobId)
-      .eq('model_id', selectedImage.model_id);
+      .eq('source_image_url', selectedImage.url);
     setModalSegments([]);
     setModalSegmentError(null);
     setModalSegmentsLoaded(false);
-  }, [selectedImage, jobId]);
+  }, [selectedImage]);
 
   // Trigger loading when the Products tab is selected
   useEffect(() => {
@@ -794,10 +857,10 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       <Dialog open={!!selectedImage} onOpenChange={() => { if (selectedImage?.model_id === 'direct') onDirectImageClose?.(); setSelectedImage(null); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
           {/* Header */}
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <DialogTitle className="text-base font-semibold text-gray-900 truncate">
+                <DialogTitle className="text-base font-semibold text-foreground truncate">
                   Interior Design Render
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground mt-0.5">
@@ -1221,9 +1284,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
               <TabsContent value="products" className="mt-4 space-y-3">
                 {/* Pending replacement banner */}
                 {pendingReplacement && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
-                    <Paintbrush className="w-4 h-4 text-violet-600 flex-shrink-0" />
-                    <p className="text-xs text-violet-800 flex-1 font-medium">
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/10 border border-primary/30 rounded-lg">
+                    <Paintbrush className="w-4 h-4 text-primary flex-shrink-0" />
+                    <p className="text-xs text-foreground flex-1 font-medium">
                       Select a zone below to replace with <span className="font-semibold">"{pendingReplacement.name}"</span>
                     </p>
                   </div>
@@ -1249,20 +1312,20 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 )}
 
                 {modalSegmenting ? (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-500">
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
                     <div className="relative">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
-                    <p className="font-medium text-sm">Detecting material zones…</p>
+                    <p className="font-medium text-sm text-foreground">Detecting material zones…</p>
                     <p className="text-xs text-muted-foreground">AI vision analysis — may take up to 90 seconds on first run</p>
                   </div>
                 ) : modalSegmentError ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="p-3 bg-red-50 rounded-full">
-                      <AlertCircle className="w-6 h-6 text-red-500" />
+                    <div className="p-3 bg-destructive/10 rounded-full">
+                      <AlertCircle className="w-6 h-6 text-destructive" />
                     </div>
                     <div className="text-center">
-                      <p className="font-medium text-sm text-gray-900">Detection failed</p>
+                      <p className="font-medium text-sm text-foreground">Detection failed</p>
                       <p className="text-xs text-center text-muted-foreground max-w-xs mt-1">{modalSegmentError}</p>
                     </div>
                     <Button
@@ -1277,11 +1340,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                   </div>
                 ) : modalSegmentsLoaded && modalSegments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="p-3 bg-gray-100 rounded-full">
-                      <Scan className="w-6 h-6 text-gray-400" />
+                    <div className="p-3 bg-muted rounded-full">
+                      <Scan className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <div className="text-center">
-                      <p className="font-medium text-sm text-gray-700">No material zones detected</p>
+                      <p className="font-medium text-sm text-foreground">No material zones detected</p>
                       <p className="text-xs text-muted-foreground mt-1">Try regenerating or use a clearer render</p>
                     </div>
                     <Button
@@ -1312,11 +1375,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       ] as const;
 
                       return (
-                        <div key={seg.id ?? idx} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <div key={seg.id ?? idx} className="rounded-xl border border-border bg-card overflow-hidden">
                           {/* Zone header — material info */}
-                          <div className="flex gap-3 p-3 border-b border-gray-100 bg-gray-50/40">
+                          <div className="flex gap-3 p-3 border-b border-border bg-muted/30">
                             {/* Crop thumbnail */}
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                               {(seg.crop_storage_url || seg.crop_data_url) && (
                                 <img
                                   src={getOptimizedImageUrl(seg.crop_storage_url ?? seg.crop_data_url, 'thumbnail')}
@@ -1325,18 +1388,18 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   onClick={() => setLightboxUrl(seg.crop_storage_url ?? seg.crop_data_url!)}
                                 />
                               )}
-                              <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl leading-tight">
+                              <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 rounded-tl leading-tight">
                                 {Math.round(seg.confidence * 100)}%
                               </div>
                             </div>
 
                             {/* Material metadata */}
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 capitalize text-sm leading-tight">{seg.label}</p>
+                              <p className="font-semibold text-foreground capitalize text-sm leading-tight">{seg.label}</p>
                               <p className="text-xs text-muted-foreground mt-0.5">{seg.material_type} · {seg.finish}</p>
                               <div className="flex items-center gap-1.5 mt-1">
                                 <div
-                                  className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                                  className="w-3 h-3 rounded-full border border-border flex-shrink-0"
                                   style={{ backgroundColor: seg.dominant_color ?? '#888' }}
                                 />
                                 <span className="text-[10px] text-muted-foreground font-mono">{seg.dominant_color}</span>
@@ -1350,15 +1413,20 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                           </div>
 
                           {/* Platform matches */}
-                          {matches.length > 0 ? (
-                            <div className="divide-y divide-gray-50">
+                          {(seg as any)._searching ? (
+                            <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                              <span>Searching catalog for matches…</span>
+                            </div>
+                          ) : matches.length > 0 ? (
+                            <div className="divide-y divide-border">
                               {matches.map((match: any, mIdx: number) => {
                                 const score = match.score ?? match.final_score ?? 0;
                                 const name = match.product_name ?? match.name ?? 'Product';
                                 return (
                                   <div key={mIdx} className="flex gap-2.5 px-3 py-2.5 items-start">
                                     {/* Product image */}
-                                    <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                                    <div className="w-10 h-10 rounded-md overflow-hidden bg-muted flex-shrink-0 border border-border">
                                       {match.image_url ? (
                                         <img
                                           src={getOptimizedImageUrl(match.image_url, 'thumbnail')}
@@ -1367,7 +1435,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                           onClick={() => setLightboxUrl(match.image_url)}
                                         />
                                       ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                        <div className="w-full h-full flex items-center justify-center text-muted-foreground/60">
                                           <Package className="w-3.5 h-3.5" />
                                         </div>
                                       )}
@@ -1376,8 +1444,8 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     {/* Name + scores */}
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
-                                        <p className="text-xs font-medium text-gray-900 truncate flex-1">{name}</p>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[10px] bg-green-50 text-green-700 border-green-200 flex-shrink-0">
+                                        <p className="text-xs font-medium text-foreground truncate flex-1">{name}</p>
+                                        <Badge variant="outline" className="h-4 px-1.5 text-[10px] bg-emerald-500/15 text-emerald-300 border-emerald-500/30 flex-shrink-0">
                                           {Math.round(score * 100)}%
                                         </Badge>
                                       </div>
@@ -1388,10 +1456,10 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                           const val: number = match[key] ?? 0;
                                           if (val === 0) return null;
                                           const cls = val >= 0.7
-                                            ? 'bg-green-100 text-green-700'
+                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                                             : val >= 0.4
-                                            ? 'bg-amber-100 text-amber-700'
-                                            : 'bg-gray-100 text-gray-500';
+                                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                            : 'bg-muted text-muted-foreground border border-border';
                                           return (
                                             <span
                                               key={key}
@@ -1409,13 +1477,13 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                               })}
 
                               {(onAskJARVIS || onFindMaterial || onZoneSelectedForReplacement || editMode === 'zone-select') && (
-                                <div className="px-3 py-2 bg-gray-50/60 flex flex-col gap-1.5">
+                                <div className="px-3 py-2 bg-muted/30 flex flex-col gap-1.5">
                                   {/* Edit mode: Replace Material button */}
                                   {editMode === 'zone-select' && (
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-[11px] font-semibold rounded-md transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold rounded-full transition-colors w-full justify-center"
                                     >
                                       {generatingMask
                                         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -1426,7 +1494,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onAskJARVIS && (
                                     <button
                                       onClick={() => onAskJARVIS(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium rounded-full transition-colors w-full justify-center"
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                       Search Relevant
@@ -1435,7 +1503,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onFindMaterial && (
                                     <button
                                       onClick={() => onFindMaterial(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium rounded-full transition-colors w-full justify-center"
                                     >
                                       <Search className="w-3 h-3" />
                                       Find This Material
@@ -1445,7 +1513,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium rounded-full transition-colors w-full justify-center"
                                     >
                                       {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                       Replace with "{pendingReplacement.name}"
@@ -1462,7 +1530,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   <button
                                     onClick={() => generateMaskFromZone(seg)}
                                     disabled={generatingMask}
-                                    className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-[11px] font-semibold rounded-md transition-colors w-full justify-center"
+                                    className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold rounded-full transition-colors w-full justify-center"
                                   >
                                     {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                     {generatingMask ? 'Generating mask…' : 'Replace Material'}
@@ -1472,7 +1540,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onAskJARVIS && (
                                     <button
                                       onClick={() => onAskJARVIS(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium rounded-full transition-colors"
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                       Search Relevant
@@ -1481,7 +1549,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onFindMaterial && (
                                     <button
                                       onClick={() => onFindMaterial(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-md transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium rounded-full transition-colors"
                                     >
                                       <Search className="w-3 h-3" />
                                       Find This Material
@@ -1491,7 +1559,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-medium rounded-md transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium rounded-full transition-colors"
                                     >
                                       {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                       Replace here
@@ -1508,10 +1576,10 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 ) : (
                   // Not yet loaded — shows briefly before useEffect triggers loading
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <div className="p-3 bg-gray-100 rounded-full">
-                      <Scan className="w-6 h-6 text-gray-400" />
+                    <div className="p-3 bg-muted rounded-full">
+                      <Scan className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium text-gray-700">Preparing material analysis…</p>
+                    <p className="text-sm font-medium text-foreground">Preparing material analysis…</p>
                   </div>
                 )}
               </TabsContent>
@@ -1745,15 +1813,34 @@ async function createBboxMask(
   });
 }
 
+// FNV-1a 32-bit hash → 8-char hex. Stable across sessions for the same URL,
+// so cached crops keep the same path even when generationId is unknown.
+function hashUrlKey(url: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) {
+    h ^= url.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
 async function uploadCrop(
   dataUrl: string,
-  generationId: string,
+  bucketKey: string | null | undefined,
+  fallbackUrl: string,
   index: number,
 ): Promise<string | undefined> {
   try {
+    // Direct/edited images have no jobId — fall back to a stable hash of the
+    // source URL so the path never collapses to `generation-segments//1.jpg`
+    // (the double-slash makes Supabase storage return a 404-styled URL that
+    // downstream code then ships into agent prompts as a broken image link).
+    const safeKey = (bucketKey && bucketKey.length > 0)
+      ? bucketKey
+      : `direct-${hashUrlKey(fallbackUrl)}`;
     const base64 = dataUrl.split(',')[1];
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `generation-segments/${generationId}/${index}.jpg`;
+    const path = `generation-segments/${safeKey}/${index}.jpg`;
 
     const { error } = await supabase.storage
       .from('product-images')
