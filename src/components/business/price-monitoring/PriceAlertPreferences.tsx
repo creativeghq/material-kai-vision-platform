@@ -58,14 +58,17 @@ export const PriceAlertPreferences: React.FC<PriceAlertPreferencesProps> = ({ pr
     return () => { cancelled = true; };
   }, []);
 
-  // Pull current preferences for this product.
+  // Pull current preferences for this product. After consolidation, alert
+  // prefs live on the internal tracked_query (api_key_id IS NULL +
+  // product_id = X). At most one row exists per product.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data } = await supabase
-        .from('price_monitoring_products')
+        .from('tracked_queries')
         .select('alert_on_price_drop, alert_on_new_retailer, alert_on_promo, alert_channels')
         .eq('product_id', productId)
+        .is('api_key_id', null)
         .maybeSingle();
       if (cancelled) return;
       setPrefs({
@@ -85,9 +88,10 @@ export const PriceAlertPreferences: React.FC<PriceAlertPreferencesProps> = ({ pr
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('price_monitoring_products')
+        .from('tracked_queries')
         .update(patch)
-        .eq('product_id', productId);
+        .eq('product_id', productId)
+        .is('api_key_id', null);
       if (error) throw error;
     } catch (e) {
       toast({ title: 'Failed to save preferences', description: String(e), variant: 'destructive' });

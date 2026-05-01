@@ -1,6 +1,8 @@
 /**
  * Competitor Source Manager
- * UI to add, edit, and remove competitor URLs for price monitoring
+ * UI to add a custom retailer URL ("Custom Monitoring"). Backed by a
+ * mode='url-only' tracked_queries row — Firecrawl re-verifies it on every
+ * refresh, no Perplexity discovery cost.
  */
 
 import React, { useState } from 'react';
@@ -9,8 +11,8 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
-import { AlertCircle, Plus, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { AlertCircle } from 'lucide-react';
+import { addUrlOnly } from '@/services/priceMonitoringApi';
 
 interface CompetitorSourceManagerProps {
   productId: string;
@@ -49,17 +51,9 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
 
     try {
       setIsSubmitting(true);
-
-      const { error: insertError } = await supabase
-        .from('competitor_sources')
-        .insert({
-          product_id: productId,
-          source_name: sourceName.trim(),
-          source_url: sourceUrl.trim(),
-          is_active: true,
-        });
-
-      if (insertError) throw insertError;
+      // Custom monitoring = mode='url-only' tracked_query. Firecrawl verifies
+      // the URL on every refresh; no Perplexity discovery cost.
+      await addUrlOnly({ productId, url: sourceUrl.trim() });
 
       // Reset form
       setSourceName('');
@@ -72,8 +66,12 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
 
       onClose();
     } catch (err) {
-      console.error('Failed to add competitor source:', err);
-      setError('Failed to add competitor source. Please try again.');
+      console.error('Failed to add custom retailer URL:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to add custom retailer URL. Please try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }

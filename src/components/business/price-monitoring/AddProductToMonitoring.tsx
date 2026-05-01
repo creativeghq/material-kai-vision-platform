@@ -26,6 +26,7 @@ import {
 import { Plus, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { trackProduct } from '@/services/priceMonitoringApi';
 
 interface Product {
   id: string;
@@ -107,42 +108,15 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
 
     setIsLoading(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('workspace_id')
-        .eq('id', user.user.id)
-        .single();
-
-      if (!profile) throw new Error('Profile not found');
-
-      // Single-tier 24h cadence: every monitored product refreshes once per
-      // day from its last check. The hourly cron picks up products whose
-      // 24h window has elapsed.
-      const nextCheckAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-      // Add product to monitoring
-      const { error } = await supabase
-        .from('price_monitoring_products')
-        .upsert({
-          product_id: selectedProductId,
-          user_id: user.user.id,
-          workspace_id: profile.workspace_id,
-          monitoring_enabled: true,
-          monitoring_frequency: 'daily',
-          next_check_at: nextCheckAt,
-          status: 'active',
-        }, {
-          onConflict: 'product_id,user_id',
-        });
-
-      if (error) throw error;
+      // Enroll the product. Backend creates a tracked_queries row with
+      // api_key_id IS NULL + product_id set, runs the first discovery
+      // refresh synchronously, and the volatility-based cron handles the
+      // ongoing cadence.
+      await trackProduct(selectedProductId);
 
       toast({
         title: 'Success',
-        description: 'Product added to monitoring — refreshes every 24h',
+        description: 'Product added to monitoring — first scan running now',
       });
 
       setIsOpen(false);

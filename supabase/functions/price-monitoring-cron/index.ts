@@ -1,37 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Price Monitoring Cron Job
+ * Price Monitoring Cron Job — internal-flow refresher.
  *
  * Architecture: Edge Function → Python Backend API
  *
- * This Edge Function runs on a schedule (hourly) and:
- * 1. Queries database for products due for monitoring
- * 2. Calls Python backend API for each product
- * 3. Python backend handles:
- *    - Firecrawl scraping
- *    - Credit debit via CreditsIntegrationService
- *    - AI usage logging via AICallLogger
- *    - Database updates
- *    - Price alert checks
+ * After the 2026-05-01 consolidation, every catalog product enrolled in
+ * monitoring is a `tracked_queries` row with `api_key_id IS NULL` and
+ * `product_id NOT NULL`. This cron:
+ *   1. Calls `get_internal_tracked_queries_due()` to pick rows whose
+ *      `next_check_at` (volatility-aware cadence) has elapsed.
+ *   2. POSTs each one to MIVAA's `/api/v1/price-monitoring/products/{id}/refresh`
+ *      so the Python backend runs the full discovery + verification pipeline,
+ *      writes to `tracked_query_price_history`, and bumps `next_check_at` via
+ *      `update_tracked_query_cadence`.
  *
- * Benefits:
- * - Unified credit system
- * - Unified AI analytics
- * - Single source of truth for business logic
- * - Consistent error handling
- *
- * Triggered by: Supabase Cron or external scheduler
+ * External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT
+ * touched — they pay per call and control their own refresh cadence.
  */
 
 Deno.serve(async (req) => {
   console.log('🔄 Price monitoring cron job started');
 
   try {
-    // Verify cron secret for security
     const cronSecret = req.headers.get('x-cron-secret');
     const expectedSecret = Deno.env.get('CRON_SECRET');
-
     if (cronSecret !== expectedSecret) {
       console.error('❌ Invalid cron secret');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -40,150 +33,109 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Python backend URL (required)
     const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL');
     if (!pythonBackendUrl) {
       throw new Error('PYTHON_BACKEND_URL environment variable not set');
     }
 
-    // Get products due for monitoring
-    // Uses database function to find products where next_check_at <= NOW()
-    const { data: productsToMonitor, error: fetchError } = await supabase
-      .rpc('get_products_due_for_monitoring');
+    // Pull internal tracked_queries whose next_check_at has elapsed.
+    const { data: due, error: fetchError } = await supabase
+      .rpc('get_internal_tracked_queries_due');
 
     if (fetchError) {
-      console.error('❌ Failed to fetch products:', fetchError);
-      throw new Error(`Failed to fetch products: ${fetchError.message}`);
+      console.error('❌ Failed to fetch due tracked_queries:', fetchError);
+      throw new Error(`Failed to fetch due tracked_queries: ${fetchError.message}`);
     }
 
-    console.log(`📊 Found ${productsToMonitor?.length || 0} products due for monitoring`);
+    console.log(`📊 Found ${due?.length || 0} internal tracked_queries due`);
 
-    if (!productsToMonitor || productsToMonitor.length === 0) {
-      console.log('✅ No products due for monitoring');
+    if (!due || due.length === 0) {
       return new Response(JSON.stringify({
         success: true,
         message: 'No products due for monitoring',
         processed: 0,
         succeeded: 0,
         failed: 0,
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     let processed = 0;
     let succeeded = 0;
     let failed = 0;
-    const results: any[] = [];
+    const results: Array<Record<string, unknown>> = [];
 
-    // Process each product
-    for (const product of productsToMonitor) {
+    for (const row of due) {
+      const productId = (row as { product_id?: string }).product_id;
+      if (!productId) continue;
+
       try {
-        console.log(`\n🔍 Processing product: ${product.product_id}`);
-        console.log(`   Product name: ${product.product_name || 'Unknown'}`);
-        console.log(`   Frequency: ${product.monitoring_frequency}`);
-
-        // Call Python backend API to perform price check
-        // The Python backend handles:
-        // - Firecrawl scraping
-        // - Credit debit via CreditsIntegrationService
-        // - AI usage logging via AICallLogger
-        // - Database updates (price_history, competitor_sources)
-        // - Job tracking (price_monitoring_jobs)
-        // - Price alert checks
-
-        const response = await fetch(`${pythonBackendUrl}/api/v1/price-monitoring/check-now`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Use service role key for backend-to-backend auth
-            'Authorization': `Bearer ${supabaseKey}`,
+        const response = await fetch(
+          `${pythonBackendUrl}/api/v1/price-monitoring/products/${productId}/refresh`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // Service-role JWT lets MIVAA's get_current_user accept us without
+              // a session JWT. The endpoint internally uses the row owner.
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({ force_refresh: false, verify_prices: true }),
           },
-          body: JSON.stringify({
-            product_id: product.product_id,
-            product_name: product.product_name || 'Unknown Product',
-          }),
-        });
+        );
+
+        processed++;
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`❌ Python backend error (${response.status}): ${errorText}`);
+          console.error(`❌ Backend ${response.status} for product ${productId}: ${errorText.slice(0, 200)}`);
           failed++;
-          results.push({
-            product_id: product.product_id,
-            success: false,
-            error: `Backend returned ${response.status}: ${errorText}`,
-          });
+          results.push({ product_id: productId, success: false, error: `${response.status}` });
           continue;
         }
 
         const result = await response.json();
-
+        const inner = (result?.data || {}) as Record<string, unknown>;
         if (result.success) {
-          console.log(`✅ Price check completed for ${product.product_id}`);
-          console.log(`   Sources checked: ${result.sources_checked || 0}`);
-          console.log(`   Prices found: ${result.prices_found || 0}`);
-          console.log(`   Credits consumed: ${result.credits_consumed || 0}`);
           succeeded++;
           results.push({
-            product_id: product.product_id,
+            product_id: productId,
             success: true,
-            sources_checked: result.sources_checked,
-            prices_found: result.prices_found,
-            credits_consumed: result.credits_consumed,
+            credits_used: inner.credits_used ?? 0,
+            results_count: Array.isArray(inner.results) ? inner.results.length : 0,
           });
         } else {
-          console.error(`❌ Price check failed for ${product.product_id}: ${result.error || 'Unknown error'}`);
           failed++;
           results.push({
-            product_id: product.product_id,
+            product_id: productId,
             success: false,
-            error: result.error || 'Unknown error',
+            status: inner.status,
+            error: inner.error,
           });
         }
-
-        processed++;
-
-        // Update next check time using database function
-        const { error: updateError } = await supabase.rpc('update_next_check_time', {
-          p_monitoring_id: product.id,
-          p_frequency: product.monitoring_frequency,
-        });
-
-        if (updateError) {
-          console.error(`⚠️  Failed to update next check time for ${product.product_id}:`, updateError);
-        }
-
       } catch (error) {
-        console.error(`❌ Error processing product ${product.product_id}:`, error);
+        console.error(`❌ Error refreshing product ${productId}:`, error);
         failed++;
+        processed++;
         results.push({
-          product_id: product.product_id,
+          product_id: productId,
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
 
-    console.log(`\n✅ Internal monitoring completed: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
-
-    // External tracked_queries (`tracked_queries` table) are intentionally NOT
-    // refreshed here. External API consumers control their own refresh
-    // cadence by calling POST /api/v1/prices/track/{id}/refresh themselves.
-    // Our internal cron does not touch their data — they pay per-call, and
-    // unsolicited refreshes would surprise their billing.
+    console.log(`✅ Internal monitoring completed: ${processed} processed, ${succeeded} succeeded, ${failed} failed`);
 
     return new Response(JSON.stringify({
       success: true,
       message: `Price monitoring completed: ${succeeded}/${processed} succeeded`,
       stats: {
         internal: {
-          total: productsToMonitor.length,
+          total: due.length,
           processed,
           succeeded,
           failed,
@@ -191,9 +143,7 @@ Deno.serve(async (req) => {
         },
       },
       timestamp: new Date().toISOString(),
-    }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    }), { headers: { 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('❌ Error in price-monitoring-cron:', error);
@@ -202,30 +152,6 @@ Deno.serve(async (req) => {
       success: false,
       error: errorMessage,
       timestamp: new Date().toISOString(),
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 });
-
-// ============================================================================
-// END OF CRON JOB
-// ============================================================================
-// All scraping logic has been moved to the Python backend.
-// This Edge Function only orchestrates the cron schedule and calls the backend API.
-//
-// Python backend handles:
-// - Firecrawl scraping (CompetitorScraperService)
-// - Credit debit (CreditsIntegrationService)
-// - AI usage logging (AICallLogger)
-// - Price history storage
-// - Price alert checks (PriceAlertService)
-// - Job tracking
-//
-// Benefits:
-// - Unified credit system
-// - Unified AI analytics dashboard
-// - Single source of truth for business logic
-// - Consistent error handling and retry logic
-// ============================================================================

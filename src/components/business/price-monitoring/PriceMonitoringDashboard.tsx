@@ -1,25 +1,26 @@
 /**
- * Price Monitoring Dashboard
- * Main interface for managing price monitoring across products
+ * Price Monitoring Dashboard — internal flow.
+ *
+ * Lists every product enrolled in monitoring (tracked_queries with
+ * api_key_id IS NULL) and surfaces top-level stats. Per-product detail
+ * lives in `ProductMonitorTab`.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { TrendingDown, TrendingUp, Activity, AlertCircle, RefreshCw } from 'lucide-react';
+import { TrendingDown, Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PriceMonitoringProduct, PriceMonitoringJob } from './types';
+import type { TrackedQuery } from '@/services/priceMonitoringApi';
 import { MonitoredProductsList } from './MonitoredProductsList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertsPanel } from './PriceAlertsPanel';
 import { AddProductToMonitoring } from './AddProductToMonitoring';
 
 export const PriceMonitoringDashboard: React.FC = () => {
-  const [monitoredProducts, setMonitoredProducts] = useState<PriceMonitoringProduct[]>([]);
-  const [recentJobs, setRecentJobs] = useState<PriceMonitoringJob[]>([]);
+  const [monitoredProducts, setMonitoredProducts] = useState<TrackedQuery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalMonitored: 0,
@@ -36,57 +37,55 @@ export const PriceMonitoringDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Load monitored products
-      const { data: products, error: productsError } = await supabase
-        .from('price_monitoring_products')
+      // Internal-flow rows: api_key_id IS NULL + product_id NOT NULL.
+      // Cast through unknown — the generated types haven't been refreshed
+      // with the new product_id / mode / current_* columns yet.
+      const { data: rows, error: rowsError } = await (supabase
+        .from('tracked_queries') as any)
         .select('*')
         .eq('user_id', user.id)
+        .is('api_key_id', null)
+        .not('product_id', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (productsError) throw productsError;
+      if (rowsError) throw rowsError;
+      const products = (rows ?? []) as TrackedQuery[];
+      setMonitoredProducts(products);
 
-      setMonitoredProducts(products || []);
+      const activeCount = products.filter((p) => p.is_active).length;
 
-      // Load recent jobs
-      const { data: jobs, error: jobsError } = await supabase
-        .from('price_monitoring_jobs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (jobsError) throw jobsError;
-
-      setRecentJobs(jobs || []);
-
-      // Calculate stats
-      const activeCount = products?.filter(p => p.monitoring_enabled && p.status === 'active').length || 0;
+      // Credits today — sum the latest refresh credits across active rows.
+      // Rough approximation; precise per-day spend lives in ai_usage_logs.
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
+      let creditsUsed = 0;
+      for (const p of products) {
+        if (
+          p.last_refreshed_at
+          && new Date(p.last_refreshed_at) >= todayStart
+          && p.last_refresh_credits_used
+        ) {
+          creditsUsed += p.last_refresh_credits_used;
+        }
+      }
 
-      const todayJobs = jobs?.filter(j => new Date(j.created_at) >= todayStart) || [];
-      const creditsUsed = todayJobs.reduce((sum, j) => sum + (j.credits_consumed || 0), 0);
-
-      // Count price drops today from alert history
+      // Price drops today — read from the unified alert log.
       const { count: priceDropCount } = await supabase
-        .from('price_alert_history')
+        .from('price_alert_log')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .lt('price_change_amount', 0)
-        .gte('triggered_at', todayStart.toISOString());
+        .eq('alert_type', 'price_drop')
+        .gte('created_at', todayStart.toISOString());
 
       setStats({
-        totalMonitored: products?.length || 0,
+        totalMonitored: products.length,
         activeMonitoring: activeCount,
         priceDropsToday: priceDropCount ?? 0,
         creditsUsedToday: creditsUsed,
       });
-
     } catch (error) {
       console.error('Error loading dashboard:', error);
       toast({
@@ -105,7 +104,6 @@ export const PriceMonitoringDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Price Monitoring</h1>
@@ -114,16 +112,15 @@ export const PriceMonitoringDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleRefresh} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <AddProductToMonitoring onProductAdded={loadDashboardData} />
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Monitored</CardTitle>
@@ -131,9 +128,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalMonitored}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.activeMonitoring} active
-            </p>
+            <p className="text-xs text-muted-foreground">{stats.activeMonitoring} active</p>
           </CardContent>
         </Card>
 
@@ -144,9 +139,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.priceDropsToday}</div>
-            <p className="text-xs text-muted-foreground">
-              Alerts triggered
-            </p>
+            <p className="text-xs text-muted-foreground">Alerts triggered</p>
           </CardContent>
         </Card>
 
@@ -157,40 +150,20 @@ export const PriceMonitoringDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.creditsUsedToday.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Firecrawl credits
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Price Change</CardTitle>
-            <TrendingUp className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">
-              Last 7 days
-            </p>
+            <p className="text-xs text-muted-foreground">Discovery + verification</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Monitored Products</TabsTrigger>
           <TabsTrigger value="alerts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Price Alerts</TabsTrigger>
           <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Price History</TabsTrigger>
-          <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Recent Jobs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
-          <MonitoredProductsList
-            products={monitoredProducts}
-            onRefresh={loadDashboardData}
-          />
+          <MonitoredProductsList products={monitoredProducts} onRefresh={loadDashboardData} />
         </TabsContent>
 
         <TabsContent value="alerts" className="space-y-4">
@@ -200,60 +173,9 @@ export const PriceMonitoringDashboard: React.FC = () => {
         <TabsContent value="history" className="space-y-4">
           <PriceHistoryChart />
         </TabsContent>
-
-        <TabsContent value="jobs" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Monitoring Jobs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recentJobs.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  No monitoring jobs yet
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {recentJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={
-                            job.status === 'completed' ? 'default' :
-                            job.status === 'failed' ? 'destructive' :
-                            job.status === 'running' ? 'secondary' : 'outline'
-                          }>
-                            {job.status}
-                          </Badge>
-                          <span className="text-sm font-medium">
-                            {job.job_type === 'on_demand' ? 'On-Demand' : 'Scheduled'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(job.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">
-                          {job.prices_found} prices found
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {job.sources_checked} sources checked
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
 export default PriceMonitoringDashboard;
-

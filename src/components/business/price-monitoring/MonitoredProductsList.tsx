@@ -1,9 +1,12 @@
 /**
- * Monitored Products List
- * Displays list of products being monitored with controls
+ * Monitored Products List — internal flow.
+ *
+ * One row per `tracked_queries` row owned by the user (api_key_id IS NULL).
+ * Reads the denormalized `current_price` cache populated by every refresh,
+ * so the table renders without per-row history queries.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -16,20 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
-import { Play, Pause, Settings, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { Play, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PriceMonitoringProduct } from './types';
+import { refreshProduct, untrackProduct, trackProduct } from '@/services/priceMonitoringApi';
+import type { TrackedQuery } from '@/services/priceMonitoringApi';
 
 interface MonitoredProductsListProps {
-  products: PriceMonitoringProduct[];
+  products: TrackedQuery[];
   onRefresh: () => void;
 }
 
@@ -37,145 +34,75 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
   products,
   onRefresh,
 }) => {
-  const [productDetails, setProductDetails] = useState<Record<string, any>>({});
-  const [latestPrices, setLatestPrices] = useState<Record<string, any>>({});
+  const [productNames, setProductNames] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
-    if (products.length > 0) {
-      loadProductDetails();
-      loadLatestPrices();
-    }
+    const productIds = products.map((p) => p.product_id).filter((id): id is string => Boolean(id));
+    if (productIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', productIds);
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const p of data ?? []) map[p.id] = p.name;
+      setProductNames(map);
+    })();
+    return () => { cancelled = true; };
   }, [products]);
 
-  const loadProductDetails = async () => {
-    const productIds = products.map(p => p.product_id);
-
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, metadata')
-      .in('id', productIds);
-
-    if (!error && data) {
-      const detailsMap = data.reduce((acc, product) => {
-        acc[product.id] = product;
-        return acc;
-      }, {} as Record<string, any>);
-      setProductDetails(detailsMap);
-    }
-  };
-
-  const loadLatestPrices = async () => {
-    const productIds = products.map(p => p.product_id);
-
-    // Get latest price for each product
-    const pricesMap: Record<string, any> = {};
-
-    for (const productId of productIds) {
-      const { data } = await supabase
-        .from('price_history')
-        .select('*')
-        .eq('product_id', productId)
-        .order('scraped_at', { ascending: false })
-        .limit(2); // Get last 2 to calculate trend
-
-      if (data && data.length > 0) {
-        pricesMap[productId] = {
-          current: data[0],
-          previous: data[1] || null,
-        };
-      }
-    }
-
-    setLatestPrices(pricesMap);
-  };
-
-  const handleToggleMonitoring = async (productId: string, currentlyEnabled: boolean) => {
+  const handleToggleMonitoring = async (tq: TrackedQuery) => {
+    const productId = tq.product_id;
+    if (!productId) return;
+    setBusy((prev) => ({ ...prev, [tq.id]: true }));
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('price_monitoring_products')
-        .update({
-          monitoring_enabled: !currentlyEnabled,
-          status: !currentlyEnabled ? 'active' : 'paused',
-        })
-        .eq('product_id', productId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: `Monitoring ${!currentlyEnabled ? 'enabled' : 'paused'}`,
-      });
-
+      if (tq.is_active) {
+        await untrackProduct(productId);
+        toast({ title: 'Monitoring paused', description: 'No more refreshes until you re-enable.' });
+      } else {
+        await trackProduct(productId);
+        toast({ title: 'Monitoring resumed' });
+      }
       onRefresh();
     } catch (error) {
-      console.error('Error toggling monitoring:', error);
+      console.error('Toggle failed:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update monitoring status',
+        title: 'Failed to toggle',
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
+    } finally {
+      setBusy((prev) => ({ ...prev, [tq.id]: false }));
     }
   };
 
-  const handleCheckNow = async (productId: string) => {
+  const handleCheckNow = async (tq: TrackedQuery) => {
+    const productId = tq.product_id;
+    if (!productId) return;
+    setBusy((prev) => ({ ...prev, [tq.id]: true }));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/price-monitoring`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'check_now',
-            productId,
-          }),
-        },
-      );
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: 'Success',
-          description: `Price check started. ${result.results?.pricesFound || 0} prices found.`,
-        });
-        onRefresh();
-      } else {
-        throw new Error(result.error || 'Failed to check prices');
-      }
-    } catch (error) {
-      console.error('Error checking prices:', error);
+      const outcome = await refreshProduct(productId, { force_refresh: true });
       toast({
-        title: 'Error',
-        description: 'Failed to start price check',
+        title: outcome.status === 'refreshed' ? 'Refresh complete' : `Status: ${outcome.status}`,
+        description: outcome.status === 'refreshed'
+          ? `${outcome.results?.length ?? 0} prices found, ${outcome.credits_used ?? 0} credits used`
+          : outcome.error ?? '',
+      });
+      onRefresh();
+    } catch (error) {
+      console.error('Check now failed:', error);
+      toast({
+        title: 'Failed to refresh',
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
-    }
-  };
-
-  const getPriceTrend = (productId: string) => {
-    const prices = latestPrices[productId];
-    if (!prices || !prices.previous) return null;
-
-    const change = prices.current.price - prices.previous.price;
-    const changePercent = ((change / prices.previous.price) * 100).toFixed(1);
-
-    if (change < 0) {
-      return { icon: TrendingDown, color: 'text-green-600', text: `${changePercent}%` };
-    } else if (change > 0) {
-      return { icon: TrendingUp, color: 'text-red-600', text: `+${changePercent}%` };
-    } else {
-      return { icon: Minus, color: 'text-gray-600', text: '0%' };
+    } finally {
+      setBusy((prev) => ({ ...prev, [tq.id]: false }));
     }
   };
 
@@ -197,76 +124,63 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead>Current Price</TableHead>
-                <TableHead>Trend</TableHead>
-                <TableHead>Frequency</TableHead>
+                <TableHead>Cheapest Verified</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Check</TableHead>
+                <TableHead>Next Check</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => {
-                const details = productDetails[product.product_id];
-                const prices = latestPrices[product.product_id];
-                const trend = getPriceTrend(product.product_id);
-                const TrendIcon = trend?.icon;
-
+              {products.map((tq) => {
+                const isBusy = busy[tq.id] ?? false;
+                const name = (tq.product_id && productNames[tq.product_id]) || tq.search_query;
                 return (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">
-                      {details?.name || 'Loading...'}
-                    </TableCell>
+                  <TableRow key={tq.id}>
+                    <TableCell className="font-medium">{name}</TableCell>
                     <TableCell>
-                      {prices?.current ? (
-                        <span className="font-semibold">
-                          ${prices.current.price.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">--</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {trend && TrendIcon && (
-                        <div className={`flex items-center gap-1 ${trend.color}`}>
-                          <TrendIcon className="h-4 w-4" />
-                          <span className="text-sm font-medium">{trend.text}</span>
+                      {tq.current_price != null ? (
+                        <div>
+                          <span className="font-semibold">
+                            {tq.current_price.toFixed(2)} {tq.current_currency || ''}
+                          </span>
+                          {tq.current_price_verified ? (
+                            <Badge variant="outline" className="ml-2 text-xs">verified</Badge>
+                          ) : null}
                         </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {product.monitoring_frequency}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        product.status === 'active' ? 'default' :
-                        product.status === 'error' ? 'destructive' : 'secondary'
-                      }>
-                        {product.status}
+                      <Badge variant={tq.is_active ? 'default' : 'secondary'}>
+                        {tq.is_active ? 'active' : 'paused'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {product.last_check_at
-                        ? new Date(product.last_check_at).toLocaleString()
+                      {tq.last_refreshed_at
+                        ? new Date(tq.last_refreshed_at).toLocaleString()
                         : 'Never'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {tq.next_check_at
+                        ? new Date(tq.next_check_at).toLocaleString()
+                        : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Switch
-                          checked={product.monitoring_enabled}
-                          onCheckedChange={() =>
-                            handleToggleMonitoring(product.product_id, product.monitoring_enabled)
-                          }
+                          checked={tq.is_active}
+                          onCheckedChange={() => handleToggleMonitoring(tq)}
+                          disabled={isBusy}
                         />
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleCheckNow(product.product_id)}
-                          disabled={!product.monitoring_enabled}
+                          onClick={() => handleCheckNow(tq)}
+                          disabled={!tq.is_active || isBusy}
                         >
-                          <Play className="h-4 w-4" />
+                          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                         </Button>
                       </div>
                     </TableCell>
@@ -282,4 +196,3 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 };
 
 export default MonitoredProductsList;
-

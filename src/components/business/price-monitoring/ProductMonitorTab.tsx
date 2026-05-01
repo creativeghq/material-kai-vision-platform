@@ -42,17 +42,20 @@ import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertPreferences } from './PriceAlertPreferences';
 import {
-  discoverRetailers,
-  startMonitoring,
-  stopMonitoring,
+  refreshProduct,
+  trackProduct,
+  untrackProduct,
+  getProductMonitoring,
+  getProductSources,
+  listUrlOnlyForProduct,
   submitClassifierCorrection,
   excludeProductResult,
   includeProductResult,
   listProductExclusions,
   verifyProductSources,
-  type PerplexityHit,
-  type DiscoverResponse,
+  type RetailerRow,
   type ProductExclusion,
+  type TrackedQuery,
 } from '@/services/priceMonitoringApi';
 import {
   isDemoProduct,
@@ -127,6 +130,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [sources, setSources] = useState<CompetitorSource[]>([]);
+  const [trackedQueryId, setTrackedQueryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
@@ -181,34 +185,105 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     try {
       setIsLoading(true);
 
-      const { data: monitoring } = await supabase
-        .from('price_monitoring_products')
-        .select('monitoring_enabled, status, last_claude_search_at, next_check_at, monitoring_frequency')
-        .eq('product_id', productId)
-        .maybeSingle();
-
-      if (monitoring) {
-        setMonitoringEnabled(monitoring.monitoring_enabled ?? false);
-        setLastSearchAt(monitoring.last_claude_search_at ?? null);
-        setNextCheckAt(monitoring.next_check_at ?? null);
-        setMonitoringFrequency(monitoring.monitoring_frequency ?? null);
+      // Read the internal tracked_query summary (one per product, may not exist yet).
+      const tq = await getProductMonitoring(productId);
+      if (tq) {
+        setTrackedQueryId(tq.id);
+        setMonitoringEnabled(Boolean(tq.is_active));
+        setLastSearchAt(tq.last_refreshed_at);
+        setNextCheckAt(tq.next_check_at);
+        // Volatility-based cadence — surfaced as text. The legacy fixed
+        // 'daily/weekly' enum is gone.
+        if (tq.consecutive_stable_refreshes >= 7) {
+          setMonitoringFrequency('every 72h (stable)');
+        } else if (tq.consecutive_stable_refreshes >= 3) {
+          setMonitoringFrequency('every 48h (stable)');
+        } else {
+          setMonitoringFrequency('every 24h');
+        }
+        setVerifyPrices(Boolean(tq.verify_prices ?? true));
       } else {
+        setTrackedQueryId(null);
+        setMonitoringEnabled(false);
+        setLastSearchAt(null);
         setNextCheckAt(null);
         setMonitoringFrequency(null);
       }
 
-      const { data: rows } = await supabase
-        .from('competitor_sources')
-        .select(
-          'id, source_name, source_url, source_type, current_price, current_original_price, current_price_verified, current_currency, current_availability, current_metadata, match_kind, match_score, match_note, current_price_updated_at, last_seen_at, is_active'
-        )
-        .eq('product_id', productId)
-        .eq('is_active', true)
-        .order('current_price', { ascending: true, nullsFirst: false });
+      // Read the latest retailer rows (split into primary + family) and the
+      // pinned URL-only entries for the Custom Monitoring section. Adapt the
+      // RetailerRow shape to the legacy CompetitorSource shape so the rest of
+      // the component renders without further changes.
+      const split = await getProductSources(productId);
+      const urlOnly = await listUrlOnlyForProduct(productId);
 
-      setSources((rows as CompetitorSource[]) || []);
+      const sourceTypeOf = (raw: string): CompetitorSource['source_type'] => {
+        switch ((raw || '').toLowerCase()) {
+          case 'dataforseo': return 'dataforseo_shopping';
+          case 'skroutz': return 'marketplace_skroutz';
+          case 'bestprice': return 'marketplace_bestprice';
+          case 'shopflix': return 'marketplace_shopflix';
+          case 'idealo': return 'perplexity_web_search'; // bucket idealo under "discovered" in the UI
+          default: return 'perplexity_web_search';
+        }
+      };
+
+      const adaptRow = (r: RetailerRow): CompetitorSource => ({
+        id: r.id || `${r.product_url}-${r.scraped_at || ''}`,
+        source_name: r.retailer_name,
+        source_url: r.product_url,
+        source_type: sourceTypeOf(r.source),
+        current_price: r.price,
+        current_original_price: r.original_price,
+        current_price_verified: Boolean(r.verified),
+        current_currency: r.currency,
+        current_availability: r.availability,
+        current_price_updated_at: r.scraped_at ?? null,
+        last_seen_at: r.scraped_at ?? null,
+        is_active: true,
+        current_metadata: { product_title: r.product_title ?? undefined, notes: r.notes ?? undefined },
+        match_kind: r.match_kind as CompetitorSource['match_kind'],
+        match_score: r.match_score ?? null,
+        match_note: r.match_note,
+        is_anomaly: r.is_anomaly ?? null,
+        anomaly_reason: r.anomaly_reason ?? null,
+        rolling_median_at_check: r.rolling_median_at_check ?? null,
+        manual_override: r.manual_override ?? null,
+        pending_reading_price: r.is_anomaly ? r.price : null,
+      });
+
+      const adaptUrlOnly = (q: TrackedQuery): CompetitorSource => ({
+        id: q.id,
+        source_name: q.pinned_url ? new URL(q.pinned_url).hostname.replace(/^www\./, '') : q.search_query,
+        source_url: q.pinned_url ?? '',
+        source_type: 'firecrawl_url',
+        current_price: q.current_price,
+        current_original_price: q.current_original_price,
+        current_price_verified: Boolean(q.current_price_verified),
+        current_currency: q.current_currency,
+        current_availability: q.current_availability,
+        current_price_updated_at: q.current_price_updated_at,
+        last_seen_at: q.current_price_updated_at,
+        is_active: Boolean(q.is_active),
+        current_metadata: (q.current_metadata as CompetitorSource['current_metadata']) ?? null,
+        match_kind: null,
+        match_score: null,
+        match_note: null,
+        is_anomaly: null,
+        anomaly_reason: null,
+        rolling_median_at_check: null,
+        manual_override: null,
+        pending_reading_price: null,
+      });
+
+      const adapted: CompetitorSource[] = [
+        ...split.results.map(adaptRow),
+        ...split.family_results.map(adaptRow),
+        ...urlOnly.map(adaptUrlOnly),
+      ];
+      setSources(adapted);
     } catch (err) {
-      console.error('Failed to load competitor sources', err);
+      console.error('Failed to load tracked-query data', err);
       toast({ title: 'Error', description: 'Could not load retailer list', variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -246,27 +321,31 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       }
       try {
         setIsDiscovering(true);
-        const result: DiscoverResponse = await discoverRetailers(productId, forceRefresh, verifyPrices);
-        if (!result.success) {
+        const outcome = await refreshProduct(productId, {
+          force_refresh: forceRefresh,
+          verify_prices: verifyPrices,
+        });
+        if (outcome.status === 'error') {
           toast({
             title: 'Discovery failed',
-            description: result.error ?? 'Unknown error',
+            description: outcome.error ?? 'Unknown error',
             variant: 'destructive',
           });
           return;
         }
-        setThrottleUntil(result.throttle_until);
-        setLastSearchAt(result.last_search_at);
-        setSummary(result.summary ?? null);
-        if (result.throttled) {
+        setThrottleUntil(outcome.throttle_until ?? null);
+        setSummary(outcome.summary ?? null);
+        if (outcome.status === 'throttled') {
           toast({
             title: 'Using cached results',
-            description: `Last refresh ${timeAgo(result.last_search_at)}. Next allowed ${timeAgo(result.throttle_until)}.`,
+            description: outcome.throttle_until
+              ? `Next allowed ${timeAgo(outcome.throttle_until)}.`
+              : 'Volatility cadence not yet elapsed.',
           });
         } else {
           toast({
             title: 'Discovery complete',
-            description: `${result.total_results} retailers, ${result.credits_used} credits used.`,
+            description: `${outcome.results?.length ?? 0} retailers, ${outcome.credits_used ?? 0} credits used.`,
           });
         }
         await loadSources();
@@ -284,12 +363,12 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     try {
       setIsToggling(true);
       if (!monitoringEnabled) {
-        await startMonitoring(productId, 'daily');
+        await trackProduct(productId);
         setMonitoringEnabled(true);
         toast({ title: 'Monitoring enabled', description: 'Discovering retailers…' });
-        await runDiscovery(false);
+        await loadSources();
       } else {
-        await stopMonitoring(productId);
+        await untrackProduct(productId);
         setMonitoringEnabled(false);
         toast({ title: 'Monitoring paused' });
       }
@@ -298,7 +377,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     } finally {
       setIsToggling(false);
     }
-  }, [monitoringEnabled, productId, runDiscovery, isDemo, toast]);
+  }, [monitoringEnabled, productId, loadSources, isDemo, toast]);
 
   // ─── Derived data ────────────────────────────────────────────────────────
   // Family rows split out: they're the same series but different SKU and live
@@ -555,7 +634,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 No retailers discovered yet. {isAdmin && 'Click Refresh now above to try.'}
               </div>
             )}
-            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />}
+            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />}
           </CardContent>
         </Card>
       )}
@@ -576,7 +655,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
+            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -599,7 +678,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
+            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -626,7 +705,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 missed a retailer you know sells this product.
               </p>
             ) : (
-              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} onChange={() => { loadSources(); loadExclusions(); }} />
+              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
             )}
           </CardContent>
         </Card>
@@ -870,51 +949,48 @@ const SimilarProductsSection: React.FC<{
 // ─── RetailerTable subcomponent ──────────────────────────────────────────────
 
 /**
- * Per-row admin actions:
- *   - Thumb-down: posts to /api/v1/price-monitoring/classifier-correction so
- *     the next classifier run pulls this row in as a few-shot example.
- *   - "Trust this reading": flips manual_override=true on the latest
- *     anomaly-flagged price_history row + back-fills competitor_sources.current_price
- *     with the rejected reading, opting into the new value as truth.
- *   - "Dismiss reading": leaves the row anomaly-flagged but acknowledges it
- *     so the yellow banner goes away.
+ * Per-row admin actions (post-consolidation: every internal product is a
+ * tracked_query, so all DB writes target tracked_query_price_history).
+ *
+ *   - Thumb-down: POST /classifier-correction with the row's id from
+ *     tracked_query_price_history. Next classifier run pulls it in as
+ *     a few-shot example.
+ *   - "Trust this reading": flips manual_override=true on the anomaly row
+ *     so the median sees it on the next refresh.
+ *   - "Dismiss reading": clears is_anomaly so the yellow banner goes away.
  */
-const correctClassifier = async (sourceId: string, kind: string, note?: string) => {
+const correctClassifier = async (historyRowId: string, kind: string, note?: string) => {
   await submitClassifierCorrection({
-    competitorSourceId: sourceId,
+    trackedQueryHistoryId: historyRowId,
     correctedMatchKind: kind as 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop',
     correctionNote: note,
   });
 };
 
-const trustAnomalyReading = async (productId: string, sourceUrl: string, productPrice: number) => {
-  // Flip manual_override on the most recent anomaly row + push the price
-  // back into competitor_sources.current_price.
-  const { error: histErr } = await supabase
-    .from('price_history')
+const trustAnomalyReading = async (
+  trackedQueryId: string,
+  productUrl: string,
+) => {
+  // Mark the most recent anomaly row for this URL as manually trusted —
+  // the median sees the price on the next refresh.
+  const { error } = await supabase
+    .from('tracked_query_price_history')
     .update({ manual_override: true })
-    .eq('product_id', productId)
-    .eq('source_url', sourceUrl)
-    .eq('is_anomaly', true)
-    .order('scraped_at', { ascending: false })
-    .limit(1);
-  if (histErr) throw histErr;
-  const { error: csErr } = await supabase
-    .from('competitor_sources')
-    .update({ current_price: productPrice, current_price_updated_at: new Date().toISOString() })
-    .eq('product_id', productId)
-    .eq('source_url', sourceUrl);
-  if (csErr) throw csErr;
+    .eq('tracked_query_id', trackedQueryId)
+    .eq('product_url', productUrl)
+    .eq('is_anomaly', true);
+  if (error) throw error;
 };
 
-const dismissAnomalyReading = async (productId: string, sourceUrl: string) => {
-  // We don't delete the row; just clear is_anomaly so the banner disappears
-  // and the median sees the data on the next refresh.
+const dismissAnomalyReading = async (
+  trackedQueryId: string,
+  productUrl: string,
+) => {
   await supabase
-    .from('price_history')
+    .from('tracked_query_price_history')
     .update({ is_anomaly: false, manual_override: false })
-    .eq('product_id', productId)
-    .eq('source_url', sourceUrl)
+    .eq('tracked_query_id', trackedQueryId)
+    .eq('product_url', productUrl)
     .eq('is_anomaly', true);
 };
 
@@ -924,8 +1000,9 @@ const RetailerTable: React.FC<{
   priceDiff: (p: number | null) => number | null;
   isAdmin: boolean;
   productId: string;
+  trackedQueryId: string | null;
   onChange?: () => void;
-}> = ({ rows, priceDiff, isAdmin, productId, onChange }) => (
+}> = ({ rows, priceDiff, isAdmin, productId, trackedQueryId, onChange }) => (
   <div className="divide-y">
     {rows.map((r) => {
       const diff = priceDiff(r.current_price);
@@ -1111,8 +1188,9 @@ const RetailerTable: React.FC<{
                             variant="outline"
                             className="h-7 text-[11px] gap-1 border-amber-500 text-amber-900"
                             onClick={async () => {
+                              if (!trackedQueryId) return;
                               try {
-                                await trustAnomalyReading(productId, r.source_url, r.pending_reading_price!);
+                                await trustAnomalyReading(trackedQueryId, r.source_url);
                                 onChange?.();
                               } catch (e) {
                                 console.error('Trust reading failed', e);
@@ -1127,8 +1205,9 @@ const RetailerTable: React.FC<{
                           variant="ghost"
                           className="h-7 text-[11px] gap-1 text-amber-800"
                           onClick={async () => {
+                            if (!trackedQueryId) return;
                             try {
-                              await dismissAnomalyReading(productId, r.source_url);
+                              await dismissAnomalyReading(trackedQueryId, r.source_url);
                               onChange?.();
                             } catch (e) {
                               console.error('Dismiss reading failed', e);

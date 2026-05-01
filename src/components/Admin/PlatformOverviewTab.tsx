@@ -798,41 +798,38 @@ export function PlatformOverviewTab() {
     try {
       const ago12 = new Date(); ago12.setDate(ago12.getDate() - 84);
       const wks12 = buildWeeks(12);
-      const MARKETPLACE_SOURCES = ['marketplace_skroutz', 'marketplace_bestprice', 'marketplace_shopflix'];
+      // Marketplace sources are tagged in tracked_query_price_history.source
+      // (an enum). Internal + external rows live in the same table since the
+      // 2026-05-01 consolidation.
+      const MARKETPLACE_SOURCES = ['skroutz', 'bestprice', 'shopflix'];
 
-      const [priceHistory, trackedHistory, marketplaceRows, allSourceRows, moduleUsage, trackedActive] = await Promise.all([
-        supabase.from('price_history').select('created_at').gte('created_at', ago12.toISOString()).limit(5000),
-        supabase.from('tracked_query_price_history').select('created_at').gte('created_at', ago12.toISOString()).limit(5000),
-        supabase.from('competitor_sources').select('source_type, created_at').in('source_type', MARKETPLACE_SOURCES).gte('created_at', ago12.toISOString()).limit(5000),
-        supabase.from('competitor_sources').select('source_type').gte('created_at', ago12.toISOString()).limit(5000),
+      const [allHistory, marketplaceRows, moduleUsage, trackedActive] = await Promise.all([
+        supabase.from('tracked_query_price_history').select('source, created_at').gte('created_at', ago12.toISOString()).limit(10000),
+        supabase.from('tracked_query_price_history').select('source, created_at').in('source', MARKETPLACE_SOURCES).gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'greek-marketplaces').gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('tracked_queries').select('id', { count: 'exact', head: true }).eq('is_active', true),
       ]);
 
-      const internal = (priceHistory.data ?? []).length;
-      const tracked = (trackedHistory.data ?? []).length;
+      const refreshes = (allHistory.data ?? []).length;
       const marketplaceHits = (marketplaceRows.data ?? []).length;
       const totalCredits = (moduleUsage.data ?? []).reduce((sum, r: { credits_debited?: number | null }) =>
         sum + Number(r.credits_debited ?? 0), 0);
       const trackedCount = trackedActive.count ?? 0;
 
       setPricingKpis({
-        refreshes12w: internal + tracked,
+        refreshes12w: refreshes,
         marketplaceHits12w: marketplaceHits,
         moduleCredits12w: Math.round(totalCredits * 100) / 100,
         trackedQueries: trackedCount,
       });
 
-      // Weekly trend: three series (internal, external-tracked, marketplace hits)
-      const weekMap = new Map<string, { internal: number; tracked: number; marketplace: number }>(
-        wks12.map(w => [w, { internal: 0, tracked: 0, marketplace: 0 }]),
+      // Weekly trend: two series (all refreshes, marketplace-only subset).
+      // The pre-consolidation breakdown of "internal vs tracked" is no longer
+      // meaningful — every row lives on the same table now.
+      const weekMap = new Map<string, { tracked: number; marketplace: number }>(
+        wks12.map(w => [w, { tracked: 0, marketplace: 0 }]),
       );
-      (priceHistory.data ?? []).forEach((r: { created_at: string }) => {
-        const l = weekLabel(new Date(r.created_at));
-        const entry = weekMap.get(l);
-        if (entry) entry.internal += 1;
-      });
-      (trackedHistory.data ?? []).forEach((r: { created_at: string }) => {
+      (allHistory.data ?? []).forEach((r: { created_at: string }) => {
         const l = weekLabel(new Date(r.created_at));
         const entry = weekMap.get(l);
         if (entry) entry.tracked += 1;
@@ -842,24 +839,21 @@ export function PlatformOverviewTab() {
         const entry = weekMap.get(l);
         if (entry) entry.marketplace += 1;
       });
-      setPricingWeekly(Array.from(weekMap.entries()).map(([week, d]) => ({ week, ...d })));
+      setPricingWeekly(Array.from(weekMap.entries()).map(([week, d]) => ({ week, internal: 0, ...d })));
 
-      // Per-marketplace breakdown (counts only the 3 module sources)
+      // Per-marketplace breakdown (counts the 3 module sources).
       const sourceMap = new Map<string, number>(MARKETPLACE_SOURCES.map(s => [s, 0]));
-      (marketplaceRows.data ?? []).forEach((r: { source_type: string }) => {
-        sourceMap.set(r.source_type, (sourceMap.get(r.source_type) ?? 0) + 1);
+      (marketplaceRows.data ?? []).forEach((r: { source: string }) => {
+        sourceMap.set(r.source, (sourceMap.get(r.source) ?? 0) + 1);
       });
       setMarketplaceBySource(
-        Array.from(sourceMap.entries()).map(([source, count]) => ({
-          source: source.replace('marketplace_', ''),
-          count,
-        })),
+        Array.from(sourceMap.entries()).map(([source, count]) => ({ source, count })),
       );
 
-      // All source types distribution (shows where marketplace rows sit vs perplexity/dataforseo/firecrawl)
+      // All-source distribution (shows where marketplaces sit vs perplexity/dataforseo/idealo).
       const allMap = new Map<string, number>();
-      (allSourceRows.data ?? []).forEach((r: { source_type: string }) => {
-        allMap.set(r.source_type, (allMap.get(r.source_type) ?? 0) + 1);
+      (allHistory.data ?? []).forEach((r: { source: string }) => {
+        allMap.set(r.source, (allMap.get(r.source) ?? 0) + 1);
       });
       setPricingSourceDist(
         Array.from(allMap.entries())

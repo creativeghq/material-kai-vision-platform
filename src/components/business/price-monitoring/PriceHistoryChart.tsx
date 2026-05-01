@@ -107,23 +107,45 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
           break;
       }
 
-      // Fetch price history
-      const { data, error } = await supabase
-        .from('price_history')
-        .select('*')
+      // Find this product's internal tracked_query (if any).
+      const { data: tq } = await (supabase
+        .from('tracked_queries') as any)
+        .select('id')
         .eq('product_id', productId)
+        .is('api_key_id', null)
+        .maybeSingle();
+
+      if (!tq?.id) {
+        setPriceData([]);
+        setStats({
+          currentPrice: 0, lowestPrice: 0, highestPrice: 0,
+          averagePrice: 0, priceChange: 0, priceChangePercent: 0,
+        });
+        return;
+      }
+
+      // Fetch price history from the consolidated tracked_query_price_history.
+      // Excludes anomalies + family rows so the chart shows the meaningful
+      // tracked-product trend.
+      const { data, error } = await supabase
+        .from('tracked_query_price_history')
+        .select('scraped_at, price, retailer_name, availability, match_kind, is_anomaly')
+        .eq('tracked_query_id', tq.id)
+        .eq('is_anomaly', false)
         .gte('scraped_at', startDate.toISOString())
         .order('scraped_at', { ascending: true });
 
       if (error) throw error;
 
-      // Transform data for chart
-      const chartData: PriceDataPoint[] = (data || []).map((item) => ({
-        date: new Date(item.scraped_at).toLocaleDateString(),
-        price: item.price,
-        source: item.source_name,
-        availability: item.availability,
-      }));
+      // Transform data for chart — drop family rows, drop nulls.
+      const chartData: PriceDataPoint[] = (data || [])
+        .filter((item) => item.price !== null && (item.match_kind ?? '').toLowerCase() !== 'family')
+        .map((item) => ({
+          date: new Date(item.scraped_at).toLocaleDateString(),
+          price: item.price as number,
+          source: item.retailer_name || '',
+          availability: item.availability || '',
+        }));
 
       setPriceData(chartData);
 

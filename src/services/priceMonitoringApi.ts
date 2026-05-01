@@ -1,9 +1,12 @@
 /**
- * Price Monitoring API client — wraps MIVAA endpoints the UI calls.
+ * Price Monitoring API client.
  *
- * Two kinds of endpoints here:
- *   - /api/v1/price-monitoring/* (session JWT auth, platform UI use)
- *   - /api/v1/prices/lookup + /api/v1/prices/track/* (api_keys Bearer, external use — NOT wrapped here)
+ * Wraps MIVAA's `/api/v1/price-monitoring/*` endpoints. After the 2026-05-01
+ * consolidation, every internal product is a `tracked_queries` row — there is
+ * no separate `competitor_sources` / `price_history` schema. The product-scoped
+ * endpoints (`/products/{id}/...`) are the canonical surface; the legacy
+ * `/discover`, `/start`, `/stop`, `/check-now`, `/sources/{id}`, `/history/{id}`
+ * aliases are kept short-term for backwards compat and will be removed.
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -17,224 +20,221 @@ async function authHeader(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${MIVAA_BASE}${path}`, {
+    ...init,
+    headers: { ...(await authHeader()), ...(init?.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`${path} failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Domain types — mirror the backend's `tracked_query_price_history` row.
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
  * Product-identity verdict from Haiku batched classifier.
  *   exact        — brand + model + product_type all match. Include in stats.
  *   variant      — same model, different color/finish/size. Keep with note,
  *                  EXCLUDE from price statistics.
  *   family       — same brand + series, DIFFERENT SKU. Shown under
- *                  "Similar Products in this series". Inert: never feeds
- *                  chart, median, alerts. Admin can promote to tracked.
- *   unverifiable — Firecrawl couldn't extract product_name (blocked, 404,
- *                  ad-wall). Keep with grey badge, EXCLUDE from stats.
+ *                  "Similar Products in this series". Inert.
+ *   unverifiable — Firecrawl couldn't extract product_name. Keep, EXCLUDE.
  *   null         — legacy row created before identity classification shipped.
  *
  * 'mismatch' never reaches the UI — dropped at classification time.
  */
 export type MatchKind = 'exact' | 'variant' | 'family' | 'unverifiable' | null;
 
-export interface PerplexityHit {
+/** A single retailer row from tracked_query_price_history (latest refresh). */
+export interface RetailerRow {
+  /** PK in tracked_query_price_history. Pass to promote/demote/correction. */
+  id?: string;
   retailer_name: string;
   product_url: string;
   price: number | null;
-  /** On-page "was" price when the retailer displays a promo (e.g. "Was €89, Now €79"). */
+  /** On-page "was" price when the retailer displays a promo. */
   original_price: number | null;
   currency: string | null;
   price_unit: string | null;
   availability: string | null;
   city: string | null;
   ships_from_abroad: boolean;
-  is_quote_only: boolean;
-  last_verified: string | null;
   notes: string | null;
-  /** 'perplexity' = web search retailer, 'dataforseo' = Google Shopping merchant. */
-  source: 'perplexity' | 'dataforseo';
+  /** 'perplexity' | 'dataforseo' | 'skroutz' | 'bestprice' | 'shopflix' | 'idealo'. */
+  source: string;
   /** True when Firecrawl actually fetched the page and confirmed the price. */
   verified: boolean;
-  /** DataForSEO-only enrichment. */
-  image_url: string | null;
-  rating_value: number | null;
-  rating_votes: number | null;
-  /** Product-identity verdict — see MatchKind. */
   match_kind: MatchKind;
-  /** 0-100 identity-match confidence from the classifier. */
   match_score: number | null;
-  /** Human-readable facet diff (e.g. "Color differs: asked BLACK MATT, page shows WHITE"). */
   match_note: string | null;
-  /**
-   * Exact product name shown on the retailer's page (DataForSEO Shopping feed
-   * title or Firecrawl product_name extraction). Use as a subtitle under
-   * retailer_name to disambiguate multiple rows from the same retailer for
-   * different variants.
-   */
+  /** Exact product name shown on the retailer's page. Subtitle under retailer_name. */
   product_title: string | null;
+  /** Sanity-band metadata. */
+  is_anomaly?: boolean;
+  anomaly_reason?: string | null;
+  rolling_median_at_check?: number | null;
+  manual_override?: boolean;
+  scraped_at?: string;
+  refresh_run_id?: string;
 }
 
-export interface DiscoverResponse {
-  success: boolean;
-  source: string;
-  product_id: string;
-  results: PerplexityHit[];
-  total_results: number;
-  credits_used: number;
-  latency_ms: number;
-  /** 2-3 sentence Perplexity summary: closest retailer, pricing outliers, etc. */
-  summary: string | null;
-  throttled: boolean;
-  throttle_until: string | null;
-  last_search_at: string | null;
-  cached: boolean;
-  error: string | null;
-}
-
-/**
- * Submit a classifier correction. Admin clicks "Wrong match" on a row whose
- * match_kind verdict was wrong; the correction lands in `match_corrections`
- * and the next classifier run pulls it in as a few-shot example.
- *
- * Pass either competitor_source_id (internal flow) OR tracked_query_history_id
- * (external flow). corrected_match_kind is what the row SHOULD have been —
- * use 'should_drop' when the row should not have appeared at all.
- */
-export async function submitClassifierCorrection(args: {
-  competitorSourceId?: string;
-  trackedQueryHistoryId?: string;
-  correctedMatchKind: 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop';
-  correctionNote?: string;
-}): Promise<void> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/classifier-correction`, {
-    method: 'POST',
-    headers: await authHeader(),
-    body: JSON.stringify({
-      competitor_source_id: args.competitorSourceId,
-      tracked_query_history_id: args.trackedQueryHistoryId,
-      corrected_match_kind: args.correctedMatchKind,
-      correction_note: args.correctionNote,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`classifier-correction failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-}
-
-/**
- * Promote a family/mismatch row to tracked. Admin-only. The override is
- * sticky — every future refresh of the same URL keeps the override until
- * the admin demotes it back.
- */
-export async function promoteFamilyRow(args: {
-  competitorSourceId?: string;
-  trackedQueryHistoryId?: string;
-  overrideKind: 'exact' | 'variant';
-  reason?: string;
-}): Promise<void> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/promote-family-row`, {
-    method: 'POST',
-    headers: await authHeader(),
-    body: JSON.stringify({
-      competitor_source_id: args.competitorSourceId,
-      tracked_query_history_id: args.trackedQueryHistoryId,
-      override_kind: args.overrideKind,
-      reason: args.reason,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`promote-family-row failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-}
-
-/**
- * Demote a previously-promoted row back to family. Admin-only.
- */
-export async function demoteToFamily(args: {
-  competitorSourceId?: string;
-  trackedQueryHistoryId?: string;
-  reason?: string;
-}): Promise<void> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/demote-to-family`, {
-    method: 'POST',
-    headers: await authHeader(),
-    body: JSON.stringify({
-      competitor_source_id: args.competitorSourceId,
-      tracked_query_history_id: args.trackedQueryHistoryId,
-      reason: args.reason,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`demote-to-family failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Per-product result exclusions
-// ─────────────────────────────────────────────────────────────────────────
-
-export interface ProductExclusion {
+/** The denormalized summary row on tracked_queries. */
+export interface TrackedQuery {
   id: string;
-  url?: string | null;
-  domain?: string | null;
-  reason?: string | null;
-  excluded_at: string;
+  product_id: string | null;
+  api_key_id: string | null;
+  search_query: string;
+  manufacturer: string | null;
+  dimensions: string | null;
+  country_code: string | null;
+  is_active: boolean;
+  mode: 'discovery' | 'url-only';
+  pinned_url: string | null;
+  refresh_interval_hours: number;
+  next_check_at: string | null;
+  last_refreshed_at: string | null;
+  last_refresh_credits_used: number | null;
+  total_credits_used: number | null;
+  last_error: string | null;
+  /** Cheapest verified hit from the latest refresh (denormalized cache). */
+  current_price: number | null;
+  current_currency: string | null;
+  current_availability: string | null;
+  current_original_price: number | null;
+  current_price_verified: boolean;
+  current_metadata: Record<string, unknown> | null;
+  current_price_updated_at: string | null;
+  /** Alert prefs. */
+  alert_on_price_drop: boolean;
+  alert_on_new_retailer: boolean;
+  alert_on_promo: boolean;
+  alert_channels: string[];
+  alert_webhook_url: string | null;
+  /** Volatility cadence. */
+  volatility_score: number | null;
+  consecutive_stable_refreshes: number;
+  first_refresh_verified: boolean;
 }
 
+export interface ProductSourcesPayload {
+  results: RetailerRow[];
+  family_results: RetailerRow[];
+  tracked_query_id: string;
+}
+
+export interface ProductHistoryPayload {
+  history: RetailerRow[];
+  count: number;
+}
+
+export interface RefreshOutcome {
+  status: 'refreshed' | 'throttled' | 'inactive' | 'not_found' | 'error';
+  refresh_run_id?: string;
+  credits_used?: number;
+  latency_ms?: number;
+  results?: RetailerRow[];
+  summary?: string | null;
+  error?: string | null;
+  throttle_until?: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Product-scoped endpoints (preferred surface)
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
- * Mark a competitor URL or whole domain as excluded for THIS product.
- * Admin-only. Idempotent — re-excluding updates the reason field.
- * The next discover/refresh will not persist hits matching the exclusion,
- * and the row's `is_active` flag flips false so it disappears immediately.
+ * Enroll a catalog product into monitoring. Creates a `tracked_queries` row
+ * and runs the first discovery refresh synchronously. If the product is
+ * already enrolled, returns the existing row (set `force_refresh=true` to
+ * re-discover).
  */
-export async function excludeProductResult(args: {
-  productId: string;
-  url?: string;
-  domain?: string;
-  reason?: string;
-}): Promise<ProductExclusion> {
-  const res = await fetch(
-    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/exclude`,
+export async function trackProduct(
+  productId: string,
+  options?: { country_code?: string; force_refresh?: boolean },
+): Promise<TrackedQuery | null> {
+  const res = await api<{ success: boolean; data: { tracked_query: TrackedQuery } }>(
+    `/api/v1/price-monitoring/products/${productId}/track`,
     {
       method: 'POST',
-      headers: await authHeader(),
-      body: JSON.stringify({ url: args.url, domain: args.domain, reason: args.reason }),
+      body: JSON.stringify({
+        country_code: options?.country_code,
+        force_refresh: options?.force_refresh ?? false,
+      }),
     },
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`product-exclude failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
+  return res.data?.tracked_query ?? null;
 }
 
-/** Undo a previous exclusion. */
-export async function includeProductResult(args: {
-  productId: string;
-  url?: string;
-  domain?: string;
-}): Promise<{ success: boolean; removed_count: number }> {
-  const res = await fetch(
-    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/include`,
-    {
-      method: 'POST',
-      headers: await authHeader(),
-      body: JSON.stringify({ url: args.url, domain: args.domain }),
-    },
+/** Stop monitoring (soft delete — history preserved). */
+export async function untrackProduct(productId: string): Promise<void> {
+  await api(
+    `/api/v1/price-monitoring/products/${productId}/track`,
+    { method: 'DELETE' },
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`product-include failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
+}
+
+/** Read the tracked_query summary for this product (null if not enrolled). */
+export async function getProductMonitoring(productId: string): Promise<TrackedQuery | null> {
+  const res = await api<{ success: boolean; data: TrackedQuery | null }>(
+    `/api/v1/price-monitoring/products/${productId}`,
+    { method: 'GET' },
+  );
+  return res.data;
 }
 
 /**
- * Re-verify retailer prices on demand. Re-runs Firecrawl on selected (or all
- * active) retailer URLs and refreshes current_price + verified flag in place.
- * Does NOT call Perplexity / DataForSEO / marketplace adapters — narrower
- * scope than discoverRetailers, cheaper, faster.
- *
- * Cost: 1 Firecrawl credit per URL re-verified.
+ * Re-run discovery for this product. Auto-enrolls on first call.
+ * `force_refresh` requires admin (bypasses volatility cadence).
+ */
+export async function refreshProduct(
+  productId: string,
+  options?: { force_refresh?: boolean; verify_prices?: boolean },
+): Promise<RefreshOutcome> {
+  const res = await api<{ success: boolean; data: RefreshOutcome }>(
+    `/api/v1/price-monitoring/products/${productId}/refresh`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        force_refresh: options?.force_refresh ?? false,
+        verify_prices: options?.verify_prices ?? true,
+      }),
+    },
+  );
+  return res.data;
+}
+
+/**
+ * Latest retailer rows for this product, split into:
+ *   - results        : exact + variant + unverifiable (the tracked product)
+ *   - family_results : family rows (similar SKUs in the series, inert)
+ */
+export async function getProductSources(productId: string): Promise<ProductSourcesPayload> {
+  const res = await api<{ success: boolean; data: ProductSourcesPayload }>(
+    `/api/v1/price-monitoring/products/${productId}/sources`,
+    { method: 'GET' },
+  );
+  return res.data ?? { results: [], family_results: [], tracked_query_id: '' };
+}
+
+/** Historical price rows (newest first), per-product. */
+export async function getProductHistory(
+  productId: string,
+  limit = 200,
+): Promise<ProductHistoryPayload> {
+  return api<ProductHistoryPayload>(
+    `/api/v1/price-monitoring/products/${productId}/history?limit=${encodeURIComponent(String(limit))}`,
+    { method: 'GET' },
+  );
+}
+
+/**
+ * Re-verify retailer URLs (Firecrawl only — no new discovery). Cheaper than
+ * refresh, useful for clearing stale 'unverified' flags.
  */
 export interface VerifyProductSourcesResponse {
   success: boolean;
@@ -252,104 +252,153 @@ export async function verifyProductSources(args: {
   productId: string;
   urls?: string[];
 }): Promise<VerifyProductSourcesResponse> {
-  const res = await fetch(
-    `${MIVAA_BASE}/api/v1/price-monitoring/products/${args.productId}/verify`,
+  return api<VerifyProductSourcesResponse>(
+    `/api/v1/price-monitoring/products/${args.productId}/verify`,
+    { method: 'POST', body: JSON.stringify({ urls: args.urls }) },
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Per-product result exclusions
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ProductExclusion {
+  id: string;
+  url?: string | null;
+  domain?: string | null;
+  reason?: string | null;
+  excluded_at: string;
+}
+
+/** Mark a competitor URL or whole domain as excluded for THIS product. */
+export async function excludeProductResult(args: {
+  productId: string;
+  url?: string;
+  domain?: string;
+  reason?: string;
+}): Promise<ProductExclusion> {
+  return api<ProductExclusion>(
+    `/api/v1/price-monitoring/products/${args.productId}/exclude`,
     {
       method: 'POST',
-      headers: await authHeader(),
-      body: JSON.stringify({ urls: args.urls }),
+      body: JSON.stringify({ url: args.url, domain: args.domain, reason: args.reason }),
     },
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`product-verify failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
+}
+
+/** Undo a previous exclusion. */
+export async function includeProductResult(args: {
+  productId: string;
+  url?: string;
+  domain?: string;
+}): Promise<{ success: boolean; removed_count: number }> {
+  return api<{ success: boolean; removed_count: number }>(
+    `/api/v1/price-monitoring/products/${args.productId}/include`,
+    { method: 'POST', body: JSON.stringify({ url: args.url, domain: args.domain }) },
+  );
 }
 
 /** List every exclusion attached to this product. */
 export async function listProductExclusions(productId: string): Promise<ProductExclusion[]> {
-  const res = await fetch(
-    `${MIVAA_BASE}/api/v1/price-monitoring/products/${productId}/exclusions`,
+  return api<ProductExclusion[]>(
+    `/api/v1/price-monitoring/products/${productId}/exclusions`,
+    { method: 'GET' },
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Custom Monitoring (mode='url-only' tracked_queries)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Add a pinned retailer URL (no Perplexity discovery — Firecrawl only). */
+export async function addUrlOnly(args: {
+  productId: string;
+  url: string;
+  country_code?: string;
+}): Promise<TrackedQuery> {
+  const res = await api<{ success: boolean; data: TrackedQuery }>(
+    `/api/v1/price-monitoring/products/${args.productId}/url-only`,
     {
-      method: 'GET',
-      headers: await authHeader(),
+      method: 'POST',
+      body: JSON.stringify({ url: args.url, country_code: args.country_code }),
     },
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`product-exclusions failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
+  return res.data;
 }
 
+/** List all pinned-URL tracked_queries for this product. */
+export async function listUrlOnlyForProduct(productId: string): Promise<TrackedQuery[]> {
+  const res = await api<{ success: boolean; data: TrackedQuery[] }>(
+    `/api/v1/price-monitoring/products/${productId}/url-only`,
+    { method: 'GET' },
+  );
+  return res.data ?? [];
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Cross-flow: classifier feedback + admin overrides
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
- * Trigger Perplexity discovery for a monitored product. Respects 6h throttle
- * unless force_refresh=true (admin/super_admin only).
+ * Submit a classifier correction. Admin clicks "Wrong match" on a retailer
+ * row whose match_kind verdict was wrong. Pass the row's `id` from
+ * `tracked_query_price_history`. The next classify call (5min cache) pulls
+ * recent corrections in as few-shot examples.
+ *
+ * `corrected_match_kind: 'should_drop'` means the row should not have appeared.
  */
-export async function discoverRetailers(
-  productId: string,
-  forceRefresh = false,
-  verifyPrices = true
-): Promise<DiscoverResponse> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/discover`, {
+export async function submitClassifierCorrection(args: {
+  trackedQueryHistoryId: string;
+  correctedMatchKind: 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop';
+  correctionNote?: string;
+}): Promise<void> {
+  await api(`/api/v1/price-monitoring/classifier-correction`, {
     method: 'POST',
-    headers: await authHeader(),
     body: JSON.stringify({
-      product_id: productId,
-      force_refresh: forceRefresh,
-      verify_prices: verifyPrices,
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      corrected_match_kind: args.correctedMatchKind,
+      correction_note: args.correctionNote,
     }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`discover failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
 }
 
 /**
- * Classic Firecrawl scrape of a single user-pasted URL.
- * Used by the "Custom Monitoring" section.
+ * Promote a family/mismatch row to tracked. The override is sticky — every
+ * future refresh of the same URL keeps the override until the admin demotes
+ * it back. Admin-only.
  */
-export async function checkNow(productId: string, productName: string): Promise<{
-  success: boolean;
-  sources_checked?: number;
-  prices_found?: number;
-  credits_consumed?: number;
-  error?: string;
-}> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/check-now`, {
+export async function promoteFamilyRow(args: {
+  trackedQueryHistoryId: string;
+  overrideKind: 'exact' | 'variant';
+  reason?: string;
+}): Promise<void> {
+  await api(`/api/v1/price-monitoring/promote-family-row`, {
     method: 'POST',
-    headers: await authHeader(),
-    body: JSON.stringify({ product_id: productId, product_name: productName }),
+    body: JSON.stringify({
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      override_kind: args.overrideKind,
+      reason: args.reason,
+    }),
   });
-  if (!res.ok) throw new Error(`check-now failed: ${res.status}`);
-  return res.json();
 }
 
-/**
- * Start / stop monitoring the product (maps to platform's internal monitoring).
- */
-export async function startMonitoring(
-  productId: string,
-  frequency: 'hourly' | 'daily' | 'weekly' | 'on_demand' = 'daily'
-): Promise<void> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/start`, {
+/** Demote a previously-promoted row back to family. Admin-only. */
+export async function demoteToFamily(args: {
+  trackedQueryHistoryId: string;
+  reason?: string;
+}): Promise<void> {
+  await api(`/api/v1/price-monitoring/demote-to-family`, {
     method: 'POST',
-    headers: await authHeader(),
-    body: JSON.stringify({ product_id: productId, frequency, enabled: true }),
+    body: JSON.stringify({
+      tracked_query_history_id: args.trackedQueryHistoryId,
+      reason: args.reason,
+    }),
   });
-  if (!res.ok) throw new Error(`start monitoring failed: ${res.status}`);
 }
 
-export async function stopMonitoring(productId: string): Promise<void> {
-  const res = await fetch(
-    `${MIVAA_BASE}/api/v1/price-monitoring/stop?product_id=${encodeURIComponent(productId)}`,
-    { method: 'POST', headers: await authHeader() }
-  );
-  if (!res.ok) throw new Error(`stop monitoring failed: ${res.status}`);
-}
+// ─────────────────────────────────────────────────────────────────────────
+// Stateless market scan (admin-only — used by PriceLookupDrawer)
+// ─────────────────────────────────────────────────────────────────────────
 
 export interface MarketStats {
   count: number;
@@ -365,13 +414,13 @@ export interface MarketCheckResponse {
   product_id: string | null;
   query: string;
   country_code: string;
-  results: PerplexityHit[];
+  results: RetailerRow[];
   total_results: number;
   stats: MarketStats;
   summary: string | null;
   credits_used: number;
   latency_ms: number;
-  /** True when the product was already enrolled in monitoring and the cached snapshot was reused (≤6h old). */
+  /** True when the product was already enrolled and the cached snapshot was reused (≤6h old). */
   from_monitoring_cache: boolean;
   cache_age_seconds: number | null;
   error: string | null;
@@ -386,16 +435,12 @@ export interface MarketCheckParams {
 }
 
 /**
- * One-shot stateless market scan. Admin-only. Used by the "Check market" button
- * in PriceLookupDrawer so admins can compare the KB-proposed price against live
- * retailer range/median before committing. Does NOT enroll the product into
- * monitoring — if the product is already enrolled and its last refresh is ≤6h
- * old, the cached competitor_sources snapshot is returned (from_monitoring_cache=true).
+ * One-shot stateless market scan. Admin-only. Used by the "Check market"
+ * button in PriceLookupDrawer. Does NOT enroll the product into monitoring.
  */
 export async function marketCheck(params: MarketCheckParams): Promise<MarketCheckResponse> {
-  const res = await fetch(`${MIVAA_BASE}/api/v1/price-monitoring/market-check`, {
+  return api<MarketCheckResponse>(`/api/v1/price-monitoring/market-check`, {
     method: 'POST',
-    headers: await authHeader(),
     body: JSON.stringify({
       product_id: params.productId,
       product_name: params.productName,
@@ -404,9 +449,85 @@ export async function marketCheck(params: MarketCheckParams): Promise<MarketChec
       verify_prices: params.verifyPrices ?? true,
     }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`market-check failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return res.json();
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Backwards-compatible aliases — TO BE REMOVED once all call sites migrate.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** @deprecated Use trackProduct() — same payload returned via legacy /start endpoint. */
+export async function startMonitoring(
+  productId: string,
+  _frequency: 'hourly' | 'daily' | 'weekly' | 'on_demand' = 'daily',
+): Promise<void> {
+  await trackProduct(productId);
+}
+
+/** @deprecated Use untrackProduct(). */
+export async function stopMonitoring(productId: string): Promise<void> {
+  return untrackProduct(productId);
+}
+
+/** @deprecated Use refreshProduct(). Old shape preserved for legacy callers. */
+export interface DiscoverResponse {
+  success: boolean;
+  source: string;
+  product_id: string;
+  results: RetailerRow[];
+  total_results: number;
+  credits_used: number;
+  latency_ms: number;
+  summary: string | null;
+  throttled: boolean;
+  throttle_until: string | null;
+  last_search_at: string | null;
+  cached: boolean;
+  error: string | null;
+}
+
+/** @deprecated Use refreshProduct(). */
+export async function discoverRetailers(
+  productId: string,
+  forceRefresh = false,
+  verifyPrices = true,
+): Promise<DiscoverResponse> {
+  const outcome = await refreshProduct(productId, {
+    force_refresh: forceRefresh,
+    verify_prices: verifyPrices,
+  });
+  return {
+    success: outcome.status === 'refreshed',
+    source: 'perplexity_web_search',
+    product_id: productId,
+    results: outcome.results ?? [],
+    total_results: outcome.results?.length ?? 0,
+    credits_used: outcome.credits_used ?? 0,
+    latency_ms: outcome.latency_ms ?? 0,
+    summary: outcome.summary ?? null,
+    throttled: outcome.status === 'throttled',
+    throttle_until: outcome.throttle_until ?? null,
+    last_search_at: null,
+    cached: false,
+    error: outcome.error ?? null,
+  };
+}
+
+/** @deprecated Use refreshProduct() — old "check now" semantics. */
+export async function checkNow(productId: string, _productName: string): Promise<{
+  success: boolean;
+  sources_checked?: number;
+  prices_found?: number;
+  credits_consumed?: number;
+  error?: string;
+}> {
+  const outcome = await refreshProduct(productId, { force_refresh: true });
+  return {
+    success: outcome.status === 'refreshed',
+    prices_found: outcome.results?.length,
+    credits_consumed: outcome.credits_used,
+    error: outcome.error ?? undefined,
+  };
+}
+
+/** @deprecated PerplexityHit was the old name for RetailerRow. */
+export type PerplexityHit = RetailerRow;

@@ -771,143 +771,44 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   /**
-   * Comprehensive cleanup function that deletes ALL data related to a job
-   * This includes: products, chunks, images, relationships, embeddings, etc.
+   * Delete a job and EVERYTHING tied to it via the backend cleanup service.
+   * This is the single source of truth for job deletion — calling MIVAA's
+   * DELETE /documents/jobs/{id} endpoint runs `CleanupService.delete_job_completely`,
+   * which:
+   *   - resolves products by source_job_id, source_document_id, AND product_processing_status (covers PDF/XML/scraping)
+   *   - cleans every product-side child table (layout_regions, tables, enrichments, image_product_associations)
+   *   - cleans every image-side child table (chunk_image_relationships, image_metafield_values, image_validations)
+   *   - deletes embeddings from VECS collections
+   *   - deletes Supabase Storage files (PDFs + extracted images) — impossible from the browser
+   *   - deletes server-side temp files in /tmp
+   *   - deletes the document and the job row last
+   *
+   * Auth: passes the user's session JWT so RLS / admin role checks on the
+   * backend can authorize. The previous direct-Supabase implementation
+   * leaked storage files because the browser cannot reach the server FS.
    */
   const deleteJobWithAllData = async (jobId: string): Promise<{ success: boolean; stats: Record<string, number> }> => {
-    const stats: Record<string, number> = {
-      products_deleted: 0,
-      chunks_deleted: 0,
-      images_deleted: 0,
-      relationships_deleted: 0,
-      checkpoints_deleted: 0,
-      processing_status_deleted: 0,
-    };
-
     try {
-      // 1. Get job info to find document_id
-      const { data: jobData } = await supabase
-        .from('background_jobs')
-        .select('document_id, metadata')
-        .eq('id', jobId)
-        .single();
-
-      const documentId = jobData?.document_id;
-
-      // 2. Get all products associated with this job from product_processing_status
-      const { data: processingStatus } = await supabase
-        .from('product_processing_status')
-        .select('product_id')
-        .eq('job_id', jobId);
-
-      const productIds = processingStatus?.filter(p => p.product_id).map(p => p.product_id) || [];
-
-      // 3. If we have products, delete all related data for each product
-      if (productIds.length > 0) {
-        // Delete product_layout_regions
-        const { count: layoutCount } = await supabase
-          .from('product_layout_regions')
-          .delete()
-          .in('product_id', productIds)
-          .select('*', { count: 'exact', head: true });
-        stats.relationships_deleted += layoutCount || 0;
-
-        // Delete product_tables
-        await supabase
-          .from('product_tables')
-          .delete()
-          .in('product_id', productIds);
-
-        // Delete product_enrichments
-        await supabase
-          .from('product_enrichments')
-          .delete()
-          .in('product_id', productIds);
-
-        // Delete image_product_associations
-        const { count: imgRelCount } = await supabase
-          .from('image_product_associations')
-          .delete()
-          .in('product_id', productIds)
-          .select('*', { count: 'exact', head: true });
-        stats.relationships_deleted += imgRelCount || 0;
-
-        // Delete document_chunks for these products
-        const { count: chunkCount } = await supabase
-          .from('document_chunks')
-          .delete()
-          .in('product_id', productIds)
-          .select('*', { count: 'exact', head: true });
-        stats.chunks_deleted = chunkCount || 0;
-
-        // Get images associated with these products
-        const { data: imageData } = await supabase
-          .from('document_images')
-          .select('id')
-          .in('product_id', productIds);
-
-        const imageIds = imageData?.map(img => img.id) || [];
-
-        if (imageIds.length > 0) {
-          // Delete image relationships first
-          await supabase.from('chunk_image_relationships').delete().in('image_id', imageIds);
-          await supabase.from('image_product_associations').delete().in('image_id', imageIds);
-          await supabase.from('image_metafield_values').delete().in('image_id', imageIds);
-          await supabase.from('image_validations').delete().in('image_id', imageIds);
-
-          // Delete document_images
-          const { count: imgCount } = await supabase
-            .from('document_images')
-            .delete()
-            .in('id', imageIds)
-            .select('*', { count: 'exact', head: true });
-          stats.images_deleted = imgCount || 0;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${MIVAA_API_URL}/api/v1/rag/documents/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const body = await res.json();
+      const stats: Record<string, number> = {};
+      if (body && typeof body.stats === 'object' && body.stats !== null) {
+        for (const [k, v] of Object.entries(body.stats)) {
+          if (typeof v === 'number') stats[k] = v;
         }
-
-        // Delete the products themselves
-        const { count: productCount } = await supabase
-          .from('products')
-          .delete()
-          .in('id', productIds)
-          .select('*', { count: 'exact', head: true });
-        stats.products_deleted = productCount || 0;
       }
-
-      // 4. Also delete any orphaned data by document_id if available
-      if (documentId) {
-        // Delete any remaining document_chunks by document_id
-        await supabase.from('document_chunks').delete().eq('document_id', documentId);
-
-        // Delete any remaining document_images by document_id
-        await supabase.from('document_images').delete().eq('document_id', documentId);
-
-        // Delete the document record itself
-        await supabase.from('documents').delete().eq('id', documentId);
-      }
-
-      // 5. Delete product_processing_status for this job
-      const { count: statusCount } = await supabase
-        .from('product_processing_status')
-        .delete()
-        .eq('job_id', jobId)
-        .select('*', { count: 'exact', head: true });
-      stats.processing_status_deleted = statusCount || 0;
-
-      // 6. Stage history is on background_jobs.stage_history; nothing to
-      //    delete separately — the job DELETE below removes it.
-      stats.checkpoints_deleted = 0;
-
-      // 7. Finally delete the job record
-      const { error: jobError } = await supabase
-        .from('background_jobs')
-        .delete()
-        .eq('id', jobId);
-
-      if (jobError) {
-        throw new Error(`Failed to delete job: ${jobError.message}`);
-      }
-
-      return { success: true, stats };
+      return { success: !!body?.success, stats };
     } catch (error) {
       console.error('Error in deleteJobWithAllData:', error);
       throw error;
