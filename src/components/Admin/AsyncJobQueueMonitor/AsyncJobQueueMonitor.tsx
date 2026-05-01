@@ -290,6 +290,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       completed_at: xmlJob.completed_at,
       failed_at: null,
       interrupted_at: null,
+      updated_at: xmlJob.completed_at ?? xmlJob.started_at ?? xmlJob.created_at,
       last_heartbeat: null,
       error: xmlJob.error_message,
       metadata: {

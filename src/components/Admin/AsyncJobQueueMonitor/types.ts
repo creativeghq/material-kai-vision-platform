@@ -48,6 +48,7 @@ export interface BackgroundJob {
   completed_at: string | null;
   failed_at: string | null;
   interrupted_at: string | null;
+  updated_at: string | null;
   last_heartbeat: string | null;
   error: string | null;
   // AI cost tracking
