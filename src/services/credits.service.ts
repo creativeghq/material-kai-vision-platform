@@ -174,9 +174,7 @@ export const creditsAPI = {
       'voyage-4':   { input: 0.06, output: 0.00 },
       'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
 
-      // Qwen Vision Models (HuggingFace Endpoint - 32B only)
-      'qwen3-vl-32b': { input: 0.40, output: 0.40 },
-      'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
+      // Qwen vision pricing removed 2026-05-01 — vision moved to Claude.
     };
 
     // Flat-rate pricing for non-token-based services (in credits, includes 1.50x markup)

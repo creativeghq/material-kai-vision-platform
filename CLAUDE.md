@@ -7,6 +7,16 @@
 - **Database**: Supabase PostgreSQL 15 + pgvector 0.8.0
 - **Design System**: `.claude/design-system.md` — full reference for all UI patterns, colors, components
 
+## Qwen removal — Anthropic-only vision (2026-05-01)
+Audit-discovered: the configured HF endpoint served `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) but the segmentation/classification/vision-analysis call sites all asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s and falling through to Anthropic Claude — Stage 3 had effectively been 100% Claude for months. Migration made the architecture honest:
+
+- **Vision is Anthropic-only.** Segmentation, image classification, vision_analysis, material analysis all run on `claude-opus-4-7` via Anthropic tool use (`app.models.vision_analysis.VisionAnalysis` is the schema-locked Pydantic model + `VISION_ANALYSIS_TOOL`). Tool use eliminates JSON regex recovery and provides a hard guarantee of schema adherence — the only path that protects Voyage's understanding-embedding space from drift.
+- **Chunking → Sonnet 4.6.** `Settings.chunking_primary_model` default flipped from `Qwen/Qwen3.6-35B-A3B-FP8` to `claude-sonnet-4-6`. Chunking is a text task at the quality ceiling; Opus would be 5× the cost for marginal gain.
+- **Voyage drift detection.** Every understanding-embedding row now persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version`). Same on `products.text_embedding_1024_model` / `text_embedding_schema_version`. The OpenAI fallback is **disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection.
+- **Backfill.** `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Opus + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
+- **Dead code retired.** `qwen_endpoint_manager.py` deleted. All `Settings.qwen_*` fields, `validate_qwen_model`, `get_qwen_config`, `endpoint_registry.get_qwen_manager`, the `endpoint_controller.qwen` AdaptiveConcurrency gate, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), and the qwen Operations dashboard widgets are all removed. The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy. The only Qwen string left in the codebase is the `VisionProvider.QWEN` enum value, which is retained so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate.
+- **Stage 4 product embedding fail-closed.** Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (audit gap C).
+
 ## Pipeline Audit (2026-05-01)
 A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure bugs. **All P1s and P2s fixed in one giant PR**, no backlog. Key changes:
 
@@ -102,7 +112,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 ## Key Architecture Decisions
 - **7-embedding fusion search**: text, visual, understanding, color, texture, style, material
 - **halfvec (float16)**: ALL vector columns migrated from vector→halfvec. 50% storage savings, zero accuracy loss. vecs 0.4.5 works via PostgreSQL implicit casts.
-- **Understanding embeddings**: Qwen3-VL vision_analysis JSON → text → Voyage AI 1024D embedding. Enables spec-based search.
+- **Understanding embeddings**: Claude Opus 4.7 vision_analysis JSON (schema-locked via Anthropic tool use → `app.models.vision_analysis.VisionAnalysis`) → deterministic `serialize_vision_analysis_to_text` → Voyage AI 1024D embedding. Enables spec-based search. Provenance (`embedding_model`, `schema_version`) is persisted on every row so admin UI / backfill cron can detect Voyage→OpenAI fallback drift and stale-schema rows.
 - **2-phase image pipeline**: Phase 1 (sync) = classification + SLIG embeddings (visual + 4 specialized + understanding, all written directly to VECS collections). Phase 2 (the legacy `background_image_processor.py` step that re-ran a separate analysis pass) was deleted 2026-04 — it was silently broken (called a non-existent `generate_material_embeddings` method) and produced no output.
 
 ## Important DB Details — VECS-Only Architecture (post 2026-04 cleanup)
@@ -112,7 +122,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
   - `image_texture_embeddings` — **768D** (text-guided texture SLIG)
   - `image_style_embeddings` — **768D** (text-guided style SLIG)
   - `image_material_embeddings` — **768D** (text-guided material SLIG)
-  - `image_understanding_embeddings` — **1024D** (Voyage AI from Qwen3-VL vision_analysis)
+  - `image_understanding_embeddings` — **1024D** (Voyage AI from Claude Opus 4.7 vision_analysis; provenance fields `embedding_model` + `schema_version` mirrored on `document_images.understanding_embedding_model` + `understanding_schema_version`)
   - Legacy 1152D `image_siglip_embeddings` and 1152D specialized collections were dropped 2026-04 — they were 100% orphans from the SigLIP-SO400M era.
 - **Boolean presence flags on `document_images`**: `has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`. These are the canonical "does this image have embedding X?" lookup — set automatically by `vecs_service._set_image_flag()` whenever an embedding is upserted. Use these flags for O(1) presence checks instead of round-tripping to VECS.
 - **Dropped columns 2026-04** (DO NOT reference in code or queries):

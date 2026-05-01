@@ -110,7 +110,7 @@ const OperationsDashboardInner: React.FC = () => {
     total_images: 0,
     unique_users: 0,
   });
-  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]); // AI models (Claude, GPT, Qwen, SigLIP)
+  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]); // AI models (Claude, GPT, SigLIP)
   const [interiorDesignModels, setInteriorDesignModels] = useState<ModelUsage[]>([]); // Interior Design specific models
   const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
     pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
@@ -419,7 +419,7 @@ const OperationsDashboardInner: React.FC = () => {
           totalCreditsUsed,
         }));
 
-        // Calculate AI Model Usage Stats (Claude, GPT, Qwen, SigLIP, etc.)
+        // Calculate AI Model Usage Stats (Claude, GPT, SigLIP, etc.)
         const modelStats: Record<string, {
           call_count: number;
           total_cost: number;
@@ -1694,11 +1694,11 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models — Claude Opus 4.7, Claude Haiku 4.5, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models — Claude Opus 4.7 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
-            {/* AI Models Summary Cards - GPT, Claude, Qwen, Interior Design, etc. */}
+            {/* AI Models Summary Cards - GPT, Claude, Interior Design, etc. */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="dashboard-card">
                 <div className="flex items-center gap-3">
@@ -1827,7 +1827,7 @@ const OperationsDashboardInner: React.FC = () => {
 
 
 
-            {/* AI Models Usage Table - GPT, Claude, Qwen, etc. */}
+            {/* AI Models Usage Table - GPT, Claude, etc. */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1835,7 +1835,7 @@ const OperationsDashboardInner: React.FC = () => {
                   AI Model Usage & Costs
                 </CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  All AI models (GPT, Claude, Qwen, etc.) - Performance and cost breakdown
+                  All AI models (GPT, Claude, etc.) - Performance and cost breakdown
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1891,8 +1891,8 @@ const OperationsDashboardInner: React.FC = () => {
                           {/* Placeholder rows — canonical Claude models + vision/embedding */}
                           {[
                             { name: 'Claude Opus 4.7' },
+                            { name: 'Claude Sonnet 4.6' },
                             { name: 'Claude Haiku 4.5' },
-                            { name: 'Qwen3-VL-32B' },
                             { name: 'text-embedding-3-small' },
                             { name: 'Voyage 3.5' },
                             { name: 'SLIG 768D' },

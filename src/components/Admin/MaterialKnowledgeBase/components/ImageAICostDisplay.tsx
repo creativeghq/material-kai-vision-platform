@@ -28,8 +28,13 @@ export const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) =
               (log) =>
                 log.task.includes('embedding') || log.model.includes('clip'),
             );
+            // Vision bucket: legacy 'qwen' substring kept so historical
+            // pre-2026-05-01 logs still surface here; new rows match via
+            // 'claude-opus' or 'vision'.
             const visionCalls = data.filter((log) =>
-              log.model.includes('qwen') || log.model.includes('vision'),
+              log.model.includes('vision') ||
+              log.model.includes('claude-opus') ||
+              log.model.includes('qwen'),
             );
             const claudeCalls = data.filter((log) =>
               log.model.includes('claude'),

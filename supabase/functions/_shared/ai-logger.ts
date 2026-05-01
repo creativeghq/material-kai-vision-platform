@@ -29,11 +29,11 @@ const AI_PRICING = {
     'voyage-4': { input: 0.06, output: 0.00 },
     'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical logs
   },
-  // Qwen Vision Models (time-based on HuggingFace, token pricing here is approximate)
-  qwen: {
-    'qwen3-vl-32b': { input: 0.40, output: 0.40 },
-    'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
-  },
+  // Qwen pricing intentionally absent — vision migrated to Anthropic Claude
+  // Opus 4.7 on 2026-05-01. Empty placeholder kept so the lookup path that
+  // iterates AI_PRICING.qwen still resolves to undefined cleanly without
+  // throwing "cannot read property of undefined".
+  qwen: {} as Record<string, { input: number; output: number }>,
   // Vision Models
   vision: {
     'clip': { input: 0.00, output: 0.00 }, // Free (open-source)

@@ -19,9 +19,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'voyage-4':         { input: 0.06, output: 0.00 },
   'voyage-3.5':       { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
 
-  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
-  'qwen3-vl-32b': { input: 0.40, output: 0.40 },
-  'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
+  // Qwen pricing entries removed 2026-05-01 — vision moved to Anthropic.
 };
 
 export const MODEL_CONFIGS: ModelConfig[] = [
@@ -32,8 +30,8 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   // OpenAI Embeddings only
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
-  { id: 'qwen3-vl-32b', name: 'Qwen3-VL-32B-Instruct', provider: 'huggingface' as any, model: 'Qwen/Qwen3-VL-32B-Instruct', inputCostPer1M: 0.40, outputCostPer1M: 0.40, speed: 'medium', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Qwen models removed 2026-05-01 — image classification + vision analysis
+  // both run on Claude Opus 4.7 now (already listed under Anthropic above).
 
   // Vision/Embedding Models (SLIG Cloud Endpoint)
   { id: 'slig-768d', name: 'SLIG 768D', provider: 'huggingface' as any, model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },

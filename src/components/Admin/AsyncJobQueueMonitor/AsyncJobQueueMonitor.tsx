@@ -1305,7 +1305,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
    *
    * Each step runs independently and reports its own success/failure so a
    * partial run still surfaces actionable info to the user. Image regen
-   * takes longer (Qwen + SLIG calls per image) so it runs second.
+   * takes longer (Claude Opus + SLIG calls per image) so it runs second.
    */
   const handleFillAllEmbeddings = async (job: typeof selectedJob) => {
     if (!job?.document_id) return;
@@ -2614,7 +2614,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     statusText = 'Initializing pipeline — connecting to AI services...';
                   } else if (currentStage.includes('warmup')) {
                     const warmupData = jobCheckpoints.find(cp => cp.stage === 'warmup_started')?.checkpoint_data;
-                    const endpoints = warmupData?.endpoints_to_warmup?.join(', ') || 'Qwen, SLIG, YOLO, Chandra';
+                    const endpoints = warmupData?.endpoints_to_warmup?.join(', ') || 'SLIG, YOLO, Chandra';
                     statusText = `Warming up AI endpoints: ${endpoints}`;
                   } else if (currentStage.includes('image') || currentStage.includes('Image')) {
                     statusText = imagesTotal > 0
@@ -3198,7 +3198,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 <>
                                   <Badge variant="outline" className="text-[9px] bg-amber-500/10 border-amber-500/20 text-amber-400">YOLO Layout</Badge>
                                   <Badge variant="outline" className="text-[9px] bg-purple-500/10 border-purple-500/20 text-purple-400">SigLIP Vision</Badge>
-                                  <Badge variant="outline" className="text-[9px] bg-blue-500/15 border-blue-500/30 text-blue-400">Qwen OCR</Badge>
+                                  <Badge variant="outline" className="text-[9px] bg-blue-500/15 border-blue-500/30 text-blue-400">Chandra OCR</Badge>
                                 </>
                               )}
                               {completedCheckpoints.includes('products_detected') && (
@@ -4004,8 +4004,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   'claude-haiku': { input: 0.80, output: 4.00, type: 'token' },
                   'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
                   'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
-                  // HuggingFace Endpoints (per GPU hour)
-                  'qwen-vision': { gpuHourly: 0.60, type: 'gpu', description: 'Qwen3-VL-32B Product Discovery' },
+                  // HuggingFace Endpoints (per GPU hour). 'qwen-vision' removed
+                  // 2026-05-01 — vision discovery is on Claude Opus 4.7 (token-priced).
                   'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings' },
                   'yolo-layout': { gpuHourly: 0.60, type: 'gpu', description: 'YOLO DocParser Layout Detection' },
                   'chandra-ocr': { gpuHourly: 0.30, type: 'gpu', description: 'Chandra OCR Engine' },
@@ -4042,20 +4042,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   const endTime = selectedJob?.completed_at ? new Date(selectedJob.completed_at).getTime() : Date.now();
                   const totalTimeSeconds = (endTime - startTime) / 1000;
 
-                  // Qwen Vision - Product Discovery (estimate: ~2 min active for discovery)
-                  if (discoveryCheckpoint || productsCreated > 0) {
-                    const discoveryTimeMs = discoveryCheckpoint?.metadata?.processing_time_ms || 120000;
-                    const gpuSeconds = discoveryTimeMs / 1000;
-                    costs['qwen'] = {
-                      model: 'Qwen3-VL-32B',
-                      generations: productsCreated,
-                      inputTokens: totalPages * 2000, // ~2k tokens per page (vision)
-                      outputTokens: productsCreated * 500, // ~500 tokens per product
-                      gpuSeconds,
-                      cost: (gpuSeconds / 3600) * 0.60,
-                      description: `Product discovery: ${productsCreated} products from ${totalPages} pages`,
-                    };
-                  }
+                  // Vision/Discovery — 'qwen' bucket removed 2026-05-01.
+                  // Discovery now runs on Claude Opus 4.7 and is captured under
+                  // the claude-opus row of `model_versions` aggregated below
+                  // by the Claude estimation block.
 
                   // SLIG - Visual Embeddings (estimate: 0.5s per image)
                   const clipEmbeddings = selectedJob?.metadata?.clip_embeddings || selectedJob?.metadata?.result?.clip_embeddings || imagesProcessed;
@@ -4231,8 +4221,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     {/* Cost breakdown note */}
                     <div className="mt-3 p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
                       <p className="text-[10px] text-blue-400">
-                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: Qwen ($0.60/hr), SLIG ($0.45/hr), YOLO ($0.60/hr).
-                        Token costs: Claude Opus ($3/$15 per 1M), Embeddings ($0.02 per 1M). Actual costs may vary.
+                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: SLIG ($0.45/hr), YOLO ($0.60/hr), Chandra ($0.30/hr).
+                        Token costs: Claude Opus ($15/$75 per 1M), Claude Sonnet ($3/$15 per 1M), Voyage embeddings ($0.06 per 1M). Actual costs may vary.
                       </p>
                     </div>
                   </div>
