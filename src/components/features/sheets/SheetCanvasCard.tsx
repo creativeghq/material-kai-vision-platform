@@ -22,7 +22,7 @@ export interface SheetCanvasCardProps {
   title?: string;
 }
 
-export function SheetCanvasCard({ sheetId, sheetType, initialData, title }: SheetCanvasCardProps) {
+export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, title }: SheetCanvasCardProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   if (pdfUrl) {
