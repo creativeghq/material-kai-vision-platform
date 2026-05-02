@@ -12,8 +12,7 @@ The Material Kai Vision Platform now supports **automatic product discovery from
 ### Async Processing
 
 Web scraping uses **fully async processing** with the same concurrency limits as PDF processing:
-- ✅ 5 concurrent Qwen Vision requests (image classification)
-- ✅ 2 concurrent Claude requests (validation)
+- ✅ 5 concurrent Claude Opus 4.7 vision_analysis requests via Anthropic tool use (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 was a two-stage Qwen→Claude pipeline (5 + 2 concurrent); the Qwen HF endpoint had been 404-ing for months → retired, two stages collapsed to single-stage Claude.
 - ✅ 10 concurrent image uploads
 - ✅ 20 images per CLIP batch
 - ✅ Same timeout guards (300s product discovery, 120s AI)

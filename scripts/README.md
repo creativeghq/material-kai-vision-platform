@@ -6,13 +6,20 @@
 
 ## 0. WHAT YOU ARE DOING
 
-You are running an end-to-end validation of the post-2026-04 MIVAA pipeline by executing the canonical test script `test_full_workflow.sh` on the production server. The script discovers all products in `harmony-signature-book-24-25.pdf` and processes **every discovered product** end-to-end (full mode — no `--test` flag).
+You are running an end-to-end validation of the post-2026-04 MIVAA pipeline by executing the canonical test script `test_full_workflow.sh` on the production server. The script discovers all products in `harmony-signature-book-24-25.pdf` and processes them end-to-end.
 
-The goal is to prove that — across all 11 processed products — every part of the 7-vector pipeline produced data:
+You can run in **one of two modes** — pick exactly one in §2 by setting `RUN_MODE`:
 
-- Discovery returns exactly 11 products
-- All 11 products are processed (no early-exit, no test-mode short-circuit)
-- Each product produces chunks, chunk text embeddings, images, all 6 image embedding vectors per material image, vision_analysis JSON, visual metadata, a products row with text_embedding_1024, and all the relationship rows
+| Mode | `RUN_MODE` value | Script flag | Products processed | Use when |
+|---|---|---|---|---|
+| **Full** | `full` | (none) | All 11 discovered | Pre-release validation, full regression sweep |
+| **Single-product** | `single` | `--test` | Only the first discovered product | Fast validation of a fix (~5–15 min), iterating on a specific bug |
+
+The goal is to prove — across all processed products — every part of the 7-vector pipeline produced data:
+
+- Discovery returns exactly 11 products **regardless of mode** (the gate is on discovery, not processing)
+- All `EXPECTED_PRODUCTS_PROCESSED` products are processed (no premature exit)
+- Each processed product produces chunks, chunk text embeddings, images, all 6 image embedding vectors per material image, vision_analysis JSON, visual metadata, a products row with text_embedding_1024, and all the relationship rows
 - `final-result.html` is written to `/tmp/final-result.html` on the production server with every section populated and zero unmet gates
 - Sentry shows zero new issues caused by the run
 
@@ -42,13 +49,14 @@ If any precondition fails, **report the failure and stop**. Do not attempt to de
 
 Use these literal values throughout. Do not invent or substitute.
 
+**Pick the run mode FIRST.** Set `RUN_MODE` to either `full` or `single`, then read the matching column in the table below. Every gate, expected count, command and timeout in this directive references one of these values.
+
 ```
+RUN_MODE                      = single              # ← change this. valid: full | single
 WORKSPACE_ID                  = ffafc28b-1b8b-4b0d-b226-9f9a6154004e
 PDF_NAME                      = harmony-signature-book-24-25.pdf
-EXPECTED_PRODUCTS_DISCOVERED  = 11
-EXPECTED_PRODUCTS_PROCESSED   = 11                   # full PDF — every discovered product is processed
+EXPECTED_PRODUCTS_DISCOVERED  = 11                   # ALWAYS 11 — discovery runs identically in both modes
 SCRIPT_PATH                   = /var/www/mivaa-pdf-extractor/test_full_workflow.sh
-SCRIPT_FLAGS                  =                      # no --test flag — full processing
 SERVICE_NAME                  = mivaa-pdf-extractor.service
 TEST_RUN_LOG                  = /tmp/test_run.log
 FINAL_REPORT                  = /tmp/final-result.html
@@ -56,9 +64,18 @@ PRODUCTION_API                = https://v1api.materialshub.gr
 LOCAL_API_ON_SERVER           = http://localhost:8000
 LOG_TAIL_FILTER               = "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|🎨|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR|Discovery|product|chunk_image_relationship|image_product_association"
 POLL_INTERVAL_SEC             = 30
-STALL_DETECTION_POLLS         = 6                    # 6 polls with no progress = stuck (3min — full mode is slower per stage)
-HARD_TIMEOUT_MINUTES          = 180                  # 3h budget for the whole 11-product run
 ```
+
+**Mode-dependent values** — read the column matching your chosen `RUN_MODE`:
+
+| Variable | `full` | `single` |
+|---|---|---|
+| `SCRIPT_FLAGS` | *(empty — no flag)* | `--test` |
+| `EXPECTED_PRODUCTS_PROCESSED` | `11` | `1` |
+| `STALL_DETECTION_POLLS` | `6` (3 min — full mode is slower per stage) | `4` (2 min — only one product, faster cadence) |
+| `HARD_TIMEOUT_MINUTES` | `180` (3 h budget for all 11 products) | `30` (single product run is typically 5–15 min) |
+| `TEST_MODE_LOG_LINE_EXPECTED` | `🧪 TEST MODE` MUST NOT appear | `🧪 TEST MODE: Processing first product only` MUST appear exactly once |
+| Soft-pass threshold for Gate 6.C `products` | `>= 10` (allow 1 of 11 to fail) | `== 1` (no slack — there's only one product) |
 
 You will discover and capture these during the run:
 
@@ -123,13 +140,21 @@ Bash: curl -s -X POST "https://v1api.materialshub.gr/api/internal/reset-job/<exi
 
 Then re-run Step 3. If the existing job belongs to another user / wasn't started by you, **STOP** and report — do not cancel work you didn't initiate without authorization.
 
-### STEP 4 — Launch `test_full_workflow.sh` (full mode, no flag)
+### STEP 4 — Launch `test_full_workflow.sh` (mode-dependent flag)
 
 You launch the script in the background on the production server so you can poll status while it runs. The script handles the upload, dedupe, monitoring, and `verify_results` itself — your job is to monitor it and validate against stricter gates than the script's own checks.
 
+The launch command depends on `RUN_MODE` (set in §2). Use the matching line:
+
 ```
+# RUN_MODE = full   — process all 11 discovered products
 mcp__ssh-mcp__exec: cd /var/www/mivaa-pdf-extractor && rm -f /tmp/test_run.log && nohup ./test_full_workflow.sh > /tmp/test_run.log 2>&1 & echo "PID=$!"
+
+# RUN_MODE = single — process only the first discovered product (~5–15 min)
+mcp__ssh-mcp__exec: cd /var/www/mivaa-pdf-extractor && rm -f /tmp/test_run.log && nohup ./test_full_workflow.sh --test > /tmp/test_run.log 2>&1 & echo "PID=$!"
 ```
+
+The script also accepts `--test-mode` as an alias for `--test` and prints help via `--help`. Do NOT add any other flags — the script does not accept them and bash will silently ignore them while still defaulting to full mode.
 
 **Gate 4.0**: shell returned a PID. The script is now running in the background.
 
@@ -173,16 +198,16 @@ mcp__ssh-mcp__exec: tail -30 /tmp/test_run.log
 mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "90 seconds ago" | grep -E "Stage [0-9]|🤖|🔬|🩹|☁️|✅ SLIG|✅ Generated|Voyage|specialized embedding|understanding embedding|claude_fallback|❌|WARNING|ERROR|discovered|product" | tail -40
 ```
 
-**Stall detection**: track the value of `progress` across consecutive polls. If `progress` does not change for `STALL_DETECTION_POLLS` (6) consecutive polls (3 min), assume the stage is stuck. Look up "stuck job" in §4 and apply its remedy. Note: full-mode runs spend longer in Stage 3 per product (image classification + 6 embeddings × N material images), so single-poll silence is normal — only flag at 6 unchanged polls.
+**Stall detection**: track the value of `progress` across consecutive polls. If `progress` does not change for `STALL_DETECTION_POLLS` consecutive polls (full: 6 polls / 3 min — single: 4 polls / 2 min — see §2), assume the stage is stuck. Look up "stuck job" in §4 and apply its remedy. Note: `full` runs spend longer in Stage 3 per product (image classification + 6 embeddings × N material images) so single-poll silence is normal in both modes — only flag once you cross the threshold for your `RUN_MODE`.
 
-**Hard timeout**: 180 minutes (`HARD_TIMEOUT_MINUTES`) total wall-clock from the moment Step 4 launched. If exceeded, POST `/api/internal/reset-job/<JOB_ID>` and **STOP** with `❌ E2E TEST BLOCKED — TIMEOUT`.
+**Hard timeout**: `HARD_TIMEOUT_MINUTES` total wall-clock from the moment Step 4 launched (180 min for `full`, 30 min for `single` — see §2). If exceeded, POST `/api/internal/reset-job/<JOB_ID>` and **STOP** with `❌ E2E TEST BLOCKED — TIMEOUT`.
 
 **Per-stage gates** — verify each as it appears in the logs. As soon as a gate fails, run the matching §4 lookup and either fix-and-retry the affected step (within loop budget) or stop the job and re-run from Step 4:
 
 | # | Stage | Gate (must see in logs OR DB) | Fail action |
 |---|---|---|---|
-| 5.1 | **Stage 0 — Discovery** | `discovered 11 products` (or equivalent count = 11) appears in journalctl | If count != 11, immediately POST `/api/internal/reset-job/<JOB_ID>`. **STOP** and report — discovery prompt or model output changed unexpectedly. |
-| 5.2 | **Full-mode gate** | NO `🧪 TEST MODE` log line appears. The job iterates through all 11 products — expect to see per-product progress (e.g. `processing product 1/11`, `2/11`, ... `11/11`, or per-product Stage 3/4 log groups). | If `🧪 TEST MODE: Processing first product only` appears, the script was launched with `--test` by mistake. Reset the job via `/api/internal/reset-job/<JOB_ID>` and re-run Step 4 ensuring no flag is passed. |
+| 5.1 | **Stage 0 — Discovery** | `discovered 11 products` (or equivalent count = 11) appears in journalctl — **independent of `RUN_MODE`**, discovery always runs over the full PDF | If count != 11, immediately POST `/api/internal/reset-job/<JOB_ID>`. **STOP** and report — discovery prompt or model output changed unexpectedly. |
+| 5.2 | **Mode gate** (matches `RUN_MODE` in §2) | If `RUN_MODE = full`: `🧪 TEST MODE` MUST NOT appear; expect per-product progress for all 11 (e.g. `processing product 1/11`, ... `11/11`). If `RUN_MODE = single`: `🧪 TEST MODE: Processing first product only` MUST appear exactly once before Stage 1 starts. | Mismatch means the script was launched with the wrong flag. Reset the job via `/api/internal/reset-job/<JOB_ID>` and re-run Step 4 with the correct flag for your declared `RUN_MODE`. |
 | 5.3 | **Stage 1 — Layout extraction** | `YOLO` log lines appear OR `product_layout_regions` rows are written | If neither appears within 3 min, look up "YOLO endpoint paused" in §4. |
 | 5.4 | **Stage 2 — Chunking** | `chunks_created: N` (with N > 0) appears AND followed by `voyage-4` text-embedding calls per chunk | If chunks but no Voyage calls, look up "Voyage misconfigured" in §4. |
 | 5.5 | **Stage 3 — Image classification** | `🤖 Starting AI-based image classification` appears AND per-image classification results follow | If no Qwen calls within 3 min, look up "Qwen endpoint paused" in §4. |
@@ -191,7 +216,7 @@ mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "90 s
 | 5.8 | **Stage 3 — Specialized SLIG (color/texture/style/material)** | per material image: 4 lines of `✅ Generated color specialized embedding (768D, similarity=...)` — one each for color, texture, style, material | If only 1 of 4 appears, **STOP** the entire run — silent-fallback bug regression. Report immediately, do NOT proceed. Re-verify in Step 6 before continuing. |
 | 5.9 | **Stage 3 — Understanding embedding** | per material image with vision_analysis: `✅ Understanding embedding generated (1024D)` | If absent, look up "Voyage understanding broken" in §4. |
 | 5.10 | **Per-image progress events** | `current_step` from job metadata polling shows `v:N c:N t:N s:N m:N u:N` tally and these counts increase together | If no per-image progress events, the `tracker` parameter wasn't threaded — confirm Step 1.2 prompt-load output and check that `product_processor.py` is passing `tracker=tracker` into `process_product_images`. |
-| 5.11 | **Stage 4 — Product creation** | `INSERT INTO products` runs once per discovered product (expect 11 inserts) AND every inserted row has non-null `text_embedding_1024` | If any row's embedding is null, Voyage call failed silently for that product. Check journalctl for `voyage` errors. Backfill via `/api/internal/regenerate-text-embeddings` after fixing. |
+| 5.11 | **Stage 4 — Product creation** | `INSERT INTO products` runs `EXPECTED_PRODUCTS_PROCESSED` times (11 in `full`, 1 in `single`) AND every inserted row has non-null `text_embedding_1024` | If any row's embedding is null, Voyage call failed silently for that product. Check journalctl for `voyage` errors. Backfill via `/api/internal/regenerate-text-embeddings` after fixing. |
 | 5.12 | **Entity linking** | `Created N chunk-image relationship entries` AND `image_product_associations` rows are inserted | If `chunk_image_relationships` is 0 for the new doc, `entity_linking_service.link_images_to_chunks` did not run. Look up in §4. |
 | 5.13 | **Stage 3 — Icon extraction** | Per icon candidate: `🔖 Icon {id} (page N): extracted N spec items (slip_resistance, fire_rating, ...)`. The icon split log line `🔖 Icon split: N regular material, N icon candidates ...` appears once per Stage 3. | If `icon_candidates_processed > 0` but `icon_metadata_extracted == 0`, the OCR or Claude call is failing on every icon — look up "icon extraction failed" in §4. If NO icon split log line appears AT ALL, the detection rules (size + grid) didn't fire — that's NOT a failure on its own (the test PDF may legitimately have no spec icons), but expect at least 1 icon batch on a typical ceramic catalog. |
 | 5.14 | **Job completion** | `status == "completed"` AND `progress == 100`. The script also writes `/tmp/job_<JOB_ID>_final.json` on success. | If `status == "failed"`, look up the error message in §4 and re-run the affected step. |
@@ -255,17 +280,21 @@ mcp__supabase__execute_sql:
 
 **Gate 6.C** (the most important gate of the entire run):
 - `chunks_with_text_embedding == chunks`
-- `products == 11` (full mode — all discovered products must be created; partial counts indicate per-product failures)
+- `products == EXPECTED_PRODUCTS_PROCESSED` (11 in `full`, 1 in `single`)
 - `products_with_embedding == products` (every created product must have a Voyage text embedding)
 - `chunk_image_links > 0` (page proximity grounding worked)
 - `image_product_assocs > 0` (product↔image association worked)
 - `chunk_product_links > 0`
 
-If `products < 11`, inspect `result.failed_products` (or journalctl) for the failed product names. Per-product failures usually point to either Stage 3 image-failure cascading or Voyage rate-limiting on Stage 4 — fix the root cause, then backfill via `/api/internal/regenerate-text-embeddings`. Soft-pass threshold: `products >= floor(11 * 0.9)` = 10 acceptable as a partial pass with a flagged note in the report.
+If `products < EXPECTED_PRODUCTS_PROCESSED`, inspect `result.failed_products` (or journalctl) for the failed product names. Per-product failures usually point to either Stage 3 image-failure cascading or Voyage rate-limiting on Stage 4 — fix the root cause, then backfill via `/api/internal/regenerate-text-embeddings`.
+
+**Soft-pass threshold (mode-dependent — read the table in §2):**
+- `RUN_MODE = full`: `products >= 10` (≥ 90% of 11) acceptable as a partial pass, flagged in the report.
+- `RUN_MODE = single`: NO soft-pass. `products` must equal `1` exactly — there is only one candidate, so any failure means the single-product check failed entirely.
 
 If `products_with_embedding < products`, the Voyage product embedding call failed silently for some inserted rows — check journalctl for `voyage` errors and backfill before re-running Step 6.
 
-Capture the FIRST product UUID (used as the differentiation-check anchor in Query G):
+Capture the FIRST product UUID (used as the differentiation-check anchor in Query G — in `single` mode this is also the only product):
 
 ```
 mcp__supabase__execute_sql:
@@ -432,7 +461,7 @@ h2{border-bottom:2px solid #ddd;padding-bottom:4px;margin-top:32px}
   <b>Document:</b> <code><DOCUMENT_ID></code><br>
   <b>First product (anchor for differentiation check):</b> <code><PRODUCT_ID></code><br>
   <b>Generated:</b> $(date -u +"%Y-%m-%dT%H:%M:%SZ")<br>
-  <b>Mode:</b> full (no <code>--test</code> flag — all 11 discovered products processed)
+  <b>Mode:</b> <RUN_MODE> (expected processed: <EXPECTED_PRODUCTS_PROCESSED> of 11 discovered)
 </p>
 
 <h2>1. Job summary</h2>
@@ -550,12 +579,13 @@ Report to the user with this exact structure if every gate passed:
 ```
 ✅ E2E TEST PASSED
 
+Mode:                 <RUN_MODE>  (full = all 11 / single = first product only)
 Job ID:               <JOB_ID>
 Document ID:          <DOCUMENT_ID>
 Anchor product ID:    <PRODUCT_ID>  (first product, used for vector differentiation check)
-Discovery:            11 / 11 ✓
-Products processed:   <n_products>/11 (with text_embedding_1024: <n_with_embedding>)
-Duration:             <minutes from Step 4 launch to Step 5.final>
+Discovery:            11 / 11 ✓                                  (always 11, mode-independent)
+Products processed:   <n_products>/<EXPECTED_PRODUCTS_PROCESSED> (with text_embedding_1024: <n_with_embedding>)
+Duration:             <minutes from Step 4 launch to Step 5.final> (budget: <HARD_TIMEOUT_MINUTES> min)
 Chunks:               <chunks> (all with text_embedding_1024 ✓)
 Material images:      <total_regular_images>
 Icon candidates:      <icon_candidates> (extracted: <icon_metadata_extracted>, failed: <icon_extraction_failed>)
@@ -612,7 +642,7 @@ Use this when a gate fails. Each row tells you the symptom, the root cause, the 
 | Gate 5.1 — discovery returns count != 11 | Discovery prompt or model output drift | **STOP** the job immediately via `/api/internal/reset-job`. Report — this is a hard precondition violation and needs user investigation. |
 | Gate 5.2 — `🧪 TEST MODE` log line appears | Script was launched with `--test` by mistake | **STOP** the job via reset-job. Re-run Step 4 ensuring NO flag is passed (`./test_full_workflow.sh` only). |
 | Gate 6.C — `products` count == 0 | Stage 4 product creation failed for every product | Look for `Stage 4` errors in journalctl. If Voyage product embedding failed across the board, suspect `VOYAGE_API_KEY` missing/expired. Look up "Voyage misconfigured" symptom. |
-| Gate 6.C — `products` count `< 11` (partial) | Some product(s) failed mid-Stage 3 or Stage 4 | Inspect `result.failed_products` (or per-product log groups in journalctl). For each failure, look up its specific symptom in this table. After fixing, backfill via `/api/internal/regenerate-text-embeddings` (text) or `/api/internal/regenerate-image-embeddings` (visual). Re-run Step 6.C. Acceptable soft-pass: `>= 10/11`. |
+| Gate 6.C — `products` count < `EXPECTED_PRODUCTS_PROCESSED` (partial) | Some product(s) failed mid-Stage 3 or Stage 4 | Inspect `result.failed_products` (or per-product log groups in journalctl). For each failure, look up its specific symptom in this table. After fixing, backfill via `/api/internal/regenerate-text-embeddings` (text) or `/api/internal/regenerate-image-embeddings` (visual). Re-run Step 6.C. Soft-pass per §2: `RUN_MODE=full` accepts `>= 10/11`; `RUN_MODE=single` requires `1/1` exactly (the single product IS the test). |
 | Gate 6.C — `products_with_embedding < products` | Voyage product embedding call failed silently for some inserted rows | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -i voyage \| tail -40`. Check `VOYAGE_API_KEY` and rate-limit warnings. Backfill via `Bash`: `curl -s -X POST https://v1api.materialshub.gr/api/internal/regenerate-text-embeddings -d '{"workspace_id":"...","document_id":"<DOCUMENT_ID>","force_regenerate":true}'`. Re-run Step 6.C. |
 | Gate 6.A — vector counts < total_images | Some images failed during Stage 3 | Inspect `result.failed_images` array on the job. For each failure, look up its specific symptom in this table. After fixing, run "Fill Images" via `Bash`: `curl -s -X POST https://v1api.materialshub.gr/api/internal/regenerate-image-embeddings -d '{"workspace_id":"...","document_id":"<DOCUMENT_ID>","force_regenerate":true}'` to backfill the failures. Re-run Step 6. |
 | Gate 5.13 / 6.H — `icon_candidates_processed > 0` but `icon_metadata_extracted == 0` | OCR or Claude is failing on every icon. Most common causes: (a) `ocr_service.extract_icon_metadata` raised an exception, (b) `Icon-Based Metadata Extraction` prompt was renamed/deactivated, (c) Claude returned non-JSON | `mcp__supabase__execute_sql`: `SELECT name, is_active, version FROM prompts WHERE category = 'icon_metadata' AND is_active = true;` — must return 1 row. Then `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "extract_icon_metadata\|Icon OCR\|icon extraction failed" \| tail -30`. Fix the root cause and re-run Step 4. |
@@ -625,7 +655,12 @@ Use this when a gate fails. Each row tells you the symptom, the root cause, the 
 
 For each gate failure, you may attempt up to **3 fix-and-retry loops** on the affected step before giving up and reporting `❌ E2E TEST BLOCKED`. Do not try more than 3. If a fix requires user input (token rotation, env var change, prompt rewrite that changes architecture, deploying new code), report immediately — do not loop.
 
-Total wall-clock budget for the entire script: **180 minutes / 3 hours** (`HARD_TIMEOUT_MINUTES`). Full-mode processing of all 11 products is materially slower than test-mode — Stage 3 alone takes minutes per product. If the run exceeds 180 minutes total, stop the active job, generate a partial `/tmp/final-result.html` with whatever data you have, and report `❌ E2E TEST BLOCKED — TIMEOUT`.
+Total wall-clock budget for the entire script is `HARD_TIMEOUT_MINUTES` (set per `RUN_MODE` in §2):
+
+- `RUN_MODE = full`: **180 minutes / 3 hours**. Full-mode processing of all 11 products is materially slower than single-mode — Stage 3 alone takes minutes per product.
+- `RUN_MODE = single`: **30 minutes**. A single-product run is typically 5–15 min end-to-end; anything past 30 min indicates a stuck stage or a regression worth root-causing.
+
+If the run exceeds the budget, stop the active job via `/api/internal/reset-job/<JOB_ID>`, generate a partial `/tmp/final-result.html` with whatever data you have, and report `❌ E2E TEST BLOCKED — TIMEOUT`.
 
 ---
 

@@ -72,9 +72,9 @@ Complete documentation for Material Kai Vision Platform.
 
 **[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
 - Fully async architecture across all methods (PDF, Web, XML)
-- Unified concurrency limits (5 Qwen/HuggingFace, 2 Claude, 10 uploads, 20 SLIG)
+- Unified concurrency limits (2 Claude, 10 uploads, 20 SLIG, 8 Chandra v2 — Qwen gate retired 2026-05-01)
 - Timeout configuration (300s discovery, 120s AI, 30s downloads)
-- Rate limiting (10 req/min Qwen/HuggingFace, circuit breaker Claude)
+- Rate limiting (circuit breaker on Claude; Chandra retries with jitter at 3 attempts)
 - Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
 - Memory optimization (batch processing prevents OOM)
 - Network optimization (semaphores prevent congestion)
@@ -131,6 +131,13 @@ Complete documentation for Material Kai Vision Platform.
 **[virtual-staging.md](virtual-staging.md)** - Virtual Staging ✨ NEW
 - Replicate proplabs model, 20 credits, ~56s
 - 8 room types, 8 furniture styles
+
+**[gemini-image-generation.md](gemini-image-generation.md)** - Gemini image generation patterns ✨ NEW (2026-05-02)
+- Models, costs, response shape (`gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`)
+- Minimal copy-paste skeleton for new image-generation endpoints
+- Reference implementation: `seed-sheet-references` (admin static-asset seeder)
+- Admin-secret pattern, bucket conventions, prompt-engineering notes
+- Pitfalls hit in production (mimeType, response modalities, idle timeout)
 
 **[moodboard-presentation-sheets.md](moodboard-presentation-sheets.md)** - Moodboard Presentation Sheets ✨ NEW (2026-05-02)
 - 8 client-ready sheet types: Material Board, Color Palette, Concept Board, Lighting Plan, Annotated Render, Elevation+Render Pair, FF&E Schedule, Full Deck
@@ -319,12 +326,12 @@ Complete documentation for Material Kai Vision Platform.
 ### 🤖 AI & Processing
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
-- 12+ AI models across 5 providers
-- Anthropic: Claude Opus 4.7, Claude Haiku 4.5
-- OpenAI: GPT-4o, GPT-4o-mini
-- Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
-- HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (5 visual embedding types, 768D each)
+- Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
+- Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
+- HuggingFace Endpoints: SLIG SigLIP2 (5 visual embedding types, 768D each) + Chandra v2 (sole OCR engine, retry-with-jitter)
+- OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
+- Qwen retired 2026-05-01 (HF endpoint had been silently 404-ing for months)
 - 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
 - Model usage by pipeline stage
 - Cost optimization
@@ -379,9 +386,9 @@ Complete documentation for Material Kai Vision Platform.
   - Enabled by default (YOLO_ENABLED=true)
   - Stores in product_layout_regions and product_tables
 - Stage 5: Entity Linking (65-70%)
-- Stage 6: AI Classification (70-75%)
-- Stage 7: CLIP Embeddings (75-85%)
-- Stage 8: Qwen Vision Analysis (85-90%)
+- Stage 6: AI Classification (70-75%) — Claude Opus 4.7 via Anthropic tool use
+- Stage 7: SLIG Embeddings (75-85%) — SigLIP2 cloud endpoint, 5×768D specialized
+- Stage 8: Vision Analysis (85-90%) — Claude Opus 4.7 schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`
 - **Layout-Aware Chunking** ✨ NEW
   - Uses YOLO regions for intelligent chunking
   - Respects region boundaries
@@ -458,7 +465,7 @@ Complete documentation for Material Kai Vision Platform.
 - PDF Routes (4 endpoints)
 - Products Routes (3 endpoints)
 - Embeddings Routes (3 endpoints)
-- HuggingFace/Qwen Routes (3 endpoints)
+- HuggingFace Endpoint Routes (2 endpoints — SLIG SigLIP2 + Chandra v2; Qwen retired 2026-05-01)
 - Anthropic Routes (3 endpoints)
 - Monitoring Routes (3 endpoints)
 - AI Metrics Routes (2 endpoints)
@@ -547,7 +554,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 4.7 + Haiku 4.5), GPT-4o/mini, Voyage AI (voyage-4), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), SLIG SigLIP2 (HuggingFace, 5×768D visual), Chandra v2 (HuggingFace, sole OCR engine), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

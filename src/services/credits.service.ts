@@ -34,7 +34,8 @@ export interface AIUsageLog {
   output_tokens: number;
   input_cost_usd: number;
   output_cost_usd: number;
-  total_cost_usd: number;
+  billed_cost_usd: number;
+  raw_cost_usd?: number;
   credits_debited: number;
   metadata?: any;
   created_at: string;

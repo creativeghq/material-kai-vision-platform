@@ -65,11 +65,11 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 30+ Edge Functions (TypeScript/Deno)
 
 **AI Services**:
-- Anthropic (Claude Opus 4.7, Claude Haiku 4.5 + built-in web search)
-- OpenAI (GPT-4o, GPT-4o-mini for query parsing)
-- Voyage AI (voyage-4, primary text/understanding embeddings, 1024D)
-- HuggingFace Endpoint (Qwen3-VL 32B Vision)
-- SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
+- Anthropic (Claude Opus 4.7 vision-via-tool-use + chunking via Sonnet 4.6 + Haiku 4.5 classifiers + built-in web_search_20250305)
+- Voyage AI (voyage-4, sole text + understanding embedder, 1024D)
+- SigLIP2 (SLIG) via HuggingFace Endpoint (5 visual embedding types, 768D each)
+- Chandra v2 (Datalab) via HuggingFace Endpoint (sole OCR engine, retry-with-jitter)
+- OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
 - Google Gemini (gemini-3.1-flash-image-preview, gemini-3-pro-image-preview — interior generation)
@@ -93,7 +93,7 @@ MIVAA API (FastAPI) → Creates background job
   3. Semantic Chunking (Anthropic)
   4. Text Embeddings (Voyage AI voyage-4, 1024D)
   5. Image Extraction
-  6. Image Analysis (Qwen3-VL 32B → understanding embeddings via Voyage AI)
+  6. Image Analysis (Claude Opus 4.7 vision tool use → `VisionAnalysis` JSON → understanding embeddings via Voyage AI; per-image OCR via Chandra v2)
   7-10. Multi-Vector SigLIP2 Embeddings (768D halfvec: visual, color, texture, style, material)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
@@ -137,17 +137,23 @@ Real-time updates → Frontend displays results
 - **Dimensions**: 1536
 - **Status**: Retired in 2026-04. Primary and only text embedder is now Voyage AI voyage-4 (1024D, stored as halfvec in VECS). OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.
 
-#### 3. HuggingFace Endpoint - Qwen3-VL 32B Vision
+#### 3. Anthropic Claude Opus 4.7 — VISION (post-2026-05-01 — replaced Qwen)
 
-- **Parameters**: 32 billion
+- **Schema enforcement**: Anthropic tool use with `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`)
 - **Modality**: Vision + Text
-- **Use Cases**: Material image analysis, product classification, OCR
-- **Performance**:
-  - 69.4% MMMU (Massive Multitask Multimodal Understanding)
-  - #1 ranked for OCR tasks
-  - 85%+ accuracy on material recognition
-- **Cost**: $0.30 per 1M tokens
+- **Use Cases**: Material image analysis, product classification (material vs non-material), segmentation, OCR-aware quality scoring
+- **Why tool use**: hard schema adherence — eliminates fragile JSON regex recovery, protects Voyage's understanding-embedding space from drift
+- **Cost**: $15/$75 per 1M tokens
 - **Pipeline Stages**: Image Analysis (Stage 6, 8)
+- **Note**: Pre-2026-05-01 the architecture said "Qwen for vision, Claude for validation" — but the configured Qwen endpoint had been 404-ing in 0.7s for months and silently falling through to Claude. The migration made the architecture honest. The HF Qwen endpoint env vars (`QWEN_*`) and `qwen_endpoint_manager.py` were deleted on 2026-05-01.
+
+#### 3a. HuggingFace Endpoint — Chandra v2 (sole OCR engine, post-2026-05-01)
+
+- **Use Cases**: Stage 1.5 page-level OCR + Phase 3 per-image OCR for text-bearing images
+- **Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2; >95% success rate
+- **Failure marker**: `OCRResult.method='chandra_failed'`
+- **Per-attempt metrics**: `chandra_ocr_metrics` table
+- **Replaced**: pytesseract + EasyOCR (both removed entirely 2026-05-01)
 
 #### 4. SLIG (SigLIP2 via HuggingFace Cloud) — updated 2026-04
 
@@ -169,7 +175,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 
 1. **Text Embeddings** (1024D) - Voyage AI voyage-4 (primary)
 2. **Visual Embeddings** (768D) - SigLIP2 via HuggingFace Endpoint
-3. **Understanding Embeddings** (1024D) - Voyage AI from Qwen3-VL structured analysis (enables spec-based search)
+3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search)
 4. **Color Embeddings** (768D) - SigLIP2 color-guided
 5. **Texture Embeddings** (768D) - SigLIP2 texture-guided
 6. **Style Embeddings** (768D) - SigLIP2 style-guided
@@ -232,15 +238,16 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - **Checkpoint**: IMAGES_EXTRACTED
 
 **Stage 9: Image Analysis (AI)**
-- Qwen3-VL 32B Vision: Analyze each image (1-3 seconds)
+- Claude Opus 4.7 vision via Anthropic tool use (3-8s per image, schema-locked via `VisionAnalysis`)
 - Extract material properties
 - Quality scoring (0-100)
 - Classify image type (product, detail, mood, diagram)
+- Per-image OCR via Chandra v2 (text-bearing images only)
 
-**Stage 10: CLIP Embedding Generation (AI)**
-- CLIP ViT-B/32: Generate 512D visual embeddings (50-150ms per image)
-- Store in database for visual search
-- Link to document_images
+**Stage 10: SLIG Embedding Generation (AI)**
+- SLIG (SigLIP2) cloud endpoint: Generate 5× 768D specialized embeddings per image (visual / color / texture / style / material), ~150-400ms per image
+- Voyage AI voyage-4: 1024D understanding embedding from `VisionAnalysis` JSON
+- All halfvec, written directly to VECS collections
 - **Checkpoint**: IMAGE_EMBEDDINGS_GENERATED
 
 **Stage 11: Product Creation (Two-Stage AI)**
@@ -422,7 +429,7 @@ The platform uses **6 embedding types** for comprehensive search:
 8. AI Services (10 endpoints — AI model integration)
 9. Background Jobs (7 endpoints — async job tracking)
 10. Anthropic APIs (3 endpoints — Claude integration)
-11. HuggingFace Endpoint APIs (3 endpoints — Qwen integration)
+11. HuggingFace Endpoint APIs (2 endpoints — SLIG SigLIP2 visual + Chandra v2 OCR; Qwen retired 2026-05-01)
 12. Monitoring Routes (3 endpoints — health checks, metrics)
 13. AI Metrics Routes (2 endpoints — AI performance tracking)
 14. Duplicate Detection (7 endpoints — factory-based duplicate detection + merging)
@@ -541,5 +548,5 @@ The platform uses **6 embedding types** for comprehensive search:
 - ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles
-- ✨ Understanding embeddings — Qwen3-VL analysis → Voyage AI 1024D embedding
+- ✨ Understanding embeddings — Claude Opus 4.7 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding (Qwen path retired 2026-05-01)
 - ✨ B2B web search powered by Anthropic built-in web_search tool

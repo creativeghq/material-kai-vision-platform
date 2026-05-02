@@ -767,7 +767,6 @@ export type Database = {
           output_tokens: number
           product_id: string | null
           raw_cost_usd: number | null
-          total_cost_usd: number
           user_id: string | null
           workspace_id: string | null
         }
@@ -789,7 +788,6 @@ export type Database = {
           output_tokens?: number
           product_id?: string | null
           raw_cost_usd?: number | null
-          total_cost_usd?: number
           user_id?: string | null
           workspace_id?: string | null
         }
@@ -811,7 +809,6 @@ export type Database = {
           output_tokens?: number
           product_id?: string | null
           raw_cost_usd?: number | null
-          total_cost_usd?: number
           user_id?: string | null
           workspace_id?: string | null
         }
@@ -1220,6 +1217,7 @@ export type Database = {
           recovery_attempts: number | null
           recovery_attempts_after_genuine_failure: number
           recovery_history: Json
+          failure_summary: Json | null
           stage_history: Json
           started_at: string | null
           status: string
@@ -1250,6 +1248,7 @@ export type Database = {
           recovery_attempts?: number | null
           recovery_attempts_after_genuine_failure?: number
           recovery_history?: Json
+          failure_summary?: Json | null
           stage_history?: Json
           started_at?: string | null
           status: string
@@ -1280,6 +1279,7 @@ export type Database = {
           recovery_attempts?: number | null
           recovery_attempts_after_genuine_failure?: number
           recovery_history?: Json
+          failure_summary?: Json | null
           stage_history?: Json
           started_at?: string | null
           status?: string
@@ -3281,8 +3281,7 @@ export type Database = {
           duplicate_of: string | null
           embedding_metadata: Json | null
           extracted_metadata: Json | null
-          extraction_layer: string | null
-          extraction_method: string | null
+          extraction_layer: string
           has_color_slig: boolean
           has_material_slig: boolean
           has_slig_embedding: boolean
@@ -3349,8 +3348,7 @@ export type Database = {
           duplicate_of?: string | null
           embedding_metadata?: Json | null
           extracted_metadata?: Json | null
-          extraction_layer?: string | null
-          extraction_method?: string | null
+          extraction_layer?: string
           has_color_slig?: boolean
           has_material_slig?: boolean
           has_slig_embedding?: boolean
@@ -3417,8 +3415,7 @@ export type Database = {
           duplicate_of?: string | null
           embedding_metadata?: Json | null
           extracted_metadata?: Json | null
-          extraction_layer?: string | null
-          extraction_method?: string | null
+          extraction_layer?: string
           has_color_slig?: boolean
           has_material_slig?: boolean
           has_slig_embedding?: boolean
@@ -6107,104 +6104,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      material_visual_analysis: {
-        Row: {
-          analysis_confidence: number | null
-          clip_embedding: unknown
-          clip_model_version: string | null
-          color_description: string | null
-          created_at: string | null
-          created_by: string | null
-          description_embedding: unknown
-          error_message: string | null
-          finish_type: string | null
-          id: string
-          image_dimensions: Json | null
-          llama_analysis_prompt_hash: string | null
-          llama_confidence_score: number | null
-          llama_model_version: string
-          llama_processing_time_ms: number | null
-          material_id: string
-          material_type: string
-          material_type_embedding: unknown
-          pattern_grain: string | null
-          processing_status: string | null
-          reflectivity: string | null
-          source_image_hash: string | null
-          source_image_url: string | null
-          structural_properties: Json | null
-          surface_texture: string | null
-          updated_at: string | null
-          visual_characteristics: string | null
-        }
-        Insert: {
-          analysis_confidence?: number | null
-          clip_embedding?: unknown
-          clip_model_version?: string | null
-          color_description?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description_embedding?: unknown
-          error_message?: string | null
-          finish_type?: string | null
-          id?: string
-          image_dimensions?: Json | null
-          llama_analysis_prompt_hash?: string | null
-          llama_confidence_score?: number | null
-          llama_model_version?: string
-          llama_processing_time_ms?: number | null
-          material_id: string
-          material_type: string
-          material_type_embedding?: unknown
-          pattern_grain?: string | null
-          processing_status?: string | null
-          reflectivity?: string | null
-          source_image_hash?: string | null
-          source_image_url?: string | null
-          structural_properties?: Json | null
-          surface_texture?: string | null
-          updated_at?: string | null
-          visual_characteristics?: string | null
-        }
-        Update: {
-          analysis_confidence?: number | null
-          clip_embedding?: unknown
-          clip_model_version?: string | null
-          color_description?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description_embedding?: unknown
-          error_message?: string | null
-          finish_type?: string | null
-          id?: string
-          image_dimensions?: Json | null
-          llama_analysis_prompt_hash?: string | null
-          llama_confidence_score?: number | null
-          llama_model_version?: string
-          llama_processing_time_ms?: number | null
-          material_id?: string
-          material_type?: string
-          material_type_embedding?: unknown
-          pattern_grain?: string | null
-          processing_status?: string | null
-          reflectivity?: string | null
-          source_image_hash?: string | null
-          source_image_url?: string | null
-          structural_properties?: Json | null
-          surface_texture?: string | null
-          updated_at?: string | null
-          visual_characteristics?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "material_visual_analysis_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "materials_catalog"
             referencedColumns: ["id"]
           },
         ]

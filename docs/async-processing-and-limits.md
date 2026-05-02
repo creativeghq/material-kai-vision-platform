@@ -61,14 +61,17 @@ All methods update the `background_jobs` table in real-time with the current job
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
-| **Qwen Vision Concurrent** | 5 | Fast material classification |
-| **Claude Validation Concurrent** | 2 | Validation for uncertain cases |
+| **Claude Vision Concurrent** | 2 | Vision analysis (post-2026-05-01: schema-locked via tool use) |
+| **SLIG Cloud Concurrent** | 20 | Visual + specialized embeddings |
+| **Chandra v2 Concurrent** | 8 | Page + per-image OCR (retry-with-jitter, 3 attempts) |
 | **Batch Size** | 15 images | Memory optimization |
 
 **Why these limits?**
-- **HuggingFace/Qwen (5)**: HuggingFace Endpoint (Qwen3-VL 32B) → higher concurrency
-- **Claude (2)**: Expensive, rate-limited → lower concurrency
+- **Claude (2)**: vision-via-tool-use is the sole vision path post-2026-05-01; rate-limited → low concurrency
+- **SLIG (20)**: HuggingFace Inference Endpoint with auto-pause → high concurrency
+- **Chandra v2 (8)**: HuggingFace Inference Endpoint; the 3-attempt retry budget multiplies effective load
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
+- **Qwen retired**: pre-2026-05-01 had a "5 Qwen concurrent" gate; the HF Qwen endpoint had been 404-ing for months, falling through to Claude. Gate deleted along with `endpoint_controller.qwen` AdaptiveConcurrency.
 
 ---
 
@@ -198,21 +201,24 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 ### 4. AI Classification Timeouts
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Service**: `QwenEndpointService`, `AIClientService`
+**Service**: `AIClientService` (Anthropic), `chandra_endpoint_manager`, `slig_client`
 
 | Operation | Timeout | Purpose |
 |-----------|---------|---------|
-| **Qwen Vision Request** | 120s | Image classification |
-| **Claude Request** | 120s | Validation |
+| **Claude Vision Request** | 120s | Vision analysis via Anthropic tool use |
+| **Chandra v2 OCR Request** | 60s per attempt × 3 retries | Page + per-image OCR |
+| **SLIG Embedding Request** | 30s | 5× specialized 768D vectors |
 
 ---
 
 ## Rate Limiting
 
-### 1. HuggingFace Endpoint (Qwen3-VL Vision)
+### 1. HuggingFace Endpoints (SLIG SigLIP2 + Chandra v2)
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Service**: `QwenEndpointService`
+**Services**: `slig_client`, `chandra_endpoint_manager`
+
+> **Note (2026-05-01)**: The `QwenEndpointService` and `Settings.qwen_*` are gone. Vision moved to Anthropic Claude Opus 4.7 via tool use; OCR moved to Chandra v2 only.
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
@@ -252,7 +258,7 @@ All three methods use the **SAME** services with **SAME** limits:
 
 **Used by**: PDF, Web Scraping, XML Import
 
-Shared limits across all methods: 5 concurrent HuggingFace Endpoint (Qwen3-VL) requests, 2 concurrent Claude requests, 10 concurrent uploads, classification batch size of 15 images, and CLIP batch size of 20 images.
+Shared limits across all methods (post-2026-05-01): 2 concurrent Claude vision requests, 20 concurrent SLIG embedding requests, 8 concurrent Chandra v2 OCR requests, 10 concurrent uploads, classification batch size of 15 images, SLIG batch size of 20 images.
 
 ---
 
@@ -260,7 +266,7 @@ Shared limits across all methods: 5 concurrent HuggingFace Endpoint (Qwen3-VL) r
 
 **Used by**: PDF, Web Scraping, XML Import
 
-Uses SigLIP2 via the SLIG cloud endpoint (HuggingFace Inference Endpoint, 768D) and generates five specialized 768D embedding types written directly to VECS: `image_slig_embeddings` (visual), `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, and `image_material_embeddings`. Plus an understanding embedding (1024D Voyage AI from Qwen3-VL vision_analysis) → `image_understanding_embeddings`. Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped.
+Uses SigLIP2 via the SLIG cloud endpoint (HuggingFace Inference Endpoint, 768D) and generates five specialized 768D embedding types written directly to VECS: `image_slig_embeddings` (visual), `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, and `image_material_embeddings`. Plus an understanding embedding (1024D Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`) → `image_understanding_embeddings`. Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026-05-01: vision pass migrated from Qwen to Claude Opus 4.7 tool use (Qwen had been silently 404-ing for months).
 
 ---
 
@@ -311,9 +317,11 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 
 | API | Limit | Strategy |
 |-----|-------|----------|
-| **HuggingFace (Qwen3-VL)** | 10 req/min | Semaphore (5 concurrent) |
-| **Claude** | Circuit breaker | Semaphore (2 concurrent) |
-| **OpenAI** | No limit | Batch processing |
+| **HuggingFace (SLIG SigLIP2)** | endpoint auto-pause | Semaphore (20 concurrent) |
+| **HuggingFace (Chandra v2)** | endpoint auto-pause | Semaphore (8 concurrent) + 3-attempt retry-jitter |
+| **Anthropic Claude** | Circuit breaker | Semaphore (2 concurrent — sole vision path) |
+| **Voyage AI** | 429 with Retry-After | Honors header, 2 retries |
+| **OpenAI** | No limit | Batch processing (optional alternatives only) |
 
 ---
 
@@ -336,11 +344,12 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 
 | Limit | PDF | Web | XML |
 |-------|-----|-----|-----|
-| **Qwen Vision** | 5 concurrent | 5 concurrent | 5 concurrent |
-| **Claude Validation** | 2 concurrent | 2 concurrent | 2 concurrent |
+| **Claude Vision (tool use)** | 2 concurrent | 2 concurrent | 2 concurrent |
+| **SLIG Embeddings** | 20 concurrent | 20 concurrent | 20 concurrent |
+| **Chandra v2 OCR** | 8 concurrent | 8 concurrent | 8 concurrent |
 | **Image Classification Batch** | 15 images | 15 images | 15 images |
 | **Image Uploads** | 10 concurrent | 10 concurrent | 10 concurrent |
-| **CLIP Batch** | 20 images | 20 images | 20 images |
+| **SLIG Batch** | 20 images | 20 images | 20 images |
 | **Image Downloads** | N/A | N/A | 5 concurrent |
 | **Product Batch** | N/A | N/A | 10 products |
 | **PDF Workers** | 2 workers | N/A | N/A |
@@ -381,9 +390,9 @@ Always update the `background_jobs` table after each stage with the current prog
 ## Summary
 
 ✅ **All methods fully async**: PDF, Web Scraping, XML Import
-✅ **Same concurrency limits**: 5 HuggingFace/Qwen, 2 Claude, 10 uploads, 20 SLIG
+✅ **Same concurrency limits**: 2 Claude (sole vision path), 20 SLIG, 8 Chandra v2, 10 uploads
 ✅ **Same timeout guards**: 300s discovery, 120s AI, 30s downloads
-✅ **Same rate limiting**: 10 req/min HuggingFace/Qwen, circuit breaker Claude
+✅ **Same rate limiting**: SLIG/Chandra endpoint-paced, circuit breaker on Claude, Voyage 429 with Retry-After
 ✅ **Same shared services**: ImageProcessingService, RealEmbeddingsService, AsyncQueueService
 ✅ **Memory optimized**: Batch processing prevents OOM
 ✅ **Network optimized**: Semaphores prevent congestion

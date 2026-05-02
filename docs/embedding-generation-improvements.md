@@ -157,31 +157,46 @@ The improved method is automatically used in the PDF processing pipeline at **St
 
 The service can also be called directly for reprocessing existing documents. After calling `save_images_and_generate_clips`, inspect the returned dict for `clip_embeddings_generated`, `images_saved`, and `failed_images` counts.
 
-## Understanding Embeddings (Qwen → Voyage AI)
+## Understanding Embeddings (Claude Opus 4.7 vision_analysis → Voyage AI)
 
 ### Overview
 
-Understanding embeddings capture the structured knowledge from Qwen3-VL's vision analysis. Rather than embedding the raw image pixels (which SLIG does), understanding embeddings embed the **semantic description** of what was detected: material types, colors, textures, dimensions, finishes, and OCR text.
+Understanding embeddings capture the structured knowledge from the vision_analysis pass. Rather than embedding the raw image pixels (which SLIG does), understanding embeddings embed the **semantic description** of what was detected: material types, colors, textures, dimensions, finishes, and OCR text.
 
-### How It Works
+### How It Works (post-2026-05-01)
 
-1. **Qwen3-VL Analysis** → Produces structured JSON (`vision_analysis`) with material type, colors, textures, properties, OCR text
-2. **JSON → Text Conversion** → Converts structured fields into descriptive text (e.g., "Material: porcelain tile. Colors: white, grey. Texture: matte. Dimensions: 60x120cm.")
+1. **Claude Opus 4.7 Vision Analysis** (Anthropic tool use) → Produces a `VisionAnalysis` Pydantic payload with material type, colors, textures, properties, OCR-aware fields. Schema-locked via `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`) — no JSON regex recovery needed.
+2. **JSON → Text Conversion** → `serialize_vision_analysis_to_text(VisionAnalysis)` produces a deterministic descriptive string (e.g., `"Material: porcelain tile. Colors: white, grey. Texture: matte. Dimensions: 60x120cm."`)
 3. **Voyage AI Embedding** → Embeds the text via `voyage-4` with `input_type="document"` → 1024D vector
-4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D, HNSW index)
+4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D halfvec, HNSW index)
+
+> **Why the migration matters (2026-05-01)**: Pre-migration, this pipeline read JSON from a Qwen vision endpoint that had been 404-ing for months — every Qwen call had been silently falling through to Anthropic Claude, but with regex-based JSON recovery instead of schema enforcement. The migration to Anthropic tool use locked the schema, so Voyage no longer risks embedding malformed payloads.
+
+### Provenance + Drift Detection
+
+Every understanding-embedding row persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version`). Same on `products.text_embedding_1024_model` / `text_embedding_schema_version`.
+
+The **OpenAI fallback is disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection. Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (fixed audit gap C).
 
 ### Search Flow
 
-1. **Query** → Embedded via Voyage AI with `input_type="query"` → 1024D vector
-2. **VECS Search** → Similarity search against understanding collection
-3. **Score Fusion** → Combined with 6 other embedding scores using weighted fusion
+1. **Query** → Embedded via Voyage AI `voyage-4` with `input_type="query"` → 1024D vector
+2. **VECS Search** → Similarity search against `image_understanding_embeddings`
+3. **Score Fusion** → Combined with 6 other embedding scores (text + 5× SLIG specialized) using weighted fusion (see `docs/search-strategies.md` for weight configurations)
 
-### Pipeline Integration (updated 2026-04)
+### Pipeline Integration (updated 2026-05)
 
-- **Phase 1 image pipeline (inline)**: Generates the understanding embedding directly after Qwen analysis, in the same pass that writes SLIG embeddings to VECS. The former asynchronous "Phase 2 background processor" (`background_image_processor.py`) was deleted in 2026-04 — it was silently broken and produced no output.
+- **Phase 1 image pipeline (inline)**: Generates the understanding embedding directly after Claude vision_analysis, in the same pass that writes SLIG embeddings to VECS. The former asynchronous "Phase 2 background processor" (`background_image_processor.py`) was deleted in 2026-04 — it was silently broken and produced no output.
+- **Backfill endpoint**: `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Claude Opus 4.7 + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
 - **CLIP Job Service**: Generates understanding embedding for images with existing vision_analysis
 - **Regeneration Endpoint**: Includes understanding in embedding regeneration
-- **Backfill Script**: `scripts/backfill_understanding_embeddings.py` for existing images
+
+### Hardening (2026-05-01)
+
+- **Vision schema validation**: rejects malformed payloads before Voyage embeds garbage. With Anthropic tool use this is structurally impossible, but the validator stays as defense in depth.
+- **Voyage 429 explicit handling** with `Retry-After` honoring
+- **Atomic specialized VECS upsert**: writes all 4 SLIG vectors first, then sets flags only for those that landed
+- **`ai_usage_logs` mirror**: retries twice + ERRORs on persistent failure
 
 ### Benefits
 

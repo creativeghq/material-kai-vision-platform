@@ -148,19 +148,20 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 6: AI Classification (70-75%) - URL-BASED PROCESSING      │
-│ Model: Qwen3-VL 17B Vision                                │
+│ Model: Claude Opus 4.7 (Anthropic tool use)                    │
+│ Schema: VisionAnalysis Pydantic + VISION_ANALYSIS_TOOL          │
 │ Process: Download from Supabase URLs → Classify → Delete       │
 │ Output: Material vs non-material classification                │
 │                                                                 │
 │ 🚀 URL-BASED ARCHITECTURE:                                     │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Classify with Qwen Vision (material/non-material)       │
+│   3. Classify with Claude Opus 4.7 (schema-locked tool call)  │
 │   4. Delete from RAM immediately                               │
 │   5. Delete non-material images from Supabase                 │
 │                                                                 │
 │ Memory: ~1-2MB per image (temporary download)                  │
-│ Time: ~2-3 seconds per image                                   │
+│ Time: ~3-8 seconds per image                                   │
 │ Disk: 0 images (everything in RAM)                            │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -183,20 +184,21 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 8: Qwen Vision Analysis (85-90%) - URL-BASED PROCESSING  │
-│ Model: Qwen3-VL 17B Vision                                │
+│ STAGE 8: Vision Analysis (85-90%) - URL-BASED PROCESSING       │
+│ Model: Claude Opus 4.7 (Anthropic tool use)                    │
+│ Schema: VisionAnalysis Pydantic + VISION_ANALYSIS_TOOL          │
 │ Process: Download from Supabase URLs → Analyze → Delete       │
 │ Output: Quality scores, material properties, confidence        │
 │                                                                 │
 │ 🚀 ON-DEMAND DOWNLOAD ARCHITECTURE:                           │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Analyze with Qwen Vision (quality, properties)          │
+│   3. Analyze with Claude Opus 4.7 (schema-locked tool call)   │
 │   4. Delete from RAM immediately                               │
 │   5. Batch cleanup after every 10 images                       │
 │                                                                 │
 │ Memory: ~1-2MB per image (temporary download)                  │
-│ Time: ~3-5 seconds per image                                   │
+│ Time: ~3-8 seconds per image                                   │
 │ Disk: 0 images (everything in RAM)                            │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -391,6 +393,46 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 - Reduced noise in embeddings
 - **Layout-aware chunking** - Respects document structure
 - **Table extraction** - Structured data for product specs
+
+---
+
+### Stage 1.5: Page-Level OCR + Layout Merge (post-2026-05 hardening)
+
+**Purpose**: Run page-level OCR alongside YOLO layout, persist results to `document_layout_analysis`, drive resume-skip logic, and feed canonical page text into chunking.
+
+**Model**: **Chandra v2 (sole OCR engine)** via HuggingFace endpoint, called through `chandra_endpoint_manager.run_inference`.
+
+**Pytesseract + EasyOCR removed entirely (2026-05)** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed) and even when "working" produced bbox-less text that silently degraded layout-merge.
+
+**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+
+**Failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
+
+**Balanced-bracket trimmer** (`_strip_fences_and_junk`): replaces the old `rfind(']')`-based trim that mis-trimmed `']` / `}"]` truncations. Recovers the bbox cleanly in those cases.
+
+**Per-attempt metrics** — `chandra_ocr_metrics` table:
+- `outcome` ∈ {`success`, `success_after_retry`, `failed_prose`, `failed_malformed_json`, `failed_http_error`}
+- `attempt_number`, `temperature`, `latency_ms`
+- `failure_mode_head`, `caller`
+
+**`cache_status` semantics** — written to `analysis_metadata.cache_status` on every `document_layout_analysis` row:
+
+| cache_status | Meaning |
+|--------------|---------|
+| `success` | YOLO + Chandra ran clean and produced text |
+| `yolo_only` | YOLO ran, Chandra produced no text on a non-empty page |
+| `empty_page` | YOLO + Chandra agree the page is empty (no recovery needed) |
+| `ocr_failed` | Chandra's 3 attempts all failed — page should be retried, NOT skipped on resume |
+| `page_failed` | YOLO itself failed — page should be retried |
+
+**Resume-skip query** in `precompute_document_layout` filters out `ocr_failed` + `page_failed` rows, so transient Chandra failures no longer permanently "skip" pages on every subsequent run (was a P1 silent-data-loss bug pre-2026-05).
+
+**Layout-merge config**: `MIN_CONTAINMENT_RATIO=0.30` in `merge_layout` — empirical, document-specific tuning may be needed (P2 follow-up).
+
+**Image extraction bbox normalization**: bbox is now normalized 0..1 in both `pdf_processor.py` extraction paths — fixed a Stage 3 spread-assignment bug that had been treating it as PDF-points (every image was getting mis-assigned to the left page).
+
+**Returns**: A dict with `pages_processed`, `pages_succeeded`, `pages_with_ocr_failure`, `pages_with_yolo_failure`, plus per-page `cache_status` and `chandra_attempts`.
+
 
 **Output**:
 - Focused PDF with product content
@@ -593,13 +635,13 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ### Image OCR Dimension Extraction (inline, updated 2026-04)
 
-**Note (2026-04)**: The former asynchronous "Phase 2 background image processor" (`app/services/images/background_image_processor.py`) was deleted — it called a non-existent `generate_material_embeddings` method and produced no output. Image-text dimension extraction is now handled inline during Phase 1 image processing by `_enrich_product_metadata_from_spec_image()` in the image processing service, using the same regex patterns against Qwen vision output.
+**Note (2026-04)**: The former asynchronous "Phase 2 background image processor" (`app/services/images/background_image_processor.py`) was deleted — it called a non-existent `generate_material_embeddings` method and produced no output. Image-text dimension extraction is now handled inline during Phase 1 image processing by `_enrich_product_metadata_from_spec_image()` in the image processing service, using the same regex patterns against the vision_analysis output.
 
 **Logic**:
 - If `keyword_hits >= 3` → image is a spec table → handled by `_enrich_product_metadata_from_spec_image()` as a spec table
-- If `keyword_hits < 3` → image is a product photo with possible text overlay → regex extraction against Qwen raw output
+- If `keyword_hits < 3` → image is a product photo with possible text overlay → regex extraction against the vision_analysis OCR output
 
-**Regex patterns applied** (same as Stage 4.6 but on Qwen's OCR output):
+**Regex patterns applied** (same as Stage 4.6 but on the per-image OCR output):
 - Size: `(\d+)[xX×](\d+)\s*(?:cm|CM|mm|MM)?`
 - Thickness: near keywords or bare `X.Ymm` pattern
 
@@ -611,7 +653,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 |-------|-------|--------|-----------|-----|
 | Sibling propagation | 4.5 | Sibling product DB | 0.75 | No |
 | Text chunk regex | 4.6 | document_chunks text | 0.65 | No |
-| Image OCR regex | Phase 1 (inline) | Qwen raw_qwen_output | 0.70 | Yes (Qwen) |
+| Image OCR regex | Phase 1 (inline) | Chandra v2 OCR output (`document_images.ocr_text`) | 0.70 | Yes (Chandra v2) |
 
 ---
 
@@ -656,12 +698,14 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Qwen3-VL 17B Vision
+**Model**: Claude Opus 4.7 via Anthropic tool use (post-2026-05-01 — was Qwen3-VL pre-migration, but Qwen had been 404-ing for months and silently falling through to Claude anyway)
+
+**Schema enforcement**: `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`). Tool-use guarantees the response matches the schema, so Voyage's understanding-embedding space stays clean.
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly (no disk I/O)
-3. Classify with Qwen Vision (material vs non-material)
+3. Classify with Claude Opus 4.7 (schema-locked tool call: material vs non-material)
 4. **Delete from RAM immediately**
 5. Delete non-material images from Supabase Storage
 
@@ -674,10 +718,10 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 **Output**: A JSON result with `total_images_classified`, `material_images`, `non_material_images`, `classification_errors`, `non_material_deleted_from_supabase`, `memory_usage`, and `processing_time`.
 
 **Performance Metrics**:
-- Time per image: 2-3 seconds
+- Time per image: 3-8 seconds (Claude Opus tool-use call)
 - Memory per image: ~1-2MB (temporary)
 - Disk usage: 0 images
-- Total time for 249 images: 8-12 minutes
+- Total time for 249 images: 12-30 minutes
 
 ---
 
@@ -717,44 +761,46 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ---
 
-### Stage 8: Qwen Vision Analysis (85-90%) - URL-Based Processing
+### Stage 8: Vision Analysis (85-90%) - URL-Based Processing
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Qwen3-VL 17B Vision
+**Model**: Claude Opus 4.7 via Anthropic tool use (post-2026-05-01)
+
+**Schema enforcement**: `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL`. The tool-use mechanism guarantees schema adherence — eliminates fragile JSON regex recovery, protects Voyage's understanding-embedding space from drift.
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly
-3. Analyze with Qwen Vision (quality, properties)
+3. Analyze with Claude Opus 4.7 (tool call → `VisionAnalysis` payload: quality, material properties, OCR-aware fields)
 4. **Delete from RAM immediately**
 5. **Batch cleanup after every 10 images**
 
 **Why On-Demand Download?**
-- **Qwen Requires Base64**: No URL support (yet)
+- **Anthropic accepts base64**: image content blocks via the SDK
 - **Temporary RAM Usage**: Download → Process → Delete
 - **Batch Cleanup**: Aggressive memory management
 - **Zero Disk Usage**: Everything in RAM
 
-**Output**: A JSON result with `images_analyzed`, `quality_scores_generated`, `material_properties_extracted`, `memory_usage`, and `processing_time`.
+**Output**: A JSON result with `images_analyzed`, `quality_scores_generated`, `material_properties_extracted`, `memory_usage`, and `processing_time`. The per-image payload conforms to the `VisionAnalysis` Pydantic schema.
 
 **Performance Metrics**:
-- Time per image: 3-5 seconds
+- Time per image: 3-8 seconds
 - Memory per image: ~1-2MB (temporary)
 - Disk usage: 0 images
-- Total time for 150 images: 8-12 minutes
-- Success rate: 99%+
+- Total time for 150 images: 15-30 minutes
+- Success rate: 99%+ (schema-locked, malformed payloads are impossible)
 
 ---
 
 ### Stage 6 (alternate): Image Analysis (80-85%) - ASYNC JOB
 
-**Model**: Qwen3-VL 17B Vision
+**Model**: Claude Opus 4.7 via Anthropic tool use
 
 **Process**:
 1. Runs as background job (non-blocking)
-2. Analyze each image for OCR
-3. Extract material properties
+2. Analyze each image for material properties
+3. Extract OCR-aware fields (Phase 3 OCR via Chandra v2 enriches the prompt)
 4. Calculate quality scores
 
 **Output**: A JSON structure per image with `image_id`, `ocr_text`, `materials` (list), `properties` (dict with fields like weight and weave), and `quality_score`.
@@ -834,7 +880,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 3. **CHUNKS_CREATED** - Text chunking complete
 4. **TEXT_EMBEDDINGS_GENERATED** - Text embeddings complete
 5. **IMAGES_EXTRACTED** - Images uploaded to Supabase Storage ✅ UPDATED
-6. **IMAGE_EMBEDDINGS_GENERATED** - SLIG 768D embeddings + Qwen Vision complete ✅ UPDATED
+6. **IMAGE_EMBEDDINGS_GENERATED** - SLIG 768D embeddings + Claude Opus 4.7 vision_analysis (tool use) + Voyage understanding 1024D complete ✅ UPDATED
 7. **PRODUCTS_DETECTED** - Products identified
 8. **PRODUCTS_CREATED** - Product creation complete
 9. **COMPLETED** - All processing complete
@@ -843,7 +889,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
-- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All 5 SLIG embeddings (768D) + Qwen Vision analysis + understanding embedding (1024D Voyage) complete
+- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All 5 SLIG embeddings (768D) + Claude Opus 4.7 vision_analysis (tool use) + understanding embedding (1024D Voyage from VisionAnalysis JSON) complete
 - Recovery uses Supabase URLs for all subsequent processing (no local files needed)
 
 ---
@@ -887,7 +933,7 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 ### Service Layer
 
 **ImageProcessingService** (`app/services/image_processing_service.py`)
-- `classify_images()` - Qwen Vision + Claude validation
+- `classify_images()` - Claude Opus 4.7 via Anthropic tool use (schema-locked)
 - `upload_images_to_storage()` - Upload to Supabase Storage
 - `save_images_and_generate_clips()` - DB save + SLIG 768D embeddings (name retained for backwards compat; writes directly to VECS)
 
@@ -1244,7 +1290,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
   - Regex patterns for WxH cm sizes and Xmm thickness
   - Fills products still missing data after Stage 4.5
   - No AI calls, confidence 0.65, source: "document_text"
-- ✅ **Image OCR Dimension Extraction (inline, updated 2026-04)**: Regex on Qwen vision output
+- ✅ **Image OCR Dimension Extraction (inline, updated 2026-04)**: Regex on Chandra v2 OCR output (`document_images.ocr_text`) — moved from vision-output regex when OCR was decoupled from vision_analysis
   - Runs inline during Phase 1 image processing (no separate Phase 2)
   - Catches dimensions from product photo text overlays
   - Confidence 0.70, source: "image_text"

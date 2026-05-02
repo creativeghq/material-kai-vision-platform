@@ -29,7 +29,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 
 **Defaults Used**:
 - Visual Embeddings: SLIG (SigLIP2) - HuggingFace endpoint (768D)
-- Classification: Qwen3-VL-32B-Instruct - HuggingFace endpoint
+- Classification: Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 attempted Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months and was retired 2026-05-01 — vision is now Anthropic-only.
 - Discovery: Claude Opus 4.7
 - Metadata: Claude
 - Text Embeddings: Voyage AI voyage-4 (1024D) → OpenAI fallback (1024D)
@@ -149,7 +149,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **DEFAULT_AI_CONFIG**:
 - Discovery (Claude Opus): ~$2.50
-- Classification (Qwen + Claude): ~$0.30
+- Classification (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.30
 - Metadata (Claude): ~$0.40
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20
@@ -157,7 +157,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **COST_OPTIMIZED_CONFIG**:
 - Discovery (GPT-4o): ~$0.25
-- Classification (Qwen + Haiku): ~$0.10
+- Classification (Claude Haiku via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.10
 - Metadata (GPT): ~$0.20
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20
@@ -165,7 +165,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **HIGH_ACCURACY_CONFIG**:
 - Discovery (GPT-5): ~$1.00
-- Classification (Qwen + Opus): ~$0.40
+- Classification (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.40
 - Metadata (Claude): ~$0.60
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20

@@ -142,7 +142,7 @@ export interface AIUsageLog {
   model_name: string;
   input_tokens: number;
   output_tokens: number;
-  total_cost_usd: number;
+  billed_cost_usd: number;
   credits_debited: number;
   created_at: string;
 }

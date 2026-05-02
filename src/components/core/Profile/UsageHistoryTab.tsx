@@ -23,7 +23,7 @@ interface UsageLog {
   model_name: string;
   input_tokens: number;
   output_tokens: number;
-  total_cost_usd: number;
+  billed_cost_usd: number;
   credits_debited: number;
 }
 
@@ -182,7 +182,7 @@ export const UsageHistoryTab: React.FC = () => {
                         {log.output_tokens.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        ${log.total_cost_usd.toFixed(6)}
+                        ${log.billed_cost_usd.toFixed(6)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-primary">
                         {log.credits_debited.toFixed(2)}

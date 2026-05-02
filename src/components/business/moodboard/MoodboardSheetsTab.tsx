@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Loader2, Download, ExternalLink, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, FileText, Loader2, Download, ExternalLink, Pencil, Trash2, AlertCircle, RotateCw, Copy, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import {
@@ -19,6 +19,7 @@ import {
   SHEET_TYPE_CREDITS,
 } from '@/services/moodboardSheetsService';
 import { useToast } from '@/hooks/use-toast';
+import { SheetTypePreviewModal } from '@/components/features/sheets/SheetTypePreviewModal';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -33,7 +34,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   annotated_render: 'Render with AI-detected callouts',
   elevation_render_pair: 'Uploaded elevation with dimensions + render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
-  full_deck: 'Multi-page presentation deck assembling other sheets',
+  full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
@@ -49,6 +50,10 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   const [sheets, setSheets] = useState<PresentationSheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [sharedTokenId, setSharedTokenId] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<SheetType | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +64,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
         if (!cancelled) setSheets(list);
       } catch (err) {
         toast({
-          title: 'Could not load sheets',
+          title: 'Could not load tools',
           description: err instanceof Error ? err.message : 'Unknown error',
           variant: 'destructive',
         });
@@ -70,13 +75,21 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
     return () => { cancelled = true; };
   }, [moodboardId, toast]);
 
+  // Step 1 — user picks a sheet type from the dropdown. We open a preview modal
+  // so they can see what the sheet looks like + what the agent will ask for,
+  // BEFORE we send them off to the chat.
+  const openSheetPreview = (sheetType: SheetType) => {
+    setPreviewType(sheetType);
+  };
+
+  // Step 2 — user clicks "Continue with KAI" in the preview modal. Now we
+  // hand off to the agent with a seeded prompt. AgentHub reads `prompt` and
+  // auto-sends once the user is authenticated.
   const launchAgentForSheet = (sheetType: SheetType) => {
-    // Hand off to KAI agent with a context-rich first message that triggers
-    // the generate_presentation_sheet tool.
+    setPreviewType(null);
     const params = new URLSearchParams();
-    params.set('agent', 'kai');
     params.set(
-      'q',
+      'prompt',
       `Create a ${SHEET_TYPE_LABELS[sheetType]} for moodboard ${moodboardId} ("${moodboardTitle}"). ` +
       `Walk me through the steps to gather the inputs, then call generate_presentation_sheet with sheet_type="${sheetType}".`,
     );
@@ -84,7 +97,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   };
 
   const handleDelete = async (sheet: PresentationSheet) => {
-    if (!confirm(`Delete sheet "${sheet.title}"?`)) return;
+    if (!confirm(`Delete "${sheet.title}"? The PDF will be removed too.`)) return;
     setDeletingId(sheet.id);
     try {
       await moodboardSheetsService.remove(sheet.id);
@@ -106,7 +119,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
     else {
       toast({
         title: 'No PDF available',
-        description: 'This sheet has not been rendered yet.',
+        description: 'This one hasn’t been rendered yet — open it in KAI to finish it.',
         variant: 'destructive',
       });
     }
@@ -114,29 +127,89 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
 
   const handleEdit = (sheet: PresentationSheet) => {
     const params = new URLSearchParams();
-    params.set('agent', 'kai');
     params.set(
-      'q',
+      'prompt',
       `Continue editing sheet ${sheet.id} (${SHEET_TYPE_LABELS[sheet.sheet_type]}, "${sheet.title}") on moodboard ${moodboardId}.`,
     );
     navigate(`/agent-hub?${params.toString()}`);
   };
 
+  const handleRetry = async (sheet: PresentationSheet) => {
+    setRetryingId(sheet.id);
+    try {
+      await moodboardSheetsService.retry(sheet.id);
+      const list = await moodboardSheetsService.list(moodboardId);
+      setSheets(list);
+      toast({ title: 'Re-rendered', description: `${sheet.title} is ready.` });
+    } catch (err) {
+      toast({
+        title: 'Retry failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleDuplicate = async (sheet: PresentationSheet) => {
+    setDuplicatingId(sheet.id);
+    try {
+      const dup = await moodboardSheetsService.duplicate(sheet.id);
+      setSheets((arr) => [dup, ...arr]);
+      toast({ title: 'Duplicated', description: `Created "${dup.title}". Open in KAI to render it.` });
+    } catch (err) {
+      toast({
+        title: 'Duplicate failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const handleShare = async (sheet: PresentationSheet) => {
+    try {
+      const { url } = await moodboardSheetsService.share(sheet.id, 30);
+      await navigator.clipboard.writeText(url);
+      setSharedTokenId(sheet.id);
+      setTimeout(() => setSharedTokenId(null), 2500);
+      toast({
+        title: 'Share link copied',
+        description: 'A 30-day public link has been copied to your clipboard.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Could not create share link',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* New Sheet launcher */}
+      <SheetTypePreviewModal
+        open={previewType !== null}
+        sheetType={previewType}
+        onCancel={() => setPreviewType(null)}
+        onContinue={launchAgentForSheet}
+      />
+
+      {/* New Tool launcher */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="text-base font-semibold">Presentation Sheets</h3>
+          <h3 className="text-base font-semibold">Presentation Tools</h3>
           <p className="text-xs text-muted-foreground">
-            Generate client-ready sheets from this moodboard via the KAI agent.
+            Pick a tool to produce a client-ready deliverable from this moodboard. KAI walks you through the inputs.
           </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="rounded-full gap-2">
               <Plus className="h-4 w-4" />
-              New Sheet
+              New Tool
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
@@ -149,7 +222,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
                 {group.types.map((t) => (
                   <DropdownMenuItem
                     key={t}
-                    onClick={() => launchAgentForSheet(t)}
+                    onClick={() => openSheetPreview(t)}
                     className="flex flex-col items-start gap-0.5 py-2"
                   >
                     <div className="flex items-center gap-2 w-full">
@@ -179,9 +252,9 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
       ) : sheets.length === 0 ? (
         <Card className="dashboard-card p-12 text-center space-y-3">
           <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-          <p className="text-sm text-muted-foreground">No sheets generated yet.</p>
+          <p className="text-sm text-muted-foreground">Nothing here yet.</p>
           <p className="text-xs text-muted-foreground">
-            Click <span className="text-foreground">New Sheet</span> above to start.
+            Pick a <span className="text-foreground">New Tool</span> above to produce your first deliverable.
           </p>
         </Card>
       ) : (
@@ -216,18 +289,45 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
                 </div>
               )}
 
-              <div className="flex items-center gap-1 pt-1">
+              <div className="flex items-center gap-0.5 pt-1 flex-wrap">
                 {sheet.status === 'ready' && (
                   <>
-                    <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={() => handleOpenPdf(sheet)}>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={() => handleOpenPdf(sheet)} title="Open PDF">
                       <ExternalLink className="h-3.5 w-3.5" />
                       <span className="text-xs">Open</span>
                     </Button>
+                    <Button
+                      size="sm" variant="ghost" className="h-7 px-2 gap-1"
+                      onClick={() => handleShare(sheet)}
+                      title="Copy a public share link (30 days)"
+                    >
+                      {sharedTokenId === sheet.id ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Share2 className="h-3.5 w-3.5" />}
+                      <span className="text-xs">Share</span>
+                    </Button>
                   </>
                 )}
-                <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={() => handleEdit(sheet)}>
+                {sheet.status === 'failed' && (
+                  <Button
+                    size="sm" variant="ghost" className="h-7 px-2 gap-1"
+                    onClick={() => handleRetry(sheet)}
+                    disabled={retryingId === sheet.id}
+                    title="Retry the render"
+                  >
+                    {retryingId === sheet.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
+                    <span className="text-xs">Retry</span>
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={() => handleEdit(sheet)} title="Open in KAI to edit">
                   <Pencil className="h-3.5 w-3.5" />
                   <span className="text-xs">Edit</span>
+                </Button>
+                <Button
+                  size="sm" variant="ghost" className="h-7 px-2 gap-1"
+                  onClick={() => handleDuplicate(sheet)}
+                  disabled={duplicatingId === sheet.id}
+                  title="Duplicate as a draft"
+                >
+                  {duplicatingId === sheet.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
                 <Button
                   size="sm"
@@ -235,6 +335,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
                   className="h-7 px-2 gap-1 ml-auto text-red-400 hover:text-red-300"
                   onClick={() => handleDelete(sheet)}
                   disabled={deletingId === sheet.id}
+                  title="Delete (PDF removed too)"
                 >
                   {deletingId === sheet.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />

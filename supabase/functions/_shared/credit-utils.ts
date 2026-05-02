@@ -173,7 +173,6 @@ export async function debitExternalServiceCredits(
       raw_cost_usd: rawCost,
       markup_multiplier: pricing.markup_multiplier,
       billed_cost_usd: billedCost,
-      total_cost_usd: billedCost,
       credits_debited: creditsToDebit,
       metadata: {
         ...metadata,

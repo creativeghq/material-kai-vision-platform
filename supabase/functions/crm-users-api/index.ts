@@ -242,8 +242,8 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           total_calls: acc.total_calls + 1,
           total_input_tokens: acc.total_input_tokens + (log.input_tokens || 0),
           total_output_tokens: acc.total_output_tokens + (log.output_tokens || 0),
-          total_raw_cost_usd: acc.total_raw_cost_usd + (parseFloat(log.raw_cost_usd) || parseFloat(log.total_cost_usd) || 0),
-          total_billed_cost_usd: acc.total_billed_cost_usd + (parseFloat(log.billed_cost_usd) || parseFloat(log.total_cost_usd) || 0),
+          total_raw_cost_usd: acc.total_raw_cost_usd + (parseFloat(log.raw_cost_usd) || 0),
+          total_billed_cost_usd: acc.total_billed_cost_usd + (parseFloat(log.billed_cost_usd) || 0),
           total_credits_debited: acc.total_credits_debited + (parseFloat(log.credits_debited) || 0),
         }),
         {
@@ -264,7 +264,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           byModel[model] = { calls: 0, cost: 0, credits: 0 };
         }
         byModel[model].calls += 1;
-        byModel[model].cost += parseFloat(log.billed_cost_usd) || parseFloat(log.total_cost_usd) || 0;
+        byModel[model].cost += parseFloat(log.billed_cost_usd) || 0;
         byModel[model].credits += parseFloat(log.credits_debited) || 0;
       });
 

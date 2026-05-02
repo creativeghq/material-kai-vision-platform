@@ -134,7 +134,6 @@ async function _logEmbeddingUsage(
       output_tokens: 0,
       input_cost_usd: rawCost,
       output_cost_usd: 0,
-      total_cost_usd: rawCost,
       raw_cost_usd: rawCost,
       markup_multiplier: MARKUP_MULTIPLIER,
       billed_cost_usd: billedCost,

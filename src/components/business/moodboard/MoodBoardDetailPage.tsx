@@ -447,7 +447,7 @@ export const MoodBoardDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Tabs: Products grid | Sheets ───────────────────────────────────── */}
+      {/* ── Tabs: Items grid | Tools (presentation-sheet generators) ────────── */}
       <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs defaultValue="products" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
@@ -463,7 +463,7 @@ export const MoodBoardDetailPage: React.FC = () => {
               className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <FileText className="h-4 w-4" />
-              Sheets
+              Tools
             </TabsTrigger>
           </TabsList>
 

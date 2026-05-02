@@ -199,7 +199,6 @@ const TABLES_TO_CLEAR = [
   'material_properties',           // Material properties
   'material_categories',           // Material categories
   'materials_catalog',             // Materials catalog entries
-  'material_visual_analysis',      // Visual analysis results
 
   // ── Processing Results ──────────────────────────────────────────────
   'processing_results',            // Processing results
@@ -246,9 +245,11 @@ const TABLES_TO_CLEAR = [
 // Storage buckets to clear (AI/processing-generated content only)
 //
 // PRESERVED buckets (NOT in this list):
-//   - quote-templates   ← cover.png / backcover.png / items-background.png (admin uploads via system settings)
-//   - profile-avatars   ← user avatar images ({userId}/avatar.ext)
-//   - pdf-documents     ← original uploaded PDF files
+//   - quote-templates              ← cover.png / backcover.png / items-background.png (admin uploads via system settings)
+//   - profile-avatars              ← user avatar images ({userId}/avatar.ext)
+//   - pdf-documents                ← original uploaded PDF files
+//   - moodboard-sheets             ← user-generated presentation sheet PDFs (per-user content; deletion governed by per-row delete, not platform reset)
+//   - moodboard-sheet-references   ← admin-uploaded reference images shown in the sheet preview modal
 // ============================================================
 const BUCKETS_TO_CLEAR = ['pdf-tiles', 'material-images', 'moodboard-images', '3d-renders'];
 

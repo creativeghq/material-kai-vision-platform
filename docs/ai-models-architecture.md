@@ -1,174 +1,197 @@
 # AI Models Architecture - Complete Overview
 
+**Last Updated**: 2026-05-02
+**Status**: Production
+
 ## Executive Summary
 
-MIVAA Platform uses **7 different AI models** across **4 providers** for different purposes:
+MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision is **Anthropic-only** (post-2026-05-01 migration); Qwen has been retired from every vision call site.
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
-| **Google (HuggingFace)** | SigLIP2 ViT-SO400M (SLIG) | Visual embeddings (768D) - Cloud endpoint |
-| **Voyage AI** | voyage-4 | Text embeddings (1024D) - Primary for semantic search |
-| **OpenAI** | GPT-4o, GPT-5 | Chat, product discovery (OpenAI text embeddings retired 2026-04 — Voyage AI is the sole text embedder) |
-| **Anthropic** | Claude Opus 4.7, Claude Haiku 4.5 | Vision analysis, validation, agents |
-| **Qwen (HuggingFace)** | Qwen3-VL-32B-Instruct | Image analysis, OCR, material detection - Cloud endpoint |
+| **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
+| **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
+| **Google (HuggingFace)** | SigLIP2 ViT-SO400M (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
+| **Datalab (HuggingFace)** | Chandra v2 | OCR — sole OCR engine (pytesseract + EasyOCR removed 2026-05) |
+| **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
 ---
 
 ## Complete Model Flow Diagram
 
+```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         PDF UPLOAD & PROCESSING                          │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 1: Product Discovery (BEFORE extraction)                          │
-│ Model: Claude Opus 4.7 OR GPT-5                                        │
-│ Purpose: Identify products, count pages, map image-to-product          │
-│ Input: PDF pages (images)                                              │
-│ Output: Product list with page ranges                                  │
+│ STAGE 0: Product Discovery (BEFORE extraction)                          │
+│ Model: Claude Opus 4.7 OR GPT-5                                         │
+│ Purpose: Identify products, count pages, map image-to-product           │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 2: Image Extraction & OCR Filtering                              │
-│ Model: SLIG (SigLIP2 cloud endpoint, 768D)                             │
-│ Purpose: Filter images - only OCR technical specs, skip lifestyle      │
-│ Input: Extracted images                                                │
-│ Output: Filtered images for OCR processing                             │
+│ STAGE 1.5: Layout + OCR (page-level)                                    │
+│ Model: Chandra v2 (Datalab on HuggingFace)                              │
+│ Purpose: YOLO layout detection + page OCR (3 retries, jittered temps)   │
+│ Failure marker: OCRResult.method='chandra_failed'                       │
+│ Cache status persisted: success/yolo_only/empty_page/ocr_failed         │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 3: Image Analysis (Primary)                                      │
-│ Model: Qwen3-VL-32B-Instruct (HuggingFace Endpoint)                   │
-│ Endpoint: https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud │
-│ Service: mh-qwen332binstruct (namespace: basiliskan)                   │
-│ Purpose: Detailed material analysis, color detection, texture          │
-│ Input: Product images                                                  │
-│ Output: Material properties, colors, textures, quality scores          │
-│ Why: State-of-the-art vision-language model, superior OCR, cloud-based│
+│ STAGE 2: Chunking (text)                                                │
+│ Model: Claude Sonnet 4.6 (default; was Qwen pre-2026-05-01)             │
+│ Setting: Settings.chunking_primary_model = 'claude-sonnet-4-6'          │
+│ Why Sonnet: chunking is at the quality ceiling — Opus would be 5×       │
+│             cost for marginal gain                                      │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 4: Image Analysis (Validation - Optional)                        │
-│ Model: Claude Opus 4.7 Vision                                         │
-│ Purpose: Validate low-quality Qwen results, enrich metadata           │
-│ Input: Images with quality_score < 0.7                                │
-│ Output: Enhanced analysis, validation                                  │
-│ Why: Higher accuracy, better reasoning, used only when needed         │
+│ STAGE 3: Image Classification + Vision Analysis (per image)             │
+│ Model: Claude Opus 4.7 (Anthropic tool use)                             │
+│ Schema: app.models.vision_analysis.VisionAnalysis (Pydantic)            │
+│ Tool:   VISION_ANALYSIS_TOOL                                            │
+│ Why tool use: hard schema adherence — eliminates JSON regex recovery,   │
+│               protects Voyage's understanding-embedding space from drift│
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 5: Visual Embeddings (5 types) - 100% CLOUD                     │
-│ Model: SLIG (SigLIP2 ViT-SO400M) - HuggingFace Endpoint               │
-│ Endpoint: https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud  │
-│ Service: mh-siglip2 (namespace: basiliskan)                           │
-│ Purpose: Generate 5 specialized 768D embeddings per image             │
-│ Types:                                                                 │
-│   1. Visual (general appearance) - image_embedding mode                │
-│   2. Color (color palette) - text_embedding mode                      │
-│   3. Texture (surface patterns) - text_embedding mode                 │
-│   4. Style (design aesthetic) - text_embedding mode                   │
-│   5. Material (material type) - text_embedding mode                   │
-│ Why: Cloud-based, auto-pause enabled, 0GB local RAM, superior quality │
+│ STAGE 3 (Phase 3 OCR): Per-image OCR for text-bearing images            │
+│ Model: Chandra v2 (with retry-with-jitter)                              │
+│ Filter: yolo_crop ∈ {TABLE,TEXT,TITLE,CAPTION} OR                       │
+│         embedded with text_detected=True                                │
+│ Stored on document_images: ocr_text, ocr_blocks, ocr_failed,            │
+│         ocr_attempts, ocr_skipped_reason                                │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 6: Text Embeddings (updated 2026-04)                             │
-│ Model: Voyage AI voyage-4 (sole provider)                           │
-│ Purpose: Generate 1024D embeddings for text chunks                    │
-│ Input: Product descriptions, specifications, chunk text               │
-│ Output: 1024D text embeddings (dict key: text_1024)                   │
-│ Input Types: "document" for indexing, "query" for search             │
-│ Why: Superior quality, optimized for retrieval, $0.06/1M tokens      │
+│ STAGE 5: Visual Embeddings (5 types) — VECS-Only, halfvec               │
+│ Model: SLIG (SigLIP2 ViT-SO400M) via HuggingFace cloud endpoint         │
+│ Purpose: 5 specialized 768D embeddings per image                        │
+│   1. Visual    → image_slig_embeddings    (key: visual_768)             │
+│   2. Color     → image_color_embeddings   (key: color_slig_768)         │
+│   3. Texture   → image_texture_embeddings (key: texture_slig_768)       │
+│   4. Style     → image_style_embeddings   (key: style_slig_768)         │
+│   5. Material  → image_material_embeddings(key: material_slig_768)      │
+│ Plus: Understanding embedding (1024D Voyage) →                          │
+│       image_understanding_embeddings (key: understanding_1024)          │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         STORAGE (Supabase)                              │
-│ - Products table (metadata)                                            │
-│ - VECS Collections (5x 768D visual + 1x 1024D understanding per image)│
-│   • image_slig_embeddings (768D — primary visual, SLIG)               │
-│   • image_color_embeddings (768D — text-guided color SLIG)            │
-│   • image_texture_embeddings (768D — text-guided texture SLIG)        │
-│   • image_material_embeddings (768D — text-guided material SLIG)      │
-│   • image_style_embeddings (768D — text-guided style SLIG)            │
-│   • image_understanding_embeddings (1024D — Voyage from Qwen3-VL)     │
-│ - Chunks table (1024D text embeddings - Voyage AI)                    │
+│ STAGE 5 (parallel): Understanding Embedding (1024D)                     │
+│ Pipeline: VisionAnalysis JSON →                                         │
+│           serialize_vision_analysis_to_text() →                         │
+│           Voyage AI voyage-4 (input_type="document") → 1024D            │
+│ Provenance persisted: embedding_model, schema_version on every row      │
+│ OpenAI fallback: DISABLED for understanding path (drift prevention)     │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    USER SEARCH & AGENT QUERIES                          │
+│ STAGE 6: Text Embeddings                                                │
+│ Model: Voyage AI voyage-4 (sole text embedder; OpenAI retired 2026-04)  │
+│ Output: 1024D vectors, dict key text_1024                               │
+│ Input types: "document" for indexing, "query" for search                │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ SEARCH: Direct Vector DB RAG (Claude 4.5 + Multi-Vector)              │
-│ Models:                                                                │
-│   - Text Embeddings: Voyage AI voyage-4 (1024D)                    │
-│   - Visual Embeddings: 5x SLIG specialized (768D each)               │
-│     • Visual, Color, Texture, Material, Style                        │
-│   - LLM: Claude Opus 4.7 (200K context)                              │
-│ Purpose: Multi-vector search + intelligent synthesis                  │
-│ Why: Direct vector DB queries, no intermediate indexing layer         │
+│                         STORAGE (Supabase + VECS)                       │
+│ - products (text_embedding_1024 + text_embedding_1024_model +           │
+│             text_embedding_schema_version)                              │
+│ - document_images (has_*_slig flags + understanding_embedding_model +   │
+│                    understanding_schema_version + ocr_*)                │
+│ - 6× VECS image collections (5× 768D SLIG + 1× 1024D understanding)     │
+│ - document_chunks (text_embedding_1024 — Voyage)                        │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ AGENTS: Mastra Framework (Agent Hub)                                   │
-│ Models Available:                                                      │
-│   - Claude Opus 4.7 (default for agents)                             │
-│   - Claude Haiku 4.5 (fast responses)                                │
-│   - GPT-5 (advanced reasoning)                                        │
-│   - Qwen3-VL 17B (cost-effective)                               │
-│ Purpose: Conversational AI, material search, recommendations          │
-│ Why: Mastra provides agent orchestration, tool calling                │
+│ SEARCH: 7-vector RAG (Claude Opus 4.7 + Multi-Vector)                   │
+│ Models:                                                                 │
+│   - Text embeddings: Voyage AI voyage-4 (1024D)                         │
+│   - Visual embeddings: 5× SLIG specialized (768D each)                  │
+│   - Understanding: Voyage AI 1024D (from VisionAnalysis JSON)           │
+│   - Synthesis LLM: Claude Opus 4.7 (200K context)                       │
 └─────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ AGENTS: KAI Agent Hub                                                    │
+│ Models Available:                                                       │
+│   - Claude Opus 4.7 (kai default)                                       │
+│   - Claude Haiku 4.5 (demo agent, fast responses)                       │
+│   - GPT-5 (advanced reasoning, optional)                                │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 🔍 Detailed Model Breakdown
 
-### 1. **SLIG (SigLIP2) Cloud Endpoint** 🎯
+### 1. **Claude Opus 4.7 — Vision Analysis (PRIMARY)** 🎨
 
-**File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
+**Files**:
+- `mivaa-pdf-extractor/app/models/vision_analysis.py` — Pydantic schema (`VisionAnalysis` + `VISION_ANALYSIS_TOOL`)
+- `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-**Cloud-Only Architecture** (HuggingFace Inference Endpoint): The SLIG client supports 4 modes — `zero_shot`, `image_embedding`, `text_embedding`, and `similarity`. For general visual embeddings it uses `image_embedding` mode to retrieve a 768D vector. For specialized embeddings (color, texture, material, style), it uses the similarity mode: it obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends the two with weighted averaging before normalizing to a unit vector.
+The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool schema is the `VisionAnalysis` Pydantic model — Anthropic's tool-use enforcement guarantees the response matches the schema, eliminating fragile JSON regex recovery and protecting the understanding-embedding space from drift.
 
-**Benefits**:
-- ✅ No local model loading (faster startup, lower memory)
-- ✅ 768D embeddings (replaces legacy 1152D local SigLIP-SO400M, retired 2026-04)
-- ✅ Automatic endpoint pause/resume (cost control)
-- ✅ Specialized embeddings via similarity mode
+**Used for**:
+- Image classification (material vs non-material)
+- Material analysis (`vision_analysis` JSON for understanding embeddings)
+- Segmentation
+- Stage 4 product validation / enrichment
+- Product discovery (Stage 0, alternative to GPT-5)
+- KAI agent (Mastra)
 
-**Purpose**:
-- Generate 768D visual embeddings for images
-- 5 specialized embeddings per image (visual, color, texture, style, material)
-- Cloud-only architecture: No local model loading, faster startup, lower memory
-
-**Impact on Flow**:
-- ✅ **PDF Processing**: Generates all 5 visual embeddings (65-75% progress)
-- ✅ **Search**: Enables visual similarity search
-- ✅ **Specialized Embeddings**: Text-guided embeddings via similarity mode
-- ✅ **Cost Control**: Automatic endpoint pause/resume
-- ✅ **Metadata Tracking**: Records which model was actually used
-
-**Cost**: Free (Hugging Face)
-**Speed**: 150-400ms per image (SigLIP), 100-300ms (CLIP)
-**Output**: 512D numpy array → normalized → list
+**Cost**: $15.00 per 1M input tokens, $75.00 per 1M output tokens
+**Speed**: 3-8 seconds per image
+**Output**: Schema-locked JSON via tool use
 
 ---
 
-### 2. **Voyage AI voyage-4** 📝 (updated 2026-04)
+### 2. **Claude Sonnet 4.6 — Chunking** ✂️
+
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'` (was `Qwen/Qwen3.6-35B-A3B-FP8` pre-2026-05-01)
+
+Chunking is a text task at the quality ceiling — Opus would be 5× the cost for marginal gain, and Qwen had been silently down for months.
+
+**Cost**: $3.00 per 1M input tokens, $15.00 per 1M output tokens
+**Speed**: 2-4 seconds per chunk batch
+
+---
+
+### 3. **Claude Haiku 4.5** ⚡
+
+**Files**:
+- `supabase/functions/agent-chat/index.ts` (demo agent)
+- `mivaa-pdf-extractor/app/services/integrations/product_identity_service.py` (price-monitoring identity classifier)
+- Various low-stakes classifiers
+
+**Used for**:
+- Demo agent (fast responses)
+- Price-monitoring product-identity classifier (with few-shot from `match_corrections`)
+- Saved-search semantic dedupe
+- Quick validation tasks
+
+**Cost**: $0.80 per 1M input tokens, $4.00 per 1M output tokens
+**Speed**: 1-3 seconds
+
+---
+
+### 4. **Voyage AI voyage-4 — Text & Understanding Embeddings** 📝
 
 **File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
 
-The service calls Voyage AI's embeddings endpoint with the model `voyage-4`. This produces a 1024D text embedding used for chunk indexing, product text, and semantic search. OpenAI `text-embedding-3-small` (1536D) was retired in 2026-04 — Voyage is now the sole text embedder, and the embedding dict key is `text_1024` (previously `text_1536`).
+Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as halfvec in VECS. The dict key is `text_1024` (was `text_1536` under OpenAI text-embedding-3-small, which was retired 2026-04).
 
-**Purpose**:
-- Generate 1024D text embeddings for chunks
-- Text-based semantic search
-- Multimodal search (combine with visual)
+**Two production uses**:
+1. **Chunk + product text embeddings** (`text_embedding_1024`)
+2. **Understanding embeddings**: vision_analysis JSON → `serialize_vision_analysis_to_text()` → voyage-4 with `input_type="document"` → 1024D → `image_understanding_embeddings` collection
 
-**Impact on Flow**:
-- ✅ **PDF Processing**: Embeds all text chunks (Stage 5, 60-70%)
-- ✅ **Search**: Primary text search mechanism
-- ✅ **RAG**: Voyage AI 3.5 for semantic retrieval
+**Provenance** persisted on every row (`embedding_model`, `schema_version`) so the admin UI / backfill cron can detect drift and stale-schema rows. The OpenAI fallback is **disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection.
+
+**Hardening (2026-05-01)**:
+- 429 explicit handling with `Retry-After` honoring
+- `ai_usage_logs` mirror retries twice + ERRORs on persistent failure
+- OpenAI legacy fallback pinned to 1024D (was using caller-provided dimensions arg — legacy 1536D callers would silently store wrong-dim text embeddings)
 
 **Cost**: $0.06 per 1M tokens
 **Speed**: 100-300ms
@@ -176,147 +199,63 @@ The service calls Voyage AI's embeddings endpoint with the model `voyage-4`. Thi
 
 ---
 
-### 3. **Qwen3-VL 17B Vision** 🦙
+### 5. **SLIG (SigLIP2) Cloud Endpoint** 🎯
 
-**File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
+**File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
 
-Requests are sent to the Together AI chat completions endpoint using the `Qwen/Qwen3-VL-8B-Instruct` model. The message structure requires the text prompt to appear **before** the image content block — this ordering is critical for Qwen models. The image is provided as a base64-encoded data URL.
+HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
 
-**Purpose**:
-- **Primary image analysis** for all product images
-- Material identification, color detection, texture analysis
-- Quality scoring, OCR text extraction
-- Cost-effective vision model
+**Output**: 768D specialized embeddings (5 types per image), all halfvec in VECS.
 
-**Impact on Flow**:
-- ✅ **PDF Processing**: Analyzes ALL images (Stage 6, 70-80%)
-- ✅ **Material Detection**: Identifies materials, colors, textures
-- ✅ **Quality Scoring**: Scores image quality (0.0-1.0)
-- ✅ **OCR**: Extracts text from technical diagrams
-- ⚠️ **Validation**: Low scores (<0.7) trigger Claude validation
+**Hardening (2026-05-01)**:
+- 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
+- Atomic specialized VECS upsert: writes all 4 vectors first, then sets flags only for those that landed
 
-**Why Qwen**:
-- 69.4% MMMU score (multimodal understanding)
-- #1 OCR performance among open models
-- Cost-effective ($0.18 per 1M tokens vs Claude $3.00)
-- Fast inference (2-5 seconds)
-
-**Cost**: $0.18 per 1M input tokens, $0.18 per 1M output tokens
-**Speed**: 2-5 seconds per image
-**Output**: JSON with material properties, colors, quality scores
+**Cost**: HuggingFace endpoint with auto-pause
+**Speed**: 150-400ms per image
+**Output**: 768D float16 (halfvec) per type
 
 ---
 
-### 4. **Claude Opus 4.7 Vision** 🎨
+### 6. **Chandra v2 — OCR (sole OCR engine)** 📜
 
-**File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
+**File**: `mivaa-pdf-extractor/app/services/ocr/chandra_endpoint_manager.py`
 
-Uses the Anthropic Python client to call `claude-opus-4-7` with `max_tokens=4096`. The message includes an image block (base64 source, JPEG media type) followed by a text validation prompt.
+**Pytesseract + EasyOCR were removed entirely in 2026-05** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed), and even when "working" it produced bbox-less text that silently degraded layout-merge.
 
-**Purpose**:
-- **Validation** of low-quality Qwen results
-- **Enrichment** of metadata
-- **Product Discovery** (alternative to GPT-5)
-- **Agent responses** (Mastra framework)
+**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
 
-**Impact on Flow**:
-- ✅ **PDF Processing**: Validates images with quality_score < 0.7 (async job)
-- ✅ **Product Discovery**: Identifies products BEFORE extraction (Stage 1)
-- ✅ **Agents**: Powers conversational AI in Agent Hub
-- ❌ **RAG**: Claude 4.5 is now the primary RAG LLM
+**Used for**:
+- Stage 1.5 page-level OCR (with `cache_status` persistence: `success` / `yolo_only` / `empty_page` / `ocr_failed` / `page_failed`)
+- Phase 3 per-image OCR (text-bearing images: yolo_crop ∈ {TABLE, TEXT, TITLE, CAPTION} or embedded with `text_detected=True`)
 
-**Why Claude**:
-- Superior reasoning and accuracy
-- Better at complex material analysis
-- Excellent vision capabilities
-- Used selectively to control costs
+**Failure marker**: `OCRResult.method='chandra_failed'` — consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 
-**Cost**: $15.00 per 1M input tokens, $75.00 per 1M output tokens
-**Speed**: 3-8 seconds per image
-**Output**: JSON with enhanced analysis
+**Per-attempt metrics**: `chandra_ocr_metrics` table — `outcome`, `attempt_number`, `temperature`, `latency_ms`, `failure_mode_head`, `caller`.
+
+**Cost**: HuggingFace endpoint with auto-pause
+**Speed**: 1-3 seconds per page (3 attempts worst-case)
 
 ---
 
-### 5. **GPT-4o / GPT-5** 🤖
+### 7. **GPT-4o / GPT-5 (optional)** 🤖
 
 **Files**:
 - `mivaa-pdf-extractor/app/services/product_discovery_service.py`
-- `mivaa-pdf-extractor/app/services/rag_service.py` (Direct Vector DB)
+- `mivaa-pdf-extractor/app/services/rag_service.py`
 
-GPT-5 is used for product discovery via the OpenAI chat completions endpoint. GPT-4o is available for Direct Vector DB RAG as the synthesis LLM.
+GPT models are available as alternatives to Claude for product discovery and agents. Not used for vision (Anthropic-only post-2026-05-01).
 
-**Purpose**:
-- **Product Discovery**: Alternative to Claude for identifying products
-- ❌ **RAG**: Claude 4.5 is now the primary RAG LLM
-- **Agent**: Available in Agent Hub for advanced reasoning
-
-**Impact on Flow**:
-- ✅ **PDF Processing**: Product discovery (Stage 1, optional)
-- ✅ **Search**: Generates answers from retrieved chunks
-- ✅ **Agents**: Available for user queries
-
-**Cost**: GPT-4o: $2.50/$10.00 per 1M tokens, GPT-5: TBD
+**Cost**: GPT-4o $2.50/$10.00 per 1M tokens, GPT-5 TBD
 **Speed**: 2-6 seconds
-**Output**: Text responses, JSON
 
 ---
 
-### 6. **Claude Haiku 4.5** ⚡
+### 8. **VisionProvider.QWEN enum (legacy)** 🪦
 
-**File**: `src/components/AI/AgentHub.tsx`
+The `VisionProvider.QWEN` enum value is retained **only** so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate. No code path produces new rows with this value. The `qwen_endpoint_manager.py` file, all `Settings.qwen_*` fields, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), the qwen Operations dashboard widgets, and the `endpoint_controller.qwen` AdaptiveConcurrency gate were all deleted on 2026-05-01.
 
-The frontend invokes the `agent-chat` Supabase Edge Function with `model: 'anthropic/claude-haiku-4-20250514'` for fast agent responses.
-
-**Purpose**:
-- **Fast agent responses** in Agent Hub
-- **Quick queries** that don't need Opus's power
-- **Cost optimization** for simple tasks
-
-**Impact on Flow**:
-- ✅ **Agents**: Fast conversational responses
-- ✅ **Simple queries**: Material lookups, basic questions
-
-**Cost**: $0.25 per 1M input tokens, $1.25 per 1M output tokens
-**Speed**: 1-3 seconds
-**Output**: Text responses
-
----
-
-### 7. **Multi-Vector SLIG Embeddings** (Direct Vector DB) 🔗 (updated 2026-04)
-
-**File**: `mivaa-pdf-extractor/app/services/rag_service.py`
-
-The RAG service uses 7 specialized embedding collections for multi-vector search (all halfvec in VECS): `image_slig_embeddings` (visual, 768D), `image_color_embeddings` (768D), `image_texture_embeddings` (768D), `image_style_embeddings` (768D), `image_material_embeddings` (768D), `image_understanding_embeddings` (1024D, Voyage from Qwen3-VL vision_analysis), plus `text` (Voyage AI 3.5 1024D). These are queried in parallel for maximum retrieval accuracy. Legacy 1152D SigLIP-SO400M and CLIP 512D collections were dropped 2026-04.
-
-**Purpose**:
-- **Multi-vector semantic search** across 6 specialized dimensions
-- **Direct vector DB queries** (no intermediate indexing)
-- **Parallel search** for maximum accuracy
-
-**Impact on Flow**:
-- ✅ **Search**: 6-way parallel vector search with intelligent fusion
-- ✅ **PDF Processing**: SigLIP for visual embeddings
-
-**Cost**: ~$0.001 per query (Voyage AI)
-**Speed**: 300-500ms (parallel execution)
-**Output**: 6 different embedding types
-
----
-
-### 8. **~~Stable Diffusion / FLUX~~ (REMOVED)** ❌
-
-**Status**: REMOVED - AI-powered image generation has been removed from the platform
-
-**Previously Used For**:
-- ~~3D material visualization~~
-- ~~Interior design generation~~
-- ~~Material texture generation~~
-
-**Replacement**: Manual 3D designer at `/designer` route using React Three Fiber
-
-**Cost**: Varies by provider
-**Speed**: 5-30 seconds
-**Output**: Generated images
+The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy.
 
 ---
 
@@ -324,11 +263,20 @@ The RAG service uses 7 specialized embedding collections for multi-vector search
 
 ### PDF Processing Pipeline
 
-Product Discovery (Stage 1): Default model is Claude Opus 4.7, with GPT-5 as an alternative. OCR Filtering (Stage 2) uses SLIG (SigLIP2 cloud) zero-shot classification. Image Analysis (Stage 6) uses Qwen3-VL 17B Vision for all images, with Claude Opus 4.7 used for validation when quality_score < 0.7. Visual Embeddings (Stages 7-10) use SLIG (SigLIP2 via HuggingFace cloud endpoint, 768D). Text Embeddings (Stage 5) use Voyage AI voyage-4 (1024D) as the only model — OpenAI text-embedding-3-small was retired in 2026-04.
+| Stage | Default Model | Alternative |
+|-------|---------------|-------------|
+| 0 — Product Discovery | Claude Opus 4.7 | GPT-5 |
+| 1.5 — Layout + Page OCR | YOLO + Chandra v2 | — |
+| 2 — Chunking | Claude Sonnet 4.6 | — |
+| 3 — Vision Analysis | Claude Opus 4.7 (tool use) | — |
+| 3 — Phase 3 OCR | Chandra v2 | — |
+| 5 — Visual Embeddings | SLIG (SigLIP2, 5×768D) | — |
+| 5 — Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
+| 6 — Text Embeddings | Voyage AI voyage-4 (1024D) | — |
 
 ### Search & Agents
 
-Direct Vector DB RAG uses Voyage AI voyage-4 (1024D) for text embeddings, 5x SLIG specialized 768D embeddings + 1x Voyage understanding 1024D embedding for multi-vector visual search, and Claude Opus 4.7 (200K context) for synthesis. The Agent Hub (Mastra) supports Claude Opus 4.7 as default, Claude Haiku 4.5 for fast responses, GPT-5 for advanced reasoning, and Qwen3-VL 17B as a cost-effective option.
+7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 4.7 for synthesis. The KAI Agent Hub supports Claude Opus 4.7 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
 
 ---
 
@@ -339,67 +287,66 @@ Direct Vector DB RAG uses Voyage AI voyage-4 (1024D) for text embeddings, 5x SLI
 | Model | Usage | Cost |
 |-------|-------|------|
 | **Claude Opus 4.7** | Product discovery (1 call) | ~$0.25 |
-| **SigLIP** | OCR filtering (50 images) | $0.00 (free) |
-| **Qwen3-VL** | Image analysis (50 images) | ~$0.02 |
-| **Claude Opus 4.7** | Validation (10 low-quality) | ~$0.75 |
-| **SigLIP** | Visual embeddings (250 total) | $0.00 (free) |
-| **OpenAI Embeddings** | Text chunks (500 chunks) | ~$0.01 |
-| **TOTAL** | Per PDF | **~$0.23** |
+| **Chandra v2** | Stage 1.5 page OCR (100 pages × ~1.5 retry avg) | endpoint |
+| **Claude Sonnet 4.6** | Chunking (~500 chunks) | ~$0.10 |
+| **Claude Opus 4.7** | Vision analysis (50 images, tool use) | ~$0.40 |
+| **Chandra v2** | Phase 3 per-image OCR (text-bearing only) | endpoint |
+| **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |
+| **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.01 |
+| **TOTAL** | Per PDF | **~$0.76** |
+
+Cost moved up vs the pre-migration estimate ($0.23) because Claude Opus is 75× the per-image cost of the (broken) Qwen pricing — but every Qwen call had been silently 404-ing and falling through to Claude anyway, so this just makes the bill match reality.
 
 ### Per Search Query
 
 | Model | Usage | Cost |
 |-------|-------|------|
-| **Voyage AI 3.5** | Query embedding | ~$0.001 |
-| **Multi-Vector CLIP** | 6-way parallel search | $0.00 |
-| **Claude 4.5** | Answer synthesis | ~$0.02 |
-| **TOTAL** | Per query | **~$0.01** |
+| **Voyage AI voyage-4** | Query embedding | ~$0.001 |
+| **SLIG + Voyage** | 7-way parallel search | endpoint |
+| **Claude Opus 4.7** | Answer synthesis | ~$0.02 |
+| **TOTAL** | Per query | **~$0.02** |
 
 ---
 
 ## 🎯 Why This Architecture?
 
-### 1. **Cost Optimization**
-- Qwen3-VL for bulk image analysis (cheap)
-- Claude only for validation (selective)
-- SigLIP for embeddings (free)
+### 1. **Schema integrity for understanding embeddings**
+Anthropic tool use guarantees the `VisionAnalysis` payload matches the Pydantic schema, so Voyage doesn't embed garbage. Provenance fields (`embedding_model`, `schema_version`) persist on every row so drift is detectable.
 
-### 2. **Quality Optimization**
-- SigLIP: +19-29% accuracy over CLIP
-- Claude: Best-in-class vision for validation
-- Qwen: 69.4% MMMU, excellent OCR
+### 2. **Honest pricing**
+Pre-2026-05-01 the documented architecture said "Qwen for cheap bulk vision, Claude for validation" — but Qwen had been 404-ing for months. The platform was 100% Claude vision and the bill reflected it. The migration aligned the docs with reality.
 
-### 3. **Speed Optimization**
-- Qwen: Fast inference (2-5s)
-- SigLIP: Fast embeddings (150-400ms)
-- Parallel processing where possible
+### 3. **OCR reliability**
+Chandra v2 with retry-with-jitter has >95% success rate. Pytesseract + EasyOCR were removed because pytesseract had been broken on production (TESSDATA_PREFIX unset) and even when working produced bbox-less text that silently degraded layout-merge.
 
-### 4. **Compatibility**
-- Direct Vector DB: Multi-vector CLIP for specialized search
-- Mastra: Support multiple agent models
-- OpenAI: Industry standard embeddings
+### 4. **VECS-only embeddings**
+No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, all halfvec for 50% storage savings vs full-precision vector. Boolean presence flags on `document_images` give O(1) presence checks.
 
 ---
 
 ## 📈 Performance Metrics
 
-| Metric | Before (CLIP) | After (SigLIP) | Improvement |
-|--------|---------------|----------------|-------------|
-| **Visual Search Accuracy** | 70-75% | 89-94% | +19-29% |
-| **Embedding Generation** | 100-300ms | 150-400ms | Acceptable |
-| **Model Size** | 350MB | 1.5GB | Larger but worth it |
-| **Cost** | $0.00 | $0.00 | Same (free) |
+| Metric | Pre-2026-05-01 | Post-Migration |
+|--------|----------------|----------------|
+| **Vision schema integrity** | JSON regex recovery (best effort) | Tool-use schema guarantee |
+| **Vision actual cost** | "Qwen $0.18/1M" (false — 404→Claude fallback) | Claude $15/$75 per 1M (honest) |
+| **OCR success rate** | ~60% (pytesseract broken in prod) | >95% (Chandra v2 jittered retry) |
+| **Voyage drift detection** | None | `embedding_model` + `schema_version` on every row |
+| **VECS storage** | 50% saved by halfvec migration | (same) |
 
 ---
 
 ## 🔮 Future Considerations
 
-1. **Regenerate Existing Embeddings**: Batch job to upgrade CLIP → SigLIP
-2. **Monitor Qwen Quality**: Track validation rate (should be <20%)
-3. **A/B Test Models**: Compare Claude vs GPT-5 for product discovery
-4. **Add More Agents**: Expand Mastra agent capabilities
+1. **Voyage `voyage-multimodal-3`** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. Watch for general availability.
+2. **Schema versioning** — the `schema_version` field is in place; bumps will trigger backfill via `POST /admin/understanding-embeddings/backfill`.
+3. **Chandra v3** — Datalab continues to ship improvements; the retry-with-jitter loop should adapt.
 
 ---
 
-**Last Updated**: 2025-01-17
-**Status**: ✅ Production Ready
+## 📚 Related Documentation
+
+- [PDF Processing Pipeline](./pdf-processing-pipeline.md)
+- [Embedding Generation Improvements](./embedding-generation-improvements.md)
+- [AI Models Complete List](./ai-models-complete-list.md)
+- [AI Models Guide](./ai-models-guide.md)

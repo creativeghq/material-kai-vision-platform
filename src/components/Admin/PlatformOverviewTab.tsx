@@ -540,7 +540,7 @@ export function PlatformOverviewTab() {
         Promise.all([
           supabase.from('credit_transactions').select('amount,transaction_type,created_at').gte('created_at', ago12.toISOString()).limit(5000),
           supabase.from('user_credits').select('balance'),
-          supabase.from('ai_usage_logs').select('model_name,operation_type,total_cost_usd,credits_debited,user_id,created_at').gte('created_at', ago12.toISOString()).limit(10000),
+          supabase.from('ai_usage_logs').select('model_name,operation_type,billed_cost_usd,credits_debited,user_id,created_at').gte('created_at', ago12.toISOString()).limit(10000),
         ]),
         // KB health
         Promise.all([
@@ -639,9 +639,9 @@ export function PlatformOverviewTab() {
         const userMap = new Map<string, { credits: number; ops: Map<string, number> }>();
         (aiLogs ?? []).forEach((l: any) => {
           const m = (l.model_name ?? 'unknown').replace('claude-', 'Claude ').replace('gpt-', 'GPT-');
-          const e = modelMap.get(m) ?? { credits: 0, cost: 0 }; e.credits += l.credits_debited ?? 0; e.cost += l.total_cost_usd ?? 0; modelMap.set(m, e);
+          const e = modelMap.get(m) ?? { credits: 0, cost: 0 }; e.credits += l.credits_debited ?? 0; e.cost += l.billed_cost_usd ?? 0; modelMap.set(m, e);
           const op = l.operation_type ?? 'unknown'; opMap.set(op, (opMap.get(op) ?? 0) + (l.credits_debited ?? 0));
-          const wk = weekLabel(new Date(l.created_at)); if (costWkMap.has(wk)) { costWkMap.get(wk)!.cost += l.total_cost_usd ?? 0; costWkMap.get(wk)!.credits += l.credits_debited ?? 0; }
+          const wk = weekLabel(new Date(l.created_at)); if (costWkMap.has(wk)) { costWkMap.get(wk)!.cost += l.billed_cost_usd ?? 0; costWkMap.get(wk)!.credits += l.credits_debited ?? 0; }
           const uid = l.user_id; if (uid) { const ue = userMap.get(uid) ?? { credits: 0, ops: new Map() }; ue.credits += l.credits_debited ?? 0; ue.ops.set(op, (ue.ops.get(op) ?? 0) + 1); userMap.set(uid, ue); }
         });
         setAiModelCosts(Array.from(modelMap.entries()).sort((a, b) => b[1].credits - a[1].credits).slice(0, 8).map(([model, d]) => ({ model, credits: d.credits, cost: +d.cost.toFixed(2) })));

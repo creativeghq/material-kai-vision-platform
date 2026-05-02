@@ -64,10 +64,10 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for text embeddings | `pa-xxxxxxxxxxxxxxxx` |
-| `QWEN_ENDPOINT_URL` | Public | Server ENV | Qwen HF endpoint URL | `https://lv7trhkha3b5757r.us-east-1.aws.endpoints.huggingface.cloud` |
-| `QWEN_ENDPOINT_NAME` | Public | Server ENV | Qwen endpoint service name | `qwen3-6-35b-fp8` |
-| `QWEN_NAMESPACE` | Public | Server ENV | Qwen endpoint namespace | `basiliskan` |
-| `QWEN_MODEL` | Public | Server ENV | Qwen model id served by the endpoint — **must match `/v1/models` response or vLLM 404s** | `Qwen/Qwen3.6-35B-A3B-FP8` |
+| ~~`QWEN_ENDPOINT_URL`~~ | — | **DEPRECATED 2026-05-01** | The Qwen HF endpoint is no longer wired — vision moved to Anthropic Claude Opus 4.7 via tool use. Safe to remove from systemd unit at next deploy. | — |
+| ~~`QWEN_ENDPOINT_NAME`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
+| ~~`QWEN_NAMESPACE`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
+| ~~`QWEN_MODEL`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
 | `YOLO_ENDPOINT_URL` | Public | Server ENV | YOLO HF endpoint URL | `https://f763mkb5o68lmwtu.us-east-1.aws.endpoints.huggingface.cloud` |
 | `YOLO_ENDPOINT_NAME` | Public | Server ENV | YOLO endpoint service name | `mh-yolo` |
 | `YOLO_NAMESPACE` | Public | Server ENV | YOLO endpoint namespace | `basiliskan` |
@@ -78,7 +78,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token (usually same as `HUGGING_FACE_ACCESS_TOKEN`) | `hf_xxxxxxxxxxxxxxxx` |
 | `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-slig` |
 | `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
-| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | Single HF token used for ALL four endpoints (Qwen / YOLO / Chandra / SLIG resume + inference) — get from https://huggingface.co/settings/tokens | `hf_xxxxxxxxxxxxxxxx` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | Single HF token used for the active endpoints (YOLO / Chandra v2 / SLIG resume + inference) — get from https://huggingface.co/settings/tokens. Qwen retired 2026-05-01. | `hf_xxxxxxxxxxxxxxxx` |
 | `MAX_CONCURRENT_PRODUCTS` | Public | Server ENV | How many products process in parallel inside one PDF job. **Set to `1` on a 4 GB droplet** (anything higher hits cgroup MemoryHigh). Bump to 2-3 on 8 GB+ | `1` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
@@ -89,15 +89,15 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
 | `VISION_GUIDED_ENABLED` | Public | Server ENV | Enable Vision AI Layer 3 for image extraction | `false` (default), `true` |
 | `VISION_GUIDED_PROVIDER` | Public | Server ENV | Vision AI provider (uses existing API keys) | `anthropic`, `openai`, `together` |
-| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-opus-4-7`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
+| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis (post-2026-05-01: Anthropic-only) | `claude-opus-4-7` (default + recommended) |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 | `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR v2 Inference Endpoint URL (defaults to live v2 endpoint, env override optional) | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` |
 | `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra OCR v2 Inference Endpoint name for pause/resume | `chandra-ocr-2` (default) |
 | `CHANDRA_NAMESPACE` | Public | Server ENV | HuggingFace namespace/username for endpoint management | `basiliskan` (default) |
-| `CHANDRA_ENABLED` | Public | Server ENV | Enable Chandra OCR fallback when EasyOCR confidence is low | `true` (default), `false` |
-| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | Server ENV | EasyOCR confidence threshold - use Chandra if below this value | `0.7` (default, range: 0.0-1.0) |
+| `CHANDRA_ENABLED` | Public | Server ENV | Enable Chandra v2 OCR (sole OCR engine post-2026-05-01) | `true` (default), `false` |
+| ~~`CHANDRA_CONFIDENCE_THRESHOLD`~~ | — | **DEPRECATED 2026-05-01** | Was the threshold below which Chandra ran in addition to EasyOCR. EasyOCR + pytesseract were removed entirely 2026-05-01; Chandra v2 is now the sole OCR engine and runs on every page/image. | — |
 | `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | Server ENV | Seconds of idle time before auto-pausing endpoint (prevents billing) | `60` (default) |
 | `CHANDRA_MAX_RESUME_RETRIES` | Public | Server ENV | Maximum retry attempts for resuming endpoint | `3` (default) |
 | `CHANDRA_RESUME_TIMEOUT` | Public | Server ENV | Timeout in seconds for endpoint resume operation | `300` (default, 5 minutes) |
@@ -139,7 +139,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | **Later.com** | `LATE_API_KEY` | Edge Functions (`late-analytics`, `late-oauth`, `late-publish`, social background agents) | https://app.later.com/ → Settings → API | Social media scheduling |
 | **Later.com** | `LATE_WEBHOOK_SECRET` | Edge Functions (`late-webhook-handler`) | Later.com webhook settings | HMAC-SHA256 signature verification |
 | **HuggingFace** | `HF_TOKEN` | Backend (Chandra, YOLO endpoint management) | https://huggingface.co/settings/tokens — needs **write** permission | Inference Endpoints pause/resume — auto-pause enabled |
-| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. Qwen / YOLO / Chandra all read `HUGGING_FACE_ACCESS_TOKEN` directly — no per-endpoint token vars needed. |
+| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. YOLO and Chandra v2 read `HUGGING_FACE_ACCESS_TOKEN` directly — no per-endpoint token vars needed. (Qwen retired 2026-05-01.) |
 | **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | Set as GitHub repo secret — same value as `HF_TOKEN` |
 | **HuggingFace** | `HUGGINGFACE_API_KEY` | Edge Functions (`health-check`) | https://huggingface.co/settings/tokens | Health status checks — same token, different name |
 
@@ -147,13 +147,9 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 
 The platform uses HuggingFace Inference Endpoints for vision models and visual embeddings:
 
-**Qwen Vision Endpoint** (current — renamed 2026-04-29 from `mh-qwen332binstruct` after the 4×T4 cluster was replaced with a single A100 hosting `Qwen/Qwen3.6-35B-A3B-FP8`):
-- **URL**: `https://lv7trhkha3b5757r.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `qwen3-6-35b-fp8`
-- **Namespace**: `basiliskan`
-- **Model id (vLLM)**: `Qwen/Qwen3.6-35B-A3B-FP8` ← **must match what `/v1/models` returns or every request 404s**
-- **Instance**: 1 × nvidia-a100, vLLM v0.18.1, FP8 quantization
-- **Auto-pause**: Enabled (paused state when idle, resumed on first request)
+**~~Qwen Vision Endpoint~~ — RETIRED 2026-05-01:**
+
+The Qwen HuggingFace endpoint was deleted from the active platform on 2026-05-01. A 2026-05-01 audit discovered that the configured endpoint had been serving `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) while every vision call site asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s for months and silently falling through to Anthropic Claude. Vision is now Anthropic-only; segmentation, image classification, vision_analysis, and material analysis all run on `claude-opus-4-7` via Anthropic tool use (`VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL`). The `qwen_endpoint_manager.py` file, all `Settings.qwen_*` fields, qwen warmup, qwen pricing entries, and the `endpoint_controller.qwen` AdaptiveConcurrency gate are all deleted. The HF Qwen endpoint env vars on the systemd unit (`QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `QWEN_MODEL`) can be deleted at the next deploy.
 
 **SLIG (SigLIP2) Endpoint:**
 - **URL**: `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud`
@@ -174,17 +170,16 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 **Required GitHub Secrets** (the deploy workflow writes them as systemd `Environment=` lines into `mivaa-pdf-extractor.service` on every deploy — see `.github/workflows/deploy.yml` lines 793-823):
 
 ```
-HUGGING_FACE_ACCESS_TOKEN  ← single token used for all 4 endpoints
-QWEN_ENDPOINT_URL          QWEN_ENDPOINT_NAME      QWEN_NAMESPACE      QWEN_MODEL
+HUGGING_FACE_ACCESS_TOKEN  ← single token used for the active endpoints
 YOLO_ENDPOINT_URL          YOLO_ENDPOINT_NAME      YOLO_NAMESPACE
 CHANDRA_ENDPOINT_URL       CHANDRA_ENDPOINT_NAME   CHANDRA_NAMESPACE
 SLIG_ENDPOINT_URL          SLIG_ENDPOINT_NAME      SLIG_NAMESPACE      SLIG_ENDPOINT_TOKEN
 MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 ```
 
-> When you rename or replace an endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain like `lv7trhkha3b5757r…`), update the corresponding `*_ENDPOINT_URL` and `*_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. The next push rewrites the systemd unit with the new values. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values, making config drift hard to debug. The drop-in `qwen-endpoint.conf` was used as an emergency override on 2026-04-29; remove it once the GH Secrets are populated.
+> **Removed 2026-05-01**: `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `QWEN_MODEL`. The Qwen HF endpoint had been silently 404-ing for months; vision migrated to Anthropic Claude Opus 4.7 via tool use. Delete these GitHub Secrets and the matching systemd `Environment=` lines at the next deploy, plus the `/etc/systemd/system/mivaa-pdf-extractor.service.d/qwen-endpoint.conf` drop-in if it still exists.
 
-> **vLLM model-name rule**: the `model` field in every chat-completion request body must equal what the endpoint's `/v1/models` route returns. Mismatch → 404 from the inference engine, not from HF. Health checks + image classification + spec extraction all post this field — if you swap the endpoint to a different repo, update `QWEN_MODEL` to match.
+> When you rename or replace an active endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain like `lv7trhkha3b5757r…`), update the corresponding `*_ENDPOINT_URL` and `*_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. The next push rewrites the systemd unit with the new values. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values, making config drift hard to debug.
 
 **Benefits:**
 - ✅ Auto-pause reduces costs during inactivity
@@ -649,7 +644,7 @@ All MIVAA service endpoints are available at:
 
 **Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, OpenAI and Anthropic API keys, Voyage AI key, Qwen and SLIG endpoint URLs, tokens, names, and namespaces). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal.
+The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, SLIG / YOLO / Chandra v2 endpoint URLs, tokens, names, and namespaces; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note (2026-05-01)**: `QWEN_*` env lines on the unit can be deleted at the next deploy — they're no longer read by the app.
 
 ### 🚀 Deployment Process
 
@@ -774,8 +769,9 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Web Framework**: FastAPI with Uvicorn ASGI server
 - **Database**: Supabase PostgreSQL with vector extensions
 - **AI Integration**: OpenAI, Anthropic, Voyage AI, HuggingFace Inference Endpoints
-- **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint (768D)
-- **Vision Models**: Qwen3-VL-32B-Instruct via HuggingFace Endpoint
+- **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint (768D, 5 specialized types)
+- **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked) — Qwen retired 2026-05-01
+- **OCR**: Chandra v2 via HuggingFace Endpoint (sole OCR engine post-2026-05-01; pytesseract + EasyOCR removed)
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
 
@@ -1266,16 +1262,17 @@ This section covers all third-party services used by the platform, their pricing
 
 ### 🤗 HuggingFace Inference Endpoints
 
-**Role**: GPU-accelerated vision models (Qwen3-VL, SigLIP2) and Chandra OCR.
+**Role**: GPU-accelerated visual embeddings (SigLIP2) and OCR (Chandra v2). Vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
 
 **Dashboard**: https://ui.endpoints.huggingface.co
 **Pricing**: https://huggingface.co/pricing
 
 | Endpoint | Instance | Rate | Auto-pause |
 |----------|----------|------|-----------|
-| Qwen3-VL-32B (Qwen analysis) | GPU (A100) | ~$3-5/hour | Yes (15 min idle) |
 | SigLIP2 (SLIG visual embeddings) | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
 | Chandra OCR v2 (`chandra-ocr-2.Q8_0.gguf`) | GPU (T4) | ~$0.50/hour | Yes (60 sec idle) |
+| YOLO DocParser | GPU (T4) | ~$0.50/hour | Yes (15 min idle) |
+| ~~Qwen3-VL-32B~~ | ~~GPU (A100)~~ | — | **DELETED 2026-05-01** — vision via Anthropic Claude Opus 4.7 |
 
 **Cost control**: All endpoints use auto-pause — billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
 

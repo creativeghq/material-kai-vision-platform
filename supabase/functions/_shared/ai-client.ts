@@ -102,7 +102,6 @@ async function _logTrackedCall(opts: {
       raw_cost_usd: rawCost,
       billed_cost_usd: billedCost,
       markup_multiplier: _MARKUP,
-      total_cost_usd: billedCost,
       input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * _MARKUP : 0,
       output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * _MARKUP : 0,
     });

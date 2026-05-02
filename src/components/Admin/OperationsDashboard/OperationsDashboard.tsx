@@ -61,6 +61,7 @@ import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
 import { PriceLookupsCard } from './PriceLookupsCard';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
+import { StorageAuditPanel } from '../StorageAuditPanel';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 
@@ -402,7 +403,7 @@ const OperationsDashboardInner: React.FC = () => {
           model_name: row.model_name,
           input_tokens: row.input_tokens || 0,
           output_tokens: row.output_tokens || 0,
-          total_cost_usd: row.billed_cost_usd || 0,
+          billed_cost_usd: row.billed_cost_usd || 0,
           credits_debited: row.credits_debited || 0,
           created_at: row.created_at,
         }));
@@ -445,7 +446,7 @@ const OperationsDashboardInner: React.FC = () => {
           }
 
           modelStats[model].call_count++;
-          modelStats[model].total_cost += Number(log.total_cost_usd || 0);
+          modelStats[model].total_cost += Number(log.billed_cost_usd || 0);
           modelStats[model].total_input_tokens += Number(log.input_tokens || 0);
           modelStats[model].total_output_tokens += Number(log.output_tokens || 0);
           modelStats[model].total_tokens += Number(log.input_tokens || 0) + Number(log.output_tokens || 0);
@@ -758,7 +759,7 @@ const OperationsDashboardInner: React.FC = () => {
     ];
     supabase
       .from('ai_usage_logs')
-      .select('model_name, total_cost_usd')
+      .select('model_name, billed_cost_usd')
       .in('model_name', SERVICE_KEYS)
       .then(({ data }) => {
         if (!data) return;
@@ -767,7 +768,7 @@ const OperationsDashboardInner: React.FC = () => {
           const key = row.model_name;
           if (!totals[key]) totals[key] = { operations: 0, cost_usd: 0 };
           totals[key].operations += 1;
-          totals[key].cost_usd += Number(row.total_cost_usd) || 0;
+          totals[key].cost_usd += Number(row.billed_cost_usd) || 0;
         });
         setSvcAllTimeTotals(totals);
       });
@@ -838,6 +839,8 @@ const OperationsDashboardInner: React.FC = () => {
           {/* System Health Tab */}
           <TabsContent value="system-health" className="space-y-4">
             <SystemHealthMonitor />
+            {/* Storage audit — orphan objects per bucket + run cleanup, across all buckets (PDFs, images, sheets, quotes, etc.) */}
+            <StorageAuditPanel />
           </TabsContent>
 
           {/* Agent Chat Analytics Tab */}
@@ -1709,7 +1712,7 @@ const OperationsDashboardInner: React.FC = () => {
                     <div className="text-sm text-muted-foreground font-medium">Total AI Cost</div>
                     <div className="text-2xl font-bold text-foreground">
                       ${(
-                        aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0) +
+                        aiUsageLogs.reduce((sum, log) => sum + (Number(log.billed_cost_usd) || 0), 0) +
                         interiorDesignStats.total_cost
                       ).toFixed(2)}
                     </div>

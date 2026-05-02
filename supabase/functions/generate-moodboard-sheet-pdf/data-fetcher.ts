@@ -27,17 +27,38 @@ export async function fetchMoodboard(
   return data as MoodboardRow;
 }
 
+export interface OwnerBranding {
+  client_fallback_name?: string;
+  logo_url?: string;
+  company_name?: string;
+  contact_line?: string;
+}
+
 export async function fetchClientName(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<string | undefined> {
+  const branding = await fetchOwnerBranding(supabase, userId);
+  return branding?.client_fallback_name;
+}
+
+/** Pull the sheet creator's profile + studio branding for the title block. */
+export async function fetchOwnerBranding(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<OwnerBranding | undefined> {
   const { data } = await supabase
     .from('user_profiles')
-    .select('full_name, email')
+    .select('full_name, email, branding_logo_url, branding_company_name, branding_contact_line')
     .eq('id', userId)
     .maybeSingle();
   if (!data) return undefined;
-  return (data as any).full_name || (data as any).email || undefined;
+  return {
+    client_fallback_name: (data as any).full_name || (data as any).email || undefined,
+    logo_url: (data as any).branding_logo_url || undefined,
+    company_name: (data as any).branding_company_name || undefined,
+    contact_line: (data as any).branding_contact_line || undefined,
+  };
 }
 
 /** Fetch product chips with thumbnails + descriptions. */

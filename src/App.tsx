@@ -84,6 +84,7 @@ const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
 const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
+const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
@@ -133,6 +134,7 @@ const App = () => (
               <Routes>
                 {/* Public routes — no auth required */}
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
+                <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
 
                 <Route
                   path="/auth"

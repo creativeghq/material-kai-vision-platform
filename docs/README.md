@@ -53,12 +53,12 @@
 - Phase 1 & 2 complete
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
-- 12+ AI models across 5 providers
-- Anthropic: Claude Opus 4.7, Claude Haiku 4.5
-- OpenAI: GPT-4o, GPT-4o-mini
-- Voyage AI: voyage-4 (primary text + understanding embeddings, 1024D)
-- HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (768D visual embeddings)
+- Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
+- Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
+- HuggingFace Endpoints: SLIG SigLIP2 (768D visual, 5 specialized types) + Chandra v2 (sole OCR engine)
+- OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
+- Qwen retired 2026-05-01 (HF endpoint had been silently 404-ing for months)
 - Model usage by stage
 - Cost optimization
 
@@ -110,7 +110,7 @@
 - Embeddings Routes (3)
 - AI Services Routes (10)
 - Background Jobs (7)
-- HuggingFace/Qwen Routes (3)
+- HuggingFace Endpoint Routes (2 — SLIG SigLIP2 + Chandra v2; Qwen retired 2026-05-01)
 - Anthropic Routes (3)
 - Monitoring Routes (3)
 - AI Metrics Routes (2)
@@ -305,7 +305,7 @@
 - **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 - **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 - **Database**: PostgreSQL 15, pgvector, Supabase
-- **AI**: Claude 4.5, GPT-4o, Qwen3-VL, SigLIP, Voyage AI, Multi-Vector CLIP
+- **AI**: Claude Opus 4.7 (vision tool use) / Sonnet 4.6 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); SLIG SigLIP2 (5×768D visual); Chandra v2 (sole OCR); GPT-4o/GPT-5 optional alternatives
 
 ### API Categories
 1. PDF Processing (12 endpoints)

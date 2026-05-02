@@ -57,9 +57,8 @@ interface AIUsageLog {
   model_name: string;
   input_tokens: number;
   output_tokens: number;
-  total_cost_usd: number;
   raw_cost_usd?: number;
-  billed_cost_usd?: number;
+  billed_cost_usd: number;
   credits_debited: number;
   created_at: string;
 }
@@ -215,7 +214,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-emerald-600">
-                      ${(log.billed_cost_usd || log.total_cost_usd || 0).toFixed(6)}
+                      ${(log.billed_cost_usd || 0).toFixed(6)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(log.created_at).toLocaleString()}

@@ -43,17 +43,14 @@ This ensures that when you search or browse, you see all relevant images for eac
 
 ### AI-Powered Analysis
 
-The platform uses two advanced AI systems working together:
+The platform uses Claude Opus 4.7 vision_analysis via Anthropic tool use as the **sole vision pass** post-2026-05-01:
 
-**Primary Analysis** - Fast, accurate material detection using Qwen3-VL Vision AI
+**Schema-locked Vision Analysis** — Claude Opus 4.7 via Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (in `app/models/vision_analysis.py`).
 - Identifies material types, colors, and textures
 - Provides quality scores for each analysis
-- Processes images quickly and efficiently
+- Tool use eliminates JSON regex recovery and provides a hard guarantee of schema adherence — the only path that protects Voyage's understanding-embedding space from drift.
 
-**Quality Validation** - Claude AI validates uncertain results
-- Reviews images that need additional analysis
-- Provides enhanced descriptions and corrections
-- Ensures high-quality results
+**Historical (pre-2026-05-01)**: A two-stage pipeline ran Qwen3-VL on a HuggingFace endpoint as the primary analyzer with Claude as a fallback validator. Audit revealed the Qwen endpoint had been 404-ing for months — every Qwen call timed out in 0.7s and silently fell through to Claude. The migration retired the Qwen call entirely so the architecture matches what was actually running.
 
 ### Multi-Vector Search Architecture
 
@@ -62,7 +59,7 @@ The platform uses a sophisticated **7-embedding fusion system** that combines mu
 **Embedding Types & Default Weights (Balanced Profile):**
 - **Text Embedding (15%)** - Semantic understanding from product names, descriptions, and metadata
 - **Visual Embedding (15%)** - General visual similarity using SigLIP 768D embeddings
-- **Understanding Embedding (20%)** - Spec-based search from Qwen3-VL analysis via Voyage AI (1024D)
+- **Understanding Embedding (20%)** - Spec-based search from Claude Opus 4.7 vision_analysis (Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D). Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint 404-ing for months). Provenance fields `embedding_model` + `schema_version` persisted on every row.
 - **Color Embedding (12.5%)** - Specialized color palette matching
 - **Texture Embedding (12.5%)** - Surface pattern and texture recognition
 - **Style Embedding (12.5%)** - Design aesthetic and style matching

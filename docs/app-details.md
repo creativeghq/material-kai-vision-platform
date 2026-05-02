@@ -97,7 +97,8 @@ The platform's core differentiator is not a single AI model — it is the orches
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
-| HuggingFace | Qwen3-VL 32B Vision | Image analysis, OCR, material recognition (69.4% MMMU, #1 OCR benchmark) | Cloud endpoint |
+| Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. (Pre-2026-05-01: routed through Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months → retired.) | Anthropic API |
+| HuggingFace | Chandra v2 | OCR (sole engine post-2026-05-01) — retry-with-jitter (3 attempts at temps 0.0/0.1/0.2). Per-attempt metrics in `chandra_ocr_metrics`. Failure marker: `OCRResult.method='chandra_failed'`. (Pytesseract + EasyOCR removed entirely.) | Cloud endpoint |
 | HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
@@ -117,7 +118,7 @@ Every product in the catalog is represented by **7 distinct AI embedding vectors
 |----------------|-----------|-------|----------------|
 | Text | 1024D | Voyage AI voyage-4 | Natural language + keyword search |
 | Visual | 768D | SigLIP2 | "Find materials that look like this photo" |
-| Understanding | 1024D | Voyage AI (from Qwen3-VL JSON analysis) | Spec-based search (dimensions, finishes, surface properties) |
+| Understanding | 1024D | Voyage AI (from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage). Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision entirely. | Spec-based search (dimensions, finishes, surface properties) |
 | Color | 768D | SigLIP2 | Color palette matching |
 | Texture | 768D | SigLIP2 | Surface texture similarity |
 | Style | 768D | SigLIP2 | Design aesthetic matching |
@@ -140,7 +141,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 3. Semantic chunking via Anthropic API (800 token max, 100 overlap)
 4. Generates text + understanding embeddings via Voyage AI
 5. Extracts all images from product pages
-6. Runs Qwen3-VL 32B Vision on every image — identifies material type, surface properties, finishes, dimensions visible, color palette
+6. Runs Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre-2026-05-01 ran Qwen3-VL with Claude fallback; the Qwen HF endpoint had been 404-ing for months (Stage 3 was effectively 100% Claude already), so the migration retired Qwen and went Anthropic-only.
 7. Generates all 5 SigLIP2 visual embedding types per image
 8. Extracts 200+ metadata fields per product (dimensions, material composition, certifications, weight, finish, slip resistance, etc.)
 9. YOLO layout detection + Camelot table extraction on complex page layouts
@@ -610,7 +611,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Claude Haiku (1K tokens) | ~$0.0008–0.004 | 1–5 credits | 50–80%+ |
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |
-| Qwen3-VL image analysis (per image) | ~$0.02–0.05 | 2–5 credits | Variable |
+| Claude Opus 4.7 vision_analysis per image (post-2026-05-01 — sole vision pass; Qwen retired) | ~$0.02–0.05 | 2–5 credits | Variable |
 | VR World — mini | $0.50 WorldLabs | 50 credits ($0.50) | Pass-through + platform overhead |
 | VR World — plus | $2.00 WorldLabs | 200 credits ($2.00) | Pass-through + platform overhead |
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
@@ -630,7 +631,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- HuggingFace Endpoints: Pay-per-use for Qwen3-VL and SigLIP2 inference
+- HuggingFace Endpoints: Pay-per-use for SigLIP2 + Chandra v2 OCR inference. (Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.)
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
 ---
@@ -691,7 +692,7 @@ This analytics layer is a significant standalone upsell — providing market int
 Most platforms use one or two embedding types. Fusing 7 specialized vectors with dynamic per-query weight profiles requires custom ML infrastructure, tuned weight profiles per query intent, and deep integration between the vision analysis pipeline and the search layer. This compound in value as more products are added.
 
 **2. Understanding Embeddings (Novel Architecture)**
-Qwen3-VL 32B generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. This JSON is then embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
+Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. (Pre-2026-05-01 used Qwen3-VL JSON for the analysis step; the Qwen HF endpoint had been 404-ing for months, falling through to Claude — the 2026-05-01 migration just retired the dead Qwen path and made the architecture honest.) This is a proprietary architecture not seen replicated elsewhere.
 
 **3. Full Vertical Integration**
 Ingestion + enrichment + search + design generation + VR visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.
@@ -733,7 +734,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 
 ### Live in Production (March 2026)
 - 7-vector fusion search with query-adaptive weight profiles
-- Understanding embeddings (spec-based search via Qwen3-VL + Voyage AI)
+- Understanding embeddings (spec-based search via Claude Opus 4.7 vision_analysis tool use → Voyage AI; pre-2026-05-01 used Qwen3-VL, retired in the migration)
 - AI search re-ranking (Claude post-retrieval re-ordering with explanations)
 - PDF ingestion pipeline (14 stages, 9 checkpoints, YOLO layout detection)
 - Web scraping ingestion (Firecrawl)

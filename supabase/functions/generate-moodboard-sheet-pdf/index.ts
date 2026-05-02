@@ -20,6 +20,7 @@ async function authenticate(req: Request): Promise<{ success: boolean; userId?: 
 import {
   fetchClientName,
   fetchMoodboard,
+  fetchOwnerBranding,
   fetchProductChips,
   fetchQuoteFfeItems,
   fetchSheet,
@@ -78,7 +79,28 @@ Deno.serve(async (req: Request) => {
 
     const sheet = await fetchSheet(supabase, sheetId);
     const moodboard = await fetchMoodboard(supabase, sheet.moodboard_id);
-    const clientName = sheet.created_by ? await fetchClientName(supabase, sheet.created_by) : undefined;
+    const branding = sheet.created_by ? await fetchOwnerBranding(supabase, sheet.created_by) : undefined;
+    const clientName = branding?.client_fallback_name;
+
+    // Refuse to render an empty/no-content PDF. Same content rules as the
+    // agent tool's validator. Marks the row as failed and returns 422 instead
+    // of uploading a trash file to storage. Required content per type:
+    //   material_board       — at least one product_id
+    //   color_palette        — at least one swatch with hex
+    //   concept_board        — at least one image in layout
+    //   ffe_schedule         — quote_id or items[]
+    //   full_deck            — included_sheet_ids[] + cover.title
+    //   lighting_plan        — backdrop AND at least one symbol (canvas filled in)
+    //   annotated_render     — backdrop_image_url AND at least one annotation
+    //   elevation_render_pair— elevation_image_url AND at least one dimension OR tile_callout
+    const contentError = validatePdfContent(sheet.sheet_type, sheet.data);
+    if (contentError) {
+      await supabase
+        .from('moodboard_presentation_sheets')
+        .update({ status: 'failed', error_message: contentError })
+        .eq('id', sheetId);
+      return jsonResponse({ success: false, error: contentError }, 422);
+    }
 
     const pdfDoc = await PDFDocument.create();
     const fonts = await loadFonts(pdfDoc);
@@ -89,6 +111,9 @@ Deno.serve(async (req: Request) => {
       sheet_label: sheetLabel(sheet.sheet_type),
       date_iso: new Date().toISOString(),
       client_name: sheet.data?.cover?.client_name || clientName,
+      branding_logo_url: branding?.logo_url,
+      branding_company_name: branding?.company_name,
+      branding_contact_line: branding?.contact_line,
     };
 
     let pageCount = 1;
@@ -208,6 +233,40 @@ Deno.serve(async (req: Request) => {
       })
       .eq('id', sheetId);
 
+    // Track every render in ai_usage_logs — credit cost is 0 because the
+    // creation already debited via the agent tool. This row gives admins
+    // visibility on TOTAL render volume (initial + retry + duplicate-then-render
+    // + live preview) so per-tool usage breakdown is accurate. The Operations
+    // Dashboard groups ai_usage_logs by operation_type, so these will surface
+    // automatically as "presentation_sheet_<type>_render".
+    if (sheet.created_by) {
+      supabase.from('ai_usage_logs').insert({
+        user_id: sheet.created_by,
+        operation_type: `presentation_sheet_${sheet.sheet_type}_render`,
+        model_name: 'presentation-sheet-pdf',
+        api_provider: 'platform',
+        input_tokens: 0,
+        output_tokens: 0,
+        input_cost_usd: 0,
+        output_cost_usd: 0,
+        raw_cost_usd: 0,
+        markup_multiplier: 1,
+        billed_cost_usd: 0,
+        credits_debited: 0,
+        metadata: {
+          feature: 'presentation_sheet',
+          event: 'render',
+          sheet_id: sheetId,
+          sheet_type: sheet.sheet_type,
+          moodboard_id: sheet.moodboard_id,
+          page_count: pageCount,
+        },
+        created_at: new Date().toISOString(),
+      }).then(({ error }) => {
+        if (error) console.warn('[render-log] insert failed (non-blocking):', error);
+      });
+    }
+
     const response: SheetPdfResponse = {
       success: true,
       pdf_url: signed?.signedUrl,
@@ -238,4 +297,72 @@ function jsonResponse(body: SheetPdfResponse, status = 200): Response {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+/**
+ * Final pre-render content guard. Stricter than the agent-tool validator
+ * because by render time the user has gone through the canvas — interactive
+ * sheets must have non-empty annotations / dimensions / symbols, not just
+ * the backdrop. Returns null if the sheet has enough content to render a
+ * meaningful PDF, otherwise a human-readable reason that gets stored in
+ * `error_message`.
+ */
+function validatePdfContent(sheet_type: string, data: Record<string, any> | undefined): string | null {
+  const d = data || {};
+  switch (sheet_type) {
+    case 'material_board':
+      if (!Array.isArray(d.product_ids) || d.product_ids.length === 0) {
+        return 'No products selected — material_board needs at least one product_id.';
+      }
+      return null;
+    case 'color_palette':
+      if (!Array.isArray(d.swatches) || d.swatches.length === 0) {
+        return 'No swatches — color_palette needs at least one {hex,name}.';
+      }
+      return null;
+    case 'concept_board':
+      if (!Array.isArray(d.layout) || d.layout.length === 0) {
+        return 'No images — concept_board needs at least one entry in layout[].';
+      }
+      return null;
+    case 'lighting_plan':
+      if (!d.backdrop || !['upload', 'rect'].includes(d.backdrop.kind)) {
+        return 'Missing backdrop — lighting_plan needs an uploaded floor plan or room dimensions.';
+      }
+      if (!Array.isArray(d.symbols) || d.symbols.length === 0) {
+        return 'No fixture symbols placed — drop at least one symbol on the canvas before rendering.';
+      }
+      return null;
+    case 'annotated_render':
+      if (!d.backdrop_image_url) return 'Missing backdrop_image_url for annotated_render.';
+      if (!Array.isArray(d.annotations) || d.annotations.length === 0) {
+        return 'No callouts placed — annotated_render needs at least one annotation.';
+      }
+      return null;
+    case 'elevation_render_pair':
+      if (!d.elevation_image_url) return 'Missing elevation_image_url for elevation_render_pair.';
+      {
+        const hasDims = Array.isArray(d.dimensions) && d.dimensions.length > 0;
+        const hasTiles = Array.isArray(d.tile_callouts) && d.tile_callouts.length > 0;
+        if (!hasDims && !hasTiles) {
+          return 'No dimensions or tile callouts — elevation_render_pair needs at least one of either.';
+        }
+      }
+      return null;
+    case 'ffe_schedule': {
+      const hasQuote = typeof d.quote_id === 'string' && d.quote_id.length > 0;
+      const hasItems = Array.isArray(d.items) && d.items.length > 0;
+      if (!hasQuote && !hasItems) return 'Missing quote_id or items[] for ffe_schedule.';
+      return null;
+    }
+    case 'full_deck':
+      if (!Array.isArray(d.included_sheet_ids) || d.included_sheet_ids.length === 0) {
+        return 'No sheets selected — full_deck needs at least one entry in included_sheet_ids[].';
+      }
+      if (!d.cover || typeof d.cover.title !== 'string' || !d.cover.title) {
+        return 'Missing cover.title for full_deck.';
+      }
+      return null;
+  }
+  return null;
 }

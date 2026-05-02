@@ -65,6 +65,7 @@ import type { ProductProgress, BackgroundJob, XMLImportJob, JobCheckpoint, JobTy
 import { GLOBAL_PIPELINE_FLOW, XML_IMPORT_PIPELINE_FLOW, WEB_SCRAPING_PIPELINE_FLOW, PRODUCT_STAGES, getPipelineForJobType } from './constants';
 import { LiveTimer } from './components/LiveTimer';
 import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
+import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
 import { MIVAA_API_URL } from '@/config/mivaa';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
@@ -2966,6 +2967,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </div>
           ) : (
             <>
+            {/* Pipeline error observability panel — only renders when the
+                job has a `failure_summary` aggregate (added 2026-05-02).
+                Surfaces failed products, OCR failures, recovery attempts in
+                one place above the tabs so operators don't have to dig. */}
+            {selectedJob && (selectedJob as any).failure_summary && (
+              <div className="mb-4">
+                <PipelineErrorsPanel
+                  jobId={selectedJob.id}
+                  failureSummary={(selectedJob as any).failure_summary}
+                />
+              </div>
+            )}
             <Tabs defaultValue="products" className="w-full">
               <TabsList className={`grid w-full ${selectedJob?.status === 'completed' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="products">Product Extraction Pipeline</TabsTrigger>

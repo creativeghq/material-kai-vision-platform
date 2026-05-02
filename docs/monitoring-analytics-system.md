@@ -91,7 +91,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 **Purpose**: Track AI model usage, costs, and performance
 
 **Metrics**:
-- **Cost Tracking**: Real-time cost per model (Claude, GPT, Qwen)
+- **Cost Tracking**: Real-time cost per model (Claude, GPT). Qwen pricing entries retired 2026-05-01 alongside the Qwen-removal migration — vision is now Anthropic-only, chunking moved to Claude Sonnet 4.6.
 - **Model Usage**: API calls by model and endpoint
 - **Confidence Scores**: Distribution of AI confidence scores
 - **Latency Metrics**: Response times per model
@@ -104,8 +104,11 @@ The platform includes a complete monitoring and analytics system that tracks:
 - Claude Haiku 4.5
 - GPT-4o
 - GPT-5
-- Qwen3-VL 17B Vision
+- Claude Sonnet 4.6 (chunking — replaced Qwen 2026-05-01)
 - Voyage AI voyage-4 (updated 2026-04 — replaced OpenAI text-embedding-3-small)
+- Chandra v2 (sole OCR engine post-2026-05-01; pytesseract + EasyOCR removed)
+
+(Qwen3-VL was retired 2026-05-01 — the HF endpoint had been 404-ing for months and silently falling through to Claude. Vision is now Anthropic-only via Claude Opus 4.7 tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. Operations dashboard widgets for Qwen were removed in the same migration.)
 
 ---
 
@@ -239,8 +242,9 @@ All stages integrate with Sentry for exception capture. Any exception raised dur
 - Claude Opus 4.7: $15.00 / 1M input tokens, $75.00 / 1M output tokens
 - Claude Haiku 4.5: $0.80 / 1M input tokens, $4.00 / 1M output tokens
 - GPT-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
-- Qwen3-VL 17B: $0.30 / 1M tokens
 - Voyage AI voyage-4: $0.06 / 1M tokens (sole production text embedder as of 2026-04)
+
+(Qwen3-VL pricing entry retired 2026-05-01 alongside the Qwen-removal migration. Vision is now billed under Claude Opus 4.7 / Haiku 4.5 line items via Anthropic tool use.)
 
 Cost calculation multiplies token counts by per-million rates for input and output separately, then sums them.
 

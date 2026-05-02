@@ -44,11 +44,20 @@ All three MUST be updated together.
   - Prompt caching support (reduced cost for cached tokens)
 - **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price) + (cached_tokens / 1M × cached_price). Platform Credits = USD Cost × 100.
 
-### 3. **HuggingFace Endpoint Models (Qwen3-VL Vision)**
-- **Pricing Unit**: Per million tokens
-- **Models Tracked**:
-  - Qwen3-VL-32B, Qwen3-VL-8B (vision models)
-- **Cost Calculation**: Same formula as OpenAI.
+### 3. **~~HuggingFace Endpoint Vision~~ — RETIRED 2026-05-01**
+- ~~Pricing Unit: Per million tokens~~
+- ~~Models Tracked: Qwen3-VL-32B, Qwen3-VL-8B~~
+- **Status**: Qwen vision endpoint deleted 2026-05-01 (had been silently 404-ing for months). Vision now runs on Anthropic Claude Opus 4.7 via tool use — billed under section 2 (Anthropic). Qwen pricing entries were removed from [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) and the Operations dashboard widgets.
+
+### 3a. **HuggingFace Endpoint OCR (Chandra v2)**
+- **Pricing Unit**: HuggingFace Inference Endpoint hourly rate (auto-paused when idle)
+- **Models Tracked**: Chandra v2 (Datalab, sole OCR engine post-2026-05-01)
+- **Cost Calculation**: Endpoint runtime cost amortized across all OCR'd pages/images. Per-attempt latency tracked in `chandra_ocr_metrics`.
+
+### 3b. **HuggingFace Endpoint Visual Embeddings (SLIG SigLIP2)**
+- **Pricing Unit**: HuggingFace Inference Endpoint hourly rate (auto-paused when idle)
+- **Models Tracked**: SLIG (SigLIP2 ViT-SO400M) — 5 specialized 768D embedding types per image
+- **Cost Calculation**: Endpoint runtime cost amortized across all images embedded.
 
 ### 4. **Embedding Models** (updated 2026-04)
 - **Pricing Unit**: Per million tokens
@@ -139,7 +148,7 @@ Pricing is split across two layers:
 
 | Layer | What it covers | Storage | How to update |
 |-------|----------------|---------|---------------|
-| **AI model + external service pricing** | Claude / OpenAI embeddings / Voyage / Qwen + Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
+| **AI model + external service pricing** | Claude (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) / Voyage AI / SLIG SigLIP2 / Chandra v2 / OpenAI (alt) + Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. (Qwen pricing entries removed 2026-05-01.) | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
 | **MIVAA gateway action pricing** | RAG search, image analysis (flat per-action credits) | Hardcoded TypeScript in [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) | Manual — these are platform-internal action-level prices, not third-party costs |
 
 ### Runtime behaviour

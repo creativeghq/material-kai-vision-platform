@@ -4,6 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
+import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
  * Annotated Render Sheet canvas.
@@ -163,17 +164,17 @@ export function CalloutCanvas({
             </svg>
             {annotations.map((a, idx) => (
               <React.Fragment key={idx}>
-                {/* Anchor dot */}
+                {/* Anchor — 24×24 invisible touch target wraps the visible 12×12 dot */}
                 <div
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full cursor-move ${
-                    selectedIdx === idx ? 'bg-red-500 ring-2 ring-white' : 'bg-red-500'
-                  }`}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-6 sm:h-6 cursor-move flex items-center justify-center"
                   style={{ left: `${a.x * 100}%`, top: `${a.y * 100}%` }}
                   onPointerDown={handleHandlePointerDown(idx, 'anchor')}
-                />
-                {/* Label box (endpoint) */}
+                >
+                  <span className={`block w-3.5 h-3.5 sm:w-3 sm:h-3 rounded-full ${selectedIdx === idx ? 'bg-red-500 ring-2 ring-white' : 'bg-red-500'}`} />
+                </div>
+                {/* Label box (endpoint) — bigger min-height on touch + larger padding */}
                 <div
-                  className={`absolute -translate-y-1/2 px-2 py-1 rounded text-xs font-medium bg-white text-black shadow cursor-move max-w-[180px] truncate ${
+                  className={`absolute -translate-y-1/2 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded text-xs font-medium bg-white text-black shadow cursor-move max-w-[180px] truncate min-h-[28px] sm:min-h-[24px] flex items-center ${
                     selectedIdx === idx ? 'ring-2 ring-primary' : 'border border-black/40'
                   }`}
                   style={{ left: `${a.line_endpoint_x * 100}%`, top: `${a.line_endpoint_y * 100}%` }}
@@ -234,6 +235,13 @@ export function CalloutCanvas({
           ))}
         </div>
       </div>
+
+      <LivePreviewPanel
+        sheetId={sheetId}
+        data={{ backdrop_image_url: backdropImageUrl, annotations }}
+        enabled={!!backdropImageUrl}
+        hasMinContent={annotations.length > 0}
+      />
 
       <div className="flex items-center gap-2 flex-wrap">
         <Button

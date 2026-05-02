@@ -26,9 +26,10 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - 9-stage PDF processing pipeline (optimized)              │
 │ - Memory-safe image processing (10-15MB constant)          │
 │ - Real-time CLIP embedding generation                      │
-│ - RAG system (Claude 4.5 + Direct Vector DB)               │
+│ - RAG system (Claude Opus 4.7 + 7-Vector Direct VECS)      │
 │ - Search APIs (Multi-Vector, Semantic, Hybrid)             │
-│ - AI Services (Claude 4.5, GPT, Qwen3-VL, SigLIP)          │
+│ - AI Services (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5,   │
+│   Voyage AI voyage-4, SLIG/SigLIP2, Chandra v2 OCR, GPT-5) │
 │ - Product Management + Metadata Management                 │
 │ - Duplicate Detection & Merging (factory-based)            │
 │ - Admin & Monitoring                                        │
@@ -59,9 +60,10 @@ Frontend (Vercel)
     └─→ MIVAA API (v1api.materialshub.gr)
             ↓
             ├─→ Supabase (Data)
-            ├─→ OpenAI (Embeddings)
-            ├─→ Anthropic (Claude)
-            ├─→ HuggingFace Endpoint (Qwen3-VL)
+            ├─→ Voyage AI (Text + Understanding Embeddings, sole text embedder)
+            ├─→ Anthropic (Claude Opus 4.7 vision tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
+            ├─→ HuggingFace Endpoints (SLIG SigLIP2 visual + Chandra v2 OCR)
+            ├─→ OpenAI (optional alternative — GPT-4o/GPT-5; not vision)
             └─→ Supabase Storage (Images)
 
 **Benefits**:
@@ -214,12 +216,12 @@ All tables use RLS policies that restrict access based on workspace membership. 
    - Statistics
 
 9. **Anthropic APIs** (3 endpoints)
-   - Claude integration
-   - Vision analysis
+   - Claude integration (Opus 4.7 vision via tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
+   - Vision analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`)
 
-10. **HuggingFace Endpoint APIs** (3 endpoints)
-    - Qwen3-VL integration
-    - Vision analysis
+10. **HuggingFace Endpoint APIs** (2 endpoints — Qwen retired 2026-05-01)
+    - SLIG (SigLIP2) — visual embeddings (768D, 5 specialized types)
+    - Chandra v2 — OCR (sole OCR engine, with retry-with-jitter)
 
 11. **Monitoring Routes** (3 endpoints)
     - System health
@@ -239,29 +241,31 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 ## 🤖 AI Integration
 
-### 12 AI Models
+### Production AI Stack (post-2026-05-01)
 
-**Anthropic**:
-- Claude Opus 4.7 (Product discovery, enrichment)
-- Claude Haiku 4.5 (Fast validation)
-- Semantic Chunking (Text segmentation)
+**Anthropic** (vision + chunking + agents, post-Qwen-removal):
+- **Claude Opus 4.7** — vision analysis (PRIMARY, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`); product discovery; KAI agent default
+- **Claude Sonnet 4.6** — chunking (PRIMARY, was Qwen pre-2026-05-01 but Qwen had been silently 404-ing for months)
+- **Claude Haiku 4.5** — fast classification, demo agent, price-monitoring identity classifier
 
-**OpenAI**:
-- GPT-4o (Alternative discovery)
-- (text-embedding-3-small retired 2026-04 — Voyage AI is the sole text embedder)
+**Voyage AI** (sole text embedder):
+- voyage-4 (1024D) — text chunks + product text + understanding embeddings (from Claude vision_analysis JSON via `serialize_vision_analysis_to_text`)
+- Provenance fields persisted (`embedding_model`, `schema_version`) for drift detection
+- OpenAI fallback DISABLED for understanding path (prevents VECS collection drift)
 
-**Voyage AI**:
-- voyage-4 (Text + understanding embeddings, 1024D)
+**HuggingFace Endpoints**:
+- **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material)
+- **Chandra v2** — OCR (sole OCR engine; pytesseract + EasyOCR removed 2026-05-01); retry-with-jitter (3 attempts at temps 0.0/0.1/0.2)
 
-**SigLIP2 (SLIG)**:
-- Visual embeddings (768D) via HuggingFace Cloud Endpoint
-- 5 collections: visual, color, texture, style, material
+**OpenAI** (optional, not vision):
+- GPT-4o / GPT-5 — alternative product discovery / agents
+- text-embedding-3-small retired 2026-04 (Voyage is sole text embedder)
 
-**HuggingFace Endpoint**:
-- Qwen3-VL 32B Vision (Image analysis, OCR → feeds understanding embeddings via Voyage AI)
+**7-Vector RAG**:
+- Text (Voyage 1024D) + 5× SLIG specialized (768D each) + Understanding (Voyage 1024D)
+- Synthesis: Claude Opus 4.7 (200K context)
 
-**Direct Vector DB RAG**:
-- Claude 4.5 + Multi-Vector Search (Document retrieval, synthesis)
+> **Qwen retirement**: All `qwen_endpoint_manager.py` code, `Settings.qwen_*` fields, qwen warmup task, qwen pricing entries, qwen Operations dashboard widgets, and the `endpoint_controller.qwen` AdaptiveConcurrency gate were deleted on 2026-05-01. Only the `VisionProvider.QWEN` enum value remains so historical pre-2026-05-01 rows still validate.
 
 ---
 
@@ -376,10 +380,10 @@ All tables use RLS policies that restrict access based on workspace membership. 
 - Redis (optional)
 
 **AI Services**:
-- OpenAI API
-- Anthropic API (Claude 4.5)
-- HuggingFace Endpoint API (Qwen3-VL 32B)
-- Voyage AI (Embeddings)
+- Anthropic API (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5 — primary)
+- Voyage AI (text + understanding embeddings, sole text embedder)
+- HuggingFace Endpoints (SLIG SigLIP2 visual + Chandra v2 OCR)
+- OpenAI API (optional alternative — GPT-4o/GPT-5; not vision)
 
 **Infrastructure**:
 - Vercel (Frontend)

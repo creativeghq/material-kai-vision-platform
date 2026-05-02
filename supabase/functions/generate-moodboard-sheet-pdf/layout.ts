@@ -76,6 +76,10 @@ export interface TitleBlockData {
   total_sheets?: number;
   date_iso: string;
   client_name?: string;
+  // Studio branding (pulled from user_profiles by the PDF function)
+  branding_logo_url?: string;
+  branding_company_name?: string;
+  branding_contact_line?: string;
 }
 
 /** Draws the bottom-of-page title block in the same shape every sheet uses. */
@@ -151,6 +155,57 @@ export function drawTitleBlock(
       maxWidth: colW - 16,
     });
   }
+
+  // Studio branding strip (right edge of title block) — company name + contact
+  if (td.branding_company_name || td.branding_contact_line) {
+    const brandingX = MARGIN + tbW - colW - 8;
+    page.drawText(td.branding_company_name || '', {
+      x: brandingX,
+      y: tbY + tbH - 50,
+      size: 8,
+      font: fonts.bold,
+      color: COLOR_DARK,
+      maxWidth: colW - 16,
+    });
+    if (td.branding_contact_line) {
+      page.drawText(td.branding_contact_line, {
+        x: brandingX,
+        y: tbY + tbH - 60,
+        size: 7,
+        font: fonts.regular,
+        color: COLOR_GRAY,
+        maxWidth: colW - 16,
+      });
+    }
+  }
+}
+
+/**
+ * Draws the studio logo in the top-right corner of the page (above the title
+ * block) when the sheet's owner has a `branding_logo_url` set. Skipped silently
+ * if the image fetch / embed fails — branding is best-effort.
+ */
+export async function drawBrandingLogo(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  td: TitleBlockData,
+): Promise<void> {
+  if (!td.branding_logo_url) return;
+  try {
+    const bytes = await fetchImageBytes(td.branding_logo_url);
+    if (!bytes) return;
+    const img = await embedImageBytes(pdfDoc, bytes);
+    if (!img) return;
+    // 80×24pt slot in top-right corner, image scaled to fit
+    const maxW = 100, maxH = 30;
+    const dims = img.scaleToFit(maxW, maxH);
+    page.drawImage(img, {
+      x: PAGE_W - MARGIN - dims.width,
+      y: PAGE_H - MARGIN - dims.height,
+      width: dims.width,
+      height: dims.height,
+    });
+  } catch {/* branding is best-effort */}
 }
 
 export function drawSheetHeader(

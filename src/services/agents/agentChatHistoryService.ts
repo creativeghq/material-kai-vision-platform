@@ -272,14 +272,17 @@ export class AgentChatHistoryService {
   }
 
   /**
-   * Delete a conversation and all its messages
+   * Delete a conversation and all its messages.
+   *
+   * The FK on agent_chat_messages.conversation_id is ON DELETE CASCADE, and
+   * AFTER DELETE triggers on both `agent_chat_messages` and
+   * `agent_chat_conversations` scrub any storage URLs found in
+   * `metadata` / `content` / `messages` (generation-images, designer-assets,
+   * agent-files, 3d-models, moodboard-sheets). So a single conversation
+   * delete is enough — no client-side message wipe needed.
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
-      // Delete messages first
-      await supabase.from('agent_chat_messages').delete().eq('conversation_id', conversationId);
-
-      // Delete conversation
       const { error } = await supabase
         .from('agent_chat_conversations')
         .delete()

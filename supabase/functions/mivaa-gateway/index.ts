@@ -463,7 +463,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
           output_tokens: 0,
           input_cost_usd: 0,
           output_cost_usd: 0,
-          total_cost_usd: pricing.creditCost * 0.01,
+          billed_cost_usd: pricing.creditCost * 0.01,
           credits_debited: pricing.creditCost,
           metadata: { action, gateway: 'mivaa' },
         }).then(({ error }) => {

@@ -4,6 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
+import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
  * Elevation + Render Pair canvas.
@@ -229,6 +230,18 @@ export function DimensionCanvas({
           ))}
         </div>
       </div>
+
+      <LivePreviewPanel
+        sheetId={sheetId}
+        data={{
+          elevation_image_url: elevationImageUrl,
+          render_image_url: renderImageUrl,
+          dimensions,
+          tile_callouts: tileCallouts,
+        }}
+        enabled={!!elevationImageUrl}
+        hasMinContent={dimensions.length > 0 || tileCallouts.length > 0}
+      />
 
       <div className="flex items-center gap-2 flex-wrap">
         <Button

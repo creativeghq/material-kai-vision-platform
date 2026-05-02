@@ -24,7 +24,7 @@ The Metadata Prototype Validation System is a semantic validation system that st
 
 ## 🎯 Overview
 
-The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using CLIP text embeddings. This ensures that Qwen Vision's free-text metadata extractions are standardized to consistent, validated property values.
+The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using CLIP text embeddings. This ensures that the vision model's free-text metadata extractions (Claude Opus 4.7 vision_analysis via Anthropic tool use, sole vision pass post-2026-05-01 — schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`; pre-2026-05-01 was Qwen3-VL with Claude fallback, retired because the Qwen HF endpoint had been 404-ing for months) are standardized to consistent, validated property values. Note: with Anthropic tool use the schema is hard-enforced at the model boundary, so this validator now mainly catches lexical drift on enum-like fields rather than malformed JSON.
 
 ---
 
@@ -487,7 +487,7 @@ A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embe
 
 ### Step-by-Step Process
 
-**1. Qwen Extracts Free Text**: The vision model produces structured property values such as `finish: "glossy"` and `pattern: "marble-like veining"`.
+**1. Vision Model Extracts Structured Values**: The vision model (Claude Opus 4.7 via Anthropic tool use, sole vision pass post-2026-05-01; pre-2026-05-01 was Qwen3-VL, retired) produces structured property values such as `finish: "glossy"` and `pattern: "marble-like veining"`. With tool use the JSON shape is hard-enforced — the validator below mainly normalizes free-text values to a known prototype.
 
 **2. Prototype Validator Processes Each Field**: The `MetadataPrototypeValidator.validate_property(property_key, extracted_value)` method is called for each field. It returns the best-matching prototype value, a `validated` boolean, a `confidence` score, and the similarity scores against all prototypes.
 
@@ -571,7 +571,7 @@ In multi-vector search, filter values are validated against prototypes before bu
 ## Benefits
 
 ### For Metadata Extraction
-- **Standardization**: Qwen's free text → validated property values
+- **Standardization**: Vision model's free text (Claude Opus 4.7 via Anthropic tool use post-2026-05-01; Qwen3-VL retired) → validated property values
 - **Consistency**: Same material gets same label across PDFs
 - **Validation**: Prevents hallucinations and invalid values
 - **Confidence**: Semantic similarity scores for each validation

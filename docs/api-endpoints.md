@@ -27,7 +27,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **Previous Updates (v2.5.0 - December 30, 2025):**
 - **IMAGE RE-CLASSIFICATION:** 1 new endpoint for AI-powered image re-classification
   - `POST /api/images/reclassify/{image_id}` - Re-run material vs non-material classification
-  - Force validation with secondary model (Qwen-32B or Claude)
+  - Force validation via Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 had a Qwen→Claude fallback that was dead code (Qwen endpoint had been 404-ing for months); migration retired the Qwen call entirely.
   - Real-time database updates with new classification results
   - Confidence scoring and reasoning
 
@@ -85,7 +85,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 7. [Products Routes](#7-products-routes) - Product management
 8. [Images Routes](#8-images-routes) - Image processing
 9. [Embeddings Routes](#9-embeddings-routes) - Embedding generation
-10. [HuggingFace/Qwen Routes](#10-huggingface-qwen-routes) - Qwen3-VL integration
+10. HuggingFace/Qwen Routes — Retired 2026-05-01. Vision (segmentation, classification, vision_analysis, material analysis) consolidated onto Claude Opus 4.7 via Anthropic tool use; Qwen endpoint had been 404-ing for months and silently falling through to Claude.
 11. [Anthropic Routes](#11-anthropic-routes) - Anthropic integration
 12. [Monitoring Routes](#12-monitoring-routes) - System monitoring
 13. [AI Metrics Routes](#13-ai-metrics-routes) - AI performance metrics
@@ -364,7 +364,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 1. Stage 0 (0-15%): Product Discovery - Claude/GPT analyzes entire PDF
 2. Stage 1 (15-30%): Focused Extraction - Extract only product pages
 3. Stage 2 (30-50%): Chunking - Create chunks for vector DB
-4. Stage 3 (50-70%): Image Processing - Qwen3-VL + CLIP embeddings
+4. Stage 3 (50-70%): Image Processing - Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) + SLIG embeddings. Pre-2026-05-01 routed through Qwen3-VL with Claude fallback; Qwen retired (silent 404s for months → 100% Claude in practice).
 5. Stage 4 (70-90%): Product Creation - Create product records
 6. Stage 5 (90-100%): Quality Enhancement - Claude validation (async)
 
@@ -464,7 +464,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 
 **Request:** `GET /api/rag/images?document_id={uuid}&limit=100&offset=0`
 
-**Response:** `images` array (id, document_id, image_url, page_number, QWEN_analysis, clip_embedding, quality_score, created_at) and `total` count
+**Response:** `images` array (id, document_id, image_url, page_number, vision_analysis, vision_provider, quality_score, created_at) and `total` count. (`vision_analysis` carries the structured `VisionAnalysis` payload from Claude Opus 4.7 via Anthropic tool use post-2026-05-01; pre-2026-05-01 rows may carry `vision_provider='qwen'` from the retired Qwen3-VL pipeline — the enum value is retained for historical row validation. Legacy 512D `clip_embedding` was dropped 2026-04 in the SLIG migration.)
 
 **Database Operations:**
 - SELECT FROM document_images WHERE document_id = ? LIMIT ? OFFSET ?

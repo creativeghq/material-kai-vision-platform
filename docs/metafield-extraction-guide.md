@@ -63,7 +63,7 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 3: Image Processing & Visual Metafield Extraction (50-70%)│
-│ AI: Qwen Vision 4 Scout 17B + CLIP                            │
+│ AI: Claude Opus 4.7 vision_analysis (Anthropic tool use) + SLIG│
 │ Purpose: Extract images, analyze for visual metafields         │
 │ Output: Images with detected colors, texture, finish           │
 └─────────────────────────────────────────────────────────────────┘
@@ -169,8 +169,8 @@ Each chunk stores its `product_name`, `page_range`, and a `metafields` dictionar
 ## 🖼️ Stage 3: Image Processing & Visual Metafield Extraction
 
 ### AI Models & Process
-- **Qwen Vision 4 Scout 17B**: Advanced image analysis
-- **CLIP**: Image embeddings (512D) for visual similarity
+- **Claude Opus 4.7 vision_analysis**: Sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (Anthropic tool use). Pre-2026-05-01 routed through Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months → retired.
+- **SLIG (SigLIP2)**: Image embeddings (768D) for visual similarity. Note: pre-2026 docs referenced 512D CLIP; the platform migrated to 768D SLIG and dropped legacy CLIP columns in 2026-04.
 
 The AI extracts images and analyzes them for visual metafields:
 
@@ -442,7 +442,7 @@ Metafield values are inserted into `product_metafield_values`, `chunk_metafield_
 |-------|----------|-------|---------|--------|----------|
 | **0** | Claude Opus 4.7 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
 | **2** | Anthropic Claude | Product pages | Create chunks, preserve metafields | Chunks with metafield metadata | 88%+ |
-| **3** | Qwen Vision + CLIP | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
+| **3** | Claude Opus 4.7 vision_analysis (Anthropic tool use) + SLIG (SigLIP2) | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
 | **4** | Claude Haiku 4.5 → Opus 4.7 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
 | **12** | Extract & Link | Product metadata | Create database records, link to products/chunks/images | metafield_values linked | 100% |
 
@@ -491,7 +491,7 @@ Metafield values are inserted into `product_metafield_values`, `chunk_metafield_
 **Material Identification**:
 1. **Stage 0**: Claude identifies material types from PDF (e.g., "White Body Tile", "Ceramic")
 2. **Stage 2**: Chunks preserve material information in metadata
-3. **Stage 3**: Qwen Vision analyzes material appearance (texture, finish, gloss)
+3. **Stage 3**: Claude Opus 4.7 vision_analysis (Anthropic tool use, sole vision pass post-2026-05-01) analyzes material appearance (texture, finish, gloss)
 4. **Stage 4**: Claude consolidates material data from all sources
 5. **Stage 12**: Material metafield linked to product, chunks, and images
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
+import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
  * Lighting Plan canvas.
@@ -241,6 +242,15 @@ export function FixtureSymbolCanvas({
         </div>
       </div>
 
+      <LivePreviewPanel
+        sheetId={sheetId}
+        data={{ backdrop, symbols, legend }}
+        enabled={
+          backdrop.kind === 'upload' ? !!backdrop.image_url : !!backdrop.width_mm && !!backdrop.height_mm
+        }
+        hasMinContent={symbols.length > 0}
+      />
+
       <div className="flex items-center gap-2 flex-wrap">
         <Button
           size="sm"
@@ -267,11 +277,14 @@ function SymbolDot({ symbol, onPointerDown }: { symbol: FixtureSymbol; onPointer
   const def = FIXTURE_DEFS.find((d) => d.type === symbol.type);
   return (
     <div
-      className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white text-black border border-black flex items-center justify-center font-mono cursor-move"
+      // 36×36 hit target on mobile, 28×28 on desktop. Visible glyph stays compact.
+      className="absolute -translate-x-1/2 -translate-y-1/2 w-9 h-9 sm:w-7 sm:h-7 cursor-move flex items-center justify-center"
       style={{ left: `${symbol.x * 100}%`, top: `${symbol.y * 100}%` }}
       onPointerDown={onPointerDown}
     >
-      {def?.glyph || '•'}
+      <span className="w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-white text-black border border-black flex items-center justify-center font-mono text-sm">
+        {def?.glyph || '•'}
+      </span>
     </div>
   );
 }

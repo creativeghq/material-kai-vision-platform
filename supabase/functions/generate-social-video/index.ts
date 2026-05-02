@@ -206,7 +206,6 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         raw_cost_usd: creditCost * 0.01 / MARKUP_MULTIPLIER,
         markup_multiplier: MARKUP_MULTIPLIER,
         billed_cost_usd: creditCost * 0.01,
-        total_cost_usd: creditCost * 0.01,
         credits_debited: creditCost,
         metadata: { model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId },
       });

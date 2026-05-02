@@ -20,7 +20,7 @@ This plan outlines a comprehensive strategy for extracting metadata from **multi
 4. **texture_slig_768** - Text-guided texture embedding (768D) → `image_texture_embeddings`
 5. **material_slig_768** - Text-guided material embedding (768D) → `image_material_embeddings`
 6. **style_slig_768** - Text-guided style embedding (768D) → `image_style_embeddings`
-7. **understanding_1024** - Voyage AI embedding of Qwen3-VL vision_analysis JSON (1024D) → `image_understanding_embeddings`
+7. **understanding_1024** - Voyage AI embedding (1024D) of Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre-2026-05-01 used Qwen3-VL JSON; the migration retired Qwen vision (HF endpoint had been 404-ing for months — was already 100% Claude in practice). Provenance fields `embedding_model` + `schema_version` persisted on every row. → `image_understanding_embeddings`
 
 Legacy 1152D SigLIP-SO400M and 512D CLIP collections, as well as the fused `multimodal_2048` vector, were dropped in 2026-04.
 

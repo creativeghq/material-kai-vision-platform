@@ -45,8 +45,8 @@ The `ai_config` object accepts the following optional fields:
 - `text_embedding_model` — Default: "voyage-4"
 - `text_embedding_dimensions` — Default: 1024
 - `text_embedding_input_type` — Default: "document"
-- `classification_primary_model` — Default: "Qwen/Qwen3-VL-32B-Instruct"
-- `classification_validation_model` — Default: "claude-opus-4-7"
+- `classification_primary_model` — Default: "claude-opus-4-7" (post-2026-05-01: vision is Anthropic-only via Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. Pre-2026-05-01 default was `Qwen/Qwen3-VL-32B-Instruct` with Claude validation; the Qwen HF endpoint had been 404-ing for months → retired.)
+- `classification_validation_model` — Default: "claude-opus-4-7" (post-2026-05-01: same as primary; the two-stage Qwen→Claude pipeline was collapsed to single-stage Claude tool use)
 - `classification_confidence_threshold` — Default: 0.7
 - `discovery_model` — Default: "claude-opus-4-7"
 - `metadata_extraction_model` — Default: "claude"
@@ -65,7 +65,7 @@ The `ai_config` object accepts the following optional fields:
 - Uses Claude Opus 4.7 for discovery and metadata
 - Uses SLIG (SigLIP2) for visual embeddings (768D, HuggingFace endpoint)
 - Uses Voyage AI voyage-4 for text embeddings (1024D)
-- Uses Qwen3-VL-32B-Instruct for vision classification (HuggingFace endpoint) with Claude validation
+- Uses Claude Opus 4.7 via Anthropic tool use for vision classification (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 used Qwen3-VL-32B-Instruct with Claude validation; the Qwen HF endpoint had been 404-ing for months → retired.
 
 **FAST_CONFIG** (Speed Optimized):
 - Uses GPT-4o instead of Claude for faster processing
@@ -113,22 +113,19 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - It receives ALL images and classifies each one
 - Uses AI to determine if each image is material-related or not
 
-**AI Processing**:
-- **Stage 1 - Qwen Vision (Fast & Accurate)**:
-  - Model: `Qwen/Qwen3-VL-32B-Instruct` (HuggingFace Endpoint)
+**AI Processing** (post-2026-05-01 — single-stage Claude vision via Anthropic tool use; the previous two-stage Qwen→Claude pipeline was collapsed when Qwen was retired):
+
+- **Single Stage — Claude Vision (Schema-locked)**:
+  - Model: `claude-opus-4-7` (Anthropic) via Anthropic tool use
+  - Schema: `VisionAnalysis` Pydantic model in `app/models/vision_analysis.py` enforced by `VISION_ANALYSIS_TOOL` — no JSON regex recovery; hard guarantee of schema adherence
   - Classifies images into 3 categories:
     - `material_closeup`: Close-up of material texture/surface/pattern
     - `material_in_situ`: Material shown in application/context
     - `non_material`: NOT material-related (faces, logos, charts, text)
-  - Returns confidence score (0-1)
+  - Returns confidence score (0-1) and detailed reasoning
   - Concurrency: 5 parallel calls
 
-- **Stage 2 - Claude Validation (High Quality)**:
-  - Model: `Claude Opus 4.7` (Anthropic)
-  - Only validates images with confidence < threshold (default: 0.7)
-  - Provides detailed reasoning for classification
-  - Improves accuracy for edge cases
-  - Concurrency: 2 parallel calls
+  **Historical (pre-2026-05-01)**: Stage 1 ran `Qwen/Qwen3-VL-32B-Instruct` on a HuggingFace endpoint, Stage 2 fell back to Claude only when Qwen confidence was below threshold. Audit revealed the Qwen endpoint had been 404-ing for months — every Qwen call timed out in 0.7s and silently fell through to Claude. The migration retired the Qwen call entirely so the architecture matches what was actually running.
 
 **Defaults**:
 - Uses `DEFAULT_AI_CONFIG` if `ai_config` not provided
@@ -368,7 +365,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 ### AI Models Used
 1. **Product Discovery**: Claude Opus 4.7 or GPT-5 (configurable)
-2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Opus 4.7 (validation)
+2. **Image Classification**: Claude Opus 4.7 via Anthropic tool use (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01: Qwen3-VL-32B-Instruct → Claude validation; Qwen retired (HF endpoint 404-ing for months).
 3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
 4. **Text Embeddings**: Voyage AI voyage-4 (1024D) — sole provider (updated 2026-04)
 
@@ -388,7 +385,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 ## 📊 Progress Tracking
 
 ### Pipeline Stages (50-100%)
-- **50-60%**: Image Classification (Qwen3-VL-32B + Claude)
+- **50-60%**: Image Classification (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass; Qwen retired)
 - **60-65%**: Image Upload (Supabase Storage)
 - **65-75%**: Save Images & SLIG Embeddings (5 per image, 768D each)
 - **75-85%**: Chunking & Text Embeddings (Voyage AI 1024D)
@@ -407,7 +404,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 ### What Each Endpoint Does
 
-1. **classify-images**: AI classification (Qwen3-VL-32B → Claude) to filter material vs non-material images
+1. **classify-images**: AI classification via Claude Opus 4.7 Anthropic tool use (post-2026-05-01 — sole vision pass; Qwen retired) to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
 3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via HuggingFace endpoint)
 4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-4 1024D)
@@ -416,7 +413,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 ### Default Processing Flow
 
 1. Extract ALL images from PDF
-2. Classify ALL images with AI (Qwen3-VL-32B + Claude) → **material_images** + non_material_images
+2. Classify ALL images with AI (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass; Qwen retired) → **material_images** + non_material_images
 3. Upload ONLY **material_images** to storage → **uploaded_images**
 4. Save ONLY **uploaded_images** to database
 5. Generate 5 visual embeddings per saved image (SLIG 768D via HuggingFace endpoint)
@@ -427,7 +424,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 ### Key Features
 
 - ✅ **Focused extraction by default** (only material images)
-- ✅ **Two-stage AI classification** (Qwen3-VL-32B fast, Claude validation)
+- ✅ **Single-stage AI classification** (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`; pre-2026-05-01 was a two-stage Qwen→Claude pipeline that collapsed to single-stage when Qwen was retired)
 - ✅ **5 visual embeddings per image** (SLIG 768D via HuggingFace endpoint: visual, color, texture, style, material)
 - ✅ **High-quality text embeddings** (Voyage AI voyage-4 1024D)
 - ✅ **Semantic chunking** with product boundary respect

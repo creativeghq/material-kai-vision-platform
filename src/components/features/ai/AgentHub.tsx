@@ -1632,7 +1632,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 const pdfMsg: Message = {
                   id: `msg-sheet-pdf-${Date.now()}`,
                   role: 'assistant',
-                  content: `${chunk.title || 'Sheet'} ready (${chunk.sheet_type.replace(/_/g, ' ')}). ${
+                  content: `${chunk.title || 'Tool output'} ready (${chunk.sheet_type.replace(/_/g, ' ')}). ${
                     chunk.page_count != null ? `${chunk.page_count} page${chunk.page_count === 1 ? '' : 's'}.` : ''
                   }`,
                   timestamp: new Date(),
@@ -1641,7 +1641,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   sheetPdfData: {
                     sheet_id: chunk.sheet_id,
                     sheet_type: chunk.sheet_type,
-                    title: chunk.title || 'Sheet',
+                    title: chunk.title || 'Tool output',
                     pdf_url: chunk.pdf_url,
                     page_count: chunk.page_count,
                     credits_used: chunk.credits_used,

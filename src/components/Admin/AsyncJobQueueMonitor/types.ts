@@ -36,6 +36,32 @@ export interface ProductProgress {
   updated_at: string;
 }
 
+// Aggregate error rollup written by `update_job_failure_summary` SQL RPC.
+// NULL on healthy jobs; non-null when something needs attention.
+export interface JobFailureSummary {
+  products_failed: number;
+  products_failed_by_stage: Record<string, number>;
+  ocr_failures: number;
+  ocr_retries_succeeded: number;
+  recovery_attempts: number;
+  recovery_succeeded: number;
+  recovery_exhausted: number;
+  computed_at: string;
+}
+
+// Row from the `pipeline_errors` SQL view (unified across 4 sources).
+export interface PipelineError {
+  source: 'product_failure' | 'job_failure' | 'ocr_failure' | 'recovery_attempt';
+  job_id: string;
+  product_id: string | null;
+  product_name: string | null;
+  stage: string | null;
+  error_message: string | null;
+  occurred_at: string | null;
+  severity: 'error' | 'warning' | 'info';
+  context: Record<string, any> | null;
+}
+
 export interface BackgroundJob {
   id: string;
   workspace_id: string;
@@ -55,6 +81,8 @@ export interface BackgroundJob {
   total_ai_cost_usd?: number;
   total_credits_used?: number;
   user_id?: string;
+  // Error observability rollup (added 2026-05-02). NULL on clean jobs.
+  failure_summary?: JobFailureSummary | null;
   metadata: {
     filename?: string;
     stage?: string;
