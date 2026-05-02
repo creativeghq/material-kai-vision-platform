@@ -34,6 +34,8 @@ import { RecommendationsService } from '@/services/recommendationsService';
 import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { supabase } from '@/integrations/supabase/client';
 import { getProductName, getManufacturer } from '@/utils/productMetadata';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { MoodboardSheetsTab } from './MoodboardSheetsTab';
 
 // ─── Helper: pick the most visually interesting hero image ────────────────────
 // Priority: generated images > 3D/VR/video renders > products with rich metadata > first available
@@ -445,8 +447,27 @@ export const MoodBoardDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Products Grid ─────────────────────────────────────────────────── */}
+      {/* ── Tabs: Products grid | Sheets ───────────────────────────────────── */}
       <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <Tabs defaultValue="products" className="space-y-4">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger
+              value="products"
+              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Layers className="h-4 w-4" />
+              Items
+            </TabsTrigger>
+            <TabsTrigger
+              value="sheets"
+              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <FileText className="h-4 w-4" />
+              Sheets
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products" className="m-0">
         {items.length === 0 ? (
           <div className="dashboard-card rounded-2xl p-12 text-center">
             <p className="text-muted-foreground mb-4">No products in this moodboard yet</p>
@@ -545,6 +566,17 @@ export const MoodBoardDetailPage: React.FC = () => {
             })}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="sheets" className="m-0">
+            {moodboard && (
+              <MoodboardSheetsTab
+                moodboardId={moodboard.id}
+                moodboardTitle={moodboard.title}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* ── Product Detail Modal ──────────────────────────────────────────── */}

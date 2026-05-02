@@ -132,6 +132,14 @@ Complete documentation for Material Kai Vision Platform.
 - Replicate proplabs model, 20 credits, ~56s
 - 8 room types, 8 furniture styles
 
+**[moodboard-presentation-sheets.md](moodboard-presentation-sheets.md)** - Moodboard Presentation Sheets ✨ NEW (2026-05-02)
+- 8 client-ready sheet types: Material Board, Color Palette, Concept Board, Lighting Plan, Annotated Render, Elevation+Render Pair, FF&E Schedule, Full Deck
+- A3-landscape PDFs via pdf-lib in `generate-moodboard-sheet-pdf` edge function
+- Generated through KAI agent chat via `generate_presentation_sheet` tool (0/2/3 cr per type)
+- Interactive types open canvas widgets in chat (CalloutCanvas, DimensionCanvas, FixtureSymbolCanvas)
+- Persistent + editable: every sheet is a row in `moodboard_presentation_sheets` with JSONB `data`
+- Sheets tab on every moodboard at `/moodboard/:id`
+
 **[interior-video-generation.md](interior-video-generation.md)** - Interior Video Generation ✨ NEW
 - 4 models: Veo-2 (30cr), Kling v3.0 (20cr), Wan 2.1 (12cr), Runway Gen4 (40cr)
 - 5 video types with auto model routing

@@ -415,6 +415,55 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 
+## Presentation Sheets — moodboard sheets via the KAI agent (2026-05-02)
+
+Eight client-ready sheet types attached to a moodboard. Generated through the KAI agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `moodboard-sheets` storage bucket. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.
+
+**Sheet types + credit cost** (debited from user balance via `debit_user_credits` RPC, mirrored to `ai_usage_logs.operation_type='presentation_sheet_<type>'`):
+
+| Type | Cost | Interactive? | Inputs |
+|---|---|---|---|
+| `material_board` | 0 cr | No | `product_ids[]` (cap 8) + optional `chip_descriptions{product_id: text}` |
+| `color_palette` | 0 cr | No | `swatches[{hex, name, source_image_id?}]` (cap 8) |
+| `concept_board` | 0 cr | No | `layout[{image_url, caption?}]` (cap 6) |
+| `lighting_plan` | 3 cr | Yes | `backdrop`, `symbols[{type, x, y, label?}]` (normalized 0..1), `legend[]` |
+| `annotated_render` | 3 cr | Yes | `backdrop_image_url`, `annotations[{x, y, line_endpoint_x, line_endpoint_y, label, product_id?, source}]` |
+| `elevation_render_pair` | 2 cr | Yes | `elevation_image_url`, `render_image_url?`, `dimensions[{x1,y1,x2,y2,value,unit}]`, `tile_callouts[]` |
+| `ffe_schedule` | 0 cr | No | `quote_id` (preferred — pulls items) OR explicit `items[]` |
+| `full_deck` | 3 cr | No | `included_sheet_ids[]` ordered + `cover{title, description?, client_name?, cover_image_url?, date}` |
+
+**Interactive vs passive**: passive types render the PDF immediately when the agent calls the tool. Interactive types (lighting / annotated / elevation) emit a `sheet_canvas_open` chunk → the chat surface mounts a `SheetCanvasCard` widget so the user finishes the inputs in-canvas → the canvas calls `moodboardSheetsService.generatePdf()` which invokes the edge function.
+
+**Coordinate convention**: every annotation, dimension, and symbol is stored as **normalized [0..1]** relative to the backdrop image. The PDF builder uses the same convention, so widgets and PDFs stay in sync regardless of pixel dimensions.
+
+**Pieces on disk:**
+
+- DB:
+  - Migration: [`supabase/migrations/20260502_moodboard_presentation_sheets.sql`](supabase/migrations/20260502_moodboard_presentation_sheets.sql) — `moodboard_presentation_sheets` table, `moodboard_sheet_type` + `moodboard_sheet_status` enums, RLS, `moodboard-sheets` storage bucket, `updated_at` trigger.
+  - Prompt addendum: [`supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql`](supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql) — appends sheet-tool guidance to the `kai` and `interior-designer` prompt rows. Idempotent (uses `--END_PRESENTATION_SHEETS_ADDENDUM--` marker).
+- Edge function: [`supabase/functions/generate-moodboard-sheet-pdf/`](supabase/functions/generate-moodboard-sheet-pdf/) — `index.ts` (router), `builders.ts` (one builder per sheet type), `data-fetcher.ts` (sheet/moodboard/products/quote-items/sub-sheet fetchers), `layout.ts` (A3 helpers, title block, `hexToRgb`, `wrapText`, `embedImageBytes`), `types.ts`. Uses `pdf-lib`.
+- Agent tool: [`supabase/functions/_shared/tools/presentation-sheet-tool.ts`](supabase/functions/_shared/tools/presentation-sheet-tool.ts) — `generate_presentation_sheet`. Validates moodboard ownership → debits credits → inserts sheet row → emits chunk (`sheet_canvas_open` for interactive, `sheet_pdf_ready` for passive after invoking the edge function). Refunds on insert failure.
+- Agent registration: [`supabase/functions/agent-chat/index.ts`](supabase/functions/agent-chat/index.ts) — added `generate_presentation_sheet` to the `kai` and `interior-designer` `tools[]` arrays + lazy-import block + tool-push block (all-users gating; per-sheet cost handled inside the tool).
+- Frontend service: [`src/services/moodboardSheetsService.ts`](src/services/moodboardSheetsService.ts) — `list/get/create/update/remove/refreshPdfUrl/generatePdf`. Exports `SHEET_TYPE_LABELS` and `SHEET_TYPE_CREDITS`.
+- Frontend widgets: [`src/components/features/sheets/`](src/components/features/sheets/) — `AnnotationLayer` (shared backdrop with normalized-coord render-prop API), `CalloutCanvas` (annotated_render — drag anchor + endpoint, edit labels), `DimensionCanvas` (elevation_render_pair — two-click dimensions, single-click tile callouts), `FixtureSymbolCanvas` (lighting_plan — fixture palette + drag placement, supports both upload and rectangle backdrops), `SheetCanvasCard` (chat dispatcher → mounts the right canvas), `SheetPreviewCard` (chat preview with iframe + download).
+- Frontend chat surface: [`src/components/features/ai/AgentHub.tsx`](src/components/features/ai/AgentHub.tsx) — handles `sheet_created` (log only), `sheet_canvas_open` (creates `sheetCanvasData` message → renders `SheetCanvasCard`), `sheet_pdf_ready` (creates `sheetPdfData` message → renders `SheetPreviewCard`).
+- Moodboard tab: [`src/components/business/moodboard/MoodboardSheetsTab.tsx`](src/components/business/moodboard/MoodboardSheetsTab.tsx) — sheet list with status badges, "+ New Sheet" dropdown grouped (Boards / Plans / Schedules / Decks). Clicking a sheet type navigates to `/agent-hub?agent=kai&q=<seeded-prompt>` so the KAI agent can drive the flow.
+- Moodboard page: [`src/components/business/moodboard/MoodBoardDetailPage.tsx`](src/components/business/moodboard/MoodBoardDetailPage.tsx) — wrapped in `Tabs` (Items / Sheets).
+
+**Chunk types** (agent → AgentHub):
+- `sheet_created` — debit acknowledged, sheet row inserted (just for logging)
+- `sheet_canvas_open` — interactive widget should mount; payload `{sheet_id, sheet_type, moodboard_id, initial_data, title}`
+- `sheet_pdf_ready` — passive sheet rendered; payload `{sheet_id, sheet_type, title, pdf_url, page_count, credits_used}`
+
+**Storage**: PDFs at `moodboard-sheets/moodboards/{moodboard_id}/sheet-{sheet_id}.pdf`. 7-day signed URLs (longer than the quote bucket because clients keep reopening these). Bucket is private; service role writes, authed users read via signed URL.
+
+**To activate** after pulling this branch: (1) apply both SQL migrations via Supabase, (2) `supabase functions deploy generate-moodboard-sheet-pdf`, (3) redeploy `agent-chat` so the new tool is loaded. Frontend ships with the next regular build.
+
+**Known follow-ups (NOT shipped 2026-05-02):**
+1. Auto Vision pre-fill for `annotated_render`. Today the agent passes `annotations: []` and the user adds them all in the canvas. The schema already supports `source: 'ai' | 'auto'` so plugging in a Claude Vision pass over the backdrop is a tool-side change only.
+2. Auto color extraction for `color_palette`. Today the agent supplies the swatches manually. The `image_color_embeddings` (768D SLIG) collection plus a "top-K-cluster" service would auto-extract from any moodboard image.
+3. Custom branding on title block. Spec says no branding for v1; user-profile-driven branding (logo, contact info) was deferred — the title block has 4 columns with PROJECT / SHEET / TYPE / DATE only.
+
 ## FF&E Specification on Quotes
 - **New fields on `quote_items`**: `room`, `dimensions`, `installation_requirements`, `delivery_date`
 - **QuoteItemsList**: Room column, dimensions appended to product name, expandable detail row (notes + installation + delivery)

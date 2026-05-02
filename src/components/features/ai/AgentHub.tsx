@@ -76,6 +76,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { SearchSpecCard } from './SearchSpecCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
+import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
+import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
@@ -264,6 +266,21 @@ interface Message {
     board_mode: 'presentation-board' | 'selection-board' | 'photorealistic-render';
     credits_used: number;
   }; // Materials Selection Board result
+  sheetCanvasData?: {
+    sheet_id: string;
+    sheet_type: 'lighting_plan' | 'annotated_render' | 'elevation_render_pair';
+    moodboard_id: string;
+    initial_data: Record<string, any>;
+    title?: string;
+  }; // Interactive presentation sheet awaiting canvas input
+  sheetPdfData?: {
+    sheet_id: string;
+    sheet_type: 'material_board' | 'color_palette' | 'concept_board' | 'lighting_plan' | 'annotated_render' | 'elevation_render_pair' | 'ffe_schedule' | 'full_deck';
+    title: string;
+    pdf_url: string;
+    page_count?: number;
+    credits_used?: number;
+  }; // Rendered presentation sheet PDF ready for download
 }
 
 interface AgentHubProps {
@@ -1573,6 +1590,78 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   ...chunk.spec,
                   query: chunk.query,
                 };
+              } else if (chunk.type === 'sheet_created') {
+                // Lightweight ack — passive sheets follow up with sheet_pdf_ready,
+                // interactive sheets follow up with sheet_canvas_open. We only
+                // need to surface a transient note; the dedicated cards below carry
+                // the actual UI.
+                logger.info(`Sheet created: ${chunk.sheet_type} (${chunk.sheet_id})`, {
+                  service: 'AgentHub',
+                  metadata: { sheet_id: chunk.sheet_id, sheet_type: chunk.sheet_type, credits_used: chunk.credits_used },
+                });
+              } else if (chunk.type === 'sheet_canvas_open') {
+                const canvasMsg: Message = {
+                  id: `msg-sheet-canvas-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Sheet ready for editing — use the canvas below to ${
+                    chunk.sheet_type === 'lighting_plan' ? 'place fixture symbols'
+                    : chunk.sheet_type === 'annotated_render' ? 'review and edit callouts'
+                    : 'add dimensions and tile callouts'
+                  }, then click Render PDF.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  sheetCanvasData: {
+                    sheet_id: chunk.sheet_id,
+                    sheet_type: chunk.sheet_type,
+                    moodboard_id: chunk.moodboard_id,
+                    initial_data: chunk.initial_data || {},
+                    title: chunk.title,
+                  },
+                };
+                setMessages(prev => [...prev, canvasMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: canvasMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, sheetCanvasData: canvasMsg.sheetCanvasData },
+                  });
+                }
+              } else if (chunk.type === 'sheet_pdf_ready') {
+                const pdfMsg: Message = {
+                  id: `msg-sheet-pdf-${Date.now()}`,
+                  role: 'assistant',
+                  content: `${chunk.title || 'Sheet'} ready (${chunk.sheet_type.replace(/_/g, ' ')}). ${
+                    chunk.page_count != null ? `${chunk.page_count} page${chunk.page_count === 1 ? '' : 's'}.` : ''
+                  }`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  sheetPdfData: {
+                    sheet_id: chunk.sheet_id,
+                    sheet_type: chunk.sheet_type,
+                    title: chunk.title || 'Sheet',
+                    pdf_url: chunk.pdf_url,
+                    page_count: chunk.page_count,
+                    credits_used: chunk.credits_used,
+                  },
+                };
+                setMessages(prev => [...prev, pdfMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: pdfMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, sheetPdfData: pdfMsg.sheetPdfData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: pdfMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
               } else if (chunk.type === 'final_result') {
                 finalResult = chunk;
               } else if (chunk.type === 'tool_error') {
@@ -2258,7 +2347,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-[#3E192A] text-white shadow-sm'
@@ -2435,6 +2524,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             </Button>
                           </a>
                         </div>
+                      </div>
+                    ) : message.sheetCanvasData ? (
+                      <div className="space-y-3">
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        <SheetCanvasCard
+                          sheetId={message.sheetCanvasData.sheet_id}
+                          sheetType={message.sheetCanvasData.sheet_type}
+                          moodboardId={message.sheetCanvasData.moodboard_id}
+                          initialData={message.sheetCanvasData.initial_data}
+                          title={message.sheetCanvasData.title}
+                        />
+                      </div>
+                    ) : message.sheetPdfData ? (
+                      <div className="space-y-3">
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        <SheetPreviewCard
+                          sheetId={message.sheetPdfData.sheet_id}
+                          sheetType={message.sheetPdfData.sheet_type}
+                          title={message.sheetPdfData.title}
+                          pdfUrl={message.sheetPdfData.pdf_url}
+                          pageCount={message.sheetPdfData.page_count}
+                          creditsUsed={message.sheetPdfData.credits_used}
+                        />
                       </div>
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">

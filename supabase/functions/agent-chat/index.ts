@@ -803,6 +803,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
+      'generate_presentation_sheet',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -835,6 +837,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'material_search', 'generate_3d', 'analyze_inspiration_url',
       // Image-driven post-processing tools (require an existing room image in the conversation)
       'apply_lighting_preset', 'generate_vr_world',
+      // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
+      'generate_presentation_sheet',
     ],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
@@ -1031,17 +1035,19 @@ async function executeAgent(
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
+  const needsPresentation = config.tools.includes('generate_presentation_sheet');
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod]: any[] = await Promise.all([
-    needsSearch ? import('../_shared/tools/search-tools.ts') : null,
-    needsGen    ? import('../_shared/tools/generation-tools.ts') : null,
-    needsOps    ? import('../_shared/tools/ops-tools.ts') : null,
-    needsDb     ? import('../_shared/tools/database-tools.ts') : null,
-    needsSub    ? import('../_shared/tools/sub-agent-tools.ts') : null,
-    needsB2b    ? import('../_shared/tools/b2b-tools.ts') : null,
-    needsSeo    ? import('../_shared/tools/seo-tools.ts') : null,
-    needsBg     ? import('../_shared/tools/background-tools.ts') : null,
-    needsPrice  ? import('../_shared/tools/price-tools.ts') : null,
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod, presentationMod]: any[] = await Promise.all([
+    needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
+    needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
+    needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
+    needsDb           ? import('../_shared/tools/database-tools.ts') : null,
+    needsSub          ? import('../_shared/tools/sub-agent-tools.ts') : null,
+    needsB2b          ? import('../_shared/tools/b2b-tools.ts') : null,
+    needsSeo          ? import('../_shared/tools/seo-tools.ts') : null,
+    needsBg           ? import('../_shared/tools/background-tools.ts') : null,
+    needsPrice        ? import('../_shared/tools/price-tools.ts') : null,
+    needsPresentation ? import('../_shared/tools/presentation-sheet-tool.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1075,6 +1081,7 @@ async function executeAgent(
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
+  const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
 
   // --- Core tools (all users) ---
 
@@ -1107,6 +1114,11 @@ async function executeAgent(
   // Inspiration URL analysis (all users) — scrape a design URL and find matching materials
   if (config.tools.includes('analyze_inspiration_url')) {
     tools.push(createInspirationUrlTool(userId, workspaceId, onChunk));
+  }
+
+  // Presentation sheet generator (all users; per-sheet credit cost handled inside the tool)
+  if (config.tools.includes('generate_presentation_sheet') && createPresentationSheetTool) {
+    tools.push(createPresentationSheetTool(userId, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
