@@ -65,7 +65,22 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const [filterSentiment, setFilterSentiment] = useState<string>('');
 
   useEffect(() => {
-    isAdminRole().then(setAdmin);
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role_id')
+        .eq('user_id', auth.user.id)
+        .maybeSingle();
+      if (!profile?.role_id) return;
+      const { data: role } = await supabase
+        .from('roles')
+        .select('name')
+        .eq('id', profile.role_id)
+        .maybeSingle();
+      setAdmin(isAdminRole(role?.name as string | null));
+    })();
   }, []);
 
   const load = useCallback(async () => {
