@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 import type {
   SEOPipelineRequest,
   SEOPipelineResponse,
@@ -358,10 +359,15 @@ Deno.serve(async (req) => {
       .sort((a: any, b: any) => b.relevance - a.relevance)
       .slice(0, 10);
 
+    // Site-aware inter-linking: match this article's plan against the user's
+    // indexed website pages (if they've connected one in profile settings).
+    const siteArticles = await buildSiteMatches(supabase, userId, plan, finalMarkdown);
+
     const interlinkingData = {
       suggestedLinks: extractInternalLinks(finalMarkdown),
       existingArticles,
       competitorArticles: research.serpInsights.slice(0, 10),
+      siteArticles,
     };
 
     // Calculate processing time and credits
@@ -668,4 +674,117 @@ function extractInternalLinks(
     targetTopic: m[2].trim(),
     reason: 'Suggested by article content',
   }));
+}
+
+/**
+ * Match this article's plan against the user's indexed website pages.
+ *
+ * Strategy:
+ *  1. Check the user has a connected website (user_websites where is_active and is_default).
+ *     Falls back to any active website if no default is set.
+ *  2. Build an embedding from the article's plan (title + meta + section headings + secondary keywords).
+ *  3. Call match_user_website_pages RPC for top 8 semantic matches.
+ *  4. For each match, propose an anchor text by picking the secondary keyword most likely to fit.
+ *
+ * Silent-failure-safe: any error returns empty array — inter-linking simply omits the section.
+ */
+async function buildSiteMatches(
+  supabase: any,
+  userId: string,
+  plan: ArticlePlan,
+  finalMarkdown: string,
+): Promise<{
+  url: string;
+  title: string | null;
+  description: string | null;
+  relevance: number;
+  anchorSuggestion: string;
+  alreadyLinked: boolean;
+}[]> {
+  try {
+    // Pick the user's default (or any active) website
+    const { data: sites } = await supabase
+      .from('user_websites')
+      .select('id, url')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .order('last_crawled_at', { ascending: false })
+      .limit(1);
+
+    if (!sites || sites.length === 0) return [];
+    const websiteId = sites[0].id as string;
+
+    // Build a compact summary of the planned article for embedding
+    const sectionHeadings = collectHeadings(plan.sections).slice(0, 30).join(' | ');
+    const summary = [
+      plan.title,
+      plan.metaDescription,
+      `Primary: ${plan.primaryKeyword}`,
+      `Secondary: ${plan.secondaryKeywords.slice(0, 15).join(', ')}`,
+      `Sections: ${sectionHeadings}`,
+    ].filter(Boolean).join('\n');
+
+    let embedding: number[];
+    try {
+      embedding = await generateStandardEmbedding(summary, 'query', { operationType: 'seo_interlink_match' });
+    } catch (e) {
+      console.warn('[seo-pipeline] interlink embedding failed:', (e as Error).message);
+      return [];
+    }
+
+    const { data: matches, error } = await supabase.rpc('match_user_website_pages', {
+      p_user_id: userId,
+      p_query_embedding: embedding,
+      p_match_threshold: 0.55,
+      p_limit: 8,
+      p_website_id: websiteId,
+    });
+
+    if (error || !matches) {
+      if (error) console.warn('[seo-pipeline] match_user_website_pages error:', error.message);
+      return [];
+    }
+
+    // Detect URLs already linked from the draft, so the UI can skip them
+    const linkedUrls = new Set<string>(
+      [...finalMarkdown.matchAll(/\]\(([^)\s]+)/g)].map((m) => m[1].trim()),
+    );
+
+    const result = (matches as any[]).map((row) => ({
+      url: row.url as string,
+      title: row.title as string | null,
+      description: row.description as string | null,
+      relevance: Number(row.similarity),
+      anchorSuggestion: pickAnchor(plan, row.title, row.description),
+      alreadyLinked: linkedUrls.has(row.url),
+    }));
+
+    return result;
+  } catch (e) {
+    console.warn('[seo-pipeline] buildSiteMatches failed:', (e as Error).message);
+    return [];
+  }
+}
+
+function collectHeadings(sections: any[]): string[] {
+  const out: string[] = [];
+  const walk = (arr: any[]) => {
+    for (const s of arr || []) {
+      if (s?.heading) out.push(String(s.heading));
+      if (s?.subsections?.length) walk(s.subsections);
+    }
+  };
+  walk(sections);
+  return out;
+}
+
+/** Pick the secondary keyword that best appears in the target page's title/description, else fall back to title. */
+function pickAnchor(plan: ArticlePlan, pageTitle: string | null, pageDescription: string | null): string {
+  const haystack = `${pageTitle || ''} ${pageDescription || ''}`.toLowerCase();
+  for (const kw of [plan.primaryKeyword, ...plan.secondaryKeywords]) {
+    if (!kw) continue;
+    if (haystack.includes(kw.toLowerCase())) return kw;
+  }
+  return pageTitle || plan.primaryKeyword;
 }

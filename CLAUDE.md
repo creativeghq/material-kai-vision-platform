@@ -415,6 +415,112 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 
+## Mention Monitoring (2026-05-03 — multi-source mention tracking + LLM visibility)
+
+Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs, RSS, YouTube, and LLM responses**. Two flow shapes (same `tracked_mentions` row, distinguished by which FK is set):
+
+- `api_key_id IS NULL AND product_id IS NOT NULL AND subject_type='product'` → internal product flow
+- `api_key_id IS NULL AND product_id IS NULL AND brand_name IS NOT NULL AND subject_type IN ('brand','keyword')` → internal brand/keyword flow
+- `api_key_id IS NOT NULL` → external API consumer flow
+
+**Pipeline** (every refresh):
+1. Decompose subject into facets via Haiku (cached on `tracked_mentions.subject_facets`).
+2. Discover in parallel across enabled sources: **DataForSEO News** (~$0.0006/req), **Perplexity Sonar** ($0.005/sweep, sonar-pro only on first/forced refresh), **RSS** (free, user-curated), **YouTube** (free, opt-in). Reddit was dropped 2026-05-03 — Responsible Builder Policy onboarding wasn't worth the friction for marginal coverage.
+3. URL canonicalize + content-hash dedupe across sources.
+4. Apply exclusions + promoted-URL overrides.
+5. Rule pre-filter (alias must appear) — drops obvious mismatches before Haiku.
+6. Verdict cache lookup (7d TTL keyed on `sha1(content_hash + subject_facets_hash)`) — repeat URLs hit cache.
+7. Haiku 4.5 batched classifier (≤50 candidates per call): **relevance** ∈ {exact, tangential, mismatch, unverifiable}, **sentiment** ∈ {positive, neutral, negative}.
+8. Drop `relevance='mismatch'`. Sanity-check sentiment outliers vs trailing 7d → flag `is_anomaly`.
+9. Persist `mention_history` rows. Update denormalized cache on `tracked_mentions`. Update volatility cadence (24h → 48h → 72h → 168h on stable subjects, 6h on active ones).
+10. Detect alerts → dispatch via the `mention-monitoring-notifications` module.
+
+**LLM mention probes** ([mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py](mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py)) — weekly cadence. 4 probe templates (generic recommendation / use-case / comparison / direct lookup) × 4 cheap models (`claude-haiku-4-5`, `gpt-4o-mini`, `gemini-2.0-flash`, `sonar`) = 16 calls/subject/week ≈ $0.008. Each response post-processed by Haiku tool use (`record_mention`) to extract: `mentioned`, `position`, `sentiment`, `competitors_mentioned[]`, `context_snippet`. Snapshot exposed via `/llm-visibility` endpoint with share-of-voice + avg-rank + top co-mentioned competitors.
+
+**Cost discipline** (mirrors price v3):
+- Verdict cache: ~95% cache rate on stable subjects across daily refreshes.
+- Rule pre-filter eliminates ~60% of candidates before Haiku.
+- Tier-skip: cheap `sonar` by default, `sonar-pro` only on first/forced refresh.
+- Volatility cadence stretches stable subjects to weekly polling.
+- RSS + YouTube are free; DataForSEO News is the cheapest paid source.
+- Typical refresh: ~$0.005–0.010 on a stable subject.
+
+**Tables** ([supabase/migrations/20260503_mention_monitoring_module.sql](supabase/migrations/20260503_mention_monitoring_module.sql)):
+- `tracked_mentions` — subject. Includes denormalized snapshot (`current_mention_count_7d`, `current_sentiment_avg`, `current_top_outlets`).
+- `mention_history` — append-only mention rows. `(tracked_mention_id, canonical_url, refresh_run_id)` unique to prevent double-insert per run.
+- `llm_mention_probes` — per-(template × model) probe attempts.
+- `mention_outlets` — outlet reputation cache (`domain_authority` 0-100, `is_aggregator`, `is_press_release_wire`).
+- `mention_classifier_verdict_cache` — 7d TTL.
+- `mention_promoted_urls` / `mention_excluded_urls` — admin overrides.
+- `mention_match_corrections` — classifier feedback (recent rows are few-shot examples).
+- `mention_alert_log` — alert audit + 24h dedupe.
+
+**RPCs**: `get_internal_tracked_mentions_due`, `get_tracked_mentions_due_for_llm_probe`, `update_tracked_mention_cadence`, `append_mention_alert_log`.
+
+**Backend surface** ([mivaa-pdf-extractor/app/api/mention_monitoring_routes.py](mivaa-pdf-extractor/app/api/mention_monitoring_routes.py)):
+
+Internal product flow (session JWT):
+- `POST /api/v1/mention-monitoring/products/{id}/track` — find-or-create + first refresh
+- `DELETE /api/v1/mention-monitoring/products/{id}/track` — soft delete
+- `GET /api/v1/mention-monitoring/products/{id}` — read summary row
+- `POST /api/v1/mention-monitoring/products/{id}/refresh` — re-run discovery (`force=true` requires admin)
+- `GET /api/v1/mention-monitoring/products/{id}/feed` — latest run rows
+- `GET /api/v1/mention-monitoring/products/{id}/history?days=&sentiment=&outlet_type=` — historical rows
+- `GET /api/v1/mention-monitoring/products/{id}/summary?days=30` — aggregate snapshot
+- `GET /api/v1/mention-monitoring/products/{id}/llm-visibility` — most recent probe snapshot
+- `POST /api/v1/mention-monitoring/products/{id}/probe-llm` — admin trigger
+
+Subject-id flow (brand/keyword):
+- `POST /track` / `GET|PUT|DELETE /track/{id}` — CRUD
+- `POST /track/{id}/refresh|exclude|include|promote|probe-llm`
+- `GET /track/{id}/feed|history|summary|llm-visibility|exclusions|share-of-voice`
+
+Cross-flow: `/classifier-correction`, `/cron-refresh`, `/cron-probe-llm` (latter two require `x-cron-secret`).
+
+**Cron** (pg_cron):
+- `mention-monitoring-refresh-hourly` (`30 * * * *`) → POSTs to `mention-monitoring-cron` edge function → MIVAA `/cron-refresh`
+- `llm-mention-probe-daily` (`0 3 * * *`) → `llm-mention-probe-cron` edge function → MIVAA `/cron-probe-llm`
+- `mention-classifier-cache-prune` (`0 4 * * *`) → DELETE expired cache rows
+
+**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py](mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py)):
+
+Four alert types, opt-in per subject:
+- `mention_spike` — today's count ≥ 2× trailing 7d daily-average
+- `negative_sentiment` — negative mention from outlet with `domain_authority ≥ 30`
+- `new_outlet` — first-ever mention from a domain
+- `llm_visibility_change` — average position across LLM probes shifts by ≥2 ranks W/W
+
+Channels (CHANNEL_CREDIT_COST): bell (0 cr), email (1 cr via `email-api` edge function with templates `mention_alert.{spike,negative_sentiment,new_outlet,llm_visibility_change}`), webhook (0 cr, per-subject `alert_webhook_url`). 24h dedupe per `(alert_type, tracked_mention_id, outlet_domain)`. Module-gated on `mention-monitoring-notifications`.
+
+**Frontend**:
+- [src/services/mentionMonitoringApi.ts](src/services/mentionMonitoringApi.ts) — single client with product-scoped + subject-scoped helpers.
+- [src/components/business/mention-monitoring/MentionMonitorTab.tsx](src/components/business/mention-monitoring/MentionMonitorTab.tsx) — per-product tab on the product detail modal (admin-only, mounted alongside the Price Monitor tab).
+- [src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx](src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx) — admin cross-catalog view at `/admin/mention-monitoring`.
+- Module folders [src/modules/mention-monitoring/](src/modules/mention-monitoring/) and [src/modules/mention-monitoring-notifications/](src/modules/mention-monitoring-notifications/) for the registry.
+
+**Agent tools** ([supabase/functions/_shared/tools/mention-tools.ts](supabase/functions/_shared/tools/mention-tools.ts)) — registered on the KAI agent:
+- `track_product_mentions` — start/stop tracking (0 cr)
+- `get_mention_summary` — pull rolling snapshot (0 cr)
+- `check_llm_visibility` — read latest snapshot or fire fresh probe with `force_run=true` (2 cr)
+- `find_negative_mentions` — filtered feed for reputation triage (0 cr)
+
+Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types streamed back to AgentHub: `mention_summary`, `llm_visibility_result`, `mention_feed`, `mention_tracking_started`. Each renders as an inline card in chat (handlers in [src/components/features/ai/AgentHub.tsx](src/components/features/ai/AgentHub.tsx) — `mentionSummaryData` / `llmVisibilityData` / `mentionFeedData` message data fields).
+
+**Required secrets** (MIVAA backend):
+- `ANTHROPIC_API_KEY`, `PERPLEXITY_API_KEY`, `DATAFORSEO_BASE64`, `OPENAI_API_KEY`, `CRON_SECRET` — already configured.
+- `YOUTUBE_DATA_API_KEY` — **NEW** (optional, opt-in per subject; free quota 10k/day).
+- `GEMINI_API_KEY` — **NEW** (optional, free tier covers daily probe load).
+- Reddit was evaluated and dropped — Reddit's Responsible Builder Policy onboarding wasn't worth the friction.
+
+**Out of scope for v1** (kept lean to validate the pipeline first):
+- Twitter/X (too expensive, $200/mo for basic tier)
+- TikTok (ToS-hostile, no stable API)
+- Instagram / Facebook mentions on others' pages (no public search)
+- YouTube transcripts (deferred to v2 — opt-in per subject)
+- Firecrawl body fetch on every URL (current pipeline ships title+excerpt to classifier; body fetch is a v2 quality lever)
+
+Full reference: [docs/api/mention-monitoring-api.md](docs/api/mention-monitoring-api.md).
+
 ## Presentation Sheets — moodboard sheets via the KAI agent (2026-05-02)
 
 Eight client-ready sheet types attached to a moodboard. Generated through the KAI agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `moodboard-sheets` storage bucket. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.

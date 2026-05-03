@@ -25,6 +25,7 @@ import { isAdmin as isAdminRole } from '@/auth/roles';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
+import { MentionMonitorTab } from '@/components/business/mention-monitoring/MentionMonitorTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -1603,6 +1604,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <Activity className="h-4 w-4" />
                   Monitor
                 </TabsTrigger>
+                <TabsTrigger value="mentions" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Sparkles className="h-4 w-4" />
+                  Mentions
+                </TabsTrigger>
               </>
             )}
           </TabsList>
@@ -2692,6 +2697,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             productName={product.name}
             currentPrice={product.pricing?.retail}
             currency={product.pricing?.currency}
+          />
+        </TabsContent>
+      )}
+
+      {/* Mentions Tab — Admin only (cross-source mention tracking + LLM visibility) */}
+      {isAdmin && (
+        <TabsContent value="mentions" className="mt-6">
+          <MentionMonitorTab
+            productId={product.id}
+            productName={product.name}
+            manufacturer={(product as any).manufacturer}
           />
         </TabsContent>
       )}

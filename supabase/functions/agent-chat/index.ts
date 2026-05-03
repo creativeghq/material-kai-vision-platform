@@ -817,6 +817,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'dispatch_background_task',
       // Price lookup from Pricing KB category (admin/owner only)
       'price_lookup',
+      // Mention monitoring (all users; per-tool credit cost gated inside the tool)
+      'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -1036,8 +1038,9 @@ async function executeAgent(
   const needsBg = config.tools.includes('dispatch_background_task');
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
+  const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod, presentationMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod, presentationMod, mentionMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1048,6 +1051,7 @@ async function executeAgent(
     needsBg           ? import('../_shared/tools/background-tools.ts') : null,
     needsPrice        ? import('../_shared/tools/price-tools.ts') : null,
     needsPresentation ? import('../_shared/tools/presentation-sheet-tool.ts') : null,
+    needsMention      ? import('../_shared/tools/mention-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1082,6 +1086,10 @@ async function executeAgent(
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
   const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
+  const createTrackProductMentionsTool = mentionMod?.createTrackProductMentionsTool;
+  const createGetMentionSummaryTool = mentionMod?.createGetMentionSummaryTool;
+  const createCheckLlmVisibilityTool = mentionMod?.createCheckLlmVisibilityTool;
+  const createFindNegativeMentionsTool = mentionMod?.createFindNegativeMentionsTool;
 
   // --- Core tools (all users) ---
 
@@ -1119,6 +1127,20 @@ async function executeAgent(
   // Presentation sheet generator (all users; per-sheet credit cost handled inside the tool)
   if (config.tools.includes('generate_presentation_sheet') && createPresentationSheetTool) {
     tools.push(createPresentationSheetTool(userId, onChunk));
+  }
+
+  // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)
+  if (config.tools.includes('track_product_mentions') && createTrackProductMentionsTool) {
+    tools.push(createTrackProductMentionsTool(userId, workspaceId, undefined, onChunk));
+  }
+  if (config.tools.includes('get_mention_summary') && createGetMentionSummaryTool) {
+    tools.push(createGetMentionSummaryTool(userId, undefined, onChunk));
+  }
+  if (config.tools.includes('check_llm_visibility') && createCheckLlmVisibilityTool) {
+    tools.push(createCheckLlmVisibilityTool(userId, undefined, onChunk));
+  }
+  if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
+    tools.push(createFindNegativeMentionsTool(userId, undefined, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached

@@ -147,6 +147,76 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
 function buildWritingSystemPrompt(basePrompt: string, plan: ArticlePlan, brief?: ContentBrief): string {
   let prompt = basePrompt;
 
+  // Modern SEO + AEO (Answer Engine Optimization) scaffolding rules — required for every article.
+  // The frontend reads these conventions to render custom blocks (TL;DR card, Key Takeaways, definitions,
+  // FAQ accordion). Stay strict on these markers — drift breaks the rendering.
+  prompt += `
+
+=== ARTICLE STRUCTURE (REQUIRED — DO NOT SKIP ANY OF THESE) ===
+Every article MUST follow this structure in this exact order:
+
+1. **H1 title** — \`# {plan.title}\` (one line only)
+
+2. **Lead paragraph** — exactly 2–3 sentences (40–70 words). Primary keyword in first 8 words. Hook the reader with the problem or stake. Plain paragraph, no heading.
+
+3. **TL;DR block** — write it as:
+   > [!tldr]
+   > One-sentence answer to the core question (≤ 30 words, primary keyword in this sentence).
+   > Then 2–3 bullet sub-points starting with "- ".
+   This is the AEO / Featured Snippet target — be tight and quotable.
+
+4. **Key Takeaways block** — write it as:
+   > [!key]
+   > - Bullet 1 (≤ 18 words, action-oriented)
+   > - Bullet 2
+   > - Bullet 3
+   > - Bullet 4
+   > - Bullet 5
+   Five bullets, each one a standalone insight.
+
+5. **Body sections** — H2/H3 from the outline.
+   For EVERY H2 section:
+   - First sentence directly answers a question implied by the heading (AEO).
+   - Include either a comparison **table** OR a **bulleted list** somewhere in the section.
+   - Use \`> [!definition]\` blockquote for the first mention of any jargon term, formatted as:
+     > [!definition] Term Name
+     > Plain-language one-sentence definition.
+   - Use \`> [!info]\` for asides, \`> [!warning]\` for risks/pitfalls. Use sparingly (≤ 3 per article each).
+
+6. **Examples / Case Studies** — at least one concrete example block (real product, real number, real scenario) somewhere mid-article. Tag it with \`> [!example]\` blockquote and a 1-line label.
+
+7. **FAQ section** — REQUIRED. H2 heading exactly: "Frequently Asked Questions"
+   Then for each FAQ question (use exactly the questions provided in DYNAMIC CONTEXT):
+   - H3 with the literal question (no markdown styling, no quotes)
+   - Answer immediately following: 40–80 words, plain paragraphs only (no nested lists).
+   The answer's first sentence MUST be a complete, self-contained answer (AEO requirement).
+
+8. **Conclusion** — H2 heading "Conclusion" or "Next Steps".
+   - 2–3 sentence recap that mentions the primary keyword once.
+   - Final paragraph with a single, specific call-to-action (no fluff like "thanks for reading").
+
+=== SEO / AEO RULES ===
+- **Primary keyword density**: appear in title (H1), lead paragraph, TL;DR sentence, ≥1 H2, conclusion. Do NOT keyword-stuff — natural placement only.
+- **Semantic richness**: use 4–6 of the listed LSI terms naturally across the body.
+- **Answer-first paragraphs**: every section opens with the answer, then explains. Inverted pyramid.
+- **Statistics with sources**: when citing a number, attribute it inline like "(Source: Company Name, 2024)".
+- **Self-contained paragraphs**: each paragraph stands alone — search engines can quote it without surrounding context.
+- **Active voice, second person** ("you / your") for instructional/how-to sections.
+- **Sentence length**: vary. Mix short punchy sentences with longer explanatory ones. Avg 14–20 words.
+- **No filler**: skip "in today's world", "in the modern era", "let's dive in", "without further ado". Get to the point.
+- **No em-dashes for asides** — use commas or parens. (Em-dashes ARE fine for direct contrast.)
+
+=== CALLOUT BLOCK REFERENCE (use these exact tags) ===
+> [!tldr]      — TL;DR / direct answer (one per article, after lead)
+> [!key]       — Key Takeaways (one per article, after TL;DR)
+> [!definition] Term Name — first-mention jargon (use as needed)
+> [!example]   — Concrete example or case study (≥1 per article)
+> [!info]      — Side note / clarifying aside
+> [!warning]   — Risk, pitfall, common mistake
+> [!quote]     — Direct quote from a named source (with attribution on the next line)
+
+These blockquote tags are rendered as custom UI components on the frontend — keep formatting tight or they'll break.`;
+
   if (brief) {
     prompt += `
 
@@ -190,19 +260,36 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
 
 function buildWritingUserPrompt(plan: ArticlePlan, brief?: ContentBrief): string {
   const outline = buildOutlineText(plan.sections, 0);
+  const faqList = plan.faqQuestions.length
+    ? plan.faqQuestions.map((q, i) => `   ${i + 1}. ${q}`).join('\n')
+    : '   (no FAQs provided — generate 4–6 reasonable questions matching search intent)';
 
-  return `Write the complete article following this outline exactly:
+  return `Write the complete article following the ARTICLE STRUCTURE rules from the system prompt.
 
+REMEMBER — every article must contain, in this order:
+  1. H1 title
+  2. Lead paragraph (2–3 sentences, 40–70 words)
+  3. \`> [!tldr]\` block (one quotable sentence + 2–3 sub-bullets)
+  4. \`> [!key]\` block with 5 takeaway bullets
+  5. Body sections (matching the outline below)
+  6. At least one \`> [!example]\` block somewhere in the body
+  7. H2 "Frequently Asked Questions" with each question as an H3
+  8. H2 "Conclusion" or "Next Steps" with a CTA
+
+Outline (match these H2/H3 headings exactly, but ADD the structure blocks above):
 ${outline}
 
-${plan.featuredSnippetTarget ? `\nFEATURED SNIPPET TARGET: Write a 40-60 word direct answer for: "${plan.featuredSnippetTarget}"\n` : ''}
+${plan.featuredSnippetTarget ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${plan.featuredSnippetTarget}"\n` : ''}
+
+FAQ QUESTIONS to include verbatim as H3 under "Frequently Asked Questions":
+${faqList}
 
 Primary keyword: ${plan.primaryKeyword}
 Secondary keywords: ${plan.secondaryKeywords.join(', ')}
 LSI terms: ${plan.lsiKeywords.join(', ')}
-Target word count: ${plan.targetWordCount} words
+Target word count: ${plan.targetWordCount} words (±10%)
 
-Write the full article now in Markdown.`;
+Write the full article now in Markdown. Use the callout blockquote syntax (\`> [!tldr]\`, \`> [!key]\`, \`> [!definition] Term\`, \`> [!example]\`, \`> [!info]\`, \`> [!warning]\`) exactly as specified — these become custom UI cards on the frontend.`;
 }
 
 function buildOutlineText(sections: ArticlePlan['sections'], depth: number): string {

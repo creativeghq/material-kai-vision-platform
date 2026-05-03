@@ -1,0 +1,9 @@
+{
+  "slug": "seo-interlinking",
+  "name": "SEO Inter-linking",
+  "description": "Connect a website's sitemap so the SEO article generator can suggest relevant internal links from your real pages, ranked by semantic similarity.",
+  "category": "seo",
+  "priceTier": "pro",
+  "icon": "Globe",
+  "version": "0.1.0"
+}

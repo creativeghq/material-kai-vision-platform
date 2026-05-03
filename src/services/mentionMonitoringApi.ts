@@ -1,0 +1,407 @@
+/**
+ * Mention Monitoring API client.
+ *
+ * Wraps MIVAA's `/api/v1/mention-monitoring/*` endpoints. Mirror of
+ * priceMonitoringApi.ts. Two flow shapes:
+ *   - Product-scoped: /products/{product_id}/...     (internal flow)
+ *   - Subject-scoped: /track/{tracked_mention_id}/...  (brand/keyword + admin)
+ */
+
+import { supabase } from '@/integrations/supabase/client';
+
+const MIVAA_BASE = import.meta.env.VITE_MIVAA_BASE_URL || 'https://v1api.materialshub.gr';
+
+async function authHeader(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Not authenticated');
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${MIVAA_BASE}${path}`, {
+    ...init,
+    headers: { ...(await authHeader()), ...(init?.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`${path} failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────
+
+export type MentionRelevance = 'exact' | 'tangential' | 'mismatch' | 'unverifiable' | null;
+export type MentionSentiment = 'positive' | 'neutral' | 'negative' | null;
+export type MentionOutletType =
+  | 'news' | 'blog' | 'youtube' | 'forum' | 'llm' | 'rss' | 'aggregator' | 'other';
+export type MentionAlertType =
+  | 'mention_spike' | 'negative_sentiment' | 'new_outlet' | 'llm_visibility_change';
+export type MentionSubjectType = 'product' | 'brand' | 'keyword';
+
+export interface MentionRow {
+  id: string;
+  tracked_mention_id: string;
+  refresh_run_id: string;
+  url: string;
+  canonical_url: string | null;
+  outlet_domain: string | null;
+  outlet_name: string | null;
+  outlet_type: MentionOutletType;
+  title: string | null;
+  excerpt: string | null;
+  body_md: string | null;
+  language_code: string | null;
+  country_code: string | null;
+  author: string | null;
+  published_at: string | null;
+  discovered_at: string;
+  sentiment: MentionSentiment;
+  sentiment_score: number | null;
+  relevance: MentionRelevance;
+  relevance_score: number | null;
+  match_note: string | null;
+  engagement: Record<string, unknown> | null;
+  is_anomaly: boolean;
+  anomaly_reason: string | null;
+  manual_override: boolean;
+  source: string;
+  classifier_cached: boolean;
+}
+
+export interface TrackedMention {
+  id: string;
+  api_key_id: string | null;
+  product_id: string | null;
+  brand_name: string | null;
+  user_id: string | null;
+  workspace_id: string | null;
+  subject_type: MentionSubjectType;
+  subject_label: string;
+  aliases: string[];
+  sources_enabled: Record<string, boolean>;
+  source_config: Record<string, unknown>;
+  language_codes: string[];
+  country_codes: string[];
+  subject_facets: Record<string, unknown> | null;
+  refresh_interval_hours: number;
+  next_check_at: string | null;
+  last_refreshed_at: string | null;
+  last_refresh_credits_used: number;
+  total_credits_used: number;
+  last_error: string | null;
+  current_mention_count_7d: number;
+  current_mention_count_30d: number;
+  current_sentiment_avg: number | null;
+  current_share_of_voice: number | null;
+  current_top_outlets: Array<{ domain: string; count: number }> | null;
+  current_metadata: Record<string, unknown> | null;
+  current_snapshot_at: string | null;
+  alert_on_spike: boolean;
+  alert_on_negative_sentiment: boolean;
+  alert_on_new_outlet: boolean;
+  alert_on_llm_visibility_change: boolean;
+  alert_channels: string[];
+  alert_webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RefreshOutcome {
+  status: 'refreshed' | 'throttled' | 'inactive' | 'not_found' | 'error';
+  credits_used: number;
+  hits_count?: number;
+  refresh_run_id?: string;
+  by_source?: Record<string, number>;
+  errors?: Record<string, string>;
+  results?: MentionRow[];
+  sentiment_avg?: number | null;
+  top_outlets?: Array<[string, number]>;
+}
+
+export interface MentionSummary {
+  tracked_mention_id: string;
+  days: number;
+  total_count: number;
+  by_sentiment: { positive: number; neutral: number; negative: number };
+  sentiment_avg: number | null;
+  top_outlets: Array<{ domain: string; count: number }>;
+  latest_at: string | null;
+}
+
+export interface LlmVisibilitySnapshot {
+  present: boolean;
+  probe_run_id?: string;
+  total_probes?: number;
+  share_of_voice?: number;
+  avg_position?: number | null;
+  per_model?: Record<string, { probes: number; mentioned: number; positions: number[] }>;
+  top_competitors?: Array<[string, number]>;
+}
+
+export interface MentionExclusion {
+  id: string;
+  tracked_mention_id: string;
+  url: string | null;
+  domain: string | null;
+  reason: string | null;
+  excluded_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Product-scoped helpers
+// ─────────────────────────────────────────────────────────────────────────
+
+export async function trackProduct(
+  productId: string,
+  options?: Partial<{
+    aliases: string[];
+    sources_enabled: Record<string, boolean>;
+    language_codes: string[];
+    country_codes: string[];
+    alert_on_spike: boolean;
+    alert_on_negative_sentiment: boolean;
+    alert_on_new_outlet: boolean;
+    alert_on_llm_visibility_change: boolean;
+    alert_channels: string[];
+    alert_webhook_url: string;
+    run_first_refresh: boolean;
+  }>,
+): Promise<TrackedMention | null> {
+  const res = await api<{ success: boolean; data: TrackedMention | null }>(
+    `/api/v1/mention-monitoring/products/${productId}/track`,
+    { method: 'POST', body: JSON.stringify(options || {}) },
+  );
+  return res.data;
+}
+
+export async function untrackProduct(productId: string): Promise<void> {
+  await api(`/api/v1/mention-monitoring/products/${productId}/track`, { method: 'DELETE' });
+}
+
+export async function getProductMonitoring(productId: string): Promise<TrackedMention | null> {
+  const res = await api<{ success: boolean; data: TrackedMention | null }>(
+    `/api/v1/mention-monitoring/products/${productId}`, { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function refreshProduct(
+  productId: string,
+  options?: { force?: boolean },
+): Promise<RefreshOutcome> {
+  const res = await api<{ success: boolean; data: RefreshOutcome }>(
+    `/api/v1/mention-monitoring/products/${productId}/refresh`,
+    { method: 'POST', body: JSON.stringify({ force: !!options?.force }) },
+  );
+  return res.data;
+}
+
+export async function getProductFeed(
+  productId: string,
+  params?: { limit?: number },
+): Promise<MentionRow[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const res = await api<{ success: boolean; data: MentionRow[] }>(
+    `/api/v1/mention-monitoring/products/${productId}/feed?${qs.toString()}`,
+    { method: 'GET' },
+  );
+  return res.data || [];
+}
+
+export async function getProductHistory(
+  productId: string,
+  params?: { days?: number; sentiment?: string; outlet_type?: string; limit?: number },
+): Promise<MentionRow[]> {
+  const qs = new URLSearchParams();
+  if (params?.days) qs.set('days', String(params.days));
+  if (params?.sentiment) qs.set('sentiment', params.sentiment);
+  if (params?.outlet_type) qs.set('outlet_type', params.outlet_type);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const res = await api<{ success: boolean; data: MentionRow[] }>(
+    `/api/v1/mention-monitoring/products/${productId}/history?${qs.toString()}`,
+    { method: 'GET' },
+  );
+  return res.data || [];
+}
+
+export async function getProductSummary(
+  productId: string,
+  days: number = 30,
+): Promise<MentionSummary | null> {
+  const res = await api<{ success: boolean; data: MentionSummary | null }>(
+    `/api/v1/mention-monitoring/products/${productId}/summary?days=${days}`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function getProductLlmVisibility(
+  productId: string,
+): Promise<LlmVisibilitySnapshot> {
+  const res = await api<{ success: boolean; data: LlmVisibilitySnapshot }>(
+    `/api/v1/mention-monitoring/products/${productId}/llm-visibility`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function probeProductLlm(
+  productId: string,
+  models?: string[],
+): Promise<{ status: string; probe_run_id: string; probe_count: number; total_cost_usd: number }> {
+  const res = await api<{ success: boolean; data: any }>(
+    `/api/v1/mention-monitoring/products/${productId}/probe-llm`,
+    { method: 'POST', body: JSON.stringify(models ? { models } : {}) },
+  );
+  return res.data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Subject-scoped helpers (brand / keyword / admin lookups)
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface CreateTrackedMentionInput {
+  subject_type?: MentionSubjectType;
+  subject_label?: string;
+  product_id?: string;
+  brand_name?: string;
+  aliases?: string[];
+  sources_enabled?: Record<string, boolean>;
+  source_config?: Record<string, unknown>;
+  language_codes?: string[];
+  country_codes?: string[];
+  refresh_interval_hours?: number;
+  alert_channels?: string[];
+  alert_on_spike?: boolean;
+  alert_on_negative_sentiment?: boolean;
+  alert_on_new_outlet?: boolean;
+  alert_on_llm_visibility_change?: boolean;
+  alert_webhook_url?: string;
+  run_first_refresh?: boolean;
+}
+
+export async function createTrackedMention(
+  input: CreateTrackedMentionInput,
+): Promise<TrackedMention> {
+  const res = await api<{ success: boolean; data: TrackedMention }>(
+    `/api/v1/mention-monitoring/track`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return res.data;
+}
+
+export async function getTrackedMention(id: string): Promise<TrackedMention> {
+  const res = await api<{ success: boolean; data: TrackedMention }>(
+    `/api/v1/mention-monitoring/track/${id}`, { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function updateTrackedMention(
+  id: string,
+  patch: Partial<CreateTrackedMentionInput & { is_active: boolean }>,
+): Promise<TrackedMention | null> {
+  const res = await api<{ success: boolean; data: TrackedMention | null }>(
+    `/api/v1/mention-monitoring/track/${id}`,
+    { method: 'PUT', body: JSON.stringify(patch) },
+  );
+  return res.data;
+}
+
+export async function deactivateTrackedMention(id: string): Promise<void> {
+  await api(`/api/v1/mention-monitoring/track/${id}`, { method: 'DELETE' });
+}
+
+export async function refreshTracked(
+  id: string,
+  options?: { force?: boolean },
+): Promise<RefreshOutcome> {
+  const res = await api<{ success: boolean; data: RefreshOutcome }>(
+    `/api/v1/mention-monitoring/track/${id}/refresh`,
+    { method: 'POST', body: JSON.stringify({ force: !!options?.force }) },
+  );
+  return res.data;
+}
+
+export async function listExclusions(id: string): Promise<MentionExclusion[]> {
+  const res = await api<{ success: boolean; data: MentionExclusion[] }>(
+    `/api/v1/mention-monitoring/track/${id}/exclusions`, { method: 'GET' },
+  );
+  return res.data || [];
+}
+
+export async function excludeMentionUrl(args: {
+  trackedMentionId: string;
+  url?: string;
+  domain?: string;
+  reason?: string;
+}): Promise<MentionExclusion> {
+  const res = await api<{ success: boolean; data: MentionExclusion }>(
+    `/api/v1/mention-monitoring/track/${args.trackedMentionId}/exclude`,
+    { method: 'POST', body: JSON.stringify({ url: args.url, domain: args.domain, reason: args.reason }) },
+  );
+  return res.data;
+}
+
+export async function includeMentionUrl(args: {
+  trackedMentionId: string;
+  url?: string;
+  domain?: string;
+}): Promise<{ removed_count: number }> {
+  const res = await api<{ success: boolean; removed_count: number }>(
+    `/api/v1/mention-monitoring/track/${args.trackedMentionId}/include`,
+    { method: 'POST', body: JSON.stringify({ url: args.url, domain: args.domain }) },
+  );
+  return { removed_count: res.removed_count };
+}
+
+export async function promoteMentionUrl(args: {
+  trackedMentionId: string;
+  url: string;
+  override_relevance: 'exact' | 'tangential' | 'unverifiable';
+  reason?: string;
+}): Promise<void> {
+  await api(`/api/v1/mention-monitoring/track/${args.trackedMentionId}/promote`, {
+    method: 'POST',
+    body: JSON.stringify({
+      url: args.url, override_relevance: args.override_relevance, reason: args.reason,
+    }),
+  });
+}
+
+export async function shareOfVoice(
+  trackedMentionId: string,
+  days: number = 30,
+): Promise<{ tracked_mention_id: string; competitor_mentions: Array<{ name: string; count: number }> }> {
+  const res = await api<{
+    success: boolean;
+    data: { tracked_mention_id: string; competitor_mentions: Array<{ name: string; count: number }> };
+  }>(
+    `/api/v1/mention-monitoring/track/${trackedMentionId}/share-of-voice?days=${days}`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function submitMentionClassifierCorrection(args: {
+  mentionHistoryId: string;
+  correctedRelevance?: MentionRelevance;
+  correctedSentiment?: MentionSentiment;
+  correctionNote?: string;
+}): Promise<void> {
+  await api(`/api/v1/mention-monitoring/classifier-correction`, {
+    method: 'POST',
+    body: JSON.stringify({
+      mention_history_id: args.mentionHistoryId,
+      corrected_relevance: args.correctedRelevance || undefined,
+      corrected_sentiment: args.correctedSentiment || undefined,
+      correction_note: args.correctionNote,
+    }),
+  });
+}

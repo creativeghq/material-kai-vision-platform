@@ -281,6 +281,41 @@ interface Message {
     page_count?: number;
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
+  mentionSummaryData?: {
+    product_id: string;
+    days: number;
+    summary: {
+      total_count: number;
+      by_sentiment: { positive: number; neutral: number; negative: number };
+      sentiment_avg: number | null;
+      top_outlets: Array<{ domain: string; count: number }>;
+      latest_at: string | null;
+    };
+  };
+  llmVisibilityData?: {
+    product_id: string;
+    snapshot: {
+      present: boolean;
+      total_probes?: number;
+      share_of_voice?: number;
+      avg_position?: number | null;
+      per_model?: Record<string, { probes: number; mentioned: number; positions: number[] }>;
+      top_competitors?: Array<[string, number]>;
+    };
+    forced?: boolean;
+    credits_used?: number;
+  };
+  mentionFeedData?: {
+    product_id: string;
+    days: number;
+    sentiment_filter?: string;
+    rows: Array<Record<string, any>>;
+  };
+  mentionTrackingStartedData?: {
+    product_id: string;
+    product_name: string;
+    tracked: Record<string, any> | null;
+  };
 }
 
 interface AgentHubProps {
@@ -1662,6 +1697,91 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                 };
+              } else if (chunk.type === 'mention_summary') {
+                const m: Message = {
+                  id: `msg-mention-summary-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Mention summary (${chunk.days}d): ${chunk.summary?.total_count ?? 0} mentions, ${chunk.summary?.by_sentiment?.negative ?? 0} negative.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  mentionSummaryData: { product_id: chunk.product_id, days: chunk.days, summary: chunk.summary },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, mentionSummaryData: m.mentionSummaryData },
+                  });
+                }
+              } else if (chunk.type === 'llm_visibility_result') {
+                const sov = chunk.snapshot?.share_of_voice ? Math.round(chunk.snapshot.share_of_voice * 100) : 0;
+                const m: Message = {
+                  id: `msg-llm-vis-${Date.now()}`,
+                  role: 'assistant',
+                  content: chunk.snapshot?.present
+                    ? `LLM visibility: ${sov}% share-of-voice across ${chunk.snapshot.total_probes ?? 0} probes${chunk.snapshot.avg_position ? ` · avg rank #${chunk.snapshot.avg_position.toFixed(1)}` : ''}.`
+                    : 'No LLM probes recorded yet.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  llmVisibilityData: {
+                    product_id: chunk.product_id,
+                    snapshot: chunk.snapshot,
+                    forced: chunk.forced,
+                    credits_used: chunk.credits_used,
+                  },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, llmVisibilityData: m.llmVisibilityData },
+                  });
+                }
+              } else if (chunk.type === 'mention_feed') {
+                const m: Message = {
+                  id: `msg-mention-feed-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Loaded ${chunk.rows?.length ?? 0} mentions${chunk.sentiment_filter ? ` (${chunk.sentiment_filter})` : ''} from the last ${chunk.days}d.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  mentionFeedData: {
+                    product_id: chunk.product_id,
+                    days: chunk.days,
+                    sentiment_filter: chunk.sentiment_filter,
+                    rows: chunk.rows || [],
+                  },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, mentionFeedData: m.mentionFeedData },
+                  });
+                }
+              } else if (chunk.type === 'mention_tracking_started') {
+                const m: Message = {
+                  id: `msg-mention-track-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Mention tracking enabled for "${chunk.product_name}". First refresh in progress — open the product's Mentions tab to view results.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  mentionTrackingStartedData: {
+                    product_id: chunk.product_id,
+                    product_name: chunk.product_name,
+                    tracked: chunk.tracked,
+                  },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, mentionTrackingStartedData: m.mentionTrackingStartedData },
+                  });
+                }
               } else if (chunk.type === 'final_result') {
                 finalResult = chunk;
               } else if (chunk.type === 'tool_error') {
@@ -1942,6 +2062,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           materialsBoardData: msg.metadata?.materialsBoardData as any | undefined,
           inspirationData: msg.metadata?.inspirationData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
+          mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
+          llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
+          mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
+          mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
         })),
       );
     },
@@ -2347,7 +2471,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-[#3E192A] text-white shadow-sm'
@@ -2377,6 +2501,128 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           roomType={message.inspirationData.room_type}
                           focus={message.inspirationData.focus}
                         />
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.mentionSummaryData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">
+                            Mention summary · last {message.mentionSummaryData.days} days
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <div className="text-xs text-white/60">Total</div>
+                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.total_count ?? 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-green-400">Positive</div>
+                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.positive ?? 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-white/60">Neutral</div>
+                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.neutral ?? 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-red-400">Negative</div>
+                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
+                            </div>
+                          </div>
+                          {(message.mentionSummaryData.summary?.top_outlets || []).length > 0 && (
+                            <div className="mt-3">
+                              <div className="text-xs text-white/60 mb-1">Top outlets</div>
+                              <div className="flex flex-wrap gap-1">
+                                {message.mentionSummaryData.summary.top_outlets.slice(0, 6).map((o: any) => (
+                                  <span key={o.domain} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                                    {o.domain} · {o.count}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <a
+                            href={`/admin/mention-monitoring/products/${message.mentionSummaryData.product_id}`}
+                            className="text-xs text-blue-300 hover:underline mt-3 inline-block"
+                          >Open Mentions tab →</a>
+                        </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.llmVisibilityData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
+                          {!message.llmVisibilityData.snapshot?.present ? (
+                            <div className="text-sm text-white/60">No probes recorded yet.</div>
+                          ) : (
+                            <>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <div className="text-xs text-white/60">Share of voice</div>
+                                  <div className="text-2xl font-medium">
+                                    {Math.round((message.llmVisibilityData.snapshot.share_of_voice || 0) * 100)}%
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-white/60">Average rank</div>
+                                  <div className="text-2xl font-medium">
+                                    {message.llmVisibilityData.snapshot.avg_position
+                                      ? `#${message.llmVisibilityData.snapshot.avg_position.toFixed(1)}`
+                                      : '—'}
+                                  </div>
+                                </div>
+                              </div>
+                              {message.llmVisibilityData.snapshot.per_model && (
+                                <div className="mt-3 space-y-1 text-xs">
+                                  {Object.entries(message.llmVisibilityData.snapshot.per_model).map(([model, stats]: any) => (
+                                    <div key={model} className="flex justify-between">
+                                      <span>{model}</span>
+                                      <span className="text-white/60">{stats.mentioned}/{stats.probes} mentions</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {message.llmVisibilityData.snapshot.top_competitors && message.llmVisibilityData.snapshot.top_competitors.length > 0 && (
+                                <div className="mt-3">
+                                  <div className="text-xs text-white/60 mb-1">Top co-mentioned competitors</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {message.llmVisibilityData.snapshot.top_competitors.slice(0, 8).map(([name, count]: any) => (
+                                      <span key={String(name)} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                                        {String(name)} · {count}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.mentionFeedData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">
+                            Mention feed{message.mentionFeedData.sentiment_filter ? ` · ${message.mentionFeedData.sentiment_filter}` : ''} · last {message.mentionFeedData.days}d
+                          </div>
+                          {message.mentionFeedData.rows.length === 0 ? (
+                            <div className="text-sm text-white/60">No mentions match the filter.</div>
+                          ) : (
+                            <ul className="divide-y divide-white/10">
+                              {message.mentionFeedData.rows.slice(0, 10).map((r) => (
+                                <li key={r.id} className="py-2">
+                                  <a
+                                    href={r.url} target="_blank" rel="noopener noreferrer"
+                                    className="text-sm hover:underline"
+                                  >{r.title || r.url}</a>
+                                  <div className="text-xs text-white/60">
+                                    {r.outlet_name || r.outlet_domain}
+                                    {r.sentiment ? ` · ${r.sentiment}` : ''}
+                                    {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.materialData ? (

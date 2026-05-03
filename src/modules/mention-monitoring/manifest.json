@@ -1,0 +1,9 @@
+{
+  "slug": "mention-monitoring",
+  "name": "Mention Monitoring",
+  "description": "Track product, brand, and keyword mentions across news, blogs, Reddit, RSS, YouTube, and LLM responses. Cost-optimized multi-source pipeline (DataForSEO News + Perplexity Sonar + Reddit + RSS + LLM probes) with sentiment classification and weekly LLM visibility tracking.",
+  "category": "pricing",
+  "priceTier": "pro",
+  "icon": "Megaphone",
+  "version": "0.1.0"
+}

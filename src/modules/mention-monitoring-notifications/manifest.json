@@ -1,0 +1,9 @@
+{
+  "slug": "mention-monitoring-notifications",
+  "name": "Mention Monitoring Notifications",
+  "description": "Send users mention-spike, negative-sentiment, new-outlet, and LLM-visibility-change alerts. Per-channel credit-metered: bell free, email costs credits, webhook free. Opt-in per subject.",
+  "category": "pricing",
+  "priceTier": "pro",
+  "icon": "BellRing",
+  "version": "0.1.0"
+}
