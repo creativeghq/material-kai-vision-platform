@@ -457,7 +457,10 @@ Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs
 
 **RPCs**: `get_internal_tracked_mentions_due`, `get_tracked_mentions_due_for_llm_probe`, `update_tracked_mention_cadence`, `append_mention_alert_log`.
 
-**Backend surface** ([mivaa-pdf-extractor/app/api/mention_monitoring_routes.py](mivaa-pdf-extractor/app/api/mention_monitoring_routes.py)):
+**Backend surface** — two routers, two auth styles:
+
+- **Public Tracking API** ([mivaa-pdf-extractor/app/api/mention_tracking_routes.py](mivaa-pdf-extractor/app/api/mention_tracking_routes.py)) — external integrations, `Authorization: Bearer kai_*` (api_keys). Mounted at `/api/v1/mentions/track/*`. Endpoint inventory: `POST /` (create), `GET /` (list), `GET|PUT|DELETE /{id}`, `POST /{id}/refresh`, `GET /{id}/feed|history|summary|llm-visibility|exclusions`, `POST /{id}/probe-llm|exclude|include`. Mirror of `/api/v1/prices/track/*`.
+- **Internal flow** ([mivaa-pdf-extractor/app/api/mention_monitoring_routes.py](mivaa-pdf-extractor/app/api/mention_monitoring_routes.py)) — session JWT, used by the Material KAI web app.
 
 Internal product flow (session JWT):
 - `POST /api/v1/mention-monitoring/products/{id}/track` — find-or-create + first refresh

@@ -166,7 +166,7 @@ const SeoInterlinkingModulePage: React.FC = () => {
               </div>
             ) : rows.length === 0 ? (
               <div className="text-center py-12 text-sm text-muted-foreground">
-                No websites have been connected yet. Users add sites from <Link to="/profile?tab=websites" className="text-primary hover:underline">Profile → Websites</Link>.
+                No websites have been connected yet. Users add sites from <Link to="/profile" className="text-primary hover:underline">their profile page</Link>.
               </div>
             ) : (
               <Table>

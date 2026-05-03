@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import { ConnectedWebsitesTab } from '@/components/core/Profile/ConnectedWebsitesTab';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -1371,6 +1372,9 @@ export const ProfileTab: React.FC = () => {
           </CardContent>
         </Card>
         )}
+
+        {/* Connected websites — used by SEO Inter-linking module */}
+        <ConnectedWebsitesTab />
 
       </div>
     </div>

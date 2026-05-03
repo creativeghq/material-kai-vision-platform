@@ -2,11 +2,19 @@
 
 Track product, brand, and keyword mentions across **news, blogs, RSS, YouTube, and LLM responses**. Cost-optimized multi-source pipeline with sentiment classification and weekly LLM visibility tracking.
 
-**Base URL**: `https://v1api.materialshub.gr/api/v1/mention-monitoring`
+**Host**: `https://v1api.materialshub.gr`
 
-**Auth**: Session JWT (`Authorization: Bearer <supabase-access-token>`) for the web flow. Cron endpoints validate `x-cron-secret`.
+There are **two surfaces** with different auth:
+
+| Surface | Path prefix | Auth | Used by |
+|---|---|---|---|
+| **Public Tracking API** | `/api/v1/mentions/track` | `Authorization: Bearer kai_*` (api_keys) | External integrations, partner projects |
+| **Internal product/brand flow** | `/api/v1/mention-monitoring` | Session JWT (Supabase access token) | Material KAI web app |
+| Cron | `/api/v1/mention-monitoring/cron-*` | `x-cron-secret` | Internal pg_cron jobs |
 
 **Module gate**: All endpoints require the `mention-monitoring` module to be enabled. Alert dispatch additionally requires `mention-monitoring-notifications`.
+
+If you're integrating from another project, **use the Public Tracking API** (section near the top of this doc). The internal endpoints are documented for reference only.
 
 ---
 
@@ -52,6 +60,147 @@ The same playbook as price-monitoring v3:
 - **LLM probes**: weekly cadence, 4 templates × 4 cheap models (haiku, gpt-4o-mini, gemini-flash, sonar) = ~$0.008/subject/week.
 
 Typical refresh cost on a stable subject: ~$0.005–0.010 per refresh (DataForSEO News + cached Sonar + free RSS).
+
+---
+
+## Public Tracking API — `/api/v1/mentions/track/*`
+
+For partner integrations using an `api_keys` Bearer token (`kai_*` prefix). Mirrors the shape of the Price Tracking API at `/api/v1/prices/track/*`.
+
+### Auth
+
+```
+Authorization: Bearer kai_<32-char-alphanumeric>
+Content-Type: application/json
+```
+
+The key must be active and not expired. Each tracked subject is owned by the api_key that created it — partner A cannot read or modify partner B's subjects.
+
+**Cascade**: deleting the api_key (or letting it expire) is permitted, but the row + all its mention history is dropped along with it (`ON DELETE CASCADE`).
+
+### Endpoint inventory
+
+| # | Method | Path | Purpose |
+|---|---|---|---|
+| 1 | `POST` | `/api/v1/mentions/track` | Create tracked subject + first refresh |
+| 2 | `GET` | `/api/v1/mentions/track` | List all subjects owned by your key |
+| 3 | `GET` | `/api/v1/mentions/track/{id}` | Read one subject (config + cached snapshot) |
+| 4 | `PUT` | `/api/v1/mentions/track/{id}` | Update aliases / sources / alert prefs / cadence |
+| 5 | `DELETE` | `/api/v1/mentions/track/{id}` | Soft delete (deactivates, preserves history) |
+| 6 | `POST` | `/api/v1/mentions/track/{id}/refresh` | Force refresh now (bypasses cadence) |
+| 7 | `GET` | `/api/v1/mentions/track/{id}/feed` | Latest refresh-run rows |
+| 8 | `GET` | `/api/v1/mentions/track/{id}/history` | Filterable history (sentiment, outlet_type, days) |
+| 9 | `GET` | `/api/v1/mentions/track/{id}/summary` | Aggregate snapshot (total count, sentiment, outlets) |
+| 10 | `GET` | `/api/v1/mentions/track/{id}/llm-visibility` | LLM probe snapshot (share-of-voice + rank + competitors) |
+| 11 | `POST` | `/api/v1/mentions/track/{id}/probe-llm` | Fire a fresh LLM probe matrix |
+| 12 | `POST` | `/api/v1/mentions/track/{id}/exclude` | Exclude a URL or domain from results |
+| 13 | `POST` | `/api/v1/mentions/track/{id}/include` | Undo an exclusion |
+| 14 | `GET` | `/api/v1/mentions/track/{id}/exclusions` | List exclusions for the subject |
+
+### Quickstart
+
+```bash
+# 1. Create a tracked subject (brand example)
+curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
+  -H "Authorization: Bearer kai_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject_type": "brand",
+    "subject_label": "Flobali",
+    "brand_name": "Flobali",
+    "aliases": ["Flobali Tiles", "Flobali Hellas"],
+    "sources_enabled": { "news": true, "blogs": true, "youtube": false, "rss": true, "llm": true },
+    "language_codes": ["en", "el"],
+    "country_codes": ["GR", "DE"],
+    "refresh_interval_hours": 24,
+    "alert_on_negative_sentiment": true,
+    "alert_on_new_outlet": true,
+    "alert_channels": ["webhook"],
+    "alert_webhook_url": "https://your.domain/webhooks/material-kai-mentions"
+  }'
+
+# Response: { "success": true, "data": { "id": "uuid", ...row, "last_refresh": { ... } } }
+```
+
+```bash
+# 2. List your subjects
+curl https://v1api.materialshub.gr/api/v1/mentions/track \
+  -H "Authorization: Bearer kai_YOUR_KEY"
+```
+
+```bash
+# 3. Get a subject's latest mention feed
+curl https://v1api.materialshub.gr/api/v1/mentions/track/{id}/feed?limit=50 \
+  -H "Authorization: Bearer kai_YOUR_KEY"
+```
+
+```bash
+# 4. Get filtered history (last 30 days, only negative sentiment, news only)
+curl "https://v1api.materialshub.gr/api/v1/mentions/track/{id}/history?days=30&sentiment=negative&outlet_type=news&limit=100" \
+  -H "Authorization: Bearer kai_YOUR_KEY"
+```
+
+```bash
+# 5. Get a 30-day summary
+curl https://v1api.materialshub.gr/api/v1/mentions/track/{id}/summary?days=30 \
+  -H "Authorization: Bearer kai_YOUR_KEY"
+```
+
+```bash
+# 6. Get LLM visibility snapshot (latest probe run)
+curl https://v1api.materialshub.gr/api/v1/mentions/track/{id}/llm-visibility \
+  -H "Authorization: Bearer kai_YOUR_KEY"
+```
+
+```bash
+# 7. Force a refresh now (bypasses cadence)
+curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track/{id}/refresh \
+  -H "Authorization: Bearer kai_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "force": true }'
+```
+
+### Refresh cadence (you control it)
+
+Set `refresh_interval_hours` between **1 and 720** (1 hour to 30 days). The platform's own cron does NOT touch external-flow rows — refreshes happen only when YOU call `POST /{id}/refresh`. This is intentional: you pay per call and shouldn't be surprised by background charges.
+
+Volatility cadence still adjusts `next_check_at` after each refresh you trigger, so you can use that field as a hint about when re-polling is worth the cost.
+
+### Webhook alerts
+
+Set `alert_webhook_url` to receive HTTP POST notifications. Payload shape:
+
+```json
+{
+  "alert_type": "negative_sentiment",
+  "title": "Negative mention from wirecutter.com",
+  "body": "...",
+  "tracked_mention_id": "uuid",
+  "outlet_name": "Wirecutter",
+  "outlet_domain": "wirecutter.com",
+  "payload": { "url": "...", "title": "...", "sentiment_score": -0.6 },
+  "fired_at": "2026-05-03T10:15:00Z"
+}
+```
+
+Four alert types, each opt-in (`alert_on_*` flags):
+- `mention_spike` — today's count ≥ 2× trailing 7d daily-average
+- `negative_sentiment` — negative mention from a high-DA outlet
+- `new_outlet` — first-ever mention from a new domain
+- `llm_visibility_change` — average rank across LLM probes shifts ≥2 W/W
+
+24h dedupe per `(alert_type, tracked_mention_id, outlet_domain)`.
+
+### Error codes
+
+| Code | Meaning |
+|---|---|
+| `400` | Bad request (missing field, invalid value) |
+| `401` | Missing or invalid `Authorization: Bearer kai_*` |
+| `403` | Your API key does not own this `tracking_id` |
+| `404` | `tracking_id` not found |
+| `429` | Rate limit exceeded (default 60 req/min, configurable per key) |
+| `500` | Internal error |
 
 ---
 

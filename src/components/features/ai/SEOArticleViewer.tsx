@@ -995,7 +995,7 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
               articles previously generated through this tool.
             </p>
             <p>
-              <a href="/profile?tab=websites" className="text-primary font-medium hover:underline">
+              <a href="/profile" className="text-primary font-medium hover:underline">
                 Connect your website's sitemap →
               </a>{' '}
               to enable site-aware inter-linking suggestions.
