@@ -49,7 +49,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
   - `embedded` with `metadata.text_detected=True`: OCR'd
   - `full_render`: SKIPPED (Stage 1.5 already covered the page — `ocr_skipped_reason='full_render_dup_of_stage_1_5'`)
   - photo / IMAGE-region yolo_crop: SKIPPED (`ocr_skipped_reason='photo_not_text_bearing'`)
-- **Storage**: new columns on `document_images` — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Consumed by: vision_analysis prompt enrichment, icon-metadata extraction, image-search labels.
+- **Storage**: new columns on `document_images` — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Phase 3 OCR runs *after* `save_images_and_generate_clips` (which is where `vision_analysis` executes), so it does NOT enrich the vision prompt — consumed by icon-metadata extraction and image-search labels only.
 - **Bbox propagation**: `OCRResult.blocks` now carries Chandra's per-fragment list. `extract_icon_metadata` reads `result.blocks` instead of the always-`None` `result.bbox` (latent bug fixed).
 
 ### Warmup — health probe before trusting "running"

@@ -1197,7 +1197,7 @@ This section covers all third-party services used by the platform, their pricing
 
 | Model | Price | Used For |
 |-------|-------|---------|
-| voyage-3-large | $0.18/M tokens | Understanding embeddings (1024D) |
+| voyage-4 | $0.06/M tokens | Text + understanding embeddings (1024D) — sole text embedder |
 
 ---
 

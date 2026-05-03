@@ -27,7 +27,6 @@ const AI_PRICING = {
   // Voyage AI Embeddings (per 1M tokens)
   voyage: {
     'voyage-4': { input: 0.06, output: 0.00 },
-    'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical logs
   },
   // Qwen pricing intentionally absent — vision migrated to Anthropic Claude
   // Opus 4.7 on 2026-05-01. Empty placeholder kept so the lookup path that

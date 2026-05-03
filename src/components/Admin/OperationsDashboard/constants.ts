@@ -17,7 +17,6 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 
   // Voyage AI Embeddings
   'voyage-4':         { input: 0.06, output: 0.00 },
-  'voyage-3.5':       { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
 
   // Qwen pricing entries removed 2026-05-01 — vision moved to Anthropic.
 };

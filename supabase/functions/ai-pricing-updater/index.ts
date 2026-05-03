@@ -42,7 +42,6 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // https://docs.voyageai.com/docs/pricing
     fallback_prices: {
       'voyage-4': { input: 0.06, output: 0.00 },
-      'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
     },
   },
   qwen: {

@@ -1,6 +1,6 @@
 # AI Models Architecture - Complete Overview
 
-**Last Updated**: 2026-05-02
+**Last Updated**: 2026-05-03
 **Status**: Production
 
 ## Executive Summary
@@ -11,7 +11,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 |----------|-------------|-----------------|
 | **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
-| **Google (HuggingFace)** | SigLIP2 ViT-SO400M (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
+| **Google (HuggingFace)** | SigLIP2 ViT-L (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
 | **Datalab (HuggingFace)** | Chandra v2 | OCR — sole OCR engine (pytesseract + EasyOCR removed 2026-05) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
@@ -25,13 +25,13 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 0: Product Discovery (BEFORE extraction)                          │
+│ DISCOVERY: Product Discovery (BEFORE extraction)                        │
 │ Model: Claude Opus 4.7 OR GPT-5                                         │
 │ Purpose: Identify products, count pages, map image-to-product           │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 1.5: Layout + OCR (page-level)                                    │
+│ LAYOUT + PAGE OCR                                                       │
 │ Model: Chandra v2 (Datalab on HuggingFace)                              │
 │ Purpose: YOLO layout detection + page OCR (3 retries, jittered temps)   │
 │ Failure marker: OCRResult.method='chandra_failed'                       │
@@ -39,16 +39,20 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 2: Chunking (text)                                                │
+│ CHUNKING (text)                                                         │
 │ Model: Claude Sonnet 4.6 (default; was Qwen pre-2026-05-01)             │
 │ Setting: Settings.chunking_primary_model = 'claude-sonnet-4-6'          │
-│ Why Sonnet: chunking is at the quality ceiling — Opus would be 5×       │
-│             cost for marginal gain                                      │
+│ Why Sonnet: chunking is a text task at the quality ceiling — Sonnet     │
+│             matches Opus output quality at lower cost; Qwen had been    │
+│             silently 404-ing for months                                 │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 3: Image Classification + Vision Analysis (per image)             │
-│ Model: Claude Opus 4.7 (Anthropic tool use)                             │
+│ VISION: Image Classification + Vision Analysis (per image)              │
+│ Primary: Claude Opus 4.7 (Anthropic tool use)                           │
+│ Validation pass: confidence < threshold OR primary failure → re-run     │
+│   on classification_validation_model (default: claude-opus-4-7)         │
+│   Profiles: FAST/COST_OPTIMIZED use claude-haiku-4-5 for validation     │
 │ Schema: app.models.vision_analysis.VisionAnalysis (Pydantic)            │
 │ Tool:   VISION_ANALYSIS_TOOL                                            │
 │ Why tool use: hard schema adherence — eliminates JSON regex recovery,   │
@@ -56,8 +60,11 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 3 (Phase 3 OCR): Per-image OCR for text-bearing images            │
+│ PHASE 3 OCR: Per-image OCR for text-bearing images                      │
 │ Model: Chandra v2 (with retry-with-jitter)                              │
+│ Runs AFTER vision_analysis. Consumed by: icon-metadata extraction +     │
+│   image-search labels. NOT consumed by chunker (Stage 1.5 is canonical) │
+│   and NOT a vision_analysis prompt input (vision already ran).          │
 │ Filter: yolo_crop ∈ {TABLE,TEXT,TITLE,CAPTION} OR                       │
 │         embedded with text_detected=True                                │
 │ Stored on document_images: ocr_text, ocr_blocks, ocr_failed,            │
@@ -65,8 +72,8 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 5: Visual Embeddings (5 types) — VECS-Only, halfvec               │
-│ Model: SLIG (SigLIP2 ViT-SO400M) via HuggingFace cloud endpoint         │
+│ VISUAL EMBEDDINGS (5 types) — VECS-Only, halfvec                        │
+│ Model: SLIG (SigLIP2 ViT-L) via HuggingFace cloud endpoint              │
 │ Purpose: 5 specialized 768D embeddings per image                        │
 │   1. Visual    → image_slig_embeddings    (key: visual_768)             │
 │   2. Color     → image_color_embeddings   (key: color_slig_768)         │
@@ -78,7 +85,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 5 (parallel): Understanding Embedding (1024D)                     │
+│ UNDERSTANDING EMBEDDING (1024D) — runs in parallel with VISUAL          │
 │ Pipeline: VisionAnalysis JSON →                                         │
 │           serialize_vision_analysis_to_text() →                         │
 │           Voyage AI voyage-4 (input_type="document") → 1024D            │
@@ -87,7 +94,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 6: Text Embeddings                                                │
+│ TEXT EMBEDDINGS                                                         │
 │ Model: Voyage AI voyage-4 (sole text embedder; OpenAI retired 2026-04)  │
 │ Output: 1024D vectors, dict key text_1024                               │
 │ Input types: "document" for indexing, "query" for search                │
@@ -141,7 +148,7 @@ The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool sch
 - Product discovery (Stage 0, alternative to GPT-5)
 - KAI agent (Mastra)
 
-**Cost**: $15.00 per 1M input tokens, $75.00 per 1M output tokens
+**Cost**: $5.00 per 1M input tokens, $25.00 per 1M output tokens
 **Speed**: 3-8 seconds per image
 **Output**: Schema-locked JSON via tool use
 
@@ -151,7 +158,7 @@ The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool sch
 
 **Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'` (was `Qwen/Qwen3.6-35B-A3B-FP8` pre-2026-05-01)
 
-Chunking is a text task at the quality ceiling — Opus would be 5× the cost for marginal gain, and Qwen had been silently down for months.
+Chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing. Qwen had been silently down for months.
 
 **Cost**: $3.00 per 1M input tokens, $15.00 per 1M output tokens
 **Speed**: 2-4 seconds per chunk batch
@@ -171,7 +178,7 @@ Chunking is a text task at the quality ceiling — Opus would be 5× the cost fo
 - Saved-search semantic dedupe
 - Quick validation tasks
 
-**Cost**: $0.80 per 1M input tokens, $4.00 per 1M output tokens
+**Cost**: $1.00 per 1M input tokens, $5.00 per 1M output tokens
 **Speed**: 1-3 seconds
 
 ---
@@ -199,13 +206,14 @@ Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as
 
 ---
 
-### 5. **SLIG (SigLIP2) Cloud Endpoint** 🎯
+### 5. **SLIG (SigLIP2 ViT-L) Cloud Endpoint** 🎯
 
 **File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
+**HF endpoint**: `mh-siglip2` (namespace `basiliskan`), serves `basiliskan/siglip2` (SigLIP2 ViT-L, 768D output)
 
 HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
 
-**Output**: 768D specialized embeddings (5 types per image), all halfvec in VECS.
+**Output**: 768D specialized embeddings (5 types per image), all halfvec in VECS. The previous-generation 1152D SigLIP-SO400M collections (image_siglip_embeddings + 1152D specialized) were dropped 2026-04 as 100% orphans from the pre-SLIG era.
 
 **Hardening (2026-05-01)**:
 - 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
@@ -265,14 +273,15 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 
 | Stage | Default Model | Alternative |
 |-------|---------------|-------------|
-| 0 — Product Discovery | Claude Opus 4.7 | GPT-5 |
-| 1.5 — Layout + Page OCR | YOLO + Chandra v2 | — |
-| 2 — Chunking | Claude Sonnet 4.6 | — |
-| 3 — Vision Analysis | Claude Opus 4.7 (tool use) | — |
-| 3 — Phase 3 OCR | Chandra v2 | — |
-| 5 — Visual Embeddings | SLIG (SigLIP2, 5×768D) | — |
-| 5 — Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
-| 6 — Text Embeddings | Voyage AI voyage-4 (1024D) | — |
+| Discovery | Claude Opus 4.7 | GPT-5 |
+| Layout + Page OCR | YOLO + Chandra v2 | — |
+| Chunking | Claude Sonnet 4.6 | — |
+| Vision (primary) | Claude Opus 4.7 (tool use) | — |
+| Vision (validation, low-confidence) | Claude Opus 4.7 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
+| Phase 3 OCR (per-image) | Chandra v2 | — |
+| Visual Embeddings | SLIG (SigLIP2 ViT-L, 5×768D) | — |
+| Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
+| Text Embeddings | Voyage AI voyage-4 (1024D) | — |
 
 ### Search & Agents
 
@@ -282,20 +291,22 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 
 ## 💰 Cost Impact Analysis
 
-### Per PDF Processing (100 pages, 50 images)
+### Per PDF Processing (100 pages, 50 images) — canonical estimate
+
+These numbers are the source of truth; Doc #4's profile cost lines reference this same workload.
 
 | Model | Usage | Cost |
 |-------|-------|------|
-| **Claude Opus 4.7** | Product discovery (1 call) | ~$0.25 |
-| **Chandra v2** | Stage 1.5 page OCR (100 pages × ~1.5 retry avg) | endpoint |
+| **Claude Opus 4.7** | Product discovery (1 call) | ~$0.08 |
+| **Chandra v2** | Layout + page OCR (100 pages × ~1.5 retry avg) | endpoint |
 | **Claude Sonnet 4.6** | Chunking (~500 chunks) | ~$0.10 |
-| **Claude Opus 4.7** | Vision analysis (50 images, tool use) | ~$0.40 |
+| **Claude Opus 4.7** | Vision analysis (50 images, tool use) | ~$0.13 |
 | **Chandra v2** | Phase 3 per-image OCR (text-bearing only) | endpoint |
 | **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |
-| **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.01 |
-| **TOTAL** | Per PDF | **~$0.76** |
+| **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
+| **TOTAL** | Per PDF | **~$0.36** |
 
-Cost moved up vs the pre-migration estimate ($0.23) because Claude Opus is 75× the per-image cost of the (broken) Qwen pricing — but every Qwen call had been silently 404-ing and falling through to Claude anyway, so this just makes the bill match reality.
+The pre-migration documented estimate (~$0.23) assumed Qwen vision at $0.18/1M tokens, but every Qwen call had been silently 404-ing and falling through to Claude anyway — the actual bill was already Anthropic-priced. Today's number reflects honest accounting at Opus 4.7's current $5/$25 pricing.
 
 ### Per Search Query
 
@@ -329,16 +340,15 @@ No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, a
 | Metric | Pre-2026-05-01 | Post-Migration |
 |--------|----------------|----------------|
 | **Vision schema integrity** | JSON regex recovery (best effort) | Tool-use schema guarantee |
-| **Vision actual cost** | "Qwen $0.18/1M" (false — 404→Claude fallback) | Claude $15/$75 per 1M (honest) |
+| **Vision actual cost** | "Qwen $0.18/1M" (false — 404→Claude fallback) | Claude Opus 4.7 $5/$25 per 1M (honest) |
 | **OCR success rate** | ~60% (pytesseract broken in prod) | >95% (Chandra v2 jittered retry) |
 | **Voyage drift detection** | None | `embedding_model` + `schema_version` on every row |
-| **VECS storage** | 50% saved by halfvec migration | (same) |
 
 ---
 
 ## 🔮 Future Considerations
 
-1. **Voyage `voyage-multimodal-3`** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. Watch for general availability.
+1. **Voyage `voyage-multimodal-3.5`** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. Watch for general availability.
 2. **Schema versioning** — the `schema_version` field is in place; bumps will trigger backfill via `POST /admin/understanding-embeddings/backfill`.
 3. **Chandra v3** — Datalab continues to ship improvements; the retry-with-jitter loop should adapt.
 

@@ -1,6 +1,8 @@
 # API Configuration Examples - Dynamic AI Models
 
-This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline.
+**Last Updated**: 2026-05-03
+
+This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline. All cost figures use current Anthropic pricing (Opus 4.7 at $5/$25 per 1M, Haiku 4.5 at $1/$5 per 1M, Sonnet 4.6 at $3/$15 per 1M). Per-PDF totals are reconciled against the canonical 100-page / 50-image workload in [AI Models Architecture](./ai-models-architecture.md).
 
 ---
 
@@ -28,11 +30,12 @@ All internal pipeline endpoints (`/api/internal/*`) accept an optional `ai_confi
 If you don't provide `ai_config`, the system uses these defaults:
 
 **Defaults Used**:
-- Visual Embeddings: SLIG (SigLIP2) - HuggingFace endpoint (768D)
-- Classification: Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 attempted Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months and was retired 2026-05-01 — vision is now Anthropic-only.
+- Visual Embeddings: SLIG (SigLIP2 ViT-L) — HuggingFace endpoint (768D)
+- Classification (primary): Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 attempted Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months and was retired 2026-05-01 — vision is now Anthropic-only.
+- Classification (validation pass): same as primary in DEFAULT_AI_CONFIG (`claude-opus-4-7`); fires when primary confidence < `classification_confidence_threshold` (default 0.7) OR primary fails. FAST_CONFIG and COST_OPTIMIZED_CONFIG override this to `claude-haiku-4-5`.
 - Discovery: Claude Opus 4.7
-- Metadata: Claude
-- Text Embeddings: Voyage AI voyage-4 (1024D) → OpenAI fallback (1024D)
+- Metadata: Claude (claude-opus-4-7)
+- Text Embeddings: Voyage AI voyage-4 (1024D, sole production embedder) → in-code 1024D-pinned legacy fallback (not invoked on the understanding path)
 
 ### Custom Configuration
 
@@ -86,17 +89,19 @@ Minimize costs while maintaining acceptable quality.
 
 ## Endpoint-Specific Examples
 
-### Endpoint 10: classify-images
+The numbers below (10/30/40/50) are internal endpoint identifiers under `/api/internal/*` — they are NOT pipeline-stage numbers. The named pipeline stages (Discovery → Layout+OCR → Chunking → Vision → Phase 3 OCR → Visual Embeddings → Understanding → Text Embeddings) are documented in [AI Models Architecture](./ai-models-architecture.md).
 
-Customize image classification models and thresholds via the `ai_config` parameter.
+### `/api/internal/classify-images` (endpoint 10)
 
-### Endpoint 30: save-images-db
+Customize image classification (primary + validation models, threshold) via the `ai_config` parameter.
 
-Customize visual embedding models (SigLIP/CLIP) via the `ai_config` parameter.
+### `/api/internal/save-images-db` (endpoint 30)
+
+Customize visual embedding models (SLIG specialized types) via the `ai_config` parameter.
 
 **Note**: 5 embeddings per image (visual, color, texture, style, material) = 65 × 5 = 325 total embeddings.
 
-### Endpoint 40: extract-metadata
+### `/api/internal/extract-metadata` (endpoint 40)
 
 Customize metadata extraction model and parameters.
 
@@ -109,7 +114,7 @@ Customize metadata extraction model and parameters.
 - Certifications and standards
 - Designer/manufacturer info
 
-### Endpoint 50: create-chunks
+### `/api/internal/create-chunks` (endpoint 50)
 
 Customize chunking and text embedding models.
 
@@ -145,31 +150,46 @@ For high-value catalogs requiring maximum accuracy:
 
 ## Cost Optimization
 
-### Estimated Costs Per PDF (100 pages, 50 images)
+### Estimated Costs Per PDF (canonical workload: 100 pages, 50 images)
+
+These align with the [AI Models Architecture](./ai-models-architecture.md) cost table — same workload, same assumptions, single source of truth.
 
 **DEFAULT_AI_CONFIG**:
-- Discovery (Claude Opus): ~$2.50
-- Classification (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.30
-- Metadata (Claude): ~$0.40
-- Visual Embeddings (SigLIP/CLIP): ~$0.10
-- Text Embeddings (OpenAI): ~$0.20
-- **Total**: ~$1.50 per PDF
+- Discovery (Claude Opus 4.7, 1 call): ~$0.08
+- Classification primary (Claude Opus 4.7 tool use, 50 images): ~$0.13
+- Classification validation pass (Claude Opus 4.7, fires only on low-conf primary): ~$0.03
+- Metadata (Claude Opus 4.7, inline with vision): rolled into classification line
+- Chunking (Claude Sonnet 4.6, ~500 chunks): ~$0.10
+- Visual Embeddings (SLIG endpoint): endpoint-metered (auto-pause)
+- Phase 3 OCR (Chandra v2): endpoint-metered
+- Text + Understanding Embeddings (Voyage voyage-4): ~$0.05
+- **Total**: ~$0.39 per PDF
 
-**COST_OPTIMIZED_CONFIG**:
-- Discovery (GPT-4o): ~$0.25
-- Classification (Claude Haiku via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.10
-- Metadata (GPT): ~$0.20
-- Visual Embeddings (SigLIP/CLIP): ~$0.10
-- Text Embeddings (OpenAI): ~$0.20
-- **Total**: ~$0.85 per PDF (43% savings)
+**FAST_CONFIG** (Haiku for discovery + validation; smaller token caps):
+- Discovery (Claude Haiku 4.5): ~$0.02
+- Classification primary (Claude Opus 4.7): ~$0.13
+- Classification validation pass (Claude Haiku 4.5): ~$0.01
+- Chunking (Claude Sonnet 4.6): ~$0.10
+- Visual + OCR + Voyage: same as above
+- **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
 
-**HIGH_ACCURACY_CONFIG**:
-- Discovery (GPT-5): ~$1.00
-- Classification (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass): ~$0.40
-- Metadata (Claude): ~$0.60
-- Visual Embeddings (SigLIP/CLIP): ~$0.10
-- Text Embeddings (OpenAI): ~$0.20
-- **Total**: ~$2.30 per PDF (53% more expensive)
+**HIGH_ACCURACY_CONFIG** (Opus everywhere, threshold raised to 0.8 → more validation calls fire):
+- Discovery (Claude Opus 4.7, more tokens): ~$0.13
+- Classification primary (Claude Opus 4.7): ~$0.13
+- Classification validation pass (Claude Opus 4.7, fires more often at threshold 0.8): ~$0.10
+- Chunking (Claude Sonnet 4.6): ~$0.10
+- Visual + OCR + Voyage: same as above
+- **Total**: ~$0.51 per PDF (≈30% more than DEFAULT)
+
+**COST_OPTIMIZED_CONFIG** (Haiku for discovery + validation; threshold lowered to 0.6 → fewer validation calls fire):
+- Discovery (Claude Haiku 4.5): ~$0.02
+- Classification primary (Claude Opus 4.7 — primary stays Opus by default): ~$0.13
+- Classification validation pass (Claude Haiku 4.5, threshold 0.6 → rare): ~$0.01
+- Chunking (Claude Sonnet 4.6): ~$0.10
+- Visual + OCR + Voyage: same as above
+- **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
+
+> **Note on the cost-optimized profile**: at current Anthropic pricing (Opus 4.7 = $5/$25, Haiku 4.5 = $1/$5), COST_OPTIMIZED only saves ≈20% over DEFAULT versus the ≈45% it saved at pre-correction pricing. If you want a meaningful cost reduction beyond this, the lever is swapping the **primary** classification model — not just validation. That tradeoff is not currently exposed as a profile because the primary-model swap has direct implications for the understanding-embedding space's schema-version provenance.
 
 ---
 
@@ -206,7 +226,7 @@ Test two configurations side-by-side by submitting separate jobs with different 
 
 1. **Start with DEFAULT_AI_CONFIG**: It provides the best balance for most use cases.
 
-2. **Test Before Production**: Use NOVA test script to validate configurations.
+2. **Test Before Production**: stage configuration changes against a non-production batch and compare per-PDF cost + classification confidence distributions before promoting.
 
 3. **Monitor Costs**: Track API usage and costs for different configurations.
 
@@ -235,13 +255,13 @@ Test two configurations side-by-side by submitting separate jobs with different 
 
 **Problem**: Pipeline takes too long to complete.
 
-**Solution**: Use FAST_CONFIG or reduce max tokens by switching to `gpt-4o` for discovery, `claude-haiku-4-20250514` for validation, and reducing `discovery_max_tokens` and `metadata_max_tokens` to 2048.
+**Solution**: Use FAST_CONFIG or reduce max tokens by switching to `gpt-4o` for discovery, `claude-haiku-4-5` for validation, and reducing `discovery_max_tokens` and `metadata_max_tokens` to 2048.
 
 ### High API Costs
 
 **Problem**: API costs are too high.
 
-**Solution**: Use COST_OPTIMIZED_CONFIG or lower threshold by reducing `classification_confidence_threshold` to 0.6, switching to `gpt-4o` for discovery, `gpt` for metadata extraction, and `claude-haiku-4-20250514` for validation.
+**Solution**: Use COST_OPTIMIZED_CONFIG or lower threshold by reducing `classification_confidence_threshold` to 0.6, switching to `gpt-4o` for discovery, `gpt-4o` for metadata extraction, and `claude-haiku-4-5` for validation.
 
 ### Poor Metadata Quality
 
@@ -260,4 +280,4 @@ The dynamic AI model configuration system gives you complete control over the PD
 - **Cost First**: COST_OPTIMIZED_CONFIG
 - **Balanced**: DEFAULT_AI_CONFIG
 
-All configurations are production-ready and tested with the NOVA end-to-end test script.
+All configurations are production-ready.

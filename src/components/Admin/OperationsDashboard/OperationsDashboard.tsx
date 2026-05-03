@@ -1896,8 +1896,7 @@ const OperationsDashboardInner: React.FC = () => {
                             { name: 'Claude Opus 4.7' },
                             { name: 'Claude Sonnet 4.6' },
                             { name: 'Claude Haiku 4.5' },
-                            { name: 'text-embedding-3-small' },
-                            { name: 'Voyage 3.5' },
+                            { name: 'voyage-4' },
                             { name: 'SLIG 768D' },
                           ].map((m) => (
                             <TableRow key={m.name}>

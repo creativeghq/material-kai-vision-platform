@@ -169,8 +169,6 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                 <SelectContent>
                   <SelectItem value="all">All Models</SelectItem>
                   <SelectItem value="voyage-4">voyage-4 (Text)</SelectItem>
-                  <SelectItem value="voyage-3.5">voyage-3.5 (Legacy Text)</SelectItem>
-                  <SelectItem value="clip">CLIP (Images)</SelectItem>
                   <SelectItem value="siglip">SigLIP (Images)</SelectItem>
                 </SelectContent>
               </Select>

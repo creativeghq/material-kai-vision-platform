@@ -1,6 +1,6 @@
 # AI Models Integration Guide
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-05-03
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
@@ -13,22 +13,20 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | Model | Provider | Purpose | Capability | Cost (per 1M tokens) |
 |-------|----------|---------|-----------|---------------------|
 | **Text Generation** |
-| Claude Opus 4.7 | Anthropic | **Vision (PRIMARY, tool use)**, product discovery, enrichment, complex reasoning | Highest accuracy + schema-locked vision | $15 input / $75 output |
+| Claude Opus 4.7 | Anthropic | **Vision (PRIMARY, tool use)**, product discovery, enrichment, complex reasoning | Highest accuracy + schema-locked vision | $5 input / $25 output |
 | Claude Sonnet 4.6 | Anthropic | **Chunking (PRIMARY)**, mid-tier reasoning | Quality ceiling for chunking | $3 input / $15 output |
-| Claude Haiku 4.5 | Anthropic | Fast classification, demo agent, price-monitoring identity | Real-time | $0.80 input / $4 output |
+| Claude Haiku 4.5 | Anthropic | Fast classification, demo agent, price-monitoring identity, vision validation pass (FAST/COST_OPTIMIZED profiles) | Real-time | $1 input / $5 output |
 | GPT-4o | OpenAI | Alternative discovery (not vision) | 94%+ accuracy | $2.50 input / $10 output |
 | GPT-5 | OpenAI | Alternative discovery / agents (not vision) | Future | TBD |
 | **Text Embeddings** |
-| voyage-4 | Voyage AI | **PRIMARY** text + understanding embeddings | 1024D vectors | $0.06 input |
-| voyage-3 | Voyage AI | Alternative text embeddings | 1024D vectors | $0.06 input |
-| voyage-3-lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
-| text-embedding-3-small | OpenAI | **LEGACY** (CI changelog only, retired 2026-04) | 1536D vectors | $0.02 input |
+| voyage-4 | Voyage AI | **PRIMARY, sole** text + understanding embedder | 1024D vectors | $0.06 input |
+| text-embedding-3-small | OpenAI | LEGACY (CI changelog only, retired 2026-04 from production); in-code fallback pinned to 1024D so legacy callers can't store wrong-dim text embeddings | 1536D historical | $0.02 input |
 | **Visual Embeddings** |
-| SLIG (SigLIP2) Visual | HuggingFace Endpoint | General visual embeddings | 768D | endpoint |
-| SLIG (SigLIP2) Color | HuggingFace Endpoint | Color-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2) Style | HuggingFace Endpoint | Style-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2) Material | HuggingFace Endpoint | Material-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 ViT-L) Visual | HuggingFace Endpoint | General visual embeddings | 768D | endpoint |
+| SLIG (SigLIP2 ViT-L) Color | HuggingFace Endpoint | Color-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 ViT-L) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 ViT-L) Style | HuggingFace Endpoint | Style-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 ViT-L) Material | HuggingFace Endpoint | Material-guided embeddings | 768D | endpoint |
 | **OCR** |
 | Chandra v2 | Datalab (HuggingFace) | **SOLE OCR ENGINE** (with retry-jitter) | >95% success | endpoint |
 
@@ -59,8 +57,8 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 **Performance**:
 - Vision accuracy: schema-locked (no malformed payloads)
 - Latency: 3-8 seconds per image
-- Context: 200K tokens (1M with extended-context beta)
-- Cost: $15/$75 per 1M tokens
+- Context: 200K tokens (1M with extended context)
+- Cost: $5/$25 per 1M tokens
 
 ---
 
@@ -70,7 +68,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'` (was `Qwen/Qwen3.6-35B-A3B-FP8` pre-2026-05-01)
 
-**Why Sonnet for chunking**: chunking is a text task at the quality ceiling — Opus would be 5× the cost for marginal gain. Qwen had been silently failing for months.
+**Why Sonnet for chunking**: chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing. Qwen had been silently failing for months.
 
 **Capabilities**:
 - Semantic chunking
@@ -98,7 +96,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 **Performance**:
 - Accuracy: 92%+
 - Latency: 500ms-1s
-- Cost: $0.80/$4 per 1M tokens
+- Cost: $1/$5 per 1M tokens
 
 ---
 
@@ -135,7 +133,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 **OpenAI fallback**: DISABLED for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection. The OpenAI legacy fallback (if ever invoked) is now pinned to 1024D.
 
 **Performance**:
-- Dimension: 1024D
+- Dimension: 1024D (storage parity with every other embedding column in the platform)
 - Latency: 100-300ms
 - Cost: $0.06 per 1M tokens
 
@@ -143,9 +141,9 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 6-10. SLIG (SigLIP2) Specialized Embeddings
+### 6-10. SLIG (SigLIP2 ViT-L) Specialized Embeddings
 
-**Purpose**: 5 specialized 768D visual embeddings per image via HuggingFace cloud endpoint (`mh-siglip2`, namespace basiliskan)
+**Purpose**: 5 specialized 768D visual embeddings per image via HuggingFace cloud endpoint (`mh-siglip2`, namespace `basiliskan`, model `basiliskan/siglip2`)
 
 **5 Embedding Types** (all 768D halfvec, written directly to VECS):
 
@@ -202,7 +200,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 - `full_render`: SKIPPED (Stage 1.5 already covered the page)
 - photo / IMAGE-region yolo_crop: SKIPPED (`ocr_skipped_reason='photo_not_text_bearing'`)
 
-**Storage**: `document_images` columns — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Consumed by: vision_analysis prompt enrichment, icon-metadata extraction, image-search labels.
+**Storage**: `document_images` columns — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Phase 3 OCR runs *after* `vision_analysis` ([stage_3_images.py:485-553](mivaa-pdf-extractor/app/api/pdf_processing/stage_3_images.py#L485-L553)), so it does NOT enrich the vision prompt — it is consumed by icon-metadata extraction and image-search labels only.
 
 ---
 
@@ -231,31 +229,33 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 
 | Stage | Primary Model | Notes |
 |-------|---------------|-------|
-| 0 — Product Discovery | Claude Opus 4.7 (or GPT-5) | |
-| 1.5 — Layout + Page OCR | YOLO + **Chandra v2** | retry-with-jitter |
-| 2 — Chunking | **Claude Sonnet 4.6** | was Qwen pre-2026-05-01 |
-| 3 — Vision Analysis | **Claude Opus 4.7 (tool use)** | was Qwen pre-2026-05-01 |
-| 3 — Phase 3 per-image OCR | **Chandra v2** | text-bearing images only |
-| 4 — Text Embeddings | Voyage AI voyage-4 (1024D) | sole text embedder |
-| 5 — Visual Embeddings | SLIG (SigLIP2, 5 types, 768D) | |
-| 5 — Understanding Embedding | Voyage AI voyage-4 (1024D) | from Claude vision_analysis JSON |
-| 9 — Product Validation | Claude Haiku 4.5 / Opus 4.7 | |
+| Discovery | Claude Opus 4.7 (or GPT-5) | |
+| Layout + Page OCR | YOLO + **Chandra v2** | retry-with-jitter |
+| Chunking | **Claude Sonnet 4.6** | was Qwen pre-2026-05-01 |
+| Vision (primary) | **Claude Opus 4.7 (tool use)** | was Qwen pre-2026-05-01 |
+| Vision (validation pass) | Claude Opus 4.7 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
+| Phase 3 per-image OCR | **Chandra v2** | text-bearing images only; runs AFTER vision |
+| Visual Embeddings | SLIG (SigLIP2 ViT-L, 5 types, 768D) | |
+| Understanding Embedding | Voyage AI voyage-4 (1024D) | from Claude vision_analysis JSON, parallel with Visual Embeddings |
+| Text Embeddings | Voyage AI voyage-4 (1024D) | sole text embedder |
 
 ---
 
 ## 💰 Cost Optimization
 
 **Strategies**:
-1. **Claude Sonnet for chunking** — 5× cheaper than Opus, equal quality at the chunking ceiling
-2. **Claude Haiku for high-volume classification** — 20× cheaper than Opus
+1. **Claude Sonnet for chunking** — Sonnet matches Opus output quality on chunking, so paying for Opus on this stage buys nothing
+2. **Claude Haiku for high-volume classification** — ~5× cheaper than Opus on input, ~5× on output
 3. **Voyage AI for text + understanding** — superior to OpenAI at $0.06/1M
 4. **SLIG cloud endpoint with auto-pause** — pay-as-you-process
 5. **Chandra v2 retry caps at 3** — most pages succeed on attempt 1
 
-**Example Cost per PDF**:
-- Small PDF (10 pages): $0.40-$0.80
-- Medium PDF (50 pages): $1.50-$3.00
-- Large PDF (200 pages): $6.00-$12.00
+**Example Cost per PDF** (recomputed at current Anthropic pricing — Opus 4.7 at $5/$25, Haiku 4.5 at $1/$5):
+- Small PDF (10 pages): $0.10-$0.25
+- Medium PDF (50 pages, 25 images): $0.20-$0.40
+- Large PDF (200 pages, 100 images): $1.00-$2.50
+
+The canonical 100-page / 50-image reference workload lands at ~$0.36 — see the [AI Models Architecture](./ai-models-architecture.md) cost table for the line-item breakdown.
 
 ---
 
@@ -303,9 +303,9 @@ The model configuration maps each task to its designated model:
 - Search query: 200-800ms
 
 **Cost**:
-- Per PDF: $0.40-$12.00 (size-dependent)
+- Per PDF: $0.10-$2.50 (size-dependent, post-pricing-correction 2026-05-03)
 - Per search: $0.001-$0.02
-- Per image (vision): $0.05-$0.20
+- Per image (vision): $0.02-$0.07
 
 ---
 
@@ -324,12 +324,11 @@ The model configuration maps each task to its designated model:
    - Failure → `OCRResult.method='chandra_failed'`
 
 ### Text Embeddings
-1. **Voyage voyage-4** (PRIMARY, sole) — All production text + understanding embeddings
-2. Voyage voyage-3-lite — Simple/fast tasks
-3. text-embedding-3-small — Retired 2026-04 (CI changelog only)
+1. **Voyage voyage-4** (PRIMARY, sole) — All production text + understanding embeddings (1024D)
+2. text-embedding-3-small — Retired 2026-04 (CI changelog only); in-code fallback pinned to 1024D so legacy 1536D callers can't silently store wrong-dim text embeddings
 
 ### Visual Embeddings
-1. **SLIG (SigLIP2)** (PRIMARY) — 5 specialized 768D types
+1. **SLIG (SigLIP2 ViT-L)** (PRIMARY) — 5 specialized 768D types
 2. 3-attempt retry on dim-mismatch
 3. Skip + flag if all fail
 
@@ -341,6 +340,6 @@ The model configuration maps each task to its designated model:
 
 ---
 
-**Last Updated**: 2026-05-02
-**Version**: 4.0.0
+**Last Updated**: 2026-05-03
+**Version**: 4.1.0
 **Status**: Production

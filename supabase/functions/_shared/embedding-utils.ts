@@ -123,7 +123,7 @@ async function _logEmbeddingUsage(
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const estimatedTokens = Math.ceil(text.length / 4);
-    const costPer1M = 0.06; // voyage-4 (same price as voyage-3.5)
+    const costPer1M = 0.06; // voyage-4
     const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
     const billedCost = rawCost * MARKUP_MULTIPLIER;
 

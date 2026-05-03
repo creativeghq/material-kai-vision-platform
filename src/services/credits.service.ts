@@ -173,7 +173,6 @@ export const creditsAPI = {
 
       // Voyage AI Embeddings
       'voyage-4':   { input: 0.06, output: 0.00 },
-      'voyage-3.5': { input: 0.06, output: 0.00 }, // legacy, kept for historical usage logs
 
       // Qwen vision pricing removed 2026-05-01 — vision moved to Claude.
     };
