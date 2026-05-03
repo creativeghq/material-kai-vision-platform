@@ -587,7 +587,7 @@ Only one of these is actually required — the rest have sensible defaults that 
 | `SLIG_ENDPOINT_URL` | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` | Optional — override only if endpoint changes |
 | `SLIG_ENDPOINT_NAME` | `mh-slig` | Optional |
 | `SLIG_NAMESPACE` | `basiliskan` | Optional |
-| `SLIG_MODEL_NAME` | `basiliskan/siglip2` | Optional (logs + validation only) |
+| `SLIG_MODEL_NAME` | `basiliskan/slig` | Optional (logs + validation only) |
 | `SLIG_EMBEDDING_DIMENSION` | `768` | Optional |
 | `SLIG_ENABLED` | `true` | Optional — set `false` to bypass SLIG entirely |
 | `SLIG_TIMEOUT` | `300` | Optional |
@@ -619,9 +619,9 @@ sudo rm /etc/systemd/system/mivaa-pdf-extractor.service.d/slig-env.conf
 sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.service
 ```
 
-**Note on two drifts between the legacy `.conf` and the code defaults** (worth knowing before you remove the file):
-- `SLIG_MODEL_NAME`: `.conf` says `basiliskan/slig`, code default is `basiliskan/siglip2`. Used for logs + validation only — harmless either way, but if your observability was indexed on `basiliskan/slig`, set the Secret to preserve it.
+**Note on a drift between the legacy `.conf` and the code defaults** (worth knowing before you remove the file):
 - `SLIG_TIMEOUT`: `.conf` says `60`, code default is `300`. The 300s default is actually *preferred* (prevents HF endpoint re-warmup during long jobs). Recommend going with the code default unless you have a reason.
+- (`SLIG_MODEL_NAME` previously drifted between `basiliskan/slig` in `.conf` and `basiliskan/siglip2` in the code default — fixed 2026-05-03; both now agree on `basiliskan/slig`.)
 
 ---
 

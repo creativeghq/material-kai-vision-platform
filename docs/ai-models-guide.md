@@ -22,11 +22,11 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | voyage-4 | Voyage AI | **PRIMARY, sole** text + understanding embedder | 1024D vectors | $0.06 input |
 | text-embedding-3-small | OpenAI | LEGACY (CI changelog only, retired 2026-04 from production); in-code fallback pinned to 1024D so legacy callers can't store wrong-dim text embeddings | 1536D historical | $0.02 input |
 | **Visual Embeddings** |
-| SLIG (SigLIP2 ViT-L) Visual | HuggingFace Endpoint | General visual embeddings | 768D | endpoint |
-| SLIG (SigLIP2 ViT-L) Color | HuggingFace Endpoint | Color-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 ViT-L) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 ViT-L) Style | HuggingFace Endpoint | Style-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 ViT-L) Material | HuggingFace Endpoint | Material-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) Visual | HuggingFace Endpoint | General visual embeddings | 768D | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) Color | HuggingFace Endpoint | Color-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) Style | HuggingFace Endpoint | Style-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) Material | HuggingFace Endpoint | Material-guided embeddings | 768D | endpoint |
 | **OCR** |
 | Chandra v2 | Datalab (HuggingFace) | **SOLE OCR ENGINE** (with retry-jitter) | >95% success | endpoint |
 
@@ -141,9 +141,9 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 6-10. SLIG (SigLIP2 ViT-L) Specialized Embeddings
+### 6-10. SLIG (SigLIP2 SO400M, 768D projected) Specialized Embeddings
 
-**Purpose**: 5 specialized 768D visual embeddings per image via HuggingFace cloud endpoint (`mh-siglip2`, namespace `basiliskan`, model `basiliskan/siglip2`)
+**Purpose**: 5 specialized 768D visual embeddings per image via HuggingFace cloud endpoint (`mh-slig`, namespace `basiliskan`, custom HF model `basiliskan/slig`). Underlying architecture is SigLIP2 SO400M (native 1152D); the endpoint applies a 1152D → 768D projection head so all VECS visual collections stay dimensionally uniform.
 
 **5 Embedding Types** (all 768D halfvec, written directly to VECS):
 
@@ -235,7 +235,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 | Vision (primary) | **Claude Opus 4.7 (tool use)** | was Qwen pre-2026-05-01 |
 | Vision (validation pass) | Claude Opus 4.7 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
 | Phase 3 per-image OCR | **Chandra v2** | text-bearing images only; runs AFTER vision |
-| Visual Embeddings | SLIG (SigLIP2 ViT-L, 5 types, 768D) | |
+| Visual Embeddings | SLIG (SigLIP2 SO400M (768D projected), 5 types, 768D) | |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | from Claude vision_analysis JSON, parallel with Visual Embeddings |
 | Text Embeddings | Voyage AI voyage-4 (1024D) | sole text embedder |
 
@@ -328,7 +328,7 @@ The model configuration maps each task to its designated model:
 2. text-embedding-3-small — Retired 2026-04 (CI changelog only); in-code fallback pinned to 1024D so legacy 1536D callers can't silently store wrong-dim text embeddings
 
 ### Visual Embeddings
-1. **SLIG (SigLIP2 ViT-L)** (PRIMARY) — 5 specialized 768D types
+1. **SLIG (SigLIP2 SO400M, 768D projected)** (PRIMARY) — 5 specialized 768D types
 2. 3-attempt retry on dim-mismatch
 3. Skip + flag if all fail
 

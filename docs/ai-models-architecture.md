@@ -11,7 +11,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 |----------|-------------|-----------------|
 | **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
-| **Google (HuggingFace)** | SigLIP2 ViT-L (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
+| **Google (HuggingFace)** | SigLIP2 SO400M (768D projected) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
 | **Datalab (HuggingFace)** | Chandra v2 | OCR — sole OCR engine (pytesseract + EasyOCR removed 2026-05) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
@@ -73,7 +73,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ VISUAL EMBEDDINGS (5 types) — VECS-Only, halfvec                        │
-│ Model: SLIG (SigLIP2 ViT-L) via HuggingFace cloud endpoint              │
+│ Model: SLIG (SigLIP2 SO400M, 768D projected) via HuggingFace cloud endpoint              │
 │ Purpose: 5 specialized 768D embeddings per image                        │
 │   1. Visual    → image_slig_embeddings    (key: visual_768)             │
 │   2. Color     → image_color_embeddings   (key: color_slig_768)         │
@@ -206,10 +206,10 @@ Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as
 
 ---
 
-### 5. **SLIG (SigLIP2 ViT-L) Cloud Endpoint** 🎯
+### 5. **SLIG (SigLIP2 SO400M, 768D projected) Cloud Endpoint** 🎯
 
 **File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
-**HF endpoint**: `mh-siglip2` (namespace `basiliskan`), serves `basiliskan/siglip2` (SigLIP2 ViT-L, 768D output)
+**HF endpoint**: `mh-slig` (namespace `basiliskan`), serves the custom HF model `basiliskan/slig`. Underlying architecture per the production env (`VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384`) is **SigLIP2 SO400M** (native 1152D), wrapped with a **1152D → 768D projection head** at the endpoint so every downstream consumer sees a uniform 768D output (`SLIG_EMBEDDING_DIMENSION=768`).
 
 HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
 
@@ -279,7 +279,7 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 | Vision (primary) | Claude Opus 4.7 (tool use) | — |
 | Vision (validation, low-confidence) | Claude Opus 4.7 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | Chandra v2 | — |
-| Visual Embeddings | SLIG (SigLIP2 ViT-L, 5×768D) | — |
+| Visual Embeddings | SLIG (SigLIP2 SO400M (768D projected), 5×768D) | — |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
 | Text Embeddings | Voyage AI voyage-4 (1024D) | — |
 

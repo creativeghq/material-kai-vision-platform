@@ -200,7 +200,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Creates 4 text-guided specialized embeddings using SLIG text_embedding mode with prompts
 - Each embedding is normalized to unit vector (L2 normalization)
 - Total: 5 × 768D = 3,840 dimensions per image
-- All embeddings use SLIG endpoint (mh-siglip2)
+- All embeddings use SLIG endpoint (`mh-slig`)
 
 **Storage**:
 - Saves to `document_images` table (PostgreSQL) with embedding columns:

@@ -63,7 +63,7 @@
 
 ### 3. HuggingFace Inference Endpoints
 
-#### SLIG (SigLIP2 ViT-L) — VISUAL EMBEDDINGS
+#### SLIG (SigLIP2 SO400M, 768D projected) — VISUAL EMBEDDINGS
 - **Use Cases**:
   - 5 specialized 768D visual embeddings per image (visual, color, texture, style, material)
   - Image-text similarity via similarity mode
@@ -71,9 +71,9 @@
   - Multi-vector search
 - **Dimensions**: 768D per type (halfvec in VECS)
 - **Modes**: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`
-- **Endpoint**: `mh-siglip2` (namespace: basiliskan), serves `basiliskan/siglip2`
+- **Endpoint**: `mh-slig` (namespace: basiliskan), serves the custom HF model `basiliskan/slig`. Underlying architecture per the production env (`VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384`) is SigLIP2 SO400M (native 1152D); the endpoint applies a 1152D → 768D projection so every downstream consumer sees a uniform 768D output (`SLIG_EMBEDDING_DIMENSION=768`).
 - **Cost**: HuggingFace endpoint with auto-pause
-- **Performance**: superior to legacy CLIP 512D and the previous-generation 1152D SigLIP-SO400M collections (both retired 2026-04)
+- **Performance**: 768D output is dimensionally aligned with all VECS visual collections; the previous direct-1152D SigLIP-SO400M collections (without projection) were retired 2026-04 as 100% orphans
 
 **Environment variables**: `SLIG_ENDPOINT_URL`, `SLIG_ENDPOINT_TOKEN`, `CHANDRA_ENDPOINT_URL`, `CHANDRA_ENDPOINT_TOKEN` (the latter two cover the Chandra v2 OCR endpoint described below).
 
@@ -163,7 +163,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 - **Vision (primary)**: **Claude Opus 4.7 via tool use** (was Qwen pre-2026-05-01 — but Qwen had been 404-ing for months)
 - **Vision (validation pass)**: triggered when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY profiles use Claude Opus 4.7; FAST/COST_OPTIMIZED profiles use Claude Haiku 4.5. Driven by `classification_validation_model` in `ai_config`.
 - **Phase 3 OCR (per-image)**: **Chandra v2**, runs AFTER vision. Consumed by icon-metadata extraction + image-search labels (NOT by chunker, NOT a vision_analysis prompt input).
-- **Visual Embeddings**: SLIG (SigLIP2 ViT-L, 5×768D)
+- **Visual Embeddings**: SLIG (SigLIP2 SO400M (768D projected), 5×768D)
 - **Understanding Embedding**: Voyage AI voyage-4 (1024D, parallel with Visual Embeddings)
 - **Text Embeddings**: Voyage AI voyage-4 (1024D, sole embedder)
 
@@ -234,7 +234,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 - Optional agent fallback
 - **Not used for vision** (Anthropic-only post-2026-05-01)
 
-### When to Use SLIG (SigLIP2 ViT-L)
+### When to Use SLIG (SigLIP2 SO400M, 768D projected)
 - Visual similarity search (5 specialized 768D types)
 - High-volume image processing
 
@@ -250,7 +250,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 | Claude Haiku 4.5 | Classification | 0.5-1s | 90%+ | $0.001-0.006 |
 | GPT-4o | Discovery | 2-4s | 93%+ | $0.04-0.12 |
 | Chandra v2 | Page OCR (3-attempt avg) | 1-3s | >95% | endpoint |
-| SLIG (SigLIP2 ViT-L) | Embeddings (5 types) | 0.15-0.4s | 89-94% | endpoint |
+| SLIG (SigLIP2 SO400M, 768D projected) | Embeddings (5 types) | 0.15-0.4s | 89-94% | endpoint |
 | Voyage voyage-4 | Text/understanding embedding | 0.1-0.3s | superior to OAI | $0.06/1M |
 | FLUX Dev | Interior design | 5-13s | 92%+ | $0.025 |
 
@@ -301,7 +301,7 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 
 **2026-04 — Embedding consolidation**:
 - ✅ All vector columns migrated from `vector` → `halfvec` (50% storage savings)
-- ✅ Legacy 1152D SigLIP-SO400M and 512D CLIP collections dropped (100% orphans). Current visual embedder is SigLIP2 ViT-L (768D output via the SLIG cloud endpoint).
+- ✅ Legacy 1152D SigLIP-SO400M and 512D CLIP collections dropped (100% orphans). Current visual embedder is SigLIP2 SO400M (768D projected) (768D output via the SLIG cloud endpoint).
 - ✅ Voyage `voyage-4` replaced OpenAI `text-embedding-3-small` (1536D → 1024D)
 
 **Earlier (2025-12)**:
