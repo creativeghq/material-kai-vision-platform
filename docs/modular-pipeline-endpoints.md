@@ -197,23 +197,18 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 **Technical Details**:
 - Uses SLIG HuggingFace endpoint exclusively for all visual embeddings
 - Generates base visual embedding (768D) using SLIG image_embedding mode
-- Creates 4 text-guided specialized embeddings using SLIG text_embedding mode with prompts
-- Each embedding is normalized to unit vector (L2 normalization)
-- Total: 5 × 768D = 3,840 dimensions per image
-- All embeddings use SLIG endpoint (`mh-slig`)
+- Creates 1 visual SLIG embedding (768D, raw image)
+- Creates 4 per-aspect Voyage `voyage-3` embeddings (1024D each) of deterministic text strings derived from VisionAnalysis (post-2026-05-04 — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)). Pre-v2: 4 SLIG-blend vectors at 768D using fixed global text prompts.
 
-**Storage**:
-- Saves to `document_images` table (PostgreSQL) with embedding columns:
-  - visual_slig_768 (SLIG base embedding)
-  - color_slig_768 (SLIG color embedding)
-  - texture_slig_768 (SLIG texture embedding)
-  - style_slig_768 (SLIG style embedding)
-  - material_slig_768 (SLIG material embedding)
+**Storage** (post-v2):
+- 1 SLIG visual vector → `image_slig_embeddings` (collection key: `visual_768`)
+- 4 Voyage aspect vectors → `image_color_embeddings` / `image_texture_embeddings` / `image_style_embeddings` / `image_material_embeddings` (collection keys: `color_aspect_1024` / `texture_aspect_1024` / `style_aspect_1024` / `material_aspect_1024`)
+- All written to VECS as halfvec; presence flagged on `document_images.has_*_slig` (flag names retained from v1 for cross-stack stability — flag = "vector present in VECS regardless of which model produced it"; check `<aspect>_aspect_embedding_model` for v1 vs v2 lineage)
 
-**Calculation**: 65 images × 5 embeddings = 325 total SLIG embeddings (768D each)
+**Calculation post-v2**: 65 images × (1 SLIG visual + ≤4 Voyage aspect) embeddings; the SLIG endpoint sees 65 calls (was 65 × ~13 = 845 calls pre-v2).
 
 **Defaults**:
-- Embeddings per image: 5 (visual, color, texture, style, material)
+- Embeddings per image: 1 SLIG visual + up to 4 Voyage aspect (some aspects skip when their source fields in VisionAnalysis are empty — legitimate per-aspect skip rather than failure)
 - Timeout: 600s (10 minutes)
 - Batch processing: All embeddings generated in parallel
 

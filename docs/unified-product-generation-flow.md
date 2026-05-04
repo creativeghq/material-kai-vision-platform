@@ -53,10 +53,10 @@ All three methods converge into a shared storage and search layer. Each method f
 **Unified Storage (VECS Collections)**:
 - `chunks` table (text_embedding 1024D — Voyage AI)
 - `image_slig_embeddings` (768D — primary visual, SLIG)
-- `image_color_embeddings` (768D — text-guided color SLIG)
-- `image_texture_embeddings` (768D — text-guided texture SLIG)
-- `image_material_embeddings` (768D — text-guided material SLIG)
-- `image_style_embeddings` (768D — text-guided style SLIG)
+- `image_color_embeddings` (1024D Voyage post-2026-05-04 from `VisionAnalysis.colors[]` — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md); was 768D SLIG-blend pre-v2)
+- `image_texture_embeddings` (1024D Voyage post-2026-05-04 from `VisionAnalysis.textures[] + finish`; was 768D SLIG-blend pre-v2)
+- `image_material_embeddings` (1024D Voyage post-2026-05-04 from `VisionAnalysis.material_type + category + subcategory`; was 768D SLIG-blend pre-v2)
+- `image_style_embeddings` (1024D Voyage post-2026-05-04 from `VisionAnalysis.style + surface_pattern + applications`; was 768D SLIG-blend pre-v2)
 - `image_understanding_embeddings` (1024D — Voyage AI from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint had been 404-ing for months). Provenance fields `embedding_model` + `schema_version` persisted on every row.)
 
 **Unified Search**: A user query is embedded, then searched in parallel across all 6 collections. Results from PDF, web, and XML sources are merged and ranked together.
@@ -207,11 +207,11 @@ All three methods store embeddings in the same VECS collections:
 
 | Collection | Dimension | Model | Used By |
 |-----------|-----------|-------|---------|
-| **image_slig_embeddings** | 768D | SigLIP2 via SLIG cloud endpoint | PDF, Web, XML |
-| **image_color_embeddings** | 768D | SLIG (color-focused similarity) | PDF, Web, XML |
-| **image_texture_embeddings** | 768D | SLIG (texture-focused similarity) | PDF, Web, XML |
-| **image_material_embeddings** | 768D | SLIG (material-focused similarity) | PDF, Web, XML |
-| **image_style_embeddings** | 768D | SLIG (style-focused similarity) | PDF, Web, XML |
+| **image_slig_embeddings** | 768D | SigLIP2 via SLIG cloud endpoint (raw image pixels) | PDF, Web, XML |
+| **image_color_embeddings** | 1024D | Voyage `voyage-3` of `VisionAnalysis.colors[]` (post-2026-05-04, see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md); was 768D SLIG-blend pre-v2) | PDF, Web, XML |
+| **image_texture_embeddings** | 1024D | Voyage `voyage-3` of `VisionAnalysis.textures[] + finish` (post-v2; was 768D SLIG-blend) | PDF, Web, XML |
+| **image_material_embeddings** | 1024D | Voyage `voyage-3` of `VisionAnalysis.material_type + category + subcategory` (post-v2; was 768D SLIG-blend) | PDF, Web, XML |
+| **image_style_embeddings** | 1024D | Voyage `voyage-3` of `VisionAnalysis.style + surface_pattern + applications` (post-v2; was 768D SLIG-blend) | PDF, Web, XML |
 | **image_understanding_embeddings** | 1024D | Voyage AI (from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text`). Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint 404-ing for months). | PDF, Web, XML |
 
 ---

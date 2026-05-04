@@ -392,7 +392,7 @@ This is a tool-side change only — no schema or PDF changes needed.
 
 ### Plug in auto color extraction for `color_palette`
 
-`document_images` already has the `image_color_embeddings` (768D SLIG) collection with `has_color_slig` boolean flag. Add a service that:
+`document_images` already has the `image_color_embeddings` collection with `has_color_slig` boolean flag (1024D Voyage post-2026-05-04, was 768D SLIG-blend pre-v2 — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)). The post-v2 vectors carry per-image color text from `VisionAnalysis.colors[]`; centroid clustering on Voyage embeddings of color-name strings is well-defined whereas the pre-v2 SLIG-blend vectors were ~80% the base visual vector and didn't cluster meaningfully by color. Add a service that:
 - Takes a list of `document_image_id`s from the moodboard.
 - Queries the SLIG color collection for centroid-cluster colors.
 - Returns top-K hex codes with auto-named labels (Claude Haiku, given the cluster RGB).

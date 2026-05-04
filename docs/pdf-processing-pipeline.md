@@ -729,27 +729,32 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **🚀 ZERO-DOWNLOAD ARCHITECTURE**
 
-**Model**: SigLIP2 via SLIG cloud endpoint (768D). Legacy SigLIP ViT-SO400M (1152D) was retired in 2026-04 — its collections were 100% orphans.
+**Models** (post-2026-05-04 — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)):
+- SLIG SigLIP2 (768D, raw image): produces ONE visual vector per image
+- Voyage `voyage-3` (1024D, text): produces FOUR per-aspect vectors per image, embedding deterministic strings derived from VisionAnalysis fields
+
+Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text prompts blended at 10-30% into the base visual vector). Legacy SigLIP ViT-SO400M (1152D) was retired in 2026-04 — its collections were 100% orphans.
 
 **Process (Per Image)**:
-1. **Pass Supabase URL to SLIG service** (no manual download!)
-2. SLIG fetches internally
-3. Generate 5 embedding types (all 768D)
-4. Save directly to VECS collections (`image_slig_embeddings`, `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, `image_material_embeddings`)
-5. Auto-cleanup
+1. **Pass Supabase URL to SLIG service** for the visual embedding (no manual download)
+2. SLIG fetches internally → 1 × 768D visual vector → `image_slig_embeddings`
+3. Pull cached `VisionAnalysis` JSON from `document_images.vision_analysis` (already produced by Stage 3)
+4. Run 4 deterministic aspect serializers on the JSON → 4 short strings
+5. Voyage-embed each non-empty aspect string → 4 × 1024D vectors → `image_color_embeddings` / `image_texture_embeddings` / `image_style_embeddings` / `image_material_embeddings`
+6. Auto-cleanup
 
 **Why Zero-Download?**
 - **URL-native**: No need to download manually
 - **Faster Processing**: No extra download step
 - **Same Quality**: URL vs base64 produces identical embeddings
 
-**5 SLIG Embedding Types Generated Per Image** (SigLIP2 via SLIG cloud endpoint, 768D each):
+**Embeddings Generated Per Image** (post-v2):
 
-1. **Visual Embeddings** (768D) — Overall visual appearance, enables visual similarity search. Collection: `image_slig_embeddings`. Producer key: `visual_768`.
-2. **Color Embeddings** (768D) — Text-guided color similarity. Collection: `image_color_embeddings`. Producer key: `color_slig_768`.
-3. **Texture Embeddings** (768D) — Text-guided texture similarity. Collection: `image_texture_embeddings`. Producer key: `texture_slig_768`.
-4. **Style Embeddings** (768D) — Text-guided style similarity. Collection: `image_style_embeddings`. Producer key: `style_slig_768`.
-5. **Material Embeddings** (768D) — Text-guided material similarity. Collection: `image_material_embeddings`. Producer key: `material_slig_768`.
+1. **Visual** (SLIG SigLIP2 768D) — Overall visual appearance, enables visual similarity search. Collection: `image_slig_embeddings`. Producer key: `visual_768`.
+2. **Color** (Voyage 1024D) — Per-image color text from `VisionAnalysis.colors[]`. Collection: `image_color_embeddings`. Producer key: `color_aspect_1024` (was `color_slig_768` 768D pre-v2).
+3. **Texture** (Voyage 1024D) — Per-image texture text from `VisionAnalysis.textures[] + finish`. Collection: `image_texture_embeddings`. Producer key: `texture_aspect_1024` (was `texture_slig_768` 768D pre-v2).
+4. **Style** (Voyage 1024D) — Per-image style text from `VisionAnalysis.style + surface_pattern + applications`. Collection: `image_style_embeddings`. Producer key: `style_aspect_1024` (was `style_slig_768` 768D pre-v2).
+5. **Material** (Voyage 1024D) — Per-image material text from `VisionAnalysis.material_type + category + subcategory`. Collection: `image_material_embeddings`. Producer key: `material_aspect_1024` (was `material_slig_768` 768D pre-v2).
 
 **Output**: A JSON result with `material_images_processed`, `slig_embeddings_generated`, `total_embeddings`, `memory_usage`, `processing_time`, and `embeddings_by_type` (visual, color, texture, style, material counts).
 

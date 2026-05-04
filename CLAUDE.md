@@ -113,18 +113,19 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 - **7-embedding fusion search**: text, visual, understanding, color, texture, style, material
 - **halfvec (float16)**: ALL vector columns migrated from vector→halfvec. 50% storage savings, zero accuracy loss. vecs 0.4.5 works via PostgreSQL implicit casts.
 - **Understanding embeddings**: Claude Opus 4.7 vision_analysis JSON (schema-locked via Anthropic tool use → `app.models.vision_analysis.VisionAnalysis`) → deterministic `serialize_vision_analysis_to_text` → Voyage AI 1024D embedding. Enables spec-based search. Provenance (`embedding_model`, `schema_version`) is persisted on every row so admin UI / backfill cron can detect Voyage→OpenAI fallback drift and stale-schema rows.
+- **Aspect embeddings (v2, 2026-05-04)**: 4 per-image aspect vectors (color, texture, style, material) are produced by Voyage-embedding deterministic text strings derived from `VisionAnalysis` fields — replacing the pre-v2 SLIG-blend trick where 4 fixed global text prompts were blended at 10-30% into the base visual vector to produce 4 vectors that were ~80% identical to each other and to `image_slig_embeddings`. Mapping: `colors[]` → color, `textures[] + finish` → texture, `style + surface_pattern + applications` → style, `material_type + category + subcategory` → material. Same model/space as `image_understanding_embeddings`. Provenance per aspect (`<aspect>_aspect_embedding_model`, `<aspect>_aspect_schema_version`) on `document_images`. Behind feature flag `EMBED_ASPECTS_FROM_VISION_ANALYSIS` during rollout — see [docs/aspect-embeddings-v2-runbook.md](docs/aspect-embeddings-v2-runbook.md).
 - **2-phase image pipeline**: Phase 1 (sync) = classification + SLIG embeddings (visual + 4 specialized + understanding, all written directly to VECS collections). Phase 2 (the legacy `background_image_processor.py` step that re-ran a separate analysis pass) was deleted 2026-04 — it was silently broken (called a non-existent `generate_material_embeddings` method) and produced no output.
 
 ## Important DB Details — VECS-Only Architecture (post 2026-04 cleanup)
 - **VECS is the single source of truth for image embeddings.** No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, all halfvec for 50% storage savings:
   - `image_slig_embeddings` — **768D** (primary visual, SigLIP2 via SLIG cloud endpoint)
-  - `image_color_embeddings` — **768D** (text-guided color SLIG)
-  - `image_texture_embeddings` — **768D** (text-guided texture SLIG)
-  - `image_style_embeddings` — **768D** (text-guided style SLIG)
-  - `image_material_embeddings` — **768D** (text-guided material SLIG)
+  - `image_color_embeddings` — **1024D post-2026-05-04 / 768D legacy** (Voyage from `VisionAnalysis.colors[]`; pre-v2 was SLIG-blend trick — see Aspect embeddings note above)
+  - `image_texture_embeddings` — **1024D post-2026-05-04 / 768D legacy** (Voyage from `VisionAnalysis.textures[] + finish`)
+  - `image_style_embeddings` — **1024D post-2026-05-04 / 768D legacy** (Voyage from `VisionAnalysis.style + surface_pattern + applications`)
+  - `image_material_embeddings` — **1024D post-2026-05-04 / 768D legacy** (Voyage from `VisionAnalysis.material_type + category + subcategory`)
   - `image_understanding_embeddings` — **1024D** (Voyage AI from Claude Opus 4.7 vision_analysis; provenance fields `embedding_model` + `schema_version` mirrored on `document_images.understanding_embedding_model` + `understanding_schema_version`)
   - Legacy 1152D `image_siglip_embeddings` and 1152D specialized collections were dropped 2026-04 — they were 100% orphans from the SigLIP-SO400M era.
-- **Boolean presence flags on `document_images`**: `has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`. These are the canonical "does this image have embedding X?" lookup — set automatically by `vecs_service._set_image_flag()` whenever an embedding is upserted. Use these flags for O(1) presence checks instead of round-tripping to VECS.
+- **Boolean presence flags on `document_images`**: `has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`. These are the canonical "does this image have embedding X?" lookup — set automatically by `vecs_service._set_image_flag()` whenever an embedding is upserted. Use these flags for O(1) presence checks instead of round-tripping to VECS. Note: the four `has_*_slig` flag names are kept post-v2 to avoid the cross-stack rename churn — what they actually flag is "this image has an aspect-N embedding present in VECS" regardless of which model produced it (look at `<aspect>_aspect_embedding_model` for the answer to that).
 - **Dropped columns 2026-04** (DO NOT reference in code or queries):
   - `document_images`: `visual_clip_embedding_512`, `color_embedding_256`, `texture_embedding_256`, `application_embedding_512`, `multimodal_fusion_embedding_2688`
   - `products`: `embedding`, `visual_clip_embedding_512`, `color_clip_embedding_512`, `texture_clip_embedding_512`, `style_clip_embedding_512`, `material_clip_embedding_512`, `multimodal_fusion_embedding_2048`
@@ -132,11 +133,12 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
   - The dual-store columns were broken since the CLIP→SLIG migration (dimension constraint mismatches) — dropping them removed dead state, not functionality.
 - **Producer→consumer key naming** (real_embeddings_service.generate_all_embeddings):
   - `visual_768` → `image_slig_embeddings`
-  - `color_slig_768` → `image_color_embeddings`
-  - `texture_slig_768` → `image_texture_embeddings`
-  - `style_slig_768` → `image_style_embeddings`
-  - `material_slig_768` → `image_material_embeddings`
+  - `color_aspect_1024` → `image_color_embeddings` (v2, post-2026-05-04 — Voyage from `VisionAnalysis.colors[]`)
+  - `texture_aspect_1024` → `image_texture_embeddings` (v2)
+  - `style_aspect_1024` → `image_style_embeddings` (v2)
+  - `material_aspect_1024` → `image_material_embeddings` (v2)
   - `understanding_1024` → `image_understanding_embeddings`
+  - Legacy aspect keys `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` are still emitted by the pre-v2 SLIG-blend code path while the feature flag is off, and accepted by the 2 consumer call sites + `embedding_to_text_service` during the rollout window. Cleanup PR removes them.
   - **Never use `*_siglip_1152` or `*_clip_512` keys — those were legacy aliases removed in the SLIG migration.**
 - **Product embeddings**: only `text_embedding_1024` lives on the products row (Voyage AI from name+description+metadata, generated inline by `stage_4_products`). All visual product embeddings are derived from associated images via `image_product_associations` + the `has_*_slig` flags. Use the RPC `get_product_embedding_status(product_id)` for product-level coverage.
 - vecs 0.4.5: no native halfvec support but PostgreSQL implicit cast vector→halfvec makes it transparent
