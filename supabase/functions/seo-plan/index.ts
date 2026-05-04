@@ -187,6 +187,12 @@ Google shows an AI Overview for this keyword. Optimize for AI citation:
 - Match the format of cited sources (well-structured, authoritative, Q&A-friendly)`;
   }
 
+  // ── Mention-monitoring SERP signals (Phase 2 enrichment) ──
+  // Injects AI Overview text, featured-snippet target, related searches,
+  // PAA answers, video / news / shopping carousel state, knowledge-graph
+  // presence, paid bidders, and per-keyword intent classification.
+  prompt += buildSerpSignalsSystemBlock(research?.serpSignals);
+
   if (brief) {
     prompt += `
 
@@ -252,6 +258,56 @@ function buildPlanningUserPrompt(
     .slice(0, 20)
     .join(', ');
 
+  const signals = research.serpSignals;
+  const aiOverviewSection = signals?.aiOverviewText
+    ? `
+
+=== GOOGLE'S AI OVERVIEW (current generative answer) ===
+${signals.aiOverviewText}
+Cited sources: ${(signals.aiOverviewReferences || []).map((r) => r.domain || r.url).filter(Boolean).slice(0, 8).join(', ') || 'none'}
+Brand mentioned in AI Overview: ${signals.aiOverviewBrandMentioned ? 'YES' : 'NO'}`
+    : '';
+
+  const featuredSnippetSection = signals?.featuredSnippetTarget?.description
+    ? `
+
+=== FEATURED SNIPPET TO OUTRANK (position 0) ===
+Currently held by: ${signals.featuredSnippetTarget.domain || 'unknown'}
+Current snippet: "${signals.featuredSnippetTarget.description}"
+Goal: write a 40-60 word answer in a single paragraph immediately after a matching H2 to displace this.`
+    : '';
+
+  const relatedSection = signals?.relatedSearches?.length
+    ? `
+
+=== GOOGLE'S RELATED SEARCHES (intent cluster) ===
+  - ${signals.relatedSearches.slice(0, 10).join('\n  - ')}
+These are queries Google groups with the primary keyword by user intent. Cover them as subsections or H3s.`
+    : '';
+
+  const paaAnswers = signals?.paaAnswers || [];
+  const paaSection = paaAnswers.length
+    ? `
+
+=== PAA WITH CURRENT TOP-ANSWER SNIPPETS ===
+${paaAnswers
+  .slice(0, 8)
+  .map((a) => `- Q: ${a.question}${a.answerSnippet ? `\n  Current top answer: "${a.answerSnippet}"` : ''}`)
+  .join('\n')}
+Target each as an FAQ entry, write a tighter answer than the current one shown.`
+    : '';
+
+  const intentSection = signals?.keywordIntents && Object.keys(signals.keywordIntents).length
+    ? `
+
+=== KEYWORD INTENT CLASSIFICATION ===
+${Object.entries(signals.keywordIntents)
+  .slice(0, 10)
+  .map(([k, v]) => `- ${k}: ${v}`)
+  .join('\n')}
+Match the article's structure to the dominant intent of the primary keyword.`
+    : '';
+
   return `Create an article plan for the following topic.
 
 === TOPIC ===
@@ -274,9 +330,48 @@ ${competitorHeadings}
 
 === PEOPLE ALSO ASK ===
   - ${paaList}
+${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}
 
 === TOTAL ADDRESSABLE VOLUME ===
 ${research.totalAddressableVolume} monthly searches across all related keywords
 
 Create a comprehensive article plan targeting 2000-3000 words.`;
+}
+
+/**
+ * Append the SerpSignalBlob's structural insights to the system prompt.
+ * Tells the planner WHAT to optimize for at a strategy level (intent
+ * matching, entity authority, video/news carousel competition) — the
+ * tactical "here's the AI Overview text" content goes in the user prompt.
+ */
+function buildSerpSignalsSystemBlock(
+  signals: KeywordResearchResult['serpSignals'],
+): string {
+  if (!signals) return '';
+  let block = '\n\n=== MENTION-MONITORING SERP SIGNALS ===';
+  if (signals.aiOverviewText) {
+    block += `\n- AI Overview is present for this keyword. Use direct-answer format, structured definitions, and statistics with attribution to maximize chance of being cited.`;
+    if (signals.aiOverviewBrandMentioned === false) {
+      block += ` Brand is NOT cited yet — this is a Generative Engine Optimization (GEO) opportunity, weight it as a high-priority section structure decision.`;
+    }
+  }
+  if (signals.featuredSnippetTarget?.description) {
+    block += `\n- Featured snippet (position 0) currently held — plan an explicit "snippet target" paragraph (40-60 words, single paragraph after a matching H2) and set it as featuredSnippetTarget in the plan.`;
+  }
+  if (signals.knowledgeGraphPresent === false) {
+    block += `\n- No Google Knowledge Panel — entity authority is weak. Plan to include schema.org Organization markup, named-entity citations, and Wikidata-style structured definitions.`;
+  }
+  if (signals.videoCarouselPresent === false && signals.videoCarouselPlatforms) {
+    const top = Object.entries(signals.videoCarouselPlatforms).sort((a, b) => b[1] - a[1])[0];
+    if (top) {
+      block += `\n- Video carousel exists for this query and brand is NOT in it (top platform: ${top[0]}). Recommend including a "watch this" embed slot in the plan so the article can be paired with a complementary video asset.`;
+    }
+  }
+  if (signals.paidCompetitors?.length) {
+    block += `\n- ${signals.paidCompetitors.length} advertisers paying Google Ads on this keyword (${signals.paidCompetitors.slice(0, 3).map((p) => p.domain).join(', ')}) — high commercial intent. Bias plan toward conversion CTAs and product-comparison structure.`;
+  }
+  if (signals.shoppingListings?.length) {
+    block += `\n- Google Shopping carousel renders for this query. Plan should include a structured price/spec section to match shopping-listing context.`;
+  }
+  return block;
 }

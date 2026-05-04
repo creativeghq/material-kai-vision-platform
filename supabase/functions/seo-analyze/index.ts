@@ -22,6 +22,7 @@ import type {
   SectionScore,
   ContentBrief,
   GEOScore,
+  SerpSignalBlob,
 } from '../_shared/seo-types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -93,7 +94,7 @@ Deno.serve(withApiLogging('seo-analyze', async (req) => {
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
     // Run analysis
-    let analysis = analyzeContent(content, body.article_plan);
+    let analysis = analyzeContent(content, body.article_plan, body.serp_signals);
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
 
@@ -129,7 +130,7 @@ Deno.serve(withApiLogging('seo-analyze', async (req) => {
         fixIterations++;
 
         // Re-analyze
-        analysis = analyzeContent(content, body.article_plan);
+        analysis = analyzeContent(content, body.article_plan, body.serp_signals);
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100`);
 
         if (analysis.overallScore >= MIN_ACCEPTABLE_SCORE) break;
@@ -167,6 +168,7 @@ Deno.serve(withApiLogging('seo-analyze', async (req) => {
 function analyzeContent(
   markdown: string,
   plan: ArticlePlan,
+  serpSignals?: SerpSignalBlob,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -454,6 +456,168 @@ function analyzeContent(
     });
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // Phase 4 — SERP-AWARE GAP CHECKS (6 rules from mention-monitoring)
+  // ════════════════════════════════════════════════════════════════
+  // Each rule scores the article against the live SERP state captured by
+  // the mention-monitoring opportunities call. Skipped silently when
+  // signals are absent (Phase 1 enrichment didn't run).
+  if (serpSignals) {
+    // ── Check 16: Featured-snippet alignment ──
+    // If a featured snippet exists, the article needs a 40-60 word direct
+    // answer paragraph. Use the existing TL;DR block ([!tldr]) heuristic.
+    const fsTarget = serpSignals.featuredSnippetTarget;
+    if (fsTarget?.description) {
+      const hasTldrBlock = /^\s*>\s*\[!tldr\]/m.test(markdown);
+      const hasShortAnswer = paragraphs.some((p) => {
+        const wc = p.split(/\s+/).filter(Boolean).length;
+        return wc >= 30 && wc <= 80 && p.includes(primaryKw);
+      });
+      if (!hasTldrBlock && !hasShortAnswer) {
+        fixes.push({
+          category: 'featured_snippet_target',
+          severity: 'high',
+          description: `No featured-snippet candidate paragraph found. Currently held by ${fsTarget.domain || 'unknown'}: "${(fsTarget.description || '').slice(0, 120)}"`,
+          suggestion: 'Add a [!tldr] block or a 40-60 word paragraph immediately after the H1/lead that directly answers the primary query.',
+          affectedSection: 'Lead / TL;DR',
+          autoFixable: true,
+          applied: false,
+        });
+      }
+    }
+
+    // ── Check 17: AI Overview cited-source coverage ──
+    // When Google's AI Overview cites specific domains, the article should
+    // cite at least one of them as a [SOURCE:] (or directly link) so search
+    // engines see topical alignment with what the AI deems authoritative.
+    const aiRefs = serpSignals.aiOverviewReferences || [];
+    if (aiRefs.length > 0 && serpSignals.aiOverviewBrandMentioned === false) {
+      const cited = aiRefs
+        .map((r) => (r.domain || '').toLowerCase())
+        .filter(Boolean);
+      const lowerContent = content;
+      const matched = cited.some((d) => lowerContent.includes(d));
+      if (!matched) {
+        fixes.push({
+          category: 'ai_overview_alignment',
+          severity: 'medium',
+          description: `Article doesn't reference any of Google's AI-Overview cited sources: ${cited.slice(0, 5).join(', ')}`,
+          suggestion: `Add one or more [SOURCE: ...](https://${cited[0] || 'domain'}/...) citations referencing the same authoritative sources Google's AI cites — drives topical-authority alignment.`,
+          affectedSection: null,
+          autoFixable: true,
+          applied: false,
+        });
+      }
+    }
+
+    // ── Check 18: PAA coverage ──
+    // Each PAA question Google shows is a search query the article should
+    // answer. Compare against H3s + FAQ headings.
+    const paaAnswers = serpSignals.paaAnswers || [];
+    if (paaAnswers.length > 0) {
+      const headingsLower = headings.map((h) => h.text.toLowerCase());
+      const missing = paaAnswers
+        .map((a) => a.question)
+        .filter((q) => {
+          const qLower = q.toLowerCase().replace(/[?.]+$/g, '').trim();
+          // Loose match: any heading shares ≥3 distinctive words with the question
+          const qWords = qLower.split(/\s+/).filter((w) => w.length > 3);
+          if (qWords.length === 0) return false;
+          return !headingsLower.some((h) => {
+            const overlap = qWords.filter((w) => h.includes(w)).length;
+            return overlap >= Math.min(3, qWords.length);
+          });
+        });
+      if (missing.length > 0) {
+        fixes.push({
+          category: 'paa_coverage',
+          severity: missing.length >= 3 ? 'high' : 'medium',
+          description: `${missing.length} PAA questions not addressed in any heading: ${missing.slice(0, 3).join('; ')}`,
+          suggestion: 'Add an H3 (under FAQ) for each missing PAA question with a self-contained 40-80 word answer.',
+          affectedSection: 'Frequently Asked Questions',
+          autoFixable: true,
+          applied: false,
+        });
+      }
+    }
+
+    // ── Check 19: Related-search coverage ──
+    // Google's "Searches related to" block shows queries that share intent
+    // with the primary keyword. Article should mention at least 30% of
+    // those terms naturally somewhere in the body (not necessarily as
+    // headings — natural cross-references count).
+    const related = serpSignals.relatedSearches || [];
+    if (related.length >= 5) {
+      const lowerContent = content;
+      const covered = related.filter((t) => {
+        const tLower = t.toLowerCase().trim();
+        return tLower.length > 0 && lowerContent.includes(tLower);
+      });
+      const coverageRatio = covered.length / related.length;
+      if (coverageRatio < 0.3) {
+        const missingRelated = related.filter((t) => !covered.includes(t)).slice(0, 5);
+        fixes.push({
+          category: 'related_search_coverage',
+          severity: 'medium',
+          description: `Only ${covered.length}/${related.length} of Google's related searches appear in the article (${Math.round(coverageRatio * 100)}% coverage). Missing: ${missingRelated.join(', ')}`,
+          suggestion: 'Mention these related-search terms naturally in body paragraphs or as cross-reference H3s — they share search intent with your primary keyword.',
+          affectedSection: null,
+          autoFixable: true,
+          applied: false,
+        });
+      }
+    }
+
+    // ── Check 20: Entity authority (no Knowledge Panel) ──
+    // When Google has no Knowledge Panel for the primary subject, the
+    // article needs Wikipedia-style structured definitions to help build
+    // entity authority. Look for a definition pattern within the first
+    // 300 words referring to the primary keyword.
+    if (serpSignals.knowledgeGraphPresent === false) {
+      const firstChunk = words.slice(0, 300).join(' ').toLowerCase();
+      // Generic structured-definition pattern: "<X> is [a/an/the] <Y>"
+      const defNearKw = new RegExp(
+        `\\b${escapeRe(primaryKw)}\\b[^.]*\\bis\\s+(an?|the)\\s+\\w+`,
+        'i',
+      ).test(firstChunk);
+      if (!defNearKw) {
+        fixes.push({
+          category: 'entity_authority',
+          severity: 'medium',
+          description: `Subject has no Google Knowledge Panel — article needs a structured "<primary keyword> is [a/an/the] [category]" definition in the first 300 words.`,
+          suggestion: `Add a Wikipedia-style sentence like "${plan.primaryKeyword} is [a/an] [category] that [function]." early in the article. Pair with [!definition] callouts for adjacent jargon.`,
+          affectedSection: 'Lead / Introduction',
+          autoFixable: true,
+          applied: false,
+        });
+      }
+    }
+
+    // ── Check 21: Intent alignment ──
+    // The plan declares searchIntent. If the keyword-intent map disagrees
+    // (e.g. plan says "informational" but Google's intent for this exact
+    // primary keyword is "commercial"), flag a strategic mismatch.
+    const intents = serpSignals.keywordIntents || {};
+    const primaryIntent = intents[plan.primaryKeyword] || intents[plan.primaryKeyword.toLowerCase()];
+    if (primaryIntent && plan.searchIntent && primaryIntent.toLowerCase() !== plan.searchIntent.toLowerCase()) {
+      fixes.push({
+        category: 'intent_alignment',
+        severity: 'medium',
+        description: `Plan declares search intent "${plan.searchIntent}" but Google classifies "${plan.primaryKeyword}" as "${primaryIntent}".`,
+        suggestion: primaryIntent.toLowerCase() === 'transactional'
+          ? 'Restructure as a product/category page with conversion CTAs, not a blog post.'
+          : primaryIntent.toLowerCase() === 'commercial'
+            ? 'Add a comparison table or buyer\'s-guide section — commercial-investigation queries need vendor comparison.'
+            : primaryIntent.toLowerCase() === 'navigational'
+              ? 'This is a brand-search query — consider redirecting traffic to a branded landing page instead of generic content.'
+              : 'Simplify to a deep how-to / explainer / FAQ — informational queries reward depth and clarity over conversion.',
+        affectedSection: null,
+        autoFixable: false, // Strategic — needs human re-plan
+        applied: false,
+      });
+    }
+  }
+
   // ── Calculate overall score ──
   let score = 100;
   for (const fix of fixes) {
@@ -502,14 +666,14 @@ function buildSectionScores(
   };
 
   return {
-    promptCoverage: makeScore(['section_coverage']),
+    promptCoverage: makeScore(['section_coverage', 'paa_coverage', 'related_search_coverage']),
     schemaMarkup: { status: 'all_good', issueCount: 0, details: [] }, // Schema generated post-analysis
-    keyTerms: makeScore(['secondary_keywords', 'geo_entities']),
+    keyTerms: makeScore(['secondary_keywords', 'geo_entities', 'entity_authority', 'intent_alignment']),
     metaTags: makeScore(['meta_tags']),
     url: { status: plan.slug.length <= 75 ? 'all_good' : 'issues_found', issueCount: plan.slug.length > 75 ? 1 : 0, details: plan.slug.length > 75 ? ['URL slug exceeds 75 characters'] : [] },
-    featuredSnippet: { status: plan.featuredSnippetTarget ? (markdown.toLowerCase().includes(plan.featuredSnippetTarget.toLowerCase().slice(0, 20)) ? 'all_good' : 'issues_found') : 'all_good', issueCount: 0, details: [] },
+    featuredSnippet: makeScore(['featured_snippet_target']),
     h1Heading: makeScore(['h1_heading']),
-    links: makeScore(['links']),
+    links: makeScore(['links', 'ai_overview_alignment']),
     h2h6Headings: makeScore(['h2_keyword', 'heading_hierarchy']),
     contentDepth: makeScore(['content_depth']),
     keywordDensity: makeScore(['keyword_density', 'keyword_placement']),
@@ -707,4 +871,8 @@ function countPhrase(text: string, phrase: string): number {
     pos += phrase.length;
   }
   return count;
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

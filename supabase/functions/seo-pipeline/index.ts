@@ -226,6 +226,10 @@ Deno.serve(async (req) => {
         recommendedPrimary: research.recommendedPrimary,
         recommendedSecondaries: research.recommendedSecondaries.slice(0, 5),
         paaQuestions: research.paaQuestions,
+        // Phase 3 — forward mention-monitoring SERP signals so the writer
+        // can use AI Overview text, featured-snippet target, and PAA
+        // answer snippets directly inside the prompt.
+        serpSignals: research.serpSignals,
       },
       user_id: userId,
     }, 180_000);
@@ -256,6 +260,9 @@ Deno.serve(async (req) => {
       auto_fix: autoFix,
       max_iterations: maxFixIterations,
       user_id: userId,
+      // Phase 4 — forward mention-monitoring SERP signals so the analyzer
+      // can run gap-scoring rules tied to current SERP state.
+      serp_signals: research.serpSignals,
     }, 180_000);
 
     const finalMarkdown = analyzeResult.data.content_markdown;
@@ -363,9 +370,72 @@ Deno.serve(async (req) => {
     // indexed website pages (if they've connected one in profile settings).
     const siteArticles = await buildSiteMatches(supabase, userId, plan, finalMarkdown);
 
+    // ── Phase 5 — auto-interlink from Google's "related searches" block ──
+    // Each term in serpSignals.relatedSearches is a query Google clusters
+    // with the primary keyword by user intent. We use this as a high-quality
+    // signal in two ways:
+    //   1. Boost any existing platform article whose target_keyword matches
+    //      a related-search term (stronger than generic keyword overlap).
+    //   2. For related searches with NO matching article yet, surface them
+    //      in suggestedLinks as "write-this-next" cluster opportunities.
+    const relatedSearches = research.serpSignals?.relatedSearches || [];
+    let suggestedLinks = extractInternalLinks(finalMarkdown);
+    let existingArticlesFinal = existingArticles;
+    if (relatedSearches.length > 0) {
+      const { data: relatedMatchesRaw } = await supabase
+        .from('seo_articles')
+        .select('id, title, slug, target_keyword')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .neq('id', articleId)
+        .order('overall_score', { ascending: false })
+        .limit(40);
+      const relatedMatches: typeof existingArticles = [];
+      for (const term of relatedSearches.slice(0, 12)) {
+        const tLower = term.toLowerCase().trim();
+        if (!tLower) continue;
+        const hit = (relatedMatchesRaw || []).find((a: any) => {
+          const tk = (a.target_keyword || '').toLowerCase();
+          const tt = (a.title || '').toLowerCase();
+          return tk.includes(tLower) || tLower.includes(tk) || tt.includes(tLower);
+        });
+        if (hit) {
+          // Avoid duplicating existingArticles
+          if (!existingArticlesFinal.some((a) => a.id === hit.id)) {
+            relatedMatches.push({
+              id: hit.id,
+              title: hit.title || 'Untitled',
+              slug: hit.slug || '',
+              relevance: 0.85, // strong — Google says these queries cluster
+            });
+          }
+        } else {
+          // No existing article — push as a "next-article" suggestion
+          suggestedLinks.push({
+            anchor: term,
+            targetTopic: term,
+            reason: 'Google clusters this with the primary keyword — strong write-this-next candidate',
+          });
+        }
+      }
+      if (relatedMatches.length > 0) {
+        existingArticlesFinal = [
+          ...relatedMatches,
+          ...existingArticles,
+        ]
+          .sort((a, b) => b.relevance - a.relevance)
+          .slice(0, 12);
+        console.log(
+          `[seo-pipeline] Phase 5 interlinking: matched ${relatedMatches.length} existing articles ` +
+          `to Google's related-search cluster, surfaced ${suggestedLinks.length - extractInternalLinks(finalMarkdown).length} ` +
+          `write-this-next suggestions`,
+        );
+      }
+    }
+
     const interlinkingData = {
-      suggestedLinks: extractInternalLinks(finalMarkdown),
-      existingArticles,
+      suggestedLinks,
+      existingArticles: existingArticlesFinal,
       competitorArticles: research.serpInsights.slice(0, 10),
       siteArticles,
     };

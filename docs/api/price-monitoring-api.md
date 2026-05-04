@@ -3,8 +3,49 @@
 External integration reference for the price lookup + price tracking endpoints.
 
 **Base URL:** `https://v1api.materialshub.gr`
+**OpenAPI tags**: `Price Lookup (Public API)`, `Price Tracking (Public API)`
+**Interactive docs (Swagger UI)**: `GET https://v1api.materialshub.gr/docs` — filter by tag
+**Machine-readable spec**: `GET https://v1api.materialshub.gr/openapi.json` — auto-generated from FastAPI route signatures, always in sync with what's deployed.
 
 All paths below are relative to this host (e.g. `POST /api/v1/prices/track` → `POST https://v1api.materialshub.gr/api/v1/prices/track`).
+
+---
+
+## Changelog
+
+### v3.2 — 2026-05-01
+
+- 🔄 **`tracked_queries` is now the single subject table** for both internal product flow and external API flow. The legacy `competitor_sources` / `price_history` / `price_monitoring_products` tables were dropped. All retailer rows now live in `tracked_query_price_history` (FK → `tracked_queries.id`).
+- 🆕 Denormalized cache on `tracked_queries`: `current_price`, `current_currency`, `current_availability`, `current_original_price`, `current_price_verified`, `current_metadata`, `current_price_updated_at`. Cheapest non-anomaly verified hit wins.
+- 🆕 Cost optimizations apply uniformly to both flows: tier-skip on Tier 2 marketplaces, brand-retailer cache, sonar/sonar-pro selection, classifier verdict cache (7d TTL), rule-based pre-classifier, volatility-aware `next_check_at`, recipe-driven httpx fallback.
+- 📦 Internal product flow (web app, session JWT) and external API flow (`kai_*` Bearer) share the same orchestrator. Internal cron only refreshes `api_key_id IS NULL` rows. External rows are refreshed only when the partner calls `/refresh`.
+
+### v3.1 — 2026-04-27
+
+- 🆕 **Family-kept policy**: `match_kind='family'` rows persist (rendered as "Similar Products in this series") instead of being dropped. Inert downstream — never feed chart, never trigger alerts. Only `match_kind='mismatch'` is dropped.
+- 🆕 Manual promotion: `POST /promote-family-row` and `POST /demote-to-family` (admin-only) flip a family/mismatch row to `exact` or `variant` with sticky URL override.
+- 🆕 Adapter facet pass-through: Greek marketplaces + Idealo accept facets and prepend SKU tokens to search queries; URL-slug post-filter drops accessory-tier hits.
+- 🆕 Source-label fix: marketplace hits now report their actual source (`skroutz` / `bestprice` / `shopflix` / `idealo`) instead of being collapsed under `perplexity_web_search`.
+
+### v3.0 — 2026-04-26
+
+- 🆕 **Sanity bands + anomaly flags**: every reading checked against trailing 7d median per (subject, retailer); rows outside `[median × 0.33, median × 3.0]` get `is_anomaly=true` + `anomaly_reason`.
+- 🆕 **Alerts**: 4 types — `price_drop`, `new_retailer`, `promo_started` (opt-in) + `anomaly_detected` (always). Multi-channel (bell / email / webhook), 24h dedupe.
+- 🆕 **First-refresh double-read** on `tracked_queries`: first refresh runs Firecrawl twice with a 30s gap; >5% disagreement → `verified=false`.
+- 🆕 **Adaptive Stage A re-issue**: when the initial Perplexity returned ≥1 exact match and no SKU was supplied, fire one additional Perplexity call with the discovered SKU. Capped at one extra call per refresh.
+- 🆕 **Retailer-list memory**: `known_retailer_domains` from prior refreshes biases the prompt away from already-known retailers and toward new ones.
+- 🆕 **Idealo module** (DACH/IT/UK/ES/FR price comparison) parallels Greek marketplaces.
+- 🆕 **Classifier feedback loop**: `match_corrections` table — admin "wrong match" clicks become few-shot examples in subsequent classifier calls.
+
+### v2.0 — 2026-04-25
+
+- 🆕 **Two-stage discovery + verification**: Perplexity Sonar-pro + DataForSEO Merchant run in parallel for discovery, then every URL is re-verified via Firecrawl with `PriceExtraction` schema. Live-page price replaces the LLM/feed price; `verified=true` is set.
+- 🆕 **Product-identity verification**: Haiku-decomposed facets → URL pre-filter → expanded Firecrawl extraction → batched Haiku classifier → `match_kind` ∈ {`exact`, `variant`, `family`, `mismatch`, `unverifiable`} per hit.
+- 🆕 `original_price` column for promo "was" pricing when retailers display both.
+
+### v1.0 — 2026-04-24
+
+- 🚀 **Initial release**: `POST /api/v1/prices/lookup` (URL or query mode) and `POST /api/v1/prices/track` family — partner integrations register tracked queries and poll for prices.
 
 ---
 

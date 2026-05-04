@@ -14,6 +14,7 @@ import { authenticate } from '../_shared/auth.ts';
 import { DataForSEOClient } from '../_shared/dataforseo-client.ts';
 import type { SEOResearchRequest, SEOResearchResponse } from '../_shared/seo-types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { fetchOpportunitiesStateless } from '../_shared/mention-opportunities-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -27,6 +28,20 @@ function jsonResponse(body: any, status = 200): Response {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+/** Map DataForSEO numeric location_code → ISO-3166 alpha-2 country code so
+ * the mention-monitoring opportunities endpoint can pin the correct locale.
+ * Mirrors the `_country_to_dfs_location` table in
+ * `mention_opportunity_service.py`. Default = US. */
+function dfsLocationToCountry(loc: number): string {
+  const map: Record<number, string> = {
+    2840: 'US', 2826: 'GB', 2276: 'DE', 2250: 'FR', 2380: 'IT', 2724: 'ES',
+    2300: 'GR', 2528: 'NL', 2056: 'BE', 2040: 'AT', 2756: 'CH', 2620: 'PT',
+    2372: 'IE', 2124: 'CA', 2036: 'AU', 2616: 'PL', 2752: 'SE', 2208: 'DK',
+    2578: 'NO', 2246: 'FI', 2792: 'TR', 2100: 'BG', 2642: 'RO', 2196: 'CY',
+  };
+  return map[loc] || 'US';
 }
 
 Deno.serve(withApiLogging('seo-research', async (req) => {
@@ -92,14 +107,45 @@ Deno.serve(withApiLogging('seo-research', async (req) => {
 
     console.log(`[seo-research] Starting research for "${body.target_keyword}" (user: ${userId})`);
 
-    // Run DataForSEO research
+    // Run DataForSEO research + mention-monitoring opportunities IN PARALLEL.
+    // The opportunities call hits MIVAA's /opportunities-stateless endpoint,
+    // which fans out to DataForSEO SERP / Labs (PAA, AI Overview, featured
+    // snippet, related searches, top organic, video / news / shopping
+    // carousels, knowledge graph, paid bidders) on the SAME keyword. Adds
+    // ~3-5s latency in the worst case but runs concurrently with the main
+    // research, so total wall-clock cost is unchanged. The stateless
+    // endpoint authenticates via x-cron-secret — no extra user credits.
     const client = new DataForSEOClient(dataforseoLogin, dataforseoPassword);
-    const research = await client.researchKeyword(
-      body.target_keyword,
-      body.topic,
-      locationCode,
-      languageCode,
-    );
+    const countryCode = dfsLocationToCountry(locationCode);
+    const [research, serpSignals] = await Promise.all([
+      client.researchKeyword(
+        body.target_keyword,
+        body.topic,
+        locationCode,
+        languageCode,
+      ),
+      fetchOpportunitiesStateless({
+        subjectLabel: body.target_keyword,
+        languageCodes: [languageCode],
+        countryCodes: [countryCode],
+        limitPerType: 5,
+      }).catch((e) => {
+        console.warn(`[seo-research] opportunities enrichment failed: ${(e as Error).message}`);
+        return null;
+      }),
+    ]);
+
+    if (serpSignals) {
+      research.serpSignals = serpSignals;
+      console.log(
+        `[seo-research] enriched with ${serpSignals.opportunities.length} opportunities ` +
+        `(AI Overview: ${serpSignals.aiOverviewText ? 'yes' : 'no'}, ` +
+        `featured snippet: ${serpSignals.featuredSnippetTarget ? 'yes' : 'no'}, ` +
+        `related searches: ${serpSignals.relatedSearches?.length ?? 0})`,
+      );
+    } else {
+      console.log('[seo-research] opportunities enrichment unavailable — continuing baseline');
+    }
 
     // Get workspace ID for the user
     const { data: memberData } = await supabase

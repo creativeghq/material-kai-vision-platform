@@ -64,6 +64,53 @@ export interface ContentLandscapeSummary {
   sentiments: Record<string, number>;
 }
 
+/**
+ * Mention-monitoring opportunity card. Mirror of `Opportunity.to_dict()` in
+ * `mention_opportunity_service.py`. Surfaced inside `KeywordResearchResult`
+ * via the parallel `/opportunities-stateless` call so the rest of the SEO
+ * pipeline (plan / write / analyze) can read AI Overview text, featured-
+ * snippet targets, PAA answers, related searches, video / news / shopping
+ * carousels, knowledge-graph presence, and paid competition straight off
+ * the research blob — no extra calls, no extra credits.
+ */
+export interface MentionOpportunity {
+  type: string;
+  title: string;
+  rationale: string;
+  suggested_action: string;
+  priority_score: number; // 0..1
+  source: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * SERP-derived signals consumed by the SEO pipeline. Populated by the
+ * mention-monitoring `/opportunities-stateless` endpoint. Optional — when
+ * the call fails or the secret/URL is missing, this stays undefined and
+ * the pipeline falls back to its baseline behavior.
+ */
+export interface SerpSignalBlob {
+  opportunities: MentionOpportunity[];
+  errors: Record<string, string>;
+  fetchedAt: string; // ISO timestamp
+  // Quick-access derived projections so downstream stages don't have to
+  // re-walk the opportunities array. All optional.
+  aiOverviewText?: string | null;
+  aiOverviewReferences?: { url?: string; domain?: string; title?: string }[];
+  aiOverviewBrandMentioned?: boolean;
+  featuredSnippetTarget?: { domain?: string; description?: string; url?: string } | null;
+  relatedSearches?: string[];
+  topCompetitors?: { rank?: number; domain: string; url?: string; title?: string }[];
+  videoCarouselPresent?: boolean;
+  videoCarouselPlatforms?: Record<string, number>;
+  newsStories?: { source?: string; domain?: string; url?: string; title?: string }[];
+  knowledgeGraphPresent?: boolean;
+  paidCompetitors?: { domain: string; rank?: number; url?: string }[];
+  shoppingListings?: { seller?: string; domain?: string; price?: number | string; currency?: string }[];
+  paaAnswers?: { question: string; answerSnippet?: string }[];
+  keywordIntents?: Record<string, string>;
+}
+
 export interface KeywordResearchResult {
   topic: string;
   targetKeyword: string;
@@ -77,6 +124,8 @@ export interface KeywordResearchResult {
   serpFeatures: SerpFeatures;
   contentLandscape: ContentLandscapeSummary;
   researchedAt: string; // ISO timestamp
+  /** Mention-monitoring SERP signals (Phase 1 wiring). Optional — never blocks the pipeline. */
+  serpSignals?: SerpSignalBlob;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -429,6 +478,10 @@ export interface SEOAnalyzeRequest {
   auto_fix?: boolean; // default: true
   max_iterations?: number; // default: 3
   user_id?: string;
+  /** Phase 4 — mention-monitoring SERP signals. Drives 6 extra gap-scoring
+   * rules (AI Overview match, featured-snippet alignment, PAA coverage,
+   * related-search coverage, entity authority, intent alignment). */
+  serp_signals?: SerpSignalBlob;
 }
 
 export interface SEOAnalyzeResponse {

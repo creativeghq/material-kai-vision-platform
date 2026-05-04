@@ -18,6 +18,8 @@ import type {
   SEOWriteResponse,
   ArticlePlan,
   ContentBrief,
+  KeywordResearchResult,
+  SerpSignalBlob,
 } from '../_shared/seo-types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -85,11 +87,12 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
 
     const plan = body.article_plan;
     const brief = body.content_brief;
+    const research = body.keyword_research_summary;
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_writer');
-    const systemPrompt = buildWritingSystemPrompt(baseSystemPrompt, plan, brief);
-    const userPrompt = buildWritingUserPrompt(plan, brief);
+    const systemPrompt = buildWritingSystemPrompt(baseSystemPrompt, plan, brief, research);
+    const userPrompt = buildWritingUserPrompt(plan, brief, research);
 
     // Call Claude Opus for writing (auto-tracked)
     const result = await generateWithClaude(userPrompt, {
@@ -144,7 +147,12 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
 // PROMPT BUILDERS
 // ════════════════════════════════════════════════════════════════
 
-function buildWritingSystemPrompt(basePrompt: string, plan: ArticlePlan, brief?: ContentBrief): string {
+function buildWritingSystemPrompt(
+  basePrompt: string,
+  plan: ArticlePlan,
+  brief?: ContentBrief,
+  research?: Partial<KeywordResearchResult>,
+): string {
   let prompt = basePrompt;
 
   // Modern SEO + AEO (Answer Engine Optimization) scaffolding rules — required for every article.
@@ -255,10 +263,63 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
     prompt += `\n- Existing articles to link to: ${brief.internalLinksContext.join(', ')}`;
   }
 
+  // Phase 3 — append mention-monitoring SERP signals so the writer optimizes
+  // direct-answer paragraphs against the actual current SERP state.
+  prompt += buildSerpSignalsWriterBlock(research?.serpSignals);
+
   return prompt;
 }
 
-function buildWritingUserPrompt(plan: ArticlePlan, brief?: ContentBrief): string {
+/**
+ * Tactical writer guidance derived from `serpSignals`. Tells the writer
+ * exactly which sentences to tune for AI Overview citation, featured-
+ * snippet capture, and PAA matching. The system block already covers
+ * structural rules — this layer is content-specific.
+ */
+function buildSerpSignalsWriterBlock(signals?: SerpSignalBlob): string {
+  if (!signals) return '';
+  let block = '\n\n=== SERP-AWARE WRITING TARGETS ===';
+
+  if (signals.aiOverviewText) {
+    block += `\n\n**AI Overview text Google currently shows:**\n"${signals.aiOverviewText.slice(0, 800)}"`;
+    if (signals.aiOverviewBrandMentioned === false) {
+      block += `\nGoal: write paragraphs Google's AI would prefer to cite over the current sources. Use direct-answer first sentence, statistics with attribution, and structured definitions. Match the tone but go deeper.`;
+    } else {
+      block += `\nReinforce the framing — your brand is already cited. Don't contradict it.`;
+    }
+  }
+
+  if (signals.featuredSnippetTarget?.description) {
+    block += `\n\n**Featured snippet to displace** (currently held by ${signals.featuredSnippetTarget.domain || 'unknown'}):\n"${signals.featuredSnippetTarget.description}"\nThe TL;DR block's lead sentence MUST answer the same question more concisely (40–60 words) so Google considers replacing the current snippet.`;
+  }
+
+  const paaAnswers = signals.paaAnswers || [];
+  if (paaAnswers.length) {
+    block += `\n\n**PAA answers currently shown by Google** — write tighter answers than these for the matching FAQ entries:`;
+    for (const a of paaAnswers.slice(0, 6)) {
+      block += `\n- Q: ${a.question}`;
+      if (a.answerSnippet) {
+        block += `\n  Current answer: "${a.answerSnippet.slice(0, 240)}"`;
+      }
+    }
+  }
+
+  if (signals.relatedSearches?.length) {
+    block += `\n\n**Related searches Google clusters with this query** (use as natural cross-references in body, not forced):\n${signals.relatedSearches.slice(0, 8).map((t) => `- ${t}`).join('\n')}`;
+  }
+
+  if (signals.knowledgeGraphPresent === false) {
+    block += `\n\n**No Knowledge Panel** — when first introducing the brand or primary entity, write a one-sentence Wikipedia-style structured definition (e.g. "Brand X is a [category] founded in [year] specializing in [domain]."). This kind of sentence is what AI Overviews and knowledge layers index for entity recognition.`;
+  }
+
+  return block;
+}
+
+function buildWritingUserPrompt(
+  plan: ArticlePlan,
+  brief?: ContentBrief,
+  research?: Partial<KeywordResearchResult>,
+): string {
   const outline = buildOutlineText(plan.sections, 0);
   const faqList = plan.faqQuestions.length
     ? plan.faqQuestions.map((q, i) => `   ${i + 1}. ${q}`).join('\n')
@@ -279,7 +340,9 @@ REMEMBER — every article must contain, in this order:
 Outline (match these H2/H3 headings exactly, but ADD the structure blocks above):
 ${outline}
 
-${plan.featuredSnippetTarget ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${plan.featuredSnippetTarget}"\n` : ''}
+${(plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description)
+  ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description}"\n`
+  : ''}
 
 FAQ QUESTIONS to include verbatim as H3 under "Frequently Asked Questions":
 ${faqList}

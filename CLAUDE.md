@@ -356,7 +356,7 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **DB columns added 2026-04-25**: `tracked_queries.verify_prices`, `tracked_query_price_history.{original_price,verified}`, `price_history.{original_price,verified}`, `competitor_sources.{current_original_price,current_price_verified,current_metadata}`. `current_metadata jsonb` carries DataForSEO thumbnail/rating + verification discrepancy notes + `product_title` so the retailer list renders in a single query.
 
-**Product-identity verification (Phase 8, 2026-04-25)** — `app/services/integrations/product_identity_service.py`. Query → Haiku-decomposed facets (cached on `tracked_queries.query_facets`) → URL pre-filter (drops homepages/SERPs/aggregator masquerades before Firecrawl) → expanded Firecrawl extraction (`product_name + breadcrumb + visible_attributes`) → batched Haiku classifier → per-hit `match_kind` in {`exact`, `variant`, `family`, `mismatch`, `unverifiable`}. Policy: `exact + variant + unverifiable` reach the UI; `family + mismatch` dropped. Variants carry `match_note` ("Color differs: BLACK MATT → WHITE MATT") and are excluded from stats but shown in the list. Greek/Latin model normalization (Μ/M, Τ/T) + accent folding live in `product_identity_service.normalize_model_token`. `original_price` sanity rejects `> 5× current_price` (Flobali €11,900 SKU-as-price bug). DB: `match_kind`, `match_score`, `match_note` on `competitor_sources + tracked_query_price_history + price_history`.
+**Product-identity verification (Phase 8, 2026-04-25)** — `app/services/integrations/product_identity_service.py`. Query → Haiku-decomposed facets (cached on `tracked_queries.query_facets`) → URL pre-filter (drops homepages/SERPs/aggregator masquerades before Firecrawl) → expanded Firecrawl extraction (`product_name + breadcrumb + visible_attributes`) → batched Haiku classifier → per-hit `match_kind` in {`exact`, `variant`, `family`, `mismatch`, `unverifiable`}. Policy: `exact + variant + unverifiable` reach the UI; `family + mismatch` dropped. Variants carry `match_note` ("Color differs: BLACK MATT → WHITE MATT") and are excluded from stats but shown in the list. Greek/Latin model normalization (Μ/M, Τ/T) + accent folding live in `product_identity_service.normalize_model_token`. `original_price` sanity rejects `> 5× current_price` (caught a SKU-as-price extraction bug where the SKU number was being parsed as the original_price field). DB: `match_kind`, `match_score`, `match_note` on `competitor_sources + tracked_query_price_history + price_history`.
 
 **DataForSEO merchant dedupe fix (2026-04-25)**: every DataForSEO Shopping URL has host `google.gr`, so the old `by_domain` dedupe in `_merge_with_dataforseo` collapsed 20+ merchants into 1. Fixed by keying DataForSEO hits on `(retailer_name, product_title[:80])`. Bumped fetch depth to `max(limit, 30)` since Google Shopping routinely has 20-30 merchants per product. Net: ~8× more merchants reach the UI.
 
@@ -515,6 +515,10 @@ Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types st
 - `GEMINI_API_KEY` — **NEW** (optional, free tier covers daily probe load).
 - Reddit was evaluated and dropped — Reddit's Responsible Builder Policy onboarding wasn't worth the friction.
 
+**Cost wiring (2026-05-04)** — `mention_cost_logger.py` is the single chokepoint. Every external API call (DataForSEO News, DataForSEO Labs, Perplexity Sonar, Anthropic Haiku, OpenAI gpt-4o-mini, Gemini Flash) writes to `ai_usage_logs` with `module_slug='mention-monitoring'`, `metadata.tracked_mention_id`, `metadata.refresh_run_id`, `product_id` (when internal-flow). After every refresh, `stamp_mention_refresh_cost(p_tracked_mention_id, p_refresh_run_id)` SQL RPC stamps `tracked_mentions.last_refresh_billed_usd` + `last_refresh_credits_debited` and recomputes lifetime `total_billed_usd` / `total_partner_credits_debited`. After probe-llm and opportunities calls, `recompute_mention_cost(p_tracked_mention_id)` updates lifetime totals (no per-run stamp since those don't have a refresh_run_id).
+
+**Partner billing** — external (`kai_*`) endpoints debit credits per call via `debit_user_credits` RPC, refund on hard failure / no-op outcomes via `credit_user_credits`. Costs in `MENTION_OP_CREDIT_COST` (mention_cost_logger.py): refresh=5, probe_llm=15, opportunities=2, opportunities_with_llm=5. Internal flow stays free (mirrors price-monitoring). Successful refreshes keep the credit even with 0 hits — upstream calls still ran. Throttled / inactive / not-found / error outcomes refund automatically. 402 returned on insufficient balance.
+
 **Out of scope for v1** (kept lean to validate the pipeline first):
 - Twitter/X (too expensive, $200/mo for basic tier)
 - TikTok (ToS-hostile, no stable API)
@@ -522,7 +526,7 @@ Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types st
 - YouTube transcripts (deferred to v2 — opt-in per subject)
 - Firecrawl body fetch on every URL (current pipeline ships title+excerpt to classifier; body fetch is a v2 quality lever)
 
-Full reference: [docs/api/mention-monitoring-api.md](docs/api/mention-monitoring-api.md).
+Full reference: [docs/api/mention-monitoring-api.md](docs/api/mention-monitoring-api.md) (versioned changelog at top). Auto-generated OpenAPI spec at `https://v1api.materialshub.gr/openapi.json`; interactive Swagger UI at `https://v1api.materialshub.gr/docs` (filter by tag: `Mention Tracking (Public API)` for the partner endpoints, `Mention Monitoring` for the internal-flow endpoints).
 
 ## Presentation Sheets — moodboard sheets via the KAI agent (2026-05-02)
 

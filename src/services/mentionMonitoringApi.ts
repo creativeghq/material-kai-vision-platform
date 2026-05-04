@@ -72,6 +72,9 @@ export interface MentionRow {
   classifier_cached: boolean;
 }
 
+/** Brand's primary domain (no scheme) — powers `domain_snapshot` opportunity. */
+export type HomepageDomain = string | null;
+
 export interface TrackedMention {
   id: string;
   api_key_id: string | null;
@@ -85,6 +88,10 @@ export interface TrackedMention {
   /** Opt-in: when true, Haiku expands the label into per-word aliases on first refresh.
    *  Default false — discovery uses only the label and any aliases supplied above. */
   auto_expand_aliases: boolean;
+  /** Discovery window in days (1–730, default 30). Bump higher for niche brands. */
+  recency_days: number;
+  /** Brand's primary domain (no scheme) — powers `domain_snapshot` opportunity. */
+  homepage_domain: HomepageDomain;
   sources_enabled: Record<string, boolean>;
   source_config: Record<string, unknown>;
   language_codes: string[];
@@ -153,6 +160,49 @@ export interface MentionExclusion {
   domain: string | null;
   reason: string | null;
   excluded_at: string;
+}
+
+export type OpportunityType =
+  // Subject-driven (work on subjects with zero mention history)
+  | 'keyword_opportunity'
+  | 'pao_question'
+  | 'ai_overview'
+  | 'featured_snippet'
+  | 'related_search'
+  | 'competitor_ranking'
+  // v0.4.6 additions — also subject-driven, free from same SERP call
+  | 'video_carousel'
+  | 'news_carousel'
+  | 'knowledge_graph'
+  | 'paid_competitor'
+  | 'shopping_listing'
+  // v0.4.7 additions
+  | 'llm_visibility'
+  | 'domain_snapshot'
+  // Mention-derived (require existing mention_history)
+  | 'trending_topic'
+  | 'outlet_pitch'
+  | 'author_relationship'
+  | 'sentiment_response';
+
+export interface Opportunity {
+  type: OpportunityType;
+  title: string;
+  rationale: string;
+  suggested_action: string;
+  priority_score: number;
+  source: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+export interface OpportunitiesResponse {
+  tracked_mention_id: string | null;
+  subject_label?: string;
+  days: number;
+  mention_count?: number;
+  opportunities: Opportunity[];
+  errors: Record<string, string>;
+  latency_ms?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -266,6 +316,38 @@ export async function probeProductLlm(
   return res.data;
 }
 
+export async function getProductOpportunities(
+  productId: string,
+  options?: {
+    types?: OpportunityType[];
+    days?: number;
+    limit_per_type?: number;
+    use_llm_summary?: boolean;
+  },
+): Promise<OpportunitiesResponse> {
+  const res = await api<{ success: boolean; data: OpportunitiesResponse }>(
+    `/api/v1/mention-monitoring/products/${productId}/opportunities`,
+    { method: 'POST', body: JSON.stringify(options || {}) },
+  );
+  return res.data;
+}
+
+export async function getTrackedOpportunities(
+  trackedMentionId: string,
+  options?: {
+    types?: OpportunityType[];
+    days?: number;
+    limit_per_type?: number;
+    use_llm_summary?: boolean;
+  },
+): Promise<OpportunitiesResponse> {
+  const res = await api<{ success: boolean; data: OpportunitiesResponse }>(
+    `/api/v1/mention-monitoring/track/${trackedMentionId}/opportunities`,
+    { method: 'POST', body: JSON.stringify(options || {}) },
+  );
+  return res.data;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Subject-scoped helpers (brand / keyword / admin lookups)
 // ─────────────────────────────────────────────────────────────────────────
@@ -282,6 +364,8 @@ export interface CreateTrackedMentionInput {
   language_codes?: string[];
   country_codes?: string[];
   refresh_interval_hours?: number;
+  recency_days?: number;
+  homepage_domain?: string;
   alert_channels?: string[];
   alert_on_spike?: boolean;
   alert_on_negative_sentiment?: boolean;

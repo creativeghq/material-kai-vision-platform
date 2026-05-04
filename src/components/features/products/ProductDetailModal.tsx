@@ -90,6 +90,43 @@ const extractValue = (val: unknown): string | undefined => {
   return String(val);
 };
 
+// Display normalizers — upstream extractors emit inconsistent casing
+// ("matte" vs "Matte") and size formatting ("11,8X11,8" vs "11,8x11,8 cm").
+// Source data is left intact; we normalize at the render boundary.
+const DISPLAY_SENTINEL = '—';
+const titleCaseDisplay = (s: string): string =>
+  s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
+const isSentinel = (s: string | undefined): boolean =>
+  !s || s === DISPLAY_SENTINEL || s === 'N/A';
+const normColor = (s: string): string =>
+  isSentinel(s) ? DISPLAY_SENTINEL : titleCaseDisplay(s.trim());
+const normPattern = (s: string): string =>
+  isSentinel(s) ? DISPLAY_SENTINEL : titleCaseDisplay(s.trim());
+const normFinish = (s: string | undefined): string | undefined =>
+  isSentinel(s) ? s : titleCaseDisplay((s as string).trim());
+const normSize = (s: string): string => {
+  if (isSentinel(s)) return DISPLAY_SENTINEL;
+  return s
+    .trim()
+    .replace(/(\d)\s*[xX×]\s*(\d)/g, '$1x$2')
+    .replace(/\s+/g, ' ');
+};
+const normVariantName = (s: string): string =>
+  isSentinel(s) ? DISPLAY_SENTINEL : s.trim().toUpperCase();
+// Strip trailing units for dedup-key purposes so "11,8x11,8" and
+// "11,8x11,8 cm" collapse onto the same row.
+const sizeDedupKey = (s: string): string =>
+  normSize(s).replace(/\s*(cm|mm|m)\s*$/i, '').trim().toLowerCase();
+// Title-case for cert chips ("iso 14001" → "Iso 14001"). Common all-caps
+// abbreviations stay all-caps (ISO/CE/EN/LEED/BREEAM/UL/ASTM/DIN/EPD).
+const CERT_ALL_CAPS = new Set(['iso', 'ce', 'en', 'leed', 'breeam', 'ul', 'astm', 'din', 'epd', 'voc', 'crI', 'fsc', 'pefc']);
+const normCertName = (s: string): string => {
+  if (isSentinel(s)) return s;
+  return s.trim().split(/\s+/)
+    .map(w => CERT_ALL_CAPS.has(w.toLowerCase()) ? w.toUpperCase() : titleCaseDisplay(w))
+    .join(' ');
+};
+
 // Safe string extraction for direct JSX rendering (prevents React error #310)
 const safeString = (val: unknown, fallback = ''): string => {
   if (val === null || val === undefined) return fallback;
@@ -664,9 +701,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return undefined;
   })();
   // Finish: AI-extracted first, vision_analysis rollup second, em-dash last.
-  const finish = extractValue(materialPropsData?.finish)
+  // Normalized to title case so "matte" / "Matte" / "MATTE" all render as "Matte".
+  const finishRaw = extractValue(materialPropsData?.finish)
     || extractValue(allData?.finish)
     || '—';
+  const finish = normFinish(finishRaw) || '—';
   // Material category chain: AI/vision-extracted → body_type → product.type.
   // Formatted via `formatMaterialCategory` so slugs like "ceramic_tile" become
   // "Ceramic Tile" for display. Returns "—" when nothing is set.
@@ -700,19 +739,39 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Thickness': thickness,
   };
 
-  // Smart color extraction — prefers product-specific available_colors, then tries to match by name
+  // Smart color extraction — prefers product-specific available_colors, then tries to match by name.
+  // Output is title-cased and deduped (case-insensitive) so "warm white" / "Warm White" /
+  // duplicates from upstream sources collapse to one entry.
+  const formatColorList = (raw: unknown): string | undefined => {
+    if (!raw) return undefined;
+    const arr = Array.isArray(raw)
+      ? (raw as unknown[]).map(c => String(c).trim()).filter(Boolean)
+      : typeof raw === 'string'
+        ? raw.split(',').map(s => s.trim()).filter(Boolean)
+        : [String(raw)];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of arr) {
+      const t = titleCaseDisplay(c);
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(t);
+    }
+    return out.length ? out.join(', ') : undefined;
+  };
   const extractProductColors = (): string | undefined => {
     // available_colors is a simple per-product array (most reliable for individual product rows)
     const avColors = allData?.available_colors;
     if (Array.isArray(avColors) && avColors.length > 0) {
-      return (avColors as string[]).map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+      return formatColorList(avColors);
     }
     const colData = appearanceData?.colors;
     const colVal = (colData && typeof colData === 'object' && 'value' in (colData as Record<string, unknown>))
       ? (colData as Record<string, unknown>).value
       : colData;
     if (!colVal) return undefined;
-    if (Array.isArray(colVal)) return (colVal as unknown[]).map(String).join(', ');
+    if (Array.isArray(colVal)) return formatColorList(colVal);
     if (typeof colVal === 'object' && colVal !== null) {
       const entries = Object.entries(colVal as Record<string, unknown>);
       // Try to find key matching this product
@@ -722,12 +781,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       });
       if (match) {
         const v = match[1];
-        return Array.isArray(v) ? (v as unknown[]).map(String).join(', ') : String(v);
+        return Array.isArray(v) ? formatColorList(v) : formatColorList(String(v));
       }
       // No match for this product — leave empty
       return undefined;
     }
-    return String(colVal);
+    return formatColorList(String(colVal));
   };
 
   // Appearance colors: prefer the explicit `available_colors` (per-product
@@ -735,15 +794,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // color list (20 perceptual shades across the images). Show both if they
   // differ meaningfully so users see both the "official" and the "observed"
   // palette.
-  const primaryColors = extractProductColors() || extractValue(allData?.colors);
+  const primaryColors = extractProductColors() || formatColorList(extractValue(allData?.colors));
   const visionColorsRaw = appearanceData?.colors_from_vision;
-  const visionColors = Array.isArray(visionColorsRaw)
-    ? (visionColorsRaw as string[])
-        .map(c => String(c))
-        .filter(Boolean)
-        .slice(0, 12)  // cap for display
-        .join(', ')
-    : undefined;
+  const visionColors = (() => {
+    if (!Array.isArray(visionColorsRaw)) return undefined;
+    const all = (visionColorsRaw as unknown[])
+      .map(c => String(c).trim())
+      .filter(Boolean);
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const c of all) {
+      const t = titleCaseDisplay(c);
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      deduped.push(t);
+    }
+    if (deduped.length === 0) return undefined;
+    const cap = 12;
+    const shown = deduped.slice(0, cap);
+    const overflow = deduped.length - cap;
+    return overflow > 0 ? `${shown.join(', ')} (+${overflow} more)` : shown.join(', ');
+  })();
+  // Compare primary vs observed as case-insensitive sets so "[White, Grey]" and
+  // "[grey, white]" don't both render under different headings.
+  const colorSetKey = (s: string | undefined): string =>
+    !s ? '' : s.replace(/\s*\(\+\d+\s*more\)\s*$/, '')
+      .split(',').map(c => c.trim().toLowerCase()).filter(Boolean).sort().join('|');
+  const showObservedShades = visionColors && colorSetKey(visionColors) !== colorSetKey(primaryColors);
 
   // Helper: pretty-print numeric/string values with optional unit suffix
   const pickPackagingValue = (obj: Record<string, unknown> | undefined, key: string): string | undefined => {
@@ -767,28 +845,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     const inner = (raw && typeof raw === 'object' && 'value' in (raw as Record<string, unknown>))
       ? (raw as Record<string, unknown>).value
       : raw;
-    if (Array.isArray(inner)) {
+    const collect = (items: unknown[]): string[] => {
       const seen = new Set<string>();
       const out: string[] = [];
-      (inner as unknown[]).forEach(p => {
+      items.forEach(p => {
         const s = String(p).trim();
-        if (!s) return;
-        const norm = s.toLowerCase();
-        if (seen.has(norm)) return;
-        seen.add(norm);
-        out.push(s);
+        if (!s || isSentinel(s)) return;
+        const t = titleCaseDisplay(s);
+        const k = t.toLowerCase();
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push(t);
       });
-      return out;
-    }
+      return out.sort();
+    };
+    if (Array.isArray(inner)) return collect(inner as unknown[]);
     if (typeof inner === 'string' && inner.trim()) {
-      return inner.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      return collect(inner.split(/[,;]/));
     }
     return [];
   })();
 
   const appearance = {
     'Colors': primaryColors,
-    'Observed Shades': (visionColors && visionColors !== primaryColors) ? visionColors : undefined,
+    'Observed Shades': showObservedShades ? visionColors : undefined,
     'Primary Color': extractValue(appearanceData?.primary_color_hex),  // hex swatch
     // Only show singular "Pattern" key if we DON'T have the aggregated list
     // (avoids duplicating information with the chip row above).
@@ -817,24 +897,54 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Frost Resistance': extractValue(performanceData?.frost_resistance),
   };
 
-  // Pretty-print recommended_use arrays as "Wall, Floor, Shower Wall"
+  // Pretty-print recommended_use arrays as "Wall, Floor, Shower Wall".
+  // Filters sentinels, dedups case-insensitively, sorts for stable rendering.
   const fmtList = (v: unknown): string | undefined => {
     if (!v) return undefined;
-    if (Array.isArray(v)) {
-      return (v as unknown[]).map(x => String(x)).filter(Boolean).map(s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).join(', ');
+    const items: string[] = Array.isArray(v)
+      ? (v as unknown[]).map(x => String(x))
+      : typeof v === 'string'
+        ? [v]
+        : [String(v)];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of items) {
+      const s = raw.replace(/_/g, ' ').trim();
+      if (!s || isSentinel(s)) continue;
+      const t = titleCaseDisplay(s);
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(t);
     }
-    if (typeof v === 'string') return v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    return String(v);
+    return out.length ? out.sort().join(', ') : undefined;
+  };
+
+  // Joint width: if the schema-locked `_mm` variant is present, append "mm".
+  // Otherwise fall back to the raw field — append "mm" only when the raw
+  // value is a bare number (avoids "8 mm mm" double-suffix).
+  const formatJointWidth = (): string | undefined => {
+    const mm = extractValue(applicationData?.joint_width_mm);
+    if (mm) return `${mm} mm`;
+    const raw = extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width);
+    if (!raw) return undefined;
+    return /^\d+(?:[.,]\d+)?$/.test(raw.trim()) ? `${raw.trim()} mm` : raw;
   };
 
   const application = {
-    'Recommended Use': fmtList(applicationData?.recommended_use) || fmtList(allData?.applications) || fmtList(allData?.recommended_use),
-    'Applications': fmtList(allData?.applications),
+    // Single key — fmtList chains the three possible sources and dedups.
+    'Recommended Use': fmtList([
+      ...((Array.isArray(applicationData?.recommended_use) ? applicationData.recommended_use : [applicationData?.recommended_use]) as unknown[]),
+      ...((Array.isArray(allData?.applications) ? allData.applications : [allData?.applications]) as unknown[]),
+      ...((Array.isArray(allData?.recommended_use) ? allData.recommended_use : [allData?.recommended_use]) as unknown[]),
+    ].filter(Boolean)),
     'Installation Method': extractValue(applicationData?.installation_method) || extractValue(applicationData?.installation),
-    'Joint Width': extractValue(applicationData?.joint_width_mm)
-      ? `${extractValue(applicationData?.joint_width_mm)} mm`
-      : extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width),
-    'Room Type': extractValue(applicationData?.room_type) || extractValue(applicationData?.suitable_rooms) || extractValue(allData?.room_type),
+    'Joint Width': formatJointWidth(),
+    'Room Type': fmtList([
+      ...((Array.isArray(applicationData?.room_type) ? applicationData.room_type : [applicationData?.room_type]) as unknown[]),
+      ...((Array.isArray(applicationData?.suitable_rooms) ? applicationData.suitable_rooms : [applicationData?.suitable_rooms]) as unknown[]),
+      ...((Array.isArray(allData?.room_type) ? allData.room_type : [allData?.room_type]) as unknown[]),
+    ].filter(Boolean)),
   };
 
   const design = {
@@ -1125,7 +1235,60 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }
     }
 
-    return variants;
+    // ─── Dedup pass ────────────────────────────────────────────────────
+    // Multiple sources (vision_variants, sku_codes, commercial.product_table)
+    // can emit the same physical variant in different shapes — different SKU
+    // formats (compound "VALENOVA TAUPE LT/11,8X11,8" vs catalog "39661"),
+    // different casing ("taupe" vs "Taupe"), unit-trailing sizes
+    // ("11,8x11,8" vs "11,8x11,8 cm"), or partially-populated patterns
+    // ("—" vs "12 patterns"). Collapse these onto a single row, taking the
+    // most-informative value per cell and unioning grout codes.
+    const isMoreInformativeSku = (a: string, b: string): boolean => {
+      // Prefer non-sentinel, then non-compound (no "/"), then numeric, then shorter
+      if (a === DISPLAY_SENTINEL && b !== DISPLAY_SENTINEL) return false;
+      if (b === DISPLAY_SENTINEL && a !== DISPLAY_SENTINEL) return true;
+      const aCompound = a.includes('/');
+      const bCompound = b.includes('/');
+      if (aCompound !== bCompound) return !aCompound;
+      const aNumeric = /^\d+$/.test(a);
+      const bNumeric = /^\d+$/.test(b);
+      if (aNumeric !== bNumeric) return aNumeric;
+      return a.length < b.length;
+    };
+    const pickBetter = (a: string, b: string): string => {
+      if (!a || a === DISPLAY_SENTINEL) return b || a;
+      if (!b || b === DISPLAY_SENTINEL) return a;
+      // Prefer the longer non-sentinel value (more info: "12 Patterns" > "—",
+      // "11,8x11,8 cm" > "11,8x11,8")
+      return b.length > a.length ? b : a;
+    };
+
+    const groups = new Map<string, Variant>();
+    for (const v of variants) {
+      // Dedup key: normalized name + color + size-without-unit. SKUs and grout
+      // codes are NOT in the key — they're allowed to differ between siblings.
+      const key = [
+        normVariantName(v.name),
+        normColor(v.color),
+        sizeDedupKey(v.size),
+      ].join('|');
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, { ...v, groutCodes: { ...v.groutCodes } });
+        continue;
+      }
+      existing.sku = isMoreInformativeSku(v.sku, existing.sku) ? v.sku : existing.sku;
+      existing.name = pickBetter(existing.name, v.name);
+      existing.color = pickBetter(existing.color, v.color);
+      existing.pattern = pickBetter(existing.pattern, v.pattern);
+      existing.size = pickBetter(existing.size, v.size);
+      // Union grout codes — keep first non-empty per supplier
+      for (const [sup, code] of Object.entries(v.groutCodes || {})) {
+        if (code && !existing.groutCodes[sup]) existing.groutCodes[sup] = code;
+      }
+    }
+
+    return Array.from(groups.values());
   };
 
   const productVariants = extractVariants();
@@ -1163,12 +1326,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       ...extractCertList(allData?.standards),
     ];
     const seen = new Set<string>();
-    return candidates.filter(c => {
-      const norm = c.toLowerCase().replace(/[\s-]/g, '');
-      if (seen.has(norm)) return false;
+    const out: string[] = [];
+    for (const raw of candidates) {
+      const cert = normCertName(raw);
+      const norm = cert.toLowerCase().replace(/[\s-]/g, '');
+      if (seen.has(norm)) continue;
       seen.add(norm);
-      return true;
-    });
+      out.push(cert);
+    }
+    return out;
   })();
   const certSource = extractValue(complianceData?.certifications_source);
 
@@ -1376,18 +1542,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="border-b border-border/30 hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-6 py-2 font-mono font-semibold">{variant.sku}</td>
-                    <td className="px-3 py-2 font-medium">{variant.name}</td>
+                    <td className="px-3 py-2 font-medium">{normVariantName(variant.name)}</td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-2">
                         <span
                           className="w-3 h-3 rounded-full border border-border/50 flex-shrink-0"
                           style={{ backgroundColor: colorSwatch(variant.color) }}
                         />
-                        {variant.color}
+                        {normColor(variant.color)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{variant.pattern}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{variant.size}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{normPattern(variant.pattern)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{normSize(variant.size)}</td>
                     {suppliers.map(sup => (
                       <td key={sup} className="px-3 py-2 font-mono text-muted-foreground">
                         {variant.groutCodes[sup] || '—'}
