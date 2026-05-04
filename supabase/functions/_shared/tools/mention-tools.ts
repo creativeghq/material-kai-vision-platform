@@ -137,7 +137,7 @@ export const createTrackProductMentionsTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, action, aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
+    async ({ product_id, action, aliases, auto_expand_aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring module disabled — ask an admin to enable it' });
       }
@@ -158,6 +158,7 @@ export const createTrackProductMentionsTool = (
         run_first_refresh: true,
       };
       if (aliases?.length) body.aliases = aliases;
+      if (auto_expand_aliases !== undefined) body.auto_expand_aliases = auto_expand_aliases;
       if (sources_enabled) body.sources_enabled = sources_enabled;
       if (language_codes?.length) body.language_codes = language_codes;
       if (country_codes?.length) body.country_codes = country_codes;
@@ -188,7 +189,8 @@ export const createTrackProductMentionsTool = (
       schema: z.object({
         product_id: z.string().describe('Product UUID to track.'),
         action: z.enum(['start', 'stop']).default('start'),
-        aliases: z.array(z.string()).optional().describe('Alternate spellings/SKUs/abbreviations.'),
+        aliases: z.array(z.string()).optional().describe('Alternate spellings/SKUs/abbreviations to use as additional discovery queries.'),
+        auto_expand_aliases: z.boolean().optional().describe('Default false. When true, an LLM (Haiku) expands the subject_label into per-word aliases on first refresh — broader recall on multi-word labels but higher cost.'),
         sources_enabled: z.record(z.boolean()).optional().describe('Per-source toggles e.g. { news:true, blogs:true, youtube:false, rss:true, llm:true }'),
         language_codes: z.array(z.string()).optional(),
         country_codes: z.array(z.string()).optional(),

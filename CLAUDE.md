@@ -424,8 +424,8 @@ Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs
 - `api_key_id IS NOT NULL` → external API consumer flow
 
 **Pipeline** (every refresh):
-1. Decompose subject into facets via Haiku (cached on `tracked_mentions.subject_facets`).
-2. Discover in parallel across enabled sources: **DataForSEO News** (~$0.0006/req), **Perplexity Sonar** ($0.005/sweep, sonar-pro only on first/forced refresh), **RSS** (free, user-curated), **YouTube** (free, opt-in). Reddit was dropped 2026-05-03 — Responsible Builder Policy onboarding wasn't worth the friction for marginal coverage.
+1. Build subject facets. **Default = deterministic** (label + user-supplied aliases, no LLM call). When `tracked_mentions.auto_expand_aliases=true`, run Haiku once to expand the label into per-word aliases + brand inference + competitor brand list (cached on `tracked_mentions.subject_facets`). Default-off was chosen 2026-05-04 after observing a chain failure — Anthropic credits depleted → Haiku 400 → empty facets → 0 hits from DataForSEO/Sonar — and consciously reducing the dependency surface. Customers tracking unique brand names get exact-match recall at predictable cost; customers tracking multi-word labels can opt in.
+2. Discover in parallel across enabled sources: **DataForSEO News** (~$0.0006/req, fan-out across distinctive aliases), **Perplexity Sonar** ($0.005/sweep, sonar-pro only on first/forced refresh, disjunctive query when multiple aliases), **RSS** (free, user-curated), **YouTube** (free, opt-in). Reddit was dropped 2026-05-03 — Responsible Builder Policy onboarding wasn't worth the friction for marginal coverage.
 3. URL canonicalize + content-hash dedupe across sources.
 4. Apply exclusions + promoted-URL overrides.
 5. Rule pre-filter (alias must appear) — drops obvious mismatches before Haiku.

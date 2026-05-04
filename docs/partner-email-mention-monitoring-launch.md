@@ -60,6 +60,7 @@ curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
     "subject_label": "YourBrand",
     "brand_name": "YourBrand",
     "aliases": ["YourBrand Tiles", "Y.B."],
+    "auto_expand_aliases": false,
     "language_codes": ["en"],
     "country_codes": ["US"],
     "alert_on_negative_sentiment": true,
@@ -70,6 +71,8 @@ curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
 ```
 
 The response includes the first refresh inline (no async polling needed for the create call).
+
+**A note on aliases**: by default the API runs **exact-match discovery** — it searches only the `subject_label` you supply plus any strings in `aliases`. No LLM expansion. If your subject is a multi-word label where articles often split the words (e.g. `"BRAND PRODUCTLINE"` written as just `"Brand"` or `"Productline"`), either supply the variants explicitly in `aliases`, or pass `"auto_expand_aliases": true` to let the platform's classifier widen the search automatically on first refresh. Default off keeps cost lower and search behavior fully predictable.
 
 ## Webhook alerts (4 types, each opt-in)
 

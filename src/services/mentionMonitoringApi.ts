@@ -82,6 +82,9 @@ export interface TrackedMention {
   subject_type: MentionSubjectType;
   subject_label: string;
   aliases: string[];
+  /** Opt-in: when true, Haiku expands the label into per-word aliases on first refresh.
+   *  Default false — discovery uses only the label and any aliases supplied above. */
+  auto_expand_aliases: boolean;
   sources_enabled: Record<string, boolean>;
   source_config: Record<string, unknown>;
   language_codes: string[];
@@ -160,6 +163,7 @@ export async function trackProduct(
   productId: string,
   options?: Partial<{
     aliases: string[];
+    auto_expand_aliases: boolean;
     sources_enabled: Record<string, boolean>;
     language_codes: string[];
     country_codes: string[];
@@ -272,6 +276,7 @@ export interface CreateTrackedMentionInput {
   product_id?: string;
   brand_name?: string;
   aliases?: string[];
+  auto_expand_aliases?: boolean;
   sources_enabled?: Record<string, boolean>;
   source_config?: Record<string, unknown>;
   language_codes?: string[];

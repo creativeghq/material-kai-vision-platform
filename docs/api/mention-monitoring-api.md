@@ -2,6 +2,25 @@
 
 Track product, brand, and keyword mentions across **news, blogs, RSS, YouTube, and LLM responses**. Cost-optimized multi-source pipeline with sentiment classification and weekly LLM visibility tracking.
 
+## Aliases (important — read before integrating)
+
+By default, the API runs **exact-match discovery**. Discovery searches use only the `subject_label` you supply, plus any strings you put in the optional `aliases` array. **No LLM expansion runs by default.** This makes the pipeline:
+
+- Free of any Anthropic dependency for discovery (cheaper, more reliable)
+- Predictable — you only get hits for terms you explicitly supplied
+- Tight on precision (less noise from same-name brands in unrelated industries)
+
+If your subject is a multi-word label where articles often split the words apart (e.g. `"ORABELLA PRECIOSA"` written as just `"Orabella"` or `"Preciosa"` in real coverage), supply the variants you care about in `aliases`:
+
+```json
+{
+  "subject_label": "ORABELLA PRECIOSA",
+  "aliases": ["Orabella", "Preciosa", "Preciosa Orabella"]
+}
+```
+
+Or, set **`auto_expand_aliases: true`** to have the platform run an LLM pass on first refresh that splits the label into per-word aliases, infers brand, and adds common reorderings. Higher recall on multi-word subjects, but adds an Anthropic token cost and a soft dependency on the Anthropic API being reachable. Off by default.
+
 **Host**: `https://v1api.materialshub.gr`
 
 There are **two surfaces** with different auth:
@@ -100,7 +119,7 @@ The key must be active and not expired. Each tracked subject is owned by the api
 ### Quickstart
 
 ```bash
-# 1. Create a tracked subject (brand example)
+# 1. Create a tracked subject (brand example, exact-match aliases)
 curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
   -H "Authorization: Bearer kai_YOUR_KEY" \
   -H "Content-Type: application/json" \
@@ -109,6 +128,7 @@ curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
     "subject_label": "Flobali",
     "brand_name": "Flobali",
     "aliases": ["Flobali Tiles", "Flobali Hellas"],
+    "auto_expand_aliases": false,
     "sources_enabled": { "news": true, "blogs": true, "youtube": false, "rss": true, "llm": true },
     "language_codes": ["en", "el"],
     "country_codes": ["GR", "DE"],
@@ -120,6 +140,19 @@ curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
   }'
 
 # Response: { "success": true, "data": { "id": "uuid", ...row, "last_refresh": { ... } } }
+```
+
+```bash
+# 1b. Same flow with LLM-driven alias expansion (recommended for multi-word subjects)
+curl -X POST https://v1api.materialshub.gr/api/v1/mentions/track \
+  -H "Authorization: Bearer kai_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject_type": "product",
+    "subject_label": "ORABELLA PRECIOSA",
+    "auto_expand_aliases": true,
+    "country_codes": ["GR"]
+  }'
 ```
 
 ```bash
