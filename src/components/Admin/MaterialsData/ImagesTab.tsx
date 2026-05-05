@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { Search, Eye, Loader2, FileText, Code, Globe, Image as ImageIcon } from 'lucide-react';
+import { Search, Eye, Loader2, FileText, Code, Globe, Image as ImageIcon, Database } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
@@ -22,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/core/ui/dialog';
+import { ImageEmbeddingsInspector } from './ImageEmbeddingsInspector';
 
 interface ImagesTabProps {
   workspaceId: string;
@@ -130,38 +132,43 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
           vector_dimensions: 768,
         });
       }
+      // Aspect collections post-2026-05-04 are 1024D Voyage embeddings of
+      // VisionAnalysis text — flag column names retained for cross-stack
+      // stability. Detailed per-aspect status (model, schema_version,
+      // source_text, rebuild controls) lives in the Embeddings tab of the
+      // dialog via ImageEmbeddingsInspector.
       if (imageData?.has_color_slig) {
         embeddings.push({
-          embedding_type: 'Color (SLIG)',
-          model_name: 'SigLIP2-SO400M',
-          vector_dimensions: 768,
+          embedding_type: 'Color (aspect)',
+          model_name: 'voyage-3',
+          vector_dimensions: 1024,
         });
       }
       if (imageData?.has_texture_slig) {
         embeddings.push({
-          embedding_type: 'Texture (SLIG)',
-          model_name: 'SigLIP2-SO400M',
-          vector_dimensions: 768,
+          embedding_type: 'Texture (aspect)',
+          model_name: 'voyage-3',
+          vector_dimensions: 1024,
         });
       }
       if (imageData?.has_style_slig) {
         embeddings.push({
-          embedding_type: 'Style (SLIG)',
-          model_name: 'SigLIP2-SO400M',
-          vector_dimensions: 768,
+          embedding_type: 'Style (aspect)',
+          model_name: 'voyage-3',
+          vector_dimensions: 1024,
         });
       }
       if (imageData?.has_material_slig) {
         embeddings.push({
-          embedding_type: 'Material (SLIG)',
-          model_name: 'SigLIP2-SO400M',
-          vector_dimensions: 768,
+          embedding_type: 'Material (aspect)',
+          model_name: 'voyage-3',
+          vector_dimensions: 1024,
         });
       }
       if (imageData?.has_understanding_embedding) {
         embeddings.push({
           embedding_type: 'Understanding',
-          model_name: 'Voyage AI 3.5',
+          model_name: 'voyage-3',
           vector_dimensions: 1024,
         });
       }
@@ -437,8 +444,38 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 />
               </div>
 
-              {/* Right Side - Classification & Metadata */}
-              <div className="w-96 overflow-y-auto space-y-4 pr-2">
+              {/* Right Side - Classification & Metadata + Embeddings inspector */}
+              <div className="w-96 overflow-y-auto pr-2">
+                <Tabs defaultValue="details" className="w-full">
+                  <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-3">
+                    <TabsTrigger
+                      value="details"
+                      className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full"
+                    >
+                      <FileText className="h-3 w-3" />
+                      Details
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="embeddings"
+                      className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full"
+                    >
+                      <Database className="h-3 w-3" />
+                      Embeddings
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="embeddings" className="mt-0 space-y-4">
+                    <ImageEmbeddingsInspector
+                      imageId={selectedImage.id}
+                      onRebuilt={() => {
+                        // Refresh badge state after a rebuild — flag changes
+                        // are reflected in the parent grid via loadImages.
+                        void loadImages(currentPage);
+                      }}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="details" className="mt-0 space-y-4">
                 {/* Classification Section */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -1060,6 +1097,8 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     View Full Metadata
                   </Button>
                 </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
           </DialogContent>
