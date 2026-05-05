@@ -38,6 +38,35 @@ serve(async (req) => {
 
     console.log('[AutoRecoveryCron] Starting stuck job detection...');
 
+    // Audit fix (this PR): sweep terminally-exhausted PDF jobs first.
+    // detect_stuck_pdf_jobs filters on recovery_attempts_after_genuine_failure
+    // < max_attempts, so a row that has already burned its 3-attempt budget
+    // is invisible to the recovery loop AND invisible to a future cron tick —
+    // it just sits at status='processing' forever. fail_exhausted_pdf_jobs
+    // RPC handles exactly this case: status='processing' AND attempts >= cap
+    // AND heartbeat stale. Was previously defined but never invoked.
+    let exhaustedFailed = 0;
+    try {
+      const { data: failedCount, error: failExhaustedErr } = await supabase.rpc(
+        'fail_exhausted_pdf_jobs',
+        { p_max_attempts: 3, stuck_threshold_seconds: 480 }
+      );
+      if (failExhaustedErr) {
+        console.warn('[AutoRecoveryCron] fail_exhausted_pdf_jobs RPC error:', failExhaustedErr);
+      } else {
+        exhaustedFailed = Number(failedCount) || 0;
+        if (exhaustedFailed > 0) {
+          console.log(`[AutoRecoveryCron] Terminally failed ${exhaustedFailed} exhausted PDF job(s)`);
+          // Cost watchdog: any time we terminally fail PDF jobs, ensure HF
+          // endpoints aren't left running. Idempotent — safe to call even
+          // when no other jobs are active.
+          await scaleAllHfEndpointsToZero(`fail_exhausted_pdf_jobs cleared ${exhaustedFailed} job(s)`);
+        }
+      }
+    } catch (e) {
+      console.warn('[AutoRecoveryCron] fail_exhausted_pdf_jobs threw:', e);
+    }
+
     // Detect stuck jobs
     const stuckJobs = await detectAllStuckJobs(supabase);
     console.log(`[AutoRecoveryCron] Found ${stuckJobs.length} stuck jobs`);
@@ -47,6 +76,7 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           message: 'No stuck jobs found',
+          exhausted_failed: exhaustedFailed,
           timestamp: new Date().toISOString(),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -61,6 +91,7 @@ serve(async (req) => {
     const summary = {
       timestamp: new Date().toISOString(),
       totalStuck: stuckJobs.length,
+      exhausted_failed: exhaustedFailed,
       recovered: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
       results,
@@ -268,7 +299,8 @@ async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
   try {
     let success = false;
     // Check if this is an agent_run stuck job (stored with _is_agent_run flag in metadata)
-    if (job.metadata?._is_agent_run) {
+    const isAgentRun = Boolean(job.metadata?._is_agent_run);
+    if (isAgentRun) {
       success = await recoverAgentRun(supabase, job);
     } else switch (job.type) {
       case 'pdf_processing':
@@ -287,11 +319,32 @@ async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
       // Do NOT increment recovery_attempts on success — only on failure
       return { jobId: job.id, type: job.type, success: true };
     } else {
-      throw new Error('Recovery failed');
+      // Audit fix (this PR): every recover* function now bumps recovery_attempts
+      // itself (PDF via mark_pdf_job_for_recovery RPC, agent via inline UPDATE,
+      // scraping/xml via the same UPDATE that flips status). Throwing here used
+      // to fall into the catch and call incrementRecoveryAttempts, double-bumping
+      // the counter and burning the budget twice as fast. Return false directly
+      // instead so we don't double-debit.
+      return {
+        jobId: job.id,
+        type: job.type,
+        success: false,
+        error: 'Recovery failed (counter already debited by recover function)',
+      };
     }
   } catch (error: any) {
+    // Genuine exception (network error, supabase down, unexpected throw inside
+    // a recover function before its own bump fired). In that case the recover
+    // function may NOT have bumped the counter, so falling back to
+    // incrementRecoveryAttempts is correct as a safety net. Note: this still
+    // double-bumps if the exception fires AFTER the counter was bumped — log
+    // the path so we can audit it later.
     console.error(`[AutoRecoveryCron] ❌ Failed to recover ${job.type} job ${job.id}:`, error);
-    await incrementRecoveryAttempts(supabase, job);
+    try {
+      await incrementRecoveryAttempts(supabase, job);
+    } catch (incErr) {
+      console.warn(`[AutoRecoveryCron] incrementRecoveryAttempts also failed for ${job.id}:`, incErr);
+    }
     return { jobId: job.id, type: job.type, success: false, error: error.message };
   }
 }
@@ -310,27 +363,44 @@ function shouldAttemptRecovery(job: StuckJob): boolean {
 async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
   const supabaseUrl        = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const nowIso = new Date().toISOString();
 
   if (!job.canRecover) {
+    // Audit fix (this PR): set completed_at on terminal failure so observers
+    // can sort/filter agent_runs by completion time. Without this, exhausted
+    // runs sat at completed_at=NULL and the dashboard showed them as
+    // perpetually "in progress" by completion_at sort.
     await supabase
       .from('agent_runs')
-      .update({ status: 'failed', error_message: 'Timed out: max recovery attempts exceeded' })
+      .update({
+        status: 'failed',
+        error_message: 'Timed out: max recovery attempts exceeded',
+        completed_at: nowIso,
+      })
       .eq('id', job.id);
     return true; // "success" = we handled it
   }
 
-  // Reset to pending so runner can re-dispatch it
-  const { error } = await supabase
+  // Reset to pending so runner can re-dispatch it.
+  // Idempotent guard via .eq('status', 'processing') — if another cron tick
+  // already claimed this run, we don't double-flip and double-dispatch.
+  const { data: claimed, error } = await supabase
     .from('agent_runs')
     .update({
       status:             'pending',
-      last_heartbeat:     new Date().toISOString(),
-      last_recovery_at:   new Date().toISOString(),
+      last_heartbeat:     nowIso,
+      last_recovery_at:   nowIso,
       recovery_attempts:  (job.recoveryAttempts || 0) + 1,
     })
-    .eq('id', job.id);
+    .eq('id', job.id)
+    .eq('status', 'processing')
+    .select('id');
 
   if (error) return false;
+  if (!claimed || (Array.isArray(claimed) && claimed.length === 0)) {
+    console.log(`[AutoRecoveryCron] Agent run ${job.id}: claim no-op (already recovered or wrong status)`);
+    return false;
+  }
 
   // Re-dispatch to runner
   const res = await fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
@@ -346,18 +416,52 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
     }),
   }).catch(e => { console.error('[AutoRecoveryCron] Failed to re-dispatch agent run:', e); return null; });
 
-  if (res && !res.ok) {
+  let dispatchOk = false;
+  if (res && res.ok) {
+    dispatchOk = true;
+  } else if (res && !res.ok) {
     const body = await res.text().catch(() => '(no body)');
     console.error(`[AutoRecoveryCron] Runner returned HTTP ${res.status}: ${body}`);
+  }
+
+  // Audit fix (this PR): on dispatch failure, revert status from 'pending'
+  // back to 'processing' so detectStuckAgentRuns picks it up next tick.
+  // Previously we returned true unconditionally, leaving the run as a
+  // 'pending' zombie that no future cron tick would re-detect (the agent
+  // runner only picks up runs it was directly invoked for).
+  if (!dispatchOk) {
+    try {
+      await supabase
+        .from('agent_runs')
+        .update({
+          status: 'processing',
+          last_heartbeat: nowIso,
+          updated_at: nowIso,
+        })
+        .eq('id', job.id)
+        .eq('status', 'pending');
+      console.log(`[AutoRecoveryCron] Reverted agent run ${job.id} pending→processing after dispatch failure`);
+    } catch (e) {
+      console.warn(`[AutoRecoveryCron] Failed to revert agent run ${job.id} status:`, e);
+    }
+    return false;
   }
 
   return true;
 }
 
 async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
+  // Audit fix #45: read last_checkpoint directly when metadata.last_checkpoint_stage
+  // is missing. Without this, every recovery_history row had from_stage:null because
+  // the metadata field is a recently-added denormalization that older jobs lack.
+  // Resolve BEFORE the claim so we capture the pre-recovery state even if the claim
+  // races with another writer.
+  const resolvedFromStage = await resolveLastCheckpointStage(supabase, job);
+
   // Atomic claim via mark_pdf_job_for_recovery — guards against two cron
   // ticks both flipping the same job to 'pending'. Returns true only if
-  // status was still 'processing' when the update ran.
+  // status was still 'processing'/'interrupted' when the update ran AND
+  // the genuine-failure budget hasn't been exhausted.
   const { data, error } = await supabase.rpc('mark_pdf_job_for_recovery', {
     p_job_id: job.id,
     p_max_attempts: 3,
@@ -367,60 +471,58 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
     return false;
   }
 
+  // If the claim was a no-op (job already taken / budget exhausted / wrong status),
+  // do NOT proceed to dispatch — that would launch a duplicate orchestrator on
+  // a job another path already owns. Return false so the cron logs it and moves on.
+  if (!data) {
+    console.log(`[AutoRecoveryCron] PDF job ${job.id}: claim no-op (already recovered, exhausted, or wrong status)`);
+    return false;
+  }
+
   // Audit fix #20: actively re-dispatch the PDF job to MIVAA. Previously the
   // RPC just flipped status='pending' and we relied on the orchestrator
   // restart hook to pick it up — which only fires on full service restart.
-  // Now we POST to MIVAA's /api/jobs/{id}/resume so recovery is immediate.
-  // Best-effort: if the POST fails, the job stays 'pending' and the next
-  // service restart still rescues it (preserving the old behavior).
+  // Now we POST to MIVAA's /api/rag/documents/job/{job_id}/resume so recovery
+  // is immediate. If the POST fails we MUST NOT leave the row at 'pending'
+  // forever — detect_stuck_pdf_jobs filters on status IN ('processing',
+  // 'interrupted'), so a 'pending' row with no orchestrator becomes a zombie
+  // that no future cron tick reclaims. Audit fix (this PR): on dispatch
+  // failure we revert status back to 'interrupted' so the next cron tick can
+  // re-attempt. The recovery_attempts counter stays bumped (already debited
+  // by the SQL RPC) so a persistently-failing MIVAA still hits the cap.
+  const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
+  const cronSecret = Deno.env.get('CRON_SECRET') || '';
   let dispatchOk = false;
-  if (data) {
-    const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
-    const cronSecret = Deno.env.get('CRON_SECRET') || '';
-    try {
-      // Real MIVAA endpoint is POST /api/rag/documents/job/{job_id}/resume
-      // (verified 2026-05-01 against rag_routes.py:1486). No auth header
-      // required — the endpoint is open. cron-secret kept for future-proofing.
-      const resp = await fetch(`${mivaaBaseUrl}/api/rag/documents/job/${job.id}/resume`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-cron-secret': cronSecret,
-        },
-        body: JSON.stringify({ trigger: 'auto_recovery_cron' }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      dispatchOk = resp.ok;
-      if (!resp.ok) {
-        console.warn(`[AutoRecoveryCron] MIVAA resume POST returned ${resp.status} for ${job.id}`);
-      }
-    } catch (e) {
-      console.warn(`[AutoRecoveryCron] MIVAA resume POST failed for ${job.id} (best-effort, job stays pending):`, e);
+  let dispatchStatus: number | null = null;
+  let dispatchError: string | null = null;
+  try {
+    // Real MIVAA endpoint is POST /api/rag/documents/job/{job_id}/resume
+    // (verified 2026-05-01 against rag_routes.py:1520). No auth header
+    // required — the endpoint is open. cron-secret kept for future-proofing.
+    const resp = await fetch(`${mivaaBaseUrl}/api/rag/documents/job/${job.id}/resume`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-cron-secret': cronSecret,
+      },
+      body: JSON.stringify({ trigger: 'auto_recovery_cron' }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    dispatchOk = resp.ok;
+    dispatchStatus = resp.status;
+    if (!resp.ok) {
+      console.warn(`[AutoRecoveryCron] MIVAA resume POST returned ${resp.status} for ${job.id}`);
     }
-  }
-
-  // Audit fix #45: read last_checkpoint directly when metadata.last_checkpoint_stage
-  // is missing. Without this, every recovery_history row had from_stage:null because
-  // the metadata field is a recently-added denormalization that older jobs lack.
-  let resolvedFromStage = job.metadata?.last_checkpoint_stage || null;
-  if (!resolvedFromStage) {
-    try {
-      const { data: checkpointRow } = await supabase
-        .from('background_jobs')
-        .select('last_checkpoint')
-        .eq('id', job.id)
-        .single();
-      const lastCheckpoint = checkpointRow?.last_checkpoint;
-      if (lastCheckpoint && typeof lastCheckpoint === 'object') {
-        resolvedFromStage = lastCheckpoint.stage || null;
-      }
-    } catch {
-      // best-effort
-    }
+  } catch (e: any) {
+    dispatchError = e?.message || String(e);
+    console.warn(`[AutoRecoveryCron] MIVAA resume POST failed for ${job.id}:`, e);
   }
 
   // Phase 1 shadow-write: log the recovery attempt to background_jobs.recovery_history.
-  // Phase 2 readers will surface this in the consolidated /full-status payload.
+  // Audit fix (this PR): write history BEFORE the status revert so observers never
+  // see a row whose status changed without an audit-log entry to explain why.
+  // Also: when dispatch failed, revert status so the next cron tick can re-attempt
+  // (status=pending is invisible to detect_stuck_pdf_jobs).
   try {
     await supabase.rpc('append_recovery_history', {
       p_job_id: job.id,
@@ -432,32 +534,120 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
         attempt_number: (job.recoveryAttempts || 0) + 1,
         succeeded: Boolean(data),
         dispatch_ok: dispatchOk,
+        dispatch_status: dispatchStatus,
+        dispatch_error: dispatchError,
       },
     });
   } catch (e) {
     console.warn(`[AutoRecoveryCron] append_recovery_history failed for ${job.id}:`, e);
   }
-  return Boolean(data);
+
+  if (!dispatchOk) {
+    // Revert status from 'pending' back to 'interrupted' so the next cron
+    // tick re-detects this job. Without this, MIVAA being briefly 5xx
+    // (deploy in progress, transient network) silently kills the job.
+    try {
+      await supabase
+        .from('background_jobs')
+        .update({
+          status: 'interrupted',
+          interrupted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id)
+        .eq('status', 'pending'); // only revert if still pending — don't stomp on a winning resume
+      console.log(`[AutoRecoveryCron] Reverted ${job.id} pending→interrupted after dispatch failure`);
+    } catch (e) {
+      console.warn(`[AutoRecoveryCron] Failed to revert ${job.id} status after dispatch failure:`, e);
+    }
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Resolve the last checkpoint stage for a job, falling back to a direct
+ * background_jobs.last_checkpoint read when the cron's denormalized
+ * metadata field is empty. Returns null if neither path yields a stage.
+ *
+ * Centralized so markAsFailed and recoverPdfJob produce consistent
+ * recovery_history.from_stage values.
+ */
+async function resolveLastCheckpointStage(supabase: any, job: StuckJob): Promise<string | null> {
+  if (job.metadata?.last_checkpoint_stage) {
+    return job.metadata.last_checkpoint_stage;
+  }
+  try {
+    const { data: checkpointRow } = await supabase
+      .from('background_jobs')
+      .select('last_checkpoint')
+      .eq('id', job.id)
+      .single();
+    const lastCheckpoint = checkpointRow?.last_checkpoint;
+    if (lastCheckpoint && typeof lastCheckpoint === 'object') {
+      return (lastCheckpoint as any).stage || null;
+    }
+  } catch {
+    // best-effort
+  }
+  return null;
 }
 
 async function recoverScrapingJob(supabase: any, job: StuckJob): Promise<boolean> {
+  // Audit fix (this PR): bump recovery_attempts + last_recovery_at on the
+  // SAME UPDATE that flips status. Previously the success path skipped the
+  // bump (incrementRecoveryAttempts is called only on the catch branch in
+  // recoverJob), so a flapping scraping session could be "recovered"
+  // indefinitely without ever hitting the 3-attempt cap.
+  const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from('scraping_sessions')
-    .update({ status: 'pending', last_heartbeat_at: new Date().toISOString() })
-    .eq('id', job.id);
+    .update({
+      status: 'pending',
+      last_heartbeat_at: nowIso,
+      recovery_attempts: (job.recoveryAttempts || 0) + 1,
+      last_recovery_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', job.id)
+    .eq('status', 'processing'); // idempotent guard — don't double-flip if another tick already claimed
   return !error;
 }
 
 async function recoverXmlJob(supabase: any, job: StuckJob): Promise<boolean> {
+  // Audit fix (this PR): same recovery_attempts bump rationale as recoverScrapingJob.
+  // Also: the 'progress: 0' reset is preserved but should be revisited — XML import
+  // doesn't have a checkpoint-resume mechanism, so a stuck job restarts from scratch.
+  // That's intentional for now (XML jobs are short-lived); flag for a future audit.
+  const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from('background_jobs')
-    .update({ status: 'pending', progress: 0, last_heartbeat: new Date().toISOString() })
-    .eq('id', job.id);
+    .update({
+      status: 'pending',
+      progress: 0,
+      last_heartbeat: nowIso,
+      recovery_attempts: (job.recoveryAttempts || 0) + 1,
+      last_recovery_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', job.id)
+    .eq('status', 'processing'); // idempotent guard
   return !error;
 }
 
 async function incrementRecoveryAttempts(supabase: any, job: StuckJob): Promise<void> {
-  const table = job.type === 'web_scraping' ? 'scraping_sessions' : 'background_jobs';
+  // Audit fix (this PR): agent runs live in the agent_runs table, not background_jobs.
+  // Previously this function targeted background_jobs unconditionally, so an agent run
+  // exception path here matched 0 rows and silently dropped the increment.
+  let table: string;
+  if (job.metadata?._is_agent_run) {
+    table = 'agent_runs';
+  } else if (job.type === 'web_scraping') {
+    table = 'scraping_sessions';
+  } else {
+    table = 'background_jobs';
+  }
   await supabase
     .from(table)
     .update({ recovery_attempts: job.recoveryAttempts + 1, last_recovery_at: new Date().toISOString() })
@@ -465,24 +655,37 @@ async function incrementRecoveryAttempts(supabase: any, job: StuckJob): Promise<
 }
 
 async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
-  const table = job.type === 'web_scraping' ? 'scraping_sessions' : 'background_jobs';
-  await supabase
-    .from(table)
-    .update({
-      status: 'failed',
-      error: `Job stuck for ${job.stuckDuration} minutes. Max recovery attempts (3) exceeded.`,
-    })
-    .eq('id', job.id);
+  // Audit fix (this PR): pick the correct table per job type. Agent runs live
+  // in agent_runs (not background_jobs), so previously markAsFailed was writing
+  // status='failed' to background_jobs with id=agent_run_id (0 rows matched —
+  // the agent run stayed at 'processing' forever).
+  let table: string;
+  if (job.metadata?._is_agent_run) {
+    table = 'agent_runs';
+  } else if (job.type === 'web_scraping') {
+    table = 'scraping_sessions';
+  } else {
+    table = 'background_jobs';
+  }
+  const errorMessage = `Job stuck for ${job.stuckDuration} minutes. Max recovery attempts (3) exceeded.`;
+  const nowIso = new Date().toISOString();
 
-  // Phase 1 shadow-write — record the exhaustion event so the consolidated
-  // job-status view can show "auto-recovery gave up after N attempts".
+  // Audit fix (this PR): write the exhaustion event to recovery_history BEFORE
+  // flipping status='failed'. Previous ordering had a window where observers
+  // could see status='failed' with no recovery_history entry to explain why,
+  // and the PipelineErrorsPanel summary chip would render an empty "Recovery
+  // (N/N ok)" stub. Same anti-pattern as the post-2026-05-01 audit principle
+  // ("explicit failure markers, not empty returns").
+  // Note: append_recovery_history writes to background_jobs.recovery_history,
+  // so it only makes sense for non-agent_run / non-scraping jobs.
   if (table === 'background_jobs') {
+    const resolvedFromStage = await resolveLastCheckpointStage(supabase, job);
     try {
       await supabase.rpc('append_recovery_history', {
         p_job_id: job.id,
         p_event: {
-          attempted_at: new Date().toISOString(),
-          from_stage: job.metadata?.last_checkpoint_stage || null,
+          attempted_at: nowIso,
+          from_stage: resolvedFromStage,
           reason: 'max_attempts_exceeded',
           stuck_minutes: job.stuckDuration,
           attempt_number: job.recoveryAttempts,
@@ -493,13 +696,43 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
     } catch (e) {
       console.warn(`[AutoRecoveryCron] append_recovery_history (exhausted) failed for ${job.id}:`, e);
     }
+  }
 
+  // Audit fix (this PR): mirror the SQL fail_exhausted_pdf_jobs RPC and write
+  // BOTH `error` and `error_message` plus `failed_at`, so consumers reading
+  // either field see a populated value. Previously we set only `error`,
+  // leaving `error_message` and `failed_at` NULL.
+  const updatePayload: Record<string, any> = {
+    status: 'failed',
+    updated_at: nowIso,
+  };
+  if (table === 'background_jobs') {
+    updatePayload.error = errorMessage;
+    updatePayload.error_message = errorMessage;
+    updatePayload.failed_at = nowIso;
+    // Audit fix (this PR): clear current_slow_operation on terminal failure
+    // so a future job re-using this row's id (or admin retry) doesn't read
+    // a stale slow-op marker and cause cron to skip it indefinitely.
+    updatePayload.current_slow_operation = null;
+  } else if (table === 'agent_runs') {
+    // agent_runs schema uses error_message (not error). completed_at is the
+    // canonical "stopped at" timestamp.
+    updatePayload.error_message = errorMessage;
+    updatePayload.completed_at = nowIso;
+  } else {
+    // scraping_sessions
+    updatePayload.error = errorMessage;
+  }
+  await supabase
+    .from(table)
+    .update(updatePayload)
+    .eq('id', job.id);
+
+  if (table === 'background_jobs' && job.type === 'pdf_processing') {
     // P0-1 cost watchdog: when we give up on a PDF job, force-scale every HF
     // endpoint to zero so we don't keep paying for replicas the dead worker
     // never cleaned up.
-    if (job.type === 'pdf_processing') {
-      await scaleAllHfEndpointsToZero(`exhausted job ${job.id}`);
-    }
+    await scaleAllHfEndpointsToZero(`exhausted job ${job.id}`);
   }
 }
 
