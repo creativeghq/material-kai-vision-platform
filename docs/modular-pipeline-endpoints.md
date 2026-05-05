@@ -198,7 +198,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Uses SLIG HuggingFace endpoint exclusively for all visual embeddings
 - Generates base visual embedding (768D) using SLIG image_embedding mode
 - Creates 1 visual SLIG embedding (768D, raw image)
-- Creates 4 per-aspect Voyage `voyage-3` embeddings (1024D each) of deterministic text strings derived from VisionAnalysis (post-2026-05-04 — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)). Pre-v2: 4 SLIG-blend vectors at 768D using fixed global text prompts.
+- Creates 4 per-aspect Voyage `voyage-3` embeddings (1024D each) of deterministic text strings derived from VisionAnalysis.
 
 **Storage** (post-v2):
 - 1 SLIG visual vector → `image_slig_embeddings` (collection key: `visual_768`)

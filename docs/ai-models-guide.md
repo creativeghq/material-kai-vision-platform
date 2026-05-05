@@ -149,7 +149,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 - Overall visual appearance, enables visual similarity search
 - Producer key: `visual_768`
 
-**Aspect Embeddings (v2, 2026-05-04)** — see [docs/aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md).
+**Aspect Embeddings**
 
 The four aspect collections are now Voyage `voyage-3` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 4.7's structured output):
 

@@ -351,7 +351,7 @@ The platform uses **6 embedding types** for comprehensive search:
 **workspaces**: Multi-tenant workspace management
 **documents**: PDF documents and metadata
 **document_chunks**: Semantic text chunks with 1024D Voyage embeddings (updated 2026-04)
-**document_images**: Image metadata + boolean presence flags (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`) + provenance columns for the four aspect collections (`<aspect>_aspect_embedding_model`, `<aspect>_aspect_schema_version` — added 2026-05-04 with the aspect-embeddings v2 migration; see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)). All image vectors live in VECS collections (updated 2026-04 — legacy 512D CLIP columns were dropped).
+**document_images**: Image metadata + boolean presence flags (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`) + provenance columns for the four aspect collections (`<aspect>_aspect_embedding_model`, `<aspect>_aspect_schema_version`). All image vectors live in VECS collections.
 **products**: Product records from PDFs
 **background_jobs**: Async job tracking with checkpoint recovery
 **material_metadata_fields**: Dynamic metafield definitions

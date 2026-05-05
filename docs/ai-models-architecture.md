@@ -77,8 +77,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 │ Visual (SLIG SigLIP2 768D) — pixel-similarity:                          │
 │   image_slig_embeddings (key: visual_768)                               │
 │                                                                          │
-│ Aspect (Voyage voyage-3 1024D, post-2026-05-04 — see                    │
-│        docs/aspect-embeddings-v2-runbook.md):                           │
+│ Aspect (Voyage voyage-3 1024D):                                          │
 │   image_color_embeddings    (key: color_aspect_1024)                    │
 │   image_texture_embeddings  (key: texture_aspect_1024)                  │
 │   image_style_embeddings    (key: style_aspect_1024)                    │

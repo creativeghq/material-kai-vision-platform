@@ -28,7 +28,7 @@ Legacy 1152D SigLIP-SO400M and 512D CLIP collections, as well as the fused `mult
 
 Pre-v2: the 4 aspect collections held SLIG-blend vectors built from a global fixed text prompt per aspect ("focus on color palette and color relationships" etc.) blended at 10-30% into the base SLIG visual embedding. The fixed prompts produced the same nudge direction for every image regardless of content — so every "color" vector ended up ~80% identical to the visual vector, carrying near-zero independent signal.
 
-Post-v2: each aspect string is a deterministic Python serialization of the per-image `VisionAnalysis` fields produced by Claude Opus 4.7 (Anthropic tool use, schema-locked). See `app.models.vision_analysis.serialize_aspect_*` and the full migration runbook at [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md).
+Post-v2: each aspect string is a deterministic Python serialization of the per-image `VisionAnalysis` fields produced by Claude Opus 4.7 (Anthropic tool use, schema-locked). See `app.models.vision_analysis.serialize_aspect_*`.
 
 ## Problem Statement
 

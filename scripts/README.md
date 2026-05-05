@@ -242,7 +242,7 @@ mcp__supabase__execute_sql:
   -- regardless of which model produced the vector (Voyage 1024D for v2 rows,
   -- legacy SLIG 768D for pre-v2 rows). To distinguish, also query the
   -- provenance columns: `<aspect>_aspect_embedding_model` and
-  -- `<aspect>_aspect_schema_version`. See aspect-embeddings-v2-runbook.md.
+  -- `<aspect>_aspect_schema_version`.
   SELECT
     COUNT(*)                                                      AS total_images,
     SUM(CASE WHEN has_slig_embedding         THEN 1 ELSE 0 END)   AS visual,

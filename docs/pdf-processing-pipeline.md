@@ -729,7 +729,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **🚀 ZERO-DOWNLOAD ARCHITECTURE**
 
-**Models** (post-2026-05-04 — see [aspect-embeddings-v2-runbook.md](aspect-embeddings-v2-runbook.md)):
+**Models**:
 - SLIG SigLIP2 (768D, raw image): produces ONE visual vector per image
 - Voyage `voyage-3` (1024D, text): produces FOUR per-aspect vectors per image, embedding deterministic strings derived from VisionAnalysis fields
 
