@@ -77,6 +77,27 @@ async function downloadImage(imageUrl: string): Promise<Uint8Array> {
 }
 
 /**
+ * Verify the authenticated user owns the target moodboard. The edge function
+ * uses the service-role supabase client (RLS bypassed) so this check is the
+ * only barrier between an authenticated user and someone else's moodboard.
+ */
+async function assertMoodboardOwner(
+  supabase: ReturnType<typeof createClient>,
+  moodboardId: string,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const { data, error } = await supabase
+    .from('moodboards')
+    .select('user_id')
+    .eq('id', moodboardId)
+    .maybeSingle();
+  if (error) return { ok: false, status: 500, error: `Moodboard lookup failed: ${error.message}` };
+  if (!data) return { ok: false, status: 404, error: 'Moodboard not found' };
+  if (data.user_id !== userId) return { ok: false, status: 403, error: 'You do not own this moodboard' };
+  return { ok: true };
+}
+
+/**
  * Import a single pin into a moodboard
  */
 async function importSinglePin(
@@ -93,6 +114,22 @@ async function importSinglePin(
   error?: string;
 }> {
   try {
+    // 0. RBAC: verify caller owns this moodboard. The function runs with the
+    // service role key so RLS doesn't gate writes to moodboard_items — without
+    // this explicit ownership check, any authenticated user could attach
+    // imported pins to anyone else's moodboard by passing a guessed UUID.
+    const { data: mb, error: mbErr } = await supabase
+      .from('moodboards')
+      .select('user_id')
+      .eq('id', moodboardId)
+      .maybeSingle();
+    if (mbErr || !mb) {
+      return { success: false, error: 'Moodboard not found' };
+    }
+    if (mb.user_id !== userId) {
+      return { success: false, error: 'Not authorized for this moodboard' };
+    }
+
     // 1. Extract pin data via oEmbed
     const pinData = await extractPinData(pinUrl);
     const pinId = extractPinId(pinUrl);
@@ -223,6 +260,12 @@ Deno.serve(withApiLogging('pinterest-import', async (req) => {
       return jsonResponse({ success: false, error: 'pin_url and moodboard_id are required' }, 400);
     }
 
+    // The function uses the service-role client (RLS bypassed). Without an
+    // explicit ownership check, any authenticated user could write into any
+    // moodboard by guessing/learning a UUID. Verify caller owns the target.
+    const ownerCheck = await assertMoodboardOwner(supabase, moodboard_id, userId);
+    if (!ownerCheck.ok) return jsonResponse({ success: false, error: ownerCheck.error }, ownerCheck.status);
+
     const result = await importSinglePin(supabase, userId, pin_url, moodboard_id, auto_match);
 
     if (!result.success) {
@@ -248,6 +291,10 @@ Deno.serve(withApiLogging('pinterest-import', async (req) => {
     if (!moodboard_id) {
       return jsonResponse({ success: false, error: 'moodboard_id is required' }, 400);
     }
+
+    // RLS-bypass safety: explicitly verify ownership before bulk-inserting items.
+    const ownerCheck = await assertMoodboardOwner(supabase, moodboard_id, userId);
+    if (!ownerCheck.ok) return jsonResponse({ success: false, error: ownerCheck.error }, ownerCheck.status);
 
     const results = [];
     let imported = 0;

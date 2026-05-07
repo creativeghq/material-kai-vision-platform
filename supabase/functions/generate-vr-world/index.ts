@@ -143,6 +143,21 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       .single();
 
     if (insertError || !vrWorld) {
+      // Refund the credits we debited just above. Without this, a transient
+      // DB error after debit but before insert leaves the user out of pocket
+      // because the catch block's refund relies on `vrWorldId` (which is null
+      // here — the insert that would have set it just failed).
+      try {
+        await supabase.rpc('debit_user_credits', {
+          p_user_id: userId,
+          p_amount: -creditCost,
+          p_operation_type: 'vr_generation_refund',
+          p_description: 'VR World generation refund (insert_failed)',
+          p_metadata: { model, reason: 'vr_worlds insert failed', error: insertError?.message },
+        });
+      } catch (refundErr) {
+        console.error('[generate-vr-world] insert-stage refund failed:', refundErr);
+      }
       throw new Error(`Failed to create VR world record: ${insertError?.message}`);
     }
 
@@ -288,6 +303,25 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
         }
       } catch (refundError) {
         console.error('[generate-vr-world] Refund failed:', refundError);
+      }
+    } else if (userId) {
+      // Failure happened AFTER credit debit but BEFORE vr_worlds row insert
+      // (e.g. insert errored at line 145). Without this branch the user has
+      // been charged but has no record to drive the refund block above —
+      // credits were silently kept by the platform.
+      try {
+        const creditCost = (typeof body !== 'undefined' && body?.model && CREDIT_COSTS[body.model])
+          || CREDIT_COSTS['marble-1.0-draft'];
+        await supabase.rpc('debit_user_credits', {
+          p_user_id: userId,
+          p_amount: -creditCost,
+          p_operation_type: 'vr_generation_refund',
+          p_description: 'VR World generation refund (record creation failed)',
+          p_metadata: { failure_stage: 'pre_record_insert' },
+        });
+        console.log(`[generate-vr-world] Refunded ${creditCost} credits (no vr_world record) to user ${userId}`);
+      } catch (refundError) {
+        console.error('[generate-vr-world] Pre-record refund failed:', refundError);
       }
     }
 

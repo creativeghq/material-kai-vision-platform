@@ -136,17 +136,27 @@ class ManufacturerAnalyticsService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
+      // user_profiles uses user_id (FK to auth.users) — NOT id (the row PK).
+      // Columns: location (free-text "city, country"), location_country_code.
+      // The previous query .eq('id', ...).select('city, country') silently
+      // returned nothing because (a) wrong filter column, (b) those fields
+      // don't exist — every analytics event was being written with null
+      // city/country.
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('city, country')
-        .eq('id', user.id)
-        .single();
+        .select('location, location_country_code')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (!profile) return null;
 
+      // location is free-text — derive city as the part before the first comma
+      const location = (profile.location as string | null) ?? undefined;
+      const city = location ? location.split(',')[0]?.trim() || undefined : undefined;
+
       const cached: UserLocationCache = {
-        city: profile.city ?? undefined,
-        country: profile.country ?? undefined,
+        city,
+        country: (profile.location_country_code as string | null) ?? undefined,
         fetched_at: Date.now(),
       };
       this.locationCache = cached;

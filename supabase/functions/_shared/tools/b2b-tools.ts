@@ -113,10 +113,14 @@ const B2B_REGIONS: Record<string, { label: string; countries: string[] }> = {
 
 const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries);
 
-export const createB2BManufacturerSearchTool = (_userId: string, onProgress?: (status: string) => void) => {
+export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ country, region, category, limit = 30 }) => {
       try {
+        if (!ANTHROPIC_API_KEY) {
+          return JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured.' });
+        }
+
         let scope: string;
         if (country) {
           scope = `in ${country}`;
@@ -161,6 +165,56 @@ export const createB2BManufacturerSearchTool = (_userId: string, onProgress?: (s
           ?.filter((b: any) => b.type === 'text')
           .map((b: any) => b.text)
           .join('\n') || '';
+
+        // Cost attribution: Haiku 4.5 ($0.80 in / $4 out per MTok) + web_search
+        // server-side tool fee (~$0.01/use; Anthropic doesn't break that out in
+        // the response, but max_uses=5 caps the worst case at $0.05). We log
+        // the token cost here so the operations dashboard sees a non-zero row;
+        // the actual web_search server tool surcharge is approximated as a
+        // flat $0.01 per call to keep accounting simple.
+        try {
+          const inputTokens = data?.usage?.input_tokens ?? 0;
+          const outputTokens = data?.usage?.output_tokens ?? 0;
+          const inputCost = (inputTokens / 1_000_000) * 0.80;
+          const outputCost = (outputTokens / 1_000_000) * 4.00;
+          const webSearchSurcharge = 0.05; // worst-case: max_uses=5 × $0.01/use
+          const rawCost = inputCost + outputCost + webSearchSurcharge;
+          const billedCost = rawCost * 1.50; // platform markup
+
+          await supabase.rpc('debit_user_credits', {
+            p_user_id: userId,
+            p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
+            p_operation_type: 'b2b_manufacturer_search',
+            p_description: `B2B manufacturer web search (${category})`,
+            p_metadata: { country, region, category, limit, web_search_max_uses: 5 },
+          });
+
+          await supabase.from('ai_usage_logs').insert({
+            user_id: userId,
+            operation_type: 'b2b_manufacturer_search',
+            model_name: 'claude-haiku-4-5',
+            api_provider: 'anthropic',
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            input_cost_usd: inputCost,
+            output_cost_usd: outputCost,
+            raw_cost_usd: rawCost,
+            markup_multiplier: 1.5,
+            billed_cost_usd: billedCost,
+            credits_debited: Math.round(billedCost * 100 * 100) / 100,
+            metadata: {
+              feature: 'b2b_research',
+              sub_feature: 'web_search',
+              country, region, category, limit,
+              web_search_surcharge_usd: webSearchSurcharge,
+            },
+            created_at: new Date().toISOString(),
+          });
+        } catch (logErr) {
+          // Non-blocking — even if usage log/debit fails, the search has
+          // already happened (cost already incurred on Anthropic side).
+          console.warn('[b2b_manufacturer_search] cost log failed:', logErr);
+        }
 
         onProgress?.(`Search complete.`);
 
@@ -308,6 +362,52 @@ ${markdown.substring(0, 15000)}`;
                 .filter((b: any) => b.type === 'text')
                 .map((b: any) => b.text)
                 .join('\n');
+
+          // Cost log for Opus 4.7 ($15 in / $75 out per MTok). The agent tool
+          // currently only debits the firecrawl scrape (~$0.001) but the Opus
+          // pass on a 15K-char page costs orders of magnitude more — without
+          // this log + debit, every scrape silently absorbs $0.05-0.15 of
+          // platform cost.
+          try {
+            const usage = (analysisResponse as any).usage_metadata
+              ?? (analysisResponse as any).response_metadata?.usage
+              ?? {};
+            const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
+            const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
+            if (inputTokens > 0 || outputTokens > 0) {
+              const inputCost = (inputTokens / 1_000_000) * 15.00;
+              const outputCost = (outputTokens / 1_000_000) * 75.00;
+              const rawCost = inputCost + outputCost;
+              const billedCost = rawCost * 1.50;
+              const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
+
+              await supabase.rpc('debit_user_credits', {
+                p_user_id: userId,
+                p_amount: creditsToDebit,
+                p_operation_type: 'company_website_scrape_analysis',
+                p_description: 'Claude Opus website analysis',
+                p_metadata: { url, sections: extractSections },
+              });
+              await supabase.from('ai_usage_logs').insert({
+                user_id: userId,
+                operation_type: 'company_website_scrape_analysis',
+                model_name: 'claude-opus-4-7',
+                api_provider: 'anthropic',
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                input_cost_usd: inputCost,
+                output_cost_usd: outputCost,
+                raw_cost_usd: rawCost,
+                markup_multiplier: 1.5,
+                billed_cost_usd: billedCost,
+                credits_debited: creditsToDebit,
+                metadata: { feature: 'b2b_research', sub_feature: 'website_scrape_analysis', url },
+                created_at: new Date().toISOString(),
+              });
+            }
+          } catch (logErr) {
+            console.warn('[company_website_scrape] cost log failed:', logErr);
+          }
 
           // Try to parse the JSON response
           try {

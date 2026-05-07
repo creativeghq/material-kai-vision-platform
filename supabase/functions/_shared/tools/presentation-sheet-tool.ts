@@ -242,38 +242,87 @@ function namedFromHex(r: number, g: number, b: number): string {
  * cabinet, wall tile, floor tile, etc.) with normalized [0..1] center
  * coordinates and a short label. Returns annotations ready to drop into
  * the canvas — user can refine instead of starting from blank.
+ *
+ * Logs the Anthropic call to ai_usage_logs so cost attribution is correct
+ * — the agent tool charges a flat sheet credit, but the underlying Vision
+ * call has a real per-token cost the platform absorbs without this log.
  */
 async function autoDetectCallouts(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  moodboardId: string,
   imageUrl: string,
 ): Promise<{ x: number; y: number; line_endpoint_x: number; line_endpoint_y: number; label: string; source: 'ai' }[]> {
   const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
   if (!ANTHROPIC_API_KEY) return [];
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1500,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'url', url: imageUrl } },
-          {
-            type: 'text',
-            text: 'Identify up to 6 distinct visible interior design elements (e.g. sink, faucet, pendant light, oven, wall tile, floor tile, cabinet, door, window). For each, return its center as normalized [0..1] coordinates (0,0 = top-left, 1,1 = bottom-right) and a 2–4 word label. Output ONLY a JSON array, no prose: [{"x":0.45,"y":0.62,"label":"Pendant Light"}, ...]',
-          },
-        ],
-      }],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: imageUrl } },
+            {
+              type: 'text',
+              text: 'Identify up to 6 distinct visible interior design elements (e.g. sink, faucet, pendant light, oven, wall tile, floor tile, cabinet, door, window). For each, return its center as normalized [0..1] coordinates (0,0 = top-left, 1,1 = bottom-right) and a 2–4 word label. Output ONLY a JSON array, no prose: [{"x":0.45,"y":0.62,"label":"Pendant Light"}, ...]',
+            },
+          ],
+        }],
+      }),
+    });
+  } catch (fetchErr) {
+    console.warn('[autoDetectCallouts] anthropic fetch failed:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
+    return [];
+  }
 
   if (!res.ok) return [];
   const data = await res.json();
+
+  // Cost log — Haiku pricing: $0.80 / MTok input, $4 / MTok output (image tokens
+  // bundled into input). Without this, the platform absorbs the cost silently.
+  try {
+    const inputTokens = data?.usage?.input_tokens ?? 0;
+    const outputTokens = data?.usage?.output_tokens ?? 0;
+    const inputCost = (inputTokens / 1_000_000) * 0.80;
+    const outputCost = (outputTokens / 1_000_000) * 4.00;
+    const rawCost = inputCost + outputCost;
+    (supabase as any).from('ai_usage_logs').insert({
+      user_id: userId,
+      operation_type: 'presentation_sheet_auto_detect_callouts',
+      model_name: 'claude-haiku-4-5',
+      api_provider: 'anthropic',
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      input_cost_usd: inputCost,
+      output_cost_usd: outputCost,
+      raw_cost_usd: rawCost,
+      markup_multiplier: 1,
+      billed_cost_usd: rawCost,
+      credits_debited: 0, // already covered by the flat sheet credit
+      metadata: {
+        feature: 'presentation_sheet',
+        sub_feature: 'auto_detect_callouts',
+        moodboard_id: moodboardId,
+        image_url: imageUrl,
+      },
+      created_at: new Date().toISOString(),
+    }).then(({ error }: { error: any }) => {
+      if (error) console.warn('[autoDetectCallouts] usage log failed (non-blocking):', error.message);
+    });
+  } catch (logErr) {
+    console.warn('[autoDetectCallouts] usage log threw:', logErr);
+  }
+
   const text = data?.content?.[0]?.text || '';
   const jsonMatch = text.match(/\[[\s\S]*\]/);
   if (!jsonMatch) return [];
@@ -378,7 +427,7 @@ export const createPresentationSheetTool = (
           if (sheet_type === 'annotated_render' &&
               initial_data.backdrop_image_url &&
               (!initial_data.annotations || initial_data.annotations.length === 0)) {
-            const annotations = await autoDetectCallouts(initial_data.backdrop_image_url);
+            const annotations = await autoDetectCallouts(supabase, userId, moodboard_id, initial_data.backdrop_image_url);
             if (annotations.length > 0) initial_data = { ...initial_data, annotations };
           }
         }
@@ -517,9 +566,26 @@ export const createPresentationSheetTool = (
         );
 
         if (pdfError || !pdfResult?.success) {
+          // Refund credits — the user paid for a sheet that never materialized.
+          // Don't refund the sheet row insert; the row stays in 'failed' status
+          // (set by the PDF function) so the user can retry without paying again.
+          if (creditCost > 0) {
+            try {
+              await supabase.rpc('debit_user_credits', {
+                p_user_id: userId,
+                p_amount: -creditCost,
+                p_operation_type: `presentation_sheet_${sheet_type}_refund`,
+                p_description: `Refund: PDF generation failed`,
+                p_metadata: { moodboard_id, sheet_type, sheet_id: sheet.id, reason: pdfError?.message || pdfResult?.error || 'pdf_failed' },
+              });
+            } catch (refundErr) {
+              console.error('[generate_presentation_sheet] refund failed:', refundErr);
+            }
+          }
           return JSON.stringify({
             success: false,
             sheet_id: sheet.id,
+            credits_refunded: creditCost,
             error: pdfError?.message || pdfResult?.error || 'PDF generation failed',
           });
         }

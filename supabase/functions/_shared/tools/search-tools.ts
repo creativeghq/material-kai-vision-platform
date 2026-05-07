@@ -430,6 +430,50 @@ ${scrapeResult.markdown.substring(0, 8000)}`;
               .map((b: any) => b.text)
               .join('\n');
 
+        // Cost log for Haiku ($0.80 in / $4 out / MTok) — the firecrawl scrape
+        // is debited 1 credit but the Haiku call costs ~$0.005-0.015 on top
+        // and was previously absorbed silently.
+        try {
+          const usage = (analysisResponse as any).usage_metadata
+            ?? (analysisResponse as any).response_metadata?.usage
+            ?? {};
+          const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
+          const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
+          if (inputTokens > 0 || outputTokens > 0) {
+            const inputCost = (inputTokens / 1_000_000) * 0.80;
+            const outputCost = (outputTokens / 1_000_000) * 4.00;
+            const rawCost = inputCost + outputCost;
+            const billedCost = rawCost * 1.50;
+            const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
+
+            await supabase.rpc('debit_user_credits', {
+              p_user_id: userId,
+              p_amount: creditsToDebit,
+              p_operation_type: 'analyze_inspiration_url_haiku',
+              p_description: 'Claude Haiku design-token extraction',
+              p_metadata: { url, focus },
+            });
+            await supabase.from('ai_usage_logs').insert({
+              user_id: userId,
+              operation_type: 'analyze_inspiration_url_haiku',
+              model_name: 'claude-haiku-4-5',
+              api_provider: 'anthropic',
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              input_cost_usd: inputCost,
+              output_cost_usd: outputCost,
+              raw_cost_usd: rawCost,
+              markup_multiplier: 1.5,
+              billed_cost_usd: billedCost,
+              credits_debited: creditsToDebit,
+              metadata: { feature: 'inspiration_url_analysis', url, focus, workspace_id: workspaceId },
+              created_at: new Date().toISOString(),
+            });
+          }
+        } catch (logErr) {
+          console.warn('[analyze_inspiration_url] cost log failed:', logErr);
+        }
+
         let designTokens: any;
         try {
           const jsonStr = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

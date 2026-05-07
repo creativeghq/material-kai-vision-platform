@@ -141,14 +141,24 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
       imageMimeType,
     });
 
-    // Debit credits
-    await supabase.rpc('debit_user_credits', {
+    // Debit credits — check the RPC's success flag, otherwise a transient
+    // race (balance drained between the upfront check and now) silently
+    // uploads the result without charging the user.
+    const { data: debitData, error: debitErr } = await supabase.rpc('debit_user_credits', {
       p_user_id: userId,
       p_amount: CREDITS_REQUIRED,
       p_operation_type: 'region_edit',
       p_description: `Region edit (Grok Aurora inpainting)`,
       p_metadata: { workspace_id: body.workspace_id, job_id: jobId },
     });
+    {
+      const row = Array.isArray(debitData) ? debitData[0] : debitData;
+      if (debitErr || (row && row.success === false)) {
+        const msg = row?.error_message || debitErr?.message || 'Credit deduction failed after generation';
+        console.error('[generate-region-edit] Credit deduction failed post-generation:', msg);
+        return jsonResponse({ success: false, error: msg }, 402);
+      }
+    }
 
     // Upload result
     const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId);
