@@ -133,11 +133,20 @@ Deno.serve(async (req: Request) => {
   let run: AgentRunRecord;
 
   if (run_id) {
-    const { data: existingRun } = await supabase
+    // .single() throws PGRST116 (Not Acceptable) when zero rows match, so the
+    // previous "ignore the error and check !existingRun" pattern would mask
+    // legitimate DB errors as "run_id not found". Switch to maybeSingle and
+    // surface real errors as 500 so the cron / chat dispatcher sees them.
+    const { data: existingRun, error: lookupErr } = await supabase
       .from('agent_runs')
       .select('*')
       .eq('id', run_id)
-      .single();
+      .maybeSingle();
+    if (lookupErr) {
+      return new Response(JSON.stringify({ error: `Failed to load run: ${lookupErr.message}` }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if (!existingRun) {
       return new Response(JSON.stringify({ error: 'run_id not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

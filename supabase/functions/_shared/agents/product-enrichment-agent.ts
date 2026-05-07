@@ -12,7 +12,7 @@
  * Delegation: throws DelegateToMivaaError when batch_size > 20
  */
 
-import { runLangGraphAgent } from './base-agent.ts';
+import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import { DelegateToMivaaError } from './types.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
@@ -149,6 +149,22 @@ Return JSON: { "description": "...", "keywords": ["..."], "material_category": "
     }
 
     await log('info', `Enrichment complete`, { enriched: enrichedCount, errors: errors.length, total: products.length });
+
+    // Cost attribution — historically zero ai_usage_logs writes from any
+    // background agent, so the Operations dashboard underreported spend.
+    if (totalInputTokens > 0 || totalOutputTokens > 0) {
+      logAgentAiUsage(supabase, {
+        runId:        run.id,
+        agentId:      agentConfig.id,
+        agentType:    this.agentType,
+        userId:       agentConfig.created_by,
+        workspaceId:  agentConfig.workspace_id,
+        model:        agentConfig.model,
+        inputTokens:  totalInputTokens,
+        outputTokens: totalOutputTokens,
+        metadata:     { enriched: enrichedCount, total: products.length },
+      });
+    }
 
     return {
       success:        enrichedCount > 0 || errors.length < products.length,

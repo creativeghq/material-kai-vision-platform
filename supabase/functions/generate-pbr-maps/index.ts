@@ -453,6 +453,24 @@ async function handleRequest(
     await updateProductPbrMaps(supabase, product_id, pbrMaps);
 
     // ── Step 6: Deduct credits ───────────────────────────────────────────────
+    //
+    // Fail-closed: if BOTH MIVAA SVBRDF and the Replicate normal-map fallback
+    // returned nothing, we only uploaded the source image as albedo — there is
+    // no actual PBR data to ship. Skip the credit debit instead of charging
+    // the full 8 credits for a no-op.
+    const producedPbrData = !!(pbrMaps.normal_url || pbrMaps.roughness_url || pbrMaps.metalness_url || pbrMaps.tileable_url);
+    if (!producedPbrData) {
+      pbrMaps.status = 'failed';
+      console.warn('[generate-pbr-maps] No PBR maps generated (both SVBRDF and Replicate fallback returned nothing). Skipping credit debit.');
+      return jsonResponse({
+        success: false,
+        error: 'No PBR maps could be generated for this image (all providers returned empty). No credits charged.',
+        product_id,
+        pbr_maps: pbrMaps,
+        credits_used: 0,
+      }, 502);
+    }
+
     await deductCredits(
       supabase,
       userId,

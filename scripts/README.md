@@ -237,6 +237,12 @@ After Step 5 reports completion, run all verification queries against the docume
 
 ```
 mcp__supabase__execute_sql:
+  -- Note: post-2026-05-04 the four `has_*_slig` flag names are retained for
+  -- cross-stack stability but they now flag aspect-collection presence
+  -- regardless of which model produced the vector (Voyage 1024D for v2 rows,
+  -- legacy SLIG 768D for pre-v2 rows). To distinguish, also query the
+  -- provenance columns: `<aspect>_aspect_embedding_model` and
+  -- `<aspect>_aspect_schema_version`.
   SELECT
     COUNT(*)                                                      AS total_images,
     SUM(CASE WHEN has_slig_embedding         THEN 1 ELSE 0 END)   AS visual,
@@ -244,7 +250,12 @@ mcp__supabase__execute_sql:
     SUM(CASE WHEN has_texture_slig           THEN 1 ELSE 0 END)   AS texture,
     SUM(CASE WHEN has_style_slig             THEN 1 ELSE 0 END)   AS style,
     SUM(CASE WHEN has_material_slig          THEN 1 ELSE 0 END)   AS material,
-    SUM(CASE WHEN has_understanding_embedding THEN 1 ELSE 0 END)  AS understanding
+    SUM(CASE WHEN has_understanding_embedding THEN 1 ELSE 0 END)  AS understanding,
+    -- v2 lineage: rows with Voyage-produced aspect vectors (post-2026-05-04)
+    SUM(CASE WHEN color_aspect_embedding_model    LIKE 'voyage%' THEN 1 ELSE 0 END) AS color_v2,
+    SUM(CASE WHEN texture_aspect_embedding_model  LIKE 'voyage%' THEN 1 ELSE 0 END) AS texture_v2,
+    SUM(CASE WHEN style_aspect_embedding_model    LIKE 'voyage%' THEN 1 ELSE 0 END) AS style_v2,
+    SUM(CASE WHEN material_aspect_embedding_model LIKE 'voyage%' THEN 1 ELSE 0 END) AS material_v2
   FROM document_images
   WHERE document_id = '<DOCUMENT_ID>';
 ```

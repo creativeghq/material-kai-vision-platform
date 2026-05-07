@@ -10,7 +10,7 @@
  *   overwrite_tags boolean  Whether to overwrite existing tags (default false)
  */
 
-import { runLangGraphAgent } from './base-agent.ts';
+import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
 const DEFAULT_TAG_FIELDS = ['material_type', 'color', 'finish', 'application'];
@@ -23,7 +23,7 @@ export class MaterialTaggerAgent implements AgentRunner {
   readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
-    const { supabase, agentConfig, input, log, heartbeat } = ctx;
+    const { supabase, agentConfig, run, input, log, heartbeat } = ctx;
 
     const cfg          = { ...agentConfig.config, ...input } as Record<string, unknown>;
     const batchSize    = Math.min(Number(cfg.batch_size     ?? 10), 20);
@@ -148,6 +148,20 @@ Return JSON with applicable fields from: material_type, color, finish, applicati
     }
 
     await log('info', `Tagging complete`, { tagged: taggedCount, errors: errors.length });
+
+    if (totalInputTokens > 0 || totalOutputTokens > 0) {
+      logAgentAiUsage(supabase, {
+        runId:        run.id,
+        agentId:      agentConfig.id,
+        agentType:    this.agentType,
+        userId:       agentConfig.created_by,
+        workspaceId:  agentConfig.workspace_id,
+        model:        agentConfig.model,
+        inputTokens:  totalInputTokens,
+        outputTokens: totalOutputTokens,
+        metadata:     { tagged: taggedCount, total: products.length },
+      });
+    }
 
     return {
       success:        taggedCount > 0 || errors.length < products.length,

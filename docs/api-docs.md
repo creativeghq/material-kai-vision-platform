@@ -33,10 +33,10 @@ The multi-vector search has been **significantly enhanced** to be the single com
 - text_embedding (15%) - Semantic understanding (Voyage AI 1024D, dict key `text_1024`, stored in document_chunks.text_embedding)
 - visual_768 / image_slig_embeddings (15%) - Visual similarity (SigLIP2 cloud 768D)
 - understanding_1024 / image_understanding_embeddings (20%) - Spec-based semantic (Voyage AI 1024D from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint 404-ing for months). Provenance fields `embedding_model` + `schema_version` persisted on every row.)
-- color_slig_768 / image_color_embeddings (12.5%) - Color palette matching (SLIG text-guided 768D)
-- texture_slig_768 / image_texture_embeddings (12.5%) - Texture pattern matching (SLIG text-guided 768D)
-- style_slig_768 / image_style_embeddings (12.5%) - Design style matching (SLIG text-guided 768D)
-- material_slig_768 / image_material_embeddings (12.5%) - Material type matching (SLIG text-guided 768D)
+- color_aspect_1024 / image_color_embeddings (12.5%) - Color matching (Voyage 1024D of `VisionAnalysis.colors[]`)
+- texture_aspect_1024 / image_texture_embeddings (12.5%) - Texture matching (Voyage 1024D of `VisionAnalysis.textures[] + finish`)
+- style_aspect_1024 / image_style_embeddings (12.5%) - Style matching (Voyage 1024D of `VisionAnalysis.style + surface_pattern + applications`)
+- material_aspect_1024 / image_material_embeddings (12.5%) - Material matching (Voyage 1024D of `VisionAnalysis.material_type + category + subcategory`)
 
 **Note (2026-04)**: All image embeddings now live **exclusively in the VECS collections** (`vecs.image_*_embeddings`, halfvec). The former dual-store columns on `document_images` (`visual_clip_embedding_512`, `color_embedding_256`, `texture_embedding_256`, `application_embedding_512`, `multimodal_fusion_embedding_2688`) were dropped — they had been broken since the CLIP→SLIG dimension change. Presence is tracked via boolean flags on `document_images` (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`) for O(1) lookup. Text embeddings remain in `document_chunks.text_embedding`.
 

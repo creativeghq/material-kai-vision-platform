@@ -15,7 +15,7 @@
  */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
-import { runLangGraphAgent } from './base-agent.ts';
+import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 
 // ── Inline tool definitions ───────────────────────────────────────────────────
 // (Minimal copies — no SSE streaming, just value return)
@@ -141,6 +141,23 @@ export class KaiTaskAgent implements AgentRunner {
       input_tokens:  result.inputTokens,
       output_tokens: result.outputTokens,
     });
+
+    if (result.inputTokens > 0 || result.outputTokens > 0) {
+      logAgentAiUsage(supabase, {
+        runId:        run.id,
+        agentId:      agentConfig.id,
+        agentType:    this.agentType,
+        userId:       agentConfig.created_by,
+        workspaceId:  agentConfig.workspace_id,
+        model,
+        inputTokens:  result.inputTokens,
+        outputTokens: result.outputTokens,
+        metadata: {
+          iterations:    result.iterations,
+          tool_call_count: result.toolResults.length,
+        },
+      });
+    }
 
     return {
       success:       true,

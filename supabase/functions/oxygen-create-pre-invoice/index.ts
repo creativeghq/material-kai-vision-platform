@@ -91,11 +91,28 @@ Deno.serve(async (req) => {
       return json({ error: 'Quote has no priced items.' }, 422);
     }
 
-    // 6. Lock — set status syncing
-    await supabase.from('quotes').update({
-      oxygen_sync_status: 'syncing',
-      oxygen_sync_error: null,
-    }).eq('id', quote.id);
+    // 6. Lock — atomically claim this quote. Two simultaneous admin clicks can
+    //    both pass the idempotency check at step 2; without a conditional
+    //    update the second click would also create a notice on Oxygen,
+    //    leaving us with duplicate notices. Filter on
+    //    oxygen_sync_status NOT IN ('syncing','synced') so only one writer
+    //    captures the row.
+    const { data: claimed, error: claimErr } = await supabase
+      .from('quotes')
+      .update({
+        oxygen_sync_status: 'syncing',
+        oxygen_sync_error: null,
+      })
+      .eq('id', quote.id)
+      .or('oxygen_sync_status.is.null,oxygen_sync_status.in.(failed,pending)')
+      .select('id');
+    if (claimErr) return json({ error: `Failed to lock quote: ${claimErr.message}` }, 500);
+    if (!claimed || claimed.length === 0) {
+      return json({
+        error: 'Another sync is already in progress for this quote (or it has already been synced). Wait and refresh.',
+        quote_id: quote.id,
+      }, 409);
+    }
 
     try {
       // 7. Resolve Oxygen contact_id (lookup → create if missing)

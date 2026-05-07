@@ -9,13 +9,31 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-// No additional auth check inside the function. Callers must hold a valid
-// Supabase JWT (Supabase gateway enforces this at the function-invocation
-// layer regardless of verify_jwt). This function operates on a single row by
-// UUID so guessing is impractical, and the actual ownership boundary is
-// enforced by the agent tool that creates the row in the first place.
-async function authenticate(req: Request): Promise<{ success: boolean; userId?: string; error?: string }> {
-  return { success: true };
+// Authenticate the caller. We accept either:
+//   - The service role key (server-to-server from agent-chat / presentation-sheet-tool),
+//     in which case ownership is verified upstream when the row is inserted.
+//   - A user JWT, in which case the row's `created_by` MUST equal the JWT user.
+// This closes a previously-open hole where the function blindly trusted any
+// sheet_id, allowing a logged-in user to re-render someone else's sheet by
+// passing the UUID. Sheet UUIDs leak through DB exports / shared screenshots
+// / the React-Query cache, so "guessing is impractical" wasn't actually true.
+async function authenticate(req: Request): Promise<{ success: boolean; userId?: string; isService?: boolean; error?: string }> {
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return { success: false, error: 'Missing Authorization header' };
+
+  // Service-role key path (internal callers)
+  if (token === supabaseServiceKey) return { success: true, isService: true };
+
+  // User JWT path — validate via the auth API
+  try {
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { data, error } = await adminClient.auth.getUser(token);
+    if (error || !data?.user?.id) return { success: false, error: 'Invalid JWT' };
+    return { success: true, userId: data.user.id };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Auth verification failed' };
+  }
 }
 import {
   fetchClientName,
@@ -72,12 +90,20 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: false, error: 'Missing sheet_id' }, 400);
     }
 
+    const sheet = await fetchSheet(supabase, sheetId);
+
+    // Ownership check on user-JWT path. Service-role calls bypass this
+    // because the upstream tool already verified moodboard ownership before
+    // inserting the row.
+    if (!auth.isService && auth.userId && sheet.created_by !== auth.userId) {
+      return jsonResponse({ success: false, error: 'Not authorized for this sheet' }, 403);
+    }
+
     await supabase
       .from('moodboard_presentation_sheets')
       .update({ status: 'generating' })
       .eq('id', sheetId);
 
-    const sheet = await fetchSheet(supabase, sheetId);
     const moodboard = await fetchMoodboard(supabase, sheet.moodboard_id);
     const branding = sheet.created_by ? await fetchOwnerBranding(supabase, sheet.created_by) : undefined;
     const clientName = branding?.client_fallback_name;

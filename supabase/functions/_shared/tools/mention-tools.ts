@@ -49,7 +49,7 @@ async function isModuleEnabled(): Promise<boolean> {
   }
 }
 
-async function debit(userId: string, amount: number, op: string): Promise<boolean> {
+async function debit(userId: string, amount: number, op: string, productId?: string): Promise<boolean> {
   if (amount <= 0) return true;
   try {
     const sb = svcClient();
@@ -57,19 +57,52 @@ async function debit(userId: string, amount: number, op: string): Promise<boolea
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: op,
+      p_description: `${op} (mention monitoring agent tool)`,
+      p_metadata: { feature: 'mention_monitoring_agent_tool', product_id: productId },
     });
     if (error) {
       console.warn(`mention-tools: debit error: ${error.message}`);
       return false;
     }
-    return Boolean(data);
+    // debit_user_credits returns a TABLE — first row carries .success + .error_message.
+    // Boolean(data) on the array would always be true, treating "Insufficient credits"
+    // as a successful debit. We must inspect the first row.
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result?.success) {
+      console.warn(`mention-tools: debit declined for user ${userId}: ${result?.error_message || 'unknown reason'}`);
+      return false;
+    }
+
+    // Mirror to ai_usage_logs for cost-attribution parity with the rest of
+    // the platform (operations dashboard groups by operation_type).
+    sb.from('ai_usage_logs').insert({
+      user_id: userId,
+      product_id: productId ?? null,
+      operation_type: op,
+      model_name: 'mention-monitoring-agent-tool',
+      api_provider: 'platform',
+      input_tokens: 0,
+      output_tokens: 0,
+      input_cost_usd: 0,
+      output_cost_usd: 0,
+      raw_cost_usd: amount / 100,
+      markup_multiplier: 1,
+      billed_cost_usd: amount / 100,
+      credits_debited: amount,
+      metadata: { feature: 'mention_monitoring_agent_tool', module_slug: MODULE_SLUG, product_id: productId },
+      created_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) console.warn('mention-tools: ai_usage_logs insert failed (non-blocking):', error.message);
+    });
+
+    return true;
   } catch (e) {
     console.warn(`mention-tools: debit failed: ${e instanceof Error ? e.message : e}`);
     return false;
   }
 }
 
-async function refund(userId: string, amount: number, op: string): Promise<void> {
+async function refund(userId: string, amount: number, op: string, productId?: string): Promise<void> {
   if (amount <= 0) return;
   try {
     const sb = svcClient();
@@ -77,6 +110,29 @@ async function refund(userId: string, amount: number, op: string): Promise<void>
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: `${op}.refund`,
+      p_description: `${op}.refund (mention monitoring agent tool)`,
+      p_metadata: { feature: 'mention_monitoring_agent_tool', product_id: productId, reason: 'tool_call_failed' },
+    });
+
+    // Mirror refund as a negative-credit row so dashboard nets out correctly.
+    sb.from('ai_usage_logs').insert({
+      user_id: userId,
+      product_id: productId ?? null,
+      operation_type: `${op}.refund`,
+      model_name: 'mention-monitoring-agent-tool',
+      api_provider: 'platform',
+      input_tokens: 0,
+      output_tokens: 0,
+      input_cost_usd: 0,
+      output_cost_usd: 0,
+      raw_cost_usd: -amount / 100,
+      markup_multiplier: 1,
+      billed_cost_usd: -amount / 100,
+      credits_debited: -amount,
+      metadata: { feature: 'mention_monitoring_agent_tool', module_slug: MODULE_SLUG, product_id: productId, refund: true },
+      created_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) console.warn('mention-tools: refund ai_usage_logs insert failed (non-blocking):', error.message);
     });
   } catch (_) {
     /* best-effort */
@@ -261,15 +317,22 @@ export const createCheckLlmVisibilityTool = (
       }
       // If force_run, debit + run probe; otherwise return latest cached snapshot
       if (force_run) {
-        const ok = await debit(userId, LLM_PROBE_CREDITS, 'mention.llm_probe');
+        const ok = await debit(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
         if (!ok) return JSON.stringify({ success: false, error: 'insufficient credits' });
         onChunk?.({ type: 'tool_progress', status: 'Running LLM visibility probe across models...', timestamp: Date.now() });
-        const r = await callMivaa(
-          `/api/v1/mention-monitoring/products/${product_id}/probe-llm`,
-          { method: 'POST', body: JSON.stringify({ models }), jwt },
-        );
+        let r: { ok: boolean; status: number; data?: any; error?: string };
+        try {
+          r = await callMivaa(
+            `/api/v1/mention-monitoring/products/${product_id}/probe-llm`,
+            { method: 'POST', body: JSON.stringify({ models }), jwt },
+          );
+        } catch (probeErr) {
+          // Network or unexpected error — refund and surface
+          await refund(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
+          return JSON.stringify({ success: false, error: probeErr instanceof Error ? probeErr.message : 'probe-llm failed' });
+        }
         if (!r.ok) {
-          await refund(userId, LLM_PROBE_CREDITS, 'mention.llm_probe');
+          await refund(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
           return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         }
       }

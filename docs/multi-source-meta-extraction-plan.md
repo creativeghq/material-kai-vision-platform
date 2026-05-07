@@ -16,17 +16,19 @@ This plan outlines a comprehensive strategy for extracting metadata from **multi
 
 1. **text_1024** - Voyage AI voyage-4 text embedding (1024D) — sole text embedder (was `text_1536` OpenAI)
 2. **visual_768** - SigLIP2 SLIG primary visual embedding (768D, cloud endpoint) → `image_slig_embeddings`
-3. **color_slig_768** - Text-guided color embedding (768D) → `image_color_embeddings`
-4. **texture_slig_768** - Text-guided texture embedding (768D) → `image_texture_embeddings`
-5. **material_slig_768** - Text-guided material embedding (768D) → `image_material_embeddings`
-6. **style_slig_768** - Text-guided style embedding (768D) → `image_style_embeddings`
+3. **color_aspect_1024** - Voyage `voyage-3` of `VisionAnalysis.colors[]` (1024D, post-2026-05-04) → `image_color_embeddings` (was `color_slig_768` 768D SLIG-blend pre-v2)
+4. **texture_aspect_1024** - Voyage `voyage-3` of `VisionAnalysis.textures[] + finish` (1024D, post-v2) → `image_texture_embeddings` (was `texture_slig_768` 768D pre-v2)
+5. **material_aspect_1024** - Voyage `voyage-3` of `VisionAnalysis.material_type + category + subcategory` (1024D, post-v2) → `image_material_embeddings` (was `material_slig_768` 768D pre-v2)
+6. **style_aspect_1024** - Voyage `voyage-3` of `VisionAnalysis.style + surface_pattern + applications` (1024D, post-v2) → `image_style_embeddings` (was `style_slig_768` 768D pre-v2)
 7. **understanding_1024** - Voyage AI embedding (1024D) of Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre-2026-05-01 used Qwen3-VL JSON; the migration retired Qwen vision (HF endpoint had been 404-ing for months — was already 100% Claude in practice). Provenance fields `embedding_model` + `schema_version` persisted on every row. → `image_understanding_embeddings`
 
 Legacy 1152D SigLIP-SO400M and 512D CLIP collections, as well as the fused `multimodal_2048` vector, were dropped in 2026-04.
 
-### Text-Guided Prompts
+### Per-aspect text generation (v2, 2026-05-04)
 
-The specialized embeddings are generated using text prompts that focus the model's attention: color embeddings focus on "color palette and color relationships", texture embeddings on "surface patterns and texture details", material embeddings on "material type and physical properties", and style embeddings on "design style and aesthetic elements".
+Pre-v2: the 4 aspect collections held SLIG-blend vectors built from a global fixed text prompt per aspect ("focus on color palette and color relationships" etc.) blended at 10-30% into the base SLIG visual embedding. The fixed prompts produced the same nudge direction for every image regardless of content — so every "color" vector ended up ~80% identical to the visual vector, carrying near-zero independent signal.
+
+Post-v2: each aspect string is a deterministic Python serialization of the per-image `VisionAnalysis` fields produced by Claude Opus 4.7 (Anthropic tool use, schema-locked). See `app.models.vision_analysis.serialize_aspect_*`.
 
 ## Problem Statement
 

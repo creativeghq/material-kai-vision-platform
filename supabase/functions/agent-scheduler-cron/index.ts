@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
   try {
     const { data: agents, error } = await supabase
       .from('background_agents')
-      .select('id, name, schedule, last_run_at')
+      .select('id, name, schedule, last_run_at, last_run_status')
       .eq('trigger_type', 'cron')
       .eq('enabled', true);
 
@@ -109,6 +109,26 @@ Deno.serve(async (req) => {
       if (agent.last_run_at) {
         const diffMs = now.getTime() - new Date(agent.last_run_at).getTime();
         if (diffMs < 55_000) continue;
+      }
+
+      // Concurrency guard — skip if a prior run is still in flight. Without
+      // this an agent whose work exceeds its cron interval (e.g. * * * * *
+      // with a 3-minute Replicate health check) gets fanned out into N
+      // concurrent runs all contending for the same heartbeat row.
+      // background_agents.last_run_status is only written at completion
+      // ('completed' / 'failed' / 'cancelled'), so query agent_runs directly
+      // for a non-terminal row — auto-recovery-cron handles genuinely-stuck
+      // ones separately on its 8-minute heartbeat threshold.
+      const { data: inflight } = await supabase
+        .from('agent_runs')
+        .select('id')
+        .eq('agent_id', agent.id)
+        .in('status', ['pending', 'processing'])
+        .limit(1)
+        .maybeSingle();
+      if (inflight) {
+        results.push({ agent_id: agent.id, name: agent.name, triggered: false, error: 'Previous run still in flight' });
+        continue;
       }
 
       // Dispatch to background-agent-runner (non-blocking)

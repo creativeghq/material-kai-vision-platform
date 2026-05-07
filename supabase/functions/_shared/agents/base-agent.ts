@@ -44,6 +44,78 @@ export function createLogHelper(supabase: SupabaseClient, runId: string) {
   };
 }
 
+// ── ai_usage_logs writer ─────────────────────────────────────────────────────
+// Background agents call Anthropic / OpenAI / Gemini through runLangGraphAgent
+// but historically never wrote to ai_usage_logs, so the Operations dashboard
+// underreported background-agent spend by 100%. Helper centralizes the insert
+// and is fire-and-forget — never blocks or breaks the agent's hot path.
+//
+// Pricing: callers pass the model name; the helper looks up the per-1M-token
+// cost from a small static table. Unknown models are logged at $0 to avoid
+// guessing — admin can backfill via the model-pricing curation tool.
+const MODEL_USD_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
+  'claude-haiku-4-5':         { input: 1.0,  output: 5.0  },
+  'claude-sonnet-4-6':        { input: 3.0,  output: 15.0 },
+  'claude-opus-4-7':          { input: 15.0, output: 75.0 },
+  'gpt-4o-mini':              { input: 0.15, output: 0.6  },
+  'gpt-4o':                   { input: 2.5,  output: 10.0 },
+  'gemini-2.0-flash':         { input: 0.075, output: 0.3 },
+};
+
+export async function logAgentAiUsage(
+  supabase: SupabaseClient,
+  args: {
+    runId:            string;
+    agentId:          string;
+    agentType:        string;
+    userId?:          string | null;
+    workspaceId?:     string | null;
+    model:            string;
+    inputTokens:      number;
+    outputTokens:     number;
+    operationType?:   string;
+    metadata?:        Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const pricing = MODEL_USD_PER_M_TOKENS[args.model] ?? { input: 0, output: 0 };
+    const inputCost  = (args.inputTokens  / 1_000_000) * pricing.input;
+    const outputCost = (args.outputTokens / 1_000_000) * pricing.output;
+    const rawCost    = inputCost + outputCost;
+    const provider   = args.model.startsWith('claude-') ? 'anthropic'
+      : args.model.startsWith('gpt-') || args.model.startsWith('o1') || args.model.startsWith('o3') ? 'openai'
+      : args.model.startsWith('gemini-') ? 'google'
+      : 'unknown';
+
+    const { error } = await supabase.from('ai_usage_logs').insert({
+      user_id:          args.userId ?? null,
+      operation_type:   args.operationType ?? `background_agent_${args.agentType}`,
+      model_name:       args.model,
+      api_provider:     provider,
+      input_tokens:     args.inputTokens,
+      output_tokens:    args.outputTokens,
+      input_cost_usd:   inputCost,
+      output_cost_usd:  outputCost,
+      raw_cost_usd:     rawCost,
+      markup_multiplier: 1,
+      billed_cost_usd:  rawCost,
+      credits_debited:  0,
+      metadata: {
+        ...(args.metadata ?? {}),
+        feature:      'background_agent',
+        agent_id:     args.agentId,
+        agent_type:   args.agentType,
+        run_id:       args.runId,
+        workspace_id: args.workspaceId ?? null,
+      },
+      created_at: new Date().toISOString(),
+    });
+    if (error) console.warn('[base-agent] ai_usage_logs insert failed (non-blocking):', error.message);
+  } catch (err) {
+    console.warn('[base-agent] ai_usage_logs insert threw (non-blocking):', err instanceof Error ? err.message : err);
+  }
+}
+
 // ── Heartbeat helper factory ──────────────────────────────────────────────────
 
 export function createHeartbeatHelper(supabase: SupabaseClient, runId: string) {

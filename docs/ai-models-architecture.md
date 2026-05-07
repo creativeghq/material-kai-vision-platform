@@ -72,16 +72,23 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ VISUAL EMBEDDINGS (5 types) — VECS-Only, halfvec                        │
-│ Model: SLIG (SigLIP2 SO400M, 768D projected) via HuggingFace cloud endpoint              │
-│ Purpose: 5 specialized 768D embeddings per image                        │
-│   1. Visual    → image_slig_embeddings    (key: visual_768)             │
-│   2. Color     → image_color_embeddings   (key: color_slig_768)         │
-│   3. Texture   → image_texture_embeddings (key: texture_slig_768)       │
-│   4. Style     → image_style_embeddings   (key: style_slig_768)         │
-│   5. Material  → image_material_embeddings(key: material_slig_768)      │
-│ Plus: Understanding embedding (1024D Voyage) →                          │
-│       image_understanding_embeddings (key: understanding_1024)          │
+│ IMAGE EMBEDDINGS (6 collections) — VECS-Only, halfvec                   │
+│                                                                          │
+│ Visual (SLIG SigLIP2 768D) — pixel-similarity:                          │
+│   image_slig_embeddings (key: visual_768)                               │
+│                                                                          │
+│ Aspect (Voyage voyage-3 1024D):                                          │
+│   image_color_embeddings    (key: color_aspect_1024)                    │
+│   image_texture_embeddings  (key: texture_aspect_1024)                  │
+│   image_style_embeddings    (key: style_aspect_1024)                    │
+│   image_material_embeddings (key: material_aspect_1024)                 │
+│   ↑ Each is the Voyage embedding of a deterministic per-image text      │
+│   string derived from VisionAnalysis fields (colors[], textures[]+      │
+│   finish, style+surface_pattern+applications, material_type+category).  │
+│                                                                          │
+│ Understanding (Voyage voyage-3 1024D):                                  │
+│   image_understanding_embeddings (key: understanding_1024)              │
+│   ↑ Voyage embedding of the full serialized VisionAnalysis text.        │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐

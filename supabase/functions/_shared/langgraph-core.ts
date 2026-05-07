@@ -238,15 +238,25 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
 
   // Guard against agents that get stuck in a tool loop or hit a slow model.
   // 5 minutes is generous for background agents; adjust via maxIterations if needed.
+  // Capture the timer id so we can clear it once the graph resolves first —
+  // otherwise the (rejecting) timeout keeps the Deno isolate alive past the
+  // request lifetime, which on hot agents shows up as leaked handles + a
+  // background "Unhandled rejection" log every 5 minutes.
   const TIMEOUT_MS = 5 * 60 * 1000;
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`runLangGraphAgent timed out after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS)
-  );
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`runLangGraphAgent timed out after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS);
+  });
 
-  const finalState = await Promise.race([
-    graph.invoke({ messages: initialMessages }),
-    timeoutPromise,
-  ]);
+  let finalState: any;
+  try {
+    finalState = await Promise.race([
+      graph.invoke({ messages: initialMessages }),
+      timeoutPromise,
+    ]);
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  }
 
   return {
     finalResponse: finalState.finalResponse

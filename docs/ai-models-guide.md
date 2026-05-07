@@ -143,31 +143,26 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ### 6-10. SLIG (SigLIP2 SO400M, 768D projected) Specialized Embeddings
 
-**Purpose**: 5 specialized 768D visual embeddings per image via HuggingFace cloud endpoint (`mh-slig`, namespace `basiliskan`, custom HF model `basiliskan/slig`). Underlying architecture is SigLIP2 SO400M (native 1152D); the endpoint applies a 1152D → 768D projection head so all VECS visual collections stay dimensionally uniform.
+**Purpose post-2026-05-04**: SLIG produces ONE per-image visual embedding (768D, `image_slig_embeddings`) via the `mh-slig` HuggingFace endpoint (`basiliskan` namespace, custom HF model `basiliskan/slig`, SigLIP2 SO400M with a 1152D → 768D projection head). The four "specialized" aspect collections (color/texture/style/material) are NOT produced by SLIG anymore — see Aspect Embeddings below.
 
-**5 Embedding Types** (all 768D halfvec, written directly to VECS):
-
-#### Visual (768D) → `image_slig_embeddings`
+**Visual (768D) → `image_slig_embeddings`**
 - Overall visual appearance, enables visual similarity search
 - Producer key: `visual_768`
 
-#### Color (768D) → `image_color_embeddings`
-- Text-guided color palette analysis
-- Producer key: `color_slig_768`
+**Aspect Embeddings**
 
-#### Texture (768D) → `image_texture_embeddings`
-- Text-guided surface texture analysis
-- Producer key: `texture_slig_768`
+The four aspect collections are now Voyage `voyage-3` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 4.7's structured output):
 
-#### Style (768D) → `image_style_embeddings`
-- Text-guided design aesthetic
-- Producer key: `style_slig_768`
+| Collection | Aspect text source | Producer key (v2) |
+|---|---|---|
+| `image_color_embeddings` (1024D) | `VisionAnalysis.colors[]` | `color_aspect_1024` |
+| `image_texture_embeddings` (1024D) | `VisionAnalysis.textures[] + finish` | `texture_aspect_1024` |
+| `image_style_embeddings` (1024D) | `VisionAnalysis.style + surface_pattern + applications` | `style_aspect_1024` |
+| `image_material_embeddings` (1024D) | `VisionAnalysis.material_type + category + subcategory` | `material_aspect_1024` |
 
-#### Material (768D) → `image_material_embeddings`
-- Text-guided material classification
-- Producer key: `material_slig_768`
+Pre-v2 these collections held 768D SLIG-blend vectors (computed as `0.7-0.9 × base_image + 0.1-0.3 × fixed_global_text_for_aspect`). The pre-v2 vectors carried near-zero independent signal because the text portion was the same fixed string for every image regardless of content — they were ~80% identical to `image_slig_embeddings` and to each other. Producer keys during the rollout window: `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` (legacy, retained behind feature flag `EMBED_ASPECTS_FROM_VISION_ANALYSIS`).
 
-Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `vision_analysis` JSON) → `image_understanding_embeddings`.
+Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `vision_analysis` JSON) → `image_understanding_embeddings`.
 
 **Hardening (2026-05-01)**:
 - 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
@@ -208,13 +203,13 @@ Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visio
 
 **Purpose**: Retrieval-Augmented Generation with multi-vector search
 
-**Vectors**:
+**Vectors** (post-2026-05-04):
 1. Text (Voyage 1024D) — `text_embedding_1024` on chunks + products
 2. Visual (SLIG 768D) — `image_slig_embeddings`
-3. Color (SLIG 768D) — `image_color_embeddings`
-4. Texture (SLIG 768D) — `image_texture_embeddings`
-5. Style (SLIG 768D) — `image_style_embeddings`
-6. Material (SLIG 768D) — `image_material_embeddings`
+3. Color (Voyage 1024D, was SLIG 768D pre-v2) — `image_color_embeddings`
+4. Texture (Voyage 1024D, was SLIG 768D pre-v2) — `image_texture_embeddings`
+5. Style (Voyage 1024D, was SLIG 768D pre-v2) — `image_style_embeddings`
+6. Material (Voyage 1024D, was SLIG 768D pre-v2) — `image_material_embeddings`
 7. Understanding (Voyage 1024D) — `image_understanding_embeddings`
 
 **Synthesis**: Claude Opus 4.7 (200K context)
