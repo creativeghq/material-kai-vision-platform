@@ -1,0 +1,4 @@
+[submodule "mivaa-pdf-extractor"]
+	path = mivaa-pdf-extractor
+	url = https://github.com/creativeghq/mivaa-pdf-extractor.git
+	branch = main
