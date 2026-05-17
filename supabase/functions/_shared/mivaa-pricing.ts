@@ -46,7 +46,7 @@ export const FREE_ACTIONS = new Set([
   'admin_list_jobs', 'admin_job_statistics', 'admin_get_job', 'admin_get_job_status',
   'admin_delete_job', 'admin_system_health', 'admin_system_metrics',
   'admin_cleanup_data', 'admin_backup_data', 'admin_export_data',
-  'admin_packages_status', 'admin_job_progress', 'admin_active_progress',
+  'admin_job_progress', 'admin_active_progress',
   'admin_job_pages', 'admin_job_stream', 'admin_job_products', 'admin_test_product',
   'admin_process_ocr', 'admin_generate_product_embeddings',
   'admin_prompts_list', 'admin_prompts_get', 'admin_prompts_update',

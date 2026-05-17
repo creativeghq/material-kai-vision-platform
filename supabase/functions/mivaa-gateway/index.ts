@@ -73,7 +73,6 @@ const MIVAA_ENDPOINTS = {
   'admin_cleanup_data': { path: '/api/admin/data/cleanup', method: 'DELETE' },  // Cleanup old data
   'admin_backup_data': { path: '/api/admin/data/backup', method: 'POST' },  // Create backup
   'admin_export_data': { path: '/api/admin/data/export', method: 'GET' },  // Export data
-  'admin_packages_status': { path: '/api/admin/packages/status', method: 'GET' },  // Package status
   'admin_job_progress': { path: '/api/admin/jobs/{job_id}/progress', method: 'GET' },  // Job progress details
   'admin_active_progress': { path: '/api/admin/jobs/progress/active', method: 'GET' },  // Active jobs progress
   'admin_job_pages': { path: '/api/admin/jobs/{job_id}/progress/pages', method: 'GET' },  // Job page progress

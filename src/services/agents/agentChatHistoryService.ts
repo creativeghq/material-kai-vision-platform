@@ -31,6 +31,8 @@ export interface ChatConversation {
   createdAt: string;
   updatedAt: string;
   isArchived: boolean;
+  /** Toolkit IDs active in this conversation. Always contains 'core'. */
+  toolkits: string[];
 }
 
 export interface CreateConversationOptions {
@@ -38,6 +40,8 @@ export interface CreateConversationOptions {
   description?: string;
   agentId: string;
   userId: string;
+  /** Toolkit IDs active when this conversation was started. Defaults to ['core']. */
+  toolkits?: string[];
 }
 
 export interface SaveMessageOptions {
@@ -63,6 +67,7 @@ export class AgentChatHistoryService {
           description: options.description,
           message_count: 0,
           is_archived: false,
+          toolkits: options.toolkits && options.toolkits.length > 0 ? options.toolkits : ['core'],
         })
         .select()
         .single();
@@ -406,7 +411,28 @@ export class AgentChatHistoryService {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       isArchived: data.is_archived || false,
+      toolkits: Array.isArray(data.toolkits) && data.toolkits.length > 0 ? data.toolkits : ['core'],
     };
+  }
+
+  /**
+   * Update the toolkit set on a conversation. Called whenever the user toggles
+   * a toolkit while in an active conversation so the choice survives reload.
+   * Always force-includes 'core' to match the always-on rule.
+   */
+  async updateConversationToolkits(conversationId: string, toolkits: string[]): Promise<boolean> {
+    try {
+      const next = Array.from(new Set([...(toolkits || []), 'core']));
+      const { error } = await supabase
+        .from('agent_chat_conversations')
+        .update({ toolkits: next, updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error updating conversation toolkits:', error);
+      return false;
+    }
   }
 
   /**

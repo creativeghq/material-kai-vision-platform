@@ -84,20 +84,12 @@ const adminSections = {
       count: 'Multi-source',
     },
     {
-      title: 'Metadata Management',
-      description: 'View and manage extracted metadata with scope detection and filtering',
-      icon: Settings,
-      path: '/admin/metadata',
+      title: 'AI Data',
+      description: 'Pipeline output review — extracted metadata, entity relationships, and AI-detected duplicates, all in one place',
+      icon: DatabaseIcon,
+      path: '/admin/ai-data',
       status: 'active',
-      count: 'AI-powered',
-    },
-    {
-      title: 'Relevancy Management',
-      description: 'Manage entity relationships and relevance scoring algorithms',
-      icon: Link2,
-      path: '/admin/relevancy',
-      status: 'active',
-      count: '3 algorithms',
+      count: 'Metadata · Relevancy · Duplicates',
     },
     {
       title: 'API Gateway Admin',
@@ -114,14 +106,6 @@ const adminSections = {
       path: '/admin/background-agents',
       status: 'active',
       count: 'AI Agents',
-    },
-    {
-      title: 'Duplicate Detection',
-      description: 'Review and merge duplicate products detected from the same manufacturer using AI similarity scoring',
-      icon: AlertTriangle,
-      path: '/admin/duplicate-detection',
-      status: 'active',
-      count: 'AI Detection',
     },
   ],
   'CRM & User Management': [
@@ -178,15 +162,7 @@ const adminSections = {
       status: 'active',
       count: '7 models',
     },
-    {
-      title: 'Packages Panel',
-      description: 'Monitor system packages and dependencies',
-      icon: Package,
-      path: '/admin/packages',
-      status: 'active',
-      count: 'Dependencies',
-    },
-    {
+{
       title: 'Application Logs',
       description:
         'View real-time application logs with filtering and search capabilities',

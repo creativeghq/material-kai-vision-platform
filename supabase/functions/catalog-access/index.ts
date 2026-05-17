@@ -1,0 +1,319 @@
+/**
+ * catalog-access
+ *
+ * Public-facing email gate for /c/:slug. Three actions, one endpoint:
+ *
+ *   POST { action: 'request', slug, email }
+ *     → Looks up the catalog by slug. Matches email against:
+ *       1. auth.users (platform user)
+ *       2. crm_contacts (private CRM contact)
+ *       3. crm_companies (B2B contact)
+ *       4. catalog_email_grants (admin-managed allowlist for this catalog)
+ *       Logs the attempt to catalog_access_log. If matched, mints a 30-day
+ *       cookie token and returns it in the response (frontend sets the
+ *       cookie itself since this is cross-origin from the API). On mismatch,
+ *       returns granted_access:false (no leak about whether catalog exists).
+ *
+ *   POST { action: 'verify', slug, token }
+ *     → Looks up the cookie token in catalog_access_log. Returns the catalog
+ *       payload (cover/body/back) if the token is fresh and matches the slug.
+ *
+ *   POST { action: 'public_meta', slug }
+ *     → Returns minimal info (title, subtitle, owner branding) for the
+ *       email-gate landing page itself. Does NOT include body materials.
+ *
+ * No auth header required — this is the only endpoint reachable by anonymous
+ * visitors. Edge function uses the service role internally.
+ */
+import { createClient } from '@supabase/supabase-js';
+import { corsHeaders } from '../_shared/cors.ts';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const TOKEN_TTL_DAYS = 30;
+const TOKEN_TTL_MS = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+interface RequestBody {
+  action: 'request' | 'verify' | 'public_meta' | 'track_view' | 'track_download';
+  slug?: string;
+  email?: string;
+  token?: string;
+  metadata?: Record<string, any>;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  try {
+    const body: RequestBody = await req.json();
+    if (!body.action || !body.slug) return jsonResponse({ error: 'action and slug are required' }, 400);
+
+    const slug = body.slug.toLowerCase().trim();
+
+    if (body.action === 'public_meta') {
+      const { data: catalog } = await supabase
+        .from('presentation_catalogs')
+        .select('id, owner_user_id, title, subtitle, description, cover_data, status')
+        .eq('slug', slug)
+        .eq('status', 'published')
+        .maybeSingle();
+      if (!catalog) return jsonResponse({ error: 'Not found' }, 404);
+
+      const { data: branding } = await supabase
+        .from('user_profiles')
+        .select('branding_logo_url, branding_company_name')
+        .eq('user_id', catalog.owner_user_id)
+        .maybeSingle();
+
+      return jsonResponse({
+        title: catalog.title,
+        subtitle: catalog.subtitle,
+        cover_image_url: catalog.cover_data?.cover_image_url || null,
+        branding: {
+          logo_url: branding?.branding_logo_url || null,
+          company_name: branding?.branding_company_name || null,
+        },
+      });
+    }
+
+    if (body.action === 'request') {
+      if (!body.email || !isLikelyEmail(body.email)) {
+        return jsonResponse({ error: 'Valid email is required' }, 400);
+      }
+      const email = body.email.toLowerCase().trim();
+
+      const { data: catalog } = await supabase
+        .from('presentation_catalogs')
+        .select('id, status')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (!catalog || catalog.status !== 'published') {
+        return jsonResponse({ granted_access: false });
+      }
+
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+      const ua = req.headers.get('user-agent') || null;
+
+      const match = await resolveEmailMatch(supabase, catalog.id, email);
+
+      const tokenStr = match.granted ? generateToken() : null;
+      const expiresAt = match.granted ? new Date(Date.now() + TOKEN_TTL_MS).toISOString() : null;
+
+      const { data: gateRow } = await supabase.from('catalog_access_log').insert({
+        catalog_id: catalog.id,
+        email,
+        matched_kind: match.kind,
+        matched_user_id: match.userId,
+        matched_crm_contact_id: match.crmContactId,
+        matched_crm_company_id: match.crmCompanyId,
+        matched_grant_id: match.grantId,
+        granted_access: match.granted,
+        ip_address: ip,
+        user_agent: ua,
+        cookie_token: tokenStr,
+        cookie_expires_at: expiresAt,
+      }).select('id').single();
+
+      if (match.granted) {
+        // Bump unique-email counter only when this is the first grant for
+        // this email/catalog pair (RPC handles the conditional logic).
+        await supabase.rpc('catalog_bump_unique_email_count', {
+          p_catalog_id: catalog.id,
+          p_email: email,
+        }).then(({ error }) => {
+          if (error) console.warn('[catalog-access] unique_email_count bump failed:', error.message);
+        });
+      }
+
+      return jsonResponse({
+        granted_access: match.granted,
+        token: tokenStr,
+        expires_at: expiresAt,
+        match_kind: match.kind,
+        access_log_id: gateRow?.id ?? null,
+      });
+    }
+
+    if (body.action === 'track_view' || body.action === 'track_download') {
+      if (!body.token) return jsonResponse({ tracked: false, error: 'token required' }, 400);
+
+      const { data: log } = await supabase
+        .from('catalog_access_log')
+        .select('id, catalog_id, email, granted_access, cookie_expires_at, matched_user_id, matched_kind')
+        .eq('cookie_token', body.token)
+        .maybeSingle();
+      if (!log || !log.granted_access) return jsonResponse({ tracked: false }, 200);
+      if (log.cookie_expires_at && new Date(log.cookie_expires_at) < new Date()) {
+        return jsonResponse({ tracked: false, reason: 'token_expired' });
+      }
+
+      const { data: catalog } = await supabase
+        .from('presentation_catalogs')
+        .select('id, slug, status')
+        .eq('id', log.catalog_id)
+        .maybeSingle();
+      if (!catalog || catalog.status !== 'published' || catalog.slug !== slug) {
+        return jsonResponse({ tracked: false }, 200);
+      }
+
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+      const ua = req.headers.get('user-agent') || null;
+      const eventType = body.action === 'track_view' ? 'page_view' : 'pdf_download';
+
+      await supabase.from('catalog_view_events').insert({
+        catalog_id: catalog.id,
+        access_log_id: log.id,
+        event_type: eventType,
+        email: log.email,
+        matched_user_id: log.matched_user_id,
+        matched_kind: log.matched_kind,
+        cookie_token: body.token,
+        ip_address: ip,
+        user_agent: ua,
+        metadata: body.metadata || {},
+      });
+
+      // Atomic view counter — only bumped on page_view events; pdf_download
+      // is a separate dimension shown alongside on the operations screen.
+      if (eventType === 'page_view') {
+        await supabase.rpc('catalog_increment_view_count', {
+          p_catalog_id: catalog.id,
+        }).then(({ error }) => {
+          if (error) console.warn('[catalog-access] view_count bump failed:', error.message);
+        });
+      }
+
+      return jsonResponse({ tracked: true, event_type: eventType });
+    }
+
+    if (body.action === 'verify') {
+      if (!body.token) return jsonResponse({ granted_access: false }, 200);
+
+      const { data: log } = await supabase
+        .from('catalog_access_log')
+        .select('catalog_id, email, granted_access, cookie_expires_at')
+        .eq('cookie_token', body.token)
+        .maybeSingle();
+
+      if (!log || !log.granted_access) return jsonResponse({ granted_access: false });
+      if (log.cookie_expires_at && new Date(log.cookie_expires_at) < new Date()) {
+        return jsonResponse({ granted_access: false, reason: 'token_expired' });
+      }
+
+      const { data: catalog } = await supabase
+        .from('presentation_catalogs')
+        .select('id, owner_user_id, slug, title, subtitle, description, cover_data, body_data, back_cover_data, status, pdf_url')
+        .eq('id', log.catalog_id)
+        .maybeSingle();
+      if (!catalog || catalog.status !== 'published' || catalog.slug !== slug) {
+        return jsonResponse({ granted_access: false });
+      }
+
+      const { data: branding } = await supabase
+        .from('user_profiles')
+        .select('branding_logo_url, branding_company_name, branding_contact_line')
+        .eq('user_id', catalog.owner_user_id)
+        .maybeSingle();
+
+      return jsonResponse({
+        granted_access: true,
+        email: log.email,
+        catalog: {
+          id: catalog.id,
+          slug: catalog.slug,
+          title: catalog.title,
+          subtitle: catalog.subtitle,
+          description: catalog.description,
+          cover_data: catalog.cover_data,
+          body_data: catalog.body_data,
+          back_cover_data: catalog.back_cover_data,
+          pdf_url: catalog.pdf_url,
+        },
+        branding: {
+          logo_url: branding?.branding_logo_url || null,
+          company_name: branding?.branding_company_name || null,
+          contact_line: branding?.branding_contact_line || null,
+        },
+      });
+    }
+
+    return jsonResponse({ error: 'Unknown action' }, 400);
+  } catch (err) {
+    console.error('[catalog-access] error:', err);
+    return jsonResponse({ error: err instanceof Error ? err.message : 'Access failed' }, 500);
+  }
+});
+
+interface MatchResult {
+  granted: boolean;
+  kind: 'platform_user' | 'crm_contact' | 'crm_company' | 'email_grant' | 'denied';
+  userId: string | null;
+  crmContactId: string | null;
+  crmCompanyId: string | null;
+  grantId: string | null;
+}
+
+async function resolveEmailMatch(supabase: any, catalogId: string, email: string): Promise<MatchResult> {
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('user_id')
+    .ilike('email', email)
+    .limit(1)
+    .maybeSingle();
+  if (profile?.user_id) {
+    return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
+  }
+
+  const { data: contact } = await supabase
+    .from('crm_contacts')
+    .select('id')
+    .ilike('email', email)
+    .limit(1)
+    .maybeSingle();
+  if (contact?.id) {
+    return { granted: true, kind: 'crm_contact', userId: null, crmContactId: contact.id, crmCompanyId: null, grantId: null };
+  }
+
+  const { data: company } = await supabase
+    .from('crm_companies')
+    .select('id')
+    .ilike('email', email)
+    .limit(1)
+    .maybeSingle();
+  if (company?.id) {
+    return { granted: true, kind: 'crm_company', userId: null, crmContactId: null, crmCompanyId: company.id, grantId: null };
+  }
+
+  const { data: grant } = await supabase
+    .from('catalog_email_grants')
+    .select('id, expires_at, revoked_at')
+    .eq('catalog_id', catalogId)
+    .ilike('email', email)
+    .maybeSingle();
+  if (grant?.id && !grant.revoked_at && (!grant.expires_at || new Date(grant.expires_at) > new Date())) {
+    return { granted: true, kind: 'email_grant', userId: null, crmContactId: null, crmCompanyId: null, grantId: grant.id };
+  }
+
+  return { granted: false, kind: 'denied', userId: null, crmContactId: null, crmCompanyId: null, grantId: null };
+}
+
+function generateToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isLikelyEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function jsonResponse(body: any, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}

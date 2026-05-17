@@ -7,14 +7,16 @@ const CRMPage = lazy(() => import('./pages/CRMPage'));
 const ContactDetailPage = lazy(() => import('./pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
 const CompanyDetailPage = lazy(() => import('./pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const UserDetailPage = lazy(() => import('./pages/UserDetailPage').then(m => ({ default: m.UserDetailPage })));
+const CategoriesRedirect = lazy(() => import('./pages/CategoriesRedirect'));
 
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
-    { path: '/admin/crm',                  component: CRMPage,           requireAdmin: true },
-    { path: '/admin/crm/contacts/:id',     component: ContactDetailPage, requireAdmin: true },
-    { path: '/admin/crm/companies/:id',    component: CompanyDetailPage, requireAdmin: true },
-    { path: '/admin/crm/users/:id',        component: UserDetailPage,    requireAdmin: true },
+    { path: '/admin/crm',                  component: CRMPage,            requireAdmin: true },
+    { path: '/admin/crm/categories',       component: CategoriesRedirect, requireAdmin: true },
+    { path: '/admin/crm/contacts/:id',     component: ContactDetailPage,  requireAdmin: true },
+    { path: '/admin/crm/companies/:id',    component: CompanyDetailPage,  requireAdmin: true },
+    { path: '/admin/crm/users/:id',        component: UserDetailPage,     requireAdmin: true },
   ],
   navItems: [
     {
@@ -23,7 +25,7 @@ const definition: ModuleDefinition = {
       icon: Users,
       location: 'admin-dashboard',
       adminCategory: 'CRM & User Management',
-      adminDescription: 'Manage users, roles, subscriptions, contacts, companies.',
+      adminDescription: 'Manage users, roles, subscriptions, contacts, companies, lists.',
       adminCount: 'CRM System',
     },
   ],

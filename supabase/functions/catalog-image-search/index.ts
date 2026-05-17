@@ -1,0 +1,197 @@
+/**
+ * catalog-image-search
+ *
+ * Find candidate images for a catalog material that doesn't have one.
+ * 1. Search platform DB first (MIVAA /api/rag/search images endpoint).
+ * 2. Fall back to web image search (DataForSEO Images SERP).
+ *
+ * Returns up to N candidates, each with thumb_url + source ('db'|'web') +
+ * source_metadata (product_id / source domain). The admin UI shows them as
+ * an approval grid; the user clicks ✓ to attach one to the material.
+ */
+import { createClient } from '@supabase/supabase-js';
+import { corsHeaders } from '../_shared/cors.ts';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+const DATAFORSEO_BASE64 = Deno.env.get('DATAFORSEO_BASE64') || '';
+const DATAFORSEO_LOGIN = Deno.env.get('DATAFORSEO_LOGIN') || '';
+const DATAFORSEO_PASSWORD = Deno.env.get('DATAFORSEO_PASSWORD') || '';
+
+interface SearchRequest {
+  query: string;
+  max_candidates?: number;
+  search_db_first?: boolean;
+  caller_user_id?: string;
+}
+
+interface ImageCandidate {
+  source: 'db' | 'web';
+  thumb_url: string;
+  full_url: string;
+  title: string | null;
+  source_metadata: Record<string, any>;
+}
+
+interface SearchResponse {
+  success: boolean;
+  candidates?: ImageCandidate[];
+  db_hits?: number;
+  web_hits?: number;
+  error?: string;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  try {
+    const body: SearchRequest = await req.json();
+    if (!body.query?.trim()) return jsonResponse({ success: false, error: 'query is required' }, 400);
+
+    const maxCandidates = Math.min(12, Math.max(1, body.max_candidates || 6));
+    const searchDbFirst = body.search_db_first !== false;
+
+    const candidates: ImageCandidate[] = [];
+    let dbHits = 0;
+    let webHits = 0;
+
+    if (searchDbFirst) {
+      const dbResults = await searchPlatformDb(supabase, body.query, maxCandidates);
+      dbHits = dbResults.length;
+      candidates.push(...dbResults);
+    }
+
+    if (candidates.length < maxCandidates) {
+      const webNeeded = maxCandidates - candidates.length;
+      const webResults = await searchWebImages(body.query, webNeeded);
+      webHits = webResults.length;
+      candidates.push(...webResults);
+    }
+
+    return jsonResponse({
+      success: true,
+      candidates: candidates.slice(0, maxCandidates),
+      db_hits: dbHits,
+      web_hits: webHits,
+    });
+  } catch (err) {
+    console.error('[catalog-image-search] error:', err);
+    return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Image search failed' }, 500);
+  }
+});
+
+async function searchPlatformDb(supabase: any, query: string, limit: number): Promise<ImageCandidate[]> {
+  try {
+    const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
+    url.searchParams.set('strategy', 'multi_vector');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (CRON_SECRET) headers['x-cron-secret'] = CRON_SECRET;
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query, top_k: limit }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const products: any[] = data?.results || data?.products || [];
+    const out: ImageCandidate[] = [];
+
+    for (const p of products) {
+      const productId = p.id || p.product_id;
+      if (!productId) continue;
+
+      const { data: img } = await supabase
+        .from('document_images')
+        .select('storage_path')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!img?.storage_path) continue;
+
+      const { data: signed } = await supabase.storage
+        .from('material-images')
+        .createSignedUrl(img.storage_path, 60 * 60 * 24 * 7);
+      if (!signed?.signedUrl) continue;
+
+      out.push({
+        source: 'db',
+        thumb_url: signed.signedUrl,
+        full_url: signed.signedUrl,
+        title: p.name || p.title || null,
+        source_metadata: { product_id: productId, score: p.score ?? null },
+      });
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch (err) {
+    console.warn('[catalog-image-search] DB search failed:', err);
+    return [];
+  }
+}
+
+async function searchWebImages(query: string, limit: number): Promise<ImageCandidate[]> {
+  const auth = DATAFORSEO_BASE64 || (DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD
+    ? btoa(`${DATAFORSEO_LOGIN}:${DATAFORSEO_PASSWORD}`)
+    : null);
+  if (!auth) {
+    console.warn('[catalog-image-search] DataForSEO not configured; skipping web fallback');
+    return [];
+  }
+
+  try {
+    const res = await fetch('https://api.dataforseo.com/v3/serp/google/images/live/advanced', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify([{
+        keyword: query,
+        location_code: 2826, // United Kingdom — broad / english results
+        language_code: 'en',
+        depth: Math.max(20, limit * 4),
+      }]),
+    });
+    if (!res.ok) {
+      console.warn('[catalog-image-search] DataForSEO error', res.status);
+      return [];
+    }
+    const data = await res.json();
+    const items: any[] = data?.tasks?.[0]?.result?.[0]?.items || [];
+    const out: ImageCandidate[] = [];
+    for (const it of items) {
+      if (!it?.source_url || !it?.url) continue;
+      out.push({
+        source: 'web',
+        thumb_url: it.encoded_url || it.url,
+        full_url: it.url,
+        title: it.title || null,
+        source_metadata: {
+          source_domain: it.source_url ? new URL(it.source_url).hostname : null,
+          source_url: it.source_url || null,
+          width: it.width,
+          height: it.height,
+        },
+      });
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch (err) {
+    console.warn('[catalog-image-search] web search failed:', err);
+    return [];
+  }
+}
+
+function jsonResponse(body: SearchResponse, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}

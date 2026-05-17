@@ -46,7 +46,7 @@ export const RelationshipsTab: React.FC<RelationshipsTabProps> = ({
                 </div>
               </div>
               <Button
-                onClick={() => navigate('/admin/relevancy')}
+                onClick={() => navigate('/admin/ai-data?tab=relevancy')}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Open Relevancy Manager

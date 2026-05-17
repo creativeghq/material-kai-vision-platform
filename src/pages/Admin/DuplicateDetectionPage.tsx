@@ -292,15 +292,11 @@ export function DuplicateDetectionPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-light text-primary">Duplicate Detection</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Products flagged as potential duplicates from the same manufacturer.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Products flagged as potential duplicates from the same manufacturer.
+        </p>
         <Button
           onClick={triggerBatchScan}
           disabled={scanning || !workspaceId}

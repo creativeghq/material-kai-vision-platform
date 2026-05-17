@@ -46,6 +46,23 @@ import {
 } from '@/types/materials';
 import { RecommendationsService } from '@/services/recommendationsService';
 
+/**
+ * Coerce a metadata field that the type system claims is `string?` but
+ * the backend may actually return as `{value, confidence}` (Stage 0 AI
+ * extractor wrapper) or an array (multi-variant). Returns a plain
+ * displayable string in all cases so the DOM never gets `[object Object]`.
+ */
+const safeMetaString = (v: unknown): string => {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(safeMetaString).filter(Boolean).join(', ');
+  if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+    return safeMetaString((v as Record<string, unknown>).value);
+  }
+  return '';
+};
+
 interface MaterialCatalogListingProps {
   materials: Material[];
   loading?: boolean;
@@ -142,19 +159,19 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
   // Filter and sort materials based on current filter state
   const filteredAndSortedMaterials = useMemo(() => {
     const filtered = materials.filter((material) => {
-      // Search filter
+      // Search filter — coerce metadata fields through safeMetaString first
+      // so .toLowerCase() never crashes when finish/size/etc. arrived as a
+      // {value, confidence} wrapper.
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesSearch =
           material.name.toLowerCase().includes(searchLower) ||
           material.description?.toLowerCase().includes(searchLower) ||
           material.category.toLowerCase().includes(searchLower) ||
-          material.metadata?.finish?.toLowerCase().includes(searchLower) ||
-          material.metadata?.size?.toLowerCase().includes(searchLower) ||
-          material.metadata?.installationMethod
-            ?.toLowerCase()
-            .includes(searchLower) ||
-          material.metadata?.application?.toLowerCase().includes(searchLower) ||
+          safeMetaString(material.metadata?.finish).toLowerCase().includes(searchLower) ||
+          safeMetaString(material.metadata?.size).toLowerCase().includes(searchLower) ||
+          safeMetaString(material.metadata?.installationMethod).toLowerCase().includes(searchLower) ||
+          safeMetaString(material.metadata?.application).toLowerCase().includes(searchLower) ||
           material.standards.some((standard) =>
             standard.toLowerCase().includes(searchLower),
           );
@@ -170,22 +187,22 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
         return false;
       }
 
-      // Meta field filters
-      if (filters.finish && material.metadata?.finish !== filters.finish) {
+      // Meta field filters — same coercion: compare on the unwrapped value.
+      if (filters.finish && safeMetaString(material.metadata?.finish) !== filters.finish) {
         return false;
       }
-      if (filters.size && material.metadata?.size !== filters.size) {
+      if (filters.size && safeMetaString(material.metadata?.size) !== filters.size) {
         return false;
       }
       if (
         filters.installationMethod &&
-        material.metadata?.installationMethod !== filters.installationMethod
+        safeMetaString(material.metadata?.installationMethod) !== filters.installationMethod
       ) {
         return false;
       }
       if (
         filters.application &&
-        material.metadata?.application !== filters.application
+        safeMetaString(material.metadata?.application) !== filters.application
       ) {
         return false;
       }
@@ -738,12 +755,17 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                 </Label>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Defensive coercion: the Material type narrows these to
+                      string? but the backend can return {value, confidence}
+                      wrappers (Stage 0) or arrays (multi-variant catalogs).
+                      `safeMetaString` unwraps both shapes so we never
+                      render [object Object] in the DOM. */}
                   {material.metadata?.finish && (
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
                         <span className="font-medium">Finish:</span>{' '}
-                        {material.metadata.finish}
+                        {safeMetaString(material.metadata.finish)}
                       </span>
                     </div>
                   )}
@@ -752,7 +774,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                       <Grid3X3 className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
                         <span className="font-medium">Size:</span>{' '}
-                        {material.metadata.size}
+                        {safeMetaString(material.metadata.size)}
                       </span>
                     </div>
                   )}
@@ -761,7 +783,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                       <Wrench className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
                         <span className="font-medium">Installation:</span>{' '}
-                        {material.metadata.installationMethod}
+                        {safeMetaString(material.metadata.installationMethod)}
                       </span>
                     </div>
                   )}
@@ -770,7 +792,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
                         <span className="font-medium">Application:</span>{' '}
-                        {material.metadata.application}
+                        {safeMetaString(material.metadata.application)}
                       </span>
                     </div>
                   )}

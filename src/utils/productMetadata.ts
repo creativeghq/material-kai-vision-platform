@@ -98,14 +98,20 @@ export function getProductName(product: ProductLike): string {
  * Returns the material category slug (wall_tile, floor_tile, fabric, etc.)
  * as-is. Use `formatMaterialCategory()` for a display-friendly version.
  */
-export function getMaterialCategory(metadata?: Record<string, any> | null): string | null {
+export function getMaterialCategory(metadata?: Record<string, unknown> | null): string | null {
   if (!metadata) return null;
-  return (
-    metadata.material_category ||
-    metadata.category ||
-    metadata.product_type ||
-    null
-  );
+  const raw =
+    metadata.material_category ??
+    metadata.category ??
+    metadata.product_type ??
+    null;
+  if (raw === null || raw === undefined || raw === '') return null;
+  // Unwrap {value, confidence} envelope if Stage 0 wrote one.
+  if (typeof raw === 'object' && 'value' in (raw as Record<string, unknown>)) {
+    const inner = (raw as Record<string, unknown>).value;
+    return inner == null || inner === '' ? null : String(inner);
+  }
+  return String(raw);
 }
 
 /**

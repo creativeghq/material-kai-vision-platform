@@ -959,10 +959,23 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
  * Resolve an AI-extracted material_category slug (e.g. "floor_tile") to
  * the upload category key (e.g. "tiles") used in the DB and this registry.
  */
-export function resolveUploadCategory(materialCategory: string | undefined | null): UploadCategory {
-  if (!materialCategory) return 'general_materials';
-
-  const lower = materialCategory.toLowerCase().trim();
+export function resolveUploadCategory(materialCategory: unknown): UploadCategory {
+  // Accept `unknown` because callers often pass raw values straight out of
+  // product.metadata (typed as `ProductMetadata` where every field is
+  // `unknown` due to wrapper-vs-primitive polymorphism). Coerce in here.
+  if (materialCategory === null || materialCategory === undefined || materialCategory === '') {
+    return 'general_materials';
+  }
+  // Unwrap a {value, confidence} wrapper if that's what we got.
+  let raw: unknown = materialCategory;
+  if (typeof raw === 'object' && raw !== null && 'value' in (raw as Record<string, unknown>)) {
+    raw = (raw as Record<string, unknown>).value;
+    if (raw === null || raw === undefined || raw === '') return 'general_materials';
+  }
+  if (typeof raw !== 'string') {
+    raw = String(raw);
+  }
+  const lower = (raw as string).toLowerCase().trim();
 
   // Direct match
   if (lower in CATEGORY_DISPLAY_REGISTRY) return lower as UploadCategory;

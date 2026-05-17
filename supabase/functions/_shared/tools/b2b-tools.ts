@@ -2,17 +2,26 @@
  * B2B Tools: validateEmailWithZeroBounce, createB2BManufacturerSearchTool,
  * createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool,
  * createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool
+ *
+ * Workflow chunks: each tool emits step_progress for the b2b-research wizard.
+ * Run_id stability comes from the agent passing `_workflow_run_id` (extracted
+ * from `[workflow:b2b-research/<step>:<run_id>]` prefix). The first tool
+ * (search) generates and emits the workflow_plan; the last (save_to_crm)
+ * emits workflow_finished.
  */
 
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.3.10');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
+const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+type B2BChunkSink = ((chunk: any) => void) | undefined;
 
 import { debitExternalServiceCredits } from '../credit-utils.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
@@ -113,11 +122,16 @@ const B2B_REGIONS: Record<string, { label: string; countries: string[] }> = {
 
 const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries);
 
-export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
   return tool(
-    async ({ country, region, category, limit = 30 }) => {
+    async ({ country, region, category, limit = 30, _workflow_run_id }) => {
+      const runId = _workflow_run_id || crypto.randomUUID();
+      const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });
+      emitter.plan({ title: `${category} manufacturers`, subtitle: country || region || 'global', metadata: { country, region, category, limit } });
+      emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'running', status_line: `Searching for ${category} manufacturers…`, input: { country, region, category, limit } });
       try {
         if (!ANTHROPIC_API_KEY) {
+          emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: 'ANTHROPIC_API_KEY not configured.' });
           return JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured.' });
         }
 
@@ -217,15 +231,23 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
         }
 
         onProgress?.(`Search complete.`);
+        emitter.step({
+          step_id: STEPS.B2B_RESEARCH[0],
+          status: 'done',
+          status_line: textContent ? 'Manufacturers discovered' : 'No results found',
+          output: { source: 'claude_web_search', has_results: !!textContent },
+        });
 
         return JSON.stringify({
           success: !!textContent,
+          _workflow_run_id: runId,
           search_results: textContent || 'No results found.',
           query_params: { country, region, category, limit },
           source: 'claude_web_search',
         });
       } catch (error) {
         console.error('B2B manufacturer search error:', error);
+        emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: error instanceof Error ? error.message : 'search failed' });
         return JSON.stringify({
           success: false,
           error: error instanceof Error ? error.message : 'B2B manufacturer search failed',
@@ -240,6 +262,7 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
         region: z.string().optional().describe('Region hint: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.'),
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
         limit: z.number().optional().default(30).describe('Max manufacturers to find. Default: 30'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
       }),
     }
   );
@@ -957,9 +980,11 @@ export const createEmailValidateTool = (userId: string, onProgress?: (status: st
  * B2B Research Tool: Save to CRM
  * Saves researched company and contacts to the CRM database
  */
-export const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
   return tool(
-    async ({ company, contacts }) => {
+    async ({ company, contacts, _workflow_run_id }) => {
+      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: _workflow_run_id }) : null;
+      emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'running', status_line: `Saving ${company?.name || 'company'} to CRM…` });
       try {
         const startTime = Date.now();
 
@@ -1045,8 +1070,17 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
 
         const elapsed = Date.now() - startTime;
 
+        emitter?.step({
+          step_id: STEPS.B2B_RESEARCH[5],
+          status: 'done',
+          status_line: `Saved ${company.name} (${contactIds.length} contact${contactIds.length === 1 ? '' : 's'})`,
+          output: { company_id: companyId, contacts_created: contactIds.length },
+        });
+        emitter?.finished({ status: 'done', summary: `Saved "${company.name}" + ${contactIds.length} contact${contactIds.length === 1 ? '' : 's'} to CRM.` });
+
         return JSON.stringify({
           success: true,
+          _workflow_run_id,
           company_id: companyId,
           contact_ids: contactIds,
           company_name: company.name,
@@ -1055,6 +1089,7 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
         });
       } catch (error) {
         console.error('Save to CRM error:', error);
+        emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'failed', error_message: error instanceof Error ? error.message : 'Failed to save to CRM' });
         return JSON.stringify({
           success: false,
           error: error instanceof Error ? error.message : 'Failed to save to CRM',
@@ -1090,6 +1125,7 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
           notes: z.string().optional().describe('Notes about the contact'),
           is_primary: z.boolean().optional().describe('Is this the primary contact'),
         })).optional().describe('Contacts to save and link to the company'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/save:<run_id>]` prefix.'),
       }),
     }
   );

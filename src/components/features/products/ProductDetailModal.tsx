@@ -17,7 +17,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle, Globe, Video, Box } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle, Globe, Video, Box, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
@@ -26,6 +26,7 @@ import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
 import { MentionMonitorTab } from '@/components/business/mention-monitoring/MentionMonitorTab';
+import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -90,6 +91,44 @@ const extractValue = (val: unknown): string | undefined => {
   return String(val);
 };
 
+// Coerce a metadata field (typed as `unknown` because ProductMetadata
+// fields are wrapper-or-primitive polymorphic) into a plain string for
+// downstream APIs that expect `string | undefined`. Unwraps the
+// {value, confidence} envelope when present.
+const asMetaString = (v: unknown): string | undefined => {
+  if (v === null || v === undefined || v === '') return undefined;
+  if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+    const inner = (v as Record<string, unknown>).value;
+    return inner == null || inner === '' ? undefined : String(inner);
+  }
+  return String(v);
+};
+
+// Per-field confidence — pulls from the {value, confidence} wrapper if
+// present. Stage 0 AI extraction writes these wrappers on every field it
+// extracts; Stage 4.5/4.6/4.7 fills also tag confidence under
+// _extraction_metadata. We surface this as a small badge so low-confidence
+// fields don't masquerade as authoritative.
+const LOW_CONFIDENCE_THRESHOLD = 0.6;
+const getFieldConfidence = (val: unknown): number | undefined => {
+  if (!val || typeof val !== 'object') return undefined;
+  const obj = val as Record<string, unknown>;
+  // Wrapper shape: {value, confidence}
+  if ('value' in obj && 'confidence' in obj) {
+    const c = obj.confidence;
+    if (typeof c === 'number') return c;
+    if (typeof c === 'string') {
+      const n = parseFloat(c);
+      return Number.isFinite(n) ? n : undefined;
+    }
+  }
+  return undefined;
+};
+const isLowConfidence = (val: unknown): boolean => {
+  const c = getFieldConfidence(val);
+  return typeof c === 'number' && c < LOW_CONFIDENCE_THRESHOLD;
+};
+
 // Display normalizers — upstream extractors emit inconsistent casing
 // ("matte" vs "Matte") and size formatting ("11,8X11,8" vs "11,8x11,8 cm").
 // Source data is left intact; we normalize at the render boundary.
@@ -117,14 +156,27 @@ const normVariantName = (s: string): string =>
 // "11,8x11,8 cm" collapse onto the same row.
 const sizeDedupKey = (s: string): string =>
   normSize(s).replace(/\s*(cm|mm|m)\s*$/i, '').trim().toLowerCase();
-// Title-case for cert chips ("iso 14001" → "Iso 14001"). Common all-caps
-// abbreviations stay all-caps (ISO/CE/EN/LEED/BREEAM/UL/ASTM/DIN/EPD).
-const CERT_ALL_CAPS = new Set(['iso', 'ce', 'en', 'leed', 'breeam', 'ul', 'astm', 'din', 'epd', 'voc', 'crI', 'fsc', 'pefc']);
+// snake_case_field → "Snake Case Field" for displaying raw metadata keys.
+// Unicode-safe; handles accented chars, Greek letters, hyphens.
+const prettyFieldLabel = (k: string): string =>
+  k.replace(/_/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase());
+
+// Title-case for cert chips. Common all-caps acronyms stay all-caps. The
+// matcher splits on whitespace AND hyphens so "ISO-14001" → "ISO-14001"
+// (not "Iso-14001").
+const CERT_ALL_CAPS = new Set(['iso', 'ce', 'en', 'leed', 'breeam', 'ul', 'astm', 'din', 'epd', 'voc', 'cri', 'fsc', 'pefc', 'reach', 'rohs']);
+const normCertToken = (w: string): string => {
+  // Word with digits like "14001" stays as-is; pure-alpha tokens get acronym/title rules.
+  if (!/[a-zA-Z]/.test(w)) return w;
+  return CERT_ALL_CAPS.has(w.toLowerCase()) ? w.toUpperCase() : titleCaseDisplay(w);
+};
 const normCertName = (s: string): string => {
   if (isSentinel(s)) return s;
-  return s.trim().split(/\s+/)
-    .map(w => CERT_ALL_CAPS.has(w.toLowerCase()) ? w.toUpperCase() : titleCaseDisplay(w))
-    .join(' ');
+  // Tokenize on whitespace, then per token re-tokenize on hyphens so each
+  // hyphen-separated piece gets its own all-caps check.
+  return s.trim().split(/\s+/).map(word =>
+    word.split('-').map(normCertToken).join('-'),
+  ).join(' ');
 };
 
 // Safe string extraction for direct JSX rendering (prevents React error #310)
@@ -866,17 +918,41 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return [];
   })();
 
+  // Vision-rolled-up textures (post-2026-05-04 schema fix) — list, deduped + title-cased
+  const visionTexturesList: string[] = (() => {
+    const raw = appearanceData?.textures ?? allData?.textures;
+    const inner = (raw && typeof raw === 'object' && 'value' in (raw as Record<string, unknown>))
+      ? (raw as Record<string, unknown>).value
+      : raw;
+    if (!Array.isArray(inner)) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const t of inner as unknown[]) {
+      const s = String(t).trim();
+      if (!s || isSentinel(s)) continue;
+      const pretty = titleCaseDisplay(s);
+      const k = pretty.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(pretty);
+    }
+    return out.sort();
+  })();
+
   const appearance = {
     'Colors': primaryColors,
     'Observed Shades': showObservedShades ? visionColors : undefined,
-    'Primary Color': extractValue(appearanceData?.primary_color_hex),  // hex swatch
+    'Primary Color': extractValue(appearanceData?.primary_color_hex),  // hex swatch (legacy field — typically empty post-2026-05-04)
+    'Vision Category': normFinish(extractValue(appearanceData?.category)),
+    'Vision Subcategory': normFinish(extractValue(appearanceData?.subcategory)),
     // Only show singular "Pattern" key if we DON'T have the aggregated list
     // (avoids duplicating information with the chip row above).
-    'Pattern': patternsList.length === 0 ? extractValue(appearanceData?.pattern) : undefined,
-    'Texture': extractValue(appearanceData?.texture),
-    'Textures': extractValue(allData?.textures),
+    'Pattern': patternsList.length === 0 ? normFinish(extractValue(appearanceData?.pattern)) : undefined,
+    'Texture': visionTexturesList.length === 0 ? normFinish(extractValue(appearanceData?.texture)) : undefined,
+    'Textures': visionTexturesList.length > 0 ? visionTexturesList.join(', ') : undefined,
     'Shade Variation': extractValue(appearanceData?.shade_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
+    'Visual Description': extractValue(appearanceData?.vision_description),
   };
 
   const performance = {
@@ -954,8 +1030,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Studio': extractValue(designData?.studio),
     'Collection': collection,
     'Brand': extractValue(designData?.brand),
-    'Design Style': extractValue(designData?.design_style),
-    'Material Subtype': extractValue(materialPropsData?.material_subtype),
+    // Style: prefer schema-locked `style`, fall back to legacy `design_style`. Title-cased.
+    'Design Style': normFinish(extractValue(designData?.style) || extractValue(designData?.design_style)),
+    'Material Subtype': normFinish(extractValue(materialPropsData?.material_subtype)),
     'Inspiration': extractValue(designData?.inspiration) || extractValue(allData?.inspiration),
     'Philosophy': extractValue(designData?.philosophy),
     'Studio Founded': extractValue(designData?.studio_founded),
@@ -1435,15 +1512,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return String(value);
   };
 
-  // Helper function to render metadata category
-  const renderMetadataCategory = (title: string, data: Record<string, unknown>) => {
+  // Helper function to render metadata category.
+  //
+  // `lowConfidenceKeys` — optional set of display keys whose values were
+  // extracted with confidence < LOW_CONFIDENCE_THRESHOLD. Populated by the
+  // dynamic-discovery sections that have direct access to wrappers.
+  // Low-confidence cells render at reduced opacity with a tooltip so users
+  // know the value is less trustworthy than the un-marked ones.
+  const renderMetadataCategory = (
+    title: string,
+    data: Record<string, unknown>,
+    lowConfidenceKeys?: Set<string>,
+  ) => {
     const filteredData = Object.entries(data).filter(([, value]) => {
       const str = renderValue(value);
       return str && str !== 'N/A' && str !== '';
     });
     if (filteredData.length === 0) return null;
 
-    const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+    // CSS hex colors are exactly 3, 4, 6, or 8 chars after the `#` (rgb / rgba / rrggbb / rrggbbaa).
+    // 5 and 7 char strings are not valid CSS — exclude them so we don't render bogus swatches.
+    const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
     return (
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
@@ -1453,12 +1542,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
+            const lowConf = lowConfidenceKeys?.has(key) ?? false;
+            const lowConfClass = lowConf ? 'opacity-60' : '';
+            const lowConfTitle = lowConf ? 'Low extraction confidence — verify against source' : undefined;
 
             // Hex color values → render as color swatch + code
             if (HEX_RE.test(str)) {
               return (
-                <div key={key} className="flex items-center justify-between py-2 border-b border-border/20">
-                  <span className="text-xs text-muted-foreground">{key}</span>
+                <div
+                  key={key}
+                  title={lowConfTitle}
+                  className={`flex items-center justify-between py-2 border-b border-border/20 ${lowConfClass}`}
+                >
+                  <span className="text-xs text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</span>
                   <div className="flex items-center gap-2">
                     <span className="inline-block w-4 h-4 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
                     <span className="text-xs font-semibold">{str}</span>
@@ -1468,8 +1564,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             }
 
             return (
-              <div key={key} className="flex items-start justify-between py-2 border-b border-border/20 gap-4">
-                <span className="text-xs text-muted-foreground shrink-0">{key}</span>
+              <div
+                key={key}
+                title={lowConfTitle}
+                className={`flex items-start justify-between py-2 border-b border-border/20 gap-4 ${lowConfClass}`}
+              >
+                <span className="text-xs text-muted-foreground shrink-0">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</span>
                 <span className="text-xs font-semibold text-right">{str}</span>
               </div>
             );
@@ -1701,7 +1801,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 size="sm"
                 className="text-xs"
                 category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
-                materialType={product.metadata?.material_category}
+                materialType={asMetaString(product.metadata?.material_category)}
               />
               <AddToMoodboardButton
                 productId={product.id}
@@ -1711,7 +1811,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 size="sm"
                 className="text-xs"
                 category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
-                materialType={product.metadata?.material_category}
+                materialType={asMetaString(product.metadata?.material_category)}
               />
               {isAdmin && (
                 <Button
@@ -1773,6 +1873,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <TabsTrigger value="mentions" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Sparkles className="h-4 w-4" />
                   Mentions
+                </TabsTrigger>
+                <TabsTrigger value="seo" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Search className="h-4 w-4" />
+                  SEO
                 </TabsTrigger>
               </>
             )}
@@ -2314,20 +2418,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
             if (patternsList.length === 0 && !hasAppearanceFields) return null;
 
-            const titleCase = (s: string): string =>
-              s.replace(/\b\w/g, c => c.toUpperCase());
+            // Vision-confidence indicator: only shown when confidence is
+            // BELOW our trust threshold (<0.7). High-confidence rows render
+            // without any badge — the absence of the badge IS the signal.
+            const visionConfidenceRaw = (allData?.vision_confidence ?? null);
+            const visionConfidence = typeof visionConfidenceRaw === 'number' ? visionConfidenceRaw
+              : typeof visionConfidenceRaw === 'string' ? parseFloat(visionConfidenceRaw) : NaN;
+            const showLowConfidence = !isNaN(visionConfidence) && visionConfidence < 0.7;
 
+            // Use the module-level Unicode-safe titleCaseDisplay (handles accented
+            // chars, Greek, hyphens). The previous local titleCase used /\b\w/g
+            // which is ASCII-only and broke on é/ü/μ/Greek/etc.
             const splitToChips = (val: unknown): string[] => {
               const raw = typeof val === 'string' ? val : renderValue(val);
               if (!raw || raw === 'N/A') return [];
-              return raw.split(',').map(s => s.trim()).filter(Boolean).map(titleCase);
+              return raw.split(',').map(s => s.trim()).filter(Boolean).map(titleCaseDisplay);
             };
 
             const colorChips = splitToChips(appearance['Colors']);
             const shadeChips = splitToChips(appearance['Observed Shades']);
 
             const CHIP_ROW_KEYS = new Set(['Colors', 'Observed Shades']);
-            const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+            // CSS hex colors are exactly 3, 4, 6, or 8 chars after the `#` (rgb / rgba / rrggbb / rrggbbaa).
+    // 5 and 7 char strings are not valid CSS — exclude them so we don't render bogus swatches.
+    const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
             const gridFields = Object.entries(appearance).filter(
               ([k, v]) => !CHIP_ROW_KEYS.has(k) && v && v !== 'N/A' && v !== '',
             );
@@ -2352,14 +2466,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             return (
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                <div className="mb-4">
+                <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-primary flex items-center gap-2">Appearance</h3>
+                  {showLowConfidence && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                      title={`Vision confidence: ${(visionConfidence * 100).toFixed(0)}% — fields below were extracted with low certainty`}
+                    >
+                      Low confidence ({(visionConfidence * 100).toFixed(0)}%)
+                    </Badge>
+                  )}
                 </div>
                 {patternsList.length > 0 && (
                   <div className="mb-4 flex items-start gap-3 py-2 border-b border-border/20">
                     <span className="text-xs text-muted-foreground shrink-0 pt-0.5">Patterns</span>
                     <span className="text-xs font-semibold">
-                      {patternsList.map(p => titleCase(p)).join(', ')}
+                      {patternsList.map(p => titleCaseDisplay(p)).join(', ')}
                     </span>
                   </div>
                 )}
@@ -2383,7 +2506,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       return (
                         <div key={key} className="bg-muted/30 rounded-lg p-3">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
-                          <p className="text-xs font-semibold">{titleCase(str)}</p>
+                          <p className="text-xs font-semibold">{titleCaseDisplay(str)}</p>
                         </div>
                       );
                     })}
@@ -2422,7 +2545,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             : 'Specifications & Design';
 
           // ── Features data ──
+          // `lowConfKeys` collects display labels for fields whose original
+          // {value, confidence} wrapper carried confidence < threshold.
+          // Threaded into renderMetadataCategory so those cells render dimmed.
           const featuresData: Record<string, unknown> = {};
+          const featuresLowConf = new Set<string>();
           if (activeSectionKeys.has('features')) {
             const featureKeys = ['assembly_required', 'stackable', 'foldable', 'modular', 'reclining',
               'storage', 'adjustable_height', 'indoor_outdoor', 'number_of_seats', 'removable_covers',
@@ -2431,13 +2558,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               'soft_close', 'drawer_system', 'hinge_type', 'push_to_open', 'integrated_lighting',
               'sensor', 'emergency', 'adjustable_tilt', 'number_of_lights', 'dimmable'];
             featureKeys.forEach(k => {
-              const v = extractValue(allData?.[k]);
-              if (v) featuresData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+              const raw = allData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                featuresData[label] = v;
+                if (isLowConfidence(raw)) featuresLowConf.add(label);
+              }
             });
           }
 
           // ── Installation data ──
           const installData: Record<string, unknown> = {};
+          const installLowConf = new Set<string>();
           if (activeSectionKeys.has('installation')) {
             const installKeys = ['click_system', 'installation_method', 'subfloor_requirements',
               'expansion_gap_mm', 'acclimation_days', 'underlay_required',
@@ -2446,33 +2579,93 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               'frame_compatibility', 'tap_hole_config', 'cartridge_type',
               'ceiling_type', 'installation_zone', 'installation_type', 'mounting_method'];
             installKeys.forEach(k => {
-              const v = extractValue(allData?.[k]) || extractValue(applicationData?.[k]);
-              if (v) installData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+              const raw = allData?.[k] ?? applicationData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                installData[label] = v;
+                if (isLowConfidence(raw)) installLowConf.add(label);
+              }
             });
           }
 
           // ── Coverage data (paint_wall_decor) ──
           const coverageData: Record<string, unknown> = {};
+          const coverageLowConf = new Set<string>();
           if (activeSectionKeys.has('coverage')) {
             ['coverage_per_litre_m2', 'coverage_per_roll_m2', 'roll_width_cm', 'roll_length_m', 'can_sizes'].forEach(k => {
-              const v = extractValue(allData?.[k]);
-              if (v) coverageData[k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())] = v;
+              const raw = allData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                coverageData[label] = v;
+                if (isLowConfidence(raw)) coverageLowConf.add(label);
+              }
             });
           }
+
+          // ── Detected text (vision OCR) — brand names, codes, dimensions
+          // visible on the material image. Skipped when empty.
+          const detectedTextRaw = (() => {
+            const raw = appearanceData?.detected_text ?? allData?.detected_text;
+            const inner = (raw && typeof raw === 'object' && 'value' in (raw as Record<string, unknown>))
+              ? (raw as Record<string, unknown>).value
+              : raw;
+            if (!Array.isArray(inner)) return [];
+            const seen = new Set<string>();
+            const out: string[] = [];
+            for (const t of inner as unknown[]) {
+              const s = String(t).trim();
+              if (!s) continue;
+              const k = s.toLowerCase();
+              if (seen.has(k)) continue;
+              seen.add(k);
+              out.push(s);
+            }
+            return out;
+          })();
+
+          const renderDetectedTextCard = () => {
+            if (detectedTextRaw.length === 0) return null;
+            return (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    Detected Text ({detectedTextRaw.length})
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Text the vision model read off the product image (brand names, codes, dimensions).
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {detectedTextRaw.map(t => (
+                    <Badge
+                      key={t}
+                      variant="outline"
+                      className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50"
+                    >
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            );
+          };
 
           return (
             <div className="space-y-6 mt-6">
               {renderAppearanceCard()}
+              {renderDetectedTextCard()}
 
               {/* Specifications & Design (Performance + Application + Design merged) */}
               {Object.keys(appDesignPerf).length > 0 &&
                 renderMetadataCategory(mainSectionTitle, appDesignPerf)}
 
               {/* Features */}
-              {activeSectionKeys.has('features') && renderMetadataCategory('Features', featuresData)}
+              {activeSectionKeys.has('features') && renderMetadataCategory('Features', featuresData, featuresLowConf)}
 
               {/* Installation */}
-              {activeSectionKeys.has('installation') && renderMetadataCategory('Installation', installData)}
+              {activeSectionKeys.has('installation') && renderMetadataCategory('Installation', installData, installLowConf)}
 
               {/* Care & Maintenance */}
               {activeSectionKeys.has('care') && renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
@@ -2481,7 +2674,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {activeSectionKeys.has('commercial') && renderMetadataCategory('Commercial Information', commercial)}
 
               {/* Coverage (paint/wallpaper) */}
-              {activeSectionKeys.has('coverage') && renderMetadataCategory('Coverage & Dimensions', coverageData)}
+              {activeSectionKeys.has('coverage') && renderMetadataCategory('Coverage & Dimensions', coverageData, coverageLowConf)}
 
               {/* Variants table */}
               {(activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable()}
@@ -2544,9 +2737,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               const str = extractValue(val);
               if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
               seenKeys.add(key);
-              const label = key
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, c => c.toUpperCase());
+              const label = prettyFieldLabel(key);
               extras.push({ key, label, value: str });
             };
 
@@ -2719,12 +2910,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   const bi = order.indexOf(b);
                   return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
                 });
-                const prettyLabel = (k: string) =>
-                  k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 return sortedKeys.map(groupKey => (
                   <div key={groupKey} className="space-y-3">
                     <h4 className="text-sm font-semibold text-primary">
-                      {prettyLabel(groupKey)}
+                      {prettyFieldLabel(groupKey)}
                     </h4>
                     {groups[groupKey].map(doc => (
                       <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
@@ -2874,6 +3063,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             productId={product.id}
             productName={product.name}
             manufacturer={(product as any).manufacturer}
+          />
+        </TabsContent>
+      )}
+
+      {/* SEO Tab — Admin only (DataForSEO research + ranking + domain snapshot) */}
+      {isAdmin && (
+        <TabsContent value="seo" className="mt-6">
+          <ProductSEOTab
+            productId={product.id}
+            productName={product.name}
+            manufacturer={(product as any).manufacturer || (product as any).manufacturer_name || (product.metadata as any)?.factory?.factory_name}
+            homepageDomain={(product as any).manufacturer_homepage || (product.metadata as any)?.factory?.homepage_domain || null}
+            category={(product as any).category || (product as any).subcategory || null}
           />
         </TabsContent>
       )}

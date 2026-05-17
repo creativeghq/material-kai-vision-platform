@@ -25,8 +25,9 @@ import {
   Globe,
   Mail,
   Send,
+  BookOpen,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   PieChart,
@@ -60,10 +61,13 @@ import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
 import { PriceLookupsCard } from './PriceLookupsCard';
+import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { StorageAuditPanel } from '../StorageAuditPanel';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
+import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
+import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
 
 import type {
   UsageAnalytics,
@@ -84,8 +88,30 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
+const VALID_OPERATIONS_TABS = new Set([
+  'system-health', 'data-processing', 'ai-performance', 'agent-chat',
+  'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
+  'seo-toolkit', 'seo-interlinking',
+]);
+
 const OperationsDashboardInner: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initial tab from ?tab= query param so other admin pages can deep-link
+  // (e.g. /admin/operations?tab=catalogs from the Catalogs list page).
+  const requestedTab = searchParams.get('tab') || '';
+  const initialTab = VALID_OPERATIONS_TABS.has(requestedTab) ? requestedTab : 'system-health';
+  const [opsActiveTab, setOpsActiveTab] = useState<string>(initialTab);
+  const handleTabChange = useCallback((value: string) => {
+    setOpsActiveTab(value);
+    // Mirror the tab change into the URL so refresh / back keeps the user on the same view
+    const next = new URLSearchParams(searchParams);
+    if (value === 'system-health') next.delete('tab');
+    else next.set('tab', value);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
     total_searches: 0,
@@ -804,7 +830,7 @@ const OperationsDashboardInner: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-6">
-        <Tabs defaultValue="system-health" className="space-y-4">
+        <Tabs value={opsActiveTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="system-health" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2" />
@@ -833,6 +859,18 @@ const OperationsDashboardInner: React.FC = () => {
             <TabsTrigger value="platform-overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Platform Overview
+            </TabsTrigger>
+            <TabsTrigger value="catalogs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <BookOpen className="h-4 w-4 mr-2" />
+              Catalogs
+            </TabsTrigger>
+            <TabsTrigger value="seo-toolkit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Search className="h-4 w-4 mr-2" />
+              SEO Toolkit
+            </TabsTrigger>
+            <TabsTrigger value="seo-interlinking" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Globe className="h-4 w-4 mr-2" />
+              SEO Inter-linking
             </TabsTrigger>
           </TabsList>
 
@@ -2197,6 +2235,25 @@ const OperationsDashboardInner: React.FC = () => {
           {/* Platform Overview Tab */}
           <TabsContent value="platform-overview" className="space-y-4">
             <PlatformOverviewTab />
+          </TabsContent>
+
+          {/* Catalog Operations Tab — email-gated catalog access events,
+              page views, and PDF downloads. Pulled out of /admin/catalogs/operations
+              and integrated into the central operations dashboard. */}
+          <TabsContent value="catalogs" className="space-y-4">
+            <CatalogOperationsTab />
+          </TabsContent>
+
+          {/* SEO Toolkit Tab — DataForSEO research, audits, backlinks, competitive intel.
+              Pulled out of /admin/seo into the operations dashboard. */}
+          <TabsContent value="seo-toolkit" className="space-y-4">
+            <SEODashboardPanel />
+          </TabsContent>
+
+          {/* SEO Inter-linking Tab — connected user websites + sitemap status.
+              Pulled out of /admin/modules/seo-interlinking into the operations dashboard. */}
+          <TabsContent value="seo-interlinking" className="space-y-4">
+            <SeoInterlinkingPanel />
           </TabsContent>
 
         </Tabs>

@@ -8,6 +8,7 @@ import { Button } from '@/components/core/ui/button';
 import { listRuns, cancelRun, formatDuration, statusColor } from '@/services/backgroundAgents';
 import type { BackgroundAgent, AgentRun } from '@/services/backgroundAgents';
 import { AgentLogsViewer } from './AgentLogsViewer';
+import { JobResearchSavedJobsPanel } from './JobResearchSavedJobsPanel';
 
 interface AgentRunHistoryDrawerProps {
   agent:   BackgroundAgent | null;
@@ -50,6 +51,13 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
             </Button>
           </SheetTitle>
         </SheetHeader>
+
+        {/* v0.3: job-research agents get an inline saved/applied triage panel above the run history */}
+        {agent?.agent_type === 'job-research' && (agent.config?.tracked_job_id as string | undefined) && (
+          <div className="mb-6 pb-4 border-b">
+            <JobResearchSavedJobsPanel trackedJobId={agent.config.tracked_job_id as string} />
+          </div>
+        )}
 
         {runs.length === 0 && !loading && (
           <p className="text-sm text-muted-foreground text-center py-8">

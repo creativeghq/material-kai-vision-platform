@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, Building2, Plus, Trash2, Search, Mail, CreditCard, Key, ExternalLink } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Users, Building2, Plus, Trash2, Search, Mail, CreditCard, Key, ExternalLink, Tags } from 'lucide-react';
 
 import {
   Card,
@@ -34,6 +34,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
 import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
+import { CategoriesPanel } from './CategoriesPage';
+
+const TAB_VALUES = ['users', 'contacts', 'companies', 'categories'] as const;
+type TabValue = typeof TAB_VALUES[number];
 
 interface UserWithAuth {
   id: string;
@@ -69,7 +73,22 @@ interface Role {
  */
 export const CRMManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+
+  const initialTab: TabValue = (() => {
+    const t = searchParams.get('tab');
+    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'users';
+  })();
+  const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
+  const handleTabChange = (val: string) => {
+    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
+    setActiveTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === 'users') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -398,7 +417,7 @@ export const CRMManagement: React.FC = () => {
         </div>
 
       {/* Tabs */}
-        <Tabs defaultValue="users" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" />
@@ -411,6 +430,10 @@ export const CRMManagement: React.FC = () => {
             <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" />
               Companies
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Tags className="h-4 w-4 mr-2" />
+              Categories
             </TabsTrigger>
           </TabsList>
 
@@ -788,6 +811,11 @@ export const CRMManagement: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Categories Tab */}
+        <TabsContent value="categories" className="space-y-4 mt-6">
+          <CategoriesPanel />
         </TabsContent>
         </Tabs>
 

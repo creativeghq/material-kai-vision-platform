@@ -1,0 +1,9 @@
+{
+  "slug": "presentation-catalogs",
+  "name": "Presentation Catalogs",
+  "description": "Admin-only catalog builder. Upload manufacturer PDFs, extract sections + images, build editable catalogs with email-gated public landing pages.",
+  "category": "generation",
+  "priceTier": "pro",
+  "icon": "BookOpen",
+  "version": "1.0.0"
+}

@@ -269,6 +269,48 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                 </div>
               )}
 
+              {/* SEO context bridge (Wave 7) — when we have a pin title, surface
+                  shortcuts to research the aesthetic on Google Trends, related
+                  searches, and Pinterest itself via the KAI agent. Pure
+                  navigation links — no live calls until the user clicks. */}
+              {extractedPin?.title && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                    <Search className="h-3 w-3" /> Research this aesthetic
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pinterest is a visual-trend signal. See how this aesthetic ranks on Google,
+                    Pinterest search, and Google Trends.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <a
+                      href={`/agent-hub?agent=kai&q=${encodeURIComponent(`Research the keyword "${extractedPin.title}" — what's trending around this aesthetic?`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] bg-white/10 hover:bg-white/20 rounded-full px-2.5 py-1 inline-flex items-center gap-1">
+                      Google research <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                    <a
+                      href={`/agent-hub?agent=kai&q=${encodeURIComponent(`Pinterest search for "${extractedPin.title}"`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] bg-white/10 hover:bg-white/20 rounded-full px-2.5 py-1 inline-flex items-center gap-1">
+                      Pinterest competitors <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                    <a
+                      href={`/agent-hub?agent=kai&q=${encodeURIComponent(`Show me Google Trends for "${extractedPin.title}" over the past 12 months`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] bg-white/10 hover:bg-white/20 rounded-full px-2.5 py-1 inline-flex items-center gap-1">
+                      Google Trends <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                    <a
+                      href={`/agent-hub?agent=kai&q=${encodeURIComponent(`What are the related searches for "${extractedPin.title}"? Show me PAA questions too.`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] bg-white/10 hover:bg-white/20 rounded-full px-2.5 py-1 inline-flex items-center gap-1">
+                      Related searches + PAA <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Import result with matches */}
               {importResult?.success && (
                 <div className="rounded-xl border border-green-200 bg-green-50 p-3 space-y-2">

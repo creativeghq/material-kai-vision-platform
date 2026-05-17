@@ -17,6 +17,18 @@ import { trackProductView } from '@/services/manufacturerAnalyticsService';
 import { getManufacturer, getProductName } from '@/utils/productMetadata';
 import { resolveUploadCategory } from '@/lib/categoryFieldRegistry';
 
+// Coerce a metadata field (typed as `unknown` because ProductMetadata
+// fields are wrapper-or-primitive polymorphic) into a plain string for
+// downstream APIs that expect string | undefined.
+const asMetaString = (v: unknown): string | undefined => {
+  if (v === null || v === undefined || v === '') return undefined;
+  if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+    const inner = (v as Record<string, unknown>).value;
+    return inner == null || inner === '' ? undefined : String(inner);
+  }
+  return String(v);
+};
+
 const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').catch(() => ({ default: () => null })));
 const ARPreviewModal = lazy(() => import('@/components/features/ar/ARPreviewModal').then(m => ({ default: m.ARPreviewModal })).catch(() => ({ default: () => null })));
 
@@ -47,7 +59,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         if (entry.isIntersecting && !trackedRef.current) {
           trackedRef.current = true;
           const mfg = getManufacturer(product.metadata) || '';
-          const matCat = product.metadata?.material_category;
+          const matCat = asMetaString(product.metadata?.material_category);
           trackProductView(product.id, mfg, window.location.pathname, undefined, resolveUploadCategory(matCat), matCat);
         }
       },
@@ -174,7 +186,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 size="sm"
                 showText={false}
                 category={resolveUploadCategory(product.metadata?.material_category)}
-                materialType={product.metadata?.material_category}
+                materialType={asMetaString(product.metadata?.material_category)}
               />
               <AddToMoodboardButton
                 productId={product.id}
@@ -184,7 +196,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 size="sm"
                 showText={false}
                 category={resolveUploadCategory(product.metadata?.material_category)}
-                materialType={product.metadata?.material_category}
+                materialType={asMetaString(product.metadata?.material_category)}
               />
             </div>
 

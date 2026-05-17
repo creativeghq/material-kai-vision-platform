@@ -32,6 +32,8 @@ let StateGraph: any, Annotation: any, END: any, START: any;
 let BaseMessage: any, HumanMessage: any, AIMessage: any, SystemMessage: any;
 let createClient: any;
 let debitExternalServiceCredits: any, checkCreditBalance: any;
+let debitAgentChatTurn: any, refundAgentChatTurn: any, getAgentTurnCost: any;
+let isPartnerApiKeyAccess: any, isEndpointAllowed: any;
 let getToolPrompt: any;
 let extractTextContent: any;
 let authenticate: any, isAdminAccess: any;
@@ -69,11 +71,16 @@ async function initRuntime() {
 
   debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
   checkCreditBalance = creditMod.checkCreditBalance;
+  debitAgentChatTurn = creditMod.debitAgentChatTurn;
+  refundAgentChatTurn = creditMod.refundAgentChatTurn;
+  getAgentTurnCost = creditMod.getAgentTurnCost;
   getToolPrompt = promptMod.getToolPrompt;
   getAgentSystemPrompt = promptMod.getAgentSystemPrompt;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
   isAdminAccess = authMod.isAdminAccess;
+  isPartnerApiKeyAccess = authMod.isPartnerApiKeyAccess;
+  isEndpointAllowed = authMod.isEndpointAllowed;
   getSkillsForAgent = skillsMod.getSkillsForAgent;
   getSkillContent = skillsMod.getSkillContent;
   formatSkillsForSystemPrompt = skillsMod.formatSkillsForSystemPrompt;
@@ -810,7 +817,36 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // B2B Research (admin/owner only)
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
       'contact_discovery', 'email_validate', 'save_to_crm',
-      // SEO (admin/owner only)
+      // SEO research card (all users — 0 user credits, internal cron-secret call)
+      'seo_research_keyword',
+      // SEO toolkit — Wave 1B+ (all users; 0 user credits, internal DataForSEO routing)
+      'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
+      'seo_keyword_overview', 'seo_ai_keyword_volume',
+      'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+      // Domain intel
+      'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
+      'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
+      'seo_relevant_pages', 'seo_categories_for_domain',
+      // Backlinks
+      'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
+      // OnPage / site crawl
+      'seo_site_crawl_start', 'seo_site_crawl_status',
+      // Content + domain analytics
+      'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
+      // AI optimization (LLM mentions native to DataForSEO)
+      'seo_llm_mentions_search',
+      // Multi-engine SERP
+      'seo_youtube_search', 'seo_local_pack',
+      // Keywords data — trends
+      'seo_google_trends',
+      // Niche
+      'seo_amazon_asin', 'seo_app_keywords',
+      'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
+      // Composite audits
+      'seo_site_review', 'seo_brand_search_audit',
+      // Escape hatch — admin only
+      'seo_dataforseo_call',
+      // SEO article pipeline (admin/owner only)
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
       'seo_article_writer', 'seo_content_analyzer',
       // Background task dispatch (admin/owner only)
@@ -819,6 +855,12 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'price_lookup',
       // Mention monitoring (all users; per-tool credit cost gated inside the tool)
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
+      // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
+      'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
+      // Presentation catalogs (admin/owner only — gated at injection time)
+      'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
+      'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
+      'generate_catalog_pdf', 'publish_catalog',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -841,6 +883,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'apply_lighting_preset', 'generate_vr_world',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
       'generate_presentation_sheet',
+      // SEO research card — useful for inspiration-keyword exploration
+      'seo_research_keyword',
     ],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
@@ -888,7 +932,7 @@ async function executeAgent(
   pinnedMaterialImages: string[] = [], // Catalog product images pinned by user for Gemini multi-reference
   generationMode?: string, // Explicit mode override from UI chip selection
   conversation_id?: string | null, // Supabase conversation ID for background task dispatch
-  selectedTools?: string[] | null, // Per-turn user-selected tool filter (subset of agent's allowed tools)
+  selectedToolkits?: string[] | null, // Per-turn user-selected toolkit IDs (resolved server-side to tool IDs)
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -920,13 +964,121 @@ async function executeAgent(
     config = AGENT_CONFIGS[agentId];
   }
 
-  // Per-turn tool filter: when the UI sends `selected_tools`, intersect with
-  // the agent's allowed tool list. RBAC gating still applies after this — a
-  // viewer asking for `b2b_manufacturer_search` won't get it, even if selected.
-  if (selectedTools && selectedTools.length > 0) {
-    const filtered = config.tools.filter((t) => selectedTools.includes(t));
-    config = { ...config, tools: filtered };
+  // ─── Per-turn tool gating ────────────────────────────────────────────────
+  //
+  // The frontend sends `selected_toolkits` — the user's currently-active
+  // toolkit IDs from the visual ToolkitPickerModal (always includes the Core
+  // toolkit). We resolve those to a set of tool IDs server-side using the
+  // SERVER_TOOLKITS map below (mirrored from agentToolsCatalog.ts).
+  //
+  // Default behavior (selected_toolkits empty or missing): bind only the Core
+  // toolkit's tools (lean ~1.5k tokens) PLUS the `load_toolkit` meta-tool, so
+  // the agent can request more capabilities mid-conversation if the user's
+  // request needs them.
+  //
+  // RBAC gating still applies AFTER this filter — admin-only tools won't
+  // bind for viewers/members even if they're in an active toolkit.
+  //
+  // The legacy per-tool restriction picker (selectedTools) was removed
+  // 2026-05-09. Toolkits + load_toolkit are now the single source of truth
+  // for tool-binding.
+
+  const SERVER_TOOLKITS: Record<string, { alwaysOn?: boolean; tool_ids: string[] }> = {
+    'core': {
+      alwaysOn: true,
+      tool_ids: ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'],
+    },
+    'catalogs': {
+      tool_ids: [
+        'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
+        'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
+        'generate_catalog_pdf', 'publish_catalog',
+      ],
+    },
+    'mentions': {
+      tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'],
+    },
+    'job-research': {
+      tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview'],
+    },
+    'presentation-sheets': {
+      tool_ids: ['generate_presentation_sheet'],
+    },
+    'generation': {
+      tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world'],
+    },
+    'seo-research': {
+      tool_ids: [
+        'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
+        'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
+        'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
+      ],
+    },
+    'seo-domain': {
+      tool_ids: [
+        'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
+        'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
+        'seo_relevant_pages', 'seo_categories_for_domain',
+      ],
+    },
+    'seo-backlinks': {
+      tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains'],
+    },
+    'seo-content': {
+      tool_ids: [
+        'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
+        'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search',
+      ],
+    },
+    'seo-multi-engine': {
+      tool_ids: [
+        'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
+        'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search',
+        'seo_pinterest_search', 'seo_reddit_search',
+      ],
+    },
+    'seo-composite': {
+      tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
+    },
+    'seo-article': {
+      tool_ids: [
+        'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
+        'seo_article_writer', 'seo_content_analyzer',
+      ],
+    },
+    'b2b': {
+      tool_ids: [
+        'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
+        'contact_discovery', 'email_validate', 'save_to_crm',
+      ],
+    },
+    'sub-agents': {
+      tool_ids: ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'],
+    },
+    'admin-misc': {
+      tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call'],
+    },
+  };
+
+  const META_TOOLS = ['load_toolkit'];
+
+  // Resolve toolkits → tool IDs. Core is always included.
+  const toolkitToolIds = new Set<string>();
+  for (const [id, def] of Object.entries(SERVER_TOOLKITS)) {
+    if (def.alwaysOn || (selectedToolkits || []).includes(id)) {
+      for (const t of def.tool_ids) toolkitToolIds.add(t);
+    }
   }
+  // Always make load_toolkit available so the agent can request more clusters
+  // if the user's request needs them. Exposed via a meta-tool registered alongside
+  // the regular tools.
+  for (const m of META_TOOLS) toolkitToolIds.add(m);
+
+  // Filter the agent's allowed tool list to the toolkit-resolved set, then
+  // ensure META_TOOLS are present even if the agent config didn't list them.
+  const baseTools = config.tools.filter((t) => toolkitToolIds.has(t));
+  for (const m of META_TOOLS) if (!baseTools.includes(m)) baseTools.push(m);
+  config = { ...config, tools: baseTools };
 
   // Extract previously generated image URLs from assistant messages (for edit mode).
   // Sources checked in priority order:
@@ -1035,12 +1187,39 @@ async function executeAgent(
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
+  // SEO agent toolkit (conversational research surface — separate from the article pipeline)
+  const SEO_AGENT_TOOL_NAMES = [
+    'seo_research_keyword',
+    'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
+    'seo_keyword_overview', 'seo_ai_keyword_volume',
+    'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+    'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
+    'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
+    'seo_relevant_pages', 'seo_categories_for_domain',
+    'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
+    'seo_site_crawl_start', 'seo_site_crawl_status',
+    'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
+    'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack',
+    'seo_google_trends',
+    'seo_amazon_asin', 'seo_app_keywords',
+    'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
+    'seo_site_review', 'seo_brand_search_audit',
+    'seo_dataforseo_call',
+  ];
+  const needsSeoAgent = config.tools.some((t: string) => SEO_AGENT_TOOL_NAMES.includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
+  const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview'].includes(t));
+  const CATALOG_TOOL_NAMES = [
+    'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
+    'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
+    'generate_catalog_pdf', 'publish_catalog',
+  ];
+  const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, bgMod, priceMod, presentationMod, mentionMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1048,10 +1227,13 @@ async function executeAgent(
     needsSub          ? import('../_shared/tools/sub-agent-tools.ts') : null,
     needsB2b          ? import('../_shared/tools/b2b-tools.ts') : null,
     needsSeo          ? import('../_shared/tools/seo-tools.ts') : null,
+    needsSeoAgent     ? import('../_shared/tools/seo-agent-tools.ts') : null,
     needsBg           ? import('../_shared/tools/background-tools.ts') : null,
     needsPrice        ? import('../_shared/tools/price-tools.ts') : null,
     needsPresentation ? import('../_shared/tools/presentation-sheet-tool.ts') : null,
     needsMention      ? import('../_shared/tools/mention-tools.ts') : null,
+    needsCatalog      ? import('../_shared/tools/catalog-tools.ts') : null,
+    needsJobResearch  ? import('../_shared/tools/job-research-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1083,6 +1265,45 @@ async function executeAgent(
   const createSEOArticleWriterTool = seoMod?.createSEOArticleWriterTool;
   const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
+  const createSEOResearchKeywordTool = seoAgentMod?.createSEOResearchKeywordTool;
+  // Wave 1B+ SEO agent toolkit
+  const createSEOKeywordDifficultyTool = seoAgentMod?.createSEOKeywordDifficultyTool;
+  const createSEOKeywordSuggestionsTool = seoAgentMod?.createSEOKeywordSuggestionsTool;
+  const createSEOSearchIntentTool = seoAgentMod?.createSEOSearchIntentTool;
+  const createSEOSerpAuditTool = seoAgentMod?.createSEOSerpAuditTool;
+  const createSEOAuditUrlTool = seoAgentMod?.createSEOAuditUrlTool;
+  const createSEODomainSnapshotTool = seoAgentMod?.createSEODomainSnapshotTool;
+  const createSEORankedKeywordsTool = seoAgentMod?.createSEORankedKeywordsTool;
+  const createSEODomainCompetitorsTool = seoAgentMod?.createSEODomainCompetitorsTool;
+  const createSEOKeywordGapTool = seoAgentMod?.createSEOKeywordGapTool;
+  const createSEOTrafficEstimationTool = seoAgentMod?.createSEOTrafficEstimationTool;
+  const createSEOBacklinksSummaryTool = seoAgentMod?.createSEOBacklinksSummaryTool;
+  const createSEOBacklinksAnchorsTool = seoAgentMod?.createSEOBacklinksAnchorsTool;
+  const createSEOReferringDomainsTool = seoAgentMod?.createSEOReferringDomainsTool;
+  const createSEOSiteCrawlStartTool = seoAgentMod?.createSEOSiteCrawlStartTool;
+  const createSEOSiteCrawlStatusTool = seoAgentMod?.createSEOSiteCrawlStatusTool;
+  const createSEOContentSentimentTool = seoAgentMod?.createSEOContentSentimentTool;
+  const createSEODomainTechnologiesTool = seoAgentMod?.createSEODomainTechnologiesTool;
+  const createSEOLlmMentionsSearchTool = seoAgentMod?.createSEOLlmMentionsSearchTool;
+  const createSEOYouTubeSearchTool = seoAgentMod?.createSEOYouTubeSearchTool;
+  const createSEOLocalPackTool = seoAgentMod?.createSEOLocalPackTool;
+  const createSEOGoogleTrendsTool = seoAgentMod?.createSEOGoogleTrendsTool;
+  const createSEOSiteReviewTool = seoAgentMod?.createSEOSiteReviewTool;
+  const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
+  // Phase 12+ niche tools
+  const createSEOAmazonAsinTool = seoAgentMod?.createSEOAmazonAsinTool;
+  const createSEOAppKeywordsTool = seoAgentMod?.createSEOAppKeywordsTool;
+  const createSEOTrustpilotSearchTool = seoAgentMod?.createSEOTrustpilotSearchTool;
+  const createSEOPinterestSearchTool = seoAgentMod?.createSEOPinterestSearchTool;
+  const createSEORedditSearchTool = seoAgentMod?.createSEORedditSearchTool;
+  const createSEODomainWhoisTool = seoAgentMod?.createSEODomainWhoisTool;
+  const createSEOSubdomainsTool = seoAgentMod?.createSEOSubdomainsTool;
+  const createSEORelevantPagesTool = seoAgentMod?.createSEORelevantPagesTool;
+  const createSEOHistoricalSerpsTool = seoAgentMod?.createSEOHistoricalSerpsTool;
+  const createSEOKeywordOverviewTool = seoAgentMod?.createSEOKeywordOverviewTool;
+  const createSEOAIKeywordVolumeTool = seoAgentMod?.createSEOAIKeywordVolumeTool;
+  const createSEOCategoriesForDomainTool = seoAgentMod?.createSEOCategoriesForDomainTool;
+  const createSEODataForSEOCallTool = seoAgentMod?.createSEODataForSEOCallTool;
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
   const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
@@ -1090,6 +1311,32 @@ async function executeAgent(
   const createGetMentionSummaryTool = mentionMod?.createGetMentionSummaryTool;
   const createCheckLlmVisibilityTool = mentionMod?.createCheckLlmVisibilityTool;
   const createFindNegativeMentionsTool = mentionMod?.createFindNegativeMentionsTool;
+  const createTrackJobSearchTool = jobResearchMod?.createTrackJobSearchTool;
+  const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
+  const createFindJobsTool = jobResearchMod?.createFindJobsTool;
+  const createGetJobDigestPreviewTool = jobResearchMod?.createGetJobDigestPreviewTool;
+  const createCreateCatalogTool = catalogMod?.createCreateCatalogTool;
+  const createAttachCatalogPdfsTool = catalogMod?.createAttachCatalogPdfsTool;
+  const createExtractFromCatalogPdfsTool = catalogMod?.createExtractFromCatalogPdfsTool;
+  const createTranslatePdfToCatalogTool = catalogMod?.createTranslatePdfToCatalogTool;
+  const createAddMaterialToCatalogTool = catalogMod?.createAddMaterialToCatalogTool;
+  const createFindImageForMaterialTool = catalogMod?.createFindImageForMaterialTool;
+  const createGenerateCatalogPdfTool = catalogMod?.createGenerateCatalogPdfTool;
+  const createPublishCatalogTool = catalogMod?.createPublishCatalogTool;
+
+  // --- Toolkit meta-tool: load_toolkit ---
+  // Always-on. Lets the agent dynamically request a toolkit cluster when the
+  // user's request needs tools that aren't currently bound. Two-turn pattern
+  // (load on turn N, use on turn N+1) — the chunk handler on the frontend
+  // updates the user's active toolkit set so the next turn binds the new tools.
+  if (config.tools.includes('load_toolkit')) {
+    try {
+      const { createLoadToolkitTool } = await import('../_shared/tools/toolkit-tools.ts');
+      tools.push(createLoadToolkitTool(isAdmin, onChunk));
+    } catch (loadToolkitErr) {
+      console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);
+    }
+  }
 
   // --- Core tools (all users) ---
 
@@ -1129,6 +1376,124 @@ async function executeAgent(
     tools.push(createPresentationSheetTool(userId, onChunk));
   }
 
+  // SEO toolkit (all users — 0 user credits, calls MIVAA via x-cron-secret).
+  // 25 tools across keyword research, SERP audit, URL audit, domain intel,
+  // backlinks, OnPage crawl, content + domain analytics, LLM-mention native
+  // search, multi-engine SERP, Google Trends, composite audits, escape hatch.
+  if (config.tools.includes('seo_research_keyword') && createSEOResearchKeywordTool) {
+    tools.push(createSEOResearchKeywordTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_keyword_difficulty') && createSEOKeywordDifficultyTool) {
+    tools.push(createSEOKeywordDifficultyTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_keyword_suggestions') && createSEOKeywordSuggestionsTool) {
+    tools.push(createSEOKeywordSuggestionsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_search_intent') && createSEOSearchIntentTool) {
+    tools.push(createSEOSearchIntentTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_serp_audit') && createSEOSerpAuditTool) {
+    tools.push(createSEOSerpAuditTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_audit_url') && createSEOAuditUrlTool) {
+    tools.push(createSEOAuditUrlTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_domain_snapshot') && createSEODomainSnapshotTool) {
+    tools.push(createSEODomainSnapshotTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_ranked_keywords') && createSEORankedKeywordsTool) {
+    tools.push(createSEORankedKeywordsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_domain_competitors') && createSEODomainCompetitorsTool) {
+    tools.push(createSEODomainCompetitorsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_keyword_gap') && createSEOKeywordGapTool) {
+    tools.push(createSEOKeywordGapTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_traffic_estimation') && createSEOTrafficEstimationTool) {
+    tools.push(createSEOTrafficEstimationTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_backlinks_summary') && createSEOBacklinksSummaryTool) {
+    tools.push(createSEOBacklinksSummaryTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_backlinks_anchors') && createSEOBacklinksAnchorsTool) {
+    tools.push(createSEOBacklinksAnchorsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_referring_domains') && createSEOReferringDomainsTool) {
+    tools.push(createSEOReferringDomainsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_site_crawl_start') && createSEOSiteCrawlStartTool) {
+    tools.push(createSEOSiteCrawlStartTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_site_crawl_status') && createSEOSiteCrawlStatusTool) {
+    tools.push(createSEOSiteCrawlStatusTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_content_sentiment') && createSEOContentSentimentTool) {
+    tools.push(createSEOContentSentimentTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_domain_technologies') && createSEODomainTechnologiesTool) {
+    tools.push(createSEODomainTechnologiesTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_llm_mentions_search') && createSEOLlmMentionsSearchTool) {
+    tools.push(createSEOLlmMentionsSearchTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_youtube_search') && createSEOYouTubeSearchTool) {
+    tools.push(createSEOYouTubeSearchTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_local_pack') && createSEOLocalPackTool) {
+    tools.push(createSEOLocalPackTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_google_trends') && createSEOGoogleTrendsTool) {
+    tools.push(createSEOGoogleTrendsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_site_review') && createSEOSiteReviewTool) {
+    tools.push(createSEOSiteReviewTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_brand_search_audit') && createSEOBrandSearchAuditTool) {
+    tools.push(createSEOBrandSearchAuditTool(userId, onChunk));
+  }
+  // Phase 12+ niche tools
+  if (config.tools.includes('seo_amazon_asin') && createSEOAmazonAsinTool) {
+    tools.push(createSEOAmazonAsinTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_app_keywords') && createSEOAppKeywordsTool) {
+    tools.push(createSEOAppKeywordsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_trustpilot_search') && createSEOTrustpilotSearchTool) {
+    tools.push(createSEOTrustpilotSearchTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_pinterest_search') && createSEOPinterestSearchTool) {
+    tools.push(createSEOPinterestSearchTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_reddit_search') && createSEORedditSearchTool) {
+    tools.push(createSEORedditSearchTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_domain_whois') && createSEODomainWhoisTool) {
+    tools.push(createSEODomainWhoisTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_subdomains') && createSEOSubdomainsTool) {
+    tools.push(createSEOSubdomainsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_relevant_pages') && createSEORelevantPagesTool) {
+    tools.push(createSEORelevantPagesTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_historical_serps') && createSEOHistoricalSerpsTool) {
+    tools.push(createSEOHistoricalSerpsTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_keyword_overview') && createSEOKeywordOverviewTool) {
+    tools.push(createSEOKeywordOverviewTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_ai_keyword_volume') && createSEOAIKeywordVolumeTool) {
+    tools.push(createSEOAIKeywordVolumeTool(userId, onChunk));
+  }
+  if (config.tools.includes('seo_categories_for_domain') && createSEOCategoriesForDomainTool) {
+    tools.push(createSEOCategoriesForDomainTool(userId, onChunk));
+  }
+  // Escape hatch — admin only (lets the agent hit any DataForSEO endpoint by name)
+  if (isAdmin && config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
+    tools.push(createSEODataForSEOCallTool(userId, onChunk));
+  }
+
   // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)
   if (config.tools.includes('track_product_mentions') && createTrackProductMentionsTool) {
     tools.push(createTrackProductMentionsTool(userId, workspaceId, undefined, onChunk));
@@ -1141,6 +1506,22 @@ async function executeAgent(
   }
   if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
     tools.push(createFindNegativeMentionsTool(userId, undefined, onChunk));
+  }
+
+  // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)
+  if (config.tools.includes('track_job_search') && createTrackJobSearchTool) {
+    // Thread the current conversation id through so the daily digest can chat-post
+    // back into THIS thread when matches are found.
+    tools.push(createTrackJobSearchTool(userId, workspaceId, undefined, onChunk, conversation_id));
+  }
+  if (config.tools.includes('list_my_job_searches') && createListMyJobSearchesTool) {
+    tools.push(createListMyJobSearchesTool(userId, undefined, onChunk));
+  }
+  if (config.tools.includes('find_jobs') && createFindJobsTool) {
+    tools.push(createFindJobsTool(userId, undefined, onChunk));
+  }
+  if (config.tools.includes('get_job_digest_preview') && createGetJobDigestPreviewTool) {
+    tools.push(createGetJobDigestPreviewTool(userId, undefined, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
@@ -1203,9 +1584,11 @@ async function executeAgent(
       tools.push(createProductAnalysisTool(workspaceId));
     }
 
-    // B2B Research tools
+    // B2B Research tools — onChunk wired so the search + save_to_crm tools
+    // emit workflow_plan / workflow_step_progress / workflow_finished chunks
+    // for the b2b-research wizard.
     if (config.tools.includes('b2b_manufacturer_search')) {
-      tools.push(createB2BManufacturerSearchTool(userId, sendProgress));
+      tools.push(createB2BManufacturerSearchTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('company_website_scrape')) {
       tools.push(createCompanyWebsiteScrapeTool(userId, sendProgress));
@@ -1220,21 +1603,22 @@ async function executeAgent(
       tools.push(createEmailValidateTool(userId, sendProgress));
     }
     if (config.tools.includes('save_to_crm')) {
-      tools.push(createSaveToCRMTool(userId, sendProgress));
+      tools.push(createSaveToCRMTool(userId, sendProgress, onChunk));
     }
 
-    // SEO Article Pipeline tools
+    // SEO Article Pipeline tools — onChunk wired across all 4 stages so the
+    // seo-article wizard advances on each step's emit.
     if (config.tools.includes('seo_keyword_research')) {
-      tools.push(createSEOKeywordResearchTool(userId, sendProgress));
+      tools.push(createSEOKeywordResearchTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('seo_article_planner')) {
-      tools.push(createSEOArticlePlannerTool(userId, sendProgress));
+      tools.push(createSEOArticlePlannerTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('seo_article_writer')) {
-      tools.push(createSEOArticleWriterTool(userId, sendProgress));
+      tools.push(createSEOArticleWriterTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('seo_content_analyzer')) {
-      tools.push(createSEOContentAnalyzerTool(userId, sendProgress));
+      tools.push(createSEOContentAnalyzerTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('create_seo_article')) {
       tools.push(createSEOPipelineTool(userId, onChunk));
@@ -1248,6 +1632,32 @@ async function executeAgent(
     // Price lookup from the Pricing KB category (admin-gated)
     if (config.tools.includes('price_lookup') && createPriceLookupTool) {
       tools.push(createPriceLookupTool(workspaceId, onChunk));
+    }
+
+    // Presentation catalogs (admin-only) — 8 tools driving the catalog builder
+    if (config.tools.includes('create_catalog') && createCreateCatalogTool) {
+      tools.push(createCreateCatalogTool(userId, workspaceId, onChunk));
+    }
+    if (config.tools.includes('attach_catalog_pdfs') && createAttachCatalogPdfsTool) {
+      tools.push(createAttachCatalogPdfsTool(userId, onChunk));
+    }
+    if (config.tools.includes('extract_from_catalog_pdfs') && createExtractFromCatalogPdfsTool) {
+      tools.push(createExtractFromCatalogPdfsTool(userId, onChunk));
+    }
+    if (config.tools.includes('translate_pdf_to_catalog') && createTranslatePdfToCatalogTool) {
+      tools.push(createTranslatePdfToCatalogTool(userId, workspaceId, onChunk));
+    }
+    if (config.tools.includes('add_material_to_catalog') && createAddMaterialToCatalogTool) {
+      tools.push(createAddMaterialToCatalogTool(userId, onChunk));
+    }
+    if (config.tools.includes('find_image_for_material') && createFindImageForMaterialTool) {
+      tools.push(createFindImageForMaterialTool(userId, onChunk));
+    }
+    if (config.tools.includes('generate_catalog_pdf') && createGenerateCatalogPdfTool) {
+      tools.push(createGenerateCatalogPdfTool(userId, onChunk));
+    }
+    if (config.tools.includes('publish_catalog') && createPublishCatalogTool) {
+      tools.push(createPublishCatalogTool(userId, onChunk));
     }
   }
 
@@ -1654,11 +2064,11 @@ Deno.serve(async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_tools = null } = await req.json();
-    // selected_tools: string[] | null — when provided (non-empty), filters the
-    // bound tool list to only these IDs (intersected with the agent's allowed
-    // tools + RBAC). Reduces input tokens by ~200-500 per omitted tool. When
-    // null/empty, the full agent tool set is used.
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null } = await req.json();
+    // selected_toolkits: string[] | null — IDs of currently-active toolkit
+    // clusters (catalogs / mentions / seo-research / etc.). Core is always
+    // included server-side. When null/empty the agent gets just Core tools +
+    // the load_toolkit meta-tool so it can request more on demand.
     // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
     // conversation_id: string | null — Supabase conversation ID, used to post background task results back
     // pinned_material_images: string[] — catalog product image URLs pinned by user for Gemini multi-reference generation
@@ -1669,17 +2079,76 @@ Deno.serve(async (req) => {
     const auth = await authenticate(req);
 
     if (!auth.success) {
-      throw new Error(auth.error || 'Unauthorized');
+      return new Response(
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     const user = auth.user;
     const userId = auth.userId;
 
+    // ── Partner kai_* API key path ────────────────────────────────────────
+    // Locked role = 'member' so admin-only tools (B2B, SEO article pipeline,
+    // catalogs, dispatch_background_task, price_lookup, sub-agents) are
+    // gated out via the existing role-based tool injection guards. Partners
+    // pay per turn on top of underlying tool/AI credits.
+    const isPartner = isPartnerApiKeyAccess(auth);
+    if (isPartner) {
+      // Endpoint allow-list check against the partner's api_keys row
+      if (!isEndpointAllowed(auth.apiKey?.allowed_endpoints ?? null, '/functions/v1/agent-chat')) {
+        return new Response(
+          JSON.stringify({ error: 'This API key does not permit access to agent-chat' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Partner-mode agent allow-list. demo is internal-only; legacy aliases
+      // (search/insights/seo) collapse to kai inside AGENT_CONFIGS anyway,
+      // but we reject them explicitly here so partners get a predictable
+      // surface to integrate against.
+      const PARTNER_ALLOWED_AGENTS = ['kai', 'interior-designer'];
+      if (!PARTNER_ALLOWED_AGENTS.includes(agentId)) {
+        return new Response(
+          JSON.stringify({
+            error: `Partner API keys may only call agents: ${PARTNER_ALLOWED_AGENTS.join(', ')}. Got: ${agentId}`,
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Pre-check balance before any expensive setup
+      const turnCost = getAgentTurnCost(agentId);
+      const { data: balRow } = await auth.supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', userId!)
+        .maybeSingle();
+      const balance = balRow?.balance ?? 0;
+      if (balance < turnCost) {
+        return new Response(
+          JSON.stringify({
+            error: 'insufficient_credits',
+            required_credits: turnCost,
+            current_balance: balance,
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     // Get user workspace membership (single query for role + workspace_id)
     const isAdmin = isAdminAccess(auth);
-    const membership = isAdmin
-      ? { role: 'admin', workspaceId: null as string | null }
-      : await getUserWorkspaceMembership(userId!);
+    let membership: { role: string; workspaceId: string | null };
+    if (isAdmin) {
+      membership = { role: 'admin', workspaceId: null };
+    } else if (isPartner) {
+      // Partner mode: force role to 'member' regardless of the underlying
+      // user's platform role. Partner keys never get admin tool access.
+      membership = { role: 'member', workspaceId: auth.apiKey?.workspace_id ?? null };
+    } else {
+      membership = await getUserWorkspaceMembership(userId!);
+    }
 
     // For admin key access, still need workspace_id
     if (isAdmin && !membership.workspaceId) {
@@ -1687,25 +2156,50 @@ Deno.serve(async (req) => {
       membership.workspaceId = m.workspaceId;
     }
 
-    // Check agent access
-    const { allowed, role } = isAdmin
-      ? { allowed: true, role: 'admin' }
-      : checkAgentAccess(membership.role, agentId);
-    if (!allowed) {
-      return new Response(
-        JSON.stringify({
-          error: `Access denied. Agent '${agentId}' requires ${AGENT_CONFIGS[agentId]?.allowedRoles.join(' or ')} role. Your role: ${role}`,
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
+    // Check agent access (skipped for partner mode — already allow-listed above)
+    let role = membership.role;
+    if (!isAdmin && !isPartner) {
+      const { allowed, role: resolvedRole } = checkAgentAccess(membership.role, agentId);
+      role = resolvedRole;
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({
+            error: `Access denied. Agent '${agentId}' requires ${AGENT_CONFIGS[agentId]?.allowedRoles.join(' or ')} role. Your role: ${role}`,
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
+    } else if (isAdmin) {
+      role = 'admin';
     }
 
     const workspaceId = membership.workspaceId;
     if (!workspaceId) {
       throw new Error('No workspace found for user');
+    }
+
+    // ── Partner per-turn debit (charges BEFORE invoking the agent) ────────
+    // Refund on hard pre-stream crash. Once streaming starts, no refund:
+    // Anthropic + tool spend has already happened on our side.
+    let partnerTurnDebitedCredits = 0;
+    if (isPartner) {
+      const debit = await debitAgentChatTurn(
+        auth.supabase,
+        userId!,
+        agentId,
+        { api_key_id: auth.apiKey?.api_key_id, conversation_id },
+      );
+      if (!debit.success) {
+        const status = debit.error === 'insufficient_credits' ? 402 : 500;
+        return new Response(
+          JSON.stringify({ error: debit.error || 'debit_failed' }),
+          { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      partnerTurnDebitedCredits = debit.credits_debited;
     }
 
     // Get last user message
@@ -1723,6 +2217,22 @@ Deno.serve(async (req) => {
     // Execute agent with STREAMING
 
     const encoder = new TextEncoder();
+    // Tracks whether the agent has produced any real output beyond status/heartbeat.
+    // Used for partner-mode refunds: if executeAgent crashes before the first
+    // tool_call / text_chunk / final_result, the underlying Anthropic + tool spend
+    // hasn't started yet, so we can safely return the per-turn credit.
+    let hasStreamedRealContent = false;
+    const refundIfNotConsumed = async (reason: string) => {
+      if (!isPartner || hasStreamedRealContent || partnerTurnDebitedCredits <= 0) return;
+      try {
+        await refundAgentChatTurn(auth.supabase, userId!, agentId, reason, {
+          api_key_id: auth.apiKey?.api_key_id,
+          conversation_id,
+        });
+      } catch (e) {
+        console.warn('Partner turn refund failed:', e);
+      }
+    };
     const stream = new ReadableStream({
       start(controller) {
         let streamClosed = false;
@@ -1739,6 +2249,11 @@ Deno.serve(async (req) => {
           try {
             const chunk = encoder.encode(JSON.stringify(data) + '\n');
             controller.enqueue(chunk);
+            // Mark partner-refund eligibility off once the agent has produced
+            // anything spendworthy. status/heartbeat are pre-execution noise.
+            if (data?.type && data.type !== 'status' && data.type !== 'heartbeat') {
+              hasStreamedRealContent = true;
+            }
             return true;
           } catch (error) {
             // Stream closed by client or network
@@ -1807,7 +2322,7 @@ Deno.serve(async (req) => {
               pinned_material_images, // Catalog product images pinned by user
               generation_mode || undefined, // Explicit mode override from UI chip
               conversation_id, // Supabase conversation ID for background task dispatch
-              selected_tools, // Per-turn user-selected tool filter
+              selected_toolkits, // Per-turn user-selected toolkit IDs (primary toolkit-level gating)
             );
             if (finalResult) {
             }
@@ -1935,6 +2450,10 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error('❌ Streaming error:', error);
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+
+          // Refund partner per-turn credit if the agent crashed before
+          // producing any real content. (No-op for internal users.)
+          await refundIfNotConsumed(error instanceof Error ? error.message : 'agent_crash_pre_stream');
 
           // Stop heartbeat on error
           if (heartbeatInterval) {

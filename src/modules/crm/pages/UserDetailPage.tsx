@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { usersAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
+import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 
 interface UserProfile {
   id: string;
@@ -688,6 +689,8 @@ export const UserDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            <CategoryAssignmentPicker target={{ kind: 'user', id: user.user_id }} />
           </TabsContent>
 
           {/* Subscription & Credits Tab */}

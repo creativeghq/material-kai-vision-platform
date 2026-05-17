@@ -46,7 +46,6 @@ import {
 import { Label } from '@/components/core/ui/label';
 import { Progress } from '@/components/core/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChunkProductRelationship {
@@ -372,14 +371,7 @@ export const RelevancyManagement: React.FC = () => {
   const showRelTypeFilter = activeTab !== 'product-image';
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Relevancy Management"
-        description="View and manage entity relationships with relevance scoring"
-        badge="Admin"
-      />
-
-      <div className="p-3 sm:p-6 space-y-6">
+    <div className="space-y-6">
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -696,7 +688,6 @@ export const RelevancyManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Details Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>

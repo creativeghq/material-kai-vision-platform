@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search } from 'lucide-react';
+import CompanySEOPanel from '@/components/business/seo-toolkit/CompanySEOPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -11,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
+import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import {
   Table,
@@ -317,6 +319,10 @@ export const CompanyDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               Notes
             </TabsTrigger>
+            <TabsTrigger value="seo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Search className="h-4 w-4 mr-2" />
+              SEO
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -509,6 +515,8 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }} />
           </TabsContent>
 
           {/* Contacts Tab */}
@@ -679,6 +687,16 @@ export const CompanyDetailPage: React.FC = () => {
                 />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* SEO Tab — DataForSEO Domain Rank + persistent monitoring */}
+          <TabsContent value="seo" className="space-y-4">
+            <CompanySEOPanel
+              companyId={company.id}
+              companyName={company.name}
+              website={company.website || null}
+              countryCode={(company as any).country_code || null}
+            />
           </TabsContent>
         </Tabs>
       </div>

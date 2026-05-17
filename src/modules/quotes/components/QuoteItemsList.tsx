@@ -46,33 +46,67 @@ interface QuoteItemsListProps {
   variant?: 'compact' | 'detailed';
 }
 
-// Convert quote product to display product format
+// Convert quote product to display product format.
+//
+// SimpleProduct.metadata is typed as ProductMetadata where every field is
+// `unknown` (wrapper-or-primitive polymorphism). Coerce each field to its
+// destination type before assigning so we get a properly-typed Product
+// rather than relying on `any`-style implicit casts.
+const asStr = (v: unknown, fallback = ''): string => {
+  if (v === null || v === undefined || v === '') return fallback;
+  if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+    const inner = (v as Record<string, unknown>).value;
+    return inner == null || inner === '' ? fallback : String(inner);
+  }
+  return String(v);
+};
+const asNum = (v: unknown, fallback = 0): number => {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  if (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+    return asNum((v as Record<string, unknown>).value, fallback);
+  }
+  return fallback;
+};
+const asObj = (v: unknown): Record<string, unknown> => {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  return {};
+};
+const asStrArr = (v: unknown): string[] => {
+  if (!Array.isArray(v)) return [];
+  return v.map(x => (typeof x === 'string' ? x : String(x))).filter(Boolean);
+};
+
 const convertToDisplayProduct = (product: SimpleProduct): Product => {
   const displayName = getProductName(product);
   const imageUrl = getProductImageUrl(product);
+  const md = product.metadata || {};
   return {
     id: product.id,
     sku: product.sku || '',
     name: displayName,
     description: product.description || '',
-    category: getMaterialCategory(product.metadata) || 'other',
-    type: product.metadata?.type || '',
+    category: getMaterialCategory(md) || 'other',
+    type: asStr(md.type),
     status: 'Active',
     images: imageUrl ? [{ url: imageUrl, alt: displayName, isPrimary: true }] : [],
-    metadata: product.metadata || {},
-    properties: product.metadata?.properties || {},
-    specifications: product.metadata?.specifications || {},
+    metadata: md,
+    properties: asObj(md.properties),
+    specifications: asObj(md.specifications),
     pricing: {
-      retail: product.metadata?.price || 0,
-      wholesale: product.metadata?.wholesale_price || 0,
+      retail: asNum(md.price),
+      wholesale: asNum(md.wholesale_price),
       currency: 'EUR',
     },
     stock: {
-      quantity: product.metadata?.stock_quantity || 0,
+      quantity: asNum(md.stock_quantity),
       status: 'Available',
-      unit: product.metadata?.unit || 'pcs',
+      unit: asStr(md.unit, 'pcs'),
     },
-    tags: product.metadata?.tags || [],
+    tags: asStrArr(md.tags),
     variants: [],
   };
 };

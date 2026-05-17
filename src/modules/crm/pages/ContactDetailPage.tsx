@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
+import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
 import {
@@ -734,6 +735,8 @@ export const ContactDetailPage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />
           </TabsContent>
 
           {/* Companies Tab */}

@@ -1,0 +1,9 @@
+{
+  "slug": "seo-toolkit",
+  "name": "SEO Toolkit",
+  "description": "Conversational + dashboard SEO surface backed by 70+ DataForSEO endpoints. Keyword research, SERP audits, URL audits, domain intelligence, backlinks, OnPage crawls, content + domain analytics, LLM mention search, multi-engine SERP (YouTube, Maps, Local Pack), Google Trends, brand search audit, composite site review.",
+  "category": "seo",
+  "priceTier": "pro",
+  "icon": "Search",
+  "version": "0.1.0"
+}

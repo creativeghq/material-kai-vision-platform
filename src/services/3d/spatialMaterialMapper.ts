@@ -384,14 +384,17 @@ export class SpatialMaterialMapper {
       }
     }
 
-    // Pattern matching
+    // Pattern matching — case-insensitive so "Herringbone" / "herringbone"
+    // / "HERRINGBONE" all score as a match. Pre-fix this was strict ===
+    // which silently scored 0 when casing differed across extractors.
     if (
       material.metadata?.pattern &&
       features.textureFeatures.pattern &&
       typeof material.metadata.pattern === 'string'
     ) {
-      const patternMatch =
-        material.metadata.pattern === features.textureFeatures.pattern ? 1 : 0;
+      const materialPattern = material.metadata.pattern.toLowerCase().trim();
+      const featurePattern = String(features.textureFeatures.pattern).toLowerCase().trim();
+      const patternMatch = materialPattern === featurePattern ? 1 : 0;
       confidence += patternMatch * 0.3;
       factors += 0.3;
     }

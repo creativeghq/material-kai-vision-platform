@@ -257,6 +257,128 @@ export async function getExternalServiceNames(supabase: SupabaseClient): Promise
   return Object.keys(pricingMap);
 }
 
+// ── Agent-chat per-turn billing (partner kai_* keys only) ─────────────────
+// Internal users (session JWT) are NOT billed per-turn — they already pay via
+// platform credits when individual tool calls debit. Partner kai_* keys pay
+// a flat fee per turn ON TOP of the underlying tool/AI usage. This matches
+// the pattern in mention_cost_logger.MENTION_OP_CREDIT_COST.
+//
+// 10 credits = $0.10 raw equivalent (1 credit = $0.01). Adjustable per-agent.
+// Refund on hard pre-execution failure (e.g. agent crashed before producing
+// a single chunk). NO refund once the agent has started streaming — the
+// underlying Anthropic + tool spend has already happened.
+const AGENT_CHAT_TURN_CREDIT_COST: Record<string, number> = {
+  kai: 10,
+  'interior-designer': 10,
+  demo: 0, // never billed; partner mode rejects this agent anyway
+};
+
+export function getAgentTurnCost(agentId: string): number {
+  return AGENT_CHAT_TURN_CREDIT_COST[agentId] ?? AGENT_CHAT_TURN_CREDIT_COST.kai;
+}
+
+export interface AgentTurnDebitResult {
+  success: boolean;
+  credits_debited: number;
+  new_balance?: number;
+  transaction_id?: string;
+  error?: string;
+}
+
+/**
+ * Pre-debit a flat per-turn fee for partner kai_* agent-chat calls.
+ * Returns 402-equivalent (`success: false` + `error: 'insufficient_credits'`)
+ * when the balance is too low. Caller MUST refuse to invoke the agent in
+ * that case.
+ */
+export async function debitAgentChatTurn(
+  supabase: SupabaseClient,
+  userId: string,
+  agentId: string,
+  metadata: Record<string, unknown> = {},
+): Promise<AgentTurnDebitResult> {
+  const credits = getAgentTurnCost(agentId);
+  if (credits <= 0) {
+    return { success: true, credits_debited: 0 };
+  }
+
+  const { data, error } = await supabase.rpc('debit_user_credits', {
+    p_user_id: userId,
+    p_amount: credits,
+    p_operation_type: 'agent_chat_turn',
+    p_description: `agent-chat ${agentId} (1 turn)`,
+    p_metadata: { ...metadata, agent_id: agentId, billing_type: 'agent_chat_turn' },
+  });
+
+  if (error) {
+    return { success: false, credits_debited: 0, error: error.message };
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result?.success) {
+    return {
+      success: false,
+      credits_debited: 0,
+      error: result?.error_message === 'Insufficient balance' ? 'insufficient_credits' : (result?.error_message || 'debit_failed'),
+    };
+  }
+
+  // Log to ai_usage_logs for partner cost transparency
+  supabase.from('ai_usage_logs').insert({
+    user_id: userId,
+    operation_type: 'agent_chat_turn',
+    model_name: `agent-${agentId}`,
+    api_provider: 'agent-chat',
+    input_tokens: 0,
+    output_tokens: 0,
+    input_cost_usd: 0,
+    output_cost_usd: 0,
+    raw_cost_usd: credits / 100,
+    markup_multiplier: 1,
+    billed_cost_usd: credits / 100,
+    credits_debited: credits,
+    metadata: { ...metadata, agent_id: agentId, billing_type: 'agent_chat_turn' },
+    created_at: new Date().toISOString(),
+  }).then(
+    () => {},
+    (e: unknown) => console.warn('[credit-utils] agent_chat_turn ai_usage_logs insert failed:', e),
+  );
+
+  return {
+    success: true,
+    credits_debited: credits,
+    new_balance: result.new_balance,
+    transaction_id: result.transaction_id,
+  };
+}
+
+/**
+ * Refund a previously-debited agent turn when the agent failed before
+ * producing any output (hard pre-stream error). NOT called once streaming
+ * has started — by then the spend is irrecoverable.
+ */
+export async function refundAgentChatTurn(
+  supabase: SupabaseClient,
+  userId: string,
+  agentId: string,
+  reason: string,
+  metadata: Record<string, unknown> = {},
+): Promise<void> {
+  const credits = getAgentTurnCost(agentId);
+  if (credits <= 0) return;
+
+  const { error } = await supabase.rpc('credit_user_credits', {
+    p_user_id: userId,
+    p_amount: credits,
+    p_operation_type: 'agent_chat_turn_refund',
+    p_description: `agent-chat ${agentId} refund: ${reason}`,
+    p_metadata: { ...metadata, agent_id: agentId, refund_reason: reason },
+  });
+  if (error) {
+    console.warn(`[credit-utils] Refund failed for ${userId} agent=${agentId}: ${error.message}`);
+  }
+}
+
 /**
  * Force-invalidate the in-memory pricing cache. Call this after admin price edits
  * if you need callers to see the new value before the 5-minute TTL expires.

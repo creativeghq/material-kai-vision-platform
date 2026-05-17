@@ -65,9 +65,6 @@ const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDash
 const SystemPerformance = lazy(() => import('./components/Admin/SystemPerformance').then(m => ({ default: m.SystemPerformance })));
 const MaterialSuggestionsPanel = lazy(() => import('./components/Admin/MaterialSuggestionsPanel').then(m => ({ default: m.MaterialSuggestionsPanel })));
 const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebuggingPanel'));
-const PackagesPanel = lazy(() => import('./components/Admin/PackagesPanel'));
-const MetadataManagement = lazy(() => import('./components/Admin/MetadataManagement').then(m => ({ default: m.MetadataManagement })));
-const RelevancyManagement = lazy(() => import('./components/Admin/RelevancyManagement').then(m => ({ default: m.RelevancyManagement })));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -81,10 +78,12 @@ const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAge
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
-const DuplicateDetectionPage = lazy(() => import('./pages/Admin/DuplicateDetectionPage'));
+const AIDataPage = lazy(() => import('./pages/Admin/AIDataPage'));
+const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
+const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
@@ -368,19 +367,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/admin/packages"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <PackagesPanel />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
+<Route
                   path="/admin/svbrdf"
                   element={
                     <AuthGuard>
@@ -433,9 +420,7 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
-                          <DuplicateDetectionPage />
-                        </Layout>
+                        <AIDataRedirect />
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -477,13 +462,23 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/admin/metadata"
+                  path="/admin/ai-data"
                   element={
                     <AuthGuard>
                       <AdminGuard>
                         <Layout>
-                          <MetadataManagement />
+                          <AIDataPage />
                         </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/metadata"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AIDataRedirect />
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -493,9 +488,7 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
-                          <RelevancyManagement />
-                        </Layout>
+                        <AIDataRedirect />
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -620,6 +613,7 @@ const App = () => (
                   }
                 />
 
+
                 {/* Public profile — no auth required */}
                 <Route
                   path="/u/:userId"
@@ -650,6 +644,9 @@ const App = () => (
                 <Route path="/coverage/*" element={<CoveragePage />} />
                 {/* AR Material Preview (public, no layout — for QR handoff from desktop) */}
                 <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
+
+                {/* Public Presentation Catalog (email-gated, no layout) */}
+                <Route path="/c/:slug" element={<PageErrorBoundary name="Public Catalog"><PublicCatalogPage /></PageErrorBoundary>} />
 
                 {/* Admin: Modules registry */}
                 <Route

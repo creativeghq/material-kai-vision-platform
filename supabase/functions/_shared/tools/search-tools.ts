@@ -24,6 +24,47 @@ async function getScrapeUrl() {
   return _scrapeUrl;
 }
 
+// Normalize product metadata before handing it to the LLM. Stage 0 writes
+// `{value, confidence}` envelopes on every field; Stage 4.7 writes
+// primitives. If the agent sees `color: {value: "red", confidence: 0.9}`
+// it can hallucinate or follow the literal JSON shape in its reply.
+// Strip wrappers + drop internal/provenance keys so the agent sees a clean
+// dict of plain values.
+const _INTERNAL_KEYS = new Set([
+  '_extraction_metadata',
+  '_discovered_extra',
+  'confidence',
+  'source',
+  'extraction_method',
+  'extraction_timestamp',
+]);
+function _unwrapAgentValue(v: unknown): unknown {
+  if (v === null || v === undefined) return v;
+  if (Array.isArray(v)) {
+    return v.map(_unwrapAgentValue).filter(x => x !== null && x !== undefined && x !== '');
+  }
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>;
+    if ('value' in obj) return _unwrapAgentValue(obj.value);
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(obj)) {
+      if (_INTERNAL_KEYS.has(k)) continue;
+      const unwrapped = _unwrapAgentValue(val);
+      if (unwrapped !== null && unwrapped !== undefined && unwrapped !== '') {
+        out[k] = unwrapped;
+      }
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  }
+  return v;
+}
+function normalizeMetadataForAgent(md: unknown): Record<string, unknown> {
+  const unwrapped = _unwrapAgentValue(md);
+  return unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)
+    ? (unwrapped as Record<string, unknown>)
+    : {};
+}
+
 async function getDebitCredits() {
   if (!_debitCredits) {
     const mod = await import('../credit-utils.ts');
@@ -285,13 +326,17 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             }));
           }
 
-          // Include product information if relevant
+          // Include product information if relevant. Normalize metadata
+          // through `normalizeMetadataForAgent` so the LLM sees plain
+          // primitives instead of {value, confidence} envelopes — those
+          // confuse the agent into either echoing the JSON or hallucinating
+          // around the wrapper shape.
           if (data.products && data.products.length > 0) {
             results.found = true;
             results.products = data.products.map((product: any) => ({
               name: product.name,
               description: product.description,
-              metadata: product.metadata,
+              metadata: normalizeMetadataForAgent(product.metadata),
               relevanceScore: product.relevance_score || 0,
             }));
           }

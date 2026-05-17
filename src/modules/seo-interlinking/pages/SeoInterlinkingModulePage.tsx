@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Globe, RefreshCw, Loader2, AlertTriangle, CheckCircle2, ExternalLink,
+  RefreshCw, Loader2, AlertTriangle, CheckCircle2, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,7 +43,7 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-const SeoInterlinkingModulePage: React.FC = () => {
+export const SeoInterlinkingPanel: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<AdminWebsiteRow[]>([]);
   const [counters, setCounters] = useState<Counters>({ total_sites: 0, total_pages: 0, errored: 0, never_crawled: 0 });
@@ -116,14 +115,12 @@ const SeoInterlinkingModulePage: React.FC = () => {
   };
 
   return (
-    <div>
-      <PageHeader
-        icon={Globe}
-        title="SEO Inter-linking"
-        subtitle="Connected user websites — sitemap-indexed pages used by the SEO article generator for site-aware link suggestions."
-      />
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Connected user websites — sitemap-indexed pages used by the SEO article generator for site-aware link suggestions.
+      </p>
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+      <div className="space-y-6">
         {/* Counters */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card className="dashboard-card">
@@ -280,4 +277,4 @@ const SeoInterlinkingModulePage: React.FC = () => {
   );
 };
 
-export default SeoInterlinkingModulePage;
+export default SeoInterlinkingPanel;

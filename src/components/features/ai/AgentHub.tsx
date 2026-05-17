@@ -3,7 +3,7 @@
  * Replaces SearchHub with comprehensive agent orchestration
  */
 
-import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
 import {
   Bot,
   Search,
@@ -33,7 +33,6 @@ import {
   ListChecks,
   GripVertical,
   Pencil,
-  Wrench,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -63,18 +62,41 @@ import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
-import { PromptLibrary } from './PromptLibrary';
+// PromptLibrary merged into PromptBuilderModal — its 35 design templates,
+// 10 room-filter chips, image-aware mode, and virtual-staging wizard hook
+// now live inside the "Prompt Library" tab when the active agent is
+// interior-designer. Templates extracted to interiorPromptTemplates.ts.
 import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import SEOArticleViewer from './SEOArticleViewer';
 import { InspirationUrlModal } from './InspirationUrlModal';
-import { StarterPromptsModal } from './StarterPromptsModal';
-import { ToolPickerModal } from './ToolPickerModal';
+// StarterPromptsModal removed — DB-curated starters now live inside
+// PromptBuilderModal as the "Prompt Library" tab.
+import { ToolkitPickerModal } from './ToolkitPickerModal';
+import {
+  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents,
+  type ToolkitDefinition,
+} from './agentToolsCatalog';
+import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
+import { WorkflowWizardCard } from './workflows/WorkflowWizardCard';
+import PromptBuilderModal from './PromptBuilderModal';
+import { useEnabledModules } from '@/modules/_core';
+import { WorkflowTracker } from './workflows/WorkflowTracker';
+import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
+import { CommandPalette } from './workflows/CommandPalette';
+import { getWorkflow as getWorkflowDefinition } from './workflows/workflowRegistry';
+import type {
+  WorkflowRuntimeState, WorkflowDefinition, WorkflowFieldSchema,
+} from './workflows/types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { SearchSpecCard } from './SearchSpecCard';
+import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
+import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageCandidatesCard';
+import { SEOResearchCard, type SEOResearchCardData } from './SEOResearchCard';
+import { SEOGenericCard, type SEOGenericCardData } from './SEOGenericCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
@@ -316,6 +338,53 @@ interface Message {
     product_name: string;
     tracked: Record<string, any> | null;
   };
+  jobFindingsData?: {
+    tracked_job_id: string;
+    tracked_job_label: string;
+    discovered_at_window: string;
+    listings: Array<{
+      id?: string;
+      url: string;
+      title?: string | null;
+      company?: string | null;
+      location?: string | null;
+      is_remote?: boolean | null;
+      salary_min?: number | null;
+      salary_max?: number | null;
+      salary_currency?: string | null;
+      employment_type?: string | null;
+      posted_at?: string | null;
+      source?: string;
+    }>;
+  };
+  seoResearchData?: SEOResearchCardData;
+  seoGenericData?: SEOGenericCardData;
+  catalogData?: {
+    event:
+      | 'created'
+      | 'pdfs_attached'
+      | 'extraction_candidates'
+      | 'translation_ready'
+      | 'material_added'
+      | 'image_candidates'
+      | 'pdf_ready'
+      | 'published'
+      | 'unpublished';
+    catalog_id: string;
+    payload: Record<string, any>;
+  };
+  catalogExtractionData?: {
+    catalog_id: string;
+    query: string;
+    candidates: ExtractionCandidate[];
+  };
+  catalogImageCandidatesData?: {
+    catalog_id: string;
+    section_id: string | null;
+    material_id: string | null;
+    material_name: string;
+    candidates: ImageCandidate[];
+  };
 }
 
 interface AgentHubProps {
@@ -409,12 +478,276 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [editingConvoTitle, setEditingConvoTitle] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
-  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  // showPromptLibrary removed — Interior-only legacy duplicate. Prompts now in PromptBuilderModal "Prompt Library" tab.
   const [showInspirationModal, setShowInspirationModal] = useState(false);
-  const [showStarterPrompts, setShowStarterPrompts] = useState(false);
-  const [showToolPicker, setShowToolPicker] = useState(false);
-  const [selectedTools, setSelectedTools] = useState<string[]>([]);
+  // showStarterPrompts removed — merged into showPromptBuilder modal
+  const [showToolkitPicker, setShowToolkitPicker] = useState(false);
+  const [showPromptBuilder, setShowPromptBuilder] = useState(false);
+  // Active toolkits — per-conversation when one is loaded, otherwise the
+  // localStorage default for the next new chat. Always force-includes Core.
+  // Hydration order:
+  //   1. Conversation loaded → use convo.toolkits (DB source of truth)
+  //   2. New chat → use localStorage `mk_active_toolkits` (browser default)
+  //   3. Neither → just Core
+  const [activeToolkits, setActiveToolkits] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [...ALWAYS_ON_TOOLKIT_IDS];
+    try {
+      const raw = window.localStorage.getItem('mk_active_toolkits');
+      if (!raw) return [...ALWAYS_ON_TOOLKIT_IDS];
+      const parsed = JSON.parse(raw) as string[];
+      const merged = new Set<string>([...parsed, ...ALWAYS_ON_TOOLKIT_IDS]);
+      return [...merged];
+    } catch { return [...ALWAYS_ON_TOOLKIT_IDS]; }
+  });
+  // The toolkit that was JUST enabled — drives the ToolkitOnboardingCard.
+  // Cleared when the user clicks a quick-start, dismisses the card, or sends
+  // any message.
+  const [justEnabledToolkitId, setJustEnabledToolkitId] = useState<string | null>(null);
+  // Workflow runtime — keyed by run_id. Mutated by workflow_* chunks. The
+  // WorkflowTracker renders one card per active run at the top of the chat.
+  const [workflows, setWorkflows] = useState<Record<string, WorkflowRuntimeState>>({});
+
+  /**
+   * Universal pre-launch check used by EVERY quick-start click (whether it
+   * boots a wizard or fires a prompt). Guarantees the agent has the tools by:
+   *   1. Auto-switching the active agent to one that owns the toolkit's tools
+   *      (computed dynamically from agentToolsCatalog).
+   *   2. Auto-enabling the toolkit in activeToolkits so the agent-chat backend
+   *      binds the tools on the next message.
+   * Without this, clicking any quick-start while on the wrong agent or with
+   * the toolkit disabled gave the dreaded "I don't have those tools" reply.
+   */
+  const ensureAgentAndToolkit = useCallback((toolkit: ToolkitDefinition) => {
+    const owners = getToolkitOwnerAgents(toolkit);
+    if (!owners.includes(selectedAgent)) {
+      setSelectedAgent(owners[0]);
+    }
+    if (!toolkit.alwaysOn && !activeToolkits.includes(toolkit.id)) {
+      // setActiveToolkits inline (avoids the not-yet-declared dep on updateActiveToolkits)
+      const merged = new Set<string>([...activeToolkits, toolkit.id, ...ALWAYS_ON_TOOLKIT_IDS]);
+      const arr = [...merged];
+      setActiveToolkits(arr);
+      try { window.localStorage.setItem('mk_active_toolkits', JSON.stringify(arr)); } catch { /* private */ }
+      if (currentConversationId) {
+        agentChatHistoryService.updateConversationToolkits(currentConversationId, arr).catch(() => {});
+      }
+    }
+  }, [selectedAgent, activeToolkits, currentConversationId]);
+
+  // Toolkit setter — writes to local state, persists to localStorage (browser
+  // default for new chats), and saves to the current conversation's row when
+  // one is loaded. Detects "just enabled" toolkits to surface the onboarding
+  // card. Declared here so bootWorkflowLocally can reference it.
+  const updateActiveToolkits = useCallback((next: string[]) => {
+    const merged = new Set<string>([...next, ...ALWAYS_ON_TOOLKIT_IDS]);
+    const arr = [...merged];
+    setActiveToolkits((prev) => {
+      const added = arr.find((id) => !prev.includes(id) && !ALWAYS_ON_TOOLKIT_IDS.includes(id));
+      if (added) setJustEnabledToolkitId(added);
+      return arr;
+    });
+    try { window.localStorage.setItem('mk_active_toolkits', JSON.stringify(arr)); } catch { /* private mode */ }
+    if (currentConversationId) {
+      agentChatHistoryService.updateConversationToolkits(currentConversationId, arr).catch((err) => {
+        console.warn('[AgentHub] Failed to persist toolkits to conversation:', err);
+      });
+    }
+  }, [currentConversationId]);
+
+  /**
+   * Boot a workflow LOCALLY without round-tripping through the agent. Used by
+   * the toolkit quick-starts that carry a `workflow_id` — the user clicks
+   * "Build my first catalog" and the wizard renders immediately with the
+   * first step's form, no agent latency. Subsequent step advances DO call
+   * the agent (the agent runs the step's tool + emits step_progress chunks),
+   * but the user sees the wizard the moment they click.
+   *
+   * Side effects to make the wizard always work:
+   *   1. Auto-switch the active agent to def.agent_id (defaults to 'kai') so
+   *      the agent that owns the workflow's tools is the one receiving the
+   *      Next-click messages. Without this, clicking a Catalogs wizard while
+   *      on Interior Designer would send messages to an agent that doesn't
+   *      have catalog tools.
+   *   2. Auto-enable the workflow's moduleSlug toolkit (catalogs / mentions /
+   *      etc.) so the tools are bound on the next message. Persists to the
+   *      current conversation if loaded.
+   */
+  const bootWorkflowLocally = useCallback((workflowId: string): string | null => {
+    const def = getWorkflowDefinition(workflowId);
+    if (!def) return null;
+
+    // 1. Switch agent if needed
+    const targetAgent = def.agent_id || 'kai';
+    if (targetAgent !== selectedAgent) {
+      setSelectedAgent(targetAgent);
+    }
+
+    // 2. Auto-enable the toolkit that owns this workflow's tools. We map
+    // workflow → toolkit by definition_id (catalog-* → catalogs, seo-* →
+    // seo-article, b2b-* → b2b, etc.) so the user doesn't get a "tools not
+    // available" reply when the agent runs the first step.
+    const toolkitForWorkflow: Record<string, string> = {
+      'catalog-build': 'catalogs',
+      'catalog-translate': 'catalogs',
+      'catalog-resume': 'catalogs',
+      'catalog-send': 'catalogs',
+      'seo-article': 'seo-article',
+      'mention-monitor': 'mentions',
+      'presentation-sheet': 'presentation-sheets',
+      'b2b-research': 'b2b',
+    };
+    const requiredToolkit = toolkitForWorkflow[workflowId];
+    if (requiredToolkit && !activeToolkits.includes(requiredToolkit)) {
+      updateActiveToolkits([...activeToolkits, requiredToolkit]);
+    }
+
+    const runId = crypto.randomUUID();
+    const stepOrder = def.steps.map((s) => s.id);
+    const stepsRt: Record<string, any> = {};
+    for (const id of stepOrder) stepsRt[id] = { step_id: id, status: 'pending' };
+    // Preempt the first step into awaiting_input so the wizard renders its
+    // form immediately. The agent will catch up when the user clicks Next.
+    const firstStep = def.steps[0];
+    if (firstStep && firstStep.input_schema && firstStep.input_schema.length > 0) {
+      stepsRt[firstStep.id] = {
+        step_id: firstStep.id,
+        status: 'awaiting_input',
+      };
+    }
+    setWorkflows((prev) => ({
+      ...prev,
+      [runId]: {
+        definition_id: workflowId,
+        run_id: runId,
+        title: def.name,
+        subtitle: undefined,
+        steps: stepsRt,
+        step_order: stepOrder,
+        status: 'planning',
+        metadata: { booted_locally: true },
+        collapsed: false,
+        awaiting_input_step_id: firstStep?.input_schema?.length ? firstStep.id : null,
+        awaiting_input_schema: firstStep?.input_schema,
+        awaiting_input_prompt: firstStep ? `Step 1 of ${def.steps.length} — ${firstStep.title}` : undefined,
+      },
+    }));
+    return runId;
+  }, [selectedAgent, activeToolkits, updateActiveToolkits]);
+
+  /**
+   * Advance a wizard step. Composes a structured continuation message the
+   * agent picks up (parsed deterministically by the prompt addendum) OR
+   * a free-form custom prompt when the user opted into the override. Sets
+   * the step to `running` locally; the real progress comes from the agent
+   * via `workflow_step_progress` chunks.
+   */
+  const handleWizardAdvance = useCallback((args: {
+    runId: string;
+    stepId: string;
+    formValues?: Record<string, any>;
+    customPrompt?: string;
+  }) => {
+    setWorkflows((prev) => {
+      const wf = prev[args.runId];
+      if (!wf) return prev;
+      return {
+        ...prev,
+        [args.runId]: {
+          ...wf,
+          awaiting_input_step_id: null,
+          awaiting_input_schema: undefined,
+          awaiting_input_prompt: undefined,
+          status: 'running',
+          steps: {
+            ...wf.steps,
+            [args.stepId]: {
+              ...(wf.steps[args.stepId] || { step_id: args.stepId, status: 'pending' }),
+              input: args.formValues,
+              status: 'running',
+            },
+          },
+        },
+      };
+    });
+
+    // Compose the message the agent will see. Two shapes:
+    //   • Structured continuation — parsed via the prompt addendum to resume
+    //     the step with form values, no LLM ambiguity.
+    //   • Free-form prose — when the user used the "in your own words" override,
+    //     the agent reads it normally and runs the step using its own judgment.
+    //
+    // The prefix includes the run_id so the agent can preserve it across the
+    // remaining steps. Agent prompt addendum instructs: extract run_id from
+    // the prefix, pass it to every tool as `_workflow_run_id`, and emit all
+    // workflow_step_progress chunks with that exact run_id.
+    const wf = workflows[args.runId];
+    const prefix = `[workflow:${wf?.definition_id || 'unknown'}/${args.stepId}:${args.runId}] `;
+    const message = args.customPrompt
+      ? `${prefix}continue with: ${args.customPrompt}`
+      : `${prefix}continue with input: ${JSON.stringify(args.formValues || {})}`;
+    setInput(message);
+    setTimeout(() => handleSendMessage(), 0);
+  }, [workflows]);
+
+  const handleWizardSkip = useCallback((runId: string, stepId: string) => {
+    setWorkflows((prev) => {
+      const wf = prev[runId];
+      if (!wf) return prev;
+      // Mark current step skipped, advance awaiting_input to the next step
+      // that needs input (if any), so the wizard renders the next form.
+      const nextSteps = { ...wf.steps };
+      nextSteps[stepId] = {
+        ...(nextSteps[stepId] || { step_id: stepId, status: 'pending' }),
+        status: 'skipped',
+      };
+      const def = getWorkflowDefinition(wf.definition_id);
+      const currentIdx = wf.step_order.indexOf(stepId);
+      let nextAwaiting: string | null = null;
+      let nextSchema: any | undefined = undefined;
+      if (def && currentIdx >= 0 && currentIdx + 1 < wf.step_order.length) {
+        for (let i = currentIdx + 1; i < wf.step_order.length; i++) {
+          const candidateId = wf.step_order[i];
+          const candidateDef = def.steps.find((s) => s.id === candidateId);
+          if (candidateDef?.input_schema?.length) {
+            nextAwaiting = candidateId;
+            nextSchema = candidateDef.input_schema;
+            nextSteps[candidateId] = {
+              ...(nextSteps[candidateId] || { step_id: candidateId, status: 'pending' }),
+              status: 'awaiting_input',
+            };
+            break;
+          }
+        }
+      }
+      return {
+        ...prev,
+        [runId]: {
+          ...wf,
+          steps: nextSteps,
+          awaiting_input_step_id: nextAwaiting,
+          awaiting_input_schema: nextSchema,
+          awaiting_input_prompt: nextAwaiting ? `Continuing after skip` : undefined,
+        },
+      };
+    });
+  }, []);
+
+  const handleWizardDismiss = useCallback((runId: string) => {
+    setWorkflows((prev) => {
+      const next = { ...prev };
+      delete next[runId];
+      return next;
+    });
+  }, []);
+  // Command palette — opens when the user types `/` at the start of an empty input
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
   const { isAdmin } = useUserRole();
+  // Enabled modules from public.modules — drives module-gated toolkit visibility
+  // (Catalogs needs `presentation-catalogs`, Mentions needs `mention-monitoring`, etc.)
+  const { enabledSlugs: enabledModuleSlugs } = useEnabledModules();
+  const enabledModulesArray = useMemo(() => Array.from(enabledModuleSlugs), [enabledModuleSlugs]);
+
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   // Elapsed time tracked by ThinkingTimer component; ref avoids re-renders in parent
@@ -1167,6 +1500,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           title: userInput.slice(0, 50) + (userInput.length > 50 ? '...' : ''),
           agentId: selectedAgent,
           userId: userId,
+          // Capture current toolkit selection so the convo persists what was
+          // active at creation time. Reloading the convo restores the same set.
+          toolkits: activeToolkits,
         });
         if (conversation) {
           conversationId = conversation.id;
@@ -1243,7 +1579,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           ...(pinnedMaterials.length > 0 && selectedAgent === 'interior-designer'
             ? { pinned_material_images: pinnedMaterials.filter(m => m.imageUrl).map(m => m.imageUrl!) }
             : {}),
-          ...(selectedTools.length > 0 ? { selected_tools: selectedTools } : {}),
+          // Toolkit-level enablement — agent-chat resolves these to tool IDs server-side.
+          // Always includes the always-on Core toolkit. Single source of truth for
+          // tool gating; the per-tool restriction picker was removed 2026-05-09 in
+          // favor of the visual toolkit picker + load_toolkit meta-tool.
+          selected_toolkits: activeToolkits,
         };
 
         // Call Supabase Edge Function for agent execution with STREAMING
@@ -1782,6 +2122,243 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionTrackingStartedData: m.mentionTrackingStartedData },
                   });
                 }
+              } else if (typeof chunk.type === 'string' && chunk.type.startsWith('seo_') && chunk.type.endsWith('_card') && chunk.type !== 'seo_research_card') {
+                // Generic SEO toolkit card — one handler for all 22+ chunk types.
+                // The card component picks the right inline mini-renderer based on data.type.
+                const m: Message = {
+                  id: `msg-seo-${chunk.type}-${Date.now()}`,
+                  role: 'assistant',
+                  content: `${chunk.type.replace(/_/g, ' ')}: result rendered above.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  seoGenericData: chunk as SEOGenericCardData,
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, seoGenericData: m.seoGenericData },
+                  });
+                }
+              } else if (chunk.type === 'seo_research_card') {
+                const sigCount = chunk.opportunity_count ?? chunk.opportunities?.length ?? 0;
+                const m: Message = {
+                  id: `msg-seo-research-${Date.now()}`,
+                  role: 'assistant',
+                  content: `SEO research for "${chunk.keyword}" (${chunk.country} · ${chunk.language}): ${sigCount} signals across ${Object.keys(chunk.summary?.types || {}).length} types.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  seoResearchData: {
+                    keyword: chunk.keyword,
+                    country: chunk.country,
+                    language: chunk.language,
+                    opportunity_count: sigCount,
+                    summary: chunk.summary || {},
+                    opportunities: chunk.opportunities || [],
+                    errors: chunk.errors,
+                    latency_ms: chunk.latency_ms,
+                  },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, seoResearchData: m.seoResearchData },
+                  });
+                }
+              } else if (chunk.type === 'toolkit_loaded') {
+                // The agent called load_toolkit mid-conversation — auto-add
+                // the requested toolkit to the user's active set so the next
+                // turn binds those tools. Persisted to localStorage.
+                const newToolkitId = chunk.toolkit_id as string;
+                if (newToolkitId && !activeToolkits.includes(newToolkitId)) {
+                  updateActiveToolkits([...activeToolkits, newToolkitId]);
+                  toast({
+                    title: `${chunk.toolkit_name || newToolkitId} toolkit loaded`,
+                    description: `${chunk.tool_ids?.length || 0} tools now available — re-send your request to use them.`,
+                  });
+                }
+              } else if (chunk.type === 'workflow_plan') {
+                // Boot the tracker. Chunk shape: { run_id, definition_id, title?, subtitle?, metadata?, step_overrides? }
+                //
+                // run_id correlation: when bootWorkflowLocally was used (the
+                // wizard kicked off without a server round-trip), the local
+                // run_id is a UUID generated on the frontend. The server-side
+                // tools emit chunks using their natural primary entity ID
+                // (catalog_id, sheet_id, tracked_mention_id, etc.). When the
+                // first workflow_plan chunk arrives with a NEW run_id but
+                // matches a locally-booted run of the same definition_id, we
+                // MIGRATE the state: transfer step_order + step states +
+                // collapsed flag, then drop the local entry. From this point
+                // forward the server's run_id is canonical.
+                const def = getWorkflowDefinition(chunk.definition_id);
+                if (def) {
+                  const stepOrder = (chunk.step_overrides || def.steps).map((s: any) => s.id);
+                  setWorkflows(prev => {
+                    // Find a locally-booted run for this workflow_id that
+                    // hasn't been migrated yet (still in 'planning' or
+                    // 'running' status). If so, migrate it.
+                    const localKey = Object.keys(prev).find((k) =>
+                      prev[k].definition_id === chunk.definition_id
+                      && k !== chunk.run_id
+                      && prev[k].metadata?.booted_locally
+                      && (prev[k].status === 'planning' || prev[k].status === 'running')
+                    );
+                    if (localKey && localKey !== chunk.run_id) {
+                      const next = { ...prev };
+                      const local = next[localKey];
+                      delete next[localKey];
+                      next[chunk.run_id] = {
+                        ...local,
+                        run_id: chunk.run_id,
+                        title: chunk.title || local.title,
+                        subtitle: chunk.subtitle || local.subtitle,
+                        metadata: { ...(local.metadata || {}), ...(chunk.metadata || {}), booted_locally: false, migrated_from: localKey },
+                        // Keep local step state (the user already filled the first form)
+                        // but reconcile step_order if the server reordered
+                        step_order: stepOrder,
+                      };
+                      return next;
+                    }
+                    // Otherwise, normal boot — fresh entry
+                    const stepsRt: Record<string, any> = {};
+                    for (const id of stepOrder) stepsRt[id] = { step_id: id, status: 'pending' };
+                    return {
+                      ...prev,
+                      [chunk.run_id]: {
+                        definition_id: chunk.definition_id,
+                        run_id: chunk.run_id,
+                        title: chunk.title,
+                        subtitle: chunk.subtitle,
+                        steps: stepsRt,
+                        step_order: stepOrder,
+                        status: 'planning',
+                        metadata: chunk.metadata || {},
+                        collapsed: false,
+                        awaiting_input_step_id: null,
+                      },
+                    };
+                  });
+                }
+              } else if (chunk.type === 'workflow_step_progress') {
+                setWorkflows(prev => {
+                  const wf = prev[chunk.run_id];
+                  if (!wf) return prev;
+                  const nextSteps = {
+                    ...wf.steps,
+                    [chunk.step_id]: {
+                      ...(wf.steps[chunk.step_id] || { step_id: chunk.step_id, status: 'pending' }),
+                      status: chunk.status,
+                      status_line: chunk.status_line,
+                      input: chunk.input ?? wf.steps[chunk.step_id]?.input,
+                      output: chunk.output ?? wf.steps[chunk.step_id]?.output,
+                      error_message: chunk.error_message,
+                      ...(chunk.status === 'running' && !wf.steps[chunk.step_id]?.started_at ? { started_at: new Date().toISOString() } : {}),
+                      ...(chunk.status === 'done' || chunk.status === 'failed' || chunk.status === 'skipped' ? { completed_at: new Date().toISOString() } : {}),
+                    },
+                  };
+                  // Derive overall status
+                  const stepStatuses = Object.values(nextSteps).map((s: any) => s.status);
+                  let overall: WorkflowRuntimeState['status'] = wf.status;
+                  if (stepStatuses.some((s) => s === 'running' || s === 'awaiting_input')) overall = 'running';
+                  else if (stepStatuses.every((s) => s === 'done' || s === 'skipped')) overall = 'done';
+                  return { ...prev, [chunk.run_id]: { ...wf, steps: nextSteps, status: overall } };
+                });
+              } else if (chunk.type === 'workflow_step_input_request') {
+                setWorkflows(prev => {
+                  const wf = prev[chunk.run_id];
+                  if (!wf) return prev;
+                  return {
+                    ...prev,
+                    [chunk.run_id]: {
+                      ...wf,
+                      awaiting_input_step_id: chunk.step_id,
+                      awaiting_input_schema: chunk.schema,
+                      awaiting_input_prompt: chunk.prompt,
+                      steps: { ...wf.steps, [chunk.step_id]: { ...(wf.steps[chunk.step_id] || { step_id: chunk.step_id, status: 'pending' }), status: 'awaiting_input' } },
+                      status: 'running',
+                    },
+                  };
+                });
+              } else if (chunk.type === 'workflow_finished') {
+                setWorkflows(prev => {
+                  const wf = prev[chunk.run_id];
+                  if (!wf) return prev;
+                  return {
+                    ...prev,
+                    [chunk.run_id]: {
+                      ...wf,
+                      status: chunk.status,
+                      collapsed: chunk.status === 'done',
+                      awaiting_input_step_id: null,
+                      awaiting_input_schema: undefined,
+                    },
+                  };
+                });
+              } else if (typeof chunk.type === 'string' && chunk.type.startsWith('catalog_')) {
+                const event = chunk.type.replace(/^catalog_/, '') as
+                  | 'created' | 'pdfs_attached' | 'extraction_candidates' | 'translation_ready'
+                  | 'material_added' | 'image_candidates' | 'pdf_ready' | 'published' | 'unpublished';
+                let line = '';
+                if (event === 'created') {
+                  line = `Catalog created — "${chunk.title}" (id: ${chunk.catalog_id}). Open it at /admin/catalogs/${chunk.catalog_id} or keep building from chat.`;
+                } else if (event === 'pdfs_attached') {
+                  line = `Attached ${chunk.pdf_ids?.length ?? 0} source PDF${chunk.pdf_ids?.length === 1 ? '' : 's'} to the catalog.`;
+                } else if (event === 'extraction_candidates') {
+                  line = `Found ${chunk.candidates?.length ?? 0} material candidate${chunk.candidates?.length === 1 ? '' : 's'} for "${chunk.query}". Open the catalog to review and approve.`;
+                } else if (event === 'translation_ready') {
+                  line = `Translated source PDF into ${chunk.sections_count ?? 0} sections / ${chunk.materials_count ?? 0} materials.`;
+                } else if (event === 'material_added') {
+                  line = `Added "${chunk.name}" to "${chunk.section_title}"${chunk.has_image ? '' : ' — needs image'}.`;
+                } else if (event === 'image_candidates') {
+                  line = `Found ${chunk.candidates?.length ?? 0} image candidate${chunk.candidates?.length === 1 ? '' : 's'} for "${chunk.material_name}". Open the catalog to pick one.`;
+                } else if (event === 'pdf_ready') {
+                  line = `Catalog PDF ready — ${chunk.page_count ?? '?'} pages.`;
+                } else if (event === 'published') {
+                  line = `Published. Public URL: ${chunk.public_url}`;
+                } else if (event === 'unpublished') {
+                  line = `Catalog archived (no longer publicly accessible).`;
+                }
+                const m: Message = {
+                  id: `msg-catalog-${event}-${Date.now()}`,
+                  role: 'assistant',
+                  content: line,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  catalogData: { event, catalog_id: chunk.catalog_id, payload: chunk },
+                };
+                if (event === 'extraction_candidates' && Array.isArray(chunk.candidates)) {
+                  m.catalogExtractionData = {
+                    catalog_id: chunk.catalog_id,
+                    query: chunk.query || '',
+                    candidates: chunk.candidates,
+                  };
+                }
+                if (event === 'image_candidates' && Array.isArray(chunk.candidates)) {
+                  m.catalogImageCandidatesData = {
+                    catalog_id: chunk.catalog_id,
+                    section_id: chunk.section_id ?? null,
+                    material_id: chunk.material_id ?? null,
+                    material_name: chunk.material_name || '',
+                    candidates: chunk.candidates,
+                  };
+                }
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: {
+                      agentId: selectedAgent,
+                      model: selectedModel,
+                      catalogData: m.catalogData,
+                      catalogExtractionData: m.catalogExtractionData,
+                      catalogImageCandidatesData: m.catalogImageCandidatesData,
+                    },
+                  });
+                }
               } else if (chunk.type === 'final_result') {
                 finalResult = chunk;
               } else if (chunk.type === 'tool_error') {
@@ -2040,6 +2617,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     async (conversationId: string) => {
       setCurrentConversationId(conversationId);
       onConversationChange?.(conversationId);
+      // Hydrate the conversation's saved toolkit set so resuming a chat
+      // restores its toolset. Always merges in the always-on Core. Suppress
+      // the onboarding card on hydration (the user isn't enabling anything
+      // new — they're loading an existing conversation).
+      const convoMeta = conversations.find((c) => c.id === conversationId);
+      if (convoMeta?.toolkits && convoMeta.toolkits.length > 0) {
+        const merged = new Set<string>([...convoMeta.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
+        setActiveToolkits([...merged]);
+      } else {
+        // Fallback: fetch the conversation row directly
+        const fetched = await agentChatHistoryService.getConversation(conversationId);
+        if (fetched?.toolkits) {
+          const merged = new Set<string>([...fetched.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
+          setActiveToolkits([...merged]);
+        }
+      }
+      setJustEnabledToolkitId(null);
       const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
       setMessages(
         msgs.map((msg) => ({
@@ -2066,6 +2660,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
           mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
           mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
+          // Job-research daily digest cards (cron-posted directly into the convo by the dispatcher,
+          // so the chunk arrives as `metadata.chunk_type === 'job_findings'` rather than via a streaming chunk)
+          jobFindingsData: (msg.metadata?.chunk_type === 'job_findings'
+            ? {
+                tracked_job_id: msg.metadata.tracked_job_id,
+                tracked_job_label: msg.metadata.tracked_job_label,
+                discovered_at_window: msg.metadata.discovered_at_window,
+                listings: msg.metadata.listings || [],
+              }
+            : (msg.metadata?.jobFindingsData as any | undefined)),
+          seoResearchData: msg.metadata?.seoResearchData as any | undefined,
+          seoGenericData: msg.metadata?.seoGenericData as any | undefined,
         })),
       );
     },
@@ -2085,6 +2691,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setCurrentConversationId(null);
     setMessages([]);
     onConversationChange?.(null);
+    setJustEnabledToolkitId(null);
+    // Reset to the localStorage default toolkit set (Core + whatever the user
+    // last picked in the picker). Doesn't trigger the onboarding card —
+    // there's nothing "just enabled".
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem('mk_active_toolkits');
+        if (raw) {
+          const parsed = JSON.parse(raw) as string[];
+          const merged = new Set<string>([...parsed, ...ALWAYS_ON_TOOLKIT_IDS]);
+          setActiveToolkits([...merged]);
+        } else {
+          setActiveToolkits([...ALWAYS_ON_TOOLKIT_IDS]);
+        }
+      } catch { setActiveToolkits([...ALWAYS_ON_TOOLKIT_IDS]); }
+    }
   }, [onConversationChange]);
 
   const handleDeleteConversation = useCallback(async (e: React.MouseEvent, conversationId: string) => {
@@ -2282,6 +2904,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <div className="text-xs text-muted-foreground truncate">
                       {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
                     </div>
+                    {/* Toolkit chips: which capability clusters this convo uses.
+                        Skip Core (always-on, low signal). Show up to 3, with a
+                        "+N" badge for the rest. */}
+                    {convo.toolkits && convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {convo.toolkits
+                          .filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id))
+                          .slice(0, 3)
+                          .map((id) => {
+                            const tk = TOOLKITS.find((t) => t.id === id);
+                            if (!tk) return null;
+                            return (
+                              <span
+                                key={id}
+                                className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 text-primary px-1.5 py-0 text-[9px] leading-relaxed"
+                                title={tk.name}
+                              >
+                                <Layers className="h-2 w-2" /> {tk.name}
+                              </span>
+                            );
+                          })}
+                        {convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 3 && (
+                          <span className="text-[9px] text-muted-foreground">
+                            +{convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
                     <button
@@ -2434,9 +3084,50 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         )}
         {/* Messages Area */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center space-y-4">
+          {/* Active workflow wizards — render whenever any are active, regardless
+              of message count. This is what makes the "click Build my first
+              catalog → wizard appears instantly on an empty chat" path work.
+              Without this rendered above the empty/non-empty branch, booting
+              a workflow locally would update state but show nothing because
+              the empty state still wins until the first message arrives. */}
+          {Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').map((wf) => (
+            <WorkflowWizardCard
+              key={`wizard-${wf.run_id}`}
+              runtime={wf}
+              onAdvance={handleWizardAdvance}
+              onSkip={handleWizardSkip}
+              onDismiss={handleWizardDismiss}
+            />
+          ))}
+
+          {/* Just-enabled toolkit onboarding card — also renders regardless of
+              message count so users see the quick-starts the moment they
+              enable a toolkit. */}
+          {justEnabledToolkitId && (() => {
+            const tk = TOOLKITS.find((t) => t.id === justEnabledToolkitId);
+            if (!tk || !(tk.quick_starts?.length || 0)) return null;
+            return (
+              <ToolkitOnboardingCard
+                mode="just_enabled"
+                toolkits={[tk]}
+                onLaunch={(prompt, qs, tkParam) => {
+                  setJustEnabledToolkitId(null);
+                  ensureAgentAndToolkit(tkParam);
+                  if (qs.workflow_id) {
+                    bootWorkflowLocally(qs.workflow_id);
+                  } else {
+                    setInput(prompt);
+                    setTimeout(() => handleSendMessage(), 0);
+                  }
+                }}
+                onDismiss={() => setJustEnabledToolkitId(null)}
+              />
+            );
+          })()}
+
+          {messages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center">
+              <div className="text-center space-y-4 mb-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
                   <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />
                 </div>
@@ -2449,9 +3140,119 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   </p>
                 </div>
               </div>
+              {/* Toolkit-driven empty state — every active toolkit's quick-starts.
+                  Always renders something because Core has its own quick-starts. */}
+              <ToolkitOnboardingCard
+                mode="empty_state"
+                toolkits={activeToolkits
+                  .map((id) => TOOLKITS.find((t) => t.id === id))
+                  .filter((tk): tk is NonNullable<typeof tk> => !!tk)
+                  .filter((tk) => (tk.quick_starts?.length || 0) > 0)}
+                onLaunch={(prompt, qs, tk) => {
+                  setJustEnabledToolkitId(null);
+                  // Universal pre-launch guarantee: agent + toolkit are always
+                  // ready before the message fires, regardless of wizard or
+                  // prompt-fire path. No more "I don't have those tools" replies.
+                  ensureAgentAndToolkit(tk);
+                  if (qs.workflow_id) {
+                    bootWorkflowLocally(qs.workflow_id);
+                  } else {
+                    setInput(prompt);
+                    setTimeout(() => handleSendMessage(), 0);
+                  }
+                }}
+              />
             </div>
+          ) : messages.length === 0 ? (
+            // Wizard is active but no messages yet — wizard already renders above.
+            null
           ) : (
             <>
+              {/* Workflow trackers — pinned above messages, one per active run */}
+              {Object.values(workflows).length > 0 && (
+                <div className="space-y-2">
+                  {Object.values(workflows)
+                    .filter((wf) => wf.status !== 'aborted')
+                    .map((wf) => {
+                      const awaitingId = wf.awaiting_input_step_id;
+                      const showForm = awaitingId && wf.awaiting_input_schema && wf.awaiting_input_schema.length > 0;
+                      return (
+                        <WorkflowTracker
+                          key={wf.run_id}
+                          runtime={wf}
+                          onToggleCollapse={() => setWorkflows((prev) => ({
+                            ...prev,
+                            [wf.run_id]: { ...prev[wf.run_id], collapsed: !prev[wf.run_id].collapsed },
+                          }))}
+                          onStepAction={(stepId, action) => {
+                            if (action === 'skip') {
+                              setWorkflows((prev) => ({
+                                ...prev,
+                                [wf.run_id]: {
+                                  ...prev[wf.run_id],
+                                  steps: { ...prev[wf.run_id].steps, [stepId]: { ...(prev[wf.run_id].steps[stepId] || { step_id: stepId, status: 'pending' }), status: 'skipped' } },
+                                  awaiting_input_step_id: prev[wf.run_id].awaiting_input_step_id === stepId ? null : prev[wf.run_id].awaiting_input_step_id,
+                                },
+                              }));
+                            } else if (action === 'rerun' || action === 'edit_input') {
+                              const def = getWorkflowDefinition(wf.definition_id);
+                              const stepDef = def?.steps.find((s) => s.id === stepId);
+                              if (stepDef?.input_schema) {
+                                setWorkflows((prev) => ({
+                                  ...prev,
+                                  [wf.run_id]: {
+                                    ...prev[wf.run_id],
+                                    awaiting_input_step_id: stepId,
+                                    awaiting_input_schema: stepDef.input_schema,
+                                    awaiting_input_prompt: `Edit input for "${stepDef.title}".`,
+                                  },
+                                }));
+                              }
+                            }
+                          }}
+                          bottomSlot={showForm && (
+                            <WorkflowInlineForm
+                              prompt={wf.awaiting_input_prompt || `Step "${awaitingId}" needs input.`}
+                              schema={wf.awaiting_input_schema!}
+                              initialValues={wf.steps[awaitingId!]?.input}
+                              onSubmit={async (values) => {
+                                // The agent picks up the next message and resumes the workflow.
+                                // We package the form values as a structured continuation hint
+                                // so the agent prompt addendum can parse it deterministically.
+                                const def = getWorkflowDefinition(wf.definition_id);
+                                const stepDef = def?.steps.find((s) => s.id === awaitingId);
+                                const continuation = `[workflow:${wf.definition_id}/${awaitingId}] continue with input: ${JSON.stringify(values)}`;
+                                setWorkflows((prev) => ({
+                                  ...prev,
+                                  [wf.run_id]: {
+                                    ...prev[wf.run_id],
+                                    awaiting_input_step_id: null,
+                                    awaiting_input_schema: undefined,
+                                    awaiting_input_prompt: undefined,
+                                    steps: { ...prev[wf.run_id].steps, [awaitingId!]: { ...(prev[wf.run_id].steps[awaitingId!] || { step_id: awaitingId!, status: 'pending' }), input: values, status: 'running' } },
+                                  },
+                                }));
+                                setInput(continuation);
+                                // Auto-send so the user doesn't have to click again
+                                setTimeout(() => handleSendMessage(), 0);
+                              }}
+                              onCancel={() => setWorkflows((prev) => ({
+                                ...prev,
+                                [wf.run_id]: {
+                                  ...prev[wf.run_id],
+                                  awaiting_input_step_id: null,
+                                  awaiting_input_schema: undefined,
+                                  awaiting_input_prompt: undefined,
+                                },
+                              }))}
+                              submitLabel={`Continue → ${wf.steps[awaitingId!]?.status === 'awaiting_input' ? 'Run step' : 'Save'}`}
+                            />
+                          )}
+                        />
+                      );
+                    })}
+                </div>
+              )}
               {messages.map((message, msgIdx) => (
                 <div
                   key={message.id}
@@ -2471,7 +3272,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-[#3E192A] text-white shadow-sm'
@@ -2501,6 +3302,88 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           roomType={message.inspirationData.room_type}
                           focus={message.inspirationData.focus}
                         />
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.jobFindingsData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="text-xs text-white/60">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24h' : message.jobFindingsData.discovered_at_window}</div>
+                              <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label}</div>
+                            </div>
+                            <div className="text-2xl font-light text-white/80">
+                              {message.jobFindingsData.listings.length}
+                              <span className="text-xs text-white/40 ml-1">{message.jobFindingsData.listings.length === 1 ? 'match' : 'matches'}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {message.jobFindingsData.listings.slice(0, 8).map((l, idx) => (
+                              <div key={l.id || `${idx}-${l.url}`} className="bg-black/20 rounded-md p-2.5 border border-white/5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <a
+                                    href={l.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-sm font-medium text-pink-300 hover:underline inline-flex items-start gap-1 min-w-0"
+                                  >
+                                    <span className="line-clamp-1">{l.title || '(untitled)'}</span>
+                                  </a>
+                                  {l.id && (
+                                    <button
+                                      type="button"
+                                      title="Wrong match? Tell the classifier"
+                                      onClick={async () => {
+                                        const reason = window.prompt(
+                                          `Why is "${l.title || 'this listing'}" a wrong match?`,
+                                          '',
+                                        );
+                                        if (reason === null) return;
+                                        try {
+                                          const { jobResearchService } = await import('@/services/jobResearchService');
+                                          await jobResearchService.correctMatch(l.id!, 'mismatch', reason || undefined);
+                                          // Optimistic UI: greying out the row would require state-lifting; the next
+                                          // conversation reload will reflect the new relevance.
+                                          // Lightweight feedback for now:
+                                          // eslint-disable-next-line no-alert
+                                          window.alert('Thanks — the classifier will mirror this judgment on the next refresh.');
+                                        } catch (e: unknown) {
+                                          // eslint-disable-next-line no-alert
+                                          window.alert('Failed to record correction: ' + String(e));
+                                        }
+                                      }}
+                                      className="text-[11px] text-white/40 hover:text-red-400 shrink-0 px-1"
+                                    >
+                                      ⚠ wrong
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="text-xs text-white/60 mt-0.5 flex items-center gap-2 flex-wrap">
+                                  <span>{l.company || '—'}</span>
+                                  {l.location && <span>· {l.location}</span>}
+                                  {l.is_remote && <span className="text-emerald-400">· Remote</span>}
+                                  {(l.salary_min || l.salary_max) && (
+                                    <span>
+                                      · {l.salary_currency || ''}
+                                      {l.salary_min ? l.salary_min.toLocaleString() : ''}
+                                      {l.salary_min && l.salary_max ? '–' : ''}
+                                      {l.salary_max ? l.salary_max.toLocaleString() : (l.salary_min ? '+' : '')}
+                                    </span>
+                                  )}
+                                  {l.source && <span className="text-white/40">· {l.source.replace(/_/g, ' ')}</span>}
+                                </div>
+                              </div>
+                            ))}
+                            {message.jobFindingsData.listings.length > 8 && (
+                              <div className="text-xs text-white/40 text-center pt-1">
+                                + {message.jobFindingsData.listings.length - 8} more
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-white/40 mt-3">
+                            Tip: ask "show me the rest" or "find more like #2" to dig in.
+                          </div>
+                        </div>
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.mentionSummaryData ? (
@@ -2623,6 +3506,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             </ul>
                           )}
                         </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.seoResearchData ? (
+                      <div className="space-y-3">
+                        <SEOResearchCard data={message.seoResearchData} />
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.seoGenericData ? (
+                      <div className="space-y-3">
+                        <SEOGenericCard data={message.seoGenericData} />
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.materialData ? (
@@ -2792,6 +3685,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           pdfUrl={message.sheetPdfData.pdf_url}
                           pageCount={message.sheetPdfData.page_count}
                           creditsUsed={message.sheetPdfData.credits_used}
+                        />
+                      </div>
+                    ) : message.catalogExtractionData ? (
+                      <div className="space-y-3">
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        <CatalogExtractionCandidatesCard
+                          catalogId={message.catalogExtractionData.catalog_id}
+                          query={message.catalogExtractionData.query}
+                          candidates={message.catalogExtractionData.candidates}
+                        />
+                      </div>
+                    ) : message.catalogImageCandidatesData ? (
+                      <div className="space-y-3">
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        <CatalogImageCandidatesCard
+                          catalogId={message.catalogImageCandidatesData.catalog_id}
+                          sectionId={message.catalogImageCandidatesData.section_id}
+                          materialId={message.catalogImageCandidatesData.material_id}
+                          materialName={message.catalogImageCandidatesData.material_name}
+                          candidates={message.catalogImageCandidatesData.candidates}
                         />
                       </div>
                     ) : message.virtualStagingData ? (
@@ -3436,20 +4349,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </TooltipContent>
                   </Tooltip>
 
-                  {selectedAgent === 'interior-designer' && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setShowPromptLibrary(true)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left"><p>Prompt library</p></TooltipContent>
-                    </Tooltip>
-                  )}
-
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -3462,60 +4361,103 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <TooltipContent side="left"><p>Design inspiration from URL</p></TooltipContent>
                   </Tooltip>
 
+                  {/* Prompt Builder — unified starters surface (toolkit cards
+                       + admin-curated DB starters merged into one modal) */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => setShowStarterPrompts(true)}
+                        onClick={() => setShowPromptBuilder(true)}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       >
-                        <ListChecks className="h-4 w-4" />
+                        <Sparkles className="h-4 w-4" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="left"><p>Starter prompts</p></TooltipContent>
+                    <TooltipContent side="left"><p>Starter prompts — browse toolkits + curated templates</p></TooltipContent>
                   </Tooltip>
 
+                  {/* Toolkits — primary picker. Visual cards, no checkboxes. */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => setShowToolPicker(true)}
+                        onClick={() => setShowToolkitPicker(true)}
                         className={cn(
                           'p-1.5 rounded-lg transition-colors relative',
-                          selectedTools.length > 0
+                          activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 0
                             ? 'text-primary bg-primary/10 hover:bg-primary/20'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                         )}
                       >
-                        <Wrench className="h-4 w-4" />
-                        {selectedTools.length > 0 && (
+                        <Layers className="h-4 w-4" />
+                        {activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 0 && (
                           <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center">
-                            {selectedTools.length}
+                            {activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length}
                           </span>
                         )}
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="left">
                       <p>
-                        {selectedTools.length > 0
-                          ? `${selectedTools.length} tool${selectedTools.length === 1 ? '' : 's'} selected`
-                          : 'Select tools'}
+                        {activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 0
+                          ? `${activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length} toolkit${activeToolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length === 1 ? '' : 's'} loaded — click to manage`
+                          : 'Toolkits — enable clusters of related tools'}
                       </p>
                     </TooltipContent>
                   </Tooltip>
+
                 </div>
 
-                {/* Textarea — resizable */}
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type your message... (Shift+Enter for new line)"
-                  className="flex-1 min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent"
-                />
+                {/* Textarea — resizable, with slash-command palette */}
+                <div className="flex-1 relative">
+                  <CommandPalette
+                    open={paletteOpen}
+                    onClose={() => { setPaletteOpen(false); setPaletteQuery(''); }}
+                    query={paletteQuery}
+                    agentId={selectedAgent}
+                    role={userRole}
+                    enabledModules={enabledModulesArray}
+                    onLaunchWorkflow={(wf) => {
+                      // Boot the visual wizard locally so the user gets the
+                      // step-by-step UI immediately (no LLM round-trip). The
+                      // agent only sees the next-step continuation messages.
+                      // For workflows that don't have a wizard-friendly first
+                      // step (no input_schema), fall back to a generic prompt.
+                      const firstStep = wf.steps[0];
+                      if (firstStep?.input_schema?.length) {
+                        bootWorkflowLocally(wf.id);
+                      } else {
+                        setInput(wf.examples?.[0] || `Run the "${wf.name}" workflow.`);
+                      }
+                    }}
+                    onUseExample={(prompt) => setInput(prompt)}
+                  />
+                  <Textarea
+                    value={input}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setInput(v);
+                      // Slash-trigger: opens when input starts with '/'. Query = chars after '/'.
+                      if (v.startsWith('/')) {
+                        setPaletteOpen(true);
+                        setPaletteQuery(v.slice(1));
+                      } else if (paletteOpen) {
+                        setPaletteOpen(false);
+                        setPaletteQuery('');
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (paletteOpen && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter' || e.key === 'Escape')) {
+                        // Let the palette handle navigation keys
+                        return;
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Type your message... (Shift+Enter for new line, / for tools)"
+                    className="min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent w-full"
+                  />
+                </div>
 
                 {/* Right panel: send button — full height */}
                 <button
@@ -3535,63 +4477,107 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
             </TooltipProvider>
 
-            <div className="mt-1.5 text-xs text-muted-foreground/60">
-              Use ⌘ + K for shortcuts, or '/' for canned messages
+            <div className="mt-1.5 flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-xs text-muted-foreground/60">
+                Type <kbd className="px-1 py-0.5 rounded bg-muted/50 text-[10px]">/</kbd> to launch a workflow or invoke a specific tool
+              </div>
+              {/* Active toolkit chips — always visible above the chat. The Core
+                  toolkit is rendered as a quiet badge; user-enabled toolkits as
+                  removable chips. Click "+" to open the picker. */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {activeToolkits
+                  .map((id) => TOOLKITS.find((t) => t.id === id))
+                  .filter((tk): tk is NonNullable<typeof tk> => !!tk)
+                  .sort((a, b) => Number(!!b.alwaysOn) - Number(!!a.alwaysOn))
+                  .map((tk) => {
+                    const removable = !tk.alwaysOn;
+                    return (
+                      <span
+                        key={tk.id}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border',
+                          tk.alwaysOn
+                            ? 'border-border/60 bg-muted/30 text-muted-foreground'
+                            : 'border-primary/40 bg-primary/10 text-primary',
+                        )}
+                        title={tk.description}
+                      >
+                        <Layers className="h-2.5 w-2.5" />
+                        {tk.name}
+                        {removable && (
+                          <button
+                            onClick={() => updateActiveToolkits(activeToolkits.filter((id) => id !== tk.id))}
+                            className="hover:text-destructive transition"
+                            title="Remove"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                <button
+                  onClick={() => setShowToolkitPicker(true)}
+                  className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border/60 hover:border-primary/40 hover:text-primary transition px-2 py-0.5 text-[10px] text-muted-foreground"
+                >
+                  <Layers className="h-2.5 w-2.5" /> + Toolkit
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Prompt Library Modal */}
-      {showPromptLibrary && (
-        <PromptLibrary
-          onSelectPrompt={(promptText) => {
-            setInput(promptText);
-          }}
-          onClose={() => setShowPromptLibrary(false)}
-          hasUploadedImage={attachedImages.length > 0}
-          onTriggerVirtualStaging={() => {
-            // Resolve the most recent image URL from the conversation or attached images
-            let imageUrl: string | null = attachedImages[0] || null;
-            if (!imageUrl) {
-              // Walk messages in reverse to find the latest generated/staged/uploaded image
-              for (let i = messages.length - 1; i >= 0; i--) {
-                const m = messages[i];
-                if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
-                if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
-                if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
-                if (m.images?.[0]) { imageUrl = m.images[0]; break; }
-              }
+      {/* Toolkit Picker Modal — primary tool-enabling surface (visual cards) */}
+      <ToolkitPickerModal
+        open={showToolkitPicker}
+        onClose={() => setShowToolkitPicker(false)}
+        role={userRole}
+        enabledModules={enabledModulesArray}
+        activeToolkitIds={activeToolkits}
+        onChange={updateActiveToolkits}
+      />
+
+
+      {/* Prompt Builder Modal — toolkit-cluster discovery surface. Cards
+          show TOOLKITS with their quick_starts as primary CTAs. Clicking
+          a quick-start auto-fires the prompt (catalog contract:
+          quick_starts always auto-send). */}
+      <PromptBuilderModal
+        open={showPromptBuilder}
+        onClose={() => setShowPromptBuilder(false)}
+        role={userRole}
+        currentAgentId={selectedAgent}
+        hasUploadedImage={attachedImages.length > 0}
+        enabledModules={enabledModulesArray}
+        onQuickStart={({ agentId, prompt }) => {
+          if (agentId !== selectedAgent) setSelectedAgent(agentId);
+          setInput(prompt);
+          // Auto-send on next tick so the agent switch (if any) settles + the
+          // input state is committed before send. handleSendMessageRef reads
+          // current state inside the closure.
+          setTimeout(() => {
+            void handleSendMessageRef.current?.();
+          }, 50);
+        }}
+        onTriggerVirtualStaging={() => {
+          // Resolve the most recent image URL from attached images or messages.
+          // Mirrors the previous PromptLibrary behavior — the staging wizard
+          // needs an image input before it can render variants.
+          let imageUrl: string | null = attachedImages[0] || null;
+          if (!imageUrl) {
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const m = messages[i];
+              if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
+              if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
+              if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
+              if (m.images?.[0]) { imageUrl = m.images[0]; break; }
             }
-            setVirtualStagingImageUrl(imageUrl || '');
-          }}
-        />
-      )}
+          }
+          setVirtualStagingImageUrl(imageUrl || '');
+        }}
+      />
 
-      {/* Tool Picker Modal — multi-select per-message tool filter */}
-      {showToolPicker && (
-        <ToolPickerModal
-          agentId={selectedAgent}
-          isAdmin={isAdmin}
-          selectedTools={selectedTools}
-          onChange={setSelectedTools}
-          onClose={() => setShowToolPicker(false)}
-        />
-      )}
-
-      {/* Starter Prompts Modal */}
-      {showStarterPrompts && (
-        <StarterPromptsModal
-          agentId={selectedAgent}
-          isAdmin={isAdmin}
-          hasUploadedImage={attachedImages.length > 0}
-          onSubmit={(promptText) => {
-            setInput(promptText);
-            setShowStarterPrompts(false);
-          }}
-          onClose={() => setShowStarterPrompts(false)}
-        />
-      )}
 
       {/* Inspiration URL Modal */}
       {showInspirationModal && (

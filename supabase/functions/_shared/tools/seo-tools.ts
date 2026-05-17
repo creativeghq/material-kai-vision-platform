@@ -2,13 +2,23 @@
  * SEO Article Pipeline Tools: callSEOFunction helper,
  * createSEOKeywordResearchTool, createSEOArticlePlannerTool,
  * createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool
+ *
+ * Workflow chunks: each tool emits workflow_plan (research only — first step)
+ * and workflow_step_progress chunks so the WorkflowWizardCard / Tracker
+ * advance step-by-step. Run_id stability comes from the agent passing
+ * `_workflow_run_id` (extracted from `[workflow:seo-article/<step>:<run_id>]`
+ * prefix in the user message) to every tool. Falls back to the research_id
+ * generated on the first call when `_workflow_run_id` is absent.
  */
 
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
+const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+type ChunkSink = ((chunk: any) => void) | undefined;
 
 // ═══════════════════════════════════════════════════════════════
 // SEO Article Pipeline Tools
@@ -48,9 +58,17 @@ export async function callSEOFunction(functionName: string, body: any, timeoutMs
  * SEO Tool: Keyword Research
  * Calls seo-research edge function → DataForSEO API
  */
-export const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ topic, target_keyword, language_code, location_code }) => {
+    async ({ topic, target_keyword, language_code, location_code, _workflow_run_id }) => {
+      // Workflow run_id strategy: prefer agent-passed _workflow_run_id (extracted
+      // from `[workflow:seo-article/research:<run_id>]` prefix). Fall back to a
+      // generated UUID — the frontend's run_id migration handler will reattach
+      // it to the locally-booted wizard run on the first workflow_plan chunk.
+      const runId = _workflow_run_id || crypto.randomUUID();
+      const emitter = createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: runId });
+      emitter.plan({ title: target_keyword, subtitle: topic });
+      emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'running', status_line: `Researching keywords for "${target_keyword}"…`, input: { topic, target_keyword, language_code, location_code } });
       try {
         onProgress?.(`Researching keywords for "${target_keyword}"...`);
 
@@ -63,45 +81,58 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
         }, 60_000);
 
         if (!result.success) {
+          emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'failed', error_message: result.error || 'Keyword research failed' });
           return JSON.stringify({ success: false, error: result.error || 'Keyword research failed' });
         }
 
         onProgress?.(`Found ${result.data?.research?.totalKeywords || 0} keywords for "${target_keyword}"`);
 
+        const summary = {
+          total_keywords: result.data?.research?.totalKeywords || 0,
+          total_volume: result.data?.research?.totalAddressableVolume || 0,
+          clusters: result.data?.research?.clusters?.length || 0,
+          top_keywords: result.data?.research?.keywords?.slice(0, 10)?.map((k: any) => ({
+            keyword: k.keyword,
+            volume: k.searchVolume,
+            difficulty: k.difficulty,
+            opportunity: k.opportunityScore,
+          })),
+          paa_questions: result.data?.research?.paaQuestions?.slice(0, 5),
+          competitors: result.data?.research?.competitors?.slice(0, 5)?.map((c: any) => ({
+            url: c.url,
+            title: c.title,
+            position: c.position,
+          })),
+        };
+
+        emitter.step({
+          step_id: STEPS.SEO_ARTICLE[0],
+          status: 'done',
+          status_line: `${summary.total_keywords} keywords · ${summary.total_volume.toLocaleString?.() || summary.total_volume} total volume`,
+          output: { research_id: result.data?.research_id, total_keywords: summary.total_keywords, total_volume: summary.total_volume },
+        });
+
         return JSON.stringify({
           success: true,
           research_id: result.data?.research_id,
-          summary: {
-            total_keywords: result.data?.research?.totalKeywords || 0,
-            total_volume: result.data?.research?.totalAddressableVolume || 0,
-            clusters: result.data?.research?.clusters?.length || 0,
-            top_keywords: result.data?.research?.keywords?.slice(0, 10)?.map((k: any) => ({
-              keyword: k.keyword,
-              volume: k.searchVolume,
-              difficulty: k.difficulty,
-              opportunity: k.opportunityScore,
-            })),
-            paa_questions: result.data?.research?.paaQuestions?.slice(0, 5),
-            competitors: result.data?.research?.competitors?.slice(0, 5)?.map((c: any) => ({
-              url: c.url,
-              title: c.title,
-              position: c.position,
-            })),
-          },
+          _workflow_run_id: runId,
+          summary,
         });
       } catch (error: any) {
         console.error('SEO keyword research error:', error);
+        emitter.step({ step_id: STEPS.SEO_ARTICLE[0], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
     {
       name: 'seo_keyword_research',
-      description: 'Research keywords for SEO article writing. Uses DataForSEO to find keyword volumes, difficulty, related keywords, People Also Ask questions, and SERP competitors. Always run this first before planning or writing an article.',
+      description: 'Research keywords for SEO article writing. Uses DataForSEO to find keyword volumes, difficulty, related keywords, People Also Ask questions, and SERP competitors. Always run this first before planning or writing an article. Pass _workflow_run_id when running inside the seo-article wizard.',
       schema: z.object({
         topic: z.string().describe('The broad topic or niche (e.g. "sustainable building materials")'),
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
         language_code: z.string().optional().describe('Language code, defaults to "en"'),
         location_code: z.number().optional().describe('DataForSEO location code, defaults to 2840 (US)'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id passed by the wizard. Extract from `[workflow:seo-article/research:<run_id>]` prefix.'),
       }),
     }
   );
@@ -111,9 +142,12 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
  * SEO Tool: Article Planner
  * Calls seo-plan edge function → Gemini structured output
  */
-export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ topic, target_keyword, keyword_research, content_brief }) => {
+    async ({ topic, target_keyword, keyword_research, content_brief, _workflow_run_id }) => {
+      const runId = _workflow_run_id || crypto.randomUUID();
+      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: runId }) : null;
+      emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'running', status_line: `Planning article structure for "${target_keyword}"…`, input: { topic, target_keyword } });
       try {
         onProgress?.(`Planning article structure for "${target_keyword}"...`);
 
@@ -126,17 +160,27 @@ export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status
         }, 60_000);
 
         if (!result.success) {
+          emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'failed', error_message: result.error || 'Article planning failed' });
           return JSON.stringify({ success: false, error: result.error || 'Article planning failed' });
         }
 
         onProgress?.(`Article plan created: "${result.data?.plan?.metaTitle || target_keyword}"`);
 
+        emitter?.step({
+          step_id: STEPS.SEO_ARTICLE[1],
+          status: 'done',
+          status_line: `Plan ready: ${result.data?.plan?.metaTitle || target_keyword}`,
+          output: { plan_title: result.data?.plan?.metaTitle, sections: result.data?.plan?.sections?.length },
+        });
+
         return JSON.stringify({
           success: true,
+          _workflow_run_id: runId,
           plan: result.data?.plan,
         });
       } catch (error: any) {
         console.error('SEO article planning error:', error);
+        emitter?.step({ step_id: STEPS.SEO_ARTICLE[1], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
@@ -148,6 +192,7 @@ export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status
         target_keyword: z.string().describe('Primary target keyword'),
         keyword_research: z.any().describe('Full keyword research result from seo_keyword_research tool'),
         content_brief: z.any().optional().describe('Optional content brief with brand voice, audience, and business context'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
   );
@@ -157,9 +202,11 @@ export const createSEOArticlePlannerTool = (userId: string, onProgress?: (status
  * SEO Tool: Article Writer
  * Calls seo-write edge function → Claude Opus
  */
-export const createSEOArticleWriterTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createSEOArticleWriterTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ article_plan, content_brief }) => {
+    async ({ article_plan, content_brief, _workflow_run_id }) => {
+      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
+      emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'running', status_line: 'Writing article with Claude Opus…' });
       try {
         onProgress?.('Writing article with Claude Opus...');
 
@@ -170,18 +217,27 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
         }, 120_000);
 
         if (!result.success) {
+          emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'failed', error_message: result.error || 'Article writing failed' });
           return JSON.stringify({ success: false, error: result.error || 'Article writing failed' });
         }
 
         onProgress?.(`Article written: ${result.data?.word_count || 0} words`);
+        emitter?.step({
+          step_id: STEPS.SEO_ARTICLE[2],
+          status: 'done',
+          status_line: `${result.data?.word_count || 0} words written`,
+          output: { word_count: result.data?.word_count },
+        });
 
         return JSON.stringify({
           success: true,
+          _workflow_run_id,
           markdown_content: result.data?.markdown_content,
           word_count: result.data?.word_count,
         });
       } catch (error: any) {
         console.error('SEO article writing error:', error);
+        emitter?.step({ step_id: STEPS.SEO_ARTICLE[2], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
@@ -191,6 +247,7 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
       schema: z.object({
         article_plan: z.any().describe('Full article plan from seo_article_planner tool'),
         content_brief: z.any().optional().describe('Optional content brief with brand voice and audience details'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
   );
@@ -200,9 +257,11 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
  * SEO Tool: Content Analyzer
  * Calls seo-analyze edge function → scoring + optional auto-fix
  */
-export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations }) => {
+    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations, _workflow_run_id }) => {
+      const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
+      emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'running', status_line: 'Analyzing article…' });
       try {
         onProgress?.('Analyzing article content for SEO quality...');
 
@@ -216,14 +275,23 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         }, 180_000);
 
         if (!result.success) {
+          emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'failed', error_message: result.error || 'Content analysis failed' });
           return JSON.stringify({ success: false, error: result.error || 'Content analysis failed' });
         }
 
         const analysis = result.data?.analysis;
         onProgress?.(`Analysis complete: score ${analysis?.overallScore || 0}/100`);
+        emitter?.step({
+          step_id: STEPS.SEO_ARTICLE[3],
+          status: 'done',
+          status_line: `Score ${analysis?.overallScore || 0}/100 · ${analysis?.fixes?.length || 0} issues`,
+          output: { overall_score: analysis?.overallScore, issues_count: analysis?.fixes?.length || 0, iterations: result.data?.iterations || 0 },
+        });
+        emitter?.finished({ status: 'done', summary: `SEO article complete — score ${analysis?.overallScore || 0}/100.` });
 
         return JSON.stringify({
           success: true,
+          _workflow_run_id,
           overall_score: analysis?.overallScore,
           seo_score: analysis?.seoScore,
           readability_score: analysis?.readabilityScore,
@@ -235,6 +303,7 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         });
       } catch (error: any) {
         console.error('SEO content analysis error:', error);
+        emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'failed', error_message: error.message });
         return JSON.stringify({ success: false, error: error.message });
       }
     },
@@ -247,6 +316,7 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         content_brief: z.any().optional().describe('Optional content brief'),
         auto_fix: z.boolean().optional().describe('Auto-fix content if score is below 70 (default: false)'),
         max_iterations: z.number().optional().describe('Max fix iterations (default: 2, max: 3)'),
+        _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
   );

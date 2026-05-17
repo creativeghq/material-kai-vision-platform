@@ -56,7 +56,6 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 // ── Batch Categorization types ──────────────────────────────────────────────
@@ -452,14 +451,7 @@ export const MetadataManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Metadata Management"
-        description="View and manage extracted metadata from PDF processing"
-        badge="Admin"
-      />
-
-      <div className="p-3 sm:p-6 space-y-6">
+    <div className="space-y-6">
         <Tabs defaultValue="metadata">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="metadata" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -769,7 +761,6 @@ export const MetadataManagement: React.FC = () => {
             )}
           </TabsContent>
         </Tabs>
-      </div>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

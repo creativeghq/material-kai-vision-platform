@@ -147,6 +147,15 @@ Complete documentation for Material Kai Vision Platform.
 - Persistent + editable: every sheet is a row in `moodboard_presentation_sheets` with JSONB `data`
 - Sheets tab on every moodboard at `/moodboard/:id`
 
+**[presentation-catalogs.md](presentation-catalogs.md)** - Presentation Catalogs ✨ NEW (2026-05-08)
+- Admin-only catalog builder driven by 8 KAI tools: create / attach_pdfs / extract / translate / add_material / find_image / generate_pdf / publish
+- Source PDFs uploaded to `catalog-sources` bucket; Sonnet 4.6 PDF Vision extracts sections + bbox per material
+- Per-candidate page rasterization via MIVAA PyMuPDF (`/api/internal/catalog/rasterize-pdf-page`) — every extracted material has a real cropped image
+- Editable JSONB body renders BOTH as A4 PDF (cover + body + back cover via pdf-lib) AND as live web page at `/c/:slug`
+- Email-gate on public pages: matched against `auth.users` + `crm_contacts` + `crm_companies` + per-catalog allowlist (`catalog_email_grants`); 30-day signed cookie
+- Operations dashboard at `/admin/operations?tab=catalogs` — gate attempts (granted/denied), page views, PDF downloads, per-catalog rollup with linked user profiles
+- 5 tables, 3 RPCs, 1 view, 5 storage buckets, 6 edge functions, 1 MIVAA endpoint
+
 **[interior-video-generation.md](interior-video-generation.md)** - Interior Video Generation ✨ NEW
 - 4 models: Veo-2 (30cr), Kling v3.0 (20cr), Wan 2.1 (12cr), Runway Gen4 (40cr)
 - 5 video types with auto model routing

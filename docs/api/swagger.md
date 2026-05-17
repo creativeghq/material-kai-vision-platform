@@ -241,7 +241,6 @@ Send `multipart/form-data` directly — auto-routed to `POST /api/rag/documents/
 | `admin_cleanup_data` | DELETE | Cleanup old data |
 | `admin_backup_data` | POST | Create backup |
 | `admin_export_data` | GET | Export data |
-| `admin_packages_status` | GET | Package status |
 | `admin_job_progress` | GET | Job progress (`job_id`) |
 | `admin_active_progress` | GET | Active jobs progress |
 | `admin_job_pages` | GET | Job page progress (`job_id`) |
