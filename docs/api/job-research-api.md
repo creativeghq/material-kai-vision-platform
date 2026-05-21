@@ -11,6 +11,45 @@ Background job-discovery agent. Each tracked search runs hourly on a volatility-
 
 ## Changelog
 
+### v0.3.3 — 2026-05-15 — Admin-stop bridge + KB consolidation + scoped pause
+
+Three related fixes addressing "how do I stop a search?" and "where do platform configs live in the KB?":
+
+- 🆕 **Admin-panel stop now actually stops.** New AFTER UPDATE trigger on `background_agents`: when an admin toggles `enabled` for a `job-research` row at `/admin/background-agents`, the trigger mirrors the change onto `tracked_jobs.is_active` so the refresh cron skips it. Previously the admin toggle was cosmetic — the engine ignored it.
+- 🆕 **Scoped pause.** `track_job_search` action `pause` (and `resume`) now accept `pause_scope: 'all' | 'digests_only'`.
+  - `all` (default): flips `tracked_jobs.is_active=false` → stops both refresh and digest.
+  - `digests_only`: flips `tracked_jobs.digest_enabled=false` → refresh keeps running; just no emails/chat-posts at digest tick. User can still call `find_jobs` to see what's accumulated.
+- 🆕 **Broader stop vocabulary.** KAI prompt addendum extended — "stop", "cancel", "turn off", "kill", "snooze", "disable" all map to pause. "got a job, stop looking" confirms then maps to delete. "stop emailing me but keep tracking" → pause with `pause_scope=digests_only`.
+- ✏️ **KB category renamed** `Job Sources` → `Internal Configuration` (slug `internal-configuration`, icon ⚙️). Generic name so future internal config pages (mention outlets, price retailers, etc.) can live as sibling docs in the same category.
+- ✏️ **KB docs consolidated**: three per-site_type docs → one `Job Research Sites` doc with three sections. `job_sites_kb_sync.sync_one_site_type()` is now a backwards-compatible alias for `sync_all()` which always re-renders the single consolidated doc.
+
+### v0.3.2 — 2026-05-15 — Sites list lives in a KB category (access_level='agent') + agent-driven flow with modal (superseded by v0.3.3)
+
+Architectural correction to v0.3.1. Standalone admin page deleted; the sites list is now a proper KB category (`access_level='agent'` → agent reads it, public KB filters it out, admin sees it via the regular KB admin UI). All add/edit/remove goes through the KAI agent.
+
+- ❌ **Deleted** the standalone admin page `/admin/knowledge-base/job-sources` (the route from v0.3.1). Operators don't open a custom page anymore.
+- 🆕 **KB category "Job Sources"** with three child kb_docs (one per `site_type`: Perplexity domain filter / Default RSS feeds / Default career pages). Bodies are auto-rendered Markdown tables, regenerated on every CRUD via the sync helper.
+- 🆕 **KAI agent tool `manage_job_sites`** — replaces the deep-link. Actions: `list` / `add` / `remove` / `toggle` / `open_form`. When the user is vague ("add a job site"), `open_form` emits a `job_sites_form_open` chunk; AgentHub mounts a modal with type/URL/country/category/notes fields. On submit, the modal populates the input box with a structured prose message that re-invokes the tool with concrete fields.
+- ✏️ **Sites CRUD endpoints** (`/api/v1/job-research/sites`) unchanged in signature, but each write now calls `_sync_kb(site_type)` to refresh the corresponding kb_doc.
+- ✏️ **KAI prompt addendum** rewritten — drops the dead deep-link, teaches the agent the new tool + the NL→action mappings + when to call `open_form` vs `add` with specifics.
+
+### v0.3.1 — 2026-05-15 — Operator-curated job-sites list at /admin/knowledge-base/job-sources (superseded by v0.3.2)
+
+The Perplexity domain filter and the default RSS / career-page lists are now editable through a hidden admin page instead of being hardcoded. Adds 4 new endpoints under `/api/v1/job-research/sites` and a new `job_research_sites` DB table (RLS: reads open, writes admin-only). The previously hardcoded `_DEFAULT_JOB_DOMAINS` constant becomes a fallback used only when the DB read fails.
+
+- 🆕 `GET /api/v1/job-research/sites[?site_type=perplexity_domain|rss_feed_default|careers_page_default]` — list configured sites (any authenticated user).
+- 🆕 `POST /api/v1/job-research/sites` — add a new site (admin/super_admin only via RLS). Body: `{ site_type, url_or_domain, display_name?, country_code?, category?, is_enabled=true, notes? }`. 409 on duplicate.
+- 🆕 `PUT /api/v1/job-research/sites/{id}` — update fields (admin-only).
+- 🆕 `DELETE /api/v1/job-research/sites/{id}` — remove (admin-only).
+- ✏️ `search_via_perplexity()` now loads the domain filter from the DB; falls back to the hardcoded constant only on DB-read failure.
+
+**Where the page lives:** `/admin/knowledge-base/job-sources` (hidden — no nav entry; deep-linked from the KAI agent or hand-typed). Three tabs:
+1. **Perplexity domain filter** — the global list Sonar searches across. Capped at 10 by Perplexity; extras displayed with a warning.
+2. **Default RSS feeds** — feeds offered as defaults when a new tracked_job enables `sources_enabled.rss_feeds`.
+3. **Default career pages** — same for `sources_enabled.careers_pages`.
+
+Per-tracked_job overrides (`tracked_jobs.careers_page_urls` / `rss_feed_urls`) still take precedence.
+
 ### v0.3.0 — 2026-05-15 — RSS adapter + burst alerts + classifier feedback + external `kai_*` API + cross-conversation triage
 
 Closes the v0.2 follow-up backlog. **Two breaking-ish changes for new fields, no breaking changes to existing endpoints.**

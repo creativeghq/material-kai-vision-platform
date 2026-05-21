@@ -62,6 +62,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
+import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
 // PromptLibrary merged into PromptBuilderModal — its 35 design templates,
 // 10 room-filter chips, image-aware mode, and virtual-staging wizard hook
 // now live inside the "Prompt Library" tab when the active agent is
@@ -357,6 +358,21 @@ interface Message {
       source?: string;
     }>;
   };
+  /** When the agent emits this, AgentHub mounts a modal form so the user can fill
+   *  job-site details (URL, type, country, etc.) instead of typing everything as prose.
+   *  On submit, the modal sends a follow-up user message ("add kariera.gr to perplexity
+   *  filter, country GR, category general") which re-invokes the manage_job_sites tool. */
+  jobSitesFormOpen?: {
+    mode: 'add' | 'edit';
+    default_site_type: 'perplexity_domain' | 'rss_feed_default' | 'careers_page_default';
+    prefill?: {
+      url_or_domain?: string;
+      display_name?: string;
+      country_code?: string;
+      category?: string;
+      notes?: string;
+    };
+  };
   seoResearchData?: SEOResearchCardData;
   seoGenericData?: SEOGenericCardData;
   catalogData?: {
@@ -461,6 +477,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
+  // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
+  const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -2101,6 +2119,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionFeedData: m.mentionFeedData },
                   });
                 }
+              } else if (chunk.type === 'job_sites_form_open') {
+                // Agent asked us to open the structured form. No new message in the thread —
+                // just mount the modal. On submit, the modal posts a follow-up user message
+                // that re-invokes manage_job_sites with concrete fields.
+                setJobSitesFormState({
+                  mode: chunk.mode || 'add',
+                  default_site_type: chunk.default_site_type || 'perplexity_domain',
+                  prefill: chunk.prefill || undefined,
+                });
+              } else if (chunk.type === 'job_sites_updated' || chunk.type === 'job_sites_list') {
+                // Surface as a tool-progress log entry — the agent's text reply summarizes the change.
+                // (No rich card needed; a list of domains is concise enough as prose.)
+                console.debug('[agent-hub] job_sites chunk', chunk);
               } else if (chunk.type === 'mention_tracking_started') {
                 const m: Message = {
                   id: `msg-mention-track-${Date.now()}`,
@@ -4783,6 +4814,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }}
         />
       )}
+
+      {/* Job-sites modal — triggered by the manage_job_sites agent tool when user is vague */}
+      <JobSitesFormModal
+        state={jobSitesFormState}
+        onClose={() => setJobSitesFormState(null)}
+        onSubmit={(followupMessage) => {
+          setInput(followupMessage);
+          toast({
+            title: 'Form ready',
+            description: 'Review the message in the input box and hit Send to apply.',
+          });
+        }}
+      />
 
       {/* Image Lightbox — full-size view of generated images */}
       {lightboxImage && (

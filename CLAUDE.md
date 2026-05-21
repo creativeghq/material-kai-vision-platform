@@ -17,6 +17,21 @@ Audit-discovered: the configured HF endpoint served `Qwen/Qwen3.6-35B-A3B-FP8` (
 - **Dead code retired.** `qwen_endpoint_manager.py` deleted. All `Settings.qwen_*` fields, `validate_qwen_model`, `get_qwen_config`, `endpoint_registry.get_qwen_manager`, the `endpoint_controller.qwen` AdaptiveConcurrency gate, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), and the qwen Operations dashboard widgets are all removed. The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy. The only Qwen string left in the codebase is the `VisionProvider.QWEN` enum value, which is retained so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate.
 - **Stage 4 product embedding fail-closed.** Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (audit gap C).
 
+## Multilingual facet canonicalization (2026-05-21)
+
+Catalogs ingested from Greek / German / Italian sources were producing `products.metadata` rows where the same colour or material existed under dozens of language-specific spellings (`'Λευκό' / 'bianco' / 'Weiß' / 'white'` all distinct), making faceted filters useless. New 3-layer pipeline (`mivaa-pdf-extractor/app/services/facets/`):
+
+- **L0 — Upstream prompt rule.** `VISION_ANALYSIS_TOOL` system prompt now mandates **lowercase English** for every descriptive attribute (`material_type`, `category`, `subcategory`, `colors`, `textures`, `finish`, `surface_pattern`, `applications`, `style`, `description`). Verbatim-only fields: `detected_text` (preserves brand names, model numbers, SKUs, socket codes, IP ratings, wattages, dimensions, certifications). Reduces the canonicalizer's residual workload to the long tail.
+- **L1 — Deterministic normalize.** `normalize_string()` — NFKC → strip → lowercase → collapse `[\s\-_/]+` to single space. Pure function, no I/O.
+- **L2 — Voyage embedding + cosine cluster.** Each L1-normalized value embedded via Voyage AI (1024D, multilingual, batched per product) → `resolve_facet_value` RPC compares against `facet_canonical_values.embedding` for that `facet_key` → cosine ≥ 0.92 merges into the existing canonical row + records alias; below threshold creates a new canonical row.
+- **Whitelist** (`facet_whitelist.py`): only descriptive natural-language attributes go through canonicalization — `color`, `material`, `finish`, `style`, `application`, `room`, `socket`, `light_color`, `mounting_type`, `surface_pattern`, `slip_resistance`, `pei_rating`, `frost_resistance`, `wood_type`, `bowl_shape`, `flush_type`, `faucet_type`, `weave`, `fiber`, `upholstery`, `ip_rating`, `tags`. **Identifiers, codes, numerics, and free-form prose stay verbatim**: `brand`, `factory`, `sku`, `model_number`, `dimensions`, `wattage`, `voltage`, `flow_rate`, `price`, `name`, `description`. Adding a key here changes behaviour across every ingest path — additions should be deliberate.
+- **Lossless raw preservation.** `products.attributes` holds the canonical form (used by faceted search); `products.attributes_raw` holds every raw value ever seen for the product (re-canonicalizable on threshold change). Both are `jsonb NOT NULL`.
+- **Wired into Stage 4.** `create_single_product` calls `canonicalize_product_attributes(supabase, metadata, source='pdf_stage_4')` between unit resolution and the products insert. Failures degrade silently — `attributes={}` + `attributes_raw={}` — so the product insert is never blocked.
+
+**New tables**: `facet_canonical_values(id, facet_key, canonical_value, embedding_model, schema_version, aliases, alias_count, first_seen_at, last_seen_at, is_locked, embedding vector(1024))`, `facet_merge_log(id, facet_key, raw_value, normalized_value, resolved_canonical, action, similarity, source, product_id, occurred_at)`. **New RPC**: `resolve_facet_value(p_facet_key, p_raw_value, p_normalized, p_embedding, p_threshold, p_source, p_product_id)`.
+
+**Pending ingest-path coverage**: Stage 4 PDF only for now. XML supplier import, web scrape, background agents, catalog candidate promote — all still write to `products.metadata` without canonicalization. Same chokepoint (`canonicalize_product_attributes`) plugs into each; tracked as follow-up.
+
 ## Pipeline Audit (2026-05-01)
 A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure bugs. **All P1s and P2s fixed in one giant PR**, no backlog. Key changes:
 
@@ -416,6 +431,62 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 **UI**: `src/components/business/price-monitoring/ProductMonitorTab.tsx` — per-product view: toggle + admin Refresh → chart → discovered retailers (Perplexity) → Custom Monitoring (Firecrawl). Admin role gated via `user_profiles.role_id → roles.name IN ('admin', 'super_admin')`.
 
 **External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
+
+## Job Research v0.3.3 (2026-05-15 — admin-stop bridge + KB category consolidation + scoped pause)
+
+Three corrections on top of v0.3.2:
+
+1. **Admin-stop bridge.** Previously the `/admin/background-agents` enable/disable toggle on a job-research row was a no-op for the engine — the refresh cron reads `tracked_jobs.is_active` directly, not `background_agents.enabled`. New AFTER UPDATE trigger `background_agents_sync_tracked_job_active` mirrors the toggle: disabling a job-research agent at the admin panel now actually stops the cron AND flips the user's row to inactive (so they see "paused" in their own listings). Function `_sync_tracked_job_active_from_bg_agent()` is SECURITY DEFINER and only acts when `agent_type = 'job-research'` and `enabled` changed.
+
+2. **KB consolidation** — `Job Sources` category → `Internal Configuration` (generic, future-proof). Three per-site_type docs → **one** consolidated `Job Research Sites` doc with three sections (Perplexity domain filter / Default RSS feeds / Default career pages). Sibling docs for other internal configs (mention outlets, price retailers, etc.) can live in the same category. Sync helper [job_sites_kb_sync.py](mivaa-pdf-extractor/app/services/integrations/job_sites_kb_sync.py) rewritten to render the single doc; legacy `sync_one_site_type()` kept as a no-op alias that calls `sync_all()` so route callers don't break.
+
+3. **Scoped pause.** `track_job_search` action=pause now accepts `pause_scope: 'all' | 'digests_only'`. Default `all` flips `is_active=false` (stops refresh + digest). `digests_only` flips `digest_enabled=false` (refresh keeps running silently; user can still ask "what new jobs did you find?" via `find_jobs` and gets the AgentHub triage panel; just no emails/chat-posts at digest tick). Broader NL vocab in the prompt — "stop", "cancel", "turn off", "kill", "snooze", "disable" all map to pause; "got a job, stop" confirms then maps to delete.
+
+**KAI prompt addendum** rewritten with explicit two-scope STOP section + the new generic category name.
+
+---
+
+## Job Research v0.3.2 (2026-05-15 — sites list moved to KB category + agent-driven flow with modal — superseded by v0.3.3)
+
+Correction to v0.3.1. The previous attempt added a standalone admin page at `/admin/knowledge-base/job-sources`. That was wrong — operator wanted (a) the list as a proper KB category with `access_level='agent'` so the agent reads it but the public KB hides it, and (b) all add/edit flows to go through the KAI agent (with a modal for vague requests), not through a dedicated admin page.
+
+**What changed vs v0.3.1:**
+- ❌ **Deleted**: `src/pages/Admin/JobResearchSitesPage.tsx` + its route in `src/App.tsx`. No more standalone admin page.
+- 🆕 **KB category `Job Sources`** ([kb_categories](src/components/Admin/KnowledgeBase/CategoryManager.tsx) with `access_level='agent'`, trigger_keyword='job sources'). Three child kb_docs (one per `site_type`) auto-rendered as Markdown tables of the current sites. Visible in admin KB; hidden from `PublicKnowledgeBasePage` which filters `access_level='public'`. Agent can search them via the standard KB search tool.
+- 🆕 **Sync helper** [job_sites_kb_sync.py](mivaa-pdf-extractor/app/services/integrations/job_sites_kb_sync.py) — after every CRUD on `job_research_sites`, calls `sync_one_site_type(site_type)` which rewrites the corresponding kb_doc body with a fresh Markdown table (enabled rows in a table, disabled in a strike-through list, with timestamp). Wired into `POST/PUT/DELETE /api/v1/job-research/sites[/{id}]` endpoints.
+- 🆕 **KAI tool `manage_job_sites`** ([job-research-tools.ts](supabase/functions/_shared/tools/job-research-tools.ts)). Actions: `list`, `add`, `remove`, `toggle`, `open_form`. Registered on the `kai` agent. Writes 401 for non-admins (RLS enforced at DB layer). When the user gives vague input ("add a job site"), the tool emits a `job_sites_form_open` chunk instead of guessing.
+- 🆕 **AgentHub modal** [JobSitesFormModal.tsx](src/components/features/ai/JobSitesFormModal.tsx) — triggered by the `job_sites_form_open` chunk. Select site_type + fill URL/domain/country/category/notes → on submit, populates the input box with a structured prose message ("Please add this job site using manage_job_sites... site_type: …, url_or_domain: …") which the user reviews and sends. Re-invokes the tool with the concrete fields.
+- 🆕 **KAI prompt addendum** updated — drops the dead `/admin/knowledge-base/job-sources` deep-link; teaches the agent the new `manage_job_sites` tool with NL→action mappings ("add kariera.gr" → action=add; vague "add a job site" → action=open_form to mount the modal).
+
+**User flow now:**
+1. User (in chat): *"add kariera.gr to the search"* → KAI calls `manage_job_sites(action=add, site_type=perplexity_domain, url_or_domain=kariera.gr)` → row inserted → kb_doc resync → confirmation in chat.
+2. User (vague): *"I want to add a job site"* → KAI calls `manage_job_sites(action=open_form)` → AgentHub mounts the modal → user fills fields → submits → input box populated → user reviews + sends → tool runs.
+3. User (read): *"which job boards do you search?"* → KAI calls `manage_job_sites(action=list)` → enumerates from KB doc / DB.
+
+**RLS model** (unchanged from v0.3.1):
+- `job_research_sites`: reads open to authenticated, writes admin-only via role check.
+- `kb_docs` under "Job Sources" category: workspace-scoped via existing KB RLS; `access_level='agent'` on the category makes the public KB skip it.
+
+---
+
+## Job Research v0.3.1 (2026-05-15 — operator-curated sites list — superseded by v0.3.2)
+
+Late-day follow-up after the v0.3 ship. The Perplexity domain filter had been hardcoded in `_DEFAULT_JOB_DOMAINS` since v0.1 — no way to add country-specific job boards (e.g. `kariera.gr`, `jobs.gr` for the Greek market) without a code change. **Fixed by moving the list into the DB with a hidden admin editor.**
+
+- 🆕 **`job_research_sites` table** — operator-curated list with `site_type ∈ {perplexity_domain, rss_feed_default, careers_page_default}`, `url_or_domain`, optional `country_code` + `category`, `is_enabled` toggle, `notes`. RLS: reads open to authenticated, writes admin-only. Seeded with the previous 10 hardcoded domains.
+- 🆕 **Hidden admin page** at `/admin/knowledge-base/job-sources` ([JobResearchSitesPage.tsx](src/pages/Admin/JobResearchSitesPage.tsx)). Three tabs (one per `site_type`), per-site enable/disable toggle, add-site dialog with country/category metadata. NOT registered in any nav config — reachable only via direct URL, KB-admin sidebar (if linked), or the KAI agent deep-link.
+- 🆕 **CRUD endpoints** at `GET/POST/PUT/DELETE /api/v1/job-research/sites[/{id}]`. Reads return all rows for any authenticated user; writes 401 for non-admins (RLS enforced).
+- ✏️ **`search_via_perplexity()`** now calls `_load_perplexity_domains_from_db()` first; falls back to the hardcoded constant only if the DB read fails or returns nothing. Perplexity's 10-domain cap is still enforced — extras are truncated alphabetically.
+- ✏️ **KAI prompt addendum** updated with a "Job source sites configuration" paragraph instructing the agent to deep-link admins to `/admin/knowledge-base/job-sources` when they ask "which sites do you search?" / "add kariera.gr to the search" / "where do I configure job boards?".
+- 📋 **Per-tracked_job overrides still win.** Setting `tracked_jobs.careers_page_urls` or `rss_feed_urls` per-search overrides the defaults. The DB list is for the *platform-wide* defaults.
+
+**Where to add a new job board (operator workflow):**
+1. Navigate to `/admin/knowledge-base/job-sources` (or ask KAI: "open the job sources admin page").
+2. Pick the right tab (`perplexity_domain` for Sonar's filter, `rss_feed_default` for a feed-aggregator, `careers_page_default` for a specific company).
+3. Click "Add site" → fill URL/domain + optional display name + country + category.
+4. Toggle enabled. Takes effect on the next refresh tick.
+
+---
 
 ## Job Research v0.3 (2026-05-15 — RSS + burst alerts + classifier feedback + external API + cross-conversation triage)
 

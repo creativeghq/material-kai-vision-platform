@@ -857,6 +857,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
+      // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
+      'manage_job_sites',
       // Presentation catalogs (admin/owner only — gated at injection time)
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
@@ -999,7 +1001,7 @@ async function executeAgent(
       tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'],
     },
     'job-research': {
-      tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview'],
+      tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
     },
     'presentation-sheets': {
       tool_ids: ['generate_presentation_sheet'],
@@ -1211,7 +1213,7 @@ async function executeAgent(
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
-  const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview'].includes(t));
+  const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const CATALOG_TOOL_NAMES = [
     'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
     'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
@@ -1315,6 +1317,7 @@ async function executeAgent(
   const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
   const createGetJobDigestPreviewTool = jobResearchMod?.createGetJobDigestPreviewTool;
+  const createManageJobSitesTool = jobResearchMod?.createManageJobSitesTool;
   const createCreateCatalogTool = catalogMod?.createCreateCatalogTool;
   const createAttachCatalogPdfsTool = catalogMod?.createAttachCatalogPdfsTool;
   const createExtractFromCatalogPdfsTool = catalogMod?.createExtractFromCatalogPdfsTool;
@@ -1522,6 +1525,9 @@ async function executeAgent(
   }
   if (config.tools.includes('get_job_digest_preview') && createGetJobDigestPreviewTool) {
     tools.push(createGetJobDigestPreviewTool(userId, undefined, onChunk));
+  }
+  if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
+    tools.push(createManageJobSitesTool(userId, undefined, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
@@ -2137,12 +2143,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get user workspace membership (single query for role + workspace_id)
+    // Get user workspace membership (single query for role + workspace_id).
+    // agent-chat is fundamentally per-user — the platform-wide sb_secret_*
+    // admin key has no user/workspace context, so reject it here with a
+    // clear pointer at the supported 3rd-party integration path (kai_* in
+    // public.api_keys) rather than throwing the misleading "No workspace
+    // found for user" later.
     const isAdmin = isAdminAccess(auth);
-    let membership: { role: string; workspaceId: string | null };
     if (isAdmin) {
-      membership = { role: 'admin', workspaceId: null };
-    } else if (isPartner) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'agent-chat does not accept the platform admin secret key. ' +
+            'For 3rd-party integrations issue a partner key (kai_<...>) ' +
+            'via public.api_keys bound to a real platform user, and send ' +
+            'it as `Authorization: Bearer kai_...` (no apikey header needed).',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    let membership: { role: string; workspaceId: string | null };
+    if (isPartner) {
       // Partner mode: force role to 'member' regardless of the underlying
       // user's platform role. Partner keys never get admin tool access.
       membership = { role: 'member', workspaceId: auth.apiKey?.workspace_id ?? null };
@@ -2150,15 +2171,10 @@ Deno.serve(async (req) => {
       membership = await getUserWorkspaceMembership(userId!);
     }
 
-    // For admin key access, still need workspace_id
-    if (isAdmin && !membership.workspaceId) {
-      const m = await getUserWorkspaceMembership(userId!);
-      membership.workspaceId = m.workspaceId;
-    }
-
-    // Check agent access (skipped for partner mode — already allow-listed above)
+    // Check agent access (skipped for partner mode — already allow-listed above;
+    // admin-secret path was rejected earlier so we no longer need to handle it here).
     let role = membership.role;
-    if (!isAdmin && !isPartner) {
+    if (!isPartner) {
       const { allowed, role: resolvedRole } = checkAgentAccess(membership.role, agentId);
       role = resolvedRole;
       if (!allowed) {
@@ -2172,8 +2188,6 @@ Deno.serve(async (req) => {
           },
         );
       }
-    } else if (isAdmin) {
-      role = 'admin';
     }
 
     const workspaceId = membership.workspaceId;

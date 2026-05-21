@@ -294,6 +294,70 @@ export const jobResearchService = {
   async removeExclusion(exclusionId: string): Promise<void> {
     await api<{ ok: true }>(`/api/v1/job-research/exclusions/${exclusionId}`, { method: 'DELETE' });
   },
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Sites configuration (operator-curated job-board list)
+  // Surfaced at /admin/knowledge-base/job-sources; reads open, writes admin-only via RLS.
+  // ─────────────────────────────────────────────────────────────────────
+
+  async listSites(siteType?: JobSiteType): Promise<JobSite[]> {
+    const qs = siteType ? `?site_type=${encodeURIComponent(siteType)}` : '';
+    const r = await api<{ sites: JobSite[] }>(`/api/v1/job-research/sites${qs}`);
+    return r.sites ?? [];
+  },
+
+  async createSite(body: {
+    site_type: JobSiteType;
+    url_or_domain: string;
+    display_name?: string;
+    country_code?: string;
+    category?: string;
+    is_enabled?: boolean;
+    notes?: string;
+  }): Promise<JobSite> {
+    const r = await api<{ site: JobSite }>(`/api/v1/job-research/sites`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return r.site;
+  },
+
+  async updateSite(siteId: string, patch: Partial<{
+    url_or_domain: string;
+    display_name: string;
+    country_code: string;
+    category: string;
+    is_enabled: boolean;
+    notes: string;
+  }>): Promise<JobSite> {
+    const r = await api<{ site: JobSite }>(`/api/v1/job-research/sites/${siteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    });
+    return r.site;
+  },
+
+  async deleteSite(siteId: string): Promise<void> {
+    await api<{ ok: true }>(`/api/v1/job-research/sites/${siteId}`, { method: 'DELETE' });
+  },
 };
+
+// ─── Sites config types ──────────────────────────────────────────────────
+
+export type JobSiteType = 'perplexity_domain' | 'rss_feed_default' | 'careers_page_default';
+
+export interface JobSite {
+  id: string;
+  site_type: JobSiteType;
+  url_or_domain: string;
+  display_name: string | null;
+  country_code: string | null;
+  category: string | null;
+  is_enabled: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export default jobResearchService;

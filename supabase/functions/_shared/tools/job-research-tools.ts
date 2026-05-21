@@ -97,7 +97,7 @@ export const createTrackJobSearchTool = (
       remote_only, seniority, employment_type, salary_min, salary_currency,
       excluded_companies, preferred_companies, sources_enabled, careers_page_urls,
       digest_hour_utc, digest_day_of_week, alert_channels, refresh_interval_hours,
-      tracked_job_id,
+      tracked_job_id, pause_scope,
     }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'job-research module is disabled — ask an admin to enable it' });
@@ -112,22 +112,32 @@ export const createTrackJobSearchTool = (
         targetId = existing?.id;
       }
 
-      // pause / resume → PUT is_active
+      // pause / resume → PUT is_active (or just digest_enabled when scope='digests_only')
       if (action === 'pause' || action === 'resume') {
         if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
+        // v0.3.3: scoped pause. 'all' (default) stops refresh + digest. 'digests_only'
+        // keeps refresh running silently — user still has fresh listings via find_jobs
+        // and the AgentHub triage panel, just no email/chat-post at digest tick.
+        const patch: Record<string, any> = {};
+        if (pause_scope === 'digests_only') {
+          patch.digest_enabled = action === 'resume';
+        } else {
+          patch.is_active = action === 'resume';
+        }
         const r = await callMivaa(`/api/v1/job-research/track/${targetId}`, {
           method: 'PUT', jwt,
-          body: JSON.stringify({ is_active: action === 'resume' }),
+          body: JSON.stringify(patch),
         });
         if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         onChunk?.({
           type: 'job_search_updated',
           tracked_job_id: targetId,
           action,
+          pause_scope: pause_scope || 'all',
           tracked_job: r.data?.tracked_job,
           timestamp: Date.now(),
         });
-        return JSON.stringify({ success: true, tracked_job: r.data?.tracked_job });
+        return JSON.stringify({ success: true, scope: pause_scope || 'all', tracked_job: r.data?.tracked_job });
       }
 
       // delete
@@ -246,6 +256,8 @@ export const createTrackJobSearchTool = (
         digest_day_of_week: z.number().int().min(0).max(6).nullable().optional().describe('0=Sunday..6=Saturday. NULL/omit = daily. Set when the user wants a weekly digest on a specific day ("every Monday morning" → 1, "every Friday" → 5).'),
         alert_channels: z.array(z.string()).optional().describe('Subset of ["bell","email","webhook"] (default ["bell","email"])'),
         refresh_interval_hours: z.number().int().min(1).max(168).optional().describe('Base cadence between background refreshes (default 24). Cron auto-stretches up to 168h on stable searches with no new matches.'),
+        pause_scope: z.enum(['all', 'digests_only']).optional()
+          .describe('For action=pause/resume. "all" (default) stops both refresh and digest. "digests_only" keeps refresh running silently — useful when the user wants to "stop emailing me but keep collecting findings I can ask for on demand". Maps to: all → is_active flag; digests_only → digest_enabled flag.'),
       }),
     },
   );
@@ -344,6 +356,154 @@ export const createFindJobsTool = (
 // ───────────────────────────────────────────────────────────────────────────
 // 4) get_job_digest_preview — what would today's email look like?
 // ───────────────────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────────────────
+// 5) manage_job_sites — admin tool to curate the platform-wide job-board list
+//
+// Three site types:
+//   - perplexity_domain     → Sonar search_domain_filter (cap 10)
+//   - rss_feed_default      → suggested RSS feeds for new tracked_jobs
+//   - careers_page_default  → suggested career pages for new tracked_jobs
+//
+// Lives in the 'Job Sources' KB category (access_level='agent' — agent reads
+// it, public KB hides it). Writes are admin-gated via RLS at the DB level.
+//
+// When the user asks generically ("add a job site" with no fields), the tool
+// emits a `job_sites_form_open` chunk so AgentHub can render a modal. When
+// they give specifics ("add kariera.gr to the perplexity filter"), the tool
+// just does it.
+// ───────────────────────────────────────────────────────────────────────────
+
+export const createManageJobSitesTool = (
+  userId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ action, site_type, url_or_domain, display_name, country_code, category, notes, site_id, is_enabled }) => {
+      if (!await isModuleEnabled()) {
+        return JSON.stringify({ success: false, error: 'job-research disabled' });
+      }
+
+      // No fields → open the modal form for the user to fill in. Useful when
+      // the user says "add a job site" without specifics.
+      if (action === 'open_form') {
+        onChunk?.({
+          type: 'job_sites_form_open',
+          mode: 'add',
+          default_site_type: site_type || 'perplexity_domain',
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, mode: 'form_opened' });
+      }
+
+      if (action === 'list') {
+        const qs = site_type ? `?site_type=${encodeURIComponent(site_type)}` : '';
+        const r = await callMivaa(`/api/v1/job-research/sites${qs}`, { method: 'GET', jwt });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+        onChunk?.({
+          type: 'job_sites_list',
+          site_type: site_type || 'all',
+          sites: r.data?.sites ?? [],
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, sites: r.data?.sites ?? [] });
+      }
+
+      if (action === 'add') {
+        if (!site_type || !url_or_domain) {
+          // Open the form prefilled with what we have
+          onChunk?.({
+            type: 'job_sites_form_open',
+            mode: 'add',
+            default_site_type: site_type || 'perplexity_domain',
+            prefill: { url_or_domain, display_name, country_code, category, notes },
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: true, mode: 'form_opened', note: 'missing required fields; opened modal' });
+        }
+        const r = await callMivaa(`/api/v1/job-research/sites`, {
+          method: 'POST', jwt,
+          body: JSON.stringify({
+            site_type, url_or_domain,
+            display_name, country_code, category, notes,
+            is_enabled: is_enabled !== false,
+          }),
+        });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+        onChunk?.({
+          type: 'job_sites_updated',
+          change: 'added',
+          site: r.data?.site,
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, site: r.data?.site });
+      }
+
+      if (action === 'remove' || action === 'toggle') {
+        if (!site_id && !url_or_domain) {
+          return JSON.stringify({ success: false, error: 'site_id or url_or_domain required' });
+        }
+        // Resolve site_id by url_or_domain if needed
+        let resolved = site_id;
+        if (!resolved) {
+          const listR = await callMivaa(`/api/v1/job-research/sites${site_type ? '?site_type=' + site_type : ''}`, { method: 'GET', jwt });
+          const match = (listR.data?.sites ?? []).find((s: any) =>
+            (s.url_or_domain || '').toLowerCase() === (url_or_domain || '').toLowerCase()
+          );
+          if (!match) return JSON.stringify({ success: false, error: `no site matching '${url_or_domain}'` });
+          resolved = match.id;
+        }
+        if (action === 'remove') {
+          const r = await callMivaa(`/api/v1/job-research/sites/${resolved}`, { method: 'DELETE', jwt });
+          if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+          onChunk?.({ type: 'job_sites_updated', change: 'removed', site_id: resolved, timestamp: Date.now() });
+          return JSON.stringify({ success: true });
+        }
+        // toggle
+        const r = await callMivaa(`/api/v1/job-research/sites/${resolved}`, {
+          method: 'PUT', jwt,
+          body: JSON.stringify({ is_enabled: is_enabled !== false }),
+        });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+        onChunk?.({ type: 'job_sites_updated', change: 'toggled', site: r.data?.site, timestamp: Date.now() });
+        return JSON.stringify({ success: true, site: r.data?.site });
+      }
+
+      return JSON.stringify({ success: false, error: `unknown action: ${action}` });
+    },
+    {
+      name: 'manage_job_sites',
+      description: [
+        'Manage the platform-wide list of job-board sites the engine searches.',
+        '',
+        'Use this when an admin says any of:',
+        '  • "add kariera.gr to the search"                  → action=add, site_type=perplexity_domain, url_or_domain=kariera.gr',
+        '  • "remove monster.com"                            → action=remove, url_or_domain=monster.com',
+        '  • "which job boards do you search?"               → action=list',
+        '  • "disable indeed.com for now"                    → action=toggle, url_or_domain=indeed.com, is_enabled=false',
+        '  • "add a default RSS feed"                        → action=open_form, site_type=rss_feed_default',
+        '  • "add a job site" (vague)                        → action=open_form (lets the user pick the type in the modal)',
+        '',
+        'For per-tracked-job overrides (this user\'s own career pages or RSS feeds for ONE search) use track_job_search instead — that puts them on `careers_page_urls` / `rss_feed_urls`. THIS tool is for the platform-wide defaults / Perplexity filter.',
+        '',
+        'Changes auto-sync into the "Job Sources" KB category (access_level=agent) so future agent context can read them. Writes require admin role at the DB level.',
+      ].join('\n'),
+      schema: z.object({
+        action: z.enum(['list', 'add', 'remove', 'toggle', 'open_form']).default('list'),
+        site_type: z.enum(['perplexity_domain', 'rss_feed_default', 'careers_page_default']).optional()
+          .describe('Which list to operate on. Required for add. Optional for list (filter) and toggle.'),
+        url_or_domain: z.string().optional().describe('The domain (e.g. "kariera.gr") for perplexity_domain, OR the full URL for RSS/career page.'),
+        display_name: z.string().optional(),
+        country_code: z.string().max(3).optional().describe('ISO-2'),
+        category: z.string().optional().describe('e.g. tech / remote / startup / finance / general'),
+        notes: z.string().optional(),
+        site_id: z.string().optional().describe('UUID; alternative to url_or_domain for remove/toggle'),
+        is_enabled: z.boolean().optional().describe('Used by toggle; defaults true on add'),
+      }),
+    },
+  );
+};
 
 export const createGetJobDigestPreviewTool = (
   userId: string,
