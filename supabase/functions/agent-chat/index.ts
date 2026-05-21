@@ -2070,7 +2070,12 @@ Deno.serve(async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null } = await req.json();
+    // user_id: string | null — only honored when the caller authenticates with
+    // the platform sb_secret_* admin key (server-to-server "act on behalf of"
+    // pattern, same as generate-interior-gemini / generate-region-edit /
+    // generate-vr-world / crm-*-api). Ignored for user-JWT and kai_* partner
+    // calls — those already carry the effective user identity.
     // selected_toolkits: string[] | null — IDs of currently-active toolkit
     // clusters (catalogs / mentions / seo-research / etc.). Core is always
     // included server-side. When null/empty the agent gets just Core tools +
@@ -2092,7 +2097,10 @@ Deno.serve(async (req) => {
     }
 
     const user = auth.user;
-    const userId = auth.userId;
+    // userId is mutable so the sb_secret_* admin-secret "act on behalf of"
+    // branch below can reassign it from body.user_id — same pattern used by
+    // generate-interior-gemini / generate-region-edit / generate-vr-world.
+    let userId = auth.userId;
 
     // ── Partner kai_* API key path ────────────────────────────────────────
     // Locked role = 'member' so admin-only tools (B2B, SEO article pipeline,
@@ -2143,36 +2151,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get user workspace membership (single query for role + workspace_id).
-    // agent-chat is fundamentally per-user — the platform-wide sb_secret_*
-    // admin key has no user/workspace context, so reject it here with a
-    // clear pointer at the supported 3rd-party integration path (kai_* in
-    // public.api_keys) rather than throwing the misleading "No workspace
-    // found for user" later.
+    // ── Admin-secret "act on behalf of user_id" (platform-wide convention) ──
+    // Same shape as generate-interior-gemini / generate-region-edit /
+    // generate-vr-world / crm-*-api: the sb_secret_* admin key is accepted
+    // for trusted server-to-server callers, and the request body carries
+    // `user_id` to identify which user the operation runs as. Workspace,
+    // role/RBAC, credits, and conversation persistence are all anchored to
+    // that resolved user — admin-secret never grants extra capabilities,
+    // it just lets a trusted backend caller stand in for a real user.
     const isAdmin = isAdminAccess(auth);
     if (isAdmin) {
-      return new Response(
-        JSON.stringify({
-          error:
-            'agent-chat does not accept the platform admin secret key. ' +
-            'For 3rd-party integrations issue a partner key (kai_<...>) ' +
-            'via public.api_keys bound to a real platform user, and send ' +
-            'it as `Authorization: Bearer kai_...` (no apikey header needed).',
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      if (!bodyUserId || typeof bodyUserId !== 'string') {
+        return new Response(
+          JSON.stringify({
+            error:
+              'When calling agent-chat with the platform admin secret key, ' +
+              'include `user_id` in the request body to identify which user ' +
+              'the conversation runs as. Workspace, role, credits, and ' +
+              'conversation persistence all anchor to that user.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      userId = bodyUserId;
     }
+
+    // Get user workspace membership (single query for role + workspace_id).
     let membership: { role: string; workspaceId: string | null };
     if (isPartner) {
       // Partner mode: force role to 'member' regardless of the underlying
       // user's platform role. Partner keys never get admin tool access.
       membership = { role: 'member', workspaceId: auth.apiKey?.workspace_id ?? null };
     } else {
+      // Both user-JWT and admin-secret-on-behalf-of paths land here with a
+      // concrete userId — look up that user's real workspace + role.
       membership = await getUserWorkspaceMembership(userId!);
     }
 
-    // Check agent access (skipped for partner mode — already allow-listed above;
-    // admin-secret path was rejected earlier so we no longer need to handle it here).
+    // Check agent access (skipped for partner mode — already allow-listed above).
     let role = membership.role;
     if (!isPartner) {
       const { allowed, role: resolvedRole } = checkAgentAccess(membership.role, agentId);
