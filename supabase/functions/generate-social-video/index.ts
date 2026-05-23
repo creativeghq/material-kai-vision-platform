@@ -18,7 +18,7 @@ import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
+const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 type VideoModel = 'kling-3.0' | 'kling-1.6-pro' | 'veo-2';
 
@@ -47,7 +47,7 @@ async function createReplicatePrediction(
   const res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY}`,
+      'Authorization': `Token ${REPLICATE_API_KEY()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input }),
@@ -71,7 +71,7 @@ async function pollReplicate(
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 5000));
     const res = await fetch(pollUrl, {
-      headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` },
+      headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` },
     });
     const data = await res.json() as { status: string; output?: string | string[]; error?: string };
 

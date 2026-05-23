@@ -50,13 +50,13 @@ Deno.serve(withApiLogging('suggest-fields', async (req) => {
     // Fetch page content using Firecrawl if no sample provided
     let pageContent = sampleHtml;
     if (!pageContent) {
-      const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-      if (!firecrawlKey) throw new Error('Firecrawl API key not configured');
+      const firecrawlKey = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
+      if (!firecrawlKey()) throw new Error('Firecrawl API key not configured');
 
       const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${firecrawlKey}`,
+          'Authorization': `Bearer ${firecrawlKey()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

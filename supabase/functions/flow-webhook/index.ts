@@ -12,6 +12,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -41,6 +42,7 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
 }
 
 Deno.serve(withApiLogging('flow-webhook', async (req) => {
+  await bootstrapForFunction();
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

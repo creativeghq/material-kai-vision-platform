@@ -7,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // =====================================================
 // TYPES
@@ -41,11 +42,11 @@ async function sendPushNotifications(
     badge?: string;
   }
 ): Promise<{ success: number; failed: number; results: any[] }> {
-  const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-  const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-  const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@materialkai.com';
+  const vapidPublicKey = () => Deno.env.get('VAPID_PUBLIC_KEY') || '';
+  const vapidPrivateKey = () => Deno.env.get('VAPID_PRIVATE_KEY') || '';
+  const vapidSubject = () => Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@materialkai.com';
 
-  if (!vapidPublicKey || !vapidPrivateKey) {
+  if (!vapidPublicKey() || !vapidPrivateKey()) {
     throw new Error('VAPID keys not configured');
   }
 
@@ -211,6 +212,7 @@ async function sendWebhooks(
 // MAIN HANDLER
 // =====================================================
 serve(async (req) => {
+  await bootstrapForFunction();
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -237,8 +239,8 @@ serve(async (req) => {
       }
 
       case 'get-vapid-key': {
-        const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-        if (!vapidPublicKey) {
+        const vapidPublicKey = () => Deno.env.get('VAPID_PUBLIC_KEY') || '';
+        if (!vapidPublicKey()) {
           return new Response(
             JSON.stringify({ configured: false }),
             {
@@ -247,7 +249,7 @@ serve(async (req) => {
           );
         }
         return new Response(
-          JSON.stringify({ configured: true, publicKey: vapidPublicKey }),
+          JSON.stringify({ configured: true, publicKey: vapidPublicKey() }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }

@@ -32,6 +32,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { usersAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
+import { AdminRoleUpgradeRequestsPanel } from '@/modules/crm/components/AdminRoleUpgradeRequestsPanel';
 
 interface UserProfile {
   id: string;
@@ -691,6 +692,12 @@ export const UserDetailPage: React.FC = () => {
             </Card>
 
             <CategoryAssignmentPicker target={{ kind: 'user', id: user.user_id }} />
+
+            {/* Role Upgrade Requests — applications for dealer/factory promotion */}
+            <AdminRoleUpgradeRequestsPanel
+              userId={user.user_id}
+              onUpdated={() => loadUser()}
+            />
           </TabsContent>
 
           {/* Subscription & Credits Tab */}

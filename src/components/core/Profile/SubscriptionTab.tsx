@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { StripeService } from '@/services/stripe.service';
 import { apiGatewayService, type ApiKey } from '@/services/apiGateway/apiGatewayService';
 import { ChangelogList } from './ChangelogList';
+import { ApplyForRoleCard } from './ApplyForRoleCard';
 
 const stripeService = new StripeService();
 
@@ -233,6 +234,9 @@ export const SubscriptionTab: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Apply for Dealer / Factory — sits above the plan grid */}
+      <ApplyForRoleCard />
 
       {/* Available Plans */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

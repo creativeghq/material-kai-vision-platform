@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 /**
  * Price Monitoring Cron Job — internal-flow refresher.
@@ -20,12 +21,13 @@ import { createClient } from '@supabase/supabase-js';
  */
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   console.log('🔄 Price monitoring cron job started');
 
   try {
     const cronSecret = req.headers.get('x-cron-secret');
-    const expectedSecret = Deno.env.get('CRON_SECRET');
-    if (cronSecret !== expectedSecret) {
+    const expectedSecret = () => Deno.env.get('CRON_SECRET') || '';
+    if (cronSecret !== expectedSecret()) {
       console.error('❌ Invalid cron secret');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,

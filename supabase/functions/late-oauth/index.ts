@@ -24,7 +24,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const LATE_API_KEY = Deno.env.get('LATE_API_KEY');
+const LATE_API_KEY = () => Deno.env.get('LATE_API_KEY') || '';
 const LATE_BASE_URL = 'https://api.late.dev/v1';
 
 // Supported platforms and their Late.dev identifiers
@@ -49,7 +49,7 @@ async function lateApiRequest(
     const res = await fetch(`${LATE_BASE_URL}${path}`, {
       method,
       headers: {
-        'Authorization': `Bearer ${LATE_API_KEY}`,
+        'Authorization': `Bearer ${LATE_API_KEY()}`,
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -111,7 +111,7 @@ Deno.serve(withApiLogging('late-oauth', async (req) => {
     return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
   }
 
-  if (!LATE_API_KEY) {
+  if (!LATE_API_KEY()) {
     return jsonResponse({ success: false, error: 'Social accounts integration is not configured (missing LATE_API_KEY)' }, 503);
   }
 

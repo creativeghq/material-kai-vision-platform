@@ -16,10 +16,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const replicateToken = Deno.env.get('REPLICATE_API_TOKEN') || '';
+const replicateToken = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 const mivaaBaseUrl = Deno.env.get('MIVAA_BACKEND_URL') || '';
 
 const CREDIT_COST = 8;
@@ -129,14 +130,14 @@ async function callReplicate(
   model: string,
   input: Record<string, unknown>,
 ): Promise<unknown> {
-  if (!replicateToken) throw new Error('REPLICATE_API_TOKEN not configured');
+  if (!replicateToken()) throw new Error('REPLICATE_API_TOKEN not configured');
 
   const createResp = await fetch(
     `https://api.replicate.com/v1/models/${model}/predictions`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${replicateToken}`,
+        'Authorization': `Bearer ${replicateToken()}`,
         'Content-Type': 'application/json',
         'Prefer': 'wait',
       },
@@ -166,7 +167,7 @@ async function callReplicate(
 
     const statusResp = await fetch(
       `https://api.replicate.com/v1/predictions/${predictionId}`,
-      { headers: { 'Authorization': `Bearer ${replicateToken}` } },
+      { headers: { 'Authorization': `Bearer ${replicateToken()}` } },
     );
 
     if (!statusResp.ok) continue;
@@ -307,6 +308,7 @@ async function updateProductPbrMaps(
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(withApiLogging('generate-pbr-maps', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 

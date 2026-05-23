@@ -14,7 +14,7 @@
  *   { success, run_id, status, duration_ms, output? }
  */
 
-const ANTHROPIC_API_KEY       = Deno.env.get('ANTHROPIC_API_KEY')!;
+const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const SUPABASE_URL             = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL        = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
@@ -199,7 +199,7 @@ Deno.serve(async (req: Request) => {
     workspaceId:     agentConfig.workspace_id,
     mivaaGatewayUrl: MIVAA_GATEWAY_URL,
     mivaaApiKey:     MIVAA_API_KEY,
-    anthropicApiKey: ANTHROPIC_API_KEY,
+    anthropicApiKey: ANTHROPIC_API_KEY(),
     log,
     heartbeat,
   };

@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // Sales/Finance — daily follow-up reminder cron.
 // Scans the follow-up queue and emits a bell notification to the quote owner for:
@@ -36,6 +37,7 @@ function json(body: any, status = 200): Response {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
 
   try {

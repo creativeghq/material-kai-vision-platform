@@ -17,6 +17,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import {
   generateImageWithGemini,
   editImageWithGrok,
@@ -35,7 +36,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
-const REPLICATE_API_TOKEN = Deno.env.get('REPLICATE_API_TOKEN') || '';
+const REPLICATE_API_TOKEN = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 /**
  * Safe chunked base64 encoder — avoids call-stack overflow on large images.
@@ -258,7 +259,7 @@ async function callFluxDepthPro(
   prompt: string,
   aspectRatio: ImageAspectRatio = '16:9',
 ): Promise<string> {
-  if (!REPLICATE_API_TOKEN) throw new Error('REPLICATE_API_TOKEN not set');
+  if (!REPLICATE_API_TOKEN()) throw new Error('REPLICATE_API_TOKEN not set');
 
   const requestBody = {
     input: {
@@ -280,7 +281,7 @@ async function callFluxDepthPro(
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        Authorization: `Bearer ${REPLICATE_API_TOKEN()}`,
         'Content-Type': 'application/json',
         Prefer: 'wait',
       },
@@ -311,7 +312,7 @@ async function callFluxDepthPro(
     await new Promise((r) => setTimeout(r, 3000));
     const statusRes = await fetch(
       `https://api.replicate.com/v1/predictions/${predictionId}`,
-      { headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` } },
+      { headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN()}` } },
     );
     const status = await statusRes.json();
     if (status.status === 'succeeded') {
@@ -489,6 +490,7 @@ Negative prompt: oversized props, exaggerated scale, distorted proportions, fish
 }
 
 Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

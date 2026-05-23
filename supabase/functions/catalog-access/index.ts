@@ -27,6 +27,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -43,6 +44,7 @@ interface RequestBody {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 

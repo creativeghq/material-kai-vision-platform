@@ -19,10 +19,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
+const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'wan2.1-i2v-720p' | 'runway-gen4-turbo';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
@@ -93,7 +94,7 @@ async function createReplicatePrediction(
   const res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY}`,
+      'Authorization': `Token ${REPLICATE_API_KEY()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input }),
@@ -118,7 +119,7 @@ async function pollReplicate(
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 5000));
-    const res = await fetch(url, { headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` } });
+    const res = await fetch(url, { headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` } });
     const data = await res.json() as { status: string; output?: string | string[]; error?: string };
     if (data.status === 'succeeded' || data.status === 'failed') return data;
   }
@@ -127,6 +128,7 @@ async function pollReplicate(
 }
 
 Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 

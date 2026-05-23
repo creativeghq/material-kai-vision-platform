@@ -18,7 +18,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const worldlabsApiKey = Deno.env.get('WORLDLABS_API_KEY') || '';
+// Read at use-site so platform_secrets bootstrap (run in the handler) is honored.
+const worldlabsApiKey = () => Deno.env.get('WORLDLABS_API_KEY') || '';
 
 const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
@@ -361,7 +362,7 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
   const prepareResponse = await fetch(`${WORLDLABS_BASE_URL}/media-assets:prepare_upload`, {
     method: 'POST',
     headers: {
-      'WLT-Api-Key': worldlabsApiKey,
+      'WLT-Api-Key': worldlabsApiKey(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -413,7 +414,7 @@ async function startWorldGeneration(
   const response = await fetch(`${WORLDLABS_BASE_URL}/worlds:generate`, {
     method: 'POST',
     headers: {
-      'WLT-Api-Key': worldlabsApiKey,
+      'WLT-Api-Key': worldlabsApiKey(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -459,7 +460,7 @@ async function pollForCompletion(
 
     const response = await fetch(`${WORLDLABS_BASE_URL}/operations/${operationId}`, {
       headers: {
-        'WLT-Api-Key': worldlabsApiKey,
+        'WLT-Api-Key': worldlabsApiKey(),
       },
     });
 
@@ -498,7 +499,7 @@ async function pollForCompletion(
 async function fetchWorld(worldId: string): Promise<any> {
   const response = await fetch(`${WORLDLABS_BASE_URL}/worlds/${worldId}`, {
     headers: {
-      'WLT-Api-Key': worldlabsApiKey,
+      'WLT-Api-Key': worldlabsApiKey(),
     },
   });
 

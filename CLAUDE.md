@@ -911,11 +911,21 @@ Seeded keys (one row per key, sharing via `platform_secret_module_links`):
 
 Platform-wide (no `primary_module_slug`, shown at `/admin/operations → Keys`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GEMINI_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_API_KEY`, `HF_TOKEN`, `HUGGINGFACE_API_KEY`, `SLIG_ENDPOINT_TOKEN`, `WORLDLABS_API_KEY`, `PINTEREST_APP_ID/SECRET/REDIRECT_URI`, `CRON_SECRET`, `ADMIN_RESTART_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VAPID_*`.
 
-### Edge-function migration (incremental, opt-in)
+### Edge-function migration (Phase 3 — completed)
 
-For an edge function to honour the DB-fallback value when env is unset, it needs to call `resolveSecret()` instead of `Deno.env.get()`. Functions that still call `Deno.env.get()` continue to work — env-first behaviour is identical — they just don't pick up the admin's UI-saved value. Migrated so far: `oxygen-create-pre-invoice`, `oxygen-admin`, `platform-secrets-admin`. Remaining ~50 functions migrate incrementally as touched; the seed rows + Settings UI work either way for env-set deployments.
+Every edge function now honours admin-saved DB values when the env var is unset, via two mechanisms:
 
-Shared infrastructure caveat: `_shared/ai-client.ts` reads keys at module-load to hand them to npm AI-SDK packages (process.env polyfill). Keys consumed there (`ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, etc.) remain env-only at runtime — the admin UI shows them but they can't fall back to DB without a non-trivial refactor of that module.
+1. **`_shared/secrets-bootstrap.ts → bootstrapSecretsFromDb()` / `bootstrapForFunction()`** — at handler entry, reads every row in `platform_secrets` and calls `Deno.env.set(key, value)` for any key that doesn't already have an env value. Env always wins because `Deno.env.set()` skips keys with existing values. Memoised per worker so the cost is one DB read per cold start.
+
+2. **`_shared/auth.ts → authenticate()`** awaits the bootstrap before returning, so any function calling `authenticate(req)` is automatically DB-aware. ~47 functions use this path.
+
+3. **`bootstrapForFunction()`** is called explicitly at the top of every non-authenticate handler (crons, webhooks, public AI endpoints). ~26 additional functions migrated.
+
+4. **`_shared/ai-client.ts`** — Google/Anthropic/Kling providers are now lazy `Proxy` objects that construct on first use, AFTER the handler's bootstrap has populated env. Existing call sites (`google(model)`, `google.image(model)`, `anthropic(model)`) are unchanged.
+
+5. **Module-load env captures** (the old anti-pattern `const X = Deno.env.get('Y')` at the top of a file) have been converted across 41 files to lazy getters (`const X = () => Deno.env.get('Y')`) with all call sites rewritten to `X()`. This was the load-bearing change — without it, the bootstrap would populate env too late to matter.
+
+**Result**: an admin can paste a key into the UI, and the edge function picks it up on its next invocation. Env-set deployments behave exactly as before.
 
 ## Oxygen Pre-Invoice Module (Greek e-Invoicing — 2026-04-22)
 Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/oxygen-admin/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.

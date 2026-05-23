@@ -184,11 +184,11 @@ interface XMLImportRequest {
   field_mappings?: Record<string, string>; // Optional: custom field mappings
   preview_only?: boolean; // If true, only return detected fields without creating job
   generate_preview?: boolean; // If true, return a single sample product with applied mappings
-  manual_values?: { // Manual values for required fields if not auto-detected
-    factory_name?: string;
-    name?: string;
-    material_category?: string;
-  };
+  // Manual values keyed by target field name. Applied as fallbacks per-row when
+  // the mapped XML tag is missing/empty. Any target is allowed (not just the
+  // three originally-required fields) — the Fill-the-Gaps UI uses this for
+  // optional fields too (e.g. job-level default description).
+  manual_values?: Record<string, string>;
 }
 
 interface DetectedField {
@@ -197,6 +197,12 @@ interface DetectedField {
   suggested_mapping: string;
   confidence: number;
   data_type: string;
+  // Coverage stats — populated by the preview_only pass so the
+  // Fill-the-Gaps UI can render "present in N/M rows" badges.
+  total_rows: number;
+  present_count: number;
+  coverage_pct: number;
+  distinct_values: number;
 }
 
 interface ProductData {
@@ -231,51 +237,97 @@ interface XMLImportResponse {
   dropped_count?: number;  // Products skipped due to missing required fields
   detected_fields?: DetectedField[]; // For preview mode
   suggested_mappings?: Record<string, string>; // AI-suggested mappings
+  total_rows?: number; // Total product rows in the XML (returned with preview)
   preview_product?: ProductData; // For generate_preview mode
+  // Per-field provenance for the preview product: 'xml' = pulled from the XML
+  // tag, 'default' = filled in from manual_values fallback. Lets the preview
+  // modal show "from default" badges so the operator knows what's papered over.
+  preview_value_sources?: Record<string, 'xml' | 'default'>;
 }
 
 /**
- * Detect all unique child fields across the first N product nodes and collect
- * up to 3 sample values per field — used by the field-mapping preview UI.
+ * Per-field coverage rollup returned by `detectXMLFields`.
+ *
+ * We walk every product node (not just the first 10) so the coverage
+ * percentages drive the Fill-the-Gaps panel honestly — a field that's present
+ * in only 312/418 rows shows up as 74%, not "looks fine in the first 10".
+ *
+ * `distinct_values` is capped at MAX_DISTINCT_VALUES_TRACKED to avoid a
+ * pathological feed (e.g. 20K rows with unique GUIDs) blowing up the Set.
  */
-function detectXMLFields(xmlContent: string): Map<string, string[]> {
+interface FieldDetection {
+  samples: string[];
+  present_count: number;
+  distinct_values: number;
+}
+
+const MAX_DISTINCT_VALUES_TRACKED = 200;
+
+function detectXMLFields(xmlContent: string): {
+  fields: Map<string, FieldDetection>;
+  total_rows: number;
+} {
   const doc = parseXmlDoc(xmlContent);
   const productNodes = findProductNodes(doc);
   if (productNodes.length === 0) {
     throw new Error('No product elements found in XML');
   }
 
-  const fieldSamples = new Map<string, Set<string>>();
-  for (const node of productNodes.slice(0, 10)) {
+  // Per-field: sample values (capped at 3), distinct value tracker (capped at
+  // MAX_DISTINCT_VALUES_TRACKED), and present_count over ALL rows.
+  const samples = new Map<string, Set<string>>();
+  const distinctTrackers = new Map<string, Set<string>>();
+  const presentCounts = new Map<string, number>();
+  const distinctOverflowed = new Map<string, boolean>();
+
+  for (const node of productNodes) {
     for (const [key, val] of Object.entries(node)) {
-      if (key.startsWith('@_') || key === '#text') continue;  // skip attributes + mixed text
+      if (key.startsWith('@_') || key === '#text') continue;
       const text = coerceToText(val);
       if (!text) continue;
-      if (!fieldSamples.has(key)) fieldSamples.set(key, new Set<string>());
-      const samples = fieldSamples.get(key)!;
-      if (samples.size < 3) samples.add(text);
+
+      presentCounts.set(key, (presentCounts.get(key) || 0) + 1);
+
+      if (!samples.has(key)) samples.set(key, new Set<string>());
+      const sampleSet = samples.get(key)!;
+      if (sampleSet.size < 3) sampleSet.add(text);
+
+      if (!distinctOverflowed.get(key)) {
+        if (!distinctTrackers.has(key)) distinctTrackers.set(key, new Set<string>());
+        const distinctSet = distinctTrackers.get(key)!;
+        distinctSet.add(text);
+        if (distinctSet.size >= MAX_DISTINCT_VALUES_TRACKED) {
+          distinctOverflowed.set(key, true);
+        }
+      }
     }
   }
 
-  const out = new Map<string, string[]>();
-  for (const [field, set] of fieldSamples) out.set(field, Array.from(set));
-  return out;
+  const out = new Map<string, FieldDetection>();
+  for (const [field, sampleSet] of samples) {
+    out.set(field, {
+      samples: Array.from(sampleSet),
+      present_count: presentCounts.get(field) || 0,
+      distinct_values: distinctTrackers.get(field)?.size || 0,
+    });
+  }
+  return { fields: out, total_rows: productNodes.length };
 }
 
 /**
  * Use AI to suggest field mappings based on field names and sample values
  */
 async function suggestFieldMappings(
-  fieldSamples: Map<string, string[]>,
+  fieldSamples: Map<string, FieldDetection>,
   anthropicApiKey: string,
   supabase: SupabaseClient,
 ): Promise<Map<string, { mapping: string; confidence: number }>> {
   const suggestions = new Map<string, { mapping: string; confidence: number }>();
 
   // Build prompt for Claude
-  const fieldsInfo = Array.from(fieldSamples.entries()).map(([field, samples]) => ({
+  const fieldsInfo = Array.from(fieldSamples.entries()).map(([field, detection]) => ({
     xml_field: field,
-    sample_values: samples
+    sample_values: detection.samples
   }));
 
   // Load prompt from database (editable via /admin/ai-configs)
@@ -335,7 +387,7 @@ ${JSON.stringify(fieldsInfo, null, 2)}`;
 /**
  * Fallback rule-based mapping when AI is unavailable
  */
-function fallbackMappings(fieldSamples: Map<string, string[]>): Map<string, { mapping: string; confidence: number }> {
+function fallbackMappings(fieldSamples: Map<string, FieldDetection>): Map<string, { mapping: string; confidence: number }> {
   const suggestions = new Map<string, { mapping: string; confidence: number }>();
 
   const mappingRules: Record<string, { mapping: string; confidence: number }> = {
@@ -500,7 +552,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    const anthropicApiKey = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase credentials not configured');
@@ -519,6 +571,16 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
     const user = auth.user;
     const userId = auth.userId;
+
+    // Forward the caller's auth header to the Python /api/import/process
+    // handoff so Python can identify the user (this was a latent bug — the
+    // import-mode code path referenced `authHeader` without ever defining it,
+    // causing every Python handoff to throw a ReferenceError that the surrounding
+    // .catch() silently swallowed into Sentry).
+    const authHeader =
+      req.headers.get('Authorization') ||
+      req.headers.get('authorization') ||
+      `Bearer ${supabaseKey}`;
 
     // Decode base64 XML content (UTF-8 safe)
     console.log('🔓 Decoding base64 XML content...');
@@ -561,22 +623,23 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     if (preview_only) {
       console.log('Preview mode: detecting fields and suggesting mappings');
 
-      const fieldSamples = detectXMLFields(xmlString);
-      console.log(`Detected ${fieldSamples.size} unique fields`);
+      const { fields: fieldDetections, total_rows } = detectXMLFields(xmlString);
+      console.log(`Detected ${fieldDetections.size} unique fields across ${total_rows} product rows`);
 
       // Get AI suggestions if API key available
       let aiSuggestions: Map<string, { mapping: string; confidence: number }>;
-      if (anthropicApiKey) {
+      if (anthropicApiKey()) {
         console.log('Using Claude AI for field mapping suggestions');
-        aiSuggestions = await suggestFieldMappings(fieldSamples, anthropicApiKey, supabase);
+        aiSuggestions = await suggestFieldMappings(fieldDetections, anthropicApiKey(), supabase);
       } else {
         console.log('Using fallback rule-based mapping');
-        aiSuggestions = fallbackMappings(fieldSamples);
+        aiSuggestions = fallbackMappings(fieldDetections);
       }
 
       // Build detected fields response
-      const detectedFields: DetectedField[] = Array.from(fieldSamples.entries()).map(([xmlField, samples]) => {
+      const detectedFields: DetectedField[] = Array.from(fieldDetections.entries()).map(([xmlField, detection]) => {
         const suggestion = aiSuggestions.get(xmlField) || { mapping: 'metadata', confidence: 0.5 };
+        const samples = detection.samples;
 
         // Determine data type from samples
         let dataType = 'string';
@@ -591,12 +654,20 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
           }
         }
 
+        const coverage_pct = total_rows > 0
+          ? Math.round((detection.present_count / total_rows) * 1000) / 10  // 1-decimal place
+          : 0;
+
         return {
           xml_field: xmlField,
           sample_values: samples,
           suggested_mapping: suggestion.mapping,
           confidence: suggestion.confidence,
-          data_type: dataType
+          data_type: dataType,
+          total_rows,
+          present_count: detection.present_count,
+          coverage_pct,
+          distinct_values: detection.distinct_values,
         };
       });
 
@@ -611,7 +682,8 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
           success: true,
           detected_fields: detectedFields,
           suggested_mappings: suggestedMappings,
-          message: `Detected ${detectedFields.length} fields. Review and confirm mappings to proceed.`
+          total_rows,
+          message: `Detected ${detectedFields.length} fields across ${total_rows} product rows. Review and confirm mappings to proceed.`
         } as XMLImportResponse),
         {
           status: 200,
@@ -631,18 +703,17 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       }
       console.log(`Found ${productNodes.length} products, extracting first one for preview`);
 
-      let previewProduct = extractProductDataWithMappings(productNodes[0], field_mappings);
-
-      if (manual_values) {
-        if (manual_values.factory_name) previewProduct.factory_name = manual_values.factory_name;
-        if (manual_values.name) previewProduct.name = manual_values.name;
-        if (manual_values.material_category) previewProduct.material_category = manual_values.material_category;
-      }
+      const { product: previewProduct, value_sources } = extractProductDataWithMappings(
+        productNodes[0],
+        field_mappings,
+        manual_values,
+      );
 
       return new Response(
         JSON.stringify({
           success: true,
           preview_product: previewProduct,
+          preview_value_sources: value_sources,
           total_products: productNodes.length,
           message: `Preview generated from 1 of ${productNodes.length} products`,
         } as XMLImportResponse),
@@ -658,8 +729,22 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       throw new Error('Missing required parameter: category');
     }
 
-    // Parse XML and extract products
-    const { products, droppedCount } = await parseXML(xmlString);
+    // Parse XML and extract products. Manual-values fall back per-row when the
+    // mapped tag is empty, AND the job-level `category` (chosen on the upload
+    // screen) is used as the material_category fallback for every product so
+    // the operator doesn't have to map it from the XML.
+    const manualValuesWithCategory: Record<string, string> = {
+      ...(manual_values || {}),
+    };
+    if (!manualValuesWithCategory.material_category) {
+      manualValuesWithCategory.material_category = category;
+    }
+
+    const { products, droppedCount } = await parseXML(
+      xmlString,
+      field_mappings,
+      manualValuesWithCategory,
+    );
     console.log(`Extracted ${products.length} products from XML (${droppedCount} dropped)`);
 
     // Hard cap on products per import — the full array is stored as one JSONB
@@ -751,7 +836,11 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
  * Returns both the extracted products and a drop count. Callers should surface
  * the drop count so partial-failure imports are distinguishable from clean ones.
  */
-async function parseXML(xmlString: string): Promise<{ products: ProductData[]; droppedCount: number }> {
+async function parseXML(
+  xmlString: string,
+  fieldMappings?: Record<string, string>,
+  manualValues?: Record<string, string>,
+): Promise<{ products: ProductData[]; droppedCount: number }> {
   const products: ProductData[] = [];
   let droppedCount = 0;
 
@@ -771,8 +860,25 @@ async function parseXML(xmlString: string): Promise<{ products: ProductData[]; d
 
   console.log(`Found ${productNodes.length} product elements in XML`);
 
+  // When the caller passed field_mappings (the Fill-the-Gaps UI always does),
+  // honor them and apply manual_values as per-row fallbacks. When no mappings
+  // are passed (legacy / programmatic callers), fall back to the hardcoded
+  // tag-name guessing in extractProductData.
+  const usingMappings = !!(fieldMappings && Object.keys(fieldMappings).length > 0);
+
   for (const node of productNodes) {
-    const product = extractProductData(node);
+    let product: ProductData | null;
+    if (usingMappings) {
+      const { product: mapped, missingRequired } = extractProductDataFromMappings(
+        node,
+        fieldMappings!,
+        manualValues,
+      );
+      product = missingRequired ? null : mapped;
+    } else {
+      product = extractProductData(node);
+    }
+
     if (product) {
       products.push(product);
     } else {
@@ -903,79 +1009,313 @@ function extractProductData(node: XmlNode): ProductData | null {
 }
 
 /**
- * Extract product data with custom field mappings applied
- * Used for preview generation
+ * Build the (target -> [xml_field, ...]) inverse index from the user's
+ * mappings. Multiple XML fields can map to the same target (the operator
+ * resolves this in the conflict UI by leaving only one mapped); whatever wins
+ * "first non-empty" at extraction time is what gets persisted.
  */
-function extractProductDataWithMappings(node: XmlNode, mappings?: Record<string, string>): ProductData {
+function invertMappings(mappings: Record<string, string>): Map<string, string[]> {
+  const inverse = new Map<string, string[]>();
+  for (const [xmlField, target] of Object.entries(mappings)) {
+    if (!target) continue;
+    if (!inverse.has(target)) inverse.set(target, []);
+    inverse.get(target)!.push(xmlField);
+  }
+  return inverse;
+}
+
+/**
+ * Resolve a single target's value for a product node:
+ *   1. Try each mapped XML tag in order; return the first non-empty value with
+ *      source='xml'.
+ *   2. If none yielded a value, fall back to manualValues[target] with
+ *      source='default'.
+ *   3. Otherwise undefined / source='missing'.
+ *
+ * This is the chokepoint that implements the "Fill-the-Gaps" semantics: a
+ * mapped-and-present row keeps its real data; a mapped-but-empty or unmapped
+ * row gets the operator's job-level default.
+ */
+function resolveTargetValue(
+  node: XmlNode,
+  target: string,
+  inverseMappings: Map<string, string[]>,
+  manualValues?: Record<string, string>,
+): { value: string | undefined; source: 'xml' | 'default' | 'missing' } {
+  const xmlFields = inverseMappings.get(target) || [];
+  for (const xmlField of xmlFields) {
+    const val = getText(node, xmlField);
+    if (val) return { value: val, source: 'xml' };
+  }
+  const fallback = manualValues?.[target];
+  if (fallback) return { value: fallback, source: 'default' };
+  return { value: undefined, source: 'missing' };
+}
+
+// Structural fields that land at the TOP LEVEL of ProductData. The Python
+// downstream reads these from product_data.<field> directly (see audit:
+// data_import_service.py:531-671). Mirroring the orchestrator's pre-refactor
+// extractProductData contract — any structural change here cascades to the
+// Python normalizer + Stage 4 product insert.
+const STRUCTURAL_TARGET_FIELDS = [
+  'name', 'factory_name', 'material_category', 'description', 'factory_group_name',
+  'factory_address', 'factory_city', 'factory_country', 'factory_postal_code',
+  'factory_phone', 'factory_email', 'factory_website', 'factory_country_of_origin',
+  'factory_founded_year', 'factory_employee_count', 'factory_linkedin_url',
+];
+
+// "Attribute" target fields. The Python embedding/canonicalization path reads
+// these as top-level on product_data (data_import_service.py:599, 605, 678).
+// Anything mapped to one of these targets MUST land both at the top level AND
+// in metadata under the canonical target name, so:
+//   (a) properties.price / properties.dimensions JSONB writes find the value
+//   (b) the text-embedding concat picks it up
+//   (c) facet canonicalization sees the whitelisted key
+const ATTRIBUTE_TARGET_FIELDS = [
+  'price', 'color', 'colors', 'dimensions', 'size',
+  'designer', 'collection', 'finish', 'material',
+];
+
+// `external_sku` is special — Python's re-import dedup reads from
+// product_data.product_id / product_data.sku / metadata.product_id
+// (data_import_service.py:628-631). We mirror to all three so an operator
+// mapping <code> → external_sku actually seeds the dedup key.
+const SKU_TARGET = 'external_sku';
+
+// Every target the resolver knows how to handle (drives the manual_values
+// fallback loop). If a target is in the Fill-the-Gaps UI but not here, the
+// operator's job-level default would silently fail to apply.
+const ALL_RESOLVABLE_TARGETS = [
+  ...STRUCTURAL_TARGET_FIELDS,
+  ...ATTRIBUTE_TARGET_FIELDS,
+  SKU_TARGET,
+];
+
+const REQUIRED_TARGET_FIELDS = ['name', 'factory_name', 'material_category'];
+
+/**
+ * Single mapping-aware extractor. Used by both the live preview
+ * (extractProductDataWithMappings) and the import-time row builder
+ * (extractProductDataFromMappings — thin wrapper below).
+ *
+ * Returns the product plus a per-target `value_sources` map so the preview UI
+ * can label each rendered field "from XML" vs "from default".
+ */
+function buildProductWithMappings(
+  node: XmlNode,
+  mappings: Record<string, string>,
+  manualValues?: Record<string, string>,
+): { product: ProductData; value_sources: Record<string, 'xml' | 'default'>; missingRequired: string[] } {
+  const inverseMappings = invertMappings(mappings);
+  const value_sources: Record<string, 'xml' | 'default'> = {};
+  const missingRequired: string[] = [];
+
+  // Resolve every known target via mapped tags → manual_values fallback. This
+  // includes BOTH structural fields and attribute fields (price/color/...) and
+  // external_sku — the operator's manual default must work for all of them.
+  const resolved: Record<string, string | undefined> = {};
+  for (const target of ALL_RESOLVABLE_TARGETS) {
+    const { value, source } = resolveTargetValue(node, target, inverseMappings, manualValues);
+    resolved[target] = value;
+    if (source !== 'missing') value_sources[target] = source;
+  }
+
+  for (const req of REQUIRED_TARGET_FIELDS) {
+    if (!resolved[req]) missingRequired.push(req);
+  }
+
+  // Images: target='images' is special — collect from ALL mapped tags, split
+  // comma-separated values, then fall back to the hardcoded <image_link>/<img>
+  // probe so a mis-mapped image field doesn't lose every URL.
+  const images: string[] = [];
+  const imageXmlFields = inverseMappings.get('images') || [];
+  for (const xmlField of imageXmlFields) {
+    const raw = getText(node, xmlField);
+    if (!raw) continue;
+    if (raw.includes(',')) {
+      images.push(...raw.split(',').map((u) => u.trim()).filter(Boolean));
+    } else {
+      images.push(raw);
+    }
+  }
+  if (images.length === 0) {
+    const imageLink = getText(node, 'image_link') || getText(node, 'image');
+    if (imageLink) images.push(imageLink);
+    const additionalImageLink = getText(node, 'additional_image_link') || getText(node, 'additional_images');
+    if (additionalImageLink) {
+      images.push(...additionalImageLink.split(',').map((u) => u.trim()).filter(Boolean));
+    }
+    if (images.length === 0) {
+      images.push(...collectFallbackImages(node));
+    }
+  }
+  if (images.length > 0) value_sources['images'] = 'xml';
+
+  const metadata: Record<string, any> = {
+    source_type: 'xml',
+    extraction_date: new Date().toISOString(),
+    extraction_method: 'xml_import',
+  };
+
+  // Attribute targets (price/color/dimensions/...) get mirrored into metadata
+  // under their CANONICAL target name so:
+  //   (a) facet canonicalizer's whitelist check passes (color → canonicalized)
+  //   (b) Python embedding service's `metadata.get(key)` fallback works
+  // The top-level write happens further down in the ProductData literal.
+  for (const target of ATTRIBUTE_TARGET_FIELDS) {
+    if (resolved[target]) metadata[target] = resolved[target];
+  }
+
+  // XML fields the operator explicitly routed to 'metadata' (or to a target
+  // not in any known list) — preserve them in the metadata blob under their
+  // lowercase XML tag name. This is the "Unmapped → metadata" bucket shown in
+  // the UI accordion.
+  for (const [xmlField, target] of Object.entries(mappings)) {
+    if (!target) continue;
+    if (target === 'metadata') {
+      const v = getText(node, xmlField);
+      if (v) metadata[xmlField] = v;
+      continue;
+    }
+    const isKnownTarget =
+      STRUCTURAL_TARGET_FIELDS.includes(target) ||
+      ATTRIBUTE_TARGET_FIELDS.includes(target) ||
+      target === SKU_TARGET ||
+      target === 'images';
+    if (!isKnownTarget) {
+      const v = getText(node, xmlField);
+      if (v) metadata[xmlField] = v;
+    }
+  }
+
+  // External SKU / product_id — Python re-import dedup checks three paths
+  // (product_data.product_id, .sku, metadata.product_id). We mirror to all
+  // three: the operator's external_sku mapping wins, otherwise fall back to
+  // the hardcoded <id>/<product_id>/<sku> probe for legacy XML feeds.
+  const productId =
+    resolved[SKU_TARGET] ||
+    getText(node, 'id') ||
+    getText(node, 'product_id') ||
+    getText(node, 'sku');
+  if (productId) {
+    metadata.product_id = productId;
+  }
+
+  // Build the factory nested object the way the legacy extractor did, so
+  // downstream consumers that read `metadata.factory` still work.
+  const factoryObj: Record<string, string> = {};
+  const factoryFieldMap: Array<[string, string]> = [
+    ['factory_name', 'factory_name'],
+    ['factory_group_name', 'factory_group_name'],
+    ['factory_address', 'address'],
+    ['factory_city', 'city'],
+    ['factory_country', 'country'],
+    ['factory_postal_code', 'postal_code'],
+    ['factory_phone', 'phone'],
+    ['factory_email', 'email'],
+    ['factory_website', 'website'],
+    ['factory_country_of_origin', 'country_of_origin'],
+    ['factory_founded_year', 'founded_year'],
+    ['factory_employee_count', 'employee_count'],
+    ['factory_linkedin_url', 'linkedin_url'],
+  ];
+  for (const [target, factoryKey] of factoryFieldMap) {
+    if (resolved[target]) factoryObj[factoryKey] = resolved[target]!;
+  }
+  if (Object.keys(factoryObj).length > 0) {
+    metadata.factory = factoryObj;
+    if (resolved.factory_name) metadata.factory_name = resolved.factory_name;
+    if (resolved.factory_group_name) metadata.factory_group_name = resolved.factory_group_name;
+    if (resolved.factory_country_of_origin) metadata.country_of_origin = resolved.factory_country_of_origin;
+  }
+
+  const nestedCategories = collectNestedCategories(node);
+  if (nestedCategories.length > 0) metadata.categories = nestedCategories;
+
+  // ProductData literal: structural fields + attribute fields all at top level.
+  // The cast to ProductData & Record is because attribute fields aren't on the
+  // ProductData type declaration today (the legacy extractor wrote them only to
+  // metadata); Python reads them off the top-level object via untyped
+  // .get('price') / .get('color') / etc. so JSON shape is what matters.
+  const product: ProductData = {
+    name: resolved.name || '',
+    description: resolved.description,
+    factory_name: resolved.factory_name || '',
+    factory_group_name: resolved.factory_group_name,
+    factory_address: resolved.factory_address,
+    factory_city: resolved.factory_city,
+    factory_country: resolved.factory_country,
+    factory_postal_code: resolved.factory_postal_code,
+    factory_phone: resolved.factory_phone,
+    factory_email: resolved.factory_email,
+    factory_website: resolved.factory_website,
+    factory_country_of_origin: resolved.factory_country_of_origin,
+    factory_founded_year: resolved.factory_founded_year,
+    factory_employee_count: resolved.factory_employee_count,
+    factory_linkedin_url: resolved.factory_linkedin_url,
+    material_category: resolved.material_category || '',
+    images,
+    metadata,
+  };
+
+  // Top-level attribute mirrors — Python reads these directly off the product
+  // dict (data_import_service.py:599 .price, :605 .dimensions, :678 .color/...
+  // /.designer/.collection/.finish/.material). Adding them here makes mapped
+  // attribute fields actually reach the Stage 4 properties JSONB write + the
+  // text embedding concat. Indexed assignment keeps the typed ProductData
+  // interface above unchanged while still landing the keys in the JSON shape.
+  for (const target of ATTRIBUTE_TARGET_FIELDS) {
+    if (resolved[target]) (product as Record<string, any>)[target] = resolved[target];
+  }
+  // SKU also mirrored to top-level product_id + sku for dedup paths 1 and 2.
+  if (productId) {
+    (product as Record<string, any>).product_id = productId;
+    (product as Record<string, any>).sku = productId;
+  }
+
+  return { product, value_sources, missingRequired };
+}
+
+/**
+ * Used by `generate_preview` — wraps `buildProductWithMappings`. Returns a
+ * non-null product even when required fields are missing (the preview UI
+ * surfaces gaps via badges; it doesn't drop the row).
+ */
+function extractProductDataWithMappings(
+  node: XmlNode,
+  mappings?: Record<string, string>,
+  manualValues?: Record<string, string>,
+): { product: ProductData; value_sources: Record<string, 'xml' | 'default'> } {
   if (!mappings || Object.keys(mappings).length === 0) {
-    return extractProductData(node) || {
+    const fallback = extractProductData(node) || {
       name: 'Unknown Product',
       factory_name: 'Unknown Factory',
       material_category: 'Unknown Category',
       images: [],
       metadata: {},
     };
+    return { product: fallback, value_sources: {} };
   }
+  const { product, value_sources } = buildProductWithMappings(node, mappings, manualValues);
+  return { product, value_sources };
+}
 
-  const product: ProductData = {
-    name: '',
-    factory_name: '',
-    material_category: '',
-    images: [],
-    metadata: {
-      source_type: 'xml',
-      extraction_date: new Date().toISOString(),
-      extraction_method: 'xml_import',
-    },
-  };
-
-  for (const [xmlField, targetField] of Object.entries(mappings)) {
-    const value = getText(node, xmlField);
-    if (!value) continue;
-
-    switch (targetField) {
-      case 'name':
-        product.name = value;
-        break;
-      case 'factory_name':
-        product.factory_name = value;
-        break;
-      case 'material_category':
-        product.material_category = value;
-        break;
-      case 'description':
-        product.description = value;
-        break;
-      case 'factory_group_name':
-        product.factory_group_name = value;
-        break;
-      case 'images':
-        if (value.includes(',')) {
-          product.images = value.split(',').map((u) => u.trim()).filter(Boolean);
-        } else {
-          product.images.push(value);
-        }
-        break;
-      default:
-        product.metadata![xmlField] = value;
-        break;
-    }
+/**
+ * Used by the import-time path. Returns the product plus a list of required
+ * fields that were missing after applying the mapping + manual-value fallback;
+ * the caller drops the row when missingRequired is non-empty.
+ */
+function extractProductDataFromMappings(
+  node: XmlNode,
+  mappings: Record<string, string>,
+  manualValues?: Record<string, string>,
+): { product: ProductData; missingRequired: boolean } {
+  const { product, missingRequired } = buildProductWithMappings(node, mappings, manualValues);
+  if (missingRequired.length > 0) {
+    console.warn('Skipping product - missing required fields:', missingRequired);
+    return { product, missingRequired: true };
   }
-
-  // Fall back to standard image fields when the mapping didn't populate any
-  if (product.images.length === 0) {
-    const imageLink = getText(node, 'image_link') || getText(node, 'image');
-    if (imageLink) product.images.push(imageLink);
-    const additionalImageLink = getText(node, 'additional_image_link');
-    if (additionalImageLink) {
-      product.images.push(...additionalImageLink.split(',').map((u) => u.trim()).filter(Boolean));
-    }
-  }
-
-  const productId = getText(node, 'id') || getText(node, 'product_id') || getText(node, 'sku');
-  if (productId) product.metadata!.product_id = productId;
-
-  return product;
+  return { product, missingRequired: false };
 }
 
 /**

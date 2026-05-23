@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,6 +87,7 @@ async function verifyResendSignature(
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

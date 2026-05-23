@@ -6,10 +6,12 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
 serve(async (req) => {
+  await bootstrapForFunction();
   try {
     // Verify this is a cron request
     const authHeader = req.headers.get('Authorization');

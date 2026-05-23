@@ -13,10 +13,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const replicateToken = Deno.env.get('REPLICATE_API_TOKEN') || '';
+const replicateToken = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 const CREDIT_COST = 20;
 const MODEL = 'proplabs/virtual-staging';
@@ -84,7 +85,7 @@ async function runReplicate(
   const createResp = await fetch(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${replicateToken}`,
+      'Authorization': `Bearer ${replicateToken()}`,
       'Content-Type': 'application/json',
       'Prefer': 'wait',
     },
@@ -94,7 +95,7 @@ async function runReplicate(
         room,
         furniture_style: furnitureStyle,
         furniture_items: furnitureItems || 'Default (AI decides)',
-        replicate_api_key: replicateToken,
+        replicate_api_key: replicateToken(),
       },
     }),
   });
@@ -124,7 +125,7 @@ async function runReplicate(
     await new Promise((r) => setTimeout(r, 4000));
 
     const statusResp = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: { 'Authorization': `Bearer ${replicateToken}` },
+      headers: { 'Authorization': `Bearer ${replicateToken()}` },
     });
 
     if (!statusResp.ok) continue;
@@ -146,6 +147,7 @@ async function runReplicate(
 }
 
 Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
@@ -195,7 +197,7 @@ async function handleRequest(
   if (!body.room) {
     return jsonResponse({ success: false, error: 'room is required' }, 400);
   }
-  if (!replicateToken) {
+  if (!replicateToken()) {
     return jsonResponse({ success: false, error: 'REPLICATE_API_TOKEN not configured' }, 500);
   }
 

@@ -9,11 +9,13 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY') || '';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+// Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
+const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
@@ -151,13 +153,14 @@ interface ScrapeResult {
 }
 
 async function firecrawlScrape(url: string): Promise<ScrapeResult> {
-  if (!FIRECRAWL_API_KEY) {
+  const firecrawlKey = FIRECRAWL_API_KEY();
+  if (!firecrawlKey) {
     return { url, title: null, description: null, content_excerpt: null, http_status: null, error: 'FIRECRAWL_API_KEY not configured' };
   }
   try {
     const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, timeout: 20_000 }),
     });
     const data = await res.json().catch(() => ({}));
@@ -325,9 +328,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
+  await bootstrapForFunction();
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const cronHeader = req.headers.get('x-cron-secret') || '';
-  const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+  const cronSecret = CRON_SECRET();
+  const isCron = !!cronSecret && cronHeader === cronSecret;
 
   let userId: string | null = null;
   if (!isCron) {

@@ -18,8 +18,8 @@ import { fetchOpportunitiesStateless } from '../_shared/mention-opportunities-cl
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const dataforseoLogin = Deno.env.get('DATAFORSEO_LOGIN') || '';
-const dataforseoPassword = Deno.env.get('DATAFORSEO_PASSWORD') || '';
+const dataforseoLogin = () => Deno.env.get('DATAFORSEO_LOGIN') || '';
+const dataforseoPassword = () => Deno.env.get('DATAFORSEO_PASSWORD') || '';
 
 const CREDIT_COST = 18;
 
@@ -74,7 +74,7 @@ Deno.serve(withApiLogging('seo-research', async (req) => {
       );
     }
 
-    if (!dataforseoLogin || !dataforseoPassword) {
+    if (!dataforseoLogin() || !dataforseoPassword()) {
       return jsonResponse(
         { success: false, error: 'DataForSEO credentials not configured' },
         500,
@@ -115,7 +115,7 @@ Deno.serve(withApiLogging('seo-research', async (req) => {
     // ~3-5s latency in the worst case but runs concurrently with the main
     // research, so total wall-clock cost is unchanged. The stateless
     // endpoint authenticates via x-cron-secret — no extra user credits.
-    const client = new DataForSEOClient(dataforseoLogin, dataforseoPassword);
+    const client = new DataForSEOClient(dataforseoLogin(), dataforseoPassword());
     const countryCode = dfsLocationToCountry(locationCode);
     const [research, serpSignals] = await Promise.all([
       client.researchKeyword(

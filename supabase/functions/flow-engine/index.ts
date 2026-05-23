@@ -483,8 +483,8 @@ async function executeAction(
 
     case 'web_search':
     case 'perplexity_search': {
-      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+      const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
+      if (!ANTHROPIC_API_KEY()) throw new Error('ANTHROPIC_API_KEY not configured');
 
       const country = String(resolved.country || '');
       const regionId = String(resolved.region || '');
@@ -505,7 +505,7 @@ async function executeAction(
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
-            'x-api-key': ANTHROPIC_API_KEY,
+            'x-api-key': ANTHROPIC_API_KEY(),
             'anthropic-version': '2023-06-01',
             'anthropic-beta': 'web-search-2025-03-05',
             'Content-Type': 'application/json',
@@ -540,8 +540,8 @@ async function executeAction(
     }
 
     case 'firecrawl_scrape': {
-      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-      if (!FIRECRAWL_API_KEY) throw new Error('FIRECRAWL_API_KEY not configured');
+      const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
+      if (!FIRECRAWL_API_KEY()) throw new Error('FIRECRAWL_API_KEY not configured');
 
       const url = String(resolved.url || '');
       if (!url) throw new Error('URL is required');
@@ -553,7 +553,7 @@ async function executeAction(
           const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY()}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),

@@ -16,7 +16,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const LATE_API_KEY = Deno.env.get('LATE_API_KEY') || '';
+const LATE_API_KEY = () => Deno.env.get('LATE_API_KEY') || '';
 const LATE_BASE_URL = 'https://api.late.dev/v1';
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -29,7 +29,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 async function lateApi(method: string, path: string): Promise<unknown> {
   const res = await fetch(`${LATE_BASE_URL}${path}`, {
     method,
-    headers: { 'Authorization': `Bearer ${LATE_API_KEY}` },
+    headers: { 'Authorization': `Bearer ${LATE_API_KEY()}` },
   });
 
   if (!res.ok) {

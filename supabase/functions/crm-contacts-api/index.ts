@@ -31,7 +31,7 @@ Deno.serve(withApiLogging('crm-contacts-api', async (req) => {
 
     // Authenticate request
     const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'manager', 'factory'],
+      allowedRoles: ['admin', 'factory'],
     });
 
     // Secret key bypasses role check

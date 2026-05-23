@@ -8,6 +8,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // Map Resend event types to our normalized event_type strings
 const RESEND_EVENT_MAP: Record<string, string> = {
@@ -20,6 +21,7 @@ const RESEND_EVENT_MAP: Record<string, string> = {
 };
 
 serve(async (req) => {
+  await bootstrapForFunction();
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

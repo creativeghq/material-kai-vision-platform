@@ -3,6 +3,7 @@ import { generateWithClaude } from '../_shared/ai-client.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') || '',
@@ -45,6 +46,7 @@ interface ReRankResponse {
 }
 
 Deno.serve(withApiLogging('ai-rerank', async (req) => {
+  await bootstrapForFunction();
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

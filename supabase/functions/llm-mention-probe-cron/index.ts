@@ -1,3 +1,4 @@
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 /**
  * LLM Mention Probe Cron Job — weekly visibility tracker.
  *
@@ -10,12 +11,13 @@
  */
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   console.log('🤖 LLM mention probe cron job started');
 
   try {
     const cronSecret = req.headers.get('x-cron-secret');
-    const expectedSecret = Deno.env.get('CRON_SECRET');
-    if (cronSecret !== expectedSecret) {
+    const expectedSecret = () => Deno.env.get('CRON_SECRET') || '';
+    if (cronSecret !== expectedSecret()) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },

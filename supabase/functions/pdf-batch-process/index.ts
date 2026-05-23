@@ -1,5 +1,6 @@
 import { serve } from 'http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 import {
   corsHeaders,
@@ -66,6 +67,7 @@ interface BatchJob {
 }
 
 serve(async (req) => {
+  await bootstrapForFunction();
   const startTime = Date.now();
 
   // Handle CORS preflight requests

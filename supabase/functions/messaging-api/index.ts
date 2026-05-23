@@ -363,14 +363,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const userId = auth.userId;
 
     // Get Twilio credentials from environment
-    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioAccountSid = () => Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+    const twilioAuthToken = () => Deno.env.get('TWILIO_AUTH_TOKEN') || '';
 
-    if (!twilioAccountSid || !twilioAuthToken) {
+    if (!twilioAccountSid() || !twilioAuthToken()) {
       throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN secrets.');
     }
 
-    const provider = new TwilioProvider(twilioAccountSid, twilioAuthToken);
+    const provider = new TwilioProvider(twilioAccountSid(), twilioAuthToken());
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/messaging-webhook`;
 
     const requestBody = req.method === 'POST' ? await req.json() : {};

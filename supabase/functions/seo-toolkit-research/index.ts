@@ -12,16 +12,17 @@
  * Body: { kind, subject, params, label? }
  * `params` is forwarded verbatim to /opportunities-stateless.
  *
- * Required env: PYTHON_BACKEND_URL, CRON_SECRET, SUPABASE_URL,
+ * Required env: PYTHON_BACKEND_URL, CRON_SECRET(), SUPABASE_URL,
  *               SUPABASE_SERVICE_ROLE_KEY.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PYTHON_BACKEND_URL = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 interface ResearchPayload {
   kind: string;
@@ -31,6 +32,7 @@ interface ResearchPayload {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -67,7 +69,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-cron-secret': CRON_SECRET,
+        'x-cron-secret': CRON_SECRET(),
       },
       body: JSON.stringify(body.params),
     });

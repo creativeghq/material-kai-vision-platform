@@ -18,9 +18,9 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const PINTEREST_APP_ID = Deno.env.get('PINTEREST_APP_ID') || '';
-const PINTEREST_APP_SECRET = Deno.env.get('PINTEREST_APP_SECRET') || '';
-const PINTEREST_REDIRECT_URI = Deno.env.get('PINTEREST_REDIRECT_URI') || '';
+const PINTEREST_APP_ID = () => Deno.env.get('PINTEREST_APP_ID') || '';
+const PINTEREST_APP_SECRET = () => Deno.env.get('PINTEREST_APP_SECRET') || '';
+const PINTEREST_REDIRECT_URI = () => Deno.env.get('PINTEREST_REDIRECT_URI') || '';
 
 const PINTEREST_API_BASE = 'https://api.pinterest.com/v5';
 
@@ -35,7 +35,7 @@ function jsonResponse(data: unknown, status = 200): Response {
  * Base64 encode client credentials for Basic auth
  */
 function getBasicAuthHeader(): string {
-  const credentials = `${PINTEREST_APP_ID}:${PINTEREST_APP_SECRET}`;
+  const credentials = `${PINTEREST_APP_ID()}:${PINTEREST_APP_SECRET()}`;
   return `Basic ${btoa(credentials)}`;
 }
 
@@ -164,7 +164,7 @@ Deno.serve(withApiLogging('pinterest-oauth', async (req) => {
 
   // ── get_auth_url ────────────────────────────────────────────────────────────
   if (action === 'get_auth_url') {
-    if (!PINTEREST_APP_ID || !PINTEREST_REDIRECT_URI) {
+    if (!PINTEREST_APP_ID() || !PINTEREST_REDIRECT_URI()) {
       return jsonResponse({ success: false, error: 'Pinterest OAuth not configured' }, 500);
     }
 
@@ -186,7 +186,7 @@ Deno.serve(withApiLogging('pinterest-oauth', async (req) => {
       });
 
     const scopes = 'pins:read,boards:read,user_accounts:read';
-    const authUrl = `https://api.pinterest.com/oauth/?response_type=code&client_id=${PINTEREST_APP_ID}&redirect_uri=${encodeURIComponent(PINTEREST_REDIRECT_URI)}&scope=${scopes}&state=${state}`;
+    const authUrl = `https://api.pinterest.com/oauth/?response_type=code&client_id=${PINTEREST_APP_ID()}&redirect_uri=${encodeURIComponent(PINTEREST_REDIRECT_URI())}&scope=${scopes}&state=${state}`;
 
     return jsonResponse({ success: true, auth_url: authUrl, state });
   }
@@ -234,7 +234,7 @@ Deno.serve(withApiLogging('pinterest-oauth', async (req) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: PINTEREST_REDIRECT_URI,
+        redirect_uri: PINTEREST_REDIRECT_URI(),
       }).toString(),
     });
 

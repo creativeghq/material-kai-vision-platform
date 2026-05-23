@@ -1,18 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // These must be set — fail loud at startup rather than silently accepting
 // unsigned webhooks (which would allow anyone to forge payment events).
-const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
-if (!stripeSecretKey)    throw new Error('STRIPE_SECRET_KEY env var is required');
-if (!stripeWebhookSecret) throw new Error('STRIPE_WEBHOOK_SECRET env var is required');
+const stripeSecretKey = () => Deno.env.get('STRIPE_SECRET_KEY') || '';
+const stripeWebhookSecret = () => Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
+if (!stripeSecretKey())    throw new Error('STRIPE_SECRET_KEY env var is required');
+if (!stripeWebhookSecret()) throw new Error('STRIPE_WEBHOOK_SECRET env var is required');
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const stripe = new Stripe(stripeSecretKey!, {
+const stripe = new Stripe(stripeSecretKey()!, {
   apiVersion: '2023-10-16',
   httpClient: Stripe.createFetchHttpClient(),
 });
@@ -22,6 +23,7 @@ const stripe = new Stripe(stripeSecretKey!, {
  * Handles Stripe webhook events for subscription and payment processing
  */
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
@@ -36,7 +38,7 @@ Deno.serve(async (req) => {
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      stripeWebhookSecret
+      stripeWebhookSecret()
     );
 
     console.log(`Received Stripe event: ${event.type}`);

@@ -19,16 +19,17 @@
  *   - Update seo_tracked_domains denormalised current_* fields +
  *     last_audited_at + last_audit_id + next_audit_at
  *
- * Required env: PYTHON_BACKEND_URL, CRON_SECRET, SUPABASE_URL,
+ * Required env: PYTHON_BACKEND_URL, CRON_SECRET(), SUPABASE_URL,
  *               SUPABASE_SERVICE_ROLE_KEY.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PYTHON_BACKEND_URL = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 interface AuditPayload {
   tracked_domain_id?: string;
@@ -36,6 +37,7 @@ interface AuditPayload {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -48,7 +50,7 @@ Deno.serve(async (req) => {
 
   try {
     const cronSecretHeader = req.headers.get('x-cron-secret');
-    const isCron = !!cronSecretHeader && cronSecretHeader === CRON_SECRET;
+    const isCron = !!cronSecretHeader && cronSecretHeader === CRON_SECRET();
 
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -124,7 +126,7 @@ async function runAuditFor(sb: any, td: any, source: string): Promise<{ audit_id
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-cron-secret': CRON_SECRET,
+      'x-cron-secret': CRON_SECRET(),
     },
     body: JSON.stringify({
       domain: td.domain,

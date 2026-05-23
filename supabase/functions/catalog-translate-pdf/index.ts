@@ -12,10 +12,11 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
 const MODEL = 'claude-sonnet-4-6';
 const MAX_MATERIALS = 200;
@@ -86,9 +87,10 @@ const TRANSLATE_TOOL = {
 };
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
-  if (!ANTHROPIC_API_KEY) return jsonResponse({ success: false, error: 'ANTHROPIC_API_KEY not configured' }, 500);
+  if (!ANTHROPIC_API_KEY()) return jsonResponse({ success: false, error: 'ANTHROPIC_API_KEY not configured' }, 500);
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
+        'x-api-key': ANTHROPIC_API_KEY(),
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({

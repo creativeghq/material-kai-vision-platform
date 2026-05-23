@@ -21,11 +21,12 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
-const ANTHROPIC_API_KEY   = Deno.env.get('ANTHROPIC_API_KEY')   || '';
-const OPENAI_API_KEY      = Deno.env.get('OPENAI_API_KEY')      || '';
-const HUGGINGFACE_API_KEY = Deno.env.get('HUGGINGFACE_API_KEY') || '';
-const VOYAGE_API_KEY      = Deno.env.get('VOYAGE_API_KEY')      || '';
+const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
+const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
+const HUGGINGFACE_API_KEY = () => Deno.env.get('HUGGINGFACE_API_KEY') || '';
+const VOYAGE_API_KEY = () => Deno.env.get('VOYAGE_API_KEY') || '';
 const MIVAA_GATEWAY_URL   = Deno.env.get('MIVAA_GATEWAY_URL')   || 'https://v1api.materialshub.gr';
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')        || '';
 const SUPABASE_ANON_KEY   = Deno.env.get('SUPABASE_ANON_KEY')   || '';
@@ -44,11 +45,11 @@ interface ExternalResult extends ServiceResult {
 // ── AI Provider checks ─────────────────────────────────────────────────────
 
 async function checkClaude(): Promise<ServiceResult> {
-  if (!ANTHROPIC_API_KEY) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
+  if (!ANTHROPIC_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
   const start = Date.now();
   try {
     const res = await fetch('https://api.anthropic.com/v1/models', {
-      headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      headers: { 'x-api-key': ANTHROPIC_API_KEY(), 'anthropic-version': '2023-06-01' },
       signal: AbortSignal.timeout(8000),
     });
     const latency_ms = Date.now() - start;
@@ -61,11 +62,11 @@ async function checkClaude(): Promise<ServiceResult> {
 }
 
 async function checkOpenAI(): Promise<ServiceResult> {
-  if (!OPENAI_API_KEY) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
+  if (!OPENAI_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
   const start = Date.now();
   try {
     const res = await fetch('https://api.openai.com/v1/models', {
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY()}` },
       signal: AbortSignal.timeout(8000),
     });
     const latency_ms = Date.now() - start;
@@ -78,11 +79,11 @@ async function checkOpenAI(): Promise<ServiceResult> {
 }
 
 async function checkHuggingFace(): Promise<ServiceResult> {
-  if (!HUGGINGFACE_API_KEY) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
+  if (!HUGGINGFACE_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
   const start = Date.now();
   try {
     const res = await fetch('https://huggingface.co/api/whoami-v2', {
-      headers: { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY}` },
+      headers: { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY()}` },
       signal: AbortSignal.timeout(8000),
     });
     const latency_ms = Date.now() - start;
@@ -97,12 +98,12 @@ async function checkHuggingFace(): Promise<ServiceResult> {
 }
 
 async function checkVoyageAI(): Promise<ServiceResult> {
-  if (!VOYAGE_API_KEY) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
+  if (!VOYAGE_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
   const start = Date.now();
   try {
     const res = await fetch('https://api.voyageai.com/v1/embeddings', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${VOYAGE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${VOYAGE_API_KEY()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'voyage-4', input: 'ping' }),
       signal: AbortSignal.timeout(10000),
     });
@@ -170,6 +171,7 @@ async function checkExternalService(url: string): Promise<ExternalResult> {
 // ── Handler ────────────────────────────────────────────────────────────────
 
 serve(withApiLogging('health-check', async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

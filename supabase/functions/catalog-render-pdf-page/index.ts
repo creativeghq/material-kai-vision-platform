@@ -10,9 +10,10 @@
  * PDF stack into the edge runtime.
  */
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 interface RenderRequest {
   source_pdf_id: string;
@@ -33,10 +34,11 @@ interface RenderResponse {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
-  if (!CRON_SECRET) {
+  if (!CRON_SECRET()) {
     return jsonResponse({ success: false, error: 'CRON_SECRET not configured on edge function' }, 500);
   }
 
@@ -50,7 +52,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-cron-secret': CRON_SECRET,
+        'x-cron-secret': CRON_SECRET(),
       },
       body: JSON.stringify(body),
     });

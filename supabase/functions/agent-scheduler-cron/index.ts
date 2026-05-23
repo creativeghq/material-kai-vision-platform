@@ -14,6 +14,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders }  from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // ── Cron expression parser (identical to flow-scheduler-cron) ────────────────
 
@@ -69,6 +70,7 @@ function fieldMatches(field: string, value: number, min: number, max: number): b
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

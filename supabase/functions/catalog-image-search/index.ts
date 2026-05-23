@@ -11,14 +11,16 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
-const DATAFORSEO_BASE64 = Deno.env.get('DATAFORSEO_BASE64') || '';
-const DATAFORSEO_LOGIN = Deno.env.get('DATAFORSEO_LOGIN') || '';
-const DATAFORSEO_PASSWORD = Deno.env.get('DATAFORSEO_PASSWORD') || '';
+// Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
+const DATAFORSEO_BASE64 = () => Deno.env.get('DATAFORSEO_BASE64') || '';
+const DATAFORSEO_LOGIN = () => Deno.env.get('DATAFORSEO_LOGIN') || '';
+const DATAFORSEO_PASSWORD = () => Deno.env.get('DATAFORSEO_PASSWORD') || '';
 
 interface SearchRequest {
   query: string;
@@ -46,6 +48,8 @@ interface SearchResponse {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
+
+  await bootstrapForFunction();
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -90,7 +94,8 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
     const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
     url.searchParams.set('strategy', 'multi_vector');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (CRON_SECRET) headers['x-cron-secret'] = CRON_SECRET;
+    const cronSecret = CRON_SECRET();
+    if (cronSecret) headers['x-cron-secret'] = cronSecret;
 
     const res = await fetch(url.toString(), {
       method: 'POST',
@@ -137,9 +142,10 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
 }
 
 async function searchWebImages(query: string, limit: number): Promise<ImageCandidate[]> {
-  const auth = DATAFORSEO_BASE64 || (DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD
-    ? btoa(`${DATAFORSEO_LOGIN}:${DATAFORSEO_PASSWORD}`)
-    : null);
+  const b64 = DATAFORSEO_BASE64();
+  const login = DATAFORSEO_LOGIN();
+  const password = DATAFORSEO_PASSWORD();
+  const auth = b64 || (login && password ? btoa(`${login}:${password}`) : null);
   if (!auth) {
     console.warn('[catalog-image-search] DataForSEO not configured; skipping web fallback');
     return [];

@@ -123,8 +123,8 @@ async function launchFirecrawlCrawl(
   sessionId: string,
   session: any,
 ): Promise<string | null> {
-  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-  if (!FIRECRAWL_API_KEY) {
+  const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
+  if (!FIRECRAWL_API_KEY()) {
     console.warn('[scrape-session-manager] FIRECRAWL_API_KEY not set — falling back to page-by-page');
     return null;
   }
@@ -191,7 +191,7 @@ async function launchFirecrawlCrawl(
     const resp = await fetch('https://api.firecrawl.dev/v1/crawl', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),

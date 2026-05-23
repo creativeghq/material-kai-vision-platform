@@ -41,13 +41,13 @@ async function sendViaResend(payload: {
   reply_to?: string;
   tags?: Array<{ name: string; value: string }>;
 }): Promise<string> {
-  const apiKey = Deno.env.get('RESEND_API_KEY');
-  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+  const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
+  if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${apiKey()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -391,12 +391,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const isAdmin = user.user_metadata?.role === 'admin';
         if (!isAdmin) throw new Error('Unauthorized: Admin access required');
 
-        const apiKey = Deno.env.get('RESEND_API_KEY');
-        if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+        const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
+        if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');
 
         // Fetch domains from Resend
         const resendRes = await fetch('https://api.resend.com/domains', {
-          headers: { 'Authorization': `Bearer ${apiKey}` },
+          headers: { 'Authorization': `Bearer ${apiKey()}` },
         });
         const resendData = await resendRes.json();
 

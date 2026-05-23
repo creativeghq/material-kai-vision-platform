@@ -14,6 +14,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // Known pricing sources for major providers (per 1M tokens)
 // These are fallback values - the function will attempt to fetch from APIs first
@@ -90,6 +91,7 @@ interface UpdateStats {
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

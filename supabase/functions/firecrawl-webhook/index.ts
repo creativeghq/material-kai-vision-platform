@@ -23,11 +23,13 @@ const MIVAA_SERVICE_URL         = Deno.env.get('MIVAA_SERVICE_URL') || 'https://
 const MIVAA_API_KEY             = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const { createClient } = await import('@supabase/supabase-js');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 Deno.serve(async (req: Request) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

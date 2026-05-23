@@ -323,10 +323,10 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
   }
 
   try {
-    // Authenticate request - requires admin or manager role
+    // Authenticate request - requires admin role
     // Secret key bypasses role check
     const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'manager'],
+      allowedRoles: ['admin'],
     });
 
     if (!auth.success && !isAdminAccess(auth)) {

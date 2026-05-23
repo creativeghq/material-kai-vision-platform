@@ -19,8 +19,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const XAI_API_KEY = Deno.env.get('XAI_API_KEY') || '';
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || '';
-const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY') || '';
+const GEMINI_API_KEY = () => Deno.env.get('GEMINI_API_KEY') || '';
+const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
@@ -92,7 +92,7 @@ async function generateWithGemini(prompt: string, aspectRatio: AspectRatio): Pro
     : '4:5';
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,7 +124,7 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-2-pro/predictions', {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY}`,
+      'Authorization': `Token ${REPLICATE_API_KEY()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -151,7 +151,7 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
   while (Date.now() - start < maxMs) {
     await new Promise(r => setTimeout(r, 2000));
     const pollRes = await fetch(pollUrl, {
-      headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` },
+      headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` },
     });
     const status = await pollRes.json() as { status: string; output?: string[]; error?: string };
 

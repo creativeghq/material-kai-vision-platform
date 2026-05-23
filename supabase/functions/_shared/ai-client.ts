@@ -13,24 +13,31 @@
  */
 
 // ── Environment setup (MUST run before npm imports) ──
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
-const KLINGAI_ACCESS_KEY = Deno.env.get('KLINGAI_ACCESS_KEY') || '';
-const KLINGAI_SECRET_KEY = Deno.env.get('KLINGAI_SECRET_KEY') || '';
-const XAI_API_KEY = Deno.env.get('XAI_API_KEY') || '';
+//
+// We seed globalThis.process.env at module-load with whatever Deno.env currently has so npm
+// packages that read process.env at import time see the expected keys. The providers themselves
+// are constructed LAZILY below so that any platform_secrets values bootstrapped into Deno.env
+// inside the request handler (via _shared/auth.ts → bootstrapSecretsFromDb) get picked up
+// on first use — even though they weren't set when this module first loaded.
+const _AI_ENV_KEYS = [
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'KLINGAI_ACCESS_KEY',
+  'KLINGAI_SECRET_KEY',
+  'XAI_API_KEY',
+] as const;
 
-// Polyfill process.env for npm packages that read it
-(globalThis as any).process = {
-  ...(globalThis as any).process,
-  env: {
-    ...((globalThis as any).process?.env || {}),
-    GOOGLE_GENERATIVE_AI_API_KEY: GOOGLE_API_KEY,
-    ANTHROPIC_API_KEY: ANTHROPIC_API_KEY,
-    KLINGAI_ACCESS_KEY,
-    KLINGAI_SECRET_KEY,
-    XAI_API_KEY,
-  },
-};
+function _syncEnvIntoPolyfill() {
+  const env: Record<string, string> = ((globalThis as any).process?.env) || {};
+  for (const k of _AI_ENV_KEYS) {
+    const v = Deno.env.get(k);
+    if (v && env[k] !== v) env[k] = v;
+  }
+  (globalThis as any).process = { ...(globalThis as any).process, env };
+}
+
+// Initial sync — module-load values only (DB bootstrap hasn't run yet).
+_syncEnvIntoPolyfill();
 
 // ── Imports ──
 import { generateText, generateImage, experimental_generateVideo as generateVideo, Output } from 'npm:ai@6';
@@ -111,9 +118,57 @@ async function _logTrackedCall(opts: {
 }
 
 // ── Provider instances ──
-const google = createGoogleGenerativeAI({ apiKey: GOOGLE_API_KEY });
-const anthropic = createAnthropic({ apiKey: ANTHROPIC_API_KEY });
-const klingai = createKlingAI({ accessKeyId: KLINGAI_ACCESS_KEY, secretAccessKey: KLINGAI_SECRET_KEY });
+//
+// Lazy: constructed on FIRST USE (not at module load) so that platform_secrets values
+// bootstrapped into Deno.env inside the request handler are reflected in apiKey.
+// Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
+// `klingai(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
+
+let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
+let _anthropic: ReturnType<typeof createAnthropic> | null = null;
+let _klingai: ReturnType<typeof createKlingAI> | null = null;
+
+function _ensureGoogle() {
+  if (!_google) {
+    _syncEnvIntoPolyfill();
+    _google = createGoogleGenerativeAI({ apiKey: Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '' });
+  }
+  return _google;
+}
+function _ensureAnthropic() {
+  if (!_anthropic) {
+    _syncEnvIntoPolyfill();
+    _anthropic = createAnthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') || '' });
+  }
+  return _anthropic;
+}
+function _ensureKlingai() {
+  if (!_klingai) {
+    _syncEnvIntoPolyfill();
+    _klingai = createKlingAI({
+      accessKeyId: Deno.env.get('KLINGAI_ACCESS_KEY') || '',
+      secretAccessKey: Deno.env.get('KLINGAI_SECRET_KEY') || '',
+    });
+  }
+  return _klingai;
+}
+
+// Proxies preserve the exact existing surface: callable as `google(modelId)` AND attribute-access
+// like `google.image(modelId)` / `google.video(modelId)`.
+const google = new Proxy(function () {}, {
+  apply: (_t, _thisArg, args) => (_ensureGoogle() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => (_ensureGoogle() as unknown as Record<string | symbol, unknown>)[prop],
+}) as unknown as ReturnType<typeof createGoogleGenerativeAI>;
+
+const anthropic = new Proxy(function () {}, {
+  apply: (_t, _thisArg, args) => (_ensureAnthropic() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => (_ensureAnthropic() as unknown as Record<string | symbol, unknown>)[prop],
+}) as unknown as ReturnType<typeof createAnthropic>;
+
+const klingai = new Proxy(function () {}, {
+  apply: (_t, _thisArg, args) => (_ensureKlingai() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => (_ensureKlingai() as unknown as Record<string | symbol, unknown>)[prop],
+}) as unknown as ReturnType<typeof createKlingAI>;
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';

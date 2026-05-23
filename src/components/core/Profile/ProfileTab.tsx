@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { ConnectedWebsitesTab } from '@/components/core/Profile/ConnectedWebsitesTab';
+import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -1015,6 +1016,9 @@ export const ProfileTab: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Business — Solo vs Business entity + linked crm_companies row */}
+      <BusinessSection />
 
       {/* Services */}
       <Card className="rounded-2xl">

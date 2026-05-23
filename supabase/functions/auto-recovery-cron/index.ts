@@ -13,6 +13,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 interface StuckJob {
   id: string;
@@ -26,6 +27,7 @@ interface StuckJob {
 }
 
 serve(async (req) => {
+  await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -491,7 +493,7 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
   // re-attempt. The recovery_attempts counter stays bumped (already debited
   // by the SQL RPC) so a persistently-failing MIVAA still hits the cap.
   const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
-  const cronSecret = Deno.env.get('CRON_SECRET') || '';
+  const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
   let dispatchOk = false;
   let dispatchStatus: number | null = null;
   let dispatchError: string | null = null;
@@ -503,7 +505,7 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-cron-secret': cronSecret,
+        'x-cron-secret': cronSecret(),
       },
       body: JSON.stringify({ trigger: 'auto_recovery_cron' }),
       signal: AbortSignal.timeout(10_000),

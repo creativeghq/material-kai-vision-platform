@@ -2,7 +2,7 @@
  * Late.dev Webhook Handler Edge Function
  *
  * Receives incoming webhooks from Late.dev and updates local DB.
- * Validates HMAC-SHA256 signature using LATE_WEBHOOK_SECRET.
+ * Validates HMAC-SHA256 signature using LATE_WEBHOOK_SECRET().
  *
  * Supported events:
  *   post.published      → sets social_posts.status = 'published', published_at = now()
@@ -12,10 +12,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const LATE_WEBHOOK_SECRET = Deno.env.get('LATE_WEBHOOK_SECRET') || '';
+const LATE_WEBHOOK_SECRET = () => Deno.env.get('LATE_WEBHOOK_SECRET') || '';
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -26,12 +27,12 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 /** Verify HMAC-SHA256 signature from Late.dev */
 async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise<boolean> {
-  if (!LATE_WEBHOOK_SECRET) return true; // Skip verification if secret not configured
+  if (!LATE_WEBHOOK_SECRET()) return true; // Skip verification if secret not configured
 
   try {
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(LATE_WEBHOOK_SECRET),
+      new TextEncoder().encode(LATE_WEBHOOK_SECRET()),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign'],
@@ -51,6 +52,7 @@ async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise
 }
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);

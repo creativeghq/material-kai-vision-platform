@@ -28,6 +28,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 interface BucketStat {
   bucket: string;
@@ -142,6 +143,7 @@ async function cleanBucket(
 }
 
 serve(async (req) => {
+  await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -151,10 +153,10 @@ serve(async (req) => {
   const sb = createClient(supabaseUrl, supabaseKey);
 
   // Optional cron-secret gating
-  const cronSecret = Deno.env.get('CRON_SECRET');
-  if (cronSecret) {
+  const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
+  if (cronSecret()) {
     const provided = req.headers.get('x-cron-secret');
-    if (provided !== cronSecret) {
+    if (provided !== cronSecret()) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

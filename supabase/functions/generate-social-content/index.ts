@@ -16,7 +16,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
 const CREDIT_COST = 2; // flat 2 credits per generation
 
@@ -78,7 +78,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY() });
 
     const systemPrompt = `You are an expert social media content creator specialising in interior design, materials, and architecture.
 Generate captions that are ${tone} in tone and optimised for ${platform}.

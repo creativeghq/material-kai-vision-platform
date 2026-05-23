@@ -11,6 +11,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 // Configuration
 const BATCH_SIZE = 10; // Messages per batch
@@ -194,6 +195,7 @@ function renderTemplate(content: string, variables: Record<string, any>): string
 // =====================================================
 
 serve(async (req) => {
+  await bootstrapForFunction();
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -214,14 +216,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get Twilio credentials
-    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioAccountSid = () => Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+    const twilioAuthToken = () => Deno.env.get('TWILIO_AUTH_TOKEN') || '';
 
-    if (!twilioAccountSid || !twilioAuthToken) {
+    if (!twilioAccountSid() || !twilioAuthToken()) {
       throw new Error('Twilio credentials not configured');
     }
 
-    const twilio = new TwilioProvider(twilioAccountSid, twilioAuthToken);
+    const twilio = new TwilioProvider(twilioAccountSid(), twilioAuthToken());
 
     // Get webhook URL for status callbacks
     const webhookBaseUrl = Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.functions.supabase.co');

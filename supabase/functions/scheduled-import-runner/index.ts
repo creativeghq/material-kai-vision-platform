@@ -8,6 +8,7 @@
 import { serve } from 'http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 interface ScheduledJob {
   id: string;
@@ -22,6 +23,7 @@ interface ScheduledJob {
 }
 
 serve(async (req) => {
+  await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

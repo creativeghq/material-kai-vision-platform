@@ -11,6 +11,14 @@ import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Input } from '@/components/core/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/core/ui/select';
+import { Label } from '@/components/core/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 import { logger } from '@/services/logger.service';
@@ -21,6 +29,17 @@ interface DetectedField {
   suggested_mapping: string;
   confidence: number;
   data_type: string;
+  total_rows?: number;
+  present_count?: number;
+  coverage_pct?: number;
+  distinct_values?: number;
+}
+
+interface MaterialCategory {
+  id: string;
+  category_key: string;
+  category_name: string;
+  display_name?: string | null;
 }
 
 const XMLImportTab: React.FC = () => {
@@ -32,13 +51,19 @@ const XMLImportTab: React.FC = () => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedFields, setDetectedFields] = useState<DetectedField[]>([]);
   const [suggestedMappings, setSuggestedMappings] = useState<Record<string, string>>({});
+  const [totalRows, setTotalRows] = useState<number>(0);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [xmlContentCache, setXmlContentCache] = useState<string>(''); // Cache XML content for URL sources
+  const [category, setCategory] = useState<string>('');
+  const [categories, setCategories] = useState<MaterialCategory[]>([]);
 
-  // Load workspace ID on mount
+  // Load workspace ID + material categories on mount. Category is the
+  // job-level material_category that every product in this XML inherits.
+  // Mirrors the PDF upload flow ([PDFUploadSection.tsx]) so operators have
+  // the same muscle memory.
   useEffect(() => {
-    const loadWorkspace = async () => {
+    const loadInitialData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -54,9 +79,34 @@ const XMLImportTab: React.FC = () => {
       if (workspaceData) {
         setWorkspaceId(workspaceData.workspace_id);
       }
+
+      try {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('material_categories')
+          .select('id, category_key, name, display_name')
+          .eq('is_active', true)
+          .order('sort_order');
+
+        if (!categoriesError && categoriesData && categoriesData.length > 0) {
+          const formatted = categoriesData.map((cat: any) => ({
+            id: cat.id,
+            category_key: cat.category_key,
+            category_name: cat.name,
+            display_name: cat.display_name,
+          }));
+          setCategories(formatted);
+          setCategory(formatted[0].category_key);
+        }
+      } catch (e) {
+        // Non-fatal; the dropdown will show "Loading..." and Detect will be
+        // disabled until categories arrive (or the operator picks via Other).
+        logger.error('Failed to load material categories', e as Error, {
+          service: 'XMLImportTab',
+        });
+      }
     };
 
-    loadWorkspace();
+    loadInitialData();
   }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +133,10 @@ const XMLImportTab: React.FC = () => {
     }
     if (sourceType === 'url' && !remoteUrl) {
       setError('Please enter a URL');
+      return;
+    }
+    if (!category) {
+      setError('Please select a material category before detecting fields');
       return;
     }
 
@@ -119,6 +173,7 @@ const XMLImportTab: React.FC = () => {
           body: {
             workspace_id: workspaceId,
             xml_content: xmlBase64,
+            category, // Sent up-front so the orchestrator knows it for import-mode
             source_url: sourceType === 'url' ? remoteUrl : undefined,
             preview_only: true, // Trigger field detection mode
           },
@@ -135,6 +190,7 @@ const XMLImportTab: React.FC = () => {
 
       setDetectedFields(data.detected_fields || []);
       setSuggestedMappings(data.suggested_mappings || {});
+      setTotalRows(data.total_rows || 0);
       setXmlContentCache(xmlText); // Cache the XML content for later use
       setShowMappingModal(true);
     } catch (err: any) {
@@ -168,6 +224,37 @@ const XMLImportTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Material Category — picked once up front for the whole import.
+          Mirrors the PDF upload flow. Every product the orchestrator emits
+          inherits this value, and the Fill-the-Gaps panel skips the
+          material_category gap because it's already known. */}
+      <div className="dashboard-card rounded-xl p-5 space-y-2">
+        <Label htmlFor="xml-import-category" className="text-sm font-medium">
+          Material Category
+        </Label>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger id="xml-import-category" className="w-full md:max-w-xs">
+            <SelectValue placeholder="Select a category" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.length > 0 ? (
+              categories.map((cat) => (
+                <SelectItem key={cat.category_key} value={cat.category_key}>
+                  {cat.display_name || cat.category_name}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem value="__loading__" disabled>
+                Loading categories...
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Every product imported from this XML will be tagged with this category.
+        </p>
+      </div>
+
       {/* Source Type Tabs */}
       <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as 'file' | 'url')} className="w-full">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
@@ -221,7 +308,7 @@ const XMLImportTab: React.FC = () => {
             {selectedFile && !detectedFields.length && (
               <Button
                 onClick={handleDetectFields}
-                disabled={isDetecting}
+                disabled={isDetecting || !category}
                 size="lg"
                 className="w-full"
               >
@@ -336,6 +423,8 @@ const XMLImportTab: React.FC = () => {
           onClose={() => setShowMappingModal(false)}
           detectedFields={detectedFields}
           suggestedMappings={suggestedMappings}
+          totalRows={totalRows}
+          category={category}
           xmlFile={selectedFile}
           xmlContent={xmlContentCache}
           onMappingConfirmed={handleMappingConfirmed}

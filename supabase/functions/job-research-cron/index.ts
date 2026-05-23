@@ -1,3 +1,4 @@
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 /**
  * Job Research Cron — internal-flow refresher.
  *
@@ -15,12 +16,13 @@
  */
 
 Deno.serve(async (req) => {
+  await bootstrapForFunction();
   console.log('💼 Job research cron started');
 
   try {
     const cronSecret = req.headers.get('x-cron-secret');
-    const expectedSecret = Deno.env.get('CRON_SECRET');
-    if (cronSecret !== expectedSecret) {
+    const expectedSecret = () => Deno.env.get('CRON_SECRET') || '';
+    if (cronSecret !== expectedSecret()) {
       console.error('❌ Invalid cron secret');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,

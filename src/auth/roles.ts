@@ -13,7 +13,6 @@ export const ROLES = {
   ADMIN: 'admin',
   SUPER_ADMIN: 'super_admin',
   OWNER: 'owner',
-  MANAGER: 'manager',
   FACTORY: 'factory',
   DEALER: 'dealer',
   USER: 'user',

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -64,6 +65,13 @@ export async function authenticate(
 
   // Create admin client for validation
   const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Bootstrap DB-stored secrets into Deno.env (env-first, DB-fallback). Memoised per worker so
+  // every authenticate() call after the first is a no-op. Existing Deno.env.get() calls in
+  // downstream code transparently pick up admin-saved values when env is unset.
+  // Fire-and-await so the first authenticate() blocks until env is populated; subsequent calls
+  // resolve immediately from the cached promise.
+  await bootstrapSecretsFromDb(adminClient);
 
   // Get headers
   const apiKey = req.headers.get('apikey') || req.headers.get('x-api-key');

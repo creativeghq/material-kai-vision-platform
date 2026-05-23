@@ -46,15 +46,39 @@ interface XMLProductPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: PreviewProduct | null;
+  // Per-target provenance: 'xml' = value came from the mapped XML tag,
+  // 'default' = filled in from the operator's job-level fallback in the
+  // Fill-the-Gaps panel. Used to render the "from default" badge so the
+  // operator sees exactly what their fallback covered.
+  valueSources?: Record<string, 'xml' | 'default'>;
   onConfirm: () => void;
   onEdit: () => void;
   totalProducts: number;
 }
 
+const SourceBadge: React.FC<{ source?: 'xml' | 'default' }> = ({ source }) => {
+  if (source === 'default') {
+    return (
+      <Badge variant="outline" className="text-[10px] h-4 px-1 border-warning/40 text-warning">
+        from default
+      </Badge>
+    );
+  }
+  if (source === 'xml') {
+    return (
+      <Badge variant="outline" className="text-[10px] h-4 px-1 border-success/30 text-success">
+        from XML
+      </Badge>
+    );
+  }
+  return null;
+};
+
 export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
   isOpen,
   onClose,
   product,
+  valueSources = {},
   onConfirm,
   onEdit,
   totalProducts,
@@ -174,11 +198,17 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
             {/* Right: Product Details */}
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-lg">{product.name}</h3>
+                  <SourceBadge source={valueSources.name} />
+                </div>
                 {product.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {product.description}
-                  </p>
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm text-muted-foreground line-clamp-3 flex-1">
+                      {product.description}
+                    </p>
+                    <SourceBadge source={valueSources.description} />
+                  </div>
                 )}
               </div>
 
@@ -190,7 +220,10 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                   <Factory className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-xs font-medium text-muted-foreground">Factory/Manufacturer</p>
-                    <p className="text-sm font-semibold">{product.factory_name || '—'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">{product.factory_name || '—'}</p>
+                      <SourceBadge source={valueSources.factory_name} />
+                    </div>
                   </div>
                   {product.factory_name ? (
                     <CheckCircle className="h-4 w-4 text-success" />
@@ -203,7 +236,10 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                   <Tag className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-xs font-medium text-muted-foreground">Material Category</p>
-                    <p className="text-sm font-semibold">{product.material_category || '—'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">{product.material_category || '—'}</p>
+                      <SourceBadge source={valueSources.material_category} />
+                    </div>
                   </div>
                   {product.material_category ? (
                     <CheckCircle className="h-4 w-4 text-success" />
@@ -217,7 +253,10 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                     <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
                     <div className="flex-1">
                       <p className="text-xs font-medium text-muted-foreground">Factory Group</p>
-                      <p className="text-sm">{product.factory_group_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm">{product.factory_group_name}</p>
+                        <SourceBadge source={valueSources.factory_group_name} />
+                      </div>
                     </div>
                   </div>
                 )}
