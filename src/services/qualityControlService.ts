@@ -228,18 +228,21 @@ export class QualityControlService {
     try {
       console.log(`🔍 Assessing chunk quality for ${chunkId}...`);
 
-      // Get chunk data with quality scores. document_vectors only carries
-      // text_embedding_1024; visual embeddings live in vecs.image_*_embeddings.
+      // 2026-05-23: `document_vectors` was dropped in the VECS-only migration.
+      // `document_chunks` is now the canonical chunk store; per-chunk quality
+      // scores live on the chunk row (coherence_score / quality_score /
+      // boundary_quality / semantic_completeness columns). text_embedding is
+      // a halfvec(1024) — its presence equals quality coverage.
       const { data: chunk, error: chunkError } = await supabase
-        .from('document_vectors')
+        .from('document_chunks')
         .select(
           `
-          chunk_id, content, metadata, page_number,
+          id, content, metadata, page_number,
           coherence_score, quality_score, boundary_quality, semantic_completeness,
-          text_embedding_1024, embedding_metadata
+          text_embedding, has_text_embedding, embedding_model
         `,
         )
-        .eq('chunk_id', chunkId)
+        .eq('id', chunkId)
         .single();
 
       if (chunkError || !chunk) {
@@ -252,7 +255,7 @@ export class QualityControlService {
         quality_score: chunk.quality_score || 0,
         boundary_quality: chunk.boundary_quality || 0,
         semantic_completeness: chunk.semantic_completeness || 0,
-        embedding_coverage: chunk.text_embedding_1024 ? 1 : 0, // Basic coverage for chunks
+        embedding_coverage: chunk.has_text_embedding ? 1 : 0, // boolean flag set by writer
       };
 
       // Calculate overall score

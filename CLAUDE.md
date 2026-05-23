@@ -208,7 +208,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 - `chandra_ocr_metrics` — per-attempt OCR telemetry (success rate, retry rate, failure modes)
 - `document_images.ocr_text / ocr_blocks / ocr_failed / ocr_attempts / ocr_skipped_reason` — Phase 3 per-image OCR
 - `document_layout_analysis.analysis_metadata.cache_status` — per-page Stage 1.5 status (filters resume-skip)
-- `background_jobs.current_slow_operation` — `{operation, started_at, expected_max_seconds}` slow-op suppression
+- `background_jobs.current_slow_operation` — `{operation, started_at, expected_max_seconds}` slow-op suppression. Backed by an in-memory stack on `ProgressTracker` (nest-safe across parallel Stage 3 markers); the DB column always reflects top-of-stack. Stage 0 (discovery), Stage 1.5 (layout precompute), and Stage 3 (per-product images) all set markers via `tracker.set_slow_operation(operation=..., expected_max_seconds=...)`.
 - `background_jobs.total_ai_cost_usd` — written at job completion from `ai_usage_logs` aggregate (sums `billed_cost_usd`)
 - `ai_usage_logs.product_id / image_id` — per-product/per-image cost attribution
 - `pipeline_strategy_metrics` — chunking strategy + Phase 3 outcome + Stage 1.5 path distribution
@@ -218,18 +218,26 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 2. **`cache_status` semantics on every persisted-result row** — distinguish "ran clean and found nothing" from "ran but failed and should be retried."
 3. **Atomic two-phase writes via SQL RPC** — `update_checkpoint_and_append_history` is the pattern. No more two-call patterns that can crash mid-way.
 4. **Per-attempt metrics in dedicated tables** — `chandra_ocr_metrics`, `pipeline_strategy_metrics`. Apply this anywhere you have a retry loop.
-5. **`current_slow_operation` for legitimate long stages** — set it before the slow op so auto-recovery doesn't false-positive.
-6. **All SQL RPCs and pg_cron schedules in version control** — go through `mcp__supabase__apply_migration` or hand-export to `supabase/migrations/`.
+5. **`current_slow_operation` for legitimate long stages** — set it before the slow op so auto-recovery doesn't false-positive. Now stack-based (2026-05-23): `ProgressTracker.set_slow_operation(operation=..., expected_max_seconds=...)` pushes; `clear_slow_operation(operation=...)` pops the matching entry. Parallel-product Stage 3 markers no longer collide.
+6. **All SQL RPCs and pg_cron schedules apply via `mcp__supabase__apply_migration`** — the MCP tool registers in Supabase's `supabase_migrations.schema_migrations` table. Do NOT also create duplicate local `supabase/migrations/*.sql` files.
 7. **Per-product cost attribution** — every `ai_usage_logs` insert that knows the product/image should set those FKs.
+8. **Never persist `file_url` on private buckets** — mint signed URLs on both upload (frontend) AND read (admin viewer). Store `storage_bucket` + `storage_object_path` so resume can re-sign via service role. Persisted URLs expire; re-deriving is free.
+9. **JWT auth required on every job-spawning route** — `upload_document`, `resume_job`, etc. take `workspace_context = Depends(get_workspace_context)`. The cron path uses `x-cron-secret` bypass. `workspace_id` form fields are reconciled against the JWT; mismatch returns 403.
+10. **Explicit `stage_history` boundary events on every stage** — `in_progress` at start + `completed`/`failed` at end. Audit log must show why a job ended; UI's stage-name fallback otherwise sticks at the previous stage's name during long-running stages.
 
-## SQL RPC Inventory (live in Supabase, formerly undocumented in VCS)
+## SQL RPC Inventory (live in Supabase)
+Verify via `SELECT proname FROM pg_proc WHERE pronamespace='public'::regnamespace`. Highlights:
 - `append_stage_history(job_id, event)` — atomic JSON append, capped at 100 entries
 - `append_recovery_history(job_id, event)` — atomic JSON append for recovery audit log
 - `update_checkpoint_and_append_history(job_id, checkpoint, event)` — atomic combined write (added 2026-05-01)
+- `merge_background_job_metadata(p_job_id, p_metadata)` — atomic jsonb deep-merge; use this instead of `UPDATE ... SET metadata=...` to avoid clobbering sibling keys
 - `cleanup_invalid_stage_history(job_id, invalid_stages[])` — admin cleanup utility
 - `detect_stuck_pdf_jobs(stuck_threshold_seconds, max_attempts)` — auto-recovery cron query
 - `mark_pdf_job_for_recovery(job_id, max_attempts)` — atomic claim + flip to 'pending', distinguishes deploy-interrupt vs genuine failure
 - `fail_exhausted_pdf_jobs(max_attempts, stuck_threshold_seconds)` — terminal-fail jobs that exhausted recovery
+- `verify_storage_orphans(bucket, paths[])` — re-validate a list of paths against the live DB reference set (called by storage-orphan-cleanup-cron immediately before each batch delete to close the race window between `find_orphan_storage_objects` snapshot and the actual `storage.remove()`)
+- `update_job_failure_summary(p_job_id)` — recompute the per-job failure rollup surfaced in the admin UI's PipelineErrorsPanel
+- `resolve_facet_value(p_facet_key, p_raw_value, p_normalized, p_embedding, p_threshold, p_source, p_product_id)` — multilingual facet canonicalization (Stage 4)
 
 ## Workflow Rules
 - **SQL / migrations**: ALWAYS run directly via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create .sql migration files first.

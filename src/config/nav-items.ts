@@ -6,6 +6,7 @@ import {
   FileText,
   BarChart3,
   Settings,
+  FolderKanban,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export interface SidebarNavItem {
 export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
+  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects' },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText },

@@ -294,32 +294,28 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       setImages(allImages || []);
 
-      // Load embeddings - query both embeddings and document_vectors tables
-      // First try document_vectors (primary), then fall back to embeddings table
-      let embeddingsData: unknown[] = [];
-
-      const {
-        data: vectorsData,
-        error: vectorsError,
-        count: vectorsCount,
-      } = await supabase
-        .from('document_vectors')
-        .select('*', { count: 'exact' })
+      // Embeddings list: `document_vectors` table was dropped 2026-04 in the
+      // VECS-only migration. Source of truth is now VECS collections + the
+      // `has_*_slig` / `has_understanding_embedding` flags on document_images
+      // and `has_text_embedding` on document_chunks. We surface counts from
+      // those flag columns instead of trying to enumerate vectors.
+      const { data: imageEmbeddingRows = [] } = await supabase
+        .from('document_images')
+        .select('id, document_id, has_slig_embedding, has_understanding_embedding, created_at')
         .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
+        .or('has_slig_embedding.eq.true,has_understanding_embedding.eq.true')
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-      if (!vectorsError && vectorsData && vectorsData.length > 0) {
-        embeddingsData = vectorsData;
-      } else {
-        if (vectorsError) {
-          console.warn('⚠️ document_vectors query failed:', vectorsError);
-        } else {
-        }
-        // embeddings table doesn't exist - only using document_vectors
-        embeddingsData = [];
-      }
+      const embeddingsData = (imageEmbeddingRows || []).map((row: any) => ({
+        id: row.id,
+        document_id: row.document_id,
+        has_slig: row.has_slig_embedding,
+        has_understanding: row.has_understanding_embedding,
+        created_at: row.created_at,
+      }));
 
-      setEmbeddings((embeddingsData || []) as Embedding[]);
+      setEmbeddings(embeddingsData as Embedding[]);
 
       // Load products created from PDF chunks
       const { data: productsData, error: productsError } = await supabase

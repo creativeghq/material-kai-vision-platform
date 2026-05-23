@@ -4276,13 +4276,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                                key === 'qwen' ? 'bg-gradient-to-br from-orange-500 to-red-500' :
                                 key === 'slig' ? 'bg-gradient-to-br from-purple-500 to-pink-500' :
                                 key === 'yolo' ? 'bg-gradient-to-br from-blue-500 to-cyan-500' :
                                 key === 'claude' ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
                                 'bg-gradient-to-br from-green-500 to-teal-500'
                               }`}>
-                                {key === 'qwen' ? '🔮' : key === 'slig' ? '🖼️' : key === 'yolo' ? '📐' : key === 'claude' ? '🧠' : '📝'}
+                                {key === 'slig' ? '🖼️' : key === 'yolo' ? '📐' : key === 'claude' ? '🧠' : '📝'}
                               </div>
                               <div>
                                 <div className="font-semibold text-sm text-foreground">{data.model}</div>

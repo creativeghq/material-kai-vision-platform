@@ -8,6 +8,8 @@ export interface CreateMoodBoardData {
   description?: string;
   is_public?: boolean;
   view_preference?: 'grid' | 'list';
+  project_id?: string | null;
+  room_id?: string | null;
 }
 
 export interface UpdateMoodBoardData {
@@ -169,7 +171,9 @@ class MoodBoardAPI {
         description: data.description,
         is_public: data.is_public ?? false,
         view_preference: data.view_preference ?? 'grid',
-      })
+        project_id: data.project_id ?? null,
+        room_id: data.room_id ?? null,
+      } as any)
       .select()
       .single();
 

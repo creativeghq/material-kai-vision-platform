@@ -638,7 +638,9 @@ export function EnhancedPDFProcessor() {
       'application/pdf': ['.pdf'],
     },
     maxFiles: 5,
-    maxSize: 50 * 1024 * 1024, // 50MB
+    // 100MB — matches backend cap. Was 50MB which silently rejected files
+    // 50-100MB at the dropzone level (2026-05-23 audit).
+    maxSize: 100 * 1024 * 1024,
   });
 
   return (
@@ -673,7 +675,7 @@ export function EnhancedPDFProcessor() {
                   Upload PDFs
                 </CardTitle>
                 <CardDescription>
-                  Drop PDF files here or click to select. Maximum 5 files, 50MB
+                  Drop PDF files here or click to select. Maximum 5 files, 100MB
                   each.
                 </CardDescription>
               </CardHeader>

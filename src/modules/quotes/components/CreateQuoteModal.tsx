@@ -14,21 +14,26 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService } from '../services/QuotesService';
+import { ProjectPickerInline } from '@/modules/projects/components/ProjectPickerInline';
 
 interface CreateQuoteModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (quoteId: string, quoteName: string) => void;
+  /** Optional pre-selected project (e.g. when invoked from a project detail page) */
+  defaultProjectId?: string | null;
 }
 
 export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   open,
   onClose,
   onSuccess,
+  defaultProjectId = null,
 }) => {
   const { toast } = useToast();
   const [quoteName, setQuoteName] = useState('');
   const [notes, setNotes] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(defaultProjectId);
   const [processing, setProcessing] = useState(false);
 
   const handleCreate = async () => {
@@ -46,6 +51,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
       const newQuote = await quotesService.createQuote({
         name: quoteName,
         notes: notes || undefined,
+        project_id: projectId,
       });
 
       toast({
@@ -102,6 +108,13 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
               disabled={processing}
             />
           </div>
+
+          <ProjectPickerInline
+            projectId={projectId}
+            onChange={({ project_id }) => setProjectId(project_id)}
+            hideRoomPicker
+            disabled={processing}
+          />
 
           <div className="flex gap-3 pt-4">
             <Button

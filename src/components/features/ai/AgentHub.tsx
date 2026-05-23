@@ -160,8 +160,8 @@ const AI_MODELS = [
   { id: 'anthropic/claude-opus-4-7',           name: 'Claude Opus 4.7',   provider: 'anthropic', type: 'language' },
   { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5',  provider: 'anthropic', type: 'language' },
 
-  // Vision Models (HuggingFace Endpoint - 32B only)
-  { id: 'huggingface/Qwen/Qwen3-VL-32B-Instruct', name: 'Qwen3-VL-32B', provider: 'huggingface', type: 'vision' },
+  // Vision Models — Qwen3-VL was removed 2026-05-01 (vision is Anthropic-only
+  // via Claude Opus 4.7). The Anthropic entry above is the active vision path.
 
   // Visual Embedding Models
   { id: 'google/siglip-so400m-patch14-384', name: 'SigLIP-SO400M', provider: 'google', type: 'visual-embedding' },

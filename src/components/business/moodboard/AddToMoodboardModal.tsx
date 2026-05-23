@@ -15,6 +15,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
+import { ProjectPickerInline } from '@/modules/projects/components/ProjectPickerInline';
 
 interface AddToMoodboardModalProps {
   productId: string;
@@ -39,6 +40,8 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [newMoodboardTitle, setNewMoodboardTitle] = useState('');
   const [notes, setNotes] = useState('');
+  const [newProjectId, setNewProjectId] = useState<string | null>(null);
+  const [newRoomId, setNewRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     loadMoodboards();
@@ -130,6 +133,8 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
       // Create new moodboard
       const newMoodboard = await moodboardAPI.createMoodBoard({
         title: newMoodboardTitle,
+        project_id: newProjectId,
+        room_id: newRoomId,
       });
 
       // Add product to the new moodboard
@@ -207,6 +212,15 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
                   className="mt-1"
                 />
               </div>
+              <ProjectPickerInline
+                projectId={newProjectId}
+                roomId={newRoomId}
+                onChange={({ project_id, room_id }) => {
+                  setNewProjectId(project_id);
+                  setNewRoomId(room_id);
+                }}
+                disabled={processing}
+              />
               <div className="flex gap-2">
                 <Button
                   onClick={() => setShowCreateNew(false)}

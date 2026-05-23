@@ -354,8 +354,12 @@ export class MivaaApiClient {
   }
 
   /**
-   * Analyze image using Qwen Vision
-   * Replaces: vision-analysis Edge Function
+   * Analyze image using Claude Opus 4.7 vision (with Anthropic tool_use
+   * schema-locked output via the `emit_vision_analysis` tool defined in
+   * mivaa-pdf-extractor/app/models/vision_analysis.py).
+   *
+   * Was Qwen Vision until 2026-05-01; the Qwen endpoint was retired and
+   * the entire vision pipeline migrated to Anthropic-only.
    */
   async analyzeVision(payload: {
     image_url?: string;
@@ -407,7 +411,7 @@ export class MivaaApiClient {
    * 7-vector fusion search with intelligent weighting:
    * - Text (15%) - Voyage AI 1024D semantic understanding
    * - Visual (15%) - SLIG 768D visual similarity
-   * - Understanding (20%) - Voyage AI 1024D from Qwen3-VL vision analysis
+   * - Understanding (20%) - Voyage AI 1024D from Claude Opus 4.7 vision_analysis (tool_use)
    * - Color (12.5%) - SLIG 768D color palette matching
    * - Texture (12.5%) - SLIG 768D texture pattern matching
    * - Style (12.5%) - SLIG 768D design style matching

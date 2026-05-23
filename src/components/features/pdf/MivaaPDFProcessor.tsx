@@ -224,7 +224,7 @@ export const MivaaPDFProcessor: React.FC = () => {
                   Drag & drop PDF files here, or click to select
                 </p>
                 <p className="text-sm text-gray-500">
-                  Supports multiple files up to 50MB each
+                  Supports multiple files up to 100MB each
                 </p>
               </div>
             )}

@@ -242,11 +242,16 @@ export const createQueryDatabaseTool = () => {
             break;
 
           case 'embeddings':
-            tableName = 'document_vectors';
+            // document_vectors was dropped 2026-04. VECS collections are now
+            // the source of truth for vectors themselves; presence-only
+            // metadata lives on the source rows. Surface a sample of
+            // document_images with embedding flags as "embeddings overview".
+            tableName = 'document_images';
             query = supabase
-              .from('document_vectors')
-              .select('id, embedding_type, metadata, created_at')
+              .from('document_images')
+              .select('id, has_slig_embedding, has_understanding_embedding, understanding_embedding_model, created_at')
               .eq('document_id', documentId)
+              .or('has_slig_embedding.eq.true,has_understanding_embedding.eq.true')
               .limit(5);
             break;
 

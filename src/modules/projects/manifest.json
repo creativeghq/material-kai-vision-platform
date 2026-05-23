@@ -1,0 +1,9 @@
+{
+  "slug": "projects",
+  "name": "Project Workspace",
+  "description": "Container above moodboards and quotes: rooms, deadlines, budget vs. actual, task checklists with subtasks.",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "FolderKanban",
+  "version": "0.1.0"
+}

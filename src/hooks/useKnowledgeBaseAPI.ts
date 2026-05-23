@@ -60,7 +60,8 @@ interface EmbeddingsStatsResponse {
       coverage_percentage: string;
     };
   };
-  document_vectors?: any;
+  // document_vectors removed 2026-04 — table dropped in VECS-only migration.
+  // Use document_chunks.has_text_embedding + document_images.has_*_slig instead.
   quality?: any;
 }
 

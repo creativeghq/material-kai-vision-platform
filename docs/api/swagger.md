@@ -171,7 +171,15 @@ Newline-delimited JSON stream (NOT SSE `data:` prefixed — each line is a raw J
 
 ### File Upload (multipart)
 
-Send `multipart/form-data` directly — auto-routed to `POST /api/rag/documents/upload-async`.
+Send `multipart/form-data` directly — auto-routed to `POST /api/rag/documents/upload`.
+
+Auth: requires a valid JWT in the `Authorization: Bearer <token>` header. The
+gateway forwards the caller's JWT (not the service key) so MIVAA's
+`get_workspace_context` resolves to the real user. The form-supplied
+`workspace_id` is validated against the JWT's workspace and rejected on
+mismatch (HTTP 403).
+
+Max file size: 100MB.
 
 ### Job Status Check (URL path)
 

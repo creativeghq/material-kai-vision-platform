@@ -169,6 +169,7 @@ export class QuotesService {
   async createQuote(data?: {
     name?: string;
     workspace_id?: string;
+    project_id?: string | null;
     notes?: string;
     custom_request_text?: string;
   }): Promise<Quote> {
@@ -182,10 +183,11 @@ export class QuotesService {
         user_id: user.id, // required for RLS policy
         name: data?.name,
         workspace_id: data?.workspace_id,
+        project_id: data?.project_id ?? null,
         notes: data?.notes,
         custom_request_text: data?.custom_request_text,
         status: 'draft',
-      })
+      } as any)
       .select()
       .single();
 
