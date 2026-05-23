@@ -454,6 +454,40 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 
+## Job Research v0.3.5 (2026-05-23 — post-deploy smoke iteration 2: rule_shortcut + cost RPC fixes)
+
+After the v0.3.4 fixes deployed (Anthropic HTTP path + DataForSEO URL), iteration-2 smoke surfaced two more production bugs:
+
+1. **`rule_shortcut` too strict — required literal substring match of full keywords.** Even with 11 Haiku-expanded keyword variants (`python developer`, `python engineer`, `sr python dev`, etc.), the rule's `_normalize(k) in blob` check requires the full keyword to be a substring. Real Perplexity titles like `Senior Backend Engineer (Python)` don't contain the literal substring `python developer` (word order doesn't match), so they were fast-dropped as mismatch BEFORE Haiku ever saw them. The classifier never got called; `persisted=0` even with 6 clearly-relevant Perplexity hits.
+   **Fix**: token-based match. Tokenize keywords + blob (alphanumeric + `+#`/`-`), apply a small stoplist of generic role words (`engineer`, `developer`, `senior`, `manager`, `lead`, `staff`, etc.) so they don't single-handedly count, then require at least one shared distinctive token. Fast-promote to `match` when a distinctive token hits the title. Ambiguous → Haiku. Committed in [job_classifier_service.py](mivaa-pdf-extractor/app/services/integrations/job_classifier_service.py) as `557f007`.
+
+2. **`stamp_job_refresh_cost` RPC silently failed forever** — referenced `platform_credits_debited` column which doesn't exist (`ai_usage_logs` actually has `credits_debited`). Postgres parse error on every call, caught by the Python wrapper's `try/except`, swallowed. `tracked_jobs.total_billed_usd` stayed `0.0` even though Perplexity charged real money per refresh.
+   **Fix**: applied via `mcp__supabase__apply_migration` — both `stamp_job_refresh_cost` and `recompute_job_cost` now SUM `credits_debited`. Backfilled the existing test row to pick up its historical cost.
+
+Both bugs are textbook "live-only" — typecheck and static analysis can't catch wrong column names in RPC strings, and the rule_shortcut's substring check looks reasonable in isolation but breaks against real-world title shapes you only see by calling Perplexity.
+
+---
+
+## Job Research v0.3.4 (2026-05-23 — post-deploy bugfixes surfaced by external smoke test)
+
+First end-to-end smoke against the deployed module (external `kai_*` API → `POST /api/v1/jobs/track` with synchronous first refresh) surfaced two production-only bugs that didn't show in static checks:
+
+1. **`AsyncMessages.create() got an unexpected keyword argument 'tools'`** — the deployed MIVAA pins `anthropic==0.23.1` in [deploy.yml:352](mivaa-pdf-extractor/.github/workflows/deploy.yml#L352), which is the beta-era SDK that hadn't promoted `tools` to the GA `messages.create()` signature yet. `requirements.txt` says `>=0.94.0` but `deploy.yml`'s `pip install --no-deps anthropic==0.23.1` wins.
+   **Fix**: bypass the SDK. Both [job_classifier_service.py](mivaa-pdf-extractor/app/services/integrations/job_classifier_service.py) and [job_keyword_expansion_service.py](mivaa-pdf-extractor/app/services/integrations/job_keyword_expansion_service.py) now call `POST https://api.anthropic.com/v1/messages` directly via `httpx` (matching the pattern used by DataForSEO / Perplexity / Firecrawl elsewhere in the codebase). HTTP API has had stable `tool_use` since 2024-06 and is immune to SDK version drama.
+2. **DataForSEO Google Jobs URL was 404'ing** — I used `/serp/google_jobs/live/advanced` (underscore-separated), correct path is `/serp/google/jobs/live/advanced` (slash-separated). Also widened the response `item.type` filter to accept both `google_jobs_serp` (legacy) and `jobs_element` (current) for forward compat. Fix in [job_search_service.py](mivaa-pdf-extractor/app/services/integrations/job_search_service.py).
+
+Both bugs traced to: code paths that only get exercised on live deploys + paid APIs. Static smoke checks and typecheck won't surface them. Lesson: a real curl-against-prod is part of "done", not a nice-to-have.
+
+**Diagnostic case** (the 2026-05-23 smoke test):
+- POST `/api/v1/jobs/track` with `keywords: ["senior python developer", "staff python engineer"]`, `remote_only: true`, `run_first_refresh: true`
+- Row created, 5 credits debited, `last_keywords_expanded_at` stamped, `first_refresh: {discovered: 15, deduped: 15, persisted: 0, matches: 0, by_source: {google_jobs: 0, perplexity: 15}}`
+- `ai_usage_logs` showed: keyword_expansion = error (tools kwarg), dataforseo_jobs = 404, perplexity_sonar-pro = success (15 hits), classifier = error (tools kwarg)
+- Net: user paid 5 credits + ~$0.018 Perplexity cost and got zero persisted listings.
+
+**Cost discipline gap** (not yet fixed): the external route's refund check only fires on `first_refresh.error`; doesn't fire when classifier-failed-wholesale leads to `persisted=0`. Open follow-up — should refund when no listings survived AND classifier batches all failed.
+
+---
+
 ## Job Research v0.3.3 (2026-05-15 — admin-stop bridge + KB category consolidation + scoped pause)
 
 Three corrections on top of v0.3.2:

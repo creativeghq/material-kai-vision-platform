@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText } from 'lucide-react';
+import {
+  CustomerFinanceSummary,
+  CustomerQuotesTab,
+  CustomerInvoicesTab,
+  CustomerPaymentsTab,
+} from '@/modules/finance/components/CustomerFinanceTabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -432,6 +438,18 @@ export const ContactDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ScrollText className="h-4 w-4 mr-2" />
+              Quotes
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Receipt className="h-4 w-4 mr-2" />
+              Invoices
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Payments
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -859,6 +877,24 @@ export const ContactDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Quotes Tab */}
+          <TabsContent value="quotes" className="space-y-4">
+            {id && <CustomerFinanceSummary contactId={id} />}
+            {id && <CustomerQuotesTab contactId={id} />}
+          </TabsContent>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices" className="space-y-4">
+            {id && <CustomerFinanceSummary contactId={id} />}
+            {id && <CustomerInvoicesTab contactId={id} />}
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-4">
+            {id && <CustomerFinanceSummary contactId={id} />}
+            {id && <CustomerPaymentsTab contactId={id} />}
           </TabsContent>
         </Tabs>
       </div>

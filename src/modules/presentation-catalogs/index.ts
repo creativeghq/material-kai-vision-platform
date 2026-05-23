@@ -26,7 +26,7 @@ const definition: ModuleDefinition = {
       path: '/admin/catalogs',
       icon: BookOpen,
       location: 'admin-dashboard',
-      adminCategory: 'Generation',
+      adminCategory: 'Communications',
       adminDescription: 'Build email-gated catalog landing pages and PDFs from manufacturer source PDFs.',
       adminCount: 'Catalogs',
     },

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText } from 'lucide-react';
+import {
+  CustomerFinanceSummary,
+  CustomerQuotesTab,
+  CustomerInvoicesTab,
+  CustomerPaymentsTab,
+} from '@/modules/finance/components/CustomerFinanceTabs';
 import CompanySEOPanel from '@/components/business/seo-toolkit/CompanySEOPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -322,6 +328,18 @@ export const CompanyDetailPage: React.FC = () => {
             <TabsTrigger value="seo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="h-4 w-4 mr-2" />
               SEO
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ScrollText className="h-4 w-4 mr-2" />
+              Quotes
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Receipt className="h-4 w-4 mr-2" />
+              Invoices
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Payments
             </TabsTrigger>
           </TabsList>
 
@@ -697,6 +715,24 @@ export const CompanyDetailPage: React.FC = () => {
               website={company.website || null}
               countryCode={(company as any).country_code || null}
             />
+          </TabsContent>
+
+          {/* Quotes Tab */}
+          <TabsContent value="quotes" className="space-y-4">
+            {company.id && <CustomerFinanceSummary companyId={company.id} />}
+            {company.id && <CustomerQuotesTab companyId={company.id} />}
+          </TabsContent>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices" className="space-y-4">
+            {company.id && <CustomerFinanceSummary companyId={company.id} />}
+            {company.id && <CustomerInvoicesTab companyId={company.id} />}
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-4">
+            {company.id && <CustomerFinanceSummary companyId={company.id} />}
+            {company.id && <CustomerPaymentsTab companyId={company.id} />}
           </TabsContent>
         </Tabs>
       </div>

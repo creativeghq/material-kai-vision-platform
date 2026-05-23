@@ -113,6 +113,10 @@ const adminSections = {
     // the `crm` and `quotes` modules via their admin-dashboard navItems[].
     // See useAdminDashboardCards().
   ],
+  'Finance & Billing': [
+    // Finance Dashboard tile is contributed by the `sales-finance` module
+    // via its admin-dashboard navItems[]. See useAdminDashboardCards().
+  ],
   'Communications': [
     // 'Email Management' and 'Messaging (SMS/WhatsApp)' are contributed by the
     // `email` and `messaging` modules via their admin-dashboard navItems[].

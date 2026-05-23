@@ -1,0 +1,9 @@
+{
+  "slug": "job-research",
+  "name": "Job Research",
+  "description": "Background agent that discovers job postings across Google Jobs, Perplexity, RSS feeds, and pinned career pages. Per-user volatility-adaptive cadence; emits consolidated daily digests.",
+  "category": "research",
+  "priceTier": "pro",
+  "icon": "Briefcase",
+  "version": "0.3.5"
+}

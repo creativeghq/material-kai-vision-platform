@@ -25,6 +25,9 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { OxygenPreInvoiceButton } from '@/modules/oxygen';
+import { QuoteActivityPanel } from '@/modules/finance/components/QuoteActivityPanel';
+import { IssueInvoiceButton } from '@/modules/finance/components/IssueInvoiceButton';
+import { formatMoney } from '@/modules/finance/services/financeService';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -604,6 +607,9 @@ export const QuoteDetailPage: React.FC = () => {
               quote={quote as unknown as import('@/modules/oxygen').QuoteOxygenView}
               onSynced={loadQuoteDetails}
             />
+
+            {/* Sales/Finance: Issue invoice (creates internal invoice row from accepted quote) */}
+            {quote && <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />}
           </div>
         </div>
 
@@ -803,6 +809,50 @@ export const QuoteDetailPage: React.FC = () => {
 
           {/* Pricing Tab */}
           <TabsContent value="pricing" className="space-y-5 mt-5">
+            {/* Profit summary — visible to admins via RLS on the underlying cost columns. */}
+            {(() => {
+              const items = quote.items || [];
+              let totalRevenue = 0;
+              let totalCost = 0;
+              let hasCost = false;
+              for (const it of items) {
+                const qty = Number(it.quantity || 0);
+                const effective = Number(it.discounted_price ?? it.unit_price ?? 0);
+                totalRevenue += qty * effective;
+                const snap = (it as any).cost_snapshot;
+                const liveCost = (it.product as any)?.cost;
+                const cost = snap != null ? Number(snap) : liveCost != null ? Number(liveCost) : null;
+                if (cost != null) {
+                  totalCost += qty * cost;
+                  hasCost = true;
+                }
+              }
+              const margin = totalRevenue - totalCost;
+              const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : null;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="dashboard-card p-3 border-0 rounded-2xl">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Revenue (net)</div>
+                    <div className="text-lg font-semibold">{formatMoney(totalRevenue, quote.currency || 'EUR')}</div>
+                  </div>
+                  <div className="dashboard-card p-3 border-0 rounded-2xl">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Estimated COGS</div>
+                    <div className="text-lg font-semibold">{hasCost ? formatMoney(totalCost, quote.currency || 'EUR') : '—'}</div>
+                  </div>
+                  <div className={`dashboard-card p-3 border-0 rounded-2xl ${margin < 0 && hasCost ? 'ring-1 ring-destructive/40' : ''}`}>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Gross margin</div>
+                    <div className={`text-lg font-semibold ${margin < 0 && hasCost ? 'text-destructive' : ''}`}>
+                      {hasCost ? formatMoney(margin, quote.currency || 'EUR') : '—'}
+                    </div>
+                  </div>
+                  <div className="dashboard-card p-3 border-0 rounded-2xl">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Margin %</div>
+                    <div className="text-lg font-semibold">{marginPct != null && hasCost ? `${marginPct.toFixed(1)}%` : '—'}</div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
               <div className="mb-5">
                 <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
@@ -1393,12 +1443,7 @@ export const QuoteDetailPage: React.FC = () => {
 
           {/* Activity Tab */}
           <TabsContent value="activity" className="mt-5">
-            <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-              <h3 className="text-sm font-semibold flex items-center gap-2 text-primary mb-4">
-                <Activity className="h-4 w-4" /> Activity Log
-              </h3>
-              <p className="text-sm text-muted-foreground">Activity log will be displayed here</p>
-            </div>
+            {id && <QuoteActivityPanel quoteId={id} />}
           </TabsContent>
         </Tabs>
       </div>

@@ -1,0 +1,9 @@
+{
+  "slug": "sales-finance",
+  "name": "Sales & Finance",
+  "description": "Profit tracking, invoicing, payments, AR/AP aging, supplier bills, credit notes, quote activity, follow-up queue.",
+  "category": "core",
+  "priceTier": "pro",
+  "icon": "DollarSign",
+  "version": "0.1.0"
+}
