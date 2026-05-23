@@ -13,6 +13,10 @@ import {
   PieChart,
   LineChart,
   Bell,
+  CalendarClock,
+  BarChart3,
+  Users,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -35,6 +39,11 @@ import {
 } from '@/modules/finance/services/financeService';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
+import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
+import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
+import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
+import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
+import type { FinanceSettings } from '@/modules/finance/services/financeService';
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -54,6 +63,12 @@ const FinancePage: React.FC = () => {
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
+  const [settings, setSettings] = useState<FinanceSettings | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    void financeService.getSettings(workspaceId).then(setSettings).catch(() => { /* ignore */ });
+  }, [workspaceId]);
 
   useEffect(() => { void resolveWorkspace(); }, []);
   useEffect(() => { if (workspaceId) void loadAll(workspaceId); }, [workspaceId]);
@@ -167,8 +182,20 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="ap" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
+            <TabsTrigger value="planning" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <CalendarClock className="h-4 w-4 mr-2" /> Planning
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <BarChart3 className="h-4 w-4 mr-2" /> Reports
+            </TabsTrigger>
+            <TabsTrigger value="parties" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
+            </TabsTrigger>
             <TabsTrigger value="followups" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <SettingsIcon className="h-4 w-4 mr-2" /> Settings
             </TabsTrigger>
           </TabsList>
 
@@ -400,6 +427,26 @@ const FinancePage: React.FC = () => {
                 </table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ─────────── PLANNING ─────────── */}
+          <TabsContent value="planning" className="space-y-4">
+            <PlanningTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          {/* ─────────── REPORTS ─────────── */}
+          <TabsContent value="reports" className="space-y-4">
+            <ReportsTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          {/* ─────────── PARTIES ─────────── */}
+          <TabsContent value="parties" className="space-y-4">
+            <PartiesTab workspaceId={workspaceId} statementsEnabled={settings?.statements_enabled ?? false} />
+          </TabsContent>
+
+          {/* ─────────── SETTINGS ─────────── */}
+          <TabsContent value="settings" className="space-y-4">
+            <SettingsTab workspaceId={workspaceId} onSettingsChanged={setSettings} />
           </TabsContent>
 
           {/* ─────────── FOLLOW-UPS ─────────── */}

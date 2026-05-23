@@ -881,6 +881,42 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 - **PDF generation**: Room column in items table, dimensions in product name, "SPECIFICATIONS & DELIVERY" section at bottom
 - **Service**: `QuotesService.addItem()`, `addCustomItem()`, `updateItem()` all accept FF&E fields
 
+## Platform Secrets (centralised key store — 2026-04-22, Phase 2 2026-04-22)
+Single registry for every external-service key the platform uses. `platform_secrets(key, value, primary_module_slug, …)` table + `platform_secret_module_links` many-to-many for shared keys (DATAFORSEO/PERPLEXITY/FIRECRAWL etc.). RLS locked to service_role; admins reach it through the `platform-secrets-admin` edge function which masks sensitive values in GETs and gates on admin/super_admin role.
+
+- **Resolution priority is ALWAYS env-first, DB-second.** `_shared/secrets.ts → resolveSecret(supabase, key)` returns `{ value, source: 'env'|'db'|'default'|'missing' }`. Edge functions should call this rather than `Deno.env.get()` directly so the admin UI value is honored when env is unset.
+- Env always wins because env represents an explicit deployer choice; the DB store exists so admins can configure non-env'd keys without a redeploy.
+- **Admin UI**: per-module Settings tabs render `<SecretsManagerCard scope={{mode:'module', moduleSlug}}/>` showing the keys that module declares. `/admin/operations → Keys` renders `scope={{mode:'platform'}}` for keys with `primary_module_slug IS NULL` (AI providers, Stripe, VAPID, cron secret, etc.).
+- A single secret can be declared by multiple modules via `platform_secret_module_links` — same row, edited from any of those tabs, used everywhere.
+- Sensitive values are masked in admin GET responses (`oxy_••••wxyz`). The plaintext only leaves the function when an edge function reads it via service-role for an actual outbound API call.
+- Deprecated 2026-04-22: per-module `oxygen_settings` table — superseded by `platform_secrets` rows with `primary_module_slug='oxygen'`.
+
+### Phase 2 — generic per-module Settings pages
+
+Every registered module gets a Settings page at `/admin/modules/<slug>/settings` automatically — no per-module page code needed. The route is wired once in `App.tsx` and renders `<ModuleSettingsPage />`, which reads the slug from the URL and mounts `<SecretsManagerCard scope={{mode:'module', moduleSlug:slug}}/>`. A small key-icon button on `/admin/modules` links to the page for each enabled module.
+
+Seeded keys (one row per key, sharing via `platform_secret_module_links`):
+
+| Key | Primary module | Also surfaced on |
+|---|---|---|
+| `PERPLEXITY_API_KEY` | mention-monitoring | job-research, seo-toolkit, seo-interlinking |
+| `FIRECRAWL_API_KEY` | mention-monitoring | job-research, greek-marketplaces, idealo, seo-toolkit, seo-interlinking |
+| `DATAFORSEO_BASE64` | mention-monitoring | job-research, seo-toolkit, seo-interlinking |
+| `DATAFORSEO_LOGIN/PASSWORD` | mention-monitoring | job-research |
+| `YOUTUBE_DATA_API_KEY` | mention-monitoring | — |
+| `TWILIO_ACCOUNT_SID/AUTH_TOKEN` | messaging | — |
+| `LATE_API_KEY/WEBHOOK_SECRET` | social-media | — |
+| `RESEND_API_KEY` | email | — |
+| `OXYGEN_*` (4 keys) | oxygen | — |
+
+Platform-wide (no `primary_module_slug`, shown at `/admin/operations → Keys`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GEMINI_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_API_KEY`, `HF_TOKEN`, `HUGGINGFACE_API_KEY`, `SLIG_ENDPOINT_TOKEN`, `WORLDLABS_API_KEY`, `PINTEREST_APP_ID/SECRET/REDIRECT_URI`, `CRON_SECRET`, `ADMIN_RESTART_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VAPID_*`.
+
+### Edge-function migration (incremental, opt-in)
+
+For an edge function to honour the DB-fallback value when env is unset, it needs to call `resolveSecret()` instead of `Deno.env.get()`. Functions that still call `Deno.env.get()` continue to work — env-first behaviour is identical — they just don't pick up the admin's UI-saved value. Migrated so far: `oxygen-create-pre-invoice`, `oxygen-admin`, `platform-secrets-admin`. Remaining ~50 functions migrate incrementally as touched; the seed rows + Settings UI work either way for env-set deployments.
+
+Shared infrastructure caveat: `_shared/ai-client.ts` reads keys at module-load to hand them to npm AI-SDK packages (process.env polyfill). Keys consumed there (`ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, etc.) remain env-only at runtime — the admin UI shows them but they can't fall back to DB without a non-trivial refactor of that module.
+
 ## Oxygen Pre-Invoice Module (Greek e-Invoicing — 2026-04-22)
 Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/oxygen-admin/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.
 
@@ -891,8 +927,8 @@ Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-c
 - **Customer create-if-missing**: lookup by `vat_number` (companies) or `email` (private), then `POST /contacts` if not found. Result cached on our side as `crm_*.oxygen_contact_id`.
 - **Product create-if-missing**: same pattern, cached as `products.oxygen_product_id`. Price written to Oxygen comes from our `quote_items.unit_price`; we never read price **from** Oxygen.
 - **Single warehouse**: stored in `oxygen_settings.default_warehouse_id`, no per-product column.
-- **Configuration (DB-backed, 2026-04-22)**: `oxygen_settings` single-row table (RLS: service_role only). Admins manage via `/admin/modules/oxygen` → Settings tab. Fields: `api_key`, `api_base_url`, `default_tax_id_24`, `default_warehouse_id`, `last_verified_at/status/error`. `oxygen-admin` edge function gates on admin role + masks the key in GETs. Env vars (`OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL`, `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`) remain as a per-field fallback only — consulted exclusively when the corresponding DB column is NULL/empty.
-- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`; new table `oxygen_settings`.
+- **Configuration**: uses the platform-wide `platform_secrets` registry (env-first, DB-fallback). Keys: `OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL`, `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`. Admins manage at `/admin/modules/oxygen → Settings` (renders the generic `<SecretsManagerCard scope={{mode:'module', moduleSlug:'oxygen'}}/>` with a tax/warehouse dropdown footer). When the corresponding env var is set on the function, that value wins at runtime regardless of what the DB row says — the source badge in the UI surfaces this.
+- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`. (The earlier `oxygen_settings` table was dropped 2026-04-22 when the secrets registry landed.)
 - **Mount point**: single `<OxygenPreInvoiceButton />` in `src/modules/quotes/pages/QuoteDetailAdminPage.tsx`. Removable by deleting the module folders + that one import. Module also registers `/admin/modules/oxygen` (Overview + Settings tabs) via the standard `ModuleDefinition` default export.
 
 ## Manufacturer Analytics (Enhanced)

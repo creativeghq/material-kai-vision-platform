@@ -4,6 +4,14 @@
 
 **All secrets required for deployment across all platforms.**
 
+> **Resolution priority (platform-wide)**: every edge function resolves secrets via `_shared/secrets.ts → resolveSecret(key)`, which checks the **environment variable first**, then the `platform_secrets` table as fallback. Env always wins. The `platform_secrets` table lets admins configure any non-env'd key from the UI (`/admin/operations → Keys` for platform-wide keys, or each module's own Settings tab for module-specific keys) without a redeploy.
+>
+> Practical implications:
+> - **Production deployment**: set env vars as you always have. The DB layer never overrides them.
+> - **Self-service config**: leave env unset to let an admin configure a key from `/admin/operations → Keys` or the relevant module Settings tab.
+> - **Sensitive values are masked** in admin GETs (`oxy_••••wxyz`). The full plaintext only leaves the edge function when it makes an outbound call.
+> - Module-specific keys (Oxygen, future Stripe/Twilio/etc. wrappers) live in each module's Settings tab. AI/Stripe/VAPID/cron keys live in `/admin/operations → Keys`.
+
 ### **Supabase Secrets**
 
 | Secret Name | Type | Where Used | Description | Example/Format |

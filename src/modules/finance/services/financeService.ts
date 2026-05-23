@@ -269,7 +269,7 @@ export interface CashFlowRow {
 // Invoices
 // =============================================================================
 
-export const financeService = {
+const _financeServiceCore = {
   // -------- Invoices --------
 
   async listInvoices(opts: {
@@ -770,6 +770,341 @@ export const financeService = {
     };
   },
 };
+
+// =============================================================================
+// Planned payments + reports + parties + settings (v2)
+// =============================================================================
+
+export type PlannedPaymentDirection = 'in' | 'out';
+export type PlannedPaymentStatus = 'planned' | 'paid' | 'cancelled' | 'overdue';
+export type PlannedPaymentCategory =
+  | 'supplier_bill'
+  | 'rent'
+  | 'utility'
+  | 'tax'
+  | 'salary'
+  | 'expected_receipt'
+  | 'loan'
+  | 'expense'
+  | 'other';
+
+export interface PlannedPayment {
+  id: string;
+  workspace_id: string;
+  direction: PlannedPaymentDirection;
+  amount: number;
+  currency: string;
+  scheduled_for: string;
+  category: PlannedPaymentCategory;
+  title: string;
+  notes: string | null;
+  counterparty_company_id: string | null;
+  counterparty_contact_id: string | null;
+  supplier_bill_id: string | null;
+  invoice_id: string | null;
+  status: PlannedPaymentStatus;
+  paid_payment_id: string | null;
+  reminder_at: string | null;
+  reminder_sent_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartyRow {
+  party_type: 'company' | 'contact';
+  party_id: string;
+  display_name: string;
+  email: string | null;
+  is_customer: boolean;
+  is_supplier: boolean;
+  workspace_id: string;
+  invoiced_total: number;
+  receivable_paid_total: number;
+  receivable_outstanding: number;
+  billed_total: number;
+  payable_paid_total: number;
+  payable_outstanding: number;
+  net_position: number;
+}
+
+export interface FinanceSettings {
+  workspace_id: string;
+  statements_enabled: boolean;
+  statement_email_subject: string | null;
+  statement_email_body: string | null;
+  statement_template_cover_path: string | null;
+  statement_template_footer_path: string | null;
+  default_payment_terms_days: number;
+  default_vat_rate: number;
+  updated_at: string;
+}
+
+export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number }
+export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
+export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
+export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
+export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number }
+export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }
+
+// v2 method bundle — merged into financeService below so callers see one symbol.
+const _financeServiceV2 = {
+  // -------- Planned payments --------
+
+  async listPlannedPayments(opts: {
+    workspaceId: string;
+    direction?: PlannedPaymentDirection;
+    status?: PlannedPaymentStatus[];
+    from?: string;
+    to?: string;
+  }): Promise<PlannedPayment[]> {
+    let q = supabase.from('planned_payments').select('*')
+      .eq('workspace_id', opts.workspaceId)
+      .order('scheduled_for', { ascending: true });
+    if (opts.direction) q = q.eq('direction', opts.direction);
+    if (opts.status?.length) q = q.in('status', opts.status);
+    if (opts.from) q = q.gte('scheduled_for', opts.from);
+    if (opts.to) q = q.lte('scheduled_for', opts.to);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as PlannedPayment[];
+  },
+
+  async createPlannedPayment(input: {
+    workspaceId: string;
+    direction: PlannedPaymentDirection;
+    title: string;
+    amount: number;
+    currency?: string;
+    scheduledFor: string;
+    category: PlannedPaymentCategory;
+    counterpartyCompanyId?: string | null;
+    counterpartyContactId?: string | null;
+    supplierBillId?: string | null;
+    invoiceId?: string | null;
+    notes?: string;
+    reminderAt?: string | null;
+  }): Promise<PlannedPayment> {
+    const { data, error } = await supabase.from('planned_payments').insert({
+      workspace_id: input.workspaceId,
+      direction: input.direction,
+      title: input.title,
+      amount: input.amount,
+      currency: input.currency ?? 'EUR',
+      scheduled_for: input.scheduledFor,
+      category: input.category,
+      counterparty_company_id: input.counterpartyCompanyId ?? null,
+      counterparty_contact_id: input.counterpartyContactId ?? null,
+      supplier_bill_id: input.supplierBillId ?? null,
+      invoice_id: input.invoiceId ?? null,
+      notes: input.notes ?? null,
+      reminder_at: input.reminderAt ?? null,
+    }).select().single();
+    if (error) throw error;
+    return data as PlannedPayment;
+  },
+
+  async updatePlannedPayment(id: string, patch: Partial<PlannedPayment>): Promise<void> {
+    const allowed: Record<string, unknown> = {};
+    for (const k of ['title','amount','scheduled_for','category','notes','status','reminder_at','counterparty_company_id','counterparty_contact_id'] as const) {
+      if (patch[k] !== undefined) allowed[k] = patch[k];
+    }
+    const { error } = await supabase.from('planned_payments').update(allowed).eq('id', id);
+    if (error) throw error;
+  },
+
+  async deletePlannedPayment(id: string): Promise<void> {
+    const { error } = await supabase.from('planned_payments').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Mark a planned_payment as paid by creating a real payment + flipping the flag. */
+  async markPlannedPaymentPaid(planned: PlannedPayment, method: PaymentMethod = 'bank_transfer'): Promise<void> {
+    const paymentId = await _financeServiceCore.recordPayment({
+      workspaceId: planned.workspace_id,
+      direction: planned.direction,
+      amount: planned.amount,
+      currency: planned.currency,
+      method,
+      counterpartyCompanyId: planned.counterparty_company_id,
+      counterpartyContactId: planned.counterparty_contact_id,
+      reference: planned.title,
+      notes: planned.notes ?? null,
+      // If linked to a supplier_bill or invoice, allocate the full amount to it
+      allocations: planned.supplier_bill_id
+        ? [{ target_id: planned.supplier_bill_id, target_type: 'supplier_bill', amount: planned.amount }]
+        : planned.invoice_id
+          ? [{ target_id: planned.invoice_id, target_type: 'invoice', amount: planned.amount }]
+          : [],
+    });
+    const { error } = await supabase
+      .from('planned_payments')
+      .update({ status: 'paid', paid_payment_id: paymentId })
+      .eq('id', planned.id);
+    if (error) throw error;
+  },
+
+  // -------- Parties --------
+
+  async listParties(opts: {
+    workspaceId: string;
+    role?: 'customer' | 'supplier' | 'both' | 'all';
+    search?: string;
+  }): Promise<PartyRow[]> {
+    let q = supabase.from('vw_finance_parties').select('*').eq('workspace_id', opts.workspaceId);
+    if (opts.role === 'customer') q = q.eq('is_customer', true);
+    if (opts.role === 'supplier') q = q.eq('is_supplier', true);
+    if (opts.role === 'both') q = q.eq('is_customer', true).eq('is_supplier', true);
+    if (opts.search) q = q.ilike('display_name', `%${opts.search}%`);
+    const { data, error } = await q.order('receivable_outstanding', { ascending: false }).limit(500);
+    if (error) throw error;
+    return (data ?? []) as PartyRow[];
+  },
+
+  async getPartyDetail(opts: { workspaceId: string; partyType: 'company'|'contact'; partyId: string }): Promise<{
+    party: PartyRow | null;
+    invoices: Invoice[];
+    bills: SupplierBill[];
+    payments: Payment[];
+  }> {
+    const partyP = supabase.from('vw_finance_parties').select('*')
+      .eq('workspace_id', opts.workspaceId)
+      .eq('party_type', opts.partyType)
+      .eq('party_id', opts.partyId)
+      .maybeSingle();
+
+    const invoicesP = opts.partyType === 'company'
+      ? supabase.from('invoices').select('*').eq('customer_company_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false })
+      : supabase.from('invoices').select('*').eq('customer_contact_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false });
+
+    const billsP = opts.partyType === 'company'
+      ? supabase.from('supplier_bills').select('*').eq('supplier_company_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false })
+      : supabase.from('supplier_bills').select('*').eq('supplier_contact_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false });
+
+    const paymentsP = opts.partyType === 'company'
+      ? supabase.from('payments').select('*').eq('counterparty_company_id', opts.partyId).order('paid_at', { ascending: false })
+      : supabase.from('payments').select('*').eq('counterparty_contact_id', opts.partyId).order('paid_at', { ascending: false });
+
+    const [party, invs, bills, payments] = await Promise.all([partyP, invoicesP, billsP, paymentsP]);
+    if (party.error) throw party.error;
+    if (invs.error) throw invs.error;
+    if (bills.error) throw bills.error;
+    if (payments.error) throw payments.error;
+    return {
+      party: (party.data ?? null) as PartyRow | null,
+      invoices: (invs.data ?? []) as Invoice[],
+      bills: (bills.data ?? []) as SupplierBill[],
+      payments: (payments.data ?? []) as Payment[],
+    };
+  },
+
+  // -------- Settings --------
+
+  async getSettings(workspaceId: string): Promise<FinanceSettings> {
+    const { data, error } = await supabase
+      .from('finance_settings')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data as FinanceSettings;
+    // Auto-create defaults on first access
+    const { data: inserted, error: insErr } = await supabase
+      .from('finance_settings')
+      .insert({ workspace_id: workspaceId })
+      .select()
+      .single();
+    if (insErr) throw insErr;
+    return inserted as FinanceSettings;
+  },
+
+  async updateSettings(workspaceId: string, patch: Partial<FinanceSettings>): Promise<FinanceSettings> {
+    const allowed: Record<string, unknown> = {};
+    for (const k of [
+      'statements_enabled','statement_email_subject','statement_email_body',
+      'statement_template_cover_path','statement_template_footer_path',
+      'default_payment_terms_days','default_vat_rate',
+    ] as const) {
+      if (patch[k] !== undefined) allowed[k] = patch[k];
+    }
+    const { data, error } = await supabase
+      .from('finance_settings')
+      .update(allowed)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as FinanceSettings;
+  },
+
+  // -------- Reports --------
+
+  async reportSalesPerDay(workspaceId: string, from: string, to: string): Promise<SalesPerDayRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_day', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as SalesPerDayRow[];
+  },
+  async reportSalesPerCustomer(workspaceId: string, from: string, to: string): Promise<SalesPerCustomerRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_customer', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as SalesPerCustomerRow[];
+  },
+  async reportSalesPerProduct(workspaceId: string, from: string, to: string): Promise<SalesPerProductRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_product', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as SalesPerProductRow[];
+  },
+  async reportSalesPerCategory(workspaceId: string, from: string, to: string): Promise<SalesPerCategoryRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_category', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as SalesPerCategoryRow[];
+  },
+  async reportPurchasesPerProduct(workspaceId: string, from: string, to: string): Promise<PurchasesPerProductRow[]> {
+    const { data, error } = await supabase.rpc('report_purchases_per_product', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as PurchasesPerProductRow[];
+  },
+  async reportReceiptsPerProduct(workspaceId: string, from: string, to: string): Promise<PurchasesPerProductRow[]> {
+    const { data, error } = await supabase.rpc('report_receipts_per_product', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as PurchasesPerProductRow[];
+  },
+  async reportOpenTasks(workspaceId: string): Promise<OpenTaskRow[]> {
+    const { data, error } = await supabase.rpc('report_open_tasks', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as OpenTaskRow[];
+  },
+
+  // -------- Send statement --------
+
+  async sendStatement(input: {
+    partyType: 'company'|'contact';
+    partyId: string;
+    email?: string;
+    dryRun?: boolean;
+  }): Promise<{ ok: boolean; email_sent_to: string | null; pdf_url: string | null; lines: number; total_outstanding: number; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('finance-send-statement', { body: input });
+    if (error) throw error;
+    return data as any;
+  },
+};
+
+// Single merged service surface. TS infers the union of both literals' types,
+// so callers get v1 + v2 methods on one symbol.
+export const financeService: typeof _financeServiceCore & typeof _financeServiceV2 =
+  Object.assign(_financeServiceCore, _financeServiceV2);
 
 // =============================================================================
 // Formatters (shared)

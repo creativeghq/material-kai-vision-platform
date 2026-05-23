@@ -26,6 +26,7 @@ import {
   Mail,
   Send,
   BookOpen,
+  KeyRound,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
@@ -68,6 +69,7 @@ import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
 import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
+import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 
 import type {
   UsageAnalytics,
@@ -91,7 +93,7 @@ import { StatCard } from './components/StatCard';
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'ai-performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
-  'seo-toolkit', 'seo-interlinking',
+  'seo-toolkit', 'seo-interlinking', 'keys',
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
@@ -872,6 +874,10 @@ const OperationsDashboardInner: React.FC = () => {
               <Globe className="h-4 w-4 mr-2" />
               SEO Inter-linking
             </TabsTrigger>
+            <TabsTrigger value="keys" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <KeyRound className="h-4 w-4 mr-2" />
+              Keys
+            </TabsTrigger>
           </TabsList>
 
           {/* System Health Tab */}
@@ -1291,9 +1297,9 @@ const OperationsDashboardInner: React.FC = () => {
           </TabsContent>
 
           {/* Services & Billing Tab — 3rd Party API Services */}
-          <TabsContent value="services-billing" className="space-y-6">
+          <TabsContent value="services-billing" className="space-y-4">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">3rd Party Services</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-2">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
                 Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, and Late.dev (social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
@@ -1730,11 +1736,11 @@ const OperationsDashboardInner: React.FC = () => {
 
 
           {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
-          <TabsContent value="ai-performance" className="space-y-6">
+          <TabsContent value="ai-performance" className="space-y-4">
             {/* Page Header */}
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Monitoring all AI models — Claude Opus 4.7 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
@@ -1972,11 +1978,11 @@ const OperationsDashboardInner: React.FC = () => {
           </TabsContent>
 
           {/* Data Processing Tab - PDF, XML, Scraping */}
-          <TabsContent value="data-processing" className="space-y-6">
+          <TabsContent value="data-processing" className="space-y-4">
             {/* Page Header */}
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">Data Processing Pipeline</h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Real-time monitoring of PDF processing, XML imports, and web scraping operations. Track job status, success rates, processing times, and data volumes across all import sources.
               </p>
             </div>
@@ -2254,6 +2260,23 @@ const OperationsDashboardInner: React.FC = () => {
               Pulled out of /admin/modules/seo-interlinking into the operations dashboard. */}
           <TabsContent value="seo-interlinking" className="space-y-4">
             <SeoInterlinkingPanel />
+          </TabsContent>
+
+          {/* Keys Tab — platform-wide secrets (AI keys, Stripe, VAPID, cron secret, …).
+              Module-specific keys live in each module's own Settings tab. Env vars always win;
+              this table is the fallback admins can edit when env is unset. */}
+          <TabsContent value="keys" className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Platform Keys</h2>
+              <p className="text-muted-foreground text-sm">
+                Centrally manage secrets that aren't tied to a single module — AI providers, payments, push notifications, and cron secrets. Environment variables take priority; the values stored here are only used when the corresponding env var is unset. Module-specific keys (Oxygen, etc.) live in each module's own Settings tab.
+              </p>
+            </div>
+            <SecretsManagerCard
+              scope={{ mode: 'platform' }}
+              title="Platform secret keys"
+              description="Shared across all edge functions and modules. A single value here can satisfy multiple consumers."
+            />
           </TabsContent>
 
         </Tabs>

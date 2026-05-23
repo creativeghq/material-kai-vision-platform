@@ -52,31 +52,20 @@ Quote → customer lookup order (first hit wins):
 
 ## Configuration
 
-**Primary location: `/admin/modules/oxygen` → Settings tab** (DB-backed, single-row `oxygen_settings`). Admins set all four values from the UI — no devops trip required:
+Uses the platform-wide `platform_secrets` registry. **Env vars take priority; the DB row is the fallback** — both the create-pre-invoice function and the Settings UI read through `_shared/secrets.ts → resolveSecret()`.
 
-- **API key** — paste once, stored in `oxygen_settings.api_key`, returned masked (`oxy_••••wxyz`) in any subsequent GET.
-- **API base URL** — defaults to `https://api.oxygen.gr/v1`.
-- **Default tax id (24% VAT)** — populated by a **dropdown** that calls `GET /taxes` via `oxygen-admin` once you paste a valid key.
-- **Default warehouse id** — same dropdown pattern from `GET /warehouses`.
+**Primary location: `/admin/modules/oxygen` → Settings tab.** Admins set all four values from the UI:
 
-The Settings tab also has a **Test connection** button (`GET /taxes`) that stamps `last_verified_at` + `last_verified_status` on the row so you can see at a glance whether the configured key works.
+- **`OXYGEN_API_KEY`** — paste once, stored in `platform_secrets.value`, returned masked (`oxy_••••wxyz`) in any subsequent GET.
+- **`OXYGEN_API_BASE_URL`** — defaults to `https://api.oxygen.gr/v1`.
+- **`OXYGEN_DEFAULT_TAX_ID_24`** — picked from a **dropdown** populated by `GET /taxes` (via `platform-secrets-admin → list_oxygen_taxes`).
+- **`OXYGEN_DEFAULT_WAREHOUSE_ID`** — same dropdown pattern from `GET /warehouses`.
 
-### Env-var fallback (legacy)
+The Settings tab also exposes a **Test connection** button (`GET /taxes`) that stamps `platform_secrets.last_verified_at + last_verified_status` on the row so you can see at a glance whether the configured key works.
 
-For pre-existing deployments, the edge function still reads these env vars when the DB row is empty:
+**Env-var override at runtime**: if `OXYGEN_API_KEY` is set on the edge function, that value is used regardless of what's in the DB. The Settings tab surfaces this with an "env" source badge on the affected row so an admin doesn't think their UI edit took effect when it didn't.
 
-| Env var | Note |
-|---|---|
-| `OXYGEN_API_KEY` | Used only if `oxygen_settings.api_key IS NULL` |
-| `OXYGEN_API_BASE_URL` | Used only if `oxygen_settings.api_base_url` is empty |
-| `OXYGEN_DEFAULT_TAX_ID_24` | Used only if `oxygen_settings.default_tax_id_24 IS NULL` |
-| `OXYGEN_DEFAULT_WAREHOUSE_ID` | Used only if `oxygen_settings.default_warehouse_id IS NULL` |
-
-Once an admin saves any field in the Settings tab, that field's env-var equivalent stops being read for that field.
-
-### Settings RLS model
-
-`oxygen_settings` is RLS-locked to `service_role` only. Admins reach it exclusively through the `oxygen-admin` edge function, which authenticates on the user JWT (`admin` / `super_admin` roles) and masks the API key in responses.
+**RLS**: `platform_secrets` is locked to `service_role`. Admins reach it through `platform-secrets-admin`, which authenticates on user JWT (`admin` / `super_admin` roles) and masks `is_sensitive` values.
 
 ## Public API
 

@@ -85,6 +85,7 @@ const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
+const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
 import { buildModuleRoutes } from './modules/_core';
@@ -656,6 +657,22 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <ModulesPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+
+                {/* Admin: Generic per-module Settings page (renders SecretsManagerCard for the slug).
+                    Every module that declares secrets in platform_secrets gets this page automatically.
+                    Modules with bespoke pages (like Oxygen) still override via their own route. */}
+                <Route
+                  path="/admin/modules/:slug/settings"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <ModuleSettingsPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

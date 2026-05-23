@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Package, ArrowRight, AlertCircle } from 'lucide-react';
+import { Home, Package, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -152,14 +152,23 @@ const ModulesPage: React.FC = () => {
                         onCheckedChange={(next) => handleToggle(manifest.slug, next)}
                       />
                     </div>
-                    {enabled && primaryRoute && (
-                      <Button asChild size="sm" variant="outline" className="gap-1">
-                        <Link to={primaryRoute}>
-                          Open
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {enabled && (
+                        <Button asChild size="sm" variant="ghost" className="gap-1" title="Module settings (API keys)">
+                          <Link to={`/admin/modules/${manifest.slug}/settings`}>
+                            <KeyRound className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      )}
+                      {enabled && primaryRoute && (
+                        <Button asChild size="sm" variant="outline" className="gap-1">
+                          <Link to={primaryRoute}>
+                            Open
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <span className="uppercase tracking-wide">{manifest.category}</span>
