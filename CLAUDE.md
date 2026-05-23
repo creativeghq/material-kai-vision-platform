@@ -7,6 +7,28 @@
 - **Database**: Supabase PostgreSQL 15 + pgvector 0.8.0
 - **Design System**: `.claude/design-system.md` — full reference for all UI patterns, colors, components
 
+## Storage Buckets (post-consolidation 2026-05-23)
+The platform uses **6 buckets** (down from 17). Routing is path-based; feature identity lives in the top-level folder, not the bucket name.
+
+| Bucket | Public | Folders / use |
+|---|---|---|
+| `pdf-documents` | 🔒 private (signed URLs) | KB raw PDFs at `{user_id}/...` · `catalog-source/{catalog_id}/...` · `catalog-output/{catalog_id}/...` · `quote-output/{quote_id}/...` · `moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf` |
+| `pdf-tiles` | ✅ public | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
+| `generation-images` | ✅ public, 100 MB, image/video | `{user_id}/...`, `gemini/`, `videos/`, `user-uploads/`, `social/`, `product-crops/...` (SAM crops + segmentation), `agent/` (chat uploads), `3d/` (3D models), `designer/` (designer module) |
+| `quote-templates` | 🔒 private, 50 MB | Quote template PNGs at root (`template-cover.png`, `template-content.png`, `template-backcover.png`, `template-intro.png`) · `catalog/cover.png` / `catalog/backcover.png` (catalog templates) |
+| `moodboard-sheet-references` | ✅ public | Static admin-curated illustrations for the sheet-type picker (`material_board.png`, `color_palette.png`, etc.) |
+| `profile-avatars` | ✅ public, 2 MB | `{user_id}/avatar.ext` |
+
+**Privacy model:**
+- `pdf-documents` is private — every reader mints a fresh signed URL via `createSignedUrl()`. Stop persisting full URLs in DB rows; store the storage path and re-derive on each render.
+- `pdf-tiles` + `generation-images` are public but writes are RLS-gated to authenticated users or service role.
+- `quote-templates` is admin-only RW via the `quote_templates_admin_all` policy (admin / super_admin / owner roles, plus service_role).
+
+**Cleanup wiring:**
+- `storage-orphan-cleanup-cron` scans `pdf-documents` + `pdf-tiles` (24h grace) and `generation-images` (14d grace).
+- 7 AFTER DELETE trigger functions (`_cleanup_moodboard_sheet_storage`, `_cleanup_quote_pdf_storage`, `_cleanup_generation_segment_storage`, `_cleanup_agent_uploaded_file_storage`, `_cleanup_chat_message_storage`, `_cleanup_conversation_storage`, `build_storage_reference_set`) all reference the new bucket layout.
+- `reset-platform` clears `pdf-tiles` + `generation-images` only. KB raw + generated outputs in `pdf-documents` survive a reset (the orphan cron picks up any that the table-clear step orphans).
+
 ## Qwen removal — Anthropic-only vision (2026-05-01)
 Audit-discovered: the configured HF endpoint served `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) but the segmentation/classification/vision-analysis call sites all asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s and falling through to Anthropic Claude — Stage 3 had effectively been 100% Claude for months. Migration made the architecture honest:
 
@@ -771,7 +793,7 @@ Full reference: [docs/api/mention-monitoring-api.md](docs/api/mention-monitoring
 
 ## Presentation Sheets — moodboard sheets via the KAI agent (2026-05-02)
 
-Eight client-ready sheet types attached to a moodboard. Generated through the KAI agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `moodboard-sheets` storage bucket. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.
+Eight client-ready sheet types attached to a moodboard. Generated through the KAI agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `pdf-documents` storage bucket under the `moodboard-output/` prefix. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.
 
 **Sheet types + credit cost** (debited from user balance via `debit_user_credits` RPC, mirrored to `ai_usage_logs.operation_type='presentation_sheet_<type>'`):
 
@@ -793,7 +815,7 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 **Pieces on disk:**
 
 - DB:
-  - Migration: [`supabase/migrations/20260502_moodboard_presentation_sheets.sql`](supabase/migrations/20260502_moodboard_presentation_sheets.sql) — `moodboard_presentation_sheets` table, `moodboard_sheet_type` + `moodboard_sheet_status` enums, RLS, `moodboard-sheets` storage bucket, `updated_at` trigger.
+  - Migration: [`supabase/migrations/20260502_moodboard_presentation_sheets.sql`](supabase/migrations/20260502_moodboard_presentation_sheets.sql) — `moodboard_presentation_sheets` table, `moodboard_sheet_type` + `moodboard_sheet_status` enums, RLS, `updated_at` trigger. (Storage for the generated PDFs lives at `pdf-documents/moodboard-output/` after the 2026-05-23 consolidation.)
   - Prompt addendum: [`supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql`](supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql) — appends sheet-tool guidance to the `kai` and `interior-designer` prompt rows. Idempotent (uses `--END_PRESENTATION_SHEETS_ADDENDUM--` marker).
 - Edge function: [`supabase/functions/generate-moodboard-sheet-pdf/`](supabase/functions/generate-moodboard-sheet-pdf/) — `index.ts` (router), `builders.ts` (one builder per sheet type), `data-fetcher.ts` (sheet/moodboard/products/quote-items/sub-sheet fetchers), `layout.ts` (A3 helpers, title block, `hexToRgb`, `wrapText`, `embedImageBytes`), `types.ts`. Uses `pdf-lib`.
 - Agent tool: [`supabase/functions/_shared/tools/presentation-sheet-tool.ts`](supabase/functions/_shared/tools/presentation-sheet-tool.ts) — `generate_presentation_sheet`. Validates moodboard ownership → debits credits → inserts sheet row → emits chunk (`sheet_canvas_open` for interactive, `sheet_pdf_ready` for passive after invoking the edge function). Refunds on insert failure.
@@ -809,7 +831,7 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 - `sheet_canvas_open` — interactive widget should mount; payload `{sheet_id, sheet_type, moodboard_id, initial_data, title}`
 - `sheet_pdf_ready` — passive sheet rendered; payload `{sheet_id, sheet_type, title, pdf_url, page_count, credits_used}`
 
-**Storage**: PDFs at `moodboard-sheets/moodboards/{moodboard_id}/sheet-{sheet_id}.pdf`. 7-day signed URLs (longer than the quote bucket because clients keep reopening these). Bucket is private; service role writes, authed users read via signed URL.
+**Storage**: PDFs at `pdf-documents/moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf`. 7-day signed URLs (longer than quote outputs because clients keep reopening these). Bucket is private; service role writes, authed users read via signed URL.
 
 **To activate** after pulling this branch: (1) apply both SQL migrations via Supabase, (2) `supabase functions deploy generate-moodboard-sheet-pdf`, (3) redeploy `agent-chat` so the new tool is loaded. Frontend ships with the next regular build.
 

@@ -44,7 +44,7 @@ class QuotePDFService {
     if (!quote?.pdf_storage_path) return null;
 
     const { data } = await supabase.storage
-      .from('quote-documents')
+      .from('pdf-documents')
       .createSignedUrl(quote.pdf_storage_path, 60 * 60); // 1 hour
 
     return data?.signedUrl || null;

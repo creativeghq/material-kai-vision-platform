@@ -155,10 +155,10 @@ export class SVBRDFExtractionAPI {
 
       // Upload image to storage
       const timestamp = Date.now();
-      const fileName = `${user.id}/${timestamp}/source_image.${file.name.split('.').pop()}`;
+      const fileName = `svbrdf/${user.id}/${timestamp}/source_image.${file.name.split('.').pop()}`;
 
       const { data: _data, error } = await supabase.storage
-        .from('material-images')
+        .from('generation-images')
         .upload(fileName, file);
 
       if (error) {
@@ -166,7 +166,7 @@ export class SVBRDFExtractionAPI {
       }
 
       const { data: urlData } = supabase.storage
-        .from('material-images')
+        .from('generation-images')
         .getPublicUrl(fileName);
 
       // Start SVBRDF extraction

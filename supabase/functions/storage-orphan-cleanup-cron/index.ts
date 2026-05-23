@@ -14,15 +14,12 @@
  *
  * Buckets + grace periods (grace = "do not touch objects newer than this"):
  *
- *   pdf-documents     | 24h
- *   pdf-tiles         | 24h
- *   documents         | 24h   (legacy)
- *   moodboard-sheets  | 24h
- *   generation-images |  7d
- *   designer-assets   |  7d
- *   product-images    |  7d
- *   agent-files       | 14d
- *   3d-models         | 14d
+ *   pdf-documents     | 24h   (KB + catalog-source/ + catalog-output/ + quote-output/ + moodboard-output/)
+ *   pdf-tiles         | 24h   (extracted/ + catalog-extracted/)
+ *   generation-images | 14d   (AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/)
+ *
+ * quote-templates and moodboard-sheet-references are NOT scanned — admin
+ * curated, deletion is manual.
  *
  * Logs every pass to public.storage_cleanup_log.
  * Caps each bucket pass at 5000 deletes to bound blast radius.
@@ -40,16 +37,15 @@ interface BucketStat {
   error?: string;
 }
 
+// Post-consolidation (2026-05-23): 5 anchor buckets. The 12 absorbed buckets
+// (3d-models, agent-files, catalog-*, designer-assets, moodboard-sheets,
+// product-images, quote-documents) were dropped — their content lives under
+// path prefixes inside the anchors. Grace seconds use the most conservative
+// (longest) value across any content type folded into each anchor.
 const BUCKETS: Array<{ bucket: string; grace_seconds: number }> = [
   { bucket: 'pdf-documents',     grace_seconds:      24 * 3600 },
   { bucket: 'pdf-tiles',         grace_seconds:      24 * 3600 },
-  { bucket: 'documents',         grace_seconds:      24 * 3600 },
-  { bucket: 'moodboard-sheets',  grace_seconds:      24 * 3600 },
-  { bucket: 'generation-images', grace_seconds:  7 * 24 * 3600 },
-  { bucket: 'designer-assets',   grace_seconds:  7 * 24 * 3600 },
-  { bucket: 'product-images',    grace_seconds:  7 * 24 * 3600 },
-  { bucket: 'agent-files',       grace_seconds: 14 * 24 * 3600 },
-  { bucket: '3d-models',         grace_seconds: 14 * 24 * 3600 },
+  { bucket: 'generation-images', grace_seconds: 14 * 24 * 3600 },
 ];
 
 const PER_BUCKET_LIMIT = 5000;

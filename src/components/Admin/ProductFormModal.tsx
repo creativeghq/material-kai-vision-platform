@@ -54,6 +54,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>(
     'draft',
   );
+  const [cost, setCost] = useState<string>('');
+  const [costCurrency, setCostCurrency] = useState<string>('EUR');
   const [properties, setProperties] = useState<PropertyField[]>([]);
   const [specifications, setSpecifications] = useState<PropertyField[]>([]);
   const [metadata, setMetadata] = useState<PropertyField[]>([]);
@@ -66,6 +68,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setLongDescription((product as any).long_description || '');
       setCategory(product.category || '');
       setStatus((product as any).status || 'draft');
+      const currentCost = (product as any).cost;
+      setCost(currentCost !== null && currentCost !== undefined ? String(currentCost) : '');
+      setCostCurrency((product as any).cost_currency || 'EUR');
 
       // Convert properties object to array
       if (product.properties) {
@@ -108,6 +113,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setLongDescription('');
     setCategory('');
     setStatus('draft');
+    setCost('');
+    setCostCurrency('EUR');
     setProperties([]);
     setSpecifications([]);
     setMetadata([]);
@@ -211,6 +218,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       (productData as any).long_description =
         longDescription.trim() || undefined;
       (productData as any).status = status;
+
+      // Cost (first-class procurement-cost field, source of truth for profit calc).
+      // Empty string -> null (clears the cost). Otherwise parse number.
+      const trimmedCost = cost.trim();
+      if (trimmedCost === '') {
+        (productData as any).cost = null;
+        (productData as any).cost_updated_at = new Date().toISOString();
+        (productData as any).cost_source = 'manual';
+      } else {
+        const parsed = parseFloat(trimmedCost);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          toast({
+            title: 'Validation Error',
+            description: 'Cost must be a non-negative number',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        (productData as any).cost = parsed;
+        (productData as any).cost_currency = costCurrency || 'EUR';
+        (productData as any).cost_updated_at = new Date().toISOString();
+        (productData as any).cost_source = 'manual';
+      }
 
       await onSave(productData);
 
@@ -373,6 +404,49 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="published">Published</SelectItem>
                     <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Procurement Cost — used for profit/margin calculations. Snapshotted onto
+              quote_items.cost_snapshot at quote acceptance; later edits do not move historic margin. */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold">Procurement Cost</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                What you pay your supplier per unit. Used for margin calculations.
+                Frozen onto a quote when it's accepted — later changes don't affect historic profit.
+              </p>
+            </div>
+            <div className="grid grid-cols-[2fr_1fr] gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cost">Cost per unit</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.0001"
+                  min="0"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="costCurrency">Currency</Label>
+                <Select
+                  value={costCurrency}
+                  onValueChange={(value) => setCostCurrency(value)}
+                >
+                  <SelectTrigger id="costCurrency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

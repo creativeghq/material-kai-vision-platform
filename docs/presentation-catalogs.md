@@ -139,7 +139,7 @@ Migration: [supabase/migrations/20260508_presentation_catalogs_module.sql](../su
 | Table | Cardinality | Purpose |
 |---|---|---|
 | `presentation_catalogs` | one per catalog | Title + JSONB cover/body/back + status + slug + denormalized counters (`view_count`, `unique_email_count`). Source-of-truth row. |
-| `catalog_source_pdfs` | one per uploaded PDF | Owned by an admin user. Stores `storage_path` in the `catalog-sources` bucket. Manufacturer name + URL + notes for provenance. Status: `uploaded` / `processing` / `ready` / `failed`. |
+| `catalog_source_pdfs` | one per uploaded PDF | Owned by an admin user. Stores `storage_path` in `pdf-documents` (under the `catalog-source/` prefix). Manufacturer name + URL + notes for provenance. Status: `uploaded` / `processing` / `ready` / `failed`. |
 | `catalog_templates` | one per visual template | Cover image path, content background path, back-cover image path, accent color hex. One `is_default=true` row at a time. |
 | `catalog_email_grants` | one per (catalog, email) | Admin-managed allowlist. Visitors with these emails get access in addition to platform-user / CRM auto-match. Supports `expires_at` and `revoked_at`. |
 | `catalog_access_log` | one per email-gate submit | Forensic record of every gate attempt — email + matched_kind enum + matched_user_id + matched_crm_contact_id + matched_crm_company_id + matched_grant_id + ip_address + cookie_token + cookie_expires_at. |
@@ -166,15 +166,16 @@ Migration: [supabase/migrations/20260508_presentation_catalogs_module.sql](../su
 
 ---
 
-## Storage buckets
+## Storage layout (post-consolidation 2026-05-23)
 
-| Bucket | Public? | Contents | Lifecycle |
+The 5 dedicated catalog buckets were folded into the 3 anchor buckets. Identity now lives in the path prefix, not the bucket name. See [CLAUDE.md](../CLAUDE.md) "Storage Buckets" for the platform-wide map.
+
+| Bucket | Prefix | Contents | Lifecycle |
 |---|---|---|---|
-| `catalog-sources` | private | Admin-uploaded source PDFs (`<user_id>/<uuid>.pdf`). | Deleted when `catalog_source_pdfs` row is deleted from the admin UI. |
-| `catalog-pdfs` | private | Generated catalog PDFs (`catalogs/<catalog_id>/catalog-<ts>.pdf`). | Signed URL with 7-day TTL written into `presentation_catalogs.pdf_url`. Regenerated on `generate_catalog_pdf` calls. |
-| `catalog-templates` | private | Cover / body-background / back-cover template assets. | Admin-uploaded; one set per row in `catalog_templates`. |
-| `catalog-cover-images` | **public** | Optional per-catalog cover image override (used on the public `/c/:slug` landing page). | Public so the email-gate landing page can show the cover before auth. |
-| `catalog-extracted-images` | private | Page region crops produced by MIVAA's PyMuPDF rasterizer (`<source_pdf_id>/page-<n>-<bbox-hash>.png`). | Signed URL TTL = 7 days; deterministic path means re-extraction reuses the same key. |
+| `pdf-documents` | `catalog-source/<user_id>/<uuid>.pdf` | Admin-uploaded source PDFs. | Deleted when `catalog_source_pdfs` row is deleted from the admin UI. |
+| `pdf-documents` | `catalog-output/<catalog_id>/catalog-<ts>.pdf` | Generated catalog PDFs. | Signed URL with 7-day TTL written into `presentation_catalogs.pdf_url`. Regenerated on `generate_catalog_pdf` calls. |
+| `pdf-tiles` | `catalog-extracted/<source_pdf_id>/page-<n>-<bbox-hash>.png` | Page region crops produced by MIVAA's PyMuPDF rasterizer. | Signed URL TTL = 7 days; deterministic path means re-extraction reuses the same key. |
+| `quote-templates` | `catalog/cover.png`, `catalog/backcover.png`, `catalog/content-bg.png` | Cover / body-background / back-cover template assets. | Admin-uploaded; one set per row in `catalog_templates`. |
 
 ---
 
@@ -243,11 +244,11 @@ Single endpoint: `POST /api/internal/catalog/rasterize-pdf-page`. Auth: `x-cron-
 
 **Flow**:
 1. Look up `catalog_source_pdfs` row → `storage_path`
-2. Download PDF bytes from `catalog-sources` bucket
+2. Download PDF bytes from `pdf-documents` bucket (path stored on the row)
 3. Open with PyMuPDF (`fitz.open(stream=pdf_bytes, filetype="pdf")`)
 4. Render page at `dpi` zoom (`page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)`)
 5. If bbox provided, crop with Pillow to the normalized region
-6. Upload to `catalog-extracted-images` bucket (path = `<source_pdf_id>/page-<NNNN>-<bbox-hash>.png`)
+6. Upload to `pdf-tiles` bucket (path = `catalog-extracted/<source_pdf_id>/page-<NNNN>-<bbox-hash>.png`)
 7. Return signed URL + storage_path + width/height
 
 **Why MIVAA, not edge runtime**: PyMuPDF needs system libraries (already installed for the main pipeline). Deno-compatible PDF rasterizers either don't render to PNG (pdf-lib) or are heavyweight Wasm bundles that hit memory + cold-start limits on Supabase edge. MIVAA was the safest bet.
@@ -258,7 +259,7 @@ Single endpoint: `POST /api/internal/catalog/rasterize-pdf-page`. Auth: `x-cron-
 
 End-to-end admin journey, driven by KAI in chat:
 
-1. **Upload source PDFs** — admin opens `/admin/catalogs/sources`, uploads one or more manufacturer PDFs with optional manufacturer name + URL + notes. `catalogsService.uploadSourcePdf(file, opts)` writes to `catalog-sources` bucket + inserts `catalog_source_pdfs` row. Admin copies the IDs (or notes them).
+1. **Upload source PDFs** — admin opens `/admin/catalogs/sources`, uploads one or more manufacturer PDFs with optional manufacturer name + URL + notes. `catalogsService.uploadSourcePdf(file, opts)` writes to `pdf-documents` bucket under `catalog-source/<user_id>/<uuid>.pdf` + inserts `catalog_source_pdfs` row. Admin copies the IDs (or notes them).
 2. **Create the catalog** — admin opens `/admin/catalogs`, clicks "+ New Catalog", fills the modal. Or in chat: `Start a new catalog called "Spring 2026 Range" for Vasilis Imports`. KAI calls `create_catalog` → returns `catalog_id`.
 3. **Attach PDFs** — `Attach source PDFs <id1>, <id2> to catalog <catalog_id>`. KAI calls `attach_catalog_pdfs`. Catalog now references those source PDFs.
 4. **Extract sections** — `From the attached PDFs, pull all white porcelain tiles in 600×600 format`. KAI calls `extract_from_catalog_pdfs`. Edge function runs Sonnet Vision + auto-rasterizes bbox crops via MIVAA. Chat surface renders `CatalogExtractionCandidatesCard` with thumbnails. Admin reviews, edits the section title input, clicks ✓ on the ones to keep, hits "Add to catalog" (calls `catalogsService.approveExtractionCandidates`).
@@ -397,7 +398,7 @@ After pulling the branch:
    - `DATAFORSEO_BASE64` (or `_LOGIN`+`_PASSWORD`) — required for web image fallback in `catalog-image-search`
    - `PUBLIC_APP_URL` — optional, used for the published-catalog URL in agent responses (defaults to `https://app.materialshub.gr`)
 
-6. **Upload default template assets** to the `catalog-templates` bucket. The seeded "Default" row in `catalog_templates` references `cover.png` + `backcover.png` — replace those before the first PDF generation.
+6. **Upload default template assets** to the `quote-templates` bucket under the `catalog/` prefix. The seeded "Default" row in `catalog_templates` references `catalog/cover.png` + `catalog/backcover.png` — replace those before the first PDF generation.
 
 ---
 

@@ -312,15 +312,15 @@ async function uploadCrop(
       : `direct-${hashUrlKey(fallbackUrl)}`;
     const base64 = dataUrl.split(',')[1];
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `generation-segments/${safeKey}/${index}.jpg`;
+    const path = `product-crops/segments/${safeKey}/${index}.jpg`;
 
     const { error } = await supabase.storage
-      .from('product-images')
+      .from('generation-images')
       .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
 
     if (error) return undefined;
 
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    const { data } = supabase.storage.from('generation-images').getPublicUrl(path);
     return data.publicUrl;
   } catch {
     return undefined;

@@ -95,7 +95,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   useEffect(() => {
     Promise.all([
       supabase.from('kb_categories').select('*').eq('access_level', 'public').order('sort_order', { ascending: true }),
-      supabase.from('kb_docs').select('category_id').eq('status', 'published'),
+      supabase.from('kb_docs').select('category_id').eq('status', 'published').eq('visibility', 'public'),
     ]).then(([{ data: cats }, { data: docCounts }]) => {
       const countMap: Record<string, number> = {};
       (docCounts || []).forEach((d) => {
@@ -121,6 +121,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
         .select('id, title, summary, status, visibility, view_count, created_at, updated_at, workspace_id, content, content_markdown, category_id, created_by, updated_by, embedding_status, embedding_generated_at, embedding_model')
         .in('category_id', missingCategoryIds)
         .eq('status', 'published')
+        .eq('visibility', 'public')
         .order('created_at', { ascending: false });
 
       // Bucket the flat result back into per-category arrays
@@ -144,6 +145,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       .select('*')
       .eq('id', docId)
       .eq('status', 'published')
+      .eq('visibility', 'public')
       .single()
       .then(({ data }) => {
         if (data) {

@@ -234,10 +234,10 @@ Deno.serve(async (req: Request) => {
     pdfDoc.setCreator('Material Kai');
 
     const pdfBytes = await pdfDoc.save();
-    const storagePath = `moodboards/${sheet.moodboard_id}/sheet-${sheetId}.pdf`;
+    const storagePath = `moodboard-output/${sheet.moodboard_id}/sheet-${sheetId}.pdf`;
 
     const { error: uploadError } = await supabase.storage
-      .from('moodboard-sheets')
+      .from('pdf-documents')
       .upload(storagePath, pdfBytes, {
         contentType: 'application/pdf',
         upsert: true,
@@ -245,7 +245,7 @@ Deno.serve(async (req: Request) => {
     if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
     const { data: signed } = await supabase.storage
-      .from('moodboard-sheets')
+      .from('pdf-documents')
       .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     await supabase

@@ -116,7 +116,7 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
       if (!img?.storage_path) continue;
 
       const { data: signed } = await supabase.storage
-        .from('material-images')
+        .from('pdf-tiles')
         .createSignedUrl(img.storage_path, 60 * 60 * 24 * 7);
       if (!signed?.signedUrl) continue;
 

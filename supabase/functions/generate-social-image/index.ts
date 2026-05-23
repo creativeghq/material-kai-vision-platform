@@ -172,10 +172,10 @@ async function storeImage(
     const imgRes = await fetch(imageData);
     const arrayBuffer = await imgRes.arrayBuffer();
     const { data, error } = await supabase.storage
-      .from('generated-images')
+      .from('generation-images')
       .upload(`social/${filename}`, arrayBuffer, { contentType: 'image/webp', upsert: true });
     if (error) return imageData;
-    const { data: urlData } = supabase.storage.from('generated-images').getPublicUrl(data.path);
+    const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   }
 
@@ -183,10 +183,10 @@ async function storeImage(
     const base64Data = imageData.split(',')[1];
     const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const { data, error } = await supabase.storage
-      .from('generated-images')
+      .from('generation-images')
       .upload(`social/${filename}`, bytes, { contentType: 'image/png', upsert: true });
     if (error) return imageData;
-    const { data: urlData } = supabase.storage.from('generated-images').getPublicUrl(data.path);
+    const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   }
 

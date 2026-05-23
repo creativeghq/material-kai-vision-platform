@@ -98,8 +98,8 @@ const convertToDisplayProduct = (product: SimpleProduct): Product => {
     specifications: asObj(md.specifications),
     pricing: {
       retail: asNum(md.price),
-      wholesale: asNum(md.wholesale_price),
-      currency: 'EUR',
+      wholesale: asNum(product.cost),
+      currency: product.cost_currency || 'EUR',
     },
     stock: {
       quantity: asNum(md.stock_quantity),

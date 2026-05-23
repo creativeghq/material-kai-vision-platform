@@ -71,6 +71,9 @@ export interface Product {
   description?: string;
   metadata?: Record<string, any>;
   image_url?: string;
+  /** Per-unit procurement cost (numeric). Snapshotted to quote_items.cost_snapshot at acceptance. */
+  cost?: number | null;
+  cost_currency?: string | null;
 }
 
 export interface QuoteItemWithProduct extends QuoteItem {

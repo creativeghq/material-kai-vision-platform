@@ -66,11 +66,11 @@ Deno.serve(async (req: Request) => {
     const branding = await fetchOwnerBranding(supabase, catalog.owner_user_id);
 
     const [coverBytes, bgBytes, backBytes] = await Promise.all([
-      fetchStorageFile(supabase, 'catalog-templates', template.cover_image_path),
+      fetchStorageFile(supabase, 'quote-templates', template.cover_image_path),
       template.content_background_path
-        ? fetchStorageFile(supabase, 'catalog-templates', template.content_background_path)
+        ? fetchStorageFile(supabase, 'quote-templates', template.content_background_path)
         : Promise.resolve(null),
-      fetchStorageFile(supabase, 'catalog-templates', template.back_cover_image_path),
+      fetchStorageFile(supabase, 'quote-templates', template.back_cover_image_path),
     ]);
 
     const { pdfBytes, pageCount } = await buildCatalogPDF({
@@ -82,14 +82,14 @@ Deno.serve(async (req: Request) => {
       branding,
     });
 
-    const storagePath = `catalogs/${catalogId}/catalog-${Date.now()}.pdf`;
+    const storagePath = `catalog-output/${catalogId}/catalog-${Date.now()}.pdf`;
     const { error: upErr } = await supabase.storage
-      .from('catalog-pdfs')
+      .from('pdf-documents')
       .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
     if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
     const { data: signed } = await supabase.storage
-      .from('catalog-pdfs')
+      .from('pdf-documents')
       .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     await supabase.from('presentation_catalogs')

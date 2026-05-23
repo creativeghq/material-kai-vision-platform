@@ -123,6 +123,9 @@ export interface SimpleProduct {
   description?: string;
   image_url?: string;
   metadata?: ProductMetadata;
+  /** Per-unit procurement cost (products.cost). Snapshotted to quote_items at acceptance. */
+  cost?: number | null;
+  cost_currency?: string | null;
 }
 
 /**

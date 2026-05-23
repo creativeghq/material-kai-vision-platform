@@ -2133,15 +2133,16 @@ Supported providers: `google`, `github`, `discord`, `facebook`, `twitter`, `appl
 
 **Base URL**: `https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1`
 
-### Storage Buckets
+### Storage Buckets (post-consolidation 2026-05-23)
 
 | Bucket | Description |
 |--------|-------------|
-| `product-images` | Product and material images |
-| `workspace-assets` | Workspace logos and banners |
-| `quote-documents` | Generated quote PDFs |
-| `quote-templates` | PDF template images (cover, background, back cover) |
-| `knowledge-base` | KB document files |
+| `pdf-documents` | All PDF binaries: KB raw uploads (`{user_id}/`), catalog sources (`catalog-source/`), generated catalog PDFs (`catalog-output/`), quote PDFs (`quote-output/`), moodboard sheet PDFs (`moodboard-output/`). Private — readers use signed URLs. |
+| `pdf-tiles` | KB extracted page images (`extracted/`) + catalog page renders (`catalog-extracted/`). Public, RLS-gated writes. |
+| `generation-images` | All AI-generated and chat-uploaded media: virtual staging, region edit, video, PBR maps, SAM crops (`product-crops/`), agent chat uploads (`agent/`), 3D models (`3d/`), designer assets (`designer/`). Public, 100 MB cap. |
+| `quote-templates` | Quote template PNGs at root + catalog template PNGs under `catalog/`. Private, admin-only RW. |
+| `moodboard-sheet-references` | Static admin-curated illustrations for the sheet-type picker. |
+| `profile-avatars` | User avatars (`{user_id}/avatar.ext`). Public, 2 MB cap. |
 
 ### Upload File
 ```

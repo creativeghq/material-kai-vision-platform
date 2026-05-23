@@ -22,7 +22,14 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KBDocument, KBCategory, KnowledgeBaseService, PRICE_DOC_TYPE_LABELS, PriceDocType } from '@/services/knowledgeBaseService';
+import {
+  KBDocument,
+  KBCategory,
+  KnowledgeBaseService,
+  PRICE_DOC_TYPE_LABELS,
+  PriceDocType,
+  parseSupplierCostListDoc,
+} from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 const knowledgeBaseService = KnowledgeBaseService.getInstance();
@@ -42,7 +49,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     content_markdown: '',
     summary: '',
     status: 'draft',
-    visibility: 'workspace',
+    visibility: 'public',
     seo_keywords: [],
   });
   const [categories, setCategories] = useState<KBCategory[]>([]);
@@ -381,8 +388,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Guides the agent: <span className="font-medium">price_list</span> for catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers.
+                      Guides the agent: <span className="font-medium">price_list</span> for retail catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers, <span className="font-medium">supplier_cost_list</span> for procurement costs (materialized to <code className="text-[10px]">products.cost</code>).
                     </p>
+
+                    {document.price_doc_type === 'supplier_cost_list' && documentId && (
+                      <ApplySupplierCostListButton kbDocId={documentId} />
+                    )}
                   </div>
                 );
               })()}
@@ -434,10 +445,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="public">🌍 Public</SelectItem>
-                    <SelectItem value="workspace">👥 Workspace</SelectItem>
                     <SelectItem value="private">🔒 Private</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground leading-snug">
+                  {document.visibility === 'private'
+                    ? 'Private — readable by admins (UI + AI agents). Hidden from non-admin agent users and from the public Knowledge Base page.'
+                    : 'Public — available to all agents, platform calls, and the public Knowledge Base page.'}
+                </p>
               </div>
             </div>
           </div>
@@ -583,6 +598,96 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+interface ApplySupplierCostListButtonProps {
+  kbDocId: string;
+}
+
+const ApplySupplierCostListButton: React.FC<ApplySupplierCostListButtonProps> = ({ kbDocId }) => {
+  const [busy, setBusy] = useState<'idle' | 'previewing' | 'applying'>('idle');
+  const [lastResult, setLastResult] = useState<{
+    parsed: number;
+    matched: number;
+    updated: number;
+    unmatched: number;
+    errors: string[];
+    dryRun: boolean;
+  } | null>(null);
+  const { toast } = useToast();
+
+  const run = async (dryRun: boolean) => {
+    setBusy(dryRun ? 'previewing' : 'applying');
+    try {
+      const res = await parseSupplierCostListDoc(kbDocId, { dryRun });
+      setLastResult({
+        parsed: res.parsed_rows,
+        matched: res.matched,
+        updated: res.updated,
+        unmatched: res.unmatched,
+        errors: res.errors,
+        dryRun: res.dry_run,
+      });
+      toast({
+        title: dryRun ? 'Preview ready' : 'Cost list applied',
+        description: dryRun
+          ? `${res.matched}/${res.parsed_rows} rows would update existing products.`
+          : `Updated ${res.updated} products. ${res.unmatched} rows had no matching SKU.`,
+        variant: res.errors.length > 0 ? 'destructive' : 'default',
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy('idle');
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-border/60 bg-muted/30 p-3">
+      <div className="text-xs font-medium">Materialize cost list onto products</div>
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Parses this doc as a markdown table with columns <code>SKU</code>, <code>Cost</code>, optional <code>Currency</code>. Each row updates the matching product's <code>cost</code>.
+      </p>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => run(true)}
+          disabled={busy !== 'idle'}
+        >
+          {busy === 'previewing' ? 'Previewing…' : 'Preview match'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => run(false)}
+          disabled={busy !== 'idle'}
+        >
+          {busy === 'applying' ? 'Applying…' : 'Apply to products'}
+        </Button>
+      </div>
+      {lastResult && (
+        <div className="rounded bg-background/50 p-2 text-[11px] space-y-1">
+          <div>
+            {lastResult.dryRun ? 'Preview' : 'Applied'}: parsed {lastResult.parsed}, matched {lastResult.matched}, updated {lastResult.updated}, unmatched {lastResult.unmatched}.
+          </div>
+          {lastResult.errors.length > 0 && (
+            <ul className="list-disc pl-4 text-destructive">
+              {lastResult.errors.slice(0, 5).map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+              {lastResult.errors.length > 5 && <li>… +{lastResult.errors.length - 5} more</li>}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -357,12 +357,14 @@ The platform uses **6 embedding types** for comprehensive search:
 **material_metadata_fields**: Dynamic metafield definitions
 **metafield_values**: Metafield data for chunks/products/images
 
-### Storage Buckets
+### Storage Buckets (post-consolidation 2026-05-23)
 
-**pdf-documents**: Original PDF files (50MB max)
-**pdf-tiles**: Extracted images (10MB max)
-**material-images**: Material photos (10MB max)
-**3d-models**: Generated 3D models (100MB max)
+**pdf-documents** (private, signed URLs): All PDF binaries — KB raw uploads, catalog sources/outputs, quote PDFs, moodboard sheet PDFs. Sub-folders distinguish identity (`{user_id}/`, `catalog-source/`, `catalog-output/`, `quote-output/`, `moodboard-output/`).
+**pdf-tiles** (public): Extracted page images from PDFs — KB at `extracted/`, catalog at `catalog-extracted/`.
+**generation-images** (public, 100 MB, image/video MIME): All AI-generated and chat-uploaded media — virtual staging, region edit, video, PBR maps, SAM crops, 3D models, designer assets, agent chat uploads.
+**quote-templates** (private, 50 MB): Admin-managed template assets for quotes (root) and catalogs (`catalog/`).
+**moodboard-sheet-references** (public): Static admin-curated illustrations for the sheet picker.
+**profile-avatars** (public, 2 MB): User avatars.
 
 ### Security
 

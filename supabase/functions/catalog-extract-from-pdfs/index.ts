@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     for (const pdf of pdfs) {
       try {
         const { data: blob, error: dlErr } = await supabase.storage
-          .from('catalog-sources')
+          .from('pdf-documents')
           .download(pdf.storage_path);
         if (dlErr || !blob) {
           errors.push(`download failed: ${pdf.id}`);

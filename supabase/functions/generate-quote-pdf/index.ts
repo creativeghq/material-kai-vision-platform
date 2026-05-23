@@ -49,7 +49,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       if (existing?.pdf_storage_path && existing?.pdf_generation_status === 'completed') {
         // Refresh signed URL and return existing
         const { data: signedUrl } = await supabase.storage
-          .from('quote-documents')
+          .from('pdf-documents')
           .createSignedUrl(existing.pdf_storage_path, 60 * 60 * 24 * 7);
 
         return jsonResponse({
@@ -103,9 +103,9 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
     );
 
     // Upload to storage
-    const storagePath = `quotes/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;
+    const storagePath = `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;
     const { error: uploadError } = await supabase.storage
-      .from('quote-documents')
+      .from('pdf-documents')
       .upload(storagePath, pdfBytes, {
         contentType: 'application/pdf',
         upsert: true,
@@ -117,7 +117,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 
     // Generate signed URL (7-day expiry)
     const { data: signedUrl } = await supabase.storage
-      .from('quote-documents')
+      .from('pdf-documents')
       .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     // Update quote record

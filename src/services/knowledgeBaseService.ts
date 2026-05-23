@@ -16,7 +16,7 @@ export interface KBDocument {
   category_id?: string;
   seo_keywords?: string[];
   status: 'draft' | 'published' | 'archived';
-  visibility: 'public' | 'private' | 'workspace';
+  visibility: 'public' | 'private';
   metadata?: Record<string, any>;
   text_embedding?: number[];
   embedding_status?: 'pending' | 'success' | 'failed';
@@ -27,7 +27,7 @@ export interface KBDocument {
   created_by?: string;
   updated_by?: string;
   view_count: number;
-  price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | null;
+  price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'supplier_cost_list' | null;
 }
 
 export interface KBCategory {
@@ -46,14 +46,57 @@ export interface KBCategory {
   trigger_keyword?: string | null;
 }
 
-export type PriceDocType = 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion';
+export type PriceDocType =
+  | 'price_list'
+  | 'discount_rule'
+  | 'contract_terms'
+  | 'promotion'
+  | 'supplier_cost_list';
 
 export const PRICE_DOC_TYPE_LABELS: Record<PriceDocType, string> = {
-  price_list: 'Price list',
+  price_list: 'Price list (customer-facing / retail)',
   discount_rule: 'Discount rule',
   contract_terms: 'Contract terms',
   promotion: 'Promotion',
+  supplier_cost_list: 'Supplier cost list (procurement)',
 };
+
+export interface ParseSupplierCostListOutcome {
+  sku: string;
+  cost: number;
+  currency: string;
+  matched: boolean;
+  updated: boolean;
+  product_id: string | null;
+  reason: string | null;
+}
+
+export interface ParseSupplierCostListResult {
+  ok: boolean;
+  kb_doc_id: string;
+  dry_run: boolean;
+  parsed_rows: number;
+  matched: number;
+  updated: number;
+  unmatched: number;
+  errors: string[];
+  rows: ParseSupplierCostListOutcome[];
+}
+
+/**
+ * Parses a kb_docs row with price_doc_type='supplier_cost_list' and materializes
+ * the SKU → cost rows it contains onto products.cost. Admin/owner only.
+ */
+export async function parseSupplierCostListDoc(
+  kbDocId: string,
+  options: { dryRun?: boolean } = {},
+): Promise<ParseSupplierCostListResult> {
+  const { data, error } = await supabase.functions.invoke('parse-supplier-cost-list', {
+    body: { kb_doc_id: kbDocId, dry_run: options.dryRun === true },
+  });
+  if (error) throw error;
+  return data as ParseSupplierCostListResult;
+}
 
 export interface KBAttachment {
   id: string;

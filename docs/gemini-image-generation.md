@@ -141,14 +141,18 @@ If you have a NEW image-generation use case, ask first:
 3. **Is it batch processing?** (e.g. "regenerate every product hero overnight")
    → Background-agent pattern, NOT a synchronous edge function. Look at the `background-agent-runner` and `_shared/agents/*` directory.
 
-## Buckets convention
+## Buckets convention (post-consolidation 2026-05-23)
 
-All admin-uploaded reference images go in **public** buckets named `<feature>-references`. They're excluded from `reset-platform` automatically because that function uses an explicit allowlist of buckets to clear (`BUCKETS_TO_CLEAR` in [`supabase/functions/reset-platform/index.ts`](../supabase/functions/reset-platform/index.ts)). New reference buckets need no special handling — just don't add them to that list.
+Storage now lives in 6 anchor buckets — see [CLAUDE.md](../CLAUDE.md) "Storage Buckets" for the canonical map. New features should pick the right anchor + folder rather than creating a new bucket:
 
-User-generated content goes in **private** buckets accessed via signed URLs (e.g. `moodboard-sheets`, `quote-documents`). These need:
-- A BEFORE DELETE trigger on the owning row to clean up storage when the row is deleted (see `_cleanup_moodboard_sheet_storage`, `_cleanup_quote_pdf_storage` for the canonical pattern).
-- A signed URL refresh path on the client (call `storage.from(bucket).createSignedUrl(path, 60*60)` or similar).
-- An entry in this doc's "Bucket inventory" table once you build it (TODO).
+- **Static admin-curated reference images** → `moodboard-sheet-references` (the platform's `<feature>-references` pattern collapsed into this single bucket). It's a public bucket and `reset-platform` does not clear it.
+- **AI-generated or chat-uploaded media** → `generation-images` under a `<feature>/` prefix (e.g. `social/`, `product-crops/`, `3d/`, `designer/`, `agent/`).
+- **Generated PDFs** → `pdf-documents` under `<feature>-output/` (e.g. `quote-output/`, `catalog-output/`, `moodboard-output/`). Private bucket; use `storage.from('pdf-documents').createSignedUrl(path, 60*60*24*7)` for client access.
+- **Admin-managed templates** → `quote-templates` (private, admin-RW). Use a `<feature>/` prefix to separate template sets.
+
+Patterns to follow:
+- A BEFORE DELETE trigger on the owning row to clean up storage when the row is deleted (see `_cleanup_moodboard_sheet_storage`, `_cleanup_quote_pdf_storage` for the canonical pattern — both now target `pdf-documents`).
+- Stop persisting full URLs in DB rows; store only the storage path and re-derive a fresh signed URL on each read.
 
 ## Pitfalls we've hit
 

@@ -647,7 +647,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
             .maybeSingle();
           if (prodImg?.storage_path) {
             const { data: signed } = await supabase.storage
-              .from('material-images')
+              .from('pdf-tiles')
               .createSignedUrl(prodImg.storage_path, 60 * 60 * 24 * 30);
             if (signed?.signedUrl) imageUrl = signed.signedUrl;
           }

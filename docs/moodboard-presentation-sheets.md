@@ -84,11 +84,11 @@ Shipped 2026-05-02.
                        │                                   │
                        └────────────────┬──────────────────┘
                                         ▼
-              ┌──────────────────────────────────────────────┐
-              │  Storage: moodboard-sheets (private bucket)  │
-              │  Path: moodboards/{mb_id}/sheet-{sheet_id}.pdf│
-              │  Access: 7-day signed URL                     │
-              └──────────────────────────────────────────────┘
+              ┌────────────────────────────────────────────────────────────┐
+              │  Storage: pdf-documents (private bucket, post 2026-05-23)  │
+              │  Path: moodboard-output/{mb_id}/sheet-{sheet_id}.pdf       │
+              │  Access: 7-day signed URL                                   │
+              └────────────────────────────────────────────────────────────┘
 ```
 
 **Coordinate convention (critical):** every annotation, dimension, and fixture symbol stores `x/y` as **normalized [0..1]** relative to the rendered backdrop image area (not pixel coords). Both the frontend canvas widgets and the PDF builder use this convention. This means a sheet built on a desktop renders identically when re-opened on mobile, and the PDF positions match the canvas exactly.
@@ -128,7 +128,7 @@ Shipped 2026-05-02.
 
 #### [`supabase/migrations/20260502_moodboard_presentation_sheets.sql`](../supabase/migrations/20260502_moodboard_presentation_sheets.sql)
 
-Creates two enums (`moodboard_sheet_type`, `moodboard_sheet_status`), the `moodboard_presentation_sheets` table, indexes (by moodboard, by user, by type+status), an `updated_at` BEFORE-UPDATE trigger, RLS policies (owner-of-moodboard read/write + public-moodboard-readable), and the `moodboard-sheets` storage bucket with read/write policies.
+Creates two enums (`moodboard_sheet_type`, `moodboard_sheet_status`), the `moodboard_presentation_sheets` table, indexes (by moodboard, by user, by type+status), an `updated_at` BEFORE-UPDATE trigger, and RLS policies (owner-of-moodboard read/write + public-moodboard-readable). The original migration also created a `moodboard-sheets` storage bucket — that bucket was retired on 2026-05-23; sheet PDFs now live under `pdf-documents/moodboard-output/` with the consolidated RLS policy.
 
 **Key columns**:
 - `data jsonb` — per-sheet-type payload. Schema documented inline in the migration's column comment.
@@ -145,7 +145,7 @@ Idempotently appends a guidance block to the `kai` and `interior-designer` agent
 
 #### `index.ts` — request handler / dispatcher
 
-Receives `{sheet_id}`, authenticates, fetches the sheet row, resolves the title block (`project_title` from moodboard, `client_name` from `data.cover.client_name` or the user profile, `sheet_label` from the type), then `switch`es on `sheet_type` and invokes the right builder. Saves the PDF to `moodboard-sheets/moodboards/{moodboard_id}/sheet-{sheet_id}.pdf`, generates a 7-day signed URL, updates the sheet row to `status='ready'`. On error, marks `status='failed'` and writes `error_message`.
+Receives `{sheet_id}`, authenticates, fetches the sheet row, resolves the title block (`project_title` from moodboard, `client_name` from `data.cover.client_name` or the user profile, `sheet_label` from the type), then `switch`es on `sheet_type` and invokes the right builder. Saves the PDF to `pdf-documents/moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf`, generates a 7-day signed URL, updates the sheet row to `status='ready'`. On error, marks `status='failed'` and writes `error_message`.
 
 **Why 7 days, not 1 hour?** Quote PDFs use 1h because users typically download once. Sheet PDFs are presentation deliverables clients re-open repeatedly; 1h would force re-signing every time the moodboard tab is opened.
 

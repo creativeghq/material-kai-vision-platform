@@ -271,7 +271,7 @@ class CatalogsService {
   async remove(catalogId: string): Promise<void> {
     const cat = await this.get(catalogId);
     if (cat?.pdf_storage_path) {
-      await supabase.storage.from('catalog-pdfs').remove([cat.pdf_storage_path]).then(({ error }) => {
+      await supabase.storage.from('pdf-documents').remove([cat.pdf_storage_path]).then(({ error }) => {
         if (error) console.warn('catalog PDF cleanup failed:', error);
       });
     }
@@ -295,7 +295,7 @@ class CatalogsService {
     const cat = await this.get(catalogId);
     if (!cat?.pdf_storage_path) return null;
     const { data } = await supabase.storage
-      .from('catalog-pdfs')
+      .from('pdf-documents')
       .createSignedUrl(cat.pdf_storage_path, 60 * 60 * 24);
     return data?.signedUrl ?? null;
   }
@@ -316,10 +316,10 @@ class CatalogsService {
     if (!user) throw new Error('Not authenticated');
 
     const id = crypto.randomUUID();
-    const path = `${user.id}/${id}.pdf`;
+    const path = `catalog-source/${user.id}/${id}.pdf`;
 
     const { error: upErr } = await supabase.storage
-      .from('catalog-sources')
+      .from('pdf-documents')
       .upload(path, file, { contentType: 'application/pdf', upsert: false });
     if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
@@ -339,7 +339,7 @@ class CatalogsService {
       .select('*')
       .single();
     if (error) {
-      await supabase.storage.from('catalog-sources').remove([path]).catch(() => {});
+      await supabase.storage.from('pdf-documents').remove([path]).catch(() => {});
       throw error;
     }
     return data as CatalogSourcePdf;
@@ -361,7 +361,7 @@ class CatalogsService {
       .eq('id', sourcePdfId)
       .maybeSingle();
     if (row?.storage_path) {
-      await supabase.storage.from('catalog-sources').remove([row.storage_path]).catch(() => {});
+      await supabase.storage.from('pdf-documents').remove([row.storage_path]).catch(() => {});
     }
     const { error } = await supabase
       .from('catalog_source_pdfs')

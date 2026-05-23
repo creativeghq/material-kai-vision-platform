@@ -224,9 +224,8 @@ serve(async (req) => {
       if (segRows && segRows.length > 0) {
         const storagePaths = segRows
           .map((r: any) => {
-            // Extract path after /product-images/
             const url: string = r.crop_storage_url ?? '';
-            const marker = '/product-images/';
+            const marker = '/generation-images/';
             const idx = url.indexOf(marker);
             return idx >= 0 ? url.slice(idx + marker.length) : null;
           })
@@ -234,7 +233,7 @@ serve(async (req) => {
 
         if (storagePaths.length > 0) {
           const { data: removed } = await supabase.storage
-            .from('product-images')
+            .from('generation-images')
             .remove(storagePaths);
           stats.generation3dStorageFiles = removed?.length ?? 0;
           console.log(`[JobCleanupCron] generation_3d storage files removed: ${stats.generation3dStorageFiles}`);

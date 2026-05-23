@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Edit,
@@ -9,11 +9,14 @@ import {
   Clock,
   RefreshCw,
   ExternalLink,
+  Globe,
+  Lock,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +60,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [viewingDoc, setViewingDoc] = useState<KBDocument | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const { toast } = useToast();
 
@@ -162,6 +167,81 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected document${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+    setBulkBusy(true);
+    try {
+      const { error } = await supabase
+        .from('kb_docs')
+        .delete()
+        .in('id', Array.from(selectedIds))
+        .eq('workspace_id', workspaceId);
+
+      if (error) throw error;
+
+      toast({ title: 'Deleted', description: `${selectedIds.size} document${selectedIds.size === 1 ? '' : 's'} deleted.` });
+      setSelectedIds(new Set());
+      loadDocuments();
+    } catch (error) {
+      console.error('Bulk delete failed:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Bulk delete failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkUpdate = async (patch: { visibility?: 'public' | 'private'; status?: 'draft' | 'published' | 'archived' }) => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const { error } = await supabase
+        .from('kb_docs')
+        .update(patch)
+        .in('id', Array.from(selectedIds))
+        .eq('workspace_id', workspaceId);
+
+      if (error) throw error;
+
+      const label = patch.visibility ? `visibility → ${patch.visibility}` : `status → ${patch.status}`;
+      toast({ title: 'Updated', description: `${selectedIds.size} document${selectedIds.size === 1 ? '' : 's'} set to ${label}.` });
+      setSelectedIds(new Set());
+      loadDocuments();
+    } catch (error) {
+      console.error('Bulk update failed:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Bulk update failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const toggleSelectAll = (checked: boolean, ids: string[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) ids.forEach((id) => next.add(id));
+      else ids.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const toggleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
 
   const retryEmbedding = async (doc: KBDocument) => {
@@ -206,6 +286,17 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     doc.content.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  const filteredIds = useMemo(() => filteredDocuments.map((d) => d.id), [filteredDocuments]);
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+  const someFilteredSelected = filteredIds.some((id) => selectedIds.has(id));
+
+  const getVisibilityBadge = (visibility?: string) =>
+    visibility === 'private' ? (
+      <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" />Private</Badge>
+    ) : (
+      <Badge variant="secondary" className="gap-1"><Globe className="h-3 w-3" />Public</Badge>
+    );
+
   return (
     <>
     <Card>
@@ -231,7 +322,41 @@ export const DocumentList: React.FC<DocumentListProps> = ({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
+        {selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-y bg-muted/40">
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+            <div className="flex-1" />
+            <Select disabled={bulkBusy} onValueChange={(v) => handleBulkUpdate({ visibility: v as 'public' | 'private' })}>
+              <SelectTrigger className="w-[170px] h-8 rounded-full">
+                <SelectValue placeholder="Set visibility…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public">🌍 Public</SelectItem>
+                <SelectItem value="private">🔒 Private</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select disabled={bulkBusy} onValueChange={(v) => handleBulkUpdate({ status: v as 'draft' | 'published' | 'archived' })}>
+              <SelectTrigger className="w-[150px] h-8 rounded-full">
+                <SelectValue placeholder="Set status…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" disabled={bulkBusy} onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <Button variant="destructive" size="sm" disabled={bulkBusy} onClick={handleBulkDelete}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        )}
         {isLoading ? (
           <div className="text-center py-8">Loading documents...</div>
         ) : filteredDocuments.length === 0 ? (
@@ -242,8 +367,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allFilteredSelected ? true : someFilteredSelected ? 'indeterminate' : false}
+                    onCheckedChange={(checked) => toggleSelectAll(checked === true, filteredIds)}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Visibility</TableHead>
                 <TableHead>Embedding</TableHead>
                 <TableHead>Views</TableHead>
                 <TableHead>Created</TableHead>
@@ -252,9 +385,17 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             </TableHeader>
             <TableBody>
               {filteredDocuments.map((doc) => (
-                <TableRow key={doc.id}>
+                <TableRow key={doc.id} data-state={selectedIds.has(doc.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(doc.id)}
+                      onCheckedChange={(checked) => toggleSelectOne(doc.id, checked === true)}
+                      aria-label={`Select ${doc.title}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{doc.title}</TableCell>
                   <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                  <TableCell>{getVisibilityBadge(doc.visibility)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getEmbeddingStatusIcon(doc.embedding_status)}

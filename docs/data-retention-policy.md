@@ -58,6 +58,6 @@ Cleanup is performed by two mechanisms:
 ## Notes
 
 - `ai_call_logs` vs `ai_usage_logs`: These are **different tables**. `ai_usage_logs` is the billing record (kept forever). `ai_call_logs` contains raw request/response payloads used for debugging (cleaned after 30 days).
-- `generation_3d` storage: When unsaved renders are deleted, the corresponding crop image files are also removed from the `product-images` Storage bucket before the DB rows are deleted (CASCADE removes `generation_3d_segments`).
+- `generation_3d` storage: When unsaved renders are deleted, the corresponding crop image files are also removed from the `generation-images` Storage bucket (under the `product-crops/` prefix, post 2026-05-23 consolidation) before the DB rows are deleted (CASCADE removes `generation_3d_segments`).
 - `flow_run_steps` are always deleted before their parent `flow_runs` to avoid foreign key conflicts.
 - `data_import_jobs` with `is_scheduled = true` are excluded from cleanup because they represent recurring cron-driven jobs that must persist.

@@ -152,8 +152,8 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 **Processing**:
 - Uploads each image to Supabase Storage
-- Storage bucket: `material-images`
-- Path format: `{document_id}/{filename}`
+- Storage bucket: `pdf-tiles` (post 2026-05-23 consolidation; previously the phantom `material-images` bucket)
+- Path format: `extracted/{document_id}/{filename}`
 - Parallel uploads with rate limiting
 - Generates public URLs for each image
 

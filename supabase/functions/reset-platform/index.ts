@@ -61,10 +61,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - brand_retailer_index            ← (brand, retailer_domain, country) cache
 //   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
 //
-// Storage Buckets:
-//   - quote-templates          ← cover.png / backcover.png / items-background.png
+// Storage Buckets (5 anchors post-consolidation 2026-05-23):
+//   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
+//   - pdf-tiles                ← extracted/ (KB) + catalog-extracted/
+//   - generation-images        ← AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/
+//   - quote-templates          ← quote + catalog/ template assets (admin uploads)
+//   - moodboard-sheet-references ← static UI illustrations for sheet picker
 //   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
-//   - pdf-documents            ← original uploaded PDF files
 // ============================================================
 
 // Tables to clear (in order to respect foreign key constraints).
@@ -244,14 +247,20 @@ const TABLES_TO_CLEAR = [
 // ============================================================
 // Storage buckets to clear (AI/processing-generated content only)
 //
-// PRESERVED buckets (NOT in this list):
-//   - quote-templates              ← cover.png / backcover.png / items-background.png (admin uploads via system settings)
-//   - profile-avatars              ← user avatar images ({userId}/avatar.ext)
-//   - pdf-documents                ← original uploaded PDF files
-//   - moodboard-sheets             ← user-generated presentation sheet PDFs (per-user content; deletion governed by per-row delete, not platform reset)
-//   - moodboard-sheet-references   ← admin-uploaded reference images shown in the sheet preview modal
+// Post-consolidation (2026-05-23): 5 anchor buckets exist. We clear the two
+// that hold regenerable AI/processing output. pdf-documents holds raw user
+// uploads (KB) plus generated outputs (catalog-output/, quote-output/,
+// moodboard-output/) — those outputs become orphans when their DB rows are
+// cleared above and the nightly storage-orphan-cleanup-cron sweeps them
+// within 24h.
+//
+// PRESERVED buckets:
+//   - pdf-documents                ← KB raw uploads + generated outputs (cleaned by orphan cron)
+//   - quote-templates              ← admin-uploaded template assets (quotes + catalog branding)
+//   - profile-avatars              ← user avatars (kept across resets)
+//   - moodboard-sheet-references   ← admin-curated UI illustrations
 // ============================================================
-const BUCKETS_TO_CLEAR = ['pdf-tiles', 'material-images', 'moodboard-images', '3d-renders'];
+const BUCKETS_TO_CLEAR = ['pdf-tiles', 'generation-images'];
 
 /**
  * Recursively list every file path in a bucket folder (handles subdirectories).

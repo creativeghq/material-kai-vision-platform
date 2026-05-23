@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
   let pdf_url: string | null = null;
   if (sheet.pdf_storage_path) {
     const { data: signed } = await supabase.storage
-      .from('moodboard-sheets')
+      .from('pdf-documents')
       .createSignedUrl(sheet.pdf_storage_path, 60 * 60);
     pdf_url = signed?.signedUrl ?? null;
   }

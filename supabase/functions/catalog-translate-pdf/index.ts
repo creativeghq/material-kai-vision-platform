@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     if (pdfErr || !pdf) return jsonResponse({ success: false, error: 'Source PDF not found' }, 404);
 
     const { data: blob, error: dlErr } = await supabase.storage
-      .from('catalog-sources')
+      .from('pdf-documents')
       .download(pdf.storage_path);
     if (dlErr || !blob) return jsonResponse({ success: false, error: `Download failed: ${dlErr?.message}` }, 500);
 

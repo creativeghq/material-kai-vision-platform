@@ -140,7 +140,7 @@ class MoodboardSheetsService {
 
     if (row?.pdf_storage_path) {
       await supabase.storage
-        .from('moodboard-sheets')
+        .from('pdf-documents')
         .remove([row.pdf_storage_path])
         .then(({ error }) => {
           if (error) console.warn('Sheet PDF storage cleanup failed (will be picked up by trigger):', error);
@@ -161,7 +161,7 @@ class MoodboardSheetsService {
 
     const { data, error } = await supabase
       .storage
-      .from('moodboard-sheets')
+      .from('pdf-documents')
       .createSignedUrl(sheet.pdf_storage_path, 60 * 60);
 
     if (error || !data) return null;

@@ -535,8 +535,8 @@ function createAgentGraph(
                 },
                 pricing: {
                   retail: r.price || r.metadata?.price || 0,
-                  wholesale: r.wholesale_price || 0,
-                  currency: r.currency || 'EUR',
+                  wholesale: r.cost ?? 0,
+                  currency: r.cost_currency || r.currency || 'EUR',
                 },
                 stock: { quantity: r.stock || 0, status: 'available', unit: r.unit || 'piece' },
                 tags: r.tags || [],
