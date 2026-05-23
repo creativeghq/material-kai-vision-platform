@@ -5,12 +5,13 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'supabase/**'
+      - 'supabase/functions/**'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.*'
       - 'tsconfig.json'
       - 'index.html'
+      - 'vercel.json'
   workflow_dispatch:
     inputs:
       deployment_reason:
@@ -18,288 +19,265 @@ on:
         required: false
         default: 'Manual deployment'
         type: string
+      force_full_functions_deploy:
+        description: 'Force redeploy ALL Supabase functions (ignore diff)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-frontend-prod
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  # ────────────────────────────────────────────────────────────────────
+  # changes: figure out what's affected, and which functions to deploy.
+  # Subsequent jobs gate on these outputs so we skip work cleanly.
+  # ────────────────────────────────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      functions: ${{ steps.filter.outputs.functions }}
+      shared: ${{ steps.filter.outputs.shared }}
+      changed_functions: ${{ steps.changed-functions.outputs.list }}
+      changed_functions_count: ${{ steps.changed-functions.outputs.count }}
+    steps:
+      - name: 📥 Checkout (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'src/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'vite.config.*'
+              - 'tsconfig.json'
+              - 'index.html'
+              - 'vercel.json'
+            functions:
+              - 'supabase/functions/**'
+            shared:
+              - 'supabase/functions/_shared/**'
+
+      - name: 🧮 Compute changed functions
+        id: changed-functions
+        run: |
+          set -euo pipefail
+          FUNCS=""
+
+          # Case 1: manual run, or explicit "force all" toggle.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+             [ "${{ github.event.inputs.force_full_functions_deploy }}" = "true" ]; then
+            echo "ℹ️  Manual / forced run — deploying ALL functions"
+            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+
+          # Case 2: _shared changed — every dependent must redeploy.
+          # Walking the import graph is more work than it saves; redeploy all.
+          elif [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            echo "ℹ️  supabase/functions/_shared/** changed — deploying ALL functions"
+            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+
+          # Case 3: normal diff-based selection.
+          else
+            BASE="${{ github.event.before }}"
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              # First push to branch / force-push / squash — fall back to HEAD~1.
+              BASE=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+              echo "⚠️  github.event.before unusable; falling back to $BASE"
+            fi
+            echo "ℹ️  Diffing $BASE..${{ github.sha }}"
+            FUNCS=$(git diff --name-only "$BASE" "${{ github.sha }}" \
+                    | grep -oP '^supabase/functions/\K[^/]+(?=/)' \
+                    | grep -v '^_shared$' \
+                    | sort -u || true)
+          fi
+
+          # Filter to directories that still exist and have index.ts.
+          VALID=""
+          for f in $FUNCS; do
+            if [ -f "supabase/functions/$f/index.ts" ]; then
+              VALID="$VALID $f"
+            fi
+          done
+          VALID=$(echo "$VALID" | xargs || true)
+
+          COUNT=$(echo "$VALID" | wc -w | tr -d ' ')
+          echo "📦 Functions to deploy ($COUNT): $VALID"
+          echo "list=$VALID" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: 📋 Summary
+        run: |
+          echo "## 📊 Change Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Area | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.filter.outputs.frontend }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supabase functions | ${{ steps.filter.outputs.functions }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| _shared/ | ${{ steps.filter.outputs.shared }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Functions to deploy | ${{ steps.changed-functions.outputs.count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.changed-functions.outputs.list }}" ]; then
+            echo "**Targets:** \`${{ steps.changed-functions.outputs.list }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ────────────────────────────────────────────────────────────────────
+  # typecheck: gate for the frontend deploy. Skipped when no FE change.
+  # ────────────────────────────────────────────────────────────────────
+  typecheck:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+
+  # ────────────────────────────────────────────────────────────────────
+  # deploy-frontend: prebuilt Vercel upload (no double build).
+  # ────────────────────────────────────────────────────────────────────
+  deploy-frontend:
+    needs: [changes, typecheck]
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: 📋 Deployment Overview
-        run: |
-          echo "🚀 Material KAI Vision Platform Deployment"
-          echo "=========================================="
-          echo ""
-          echo "🎯 Deployment Type: Frontend & Supabase Functions"
-          echo "📝 Trigger: ${{ github.event_name == 'push' && 'Automatic (Code Push)' || 'Manual (workflow_dispatch)' }}"
-          echo "${{ github.event.inputs.deployment_reason && format('📝 Reason: {0}', github.event.inputs.deployment_reason) || '' }}"
-          echo ""
-          echo "📊 Deployment Details:"
-          echo "  • Target: Vercel (Production)"
-          echo "  • Branch: ${{ github.ref_name }}"
-          echo "  • Commit: ${{ github.sha }}"
-          echo "  • Triggered by: ${{ github.actor }}"
-          echo ""
-
-          # Add to GitHub Step Summary
-          echo "# 🚀 Material KAI Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📊 Deployment Overview" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **🎯 Deployment Type** | Frontend & Supabase Functions |" >> $GITHUB_STEP_SUMMARY
-          echo "| **📝 Trigger** | ${{ github.event_name == 'push' && 'Automatic (Code Push)' || 'Manual (workflow_dispatch)' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **🌿 Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **📋 Commit** | [\`${{ github.sha }}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **👤 Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **🆔 Deployment ID** | \`${{ github.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **⏰ Started** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add deployment progress
-          echo "## 🚀 Deployment Progress" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status | Description |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Initialization** | ✅ Complete | Deployment started successfully |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Dependencies** | 🟡 In Progress | Installing npm packages |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Build** | ⏳ Pending | Building frontend application |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Supabase Functions** | ⏳ Pending | Deploying edge functions |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Vercel Deploy** | ⏳ Pending | Deploying to production |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Health Check** | ⏳ Pending | Verifying deployment |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📥 Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: |
-          echo "📦 Installing npm dependencies..."
-          npm ci
-          echo "✅ Dependencies installed successfully"
+        run: npm ci
 
-      - name: 🔎 Typecheck
-        run: |
-          echo "🔎 Running TypeScript typecheck..."
-          npm run typecheck
-          echo "✅ Typecheck passed"
+      - name: 🔧 Install Vercel CLI
+        run: npm install --global vercel@latest
 
-      - name: 🏗️ Build frontend
-        run: |
-          echo "🏗️ Building frontend application..."
-          npm run build
-          echo "✅ Build completed successfully"
+      - name: 📥 Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-          # Update progress
+      - name: 🏗️ Build (Vercel, local)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🚀 Deploy prebuilt artifact
+        id: deploy
+        run: |
+          set -euo pipefail
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "🌐 Deployed: $URL"
+
+      - name: 🏥 Health check
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.url }}"
+          sleep 10
+          if [ -n "$URL" ]; then
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
+            echo "📊 HTTP $HTTP_STATUS — $URL"
+            case "$HTTP_STATUS" in
+              200|301|302) echo "✅ Healthy" ;;
+              *) echo "⚠️  Non-OK status: $HTTP_STATUS" ;;
+            esac
+          else
+            echo "⚠️  Deployment URL not captured"
+          fi
+
+      - name: 📋 Summary
+        if: always()
+        run: |
+          echo "## 🚀 Frontend Deploy" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ Build Status" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend build completed successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- Build artifacts generated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App:** https://materialshub.gr" >> $GITHUB_STEP_SUMMARY
 
-      - name: 🔧 Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+  # ────────────────────────────────────────────────────────────────────
+  # deploy-functions: parallel selective deploy.
+  # Runs in parallel with the frontend job. Skipped if no functions changed.
+  # ────────────────────────────────────────────────────────────────────
+  deploy-functions:
+    needs: changes
+    if: needs.changes.outputs.functions == 'true' && needs.changes.outputs.changed_functions_count != '0'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: 🚀 Deploy Supabase functions
+      - name: 🚀 Deploy changed functions (parallel)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+          FUNCS: ${{ needs.changes.outputs.changed_functions }}
         run: |
-          echo "🚀 Deploying Supabase edge functions..."
-          echo "📋 Project Ref: ${{ secrets.SUPABASE_PROJECT_ID }}"
-          echo "🔑 Token present: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && 'Yes' || 'No' }}"
+          set -uo pipefail
+          mkdir -p /tmp/deploy-logs
+          FAILED_FILE=$(mktemp)
+          export FAILED_FILE
 
-          PROJECT_REF="${{ secrets.SUPABASE_PROJECT_ID }}"
+          echo "📦 Deploying $(echo "$FUNCS" | wc -w | tr -d ' ') function(s): $FUNCS"
+          echo "🔧 Project: $PROJECT_REF"
+          echo ""
 
-          # Test authentication first
-          echo "🔍 Testing Supabase authentication..."
-          supabase projects list || echo "⚠️ Authentication test failed"
-
-          # Deploy functions one-by-one to avoid container resource exhaustion.
-          # Only deploys functions whose code actually changed (Supabase CLI detects this).
-          echo "📦 Deploying functions individually..."
-          FAILED=""
-          DEPLOYED=""
-          SKIPPED=""
-
-          for FUNC_DIR in supabase/functions/*/; do
-            FUNC_NAME=$(basename "$FUNC_DIR")
-
-            # Skip _shared directory and any non-function dirs
-            if [ "$FUNC_NAME" = "_shared" ] || [ ! -f "$FUNC_DIR/index.ts" ]; then
-              continue
-            fi
-
-            echo "━━━ Deploying: $FUNC_NAME"
-            if supabase functions deploy "$FUNC_NAME" --no-verify-jwt --project-ref "$PROJECT_REF" 2>&1 | tee /tmp/deploy_output.txt; then
-              if grep -q "No change found" /tmp/deploy_output.txt; then
-                SKIPPED="$SKIPPED $FUNC_NAME"
-              else
-                DEPLOYED="$DEPLOYED $FUNC_NAME"
-              fi
+          deploy_one() {
+            local name="$1"
+            local log="/tmp/deploy-logs/$name.log"
+            if supabase functions deploy "$name" --no-verify-jwt --project-ref "$PROJECT_REF" >"$log" 2>&1; then
+              echo "✅ $name"
             else
-              echo "⚠️  Failed to deploy: $FUNC_NAME"
-              FAILED="$FAILED $FUNC_NAME"
+              echo "❌ $name"
+              echo "$name" >> "$FAILED_FILE"
+              echo "─── log: $name ───"
+              tail -n 40 "$log"
+              echo "─── end log: $name ───"
             fi
-          done
+          }
+          export -f deploy_one
+          export PROJECT_REF SUPABASE_ACCESS_TOKEN
+
+          # Parallel batch of 4. Each function takes ~10–30s; 4-way parallel
+          # is safe with Supabase's per-project rate limits.
+          echo "$FUNCS" | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'deploy_one "$@"' _ {}
 
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📊 Deployment Summary"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          [ -n "$DEPLOYED" ] && echo "✅ Deployed:$DEPLOYED"
-          [ -n "$SKIPPED" ] && echo "⏭️  No changes:$SKIPPED"
-          [ -n "$FAILED" ] && echo "❌ Failed:$FAILED"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-          # Fail the step only if a critical function failed
-          if echo "$FAILED" | grep -q "agent-chat"; then
-            echo "❌ Critical function agent-chat failed to deploy!"
-            exit 1
-          fi
-
-          echo "✅ Supabase functions deployment complete"
-
-      - name: 🔧 Install Vercel CLI
-        run: |
-          echo "🔧 Installing Vercel CLI..."
-          npm install --global vercel@latest
-          echo "✅ Vercel CLI installed"
-
-      - name: 📥 Pull Vercel Environment Information
-        run: |
-          echo "📥 Pulling Vercel environment configuration..."
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          echo "✅ Environment configuration pulled"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: 🚀 Deploy to Vercel
-        run: |
-          echo "🚀 Deploying to Vercel production..."
-          DEPLOYMENT_URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tee /tmp/vercel_output.txt | grep -oP 'https://[^\s]+' | tail -1)
-          echo "✅ Deployment completed"
-          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
-          echo "🌐 Deployment URL: $DEPLOYMENT_URL"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: 🏥 Deployment Health Check
-        run: |
-          echo "🏥 Performing deployment health checks..."
-          echo "=========================================="
-
-          # Wait for deployment to be ready
-          sleep 10
-
-          # Check if deployment URL is available
-          if [ -n "$DEPLOYMENT_URL" ]; then
-            echo "🔍 Testing deployment URL: $DEPLOYMENT_URL"
-
-            # Test the deployment
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$DEPLOYMENT_URL" --connect-timeout 30 --max-time 60 || echo "000")
-
-            echo "📊 Health Check Results:"
-            echo "  • Deployment URL: $DEPLOYMENT_URL"
-            echo "  • HTTP Status: $HTTP_STATUS"
-
-            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "301" ] || [ "$HTTP_STATUS" = "302" ]; then
-              echo "✅ Deployment is healthy and responding"
-              HEALTH_STATUS="🟢 Healthy"
-            else
-              echo "⚠️  Deployment returned status: $HTTP_STATUS"
-              HEALTH_STATUS="🟡 Deployed (Status: $HTTP_STATUS)"
+          if [ -s "$FAILED_FILE" ]; then
+            echo "❌ Failed functions:"
+            cat "$FAILED_FILE"
+            # Critical functions fail the workflow; others log a warning.
+            if grep -qx 'agent-chat' "$FAILED_FILE"; then
+              echo ""
+              echo "💥 Critical function agent-chat failed — failing the job"
+              exit 1
             fi
+            echo ""
+            echo "⚠️  Non-critical failures — workflow continues"
           else
-            echo "⚠️  Could not determine deployment URL"
-            HEALTH_STATUS="🟡 Deployed (URL not captured)"
+            echo "✅ All $(echo "$FUNCS" | wc -w | tr -d ' ') functions deployed"
           fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          echo "HEALTH_STATUS=$HEALTH_STATUS" >> $GITHUB_ENV
-
-          echo ""
-          echo "🎉 Deployment completed successfully!"
-          echo "✅ Frontend: Deployed to Vercel (Production)"
-          echo "✅ Backend: Supabase functions deployed"
-          echo "📊 Build artifacts: Generated and deployed"
-
-          # Add health check results to summary
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🏥 Health Check Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Deployment URL** | ${DEPLOYMENT_URL:-Not captured} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **HTTP Status** | ${HTTP_STATUS:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Health Status** | $HEALTH_STATUS |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📊 Final Deployment Summary
+      - name: 📋 Summary
         if: always()
         run: |
-          echo ""
-          echo "🎉 Material KAI Vision Platform Deployment Complete!"
-          echo "===================================================="
-          echo ""
-
-          # Add final deployment results
+          echo "## 📦 Supabase Functions" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🎉 Deployment Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Frontend Build** | ✅ Success | Vite build completed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Supabase Functions** | ✅ Deployed | Edge functions active |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Vercel Deployment** | ✅ Success | Production deployment live |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Health Check** | ${HEALTH_STATUS:-🟡 Pending} | Deployment verified |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add service endpoints
-          echo "## 🌐 Service Endpoints" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | URL | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **🌐 Production App** | [materialshub.gr](https://materialshub.gr) | 🟢 Live |" >> $GITHUB_STEP_SUMMARY
-          echo "| **📚 Supabase Dashboard** | [Supabase Project](https://supabase.com/dashboard/project/${{ secrets.SUPABASE_PROJECT_ID }}) | 🟢 Active |" >> $GITHUB_STEP_SUMMARY
-          echo "| **🚀 Vercel Dashboard** | [Vercel Project](https://vercel.com/${{ secrets.VERCEL_ORG_ID }}/${{ secrets.VERCEL_PROJECT_ID }}) | 🟢 Active |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add quick actions
-          echo "## 🚀 Quick Actions" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- 🌐 [**Visit Application**](https://materialshub.gr)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 [**View Commit**](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [**View Deployment**](https://vercel.com/${{ secrets.VERCEL_ORG_ID }}/${{ secrets.VERCEL_PROJECT_ID }})" >> $GITHUB_STEP_SUMMARY
-          echo "- 🗄️ [**Supabase Dashboard**](https://supabase.com/dashboard/project/${{ secrets.SUPABASE_PROJECT_ID }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Update final deployment progress
-          echo "## 🎯 Final Deployment Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status | Description |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Initialization** | ✅ Complete | Deployment started successfully |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Dependencies** | ✅ Complete | npm packages installed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Build** | ✅ Complete | Frontend application built |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Supabase Functions** | ✅ Complete | Edge functions deployed |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Vercel Deploy** | ✅ Complete | Deployed to production |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Health Check** | ✅ Complete | Deployment verified |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add footer
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "🚀 **Material KAI Vision Platform** | 🕐 Completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC') | 📋 ID: \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
-
-          echo ""
-          echo "✅ Deployment Status: SUCCESS"
-          echo "📅 Completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "🎯 All components deployed successfully!"
+          echo "- **Deployed:** ${{ needs.changes.outputs.changed_functions_count }} function(s)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Targets:** \`${{ needs.changes.outputs.changed_functions }}\`" >> $GITHUB_STEP_SUMMARY
