@@ -50,14 +50,33 @@ Quote → customer lookup order (first hit wins):
 - Input: `{ quote_id }`
 - Steps: idempotency check → status gate (`accepted` only) → customer linkage gate → contact resolve (lookup→create) → per-line product resolve (create-if-missing) → `POST /notices` → persist sync state.
 
-## Required secrets (Supabase Edge Functions)
+## Configuration
 
-| Secret | Purpose |
+**Primary location: `/admin/modules/oxygen` → Settings tab** (DB-backed, single-row `oxygen_settings`). Admins set all four values from the UI — no devops trip required:
+
+- **API key** — paste once, stored in `oxygen_settings.api_key`, returned masked (`oxy_••••wxyz`) in any subsequent GET.
+- **API base URL** — defaults to `https://api.oxygen.gr/v1`.
+- **Default tax id (24% VAT)** — populated by a **dropdown** that calls `GET /taxes` via `oxygen-admin` once you paste a valid key.
+- **Default warehouse id** — same dropdown pattern from `GET /warehouses`.
+
+The Settings tab also has a **Test connection** button (`GET /taxes`) that stamps `last_verified_at` + `last_verified_status` on the row so you can see at a glance whether the configured key works.
+
+### Env-var fallback (legacy)
+
+For pre-existing deployments, the edge function still reads these env vars when the DB row is empty:
+
+| Env var | Note |
 |---|---|
-| `OXYGEN_API_KEY` | Bearer token for all Oxygen API calls |
-| `OXYGEN_API_BASE_URL` | Optional override, defaults to `https://api.oxygen.gr/v1` |
-| `OXYGEN_DEFAULT_TAX_ID_24` | Numeric Oxygen tax id for 24% Greek VAT (line `tax_id` fallback). Look up via `GET /taxes` once and store. |
-| `OXYGEN_DEFAULT_WAREHOUSE_ID` | Numeric Oxygen warehouse id (single-warehouse setup). Look up via `GET /warehouses` once and store. |
+| `OXYGEN_API_KEY` | Used only if `oxygen_settings.api_key IS NULL` |
+| `OXYGEN_API_BASE_URL` | Used only if `oxygen_settings.api_base_url` is empty |
+| `OXYGEN_DEFAULT_TAX_ID_24` | Used only if `oxygen_settings.default_tax_id_24 IS NULL` |
+| `OXYGEN_DEFAULT_WAREHOUSE_ID` | Used only if `oxygen_settings.default_warehouse_id IS NULL` |
+
+Once an admin saves any field in the Settings tab, that field's env-var equivalent stops being read for that field.
+
+### Settings RLS model
+
+`oxygen_settings` is RLS-locked to `service_role` only. Admins reach it exclusively through the `oxygen-admin` edge function, which authenticates on the user JWT (`admin` / `super_admin` roles) and masks the API key in responses.
 
 ## Public API
 

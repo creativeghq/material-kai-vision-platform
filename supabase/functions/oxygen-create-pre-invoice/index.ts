@@ -2,7 +2,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { oxygenGET, oxygenPOST, OxygenError } from '../_shared/oxygen/client.ts';
+import {
+  oxygenGET,
+  oxygenPOST,
+  OxygenError,
+  loadOxygenSettings,
+  type OxygenSettings,
+} from '../_shared/oxygen/client.ts';
 import {
   buildContactPayloadForCompany,
   buildContactPayloadForContact,
@@ -14,13 +20,11 @@ import {
 // Trigger: admin clicks "Make Pre-Invoice" on an accepted quote
 // Endpoint hit at Oxygen: POST /notices (NEVER /invoices — pre-invoice only by design)
 // Idempotent: once quotes.oxygen_notice_id is set, returns it without external calls.
+// Config: read from `oxygen_settings` table (env fallback only when the row is empty).
 
 interface RequestBody {
   quote_id: string;
 }
-
-const DEFAULT_TAX_ID = parseInt(Deno.env.get('OXYGEN_DEFAULT_TAX_ID_24') ?? '0', 10);
-const DEFAULT_WAREHOUSE_ID = parseInt(Deno.env.get('OXYGEN_DEFAULT_WAREHOUSE_ID') ?? '0', 10);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
@@ -40,8 +44,16 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as RequestBody;
     if (!body.quote_id) return json({ error: 'quote_id is required' }, 400);
 
-    if (!DEFAULT_TAX_ID || !DEFAULT_WAREHOUSE_ID) {
-      return json({ error: 'OXYGEN_DEFAULT_TAX_ID_24 and OXYGEN_DEFAULT_WAREHOUSE_ID secrets must be set' }, 500);
+    const settings = await loadOxygenSettings(supabase);
+    if (!settings.apiKey || !settings.defaultTaxId24 || !settings.defaultWarehouseId) {
+      return json({
+        error: 'Oxygen module is not configured. Open /admin/modules/oxygen → Settings to set the API key, default tax id, and warehouse id.',
+        missing: {
+          api_key: !settings.apiKey,
+          default_tax_id_24: !settings.defaultTaxId24,
+          default_warehouse_id: !settings.defaultWarehouseId,
+        },
+      }, 503);
     }
 
     // 1. Load quote + items + linked customer (contact OR company)
@@ -118,6 +130,7 @@ Deno.serve(async (req) => {
       // 7. Resolve Oxygen contact_id (lookup → create if missing)
       const oxygenContactId = await resolveOxygenContactId(
         supabase,
+        settings,
         customerKind,
         customerKind === 'company' ? quote.company : quote.contact,
       );
@@ -130,10 +143,10 @@ Deno.serve(async (req) => {
             productName: item.product.name ?? 'Unnamed product',
             productCode: code,
             unitNetAmount: Number(item.unit_price ?? 0),
-            saleTaxId: item.product.oxygen_tax_id ?? DEFAULT_TAX_ID,
-            warehouseId: DEFAULT_WAREHOUSE_ID,
+            saleTaxId: item.product.oxygen_tax_id ?? settings.defaultTaxId24,
+            warehouseId: settings.defaultWarehouseId,
           });
-          const created = await oxygenPOST('/products', productPayload);
+          const created = await oxygenPOST(settings, '/products', productPayload);
           item.product.oxygen_product_id = created.id;
           await supabase.from('products').update({
             oxygen_product_id: created.id,
@@ -150,8 +163,8 @@ Deno.serve(async (req) => {
           code,
           quantity: Number(it.quantity ?? 1),
           unit_net_value: unitPrice,
-          tax_id: it.product?.oxygen_tax_id ?? DEFAULT_TAX_ID,
-          warehouse_id: DEFAULT_WAREHOUSE_ID,
+          tax_id: it.product?.oxygen_tax_id ?? settings.defaultTaxId24,
+          warehouse_id: settings.defaultWarehouseId,
           description: it.product?.name ?? it.custom_product_name ?? undefined,
         };
       });
@@ -160,13 +173,13 @@ Deno.serve(async (req) => {
         contactId: oxygenContactId,
         issueDate: new Date().toISOString().slice(0, 10),
         notes: [quote.quote_number, quote.notes].filter(Boolean).join(' — ') || undefined,
-        defaultTaxId: DEFAULT_TAX_ID,
-        defaultWarehouseId: DEFAULT_WAREHOUSE_ID,
+        defaultTaxId: settings.defaultTaxId24,
+        defaultWarehouseId: settings.defaultWarehouseId,
         lines,
       });
 
       // 10. Create the notice
-      const notice = await oxygenPOST('/notices', noticePayload);
+      const notice = await oxygenPOST(settings, '/notices', noticePayload);
 
       // 11. Persist sync state
       await supabase.from('quotes').update({
@@ -206,6 +219,7 @@ Deno.serve(async (req) => {
 
 async function resolveOxygenContactId(
   supabase: any,
+  settings: OxygenSettings,
   kind: 'contact' | 'company',
   row: any,
 ): Promise<string> {
@@ -224,7 +238,7 @@ async function resolveOxygenContactId(
 
   let oxygenContactId: string | null = null;
   try {
-    const result = await oxygenGET(`/contacts${lookupQuery}`);
+    const result = await oxygenGET(settings, `/contacts${lookupQuery}`);
     const items: any[] = Array.isArray(result) ? result : (result?.data ?? []);
     if (items.length > 0 && items[0].id) oxygenContactId = items[0].id;
   } catch (err) {
@@ -236,7 +250,7 @@ async function resolveOxygenContactId(
     const payload = kind === 'company'
       ? buildContactPayloadForCompany(row)
       : buildContactPayloadForContact(row);
-    const created = await oxygenPOST('/contacts', payload);
+    const created = await oxygenPOST(settings, '/contacts', payload);
     oxygenContactId = created.id;
   }
 

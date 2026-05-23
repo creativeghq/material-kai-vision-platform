@@ -882,18 +882,18 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 - **Service**: `QuotesService.addItem()`, `addCustomItem()`, `updateItem()` all accept FF&E fields
 
 ## Oxygen Pre-Invoice Module (Greek e-Invoicing — 2026-04-22)
-Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.
+Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/oxygen-admin/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.
 
-- **Single endpoint hit at Oxygen**: `POST /notices` (plus `/contacts` lookup-or-create and `/products` create-if-missing as side effects). We never call `/invoices`.
-- **Auth**: `Authorization: Bearer <OXYGEN_API_KEY>` via `_shared/oxygen/client.ts`.
-- **Trigger**: admin clicks "Make Pre-Invoice" on a quote where `status='accepted'`. Hard idempotent — once `quotes.oxygen_notice_id` is set, button permanently disabled and edge function early-returns.
+- **Single endpoint hit at Oxygen for sync**: `POST /notices` (plus `/contacts` lookup-or-create and `/products` create-if-missing as side effects). We never call `/invoices`.
+- **Auth**: `Authorization: Bearer <api_key>` via `_shared/oxygen/client.ts`. Key is per-call, not module-load — see Configuration below.
+- **Trigger**: admin clicks "Make Pre-Invoice" on a quote where `status='accepted'`. Hard idempotent — once `quotes.oxygen_notice_id` is set, button permanently disabled and edge function early-returns. Atomic claim guards against double-clicks (`UPDATE … WHERE oxygen_sync_status IN (null,'failed','pending')`).
 - **Customer model**: `quotes.customer_company_id` (B2B → `crm_companies`, type=2) OR `quotes.customer_contact_id` (private/B2C → `crm_contacts`, type=1). XOR check enforces at most one. `quotes.user_id` is the operator/designer, NOT the bill-to.
 - **Customer create-if-missing**: lookup by `vat_number` (companies) or `email` (private), then `POST /contacts` if not found. Result cached on our side as `crm_*.oxygen_contact_id`.
-- **Product create-if-missing**: same pattern, cached as `products.oxygen_product_id`.
-- **Single warehouse**: `OXYGEN_DEFAULT_WAREHOUSE_ID` secret, no per-product column.
-- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`.
-- **Required Edge secrets**: `OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL` (optional, defaults to `https://api.oxygen.gr/v1`), `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`.
-- **Mount point**: single `<OxygenPreInvoiceButton />` in `src/modules/quotes/pages/QuoteDetailAdminPage.tsx`. Removable by deleting the module folders + that one import.
+- **Product create-if-missing**: same pattern, cached as `products.oxygen_product_id`. Price written to Oxygen comes from our `quote_items.unit_price`; we never read price **from** Oxygen.
+- **Single warehouse**: stored in `oxygen_settings.default_warehouse_id`, no per-product column.
+- **Configuration (DB-backed, 2026-04-22)**: `oxygen_settings` single-row table (RLS: service_role only). Admins manage via `/admin/modules/oxygen` → Settings tab. Fields: `api_key`, `api_base_url`, `default_tax_id_24`, `default_warehouse_id`, `last_verified_at/status/error`. `oxygen-admin` edge function gates on admin role + masks the key in GETs. Env vars (`OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL`, `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`) remain as a per-field fallback only — consulted exclusively when the corresponding DB column is NULL/empty.
+- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`; new table `oxygen_settings`.
+- **Mount point**: single `<OxygenPreInvoiceButton />` in `src/modules/quotes/pages/QuoteDetailAdminPage.tsx`. Removable by deleting the module folders + that one import. Module also registers `/admin/modules/oxygen` (Overview + Settings tabs) via the standard `ModuleDefinition` default export.
 
 ## Manufacturer Analytics (Enhanced)
 - **Tracking service**: `src/services/manufacturerAnalyticsService.ts` — batched fire-and-forget event tracking (flush every 5s or 20 events)

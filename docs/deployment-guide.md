@@ -276,14 +276,16 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 
 ### **Oxygen Pre-Invoice (Greek e-Invoicing)**
 
-| Service | Secret Name | Where Used | How to Get | Required? |
-|---------|------------|------------|------------|-----------|
-| **Oxygen** | `OXYGEN_API_KEY` | Edge Function `oxygen-create-pre-invoice` | https://www.oxygen.gr → Dashboard → API settings → generate key | ✅ Required if `oxygen` module enabled |
-| **Oxygen** | `OXYGEN_API_BASE_URL` | Edge Function `oxygen-create-pre-invoice` | Optional override; defaults to `https://api.oxygen.gr/v1` | Optional |
-| **Oxygen** | `OXYGEN_DEFAULT_TAX_ID_24` | Edge Function `oxygen-create-pre-invoice` | `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/taxes` → copy the 24% VAT row's numeric `id` | ✅ Required if `oxygen` module enabled |
-| **Oxygen** | `OXYGEN_DEFAULT_WAREHOUSE_ID` | Edge Function `oxygen-create-pre-invoice` | `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/warehouses` → copy the warehouse's numeric `id` | ✅ Required if `oxygen` module enabled |
+**Primary path: `/admin/modules/oxygen` → Settings tab.** Configuration is stored in the `oxygen_settings` table — no devops involvement needed. Admins paste the API key once, pick the default tax + warehouse from dropdowns populated by live calls to Oxygen, and click "Test connection". The env vars below remain as a one-time fallback only.
 
-See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)** below for the full table.
+| Service | Setting | Where Used | How to Get | Required? |
+|---------|---------|------------|------------|-----------|
+| **Oxygen** | `api_key` (or `OXYGEN_API_KEY` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | https://www.oxygen.gr → Dashboard → API settings → generate key | ✅ Required if `oxygen` module enabled |
+| **Oxygen** | `api_base_url` (or `OXYGEN_API_BASE_URL` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | Optional override; defaults to `https://api.oxygen.gr/v1` | Optional |
+| **Oxygen** | `default_tax_id_24` (or `OXYGEN_DEFAULT_TAX_ID_24` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /taxes`) | ✅ Required if `oxygen` module enabled |
+| **Oxygen** | `default_warehouse_id` (or `OXYGEN_DEFAULT_WAREHOUSE_ID` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /warehouses`) | ✅ Required if `oxygen` module enabled |
+
+See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)** below for the full env-var fallback table.
 
 ### **Supabase Edge Functions Secrets**
 
@@ -407,18 +409,20 @@ See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)
 
 #### **Oxygen Pre-Invoice (Greek e-Invoicing)**
 
-Used by the `oxygen` module (`src/modules/oxygen/`) and the `oxygen-create-pre-invoice` Edge Function. The module pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)** — never as final invoices.
+Used by the `oxygen` module (`src/modules/oxygen/`) and two Edge Functions: `oxygen-create-pre-invoice` (sync action) + `oxygen-admin` (settings + lookups). The module pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)** — never as final invoices.
+
+> **Primary configuration is the UI at `/admin/modules/oxygen` → Settings tab** (stored in the `oxygen_settings` table). The env vars below are a fallback so existing deployments that already set them keep working — they are read **only** when the corresponding DB column is `NULL`/empty. Once an admin saves a value in the UI, that field's env-var fallback is no longer consulted.
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
-| `OXYGEN_API_KEY` | **Secret** | `oxygen-create-pre-invoice` | Oxygen API bearer token. Generate from Oxygen dashboard → API settings | `oxy_xxxxxxxxxxxxxxxxxxxx` |
-| `OXYGEN_API_BASE_URL` | Public | `oxygen-create-pre-invoice` | Optional base URL override. Defaults to `https://api.oxygen.gr/v1` | `https://api.oxygen.gr/v1` |
-| `OXYGEN_DEFAULT_TAX_ID_24` | **Secret** | `oxygen-create-pre-invoice` | Numeric Oxygen tax id for Greek 24% VAT. Look up via `GET /taxes` once with your key, copy the 24% row's `id` | `1` (numeric) |
-| `OXYGEN_DEFAULT_WAREHOUSE_ID` | **Secret** | `oxygen-create-pre-invoice` | Numeric Oxygen warehouse id (single-warehouse setup). Look up via `GET /warehouses` once, copy the warehouse `id` | `1` (numeric) |
+| `OXYGEN_API_KEY` | **Secret** | `oxygen-create-pre-invoice`, `oxygen-admin` | Fallback for `oxygen_settings.api_key`. Generate from Oxygen dashboard → API settings | `oxy_xxxxxxxxxxxxxxxxxxxx` |
+| `OXYGEN_API_BASE_URL` | Public | `oxygen-create-pre-invoice`, `oxygen-admin` | Fallback for `oxygen_settings.api_base_url`. Defaults to `https://api.oxygen.gr/v1` | `https://api.oxygen.gr/v1` |
+| `OXYGEN_DEFAULT_TAX_ID_24` | **Secret** | `oxygen-create-pre-invoice` | Fallback for `oxygen_settings.default_tax_id_24`. UI picks this from a live dropdown | `1` (numeric) |
+| `OXYGEN_DEFAULT_WAREHOUSE_ID` | **Secret** | `oxygen-create-pre-invoice` | Fallback for `oxygen_settings.default_warehouse_id`. UI picks this from a live dropdown | `1` (numeric) |
 
-> **Endpoints touched at Oxygen**: `POST /notices` (pre-invoice creation), `GET /contacts?vat=…` and `POST /contacts` (customer lookup or create-if-missing), `POST /products` (catalog create-if-missing). The function never calls `POST /invoices`.
+> **Endpoints touched at Oxygen**: `POST /notices` (pre-invoice creation), `GET /contacts?vat=…` and `POST /contacts` (customer lookup or create-if-missing), `POST /products` (catalog create-if-missing), `GET /taxes` + `GET /warehouses` (dropdown lookup from the Settings tab). The function never calls `POST /invoices`.
 
-> **One-time bootstrap**: With `OXYGEN_API_KEY` set, run `curl -H "Authorization: Bearer $OXYGEN_API_KEY" https://api.oxygen.gr/v1/taxes` and `…/warehouses` to discover the numeric ids you need for the two `_DEFAULT_*` secrets. Set both before enabling the module on `/admin/modules`.
+> **Greenfield deployment**: skip the env vars entirely. Deploy `oxygen-create-pre-invoice` + `oxygen-admin`, enable the module on `/admin/modules`, open Settings, paste the API key, click "Refresh dropdowns" → pick the 24% tax + your warehouse → "Test connection" → Save. Done.
 
 #### **Cron Jobs & Backend URLs**
 
