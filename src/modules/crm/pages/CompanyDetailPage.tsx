@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerQuotesTab,
@@ -62,6 +62,8 @@ interface Company {
   linkedin?: string;
   twitter?: string;
   facebook?: string;
+  discount_percent?: number | null;
+  discount_notes?: string | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -100,6 +102,8 @@ export const CompanyDetailPage: React.FC = () => {
     linkedin: '',
     twitter: '',
     facebook: '',
+    discount_percent: null,
+    discount_notes: '',
     created_at: new Date().toISOString(),
     contacts: [],
   } : null);
@@ -530,6 +534,51 @@ export const CompanyDetailPage: React.FC = () => {
                       placeholder="United States"
                     />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Percent className="h-4 w-4" />
+                  Pricing
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="discount_percent">Default discount %</Label>
+                    <Input
+                      id="discount_percent"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      max={100}
+                      value={company.discount_percent ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updateField('discount_percent', v === '' ? null : Number(v));
+                      }}
+                      disabled={!editing}
+                      placeholder="e.g. 50"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Applied automatically by the AI price lookup when this company is the quote customer. Leave empty for no customer discount.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="discount_notes">Discount notes</Label>
+                  <Textarea
+                    id="discount_notes"
+                    value={company.discount_notes || ''}
+                    onChange={(e) => updateField('discount_notes', e.target.value)}
+                    disabled={!editing}
+                    placeholder="e.g. Long-term partner — 50% per 2025 agreement, valid until renewal."
+                    rows={2}
+                  />
                 </div>
               </CardContent>
             </Card>

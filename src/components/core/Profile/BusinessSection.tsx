@@ -164,6 +164,17 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     toast({ title: 'Company name updated to VIES-registered name' });
   };
 
+  const adoptViesAddress = (parsed: NonNullable<ViesValidationResult['address_parsed']>, rawFallback: string | null) => {
+    setBusinessForm((p) => ({
+      ...p,
+      street: parsed.street ?? (parsed.postal_code === null && rawFallback ? rawFallback : p.street),
+      street_number: parsed.street_number ?? p.street_number,
+      postal_code: parsed.postal_code ?? p.postal_code,
+      city: parsed.city ?? p.city,
+    }));
+    toast({ title: 'Address pre-filled from VIES' });
+  };
+
   const startEdit = () => {
     setBusinessForm({ ...business });
     setPendingEntityType(entityType);
@@ -381,6 +392,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     cache={viesCache}
                     lastResult={viesLastResult}
                     onAdoptName={adoptViesName}
+                    onAdoptAddress={adoptViesAddress}
                   />
                 </FormField>
                 <FormField label="Tax office">
@@ -509,10 +521,11 @@ interface ViesStatusInlineProps {
   cache: { validated: boolean | null; validated_at: string | null; name: string | null; address: string | null } | null;
   lastResult: ViesValidationResult | null;
   onAdoptName: (name: string) => void;
+  onAdoptAddress: (parsed: NonNullable<ViesValidationResult['address_parsed']>, rawFallback: string | null) => void;
 }
 
 /** Inline status under the VAT field, in edit mode. Prefers the latest live result over the cache. */
-const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, onAdoptName }) => {
+const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, onAdoptName, onAdoptAddress }) => {
   // Latest live result wins if present (just verified)
   if (lastResult) {
     if (lastResult.skipped_reason === 'non_eu') {
@@ -532,17 +545,33 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
       );
     }
     if (lastResult.valid === true) {
+      const legalName = lastResult.legal_name ?? lastResult.name;
+      const tradeName = lastResult.trade_name;
+      const parsed = lastResult.address_parsed;
+      const hasParsedAddress = parsed && (parsed.street || parsed.postal_code || parsed.city);
       return (
-        <div className="mt-1.5 space-y-1.5">
+        <div className="mt-2 rounded-lg border border-green-500/30 bg-green-500/5 p-3 space-y-2">
           <p className="text-xs text-green-700 dark:text-green-400 flex items-start gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-            <span>Verified via VIES{lastResult.name ? <> — registered as <strong>{lastResult.name}</strong></> : ''}.</span>
+            <span>Verified via VIES{legalName ? <> — registered as <strong>{legalName}</strong></> : ''}{tradeName ? <> (trading as <em>{tradeName}</em>)</> : ''}.</span>
           </p>
-          {lastResult.name && (
-            <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAdoptName(lastResult.name!)}>
-              <CornerDownLeft className="h-3 w-3 mr-1" />Use this name
-            </Button>
+          {lastResult.address && (
+            <p className="text-xs text-muted-foreground pl-5">
+              <span className="text-muted-foreground/70">Registered address: </span>{lastResult.address}
+            </p>
           )}
+          <div className="flex flex-wrap gap-2 pl-4">
+            {legalName && (
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAdoptName(legalName)}>
+                <CornerDownLeft className="h-3 w-3 mr-1" />Use this name
+              </Button>
+            )}
+            {hasParsedAddress && (
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAdoptAddress(parsed!, lastResult.address ?? null)}>
+                <CornerDownLeft className="h-3 w-3 mr-1" />Use this address
+              </Button>
+            )}
+          </div>
         </div>
       );
     }

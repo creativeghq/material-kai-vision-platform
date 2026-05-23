@@ -14,9 +14,17 @@
  *
  * Buckets + grace periods (grace = "do not touch objects newer than this"):
  *
- *   pdf-documents     | 24h   (KB + catalog-source/ + catalog-output/ + quote-output/ + moodboard-output/)
- *   pdf-tiles         | 24h   (extracted/ + catalog-extracted/)
+ *   pdf-documents     | 72h   (KB + catalog-source/ + catalog-output/ + quote-output/ + moodboard-output/)
+ *   pdf-tiles         | 48h   (extracted/ + catalog-extracted/)
  *   generation-images | 14d   (AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/)
+ *
+ * Grace was bumped from 24h → 72h on pdf-documents 2026-05-23 to widen the
+ * absorption window for delayed-DB-write paths (admin uploads, scheduled
+ * workers that upload to storage minutes before inserting the documents row,
+ * background catalog-restore from snapshot). pdf-tiles 24h → 48h for the same
+ * reason since tiles are derived but the documents row may not exist when the
+ * tile lands. See `verify_storage_orphans` re-check below — that's the
+ * race-window fix; grace is the headroom.
  *
  * quote-templates and moodboard-sheet-references are NOT scanned — admin
  * curated, deletion is manual.
@@ -35,6 +43,9 @@ interface BucketStat {
   scanned: number;
   deleted: number;
   bytes_freed: number;
+  /** Count of paths that became referenced between RPC snapshot and the
+   * pre-delete re-verify call. These are skipped from the delete batch. */
+  skipped_raced: number;
   error?: string;
 }
 
@@ -44,8 +55,8 @@ interface BucketStat {
 // path prefixes inside the anchors. Grace seconds use the most conservative
 // (longest) value across any content type folded into each anchor.
 const BUCKETS: Array<{ bucket: string; grace_seconds: number }> = [
-  { bucket: 'pdf-documents',     grace_seconds:      24 * 3600 },
-  { bucket: 'pdf-tiles',         grace_seconds:      24 * 3600 },
+  { bucket: 'pdf-documents',     grace_seconds: 72 * 3600 },
+  { bucket: 'pdf-tiles',         grace_seconds: 48 * 3600 },
   { bucket: 'generation-images', grace_seconds: 14 * 24 * 3600 },
 ];
 
@@ -56,18 +67,64 @@ async function batchRemove(
   sb: SupabaseClient,
   bucket: string,
   paths: string[],
-): Promise<number> {
+): Promise<{ removed: number; skipped_raced: number }> {
   let removed = 0;
+  let skipped_raced = 0;
   for (let i = 0; i < paths.length; i += REMOVE_CHUNK) {
     const slice = paths.slice(i, i + REMOVE_CHUNK);
-    const { data, error } = await sb.storage.from(bucket).remove(slice);
-    if (error) {
-      console.error(`[OrphanCleanup] remove(${bucket}, ${slice.length}) error:`, error);
+
+    // Re-verify each batch against the LIVE reference set immediately before
+    // deleting. find_orphan_storage_objects returned a snapshot at time T; the
+    // delete loop can run for ~30s on a full batch of 5000 paths. Any DB row
+    // that referenced one of these paths in that interval would otherwise be
+    // left dangling. verify_storage_orphans is a STABLE function so it sees
+    // the current state of every referencing table.
+    let toRemove = slice;
+    try {
+      const { data: stillOrphan, error: verifyErr } = await sb.rpc(
+        'verify_storage_orphans',
+        { p_bucket: bucket, p_paths: slice },
+      );
+      if (verifyErr) {
+        // Fail closed: if re-verify errors, SKIP the batch rather than blindly
+        // delete the snapshot list. We'd rather miss this cron tick than nuke
+        // a freshly-referenced file.
+        console.error(
+          `[OrphanCleanup] verify(${bucket}, ${slice.length}) error — skipping batch:`,
+          verifyErr,
+        );
+        skipped_raced += slice.length;
+        continue;
+      }
+      const stillOrphanSet = new Set(
+        (stillOrphan ?? []).map((r: { name: string }) => r.name),
+      );
+      toRemove = slice.filter((p) => stillOrphanSet.has(p));
+      const dropped = slice.length - toRemove.length;
+      if (dropped > 0) {
+        skipped_raced += dropped;
+        console.log(
+          `[OrphanCleanup] race-protected: ${dropped}/${slice.length} paths in ${bucket} ` +
+            `gained a DB ref between snapshot and delete — skipping those`,
+        );
+      }
+      if (toRemove.length === 0) {
+        continue;
+      }
+    } catch (e) {
+      console.error(`[OrphanCleanup] verify(${bucket}) threw — skipping batch:`, e);
+      skipped_raced += slice.length;
       continue;
     }
-    removed += data?.length ?? slice.length;
+
+    const { data, error } = await sb.storage.from(bucket).remove(toRemove);
+    if (error) {
+      console.error(`[OrphanCleanup] remove(${bucket}, ${toRemove.length}) error:`, error);
+      continue;
+    }
+    removed += data?.length ?? toRemove.length;
   }
-  return removed;
+  return { removed, skipped_raced };
 }
 
 async function logRun(
@@ -101,7 +158,7 @@ async function cleanBucket(
   bucket: string,
   graceSeconds: number,
 ): Promise<BucketStat> {
-  const stat: BucketStat = { bucket, scanned: 0, deleted: 0, bytes_freed: 0 };
+  const stat: BucketStat = { bucket, scanned: 0, deleted: 0, bytes_freed: 0, skipped_raced: 0 };
 
   try {
     const { data: orphans, error } = await sb.rpc('find_orphan_storage_objects', {
@@ -126,12 +183,23 @@ async function cleanBucket(
     }
 
     const paths = list.map((r) => r.name);
-    stat.deleted = await batchRemove(sb, bucket, paths);
+    const { removed, skipped_raced } = await batchRemove(sb, bucket, paths);
+    stat.deleted = removed;
+    stat.skipped_raced = skipped_raced;
+    // bytes_freed counts the candidates' total; subtract bytes from any paths
+    // that were race-protected so the metric doesn't overstate freed space.
     stat.bytes_freed = list.reduce((acc, r) => acc + (Number(r.size_bytes) || 0), 0);
+    if (skipped_raced > 0 && skipped_raced < list.length) {
+      // Best-effort proportional adjustment when we can't tell which exact
+      // paths were skipped. Logged in details for forensic accuracy.
+      const avg = stat.bytes_freed / list.length;
+      stat.bytes_freed = Math.max(0, Math.floor(stat.bytes_freed - avg * skipped_raced));
+    }
 
     await logRun(sb, source, bucket, stat.scanned, stat.deleted, stat.bytes_freed, {
       grace_seconds: graceSeconds,
       truncated_at_limit: list.length >= PER_BUCKET_LIMIT,
+      skipped_raced: skipped_raced,
     });
   } catch (err) {
     stat.error = err instanceof Error ? err.message : String(err);
@@ -204,6 +272,7 @@ serve(async (req) => {
           scanned: list.length,
           deleted: 0,
           bytes_freed: bytes,
+          skipped_raced: 0,
           error: error?.message,
         });
         await logRun(sb, source, bucket, list.length, 0, bytes,
@@ -217,11 +286,16 @@ serve(async (req) => {
       buckets: stats,
       total_deleted: stats.reduce((a, s) => a + s.deleted, 0),
       total_bytes_freed: stats.reduce((a, s) => a + s.bytes_freed, 0),
+      total_skipped_raced: stats.reduce((a, s) => a + (s.skipped_raced ?? 0), 0),
       duration_ms: Date.now() - startedAt,
       dry_run: dryRun,
     };
 
-    console.log(`[OrphanCleanup] Done. ${total.total_deleted} deleted, ${total.total_bytes_freed} bytes freed in ${total.duration_ms}ms`);
+    console.log(
+      `[OrphanCleanup] Done. ${total.total_deleted} deleted, ` +
+        `${total.total_skipped_raced} race-protected, ` +
+        `${total.total_bytes_freed} bytes freed in ${total.duration_ms}ms`,
+    );
 
     return new Response(JSON.stringify({ success: true, stats: total }, null, 2), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

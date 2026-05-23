@@ -23,6 +23,8 @@ import {
 } from '@/components/core/ui/collapsible';
 import { EnhancedFunctionalMetadataCard } from '@/components/features/functional-metadata/EnhancedFunctionalMetadataCard';
 import { type FunctionalMetadata } from '@/types/materials';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 import { PDFImageGallery } from './PDFImageGallery';
 
@@ -55,8 +57,14 @@ interface KnowledgeEntry {
   pdf_url?: string;
   metadata?: {
     storage_info?: {
+      /** @deprecated Persisted URL on a private bucket — expires. Prefer
+       *  `pdf_storage_bucket` + `pdf_storage_object_path` and re-sign on render. */
       pdf_storage_url?: string;
       html_storage_url?: string;
+      /** Bucket name (post-2026-05-23 consolidation, typically 'pdf-documents'). */
+      pdf_storage_bucket?: string;
+      /** Object path within the bucket (e.g. `{user_id}/...pdf`). */
+      pdf_storage_object_path?: string;
     };
     functional_metadata?: FunctionalMetadata;
     raw_functional_data?: Record<
@@ -138,6 +146,44 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
   const hasMetadata = entry.metadata?.functional_metadata;
   const chunks = entry.metadata?.chunks || [];
 
+  // Open the original PDF. The `pdf-documents` bucket is private, so the
+  // persisted `pdf_storage_url` is either an expired signed URL or an
+  // unsigned path — both broken. Prefer to mint a fresh signed URL from the
+  // storage bucket + object path. Falls back to the persisted URL only when
+  // the new path columns aren't populated (legacy rows).
+  const handleOpenOriginalPdf = useCallback(async () => {
+    const bucket = entry.metadata?.storage_info?.pdf_storage_bucket;
+    const objectPath = entry.metadata?.storage_info?.pdf_storage_object_path;
+
+    if (bucket && objectPath) {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(objectPath, 600); // 10 min view window
+      if (error || !data?.signedUrl) {
+        toast.error(`Could not open PDF: ${error?.message ?? 'unknown error'}`);
+        return;
+      }
+      window.open(data.signedUrl, '_blank');
+      return;
+    }
+
+    const legacyUrl = entry.metadata?.storage_info?.pdf_storage_url;
+    if (legacyUrl) {
+      // Legacy row without bucket/path columns. The URL is almost certainly
+      // dead; warn the user rather than silently opening a 403.
+      toast.warning('Using legacy persisted URL — may have expired. Re-upload to fix.');
+      window.open(legacyUrl, '_blank');
+      return;
+    }
+
+    toast.error('No PDF storage location recorded for this entry.');
+  }, [entry.metadata?.storage_info]);
+
+  const hasPdfLink = Boolean(
+    entry.metadata?.storage_info?.pdf_storage_bucket
+      || entry.metadata?.storage_info?.pdf_storage_url,
+  );
+
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
@@ -172,17 +218,12 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             </Button>
           )}
 
-          {entry.metadata?.storage_info?.pdf_storage_url && (
+          {hasPdfLink && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                window.open(
-                  entry.metadata?.storage_info?.pdf_storage_url,
-                  '_blank',
-                )
-              }
-              onKeyDown={(e) => e.key === 'Enter' && window.open()}
+              onClick={handleOpenOriginalPdf}
+              onKeyDown={(e) => e.key === 'Enter' && handleOpenOriginalPdf()}
               className="flex items-center gap-2"
             >
               <FileText className="h-4 w-4" />

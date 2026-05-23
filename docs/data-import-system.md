@@ -138,13 +138,20 @@ Main hub component (`src/components/Admin/DataImportHub.tsx`) with 3 tabs:
 - **Web Scraping Tab** - Firecrawl integration for web sources
 - **Import History Tab** - View past imports with re-run and scheduling
 
-#### 2. XMLFieldMappingModal (`src/components/Admin/DataImport/XMLFieldMappingModal.tsx`)
+#### 2. XMLFieldMappingModal (`src/components/Admin/DataImport/XMLFieldMappingModal.tsx`) — "Fill the Gaps" panel
 
-Interactive UI for reviewing AI-suggested field mappings:
-- Color-coded confidence badges (green ≥90%, yellow ≥70%, red <70%)
-- Dropdown selectors for target schema fields
-- Template saving functionality
-- Preview of sample values
+Dynamic per-target panel that detects missing/sparse/conflicting fields and lets the operator resolve each case inline:
+- **Per-target row rendering** based on detection state:
+  - 🔴 `blocking_required` — required target with 0 mappings or 0% coverage (blocks import until manual value is filled)
+  - 🟡 `partial` — required target with partial coverage (optional fallback textarea; shows "fills N empty rows" or "skips N rows")
+  - 🟠 `conflict` — ≥2 XML tags mapped to same target (radio picker; losers route to metadata)
+  - ✅ `present` — required target with full coverage (collapsed in accordion)
+  - ⚪ optional present/missing — collapsible textareas for job-level defaults
+- **Coverage badges** per target: `mapped from <tag>, present in 312/418 rows (74%)`
+- **Auto-mapped** and **Unmapped → metadata** fields collapsed in accordions
+- Template saving for reuse on next refresh of the same feed
+
+`material_category` is **not in this panel** — the operator picks it once on the upload screen ([XMLImportTab.tsx](../src/components/Admin/DataImport/XMLImportTab.tsx)), matching the PDF upload flow.
 
 #### 3. ImportHistoryTab (`src/components/Admin/DataImport/ImportHistoryTab.tsx`)
 
@@ -165,23 +172,27 @@ Configure cron schedules for recurring imports:
 
 #### xml-import-orchestrator (`supabase/functions/xml-import-orchestrator/index.ts`)
 
-**Purpose:** Parse XML, detect fields, suggest mappings, create import jobs
+**Purpose:** Parse XML, detect fields with coverage stats, suggest mappings, create import jobs
 
 **Endpoints:**
-- `POST /xml-import-orchestrator` - Upload XML and create import job
+- `POST /xml-import-orchestrator` - Three modes via flags: `preview_only`, `generate_preview`, or default (import)
 
 **Features:**
-- XML parsing with field detection
-- AI-powered field mapping using Claude Opus 4.7
-- Fallback rule-based mapping (multi-language support)
-- Preview mode for field detection only
-- Stores products in job metadata for Python API
+- XML parsing (fast-xml-parser) with full-pass coverage stats per field
+- **Dictionary-first field mapping** ([_shared/xml-field-dictionary.ts](../supabase/functions/_shared/xml-field-dictionary.ts)) — ~150 entries across English/Spanish/French/German/Greek + ERP shorthand + regex rules for digit-suffix patterns
+- **AI residual on Haiku 4.5** — only fields the dictionary couldn't confidently match (confidence < 0.85) get sent to the model, with dictionary hints as priors. Stable feeds skip the AI call entirely.
+- **Mapping-aware extractor** — operator's `field_mappings` and `manual_values[target]` fallbacks applied per-row at import time
+- Chunk-inserts into `data_import_job_products` (no full-array-in-memory anti-pattern)
 
-**Request parameters:** workspace_id, category, xml_content (base64 encoded), optional preview_only flag, optional field_mappings, optional mapping_template_id, and optional parent_job_id.
+**Request parameters:** workspace_id, category, xml_content (base64), optional `preview_only`/`generate_preview` flags, optional `field_mappings`, optional `manual_values` (any target), optional `mapping_template_id`.
 
-**Response (Preview Mode):** success, detected_fields array, total_products count.
+**Response (preview_only):** detected_fields array (with `total_rows` / `present_count` / `coverage_pct` / `distinct_values` per field), `suggested_mappings`, `total_rows`.
 
-**Response (Import Mode):** success, job_id, total_products count.
+**Response (generate_preview):** `preview_product`, `preview_value_sources` (`{target: 'xml' | 'default'}`), `total_products`.
+
+**Response (import):** `job_id`, `total_products`, `dropped_count`, `message`.
+
+Full API reference: [xml-import-orchestrator-api.md](./api/xml-import-orchestrator-api.md). Operator-facing overview: [xml-import-orchestrator.md](./xml-import-orchestrator.md).
 
 #### scheduled-import-runner (`supabase/functions/scheduled-import-runner/index.ts`)
 
@@ -259,11 +270,11 @@ See [API Reference](#api-reference) for detailed documentation.
 
 #### POST /xml-import-orchestrator
 
-Upload XML file and create import job.
+Three-mode endpoint — see [xml-import-orchestrator-api.md](./api/xml-import-orchestrator-api.md) for full request/response schemas.
 
-**Request Body parameters:** workspace_id (UUID), category (e.g., "materials"), xml_content (base64-encoded XML), optional preview_only flag (default false), optional field_mappings object mapping XML fields to platform fields, optional mapping_template_id, and optional parent_job_id.
+**Request Body parameters:** workspace_id (UUID), category (required for import mode — job-level material_category), xml_content (base64-encoded XML), optional `preview_only` (run dictionary + AI residual, return coverage stats), optional `generate_preview` (apply mappings + manual_values to one product, return sample + per-field value sources), optional `field_mappings` (XML tag → target), optional `manual_values` (per-target job-level fallback applied when mapped tag is empty for a row), optional `mapping_template_id`, and optional `parent_job_id` (for re-runs).
 
-**Response:** success, job_id, total_products count.
+**Response:** depends on mode — preview returns `detected_fields[]` with coverage stats; generate_preview returns `preview_product` + `preview_value_sources`; import returns `job_id` + `total_products` + `dropped_count`.
 
 ### Python API
 
@@ -324,12 +335,17 @@ Stores reusable field mapping templates. Key fields include: id, workspace_id, n
 
 1. Navigate to Admin Dashboard → Data Import Hub
 2. Click "XML Import" tab
-3. Select category (e.g., "materials")
-4. Upload XML file
-5. Review AI-suggested field mappings
-6. Adjust mappings if needed
-7. Optionally save as template
-8. Click "Import"
+3. **Pick the Material Category** in the dropdown at the top (applied to every product in this import)
+4. Upload XML file or paste a remote URL
+5. Click "Detect Fields"
+6. **Resolve any gaps in the Fill-the-Gaps panel:**
+   - 🔴 Required fields the XML doesn't have (e.g. missing `factory_name`) — type a job-level default
+   - 🟡 Required fields with partial coverage (e.g. `<Manufacturer>` present on only 74% of rows) — optionally type a fallback for the empty rows
+   - 🟠 Conflicts (e.g. `<PriceW>` and `<PriceRetail>` both map to `price`) — pick the winner; the loser routes to metadata
+   - Optional fields can have job-level defaults too
+7. Click "Preview & Import" to see one sample product (each rendered field shows "from XML" vs "from default")
+8. Optionally save the mapping as a template for reuse
+9. Click "Start Import"
 
 ### 2. Schedule Recurring Import
 

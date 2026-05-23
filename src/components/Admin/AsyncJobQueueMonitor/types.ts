@@ -83,6 +83,14 @@ export interface BackgroundJob {
   user_id?: string;
   // Error observability rollup (added 2026-05-02). NULL on clean jobs.
   failure_summary?: JobFailureSummary | null;
+  // Active long-running operation marker (Stage 0, Stage 1.5, Stage 3).
+  // Set/cleared via tracker.set_slow_operation / clear_slow_operation.
+  // auto-recovery cron treats this as a "do not flag stuck" signal.
+  current_slow_operation?: {
+    operation: string;
+    started_at: string;
+    expected_max_seconds: number;
+  } | null;
   metadata: {
     filename?: string;
     stage?: string;

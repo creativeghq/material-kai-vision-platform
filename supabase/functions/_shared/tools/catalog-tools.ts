@@ -350,15 +350,52 @@ export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkS
           });
         }
 
+        // ── Canonicalize spec values (multilingual → canonical English) ──
+        // Sonnet's extraction returns specs in whatever language the source PDF
+        // uses. Route each candidate's specs through canonicalize-attributes so
+        // both the review chunk and the auto-add catalog content carry canonical
+        // English values for filterable facets (color, finish, material, …).
+        // Non-canonicalizable specs (size, sku, brand, …) pass through unchanged.
+        const candidates: any[] = Array.isArray(invokeData.candidates) ? invokeData.candidates : [];
+        for (const c of candidates) {
+          if (!c?.specs || typeof c.specs !== 'object') continue;
+          try {
+            const { data: canonResp, error: canonErr } = await supabase.functions.invoke(
+              'canonicalize-attributes',
+              {
+                body: {
+                  raw_attributes: c.specs,
+                  source: 'catalog_extract_promote',
+                },
+              },
+            );
+            if (canonErr || !canonResp) continue;
+            const canonicalSpecs = (canonResp.attributes && typeof canonResp.attributes === 'object')
+              ? canonResp.attributes
+              : {};
+            const rawAudit = (canonResp.attributes_raw && typeof canonResp.attributes_raw === 'object')
+              ? canonResp.attributes_raw
+              : {};
+            // Replace canonicalizable keys with their canonical English form;
+            // every other key (size, sku, brand, etc.) keeps its original value.
+            c.specs = { ...c.specs, ...canonicalSpecs };
+            if (Object.keys(rawAudit).length > 0) {
+              c.specs_raw = rawAudit;
+            }
+          } catch {
+            // Best-effort. Leave specs as-is on failure.
+          }
+        }
+
         emit(onChunk, {
           type: 'catalog_extraction_candidates',
           catalog_id: input.catalog_id,
           query: input.query,
-          candidates: invokeData.candidates || [],
+          candidates,
           auto_add: !!input.auto_add,
         });
 
-        if (input.auto_add && Array.isArray(invokeData.candidates) && invokeData.candidates.length > 0) {
+        if (input.auto_add && candidates.length > 0) {
           const body = catalog.body_data || { sections: [] };
           const sections = Array.isArray(body.sections) ? body.sections : [];
 
@@ -367,7 +404,7 @@ export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkS
             id: crypto.randomUUID(),
             title: sectionTitle,
             intro: null,
-            materials: invokeData.candidates.map((c: any) => ({
+            materials: candidates.map((c: any) => ({
               id: crypto.randomUUID(),
               name: c.name,
               description: c.description || null,
@@ -378,6 +415,7 @@ export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkS
               currency: c.currency || null,
               price_source: c.price != null ? 'manual' : null,
               specs: c.specs || {},
+              ...(c.specs_raw ? { specs_raw: c.specs_raw } : {}),
               provenance: {
                 source_pdf_id: c.source_pdf_id,
                 page_no: c.page_no,
@@ -399,7 +437,7 @@ export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkS
           success: true,
           catalog_id: input.catalog_id,
           query: input.query,
-          candidates_count: invokeData.candidates?.length || 0,
+          candidates_count: candidates.length,
           auto_added: !!input.auto_add,
         });
       } catch (err) {

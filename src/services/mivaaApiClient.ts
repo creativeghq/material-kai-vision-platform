@@ -628,6 +628,32 @@ export class MivaaApiClient {
     });
   }
 
+  /**
+   * Consolidated job status read.
+   *
+   * Backend endpoint: GET /api/rag/documents/job/{job_id}/full-status
+   *
+   * Returns `{core, stage_history, recovery_history, products, memory}` in a
+   * single round trip, replacing the prior pattern of querying
+   * `background_jobs` + `product_processing_status` + (historically)
+   * `job_checkpoints`/`job_progress` from the client separately. Prefer this
+   * over the individual table reads when rendering a single job's detail view.
+   *
+   * @returns full-status payload
+   */
+  async getJobFullStatus(jobId: string): Promise<MivaaApiResponse<{
+    job_id: string;
+    core: Record<string, unknown>;
+    stage_history: Array<Record<string, unknown>>;
+    recovery_history: Array<Record<string, unknown>>;
+    products: Array<Record<string, unknown>>;
+    memory?: Record<string, unknown> | null;
+  }>> {
+    return this.request(`/api/rag/documents/job/${jobId}/full-status`, {
+      method: 'GET',
+    });
+  }
+
   // ==================== INTERNAL/ADMIN ENDPOINTS ====================
 
   /**

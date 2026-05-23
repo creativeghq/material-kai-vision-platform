@@ -87,7 +87,12 @@ async function validateVatLive(countryCode: string | null, vatNumber: string | n
     clearTimeout(timer);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json() as { valid: boolean; name?: string };
-    const name = data.name && data.name !== '---' ? data.name : null;
+    // Split VIES "legal_name||trade_name" convention — store legal name only.
+    let name: string | null = null;
+    if (data.name && data.name !== '---') {
+      const cleaned = data.name.replace(/\s+/g, ' ').trim();
+      name = cleaned.includes('||') ? (cleaned.split('||')[0].trim() || null) : cleaned;
+    }
     return {
       vat_validated: data.valid === true,
       vat_validated_at: checkedAt,

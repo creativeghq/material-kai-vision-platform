@@ -83,6 +83,7 @@ const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
+const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
@@ -135,6 +136,7 @@ const App = () => (
                 {/* Public routes — no auth required */}
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
+                <Route path="/tools" element={<PageErrorBoundary name="Public Tools"><PublicToolsPage /></PageErrorBoundary>} />
 
                 <Route
                   path="/auth"

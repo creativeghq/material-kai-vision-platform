@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from '../TempFileCleanupModal';
@@ -202,16 +203,42 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setLoadingCheckpoints(true);
 
-      // Fetch fresh job data
-      const { data: jobData, error: jobError } = await supabase
-        .from('background_jobs')
-        .select('*')
-        .eq('id', job.id)
-        .single();
+      // For PDF jobs, prefer the consolidated MIVAA endpoint that returns
+      // {core, stage_history, recovery_history, products, memory} in a single
+      // round trip (see CLAUDE.md "Consolidated read"). Falls back to direct
+      // Supabase queries if MIVAA is unreachable.
+      let jobData: BackgroundJob | null = null;
+      let history: Array<Record<string, unknown>> = [];
+      let usedFullStatus = false;
 
-      if (jobError) {
-        console.error('Error fetching job data:', jobError);
-        throw jobError;
+      if (job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload') {
+        try {
+          const fullStatus = await mivaaApi.getJobFullStatus(job.id);
+          if (fullStatus.success && fullStatus.data) {
+            jobData = fullStatus.data.core as unknown as BackgroundJob;
+            history = fullStatus.data.stage_history || [];
+            usedFullStatus = true;
+          }
+        } catch (mivaaErr) {
+          // Non-fatal — fall through to Supabase query path below.
+          console.debug('MIVAA full-status unavailable, falling back to Supabase:', mivaaErr);
+        }
+      }
+
+      if (!usedFullStatus) {
+        // Fallback: direct Supabase reads.
+        const { data: fallbackData, error: jobError } = await supabase
+          .from('background_jobs')
+          .select('*')
+          .eq('id', job.id)
+          .single();
+
+        if (jobError) {
+          console.error('Error fetching job data:', jobError);
+          throw jobError;
+        }
+        jobData = fallbackData as BackgroundJob;
+        history = ((fallbackData as { stage_history?: Array<Record<string, unknown>> })?.stage_history) || [];
       }
 
       // Update selected job with fresh data using deep comparison to prevent modal blinking.
@@ -237,11 +264,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         });
       }
 
-      // Stage history lives on background_jobs.stage_history. Map it to
-      // the shape the rest of this component expects (job_id/stage/
-      // checkpoint_data/metadata/created_at) so downstream renderers and
-      // diff logic don't need to change.
-      const history = ((jobData as { stage_history?: Array<Record<string, unknown>> })?.stage_history) || [];
+      // Stage history (already loaded above — either from /full-status or the
+      // Supabase fallback). Map to the shape the rest of this component
+      // expects so downstream renderers and diff logic don't need to change.
       const checkpoints = history.map((entry, idx) => ({
         id: `${job.id}-${idx}`,
         job_id: job.id,
@@ -2726,6 +2751,70 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       Job {selectedJob.status}{currentStage ? ` at stage: ${currentStage.replace(/_/g, ' ')}` : ''}
                     </p>
                   </div>
+                );
+              })()}
+
+              {/* Slow-operation marker (active long-running stage).
+                  Shown when current_slow_operation is non-null — explains
+                  why heartbeat may look idle and why auto-recovery is
+                  intentionally suppressing recovery on this job. */}
+              {selectedJob?.current_slow_operation && typeof selectedJob.current_slow_operation === 'object' && (() => {
+                const slowOp = selectedJob.current_slow_operation as {
+                  operation?: string;
+                  started_at?: string;
+                  expected_max_seconds?: number;
+                };
+                const startedAt = slowOp.started_at ? new Date(slowOp.started_at).getTime() : null;
+                const elapsedSec = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : null;
+                const maxSec = slowOp.expected_max_seconds ?? null;
+                const overBudget = elapsedSec !== null && maxSec !== null && elapsedSec > maxSec;
+                return (
+                  <Alert className={`mt-3 ${overBudget ? 'bg-orange-500/10 border-orange-500/30' : 'bg-blue-500/10 border-blue-500/20'}`}>
+                    <Activity className="h-4 w-4" />
+                    <AlertDescription className={overBudget ? 'text-orange-200' : 'text-blue-200'}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm">
+                          Long-running stage active: <code className="text-xs">{slowOp.operation ?? 'unknown'}</code>
+                        </span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {elapsedSec !== null ? `${elapsedSec}s` : '?'}
+                          {maxSec !== null && ` / ${maxSec}s budget`}
+                          {overBudget && ' · over budget'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs mt-1 opacity-80">
+                        Auto-recovery is suppressing stuck-job detection while this is in flight.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                );
+              })()}
+
+              {/* Zero-entities / extract-only / other explicit completion reasons.
+                  Without this, a "completed" job with 0 products looks identical
+                  to a normal completion and operators can't distinguish a clean
+                  no-op from a discovery failure. */}
+              {selectedJob?.status === 'completed' && (selectedJob.metadata as any)?.completion_reason && (() => {
+                const reason = (selectedJob.metadata as any).completion_reason as string;
+                const reasonLabels: Record<string, { label: string; tone: 'warn' | 'info' }> = {
+                  zero_entities_discovered: {
+                    label: 'Completed — but discovery returned ZERO entities. PDF text layer may be empty (scanned-only), or the catalog has nothing in the requested categories.',
+                    tone: 'warn',
+                  },
+                  extract_only_mode: {
+                    label: 'Completed in extract-only mode — Stage 1.5 layout precompute only, no products/chunks/embeddings.',
+                    tone: 'info',
+                  },
+                };
+                const info = reasonLabels[reason] ?? { label: `Completed with reason: ${reason}`, tone: 'info' as const };
+                const toneClass = info.tone === 'warn'
+                  ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
+                  : 'bg-blue-500/10 border-blue-500/20 text-blue-200';
+                return (
+                  <Alert className={`mt-3 ${toneClass}`}>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{info.label}</AlertDescription>
+                  </Alert>
                 );
               })()}
 

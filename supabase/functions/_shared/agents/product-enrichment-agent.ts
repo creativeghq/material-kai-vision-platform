@@ -70,9 +70,13 @@ export class ProductEnrichmentAgent implements AgentRunner {
     const systemPrompt = agentConfig.system_prompt_override || `You are a material product specialist.
 Your task is to enrich product data for a building materials platform.
 For each product, generate:
-1. A clear, professional description (2-3 sentences)
-2. 5-8 search keywords relevant to architects and interior designers
-3. The primary material category (e.g. "ceramic tile", "natural stone", "wood flooring")
+1. A clear, professional description (2-3 sentences) — write in English
+2. 5-8 search keywords relevant to architects and interior designers — lowercase English
+3. The primary material category (e.g. "ceramic tile", "natural stone", "wood flooring") — lowercase English
+
+LANGUAGE RULE: Return all values in English. If the input product name / description
+is in another language (Greek, Italian, German, etc.), translate to English. Preserve
+verbatim only: brand names, model numbers, SKUs, certifications.
 
 Respond with a JSON object only. No prose, no markdown fences.`;
 
@@ -126,6 +130,29 @@ Return JSON: { "description": "...", "keywords": ["..."], "material_category": "
           if (enriched.keywords) metaUpdate.search_keywords = enriched.keywords;
           if (enriched.material_category) metaUpdate.material_category = enriched.material_category;
           updateData.metadata = metaUpdate;
+        }
+
+        // ── Auto-canonicalize material_category through the facet pipeline ──
+        // material_category is whitelisted, so the canonicalizer's L0.5+L1+L2
+        // collapse "Πορσελάνη" / "Porcelain" / "Porzellan" → canonical "porcelain".
+        // The enrichment agent's other outputs (description, keywords) are NOT
+        // canonicalizable facets so they pass through unchanged.
+        try {
+          const canonResp = await supabase.functions.invoke('canonicalize-attributes', {
+            body: {
+              product_id: product.id,
+              raw_attributes: enriched.material_category ? { material_category: enriched.material_category } : {},
+              source: 'agent_product_enrichment',
+            },
+          });
+          if (canonResp.error) {
+            await log('warn', `canonicalize-attributes failed for ${product.id}`, { error: canonResp.error.message });
+          } else if (canonResp.data && Object.keys(canonResp.data.attributes || {}).length > 0) {
+            updateData.attributes     = canonResp.data.attributes;
+            updateData.attributes_raw = canonResp.data.attributes_raw;
+          }
+        } catch (canonErr: any) {
+          await log('warn', `canonicalize-attributes threw for ${product.id}`, { error: canonErr?.message });
         }
 
         if (Object.keys(updateData).length > 0) {

@@ -70,6 +70,87 @@ function normalizeVat(countryCode: string, vatNumber: string): { country: string
   return { country: rawCountry, number: rawNumber };
 }
 
+/** Split a VIES "name" field on '||' which is the convention for "legal_name||trade_name". */
+function parseViesName(raw: string | null | undefined): { full: string | null; legal: string | null; trade: string | null } {
+  if (!raw || raw === '---') return { full: null, legal: null, trade: null };
+  const cleaned = raw.replace(/\s+/g, ' ').trim();
+  if (!cleaned.includes('||')) return { full: cleaned, legal: cleaned, trade: null };
+  const [legal, trade] = cleaned.split('||').map((s) => s.trim());
+  return { full: cleaned, legal: legal || null, trade: trade || null };
+}
+
+interface ParsedAddress {
+  street: string | null;
+  street_number: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
+/**
+ * Best-effort EU address parsing. VIES returns the address as one country-specific string.
+ * We handle the top ~9 likely countries explicitly + a generic fallback.
+ *
+ * Strategy: locate the country-appropriate postal code → split into "street block" + "city" →
+ * detect leading or trailing house number in the street block depending on local convention.
+ */
+function parseEuAddress(country: string, raw: string | null | undefined): ParsedAddress | null {
+  if (!raw || raw === '---') return null;
+  // Collapse whitespace (VIES often pads with many spaces or newlines) but preserve "12B" style numbers
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  // Per-country postal-code regexes
+  const postalRegex: Record<string, RegExp> = {
+    EL: /\b(\d{3}\s?\d{2})\b/,    // 12345 or 123 45
+    DE: /\b(\d{5})\b/,
+    FR: /\b(\d{5})\b/,
+    IT: /\b(\d{5})\b/,
+    ES: /\b(\d{5})\b/,
+    NL: /\b(\d{4}\s?[A-Z]{2})\b/,  // 1234 AB
+    AT: /\b(\d{4})\b/,
+    BE: /\b(\d{4})\b/,
+    PT: /\b(\d{4}-\d{3})\b/,
+  };
+  // Countries where the house number typically appears BEFORE the street name
+  const numberFirstCountries = new Set(['FR', 'BE']);
+
+  const regex = postalRegex[country] ?? /\b(\d{4,5})\b/;
+  const match = text.match(regex);
+
+  if (!match) {
+    // Fall back: dump the raw string into street, leave the rest blank
+    return { street: text, street_number: null, postal_code: null, city: null };
+  }
+
+  const postalCode = match[1].replace(/\s+/g, ' ').trim();
+  const beforePostal = text.slice(0, match.index!).trim().replace(/[,\s-]+$/, '');
+  const afterPostal = text.slice(match.index! + match[0].length).trim().replace(/^[,\s-]+/, '');
+
+  // City is everything after the postal code, stripped of trailing province codes (IT) etc.
+  const city = afterPostal || null;
+
+  // Try to peel a house number off the street block
+  let street = beforePostal || null;
+  let streetNumber: string | null = null;
+
+  if (street) {
+    if (numberFirstCountries.has(country)) {
+      const m = street.match(/^(\d+[A-Za-z]?(?:[\-/]\d+[A-Za-z]?)?)\s+(.+)$/);
+      if (m) { streetNumber = m[1]; street = m[2]; }
+    } else {
+      const m = street.match(/^(.+?)\s+(\d+[A-Za-z]?(?:[\-/]\d+[A-Za-z]?)?)\s*[,]?$/);
+      if (m) { street = m[1]; streetNumber = m[2]; }
+    }
+  }
+
+  return {
+    street: street ?? null,
+    street_number: streetNumber,
+    postal_code: postalCode,
+    city,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -138,10 +219,16 @@ Deno.serve(async (req: Request) => {
       }, 503);
     }
 
+    const nameParsed = parseViesName(viesData.name);
+    const addressParsed = parseEuAddress(country, viesData.address);
+
     const result = {
       valid: viesData.valid === true,
-      name: viesData.name && viesData.name !== '---' ? viesData.name : null,
+      name: nameParsed.full,
+      legal_name: nameParsed.legal,
+      trade_name: nameParsed.trade,
       address: viesData.address && viesData.address !== '---' ? viesData.address : null,
+      address_parsed: addressParsed,
       country_code: country,
       vat_number: number,
       checked_at: new Date().toISOString(),
@@ -176,7 +263,7 @@ Deno.serve(async (req: Request) => {
           await admin.from('crm_companies').update({
             vat_validated: result.valid,
             vat_validated_at: result.checked_at,
-            vat_validated_name: result.name,
+            vat_validated_name: result.legal_name,
             vat_validated_address: result.address,
             vat_validation_source: 'vies',
             updated_at: new Date().toISOString(),

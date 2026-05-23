@@ -423,6 +423,7 @@ class CatalogsService {
     price?: number | null;
     currency?: string | null;
     specs?: Record<string, any>;
+    specs_raw?: Record<string, string[]>;
     source_pdf_id?: string | null;
     page_no?: number | null;
   }>): Promise<PresentationCatalog> {
@@ -449,6 +450,7 @@ class CatalogsService {
         price_source: c.price != null ? 'manual' : null,
         price_source_ref: null,
         specs: c.specs ?? {},
+        ...(c.specs_raw ? { specs_raw: c.specs_raw } : {}),
         provenance: {
           source_pdf_id: c.source_pdf_id ?? null,
           page_no: c.page_no ?? null,

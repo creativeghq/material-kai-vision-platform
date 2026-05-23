@@ -1,9 +1,24 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface ViesParsedAddress {
+  street: string | null;
+  street_number: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
 export interface ViesValidationResult {
   valid: boolean | null;
+  /** Raw name as returned by VIES (may contain "legal_name||trade_name"). */
   name?: string | null;
+  /** Legal name (the part before `||`). Prefer this over `name` when adopting into our DB. */
+  legal_name?: string | null;
+  /** Trade name (the part after `||`), if VIES provided one. */
+  trade_name?: string | null;
+  /** Raw address string from VIES — country-specific format. */
   address?: string | null;
+  /** Best-effort parsed address (per-country regex). NULL on unsupported countries. */
+  address_parsed?: ViesParsedAddress | null;
   country_code?: string;
   vat_number?: string;
   checked_at: string;

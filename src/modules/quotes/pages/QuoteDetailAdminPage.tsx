@@ -788,6 +788,8 @@ export const QuoteDetailPage: React.FC = () => {
               items={quote.items || []}
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
+              customerCompanyId={quote.customer_company_id}
+              customerContactId={quote.customer_contact_id}
               onAddProducts={() => setIsAddProductsOpen(true)}
               onUpdateQuantity={['draft', 'submitted'].includes(quote.status) ? async (itemId, quantity) => {
                 await quotesService.updateItem(itemId, { quantity });
@@ -1455,6 +1457,8 @@ export const QuoteDetailPage: React.FC = () => {
           open={isAddProductsOpen}
           onOpenChange={setIsAddProductsOpen}
           existingProductIds={(quote?.items || []).map((i: any) => i.product_id).filter(Boolean)}
+          customerCompanyId={quote?.customer_company_id}
+          customerContactId={quote?.customer_contact_id}
           onProductsAdded={loadQuoteDetails}
         />
       )}

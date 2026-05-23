@@ -109,6 +109,10 @@ interface AddProductsSheetProps {
   quoteId: string;
   existingProductIds: string[];
   onProductsAdded: () => void;
+  /** B2B customer of the parent quote — passed through to PriceLookupDrawer. */
+  customerCompanyId?: string | null;
+  /** B2C / private customer of the parent quote — passed through to PriceLookupDrawer. */
+  customerContactId?: string | null;
 }
 
 export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
@@ -117,6 +121,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   quoteId,
   existingProductIds,
   onProductsAdded,
+  customerCompanyId,
+  customerContactId,
 }) => {
   const { toast } = useToast();
 
@@ -619,6 +625,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
         sku={customForm.sku.trim() || undefined}
         quantity={customForm.quantity}
         unit={customForm.unit || undefined}
+        customerCompanyId={customerCompanyId}
+        customerContactId={customerContactId}
         onConfirm={async (payload) => {
           setCustomForm((prev) => ({
             ...prev,

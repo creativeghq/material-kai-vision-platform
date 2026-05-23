@@ -103,6 +103,15 @@ Intelligent XML file imports with AI-powered field mapping.
 - **Features:** Field detection, mapping suggestions, preview mode, bulk import
 - **Access:** Authenticated users
 
+### Public / Lead-gen APIs
+
+#### [Public Tools API](./public-tools-api.md)
+Unauthenticated price + mention scan API that backs the `/tools` page.
+- **Endpoints:** `GET /api/v1/public/quota`, `POST /api/v1/public/price-scan`, `POST /api/v1/public/mention-scan`
+- **Features:** 2 scans/day per IP, Cloudflare Turnstile required, 24h result cache, stateless (no DB writes to `tracked_*` tables)
+- **Access:** Public (no auth). Optional Bearer JWT switches quota keying to `user_id`.
+- **Configuration:** `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` in MIVAA env (preferred) or `/admin/operations → Keys` (DB fallback)
+
 ### Automation APIs
 
 #### [Price Monitoring Cron API](./price-monitoring-cron-api.md)

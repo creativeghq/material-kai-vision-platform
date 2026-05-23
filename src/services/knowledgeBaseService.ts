@@ -166,8 +166,14 @@ export class KnowledgeBaseService {
     file: File,
     metadata: Record<string, string>,
   ): Promise<any> {
-    // First, upload file to Supabase storage
-    const fileName = `kb-uploads/${Date.now()}-${file.name}`;
+    // Path convention (post-2026-05-23 bucket consolidation): KB raw PDFs live
+    // under `{user_id}/...` in `pdf-documents`. The orphan-cleanup cron's grace
+    // logic is user-scoped, so the path matters.
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('User not authenticated');
+    }
+    const fileName = `${user.id}/${Date.now()}-${file.name}`;
     const { error: uploadError } = await supabase.storage
       .from('pdf-documents')
       .upload(fileName, file);
@@ -176,14 +182,17 @@ export class KnowledgeBaseService {
       throw new Error(`File upload failed: ${uploadError.message}`);
     }
 
-    // Get public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+    // pdf-documents is private — mint a signed URL for MIVAA to download from.
+    const { data: signed, error: signError } = await supabase.storage
+      .from('pdf-documents')
+      .createSignedUrl(fileName, 3600);
+    if (signError || !signed?.signedUrl) {
+      throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
+    }
 
     // Now call gateway with file_url instead of FormData
     return this.callGateway('kb_create_from_pdf', {
-      file_url: publicUrl,
+      file_url: signed.signedUrl,
       ...metadata,
     });
   }

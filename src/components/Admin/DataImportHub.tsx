@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Globe, FileText, FileType, ExternalLink, AlertCircle } from 'lucide-react';
+import { Upload, Globe, FileText, FileType, ExternalLink, AlertCircle, Tags } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -17,6 +17,7 @@ import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
+import MaterialCategoriesTab from './DataImport/MaterialCategoriesTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { NewScraperPage } from '@/components/experimental/scraper/NewScraperPage';
@@ -36,7 +37,7 @@ const DataImportHub: React.FC = () => {
   useEffect(() => {
     checkActiveJobs();
     // Set active tab from URL parameter if present
-    if (tabParam && ['pdf', 'xml', 'firecrawl', 'history'].includes(tabParam)) {
+    if (tabParam && ['pdf', 'xml', 'firecrawl', 'history', 'categories'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -102,6 +103,10 @@ const DataImportHub: React.FC = () => {
                 <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Upload className="h-4 w-4 mr-2" />
                   Import History
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Tags className="h-4 w-4 mr-2" />
+                  Categories
                 </TabsTrigger>
               </TabsList>
 
@@ -203,6 +208,10 @@ const DataImportHub: React.FC = () => {
 
               <TabsContent value="history" className="mt-6">
                 <ImportHistoryTab />
+              </TabsContent>
+
+              <TabsContent value="categories" className="mt-6">
+                <MaterialCategoriesTab />
               </TabsContent>
             </Tabs>
           </CardContent>

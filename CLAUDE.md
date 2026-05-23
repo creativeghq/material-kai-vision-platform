@@ -13,31 +13,119 @@ The platform uses **6 buckets** (down from 17). Routing is path-based; feature i
 | Bucket | Public | Folders / use |
 |---|---|---|
 | `pdf-documents` | 🔒 private (signed URLs) | KB raw PDFs at `{user_id}/...` · `catalog-source/{catalog_id}/...` · `catalog-output/{catalog_id}/...` · `quote-output/{quote_id}/...` · `moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf` |
-| `pdf-tiles` | ✅ public | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
+| `pdf-tiles` | 🔒 RLS read=authenticated (not literally public) | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
 | `generation-images` | ✅ public, 100 MB, image/video | `{user_id}/...`, `gemini/`, `videos/`, `user-uploads/`, `social/`, `product-crops/...` (SAM crops + segmentation), `agent/` (chat uploads), `3d/` (3D models), `designer/` (designer module) |
 | `quote-templates` | 🔒 private, 50 MB | Quote template PNGs at root (`template-cover.png`, `template-content.png`, `template-backcover.png`, `template-intro.png`) · `catalog/cover.png` / `catalog/backcover.png` (catalog templates) |
 | `moodboard-sheet-references` | ✅ public | Static admin-curated illustrations for the sheet-type picker (`material_board.png`, `color_palette.png`, etc.) |
 | `profile-avatars` | ✅ public, 2 MB | `{user_id}/avatar.ext` |
 
 **Privacy model:**
-- `pdf-documents` is private — every reader mints a fresh signed URL via `createSignedUrl()`. Stop persisting full URLs in DB rows; store the storage path and re-derive on each render.
-- `pdf-tiles` + `generation-images` are public but writes are RLS-gated to authenticated users or service role.
+- `pdf-documents` is private — every reader mints a fresh signed URL via `createSignedUrl()`. Stop persisting full URLs in DB rows; store the storage path (`storage_bucket` + `storage_object_path`) and re-derive on each render. The 2026-05-23 audit hardened both write side (upload routers no longer persist `file_url` in metadata; resume reads `storage_bucket`/`storage_object_path` and signs fresh) and read side (`KnowledgeBasePDFViewer.handleOpenOriginalPdf` calls `createSignedUrl` on demand instead of opening a stale persisted URL).
+- `pdf-tiles` read is gated to `auth.role()='authenticated'` (despite the "public" label in older docs — the bucket is created public but read policy is authenticated-only). Writes are service-role.
+- `generation-images` is public-readable but writes are RLS-gated to authenticated users or service role.
 - `quote-templates` is admin-only RW via the `quote_templates_admin_all` policy (admin / super_admin / owner roles, plus service_role).
 
 **Cleanup wiring:**
-- `storage-orphan-cleanup-cron` scans `pdf-documents` + `pdf-tiles` (24h grace) and `generation-images` (14d grace).
+- `storage-orphan-cleanup-cron` scans `pdf-documents` (72h grace) + `pdf-tiles` (48h grace) + `generation-images` (14d grace). Grace bumps landed 2026-05-23 to widen absorption for delayed-DB-write paths (admin uploads, schedulers that upload to storage minutes before inserting the documents row, background catalog-restore). Each `batch.remove()` is preceded by a `verify_storage_orphans(bucket, paths[])` call that re-checks the candidate batch against the live DB reference set — closes the race between `find_orphan_storage_objects` snapshot time and the actual delete (a 5000-path batch can take ~30s, and a DB ref written in that window would otherwise be left dangling). Race-protected skips are counted in `storage_cleanup_log.details.skipped_raced`. Fail-closed on verify error — a failing RPC skips the batch rather than blindly delete the stale snapshot.
 - 7 AFTER DELETE trigger functions (`_cleanup_moodboard_sheet_storage`, `_cleanup_quote_pdf_storage`, `_cleanup_generation_segment_storage`, `_cleanup_agent_uploaded_file_storage`, `_cleanup_chat_message_storage`, `_cleanup_conversation_storage`, `build_storage_reference_set`) all reference the new bucket layout.
 - `reset-platform` clears `pdf-tiles` + `generation-images` only. KB raw + generated outputs in `pdf-documents` survive a reset (the orphan cron picks up any that the table-clear step orphans).
+
+## Public Tools page — `/tools` lead-gen (2026-05-23)
+
+Unauthenticated lead-gen surface that lets anyone type a product or brand name and get back real retailer prices + recent press mentions. Built to drive sign-ups into the paid tracked flow.
+
+**Route**: `/tools` — registered in [src/App.tsx:138](src/App.tsx#L138) **outside** `<AuthGuard>`, same pattern as `/board/:id` and `/c/:slug`.
+
+**Quota model**: 2 total scans/day per IP (combined across both scan types), keyed on `user_id` when signed in (so users behind shared IPs don't penalize each other). Identical queries within 24h hit `public_lookup_cache` and serve instantly **without consuming quota or spending upstream credits**. Failed scans (captcha-failed / rate-limited / errored) don't burn quota either — only `outcome='success'` rows in `public_lookup_log` count.
+
+**Bot defense**: Cloudflare Turnstile is required on every scan. The widget is rendered with one of two action labels (`price_scan` or `mention_scan`) and verified server-side via `https://challenges.cloudflare.com/turnstile/v0/siteverify`. Fails closed — if `TURNSTILE_SECRET_KEY` isn't set, every scan returns 400 with error code `configuration_error`.
+
+**Stateless engines**: Both scan paths re-use the existing discovery services without writing to `tracked_queries` / `tracked_mentions`:
+- `POST /api/v1/public/price-scan` → calls `PerplexityPriceSearchService.search_prices()` directly (Perplexity Sonar + DataForSEO Shopping + Firecrawl verification) → returns retailer list + min/median/max stats. Mirrors the internal `/market-check` endpoint but without the admin guard.
+- `POST /api/v1/public/mention-scan` → builds a deterministic `SubjectFacets` (label + user aliases, **no Haiku expansion**, no Anthropic dependency) and calls `MentionSearchService.search()` directly (DataForSEO News + Perplexity Sonar) → returns recent mentions + top outlets.
+- `GET  /api/v1/public/quota` → reads current `{used, remaining, limit, reset_at, turnstile_site_key, is_authenticated}` in a single round trip so the frontend can render the widget without a separate key fetch.
+
+**Database** (migration `public_tools_lookup_tables_and_turnstile_secrets`):
+- `public_lookup_log(id, scan_type, ip_address inet, user_id uuid, query_hash, query_text, cache_hit, upstream_cost_usd, latency_ms, outcome, error_message, user_agent, created_at)` — one row per scan attempt (cache hit or miss, success or failure). Quota query is `count(*) where outcome='success' and (ip = ? or user_id = ?) and created_at > now() - 24h`. RLS reads gated to admin/super_admin; writes service-role-only.
+- `public_lookup_cache(query_hash, scan_type, result jsonb, hit_count, created_at, expires_at)` — PK on `(query_hash, scan_type)`. 24h TTL. `hit_count` is bumped on every cache hit for cost-savings analytics.
+- pg_cron `public-lookup-cleanup-daily` at 04:15 UTC prunes expired cache rows + log rows older than 30d.
+
+**Turnstile keys live in `platform_secrets`** (two rows, both `primary_module_slug = NULL` → platform-wide, surface at `/admin/operations → Keys`):
+- `TURNSTILE_SITE_KEY` — public, embedded in HTML, `is_sensitive=false`. Returned by `GET /quota` so the frontend widget can render.
+- `TURNSTILE_SECRET_KEY` — used server-side by `turnstile_verifier.py`, `is_sensitive=true`, masked in admin GET responses.
+
+**Where to deploy the keys**: Preferred is **MIVAA env via deploy.yml `Environment=` lines** (same as `PERPLEXITY_API_KEY` / `FIRECRAWL_API_KEY` / `DATAFORSEO_BASE64`). Env wins over DB. The DB rows in `platform_secrets` are the rotate-without-redeploy fallback — paste new values into the admin UI and MIVAA picks them up within 30 seconds (`platform_secret_resolver.py` caches each row for 30s). Both keys are consumed by the **Python backend, not Supabase edge functions** — the widget script is loaded directly from Cloudflare on the frontend, and siteverify is called from Python.
+
+**Python env-first / DB-fallback resolver** ([platform_secret_resolver.py](mivaa-pdf-extractor/app/services/integrations/platform_secret_resolver.py)): mirrors the Deno `_shared/secrets.ts → resolveSecret()` pattern. Priority is `os.getenv(key) > platform_secrets.value > platform_secrets.default_value > missing`. 30s in-process cache per worker so per-request resolution is cheap. Used by `turnstile_verifier.verify_token()` and by the `/quota` endpoint to surface the site key.
+
+**Cost model**: Each scan costs the platform ~$0.005–$0.020 in upstream API spend (Perplexity ~$0.005, DataForSEO ~$0.0006, Firecrawl verification of 5–10 URLs ~$0.01, Haiku classification on mention path ~$0.001). Visitor pays nothing. The 24h cache + 2/day cap + Turnstile gate cap the blast radius at ~2 × 365 × $0.02 = ~$15/IP/year worst case. Real-world: most queries are repeats hitting cache.
+
+**Frontend**:
+- [src/services/publicToolsService.ts](src/services/publicToolsService.ts) — `fetchQuota()`, `priceScan()`, `mentionScan()`. Throws structured `PublicToolsApiError` with `kind: 'quota_exceeded' | 'captcha_failed' | 'upstream' | 'network'` so the page can route each failure mode independently.
+- [src/components/features/turnstile/TurnstileWidget.tsx](src/components/features/turnstile/TurnstileWidget.tsx) — React wrapper. Loads `https://challenges.cloudflare.com/turnstile/v0/api.js` once per page via memoized script promise. Exposes `reset()` via `useImperativeHandle` so the page can reissue a fresh token after each scan (Turnstile tokens are single-use).
+- [src/pages/Tools/PublicToolsPage.tsx](src/pages/Tools/PublicToolsPage.tsx) — two-tab form (Price / Mention), live quota chip in the header, Turnstile-gated scan button, result cards. When `quota.remaining === 0` the form is replaced by the `UpsellCard` with two CTAs: "Create free account" (→ `/auth?mode=signup`) and "See credit packs" (→ `/auth?mode=signup&redirect=/billing`).
+
+**To activate after this branch deploys**:
+1. Sign up at https://dash.cloudflare.com/?to=/:account/turnstile (free tier — 1M verifications/month).
+2. Create a widget for the production domain. Use `Managed` mode for invisible challenges on most legit traffic + checkbox on suspicious.
+3. Paste site key + secret key either into deploy.yml `Environment=` lines on MIVAA (preferred) **or** at `/admin/operations → Keys`.
+4. Redeploy MIVAA so the new env vars take effect (skip if using DB fallback — picks up within 30s).
+5. Test by visiting `/tools` — the quota chip in the header should show "2 / 2 free scans left today".
+
+**Known follow-ups** (not shipped 2026-05-23):
+- `/billing` credit-packs page — the upsell links there but the page doesn't exist yet. Need a Stripe-checkout-backed credit purchase flow.
+- Per-IP `PublicToolsAnalyticsPage` under `/admin/operations` for scan volume + cost-per-IP visibility. Data is there (`public_lookup_log`), no UI yet.
+- Authenticated quota above the 2-free-scan limit — currently signed-in users get the same 2/day cap as anonymous. Should become "free quota + credit-debited beyond that". Credit debit hook would go in `public_tools_routes.py` after the quota check.
+- Cache invalidation on cache-eviction admin tool — operator-driven flush by query or by scan_type if a query goes stale before 24h TTL.
+
+---
 
 ## Qwen removal — Anthropic-only vision (2026-05-01)
 Audit-discovered: the configured HF endpoint served `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) but the segmentation/classification/vision-analysis call sites all asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s and falling through to Anthropic Claude — Stage 3 had effectively been 100% Claude for months. Migration made the architecture honest:
 
-- **Vision is Anthropic-only.** Segmentation, image classification, vision_analysis, material analysis all run on `claude-opus-4-7` via Anthropic tool use (`app.models.vision_analysis.VisionAnalysis` is the schema-locked Pydantic model + `VISION_ANALYSIS_TOOL`). Tool use eliminates JSON regex recovery and provides a hard guarantee of schema adherence — the only path that protects Voyage's understanding-embedding space from drift.
+- **Vision is Anthropic-only.** Segmentation, image classification, vision_analysis, material analysis all run on `claude-opus-4-7`. The ingestion path (`_try_claude_material_analysis` → understanding embedding) uses **real Anthropic tool_use** as of 2026-05-23: `tools=[VISION_ANALYSIS_TOOL]` + `tool_choice={'type':'tool','name':...}` — the model is forced to emit a tool_use block whose `input` matches `VisionAnalysis.input_schema`. No regex repair, no JSON-parse fallback. Pydantic still validates as defense-in-depth before Voyage embeds. NOTE: the validation downstream path (`real_image_analysis_service._analyze_with_claude`, used by `ClaudeValidationService` in Stage 5) still uses free-form prompting + 3-strategy JSON regex repair — that's a separate flow used for quality scoring, not understanding-embedding ingestion. Schema lock applies to the ingestion path that feeds Voyage.
 - **Chunking → Sonnet 4.6.** `Settings.chunking_primary_model` default flipped from `Qwen/Qwen3.6-35B-A3B-FP8` to `claude-sonnet-4-6`. Chunking is a text task at the quality ceiling; Opus would be 5× the cost for marginal gain.
 - **Voyage drift detection.** Every understanding-embedding row now persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version`). Same on `products.text_embedding_1024_model` / `text_embedding_schema_version`. The OpenAI fallback is **disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection.
 - **Backfill.** `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Opus + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
 - **Dead code retired.** `qwen_endpoint_manager.py` deleted. All `Settings.qwen_*` fields, `validate_qwen_model`, `get_qwen_config`, `endpoint_registry.get_qwen_manager`, the `endpoint_controller.qwen` AdaptiveConcurrency gate, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), and the qwen Operations dashboard widgets are all removed. The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy. The only Qwen string left in the codebase is the `VisionProvider.QWEN` enum value, which is retained so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate.
 - **Stage 4 product embedding fail-closed.** Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (audit gap C).
+
+## Where vision actually runs in the pipeline (clarified 2026-05-23)
+
+The label "vision" is sometimes ambiguous in the upload API and docstrings. The actual modality per stage:
+
+- **Stage 0 — Product Discovery is TEXT-ONLY**, despite the `discovery_model='claude-vision'` upload param defaulting to a vision-capable Claude model. [`product_discovery_service._discover_with_claude`](mivaa-pdf-extractor/app/services/discovery/product_discovery_service.py) sends only `messages=[{role:'user', content: prompt}]` (a string, no `image` block) and the prompt is built from `page.get_text()` / `get_physical_page_text`. The `-vision` suffix is a model selector, not a modality selector. This works fine for catalogs where product names + page boundaries are extractable text. Catalogs where the product name is rendered as part of a page image (designer fonts, logos, stylized titles) silently lose those products. The 2026-05-23 audit added `_filter_validated_items` + zero-entities early exit so malformed / empty discovery short-circuits rather than burning Stages 1.5/2/3/4 on nothing.
+- **Stage 3 — Per-image Material Analysis IS vision.** [`image_processing_service._try_claude_material_analysis`](mivaa-pdf-extractor/app/services/images/image_processing_service.py) base64-encodes every image and sends it to Claude Opus 4.7 with `tools=[VISION_ANALYSIS_TOOL]` + `tool_choice={'type':'tool','name':...}`. Schema-locked at the API layer post 2026-05-23 (was free-form JSON + Pydantic-only validation before). Output drives the understanding embedding (Voyage 1024D) + the 4 aspect embeddings + per-product material metadata.
+- **Stage 5 — Quality Validation** runs Claude vision again with a different prompt for confidence scoring. Still uses free-form prompting + 3-strategy JSON regex repair (intentional — output is consumed as a score, not as a Voyage input).
+
+If you want vision-attached discovery (so image-baked product names get caught), that's a net-new capability — wire a rendered-page-image content block into `_discover_with_claude`. Not a bug fix; tracked as a follow-up.
+
+## XML Import "Fill the Gaps" (2026-05-23 — operator-driven mapping + dictionary-first detection + downstream contract fixes)
+
+Overhauled the XML import flow ([XMLImportTab.tsx](src/components/Admin/DataImport/XMLImportTab.tsx) + [XMLFieldMappingModal.tsx](src/components/Admin/DataImport/XMLFieldMappingModal.tsx) + [xml-import-orchestrator/index.ts](supabase/functions/xml-import-orchestrator/index.ts)) after audit-discovered gaps in the previous mapping flow. Six concrete changes:
+
+1. **Material category picked up-front at the upload screen** — mirrors the PDF flow ([PDFUploadSection.tsx:242](src/components/features/pdf/PDFUploadSection.tsx#L242)). The orchestrator stamps it on every product. `material_category` is **no longer a target the operator maps from the XML** — the Fill-the-Gaps panel doesn't render it. Operator picks "Lighting" once, every row gets `material_category='lighting'`.
+
+2. **"Fill the Gaps" panel replaces the field-mapping table.** Per-target row rendering by detection state:
+   - 🔴 `blocking_required` — required target with 0 mappings OR 0% coverage. Blocks import until a job-level default is typed.
+   - 🟡 `partial` — required target with partial coverage (e.g. `<Manufacturer>` present on 312/418 rows). Optional fallback textarea shows "fills N empty rows" or "skips N rows".
+   - 🟠 `conflict` — ≥2 XML tags → same target (e.g. `<PriceW>` + `<PriceRetail>` → `price`). Radio picker; losing tags auto-route to `metadata`.
+   - ✅ / ⚪ — present / optional missing — collapsed in accordion.
+   The orchestrator computes per-field `present_count` + `coverage_pct` + `distinct_values` across all product nodes (full pass, not just first 10) so the UI badges are honest.
+
+3. **`manual_values` are TRUE per-row fallbacks now** (not just preview cosmetics). `parseXML` accepts `field_mappings + manual_values`; per-row extractor uses `manual_values[target]` whenever the mapped XML tag is empty. Mapped-and-present rows keep their real data; mapped-but-empty + unmapped rows get the job-level default. **Any target** can have a manual value, not just the original three required fields.
+
+4. **Dictionary-first / AI-residual field detection.** New file [_shared/xml-field-dictionary.ts](supabase/functions/_shared/xml-field-dictionary.ts) — ~150 multilingual entries (English/Spanish/French/German/Greek + ERP shorthand: `mtrl`, `pricew`, `kodikos`, etc.) + regex rules for digit-suffix tags (`image1`/`dim2`/`barcode13`). `classifyFields()` buckets every tag into `confident` (≥0.85 confidence — skip AI), `ambiguous` (sent to AI with dictionary hint as prior), or `unknown` (sent to AI fresh). Cost drop on a typical stable feed: ~$0.005-0.02 (Opus, all fields) → ~$0.0001 (Haiku, 3-5 residual fields). Latency drop: 2-4s → <50ms when dictionary covers everything. Determinism win: same XML → same suggestions across runs for the dictionary-confident bucket.
+
+5. **Downstream contract fixed (post-audit P0 bugs).** Two real bugs caught by tracing the Python `/api/import/process` path:
+   - **Attribute targets were lost to metadata under XML tag name.** Mapping `<PriceW>→price` was writing `metadata.pricew` instead of `metadata.price` AND not writing top-level `product_data.price` — so `properties.price` JSONB write ([data_import_service.py:599](mivaa-pdf-extractor/app/services/integrations/data_import_service.py#L599)), Voyage text embedding ([:678](mivaa-pdf-extractor/app/services/integrations/data_import_service.py#L678)), and facet canonicalization ([facet_canonicalizer.py:142](mivaa-pdf-extractor/app/services/facets/facet_canonicalizer.py#L142)) all silently skipped the value. Fix: `buildProductWithMappings` now writes attribute targets (price/color/dimensions/designer/collection/finish/material/colors/size) to BOTH top-level on ProductData AND `metadata.<target>` (under canonical name, not XML tag name).
+   - **`external_sku` target was broken for re-import dedup.** Python checks `product_data.product_id` / `product_data.sku` / `metadata.product_id` ([:628](mivaa-pdf-extractor/app/services/integrations/data_import_service.py#L628)); orchestrator was writing `metadata.code` (or whatever XML tag). Fix: SKU target routes to all three paths.
+
+6. **Pre-existing latent bug fixed.** Orchestrator referenced `authHeader` at line 769 without ever extracting it from the request. Every `POST /api/import/process` handoff was throwing a `ReferenceError` swallowed silently into Sentry. **Historically no XML import has ever triggered the Python processor through that code path** — the jobs row was created but the Python kick-off failed instantly. Fix: extract from `req.headers.get('Authorization')` with service-role fallback.
+
+**To extend coverage for a new language or supplier**: edit [_shared/xml-field-dictionary.ts](supabase/functions/_shared/xml-field-dictionary.ts), redeploy. No logic changes. Confidence ≥ 0.85 entries bypass the AI residual entirely.
+
+**Full reference**: [docs/xml-import-orchestrator.md](docs/xml-import-orchestrator.md), [docs/api/xml-import-orchestrator-api.md](docs/api/xml-import-orchestrator-api.md).
 
 ## Multilingual facet canonicalization (2026-05-21)
 
@@ -65,11 +153,11 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 - **Image extraction accuracy**: bbox is normalized 0..1 in both `pdf_processor.py` extraction paths — fixed stage_3 spread-assignment that was treating it as PDF-points (every image was getting mis-assigned to left page); extraction stats log post-dedup actual counts alongside pre-dedup totals.
 - **Stage 4**: FK pre-validation on `source_document_id` before insert; immediate `image_product_associations` write at product creation (closes the window between Stage 4 and Stage 4.7); icon unknown fields surfaced in rollup.
 - **Atomicity**: `_emit_stage_event` retries once before logging at ERROR (was silent warning).
-- **Audit completeness**: `supabase/migrations/20260501_audit_export_cron_schedules_and_rpcs.sql` mirrors all 7 RPCs + 4 cron schedules from the live DB into VCS so any reviewer sees what's actually running.
+- **Audit completeness**: `supabase/migrations/20260501_audit_export_cron_schedules_and_rpcs.sql` mirrors 6 of the 7 RPCs + 4 cron schedules from the live DB into VCS. The 7th (`update_checkpoint_and_append_history`) plus the 2026-05-21 facet canonicalization DDL (`facet_canonical_values`, `facet_merge_log`, `resolve_facet_value`) were exported in `supabase/migrations/20260521_facet_canonicalization_and_missing_rpcs.sql` as a follow-up.
 
 ### OCR — Chandra v2 only, retry-with-jitter
 - **Pytesseract + EasyOCR removed entirely** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed). Even when "working" it produced bbox-less text that silently degraded layout-merge to UNCLASSIFIED orphans.
-- **Chandra v2 retry-with-jitter** (`chandra_endpoint_manager.run_inference`): 3 attempts at temperatures 0.0/0.1/0.2. The model freelances ("The image is..." prose) ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+- **Chandra v2 retry-with-jitter** (`chandra_endpoint_manager.run_inference`): 3 attempts at temperatures **0.0/0.4/0.8** (widened 2026-05-03 from the original 0.0/0.1/0.2 spread — that narrow range still left the model stuck in sticky-prose state through all three retries on graphic-heavy pages; observed ~55% cumulative failure rate on job 051e1dda's catalog-icon pre-pass). The wider jitter breaks the sticky state and lifts success rate past 90%.
 - **Balanced-bracket trimmer** (`_strip_fences_and_junk`): replaces the old `rfind(']')`-based trim that mis-trimmed `\']`/`}"]` truncations. Recovers the bbox cleanly in those cases.
 - **Explicit failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 - **Per-attempt metrics**: `chandra_ocr_metrics` table — one row per attempt, captures `outcome` (`success`/`success_after_retry`/`failed_prose`/`failed_malformed_json`/`failed_http_error`), `attempt_number`, `temperature`, `latency_ms`, `failure_mode_head`, `caller`.
@@ -81,11 +169,14 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 
 ### Phase 3 OCR — expanded to all text-bearing product images
 - **Was**: icon-only OCR, regular product images had zero per-image OCR. Scanned spec sheets silently lost all per-image text.
-- **Now**: `_run_phase_3_ocr_for_product` runs Chandra v2 on every text-bearing image after `save_images_and_generate_clips`. Filter rule:
-  - `yolo_crop` of region_type ∈ {TABLE, TEXT, TITLE, CAPTION}: OCR'd
-  - `embedded` with `metadata.text_detected=True`: OCR'd
+- **Now**: `_run_phase_3_ocr_for_product` runs Chandra v2 on every text-bearing image after `save_images_and_generate_clips`. Filter rule (code matches this exactly — see `stage_3_images.py:_run_phase_3_ocr_for_product`):
+  - `yolo_crop` + region_type ∈ {TABLE, TEXT, TITLE, CAPTION}: OCR'd
+  - `yolo_crop` + region_type ∈ {IMAGE, FIGURE, PHOTO}: SKIPPED (`ocr_skipped_reason='photo_not_text_bearing'`)
+  - `yolo_crop` + region_type unknown/other: OCR'd (conservative — better a wasted Chandra call than a missed spec sheet)
+  - `embedded` + `metadata.text_detected` is True: OCR'd
+  - `embedded` + `metadata.text_detected` is False: SKIPPED (`ocr_skipped_reason='embedded_no_text_detected'`)
+  - `embedded` + `text_detected` missing: OCR'd (conservative)
   - `full_render`: SKIPPED (Stage 1.5 already covered the page — `ocr_skipped_reason='full_render_dup_of_stage_1_5'`)
-  - photo / IMAGE-region yolo_crop: SKIPPED (`ocr_skipped_reason='photo_not_text_bearing'`)
 - **Storage**: new columns on `document_images` — `ocr_text`, `ocr_blocks` (per-fragment bbox in image-local coords), `ocr_failed`, `ocr_attempts`, `ocr_skipped_reason`. **NEVER consumed by chunker** (Stage 1.5 is canonical text source). Phase 3 OCR runs *after* `save_images_and_generate_clips` (which is where `vision_analysis` executes), so it does NOT enrich the vision prompt — consumed by icon-metadata extraction and image-search labels only.
 - **Bbox propagation**: `OCRResult.blocks` now carries Chandra's per-fragment list. `extract_icon_metadata` reads `result.blocks` instead of the always-`None` `result.bbox` (latent bug fixed).
 
@@ -105,12 +196,12 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 
 ### Cost + completion + slow-op
 - `complete_job()` is now idempotent — early-returns if `status='completed'` already. Was overwriting `completed_at` on every retry.
-- `total_ai_cost_usd` is now written at completion by summing `ai_usage_logs.cost_usd` for `job_id`. Was never written → uncomputable per-job cost.
+- `total_ai_cost_usd` is now written at completion by summing `ai_usage_logs.billed_cost_usd` for `job_id`. Was never written → uncomputable per-job cost.
 - New `background_jobs.current_slow_operation jsonb` flag (`{operation, started_at, expected_max_seconds}`). Stages that take >5min (long Chandra batches, SLIG fan-out) set this; auto-recovery cron skips jobs with fresh slow-op to prevent spurious recovery.
 
 ### Auto-recovery — actually re-dispatches now + atomic checkpoint RPC
 - New SQL RPC `update_checkpoint_and_append_history(job_id, checkpoint, event)` — single-UPDATE atomic replacement for the previous two-call pattern (table.update + RPC append) that left audit gaps on crash between calls.
-- `auto-recovery-cron` PDF path now POSTs to MIVAA `/api/jobs/{id}/resume` after `mark_pdf_job_for_recovery` (was passive — relied on service restart). Best-effort; if POST fails, job stays `pending` and next restart still rescues.
+- `auto-recovery-cron` PDF path now POSTs to MIVAA `/api/rag/documents/job/{id}/resume` after `mark_pdf_job_for_recovery` (was passive — relied on service restart). Best-effort; if POST fails, job stays `pending` and next restart still rescues.
 - `recovery_history` event now includes `dispatch_ok` boolean.
 
 ## Pipeline Tables Reference (post-audit)
@@ -175,7 +266,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
   - `style_aspect_1024` → `image_style_embeddings` (v2)
   - `material_aspect_1024` → `image_material_embeddings` (v2)
   - `understanding_1024` → `image_understanding_embeddings`
-  - Legacy aspect keys `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` are still emitted by the pre-v2 SLIG-blend code path while the feature flag is off, and accepted by the 2 consumer call sites + `embedding_to_text_service` during the rollout window. Cleanup PR removes them.
+  - Legacy aspect keys `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` (from the pre-v2 SLIG-blend code path) have been **removed** — the cleanup landed alongside the v2 rollout. The producer no longer emits them; consumers no longer accept them.
   - **Never use `*_siglip_1152` or `*_clip_512` keys — those were legacy aliases removed in the SLIG migration.**
 - **Product embeddings**: only `text_embedding_1024` lives on the products row (Voyage AI from name+description+metadata, generated inline by `stage_4_products`). All visual product embeddings are derived from associated images via `image_product_associations` + the `has_*_slig` flags. Use the RPC `get_product_embedding_status(product_id)` for product-level coverage.
 - vecs 0.4.5: no native halfvec support but PostgreSQL implicit cast vector→halfvec makes it transparent
@@ -239,7 +330,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 - **`background_jobs.recovery_history jsonb`**: append-only log written by `auto-recovery-cron` whenever it claims a stuck job (`{attempted_at, from_stage, reason, attempt_number, succeeded, exhausted}`). Replaces the previous "scattered in metadata" pattern.
 - **`background_jobs.last_checkpoint jsonb`**: still the snapshot the auto-recovery cron uses to know which stage to resume from. Updated alongside every `append_stage_history` call.
 - **SQL helpers** (atomic `||` UPDATE — race-safe): `append_stage_history(p_job_id uuid, p_event jsonb)`, `append_recovery_history(p_job_id uuid, p_event jsonb)`, `cleanup_invalid_stage_history(p_job_id uuid, p_invalid_stages text[])`, `match_document_chunks_semantic(...)`, `detect_stuck_pdf_jobs(...)`, `mark_pdf_job_for_recovery(...)`, `fail_exhausted_pdf_jobs(...)`.
-- **Consolidated read**: `GET /api/rag/documents/job/{job_id}/full-status` returns `{core, stage_history, recovery_history, products, memory}` in a single round trip — replaces the prior pattern of querying three tables.
+- **Consolidated read**: `GET /api/rag/documents/job/{job_id}/full-status` returns `{core, stage_history, recovery_history, products, memory}` in a single round trip — replaces the prior pattern of querying three tables. The `memory` field is **process-local** (`job_storage` dict on the MIVAA pod); after a pod restart `memory` is `null` even for completed jobs. Treat `stage_history` + `recovery_history` as the durable surfaces.
 - **Per-product state**: `product_processing_status` stays as a child table (1 job → N products) — different cardinality from job state, deserves its own row.
 - **Writers** (every code path that emits a stage event uses `append_stage_history` only): `checkpoint_recovery_service.create_checkpoint`, `progress_tracker._sync_to_database`, `data_import_service._update_job_progress` (XML), `web_scraping_service.update_job_progress`, `scrape-session-manager` edge function.
 - **Heartbeat**: `JobHeartbeat` (in `app/services/tracking/job_heartbeat.py`) writes `last_heartbeat` every `JOB_HEARTBEAT_INTERVAL_SECONDS` (default 60s) for the entire orchestrator lifetime, so a job stalled inside a single stage is still detectable.

@@ -44,6 +44,10 @@ interface QuoteItemsListProps {
   editable?: boolean;
   /** @deprecated use editPricing — kept for backward compat */
   variant?: 'compact' | 'detailed';
+  /** B2B customer of the parent quote — passed to PriceLookupDrawer so the AI factors the CRM-managed discount into the proposal. */
+  customerCompanyId?: string | null;
+  /** B2C / private customer of the parent quote — same role as customerCompanyId. */
+  customerContactId?: string | null;
 }
 
 // Convert quote product to display product format.
@@ -172,6 +176,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   emptyMessage = 'No items in this quote yet',
   emptyButtonText = 'Add Your First Product',
   editable = false,
+  customerCompanyId,
+  customerContactId,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -623,6 +629,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
           manufacturer={(lookupItem.product?.metadata as any)?.factory?.factory_name}
           quantity={lookupItem.quantity}
           unit={lookupItem.custom_unit || undefined}
+          customerCompanyId={customerCompanyId}
+          customerContactId={customerContactId}
           onConfirm={async (payload) => {
             if (!onUpdateItem) return;
             await onUpdateItem(lookupItem.id, {

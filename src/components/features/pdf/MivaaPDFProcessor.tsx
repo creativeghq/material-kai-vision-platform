@@ -49,7 +49,9 @@ export const MivaaPDFProcessor: React.FC = () => {
       'application/pdf': ['.pdf'],
     },
     multiple: true,
-    maxSize: 50 * 1024 * 1024, // 50MB
+    // 100MB — matches the backend cap. Was 50MB, which silently rejected
+    // files in the 50-100MB range at the dropzone level (2026-05-23 audit).
+    maxSize: 100 * 1024 * 1024,
   });
 
   const startProcessing = async () => {
@@ -86,14 +88,19 @@ export const MivaaPDFProcessor: React.FC = () => {
           throw new Error(`Failed to upload file: ${uploadError.message}`);
         }
 
-        // Get public URL for the uploaded file
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+        // pdf-documents is private — mint a signed URL (1h TTL is enough; the
+        // backend downloads on the upload request, resume paths re-mint from
+        // storage_bucket/storage_object_path).
+        const { data: signed, error: signError } = await supabase.storage
+          .from('pdf-documents')
+          .createSignedUrl(fileName, 3600);
+        if (signError || !signed?.signedUrl) {
+          throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
+        }
 
         // Step 2: Send file_url to MIVAA for processing (consistent with other upload flows)
         const formData = new FormData();
-        formData.append('file_url', publicUrl);
+        formData.append('file_url', signed.signedUrl);
         formData.append('title', file.name);
 
         // Call MIVAA API for PDF processing

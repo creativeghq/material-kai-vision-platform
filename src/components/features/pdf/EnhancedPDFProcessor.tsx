@@ -419,10 +419,13 @@ export function EnhancedPDFProcessor() {
           throw new Error(`Upload failed: ${uploadError.message}`);
         }
 
-        // Get public URL
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+        // pdf-documents is private — mint a signed URL (1h TTL).
+        const { data: signed, error: signError } = await supabase.storage
+          .from('pdf-documents')
+          .createSignedUrl(fileName, 3600);
+        if (signError || !signed?.signedUrl) {
+          throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
+        }
 
         setUploadProgress(40);
         updateJobStatus(
@@ -437,7 +440,7 @@ export function EnhancedPDFProcessor() {
         const extractionResponse = await callMivaaGatewayDirect(
           'pdf_process_document',
           {
-            file_url: publicUrl, // Standardized field name (was documentId)
+            file_url: signed.signedUrl, // Standardized field name (was documentId)
             extraction_type: 'all', // Snake_case for backend consistency
             output_format: 'json',
           },

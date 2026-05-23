@@ -7,8 +7,66 @@
 
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
+const { createClient } = await import('npm:@supabase/supabase-js@2');
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 type PriceDocType = 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion';
+
+interface CustomerDiscount {
+  kind: 'company' | 'contact';
+  id: string;
+  name: string;
+  discount_percent: number | null;
+  discount_notes: string | null;
+}
+
+/**
+ * Lookup the standing customer discount from CRM. Either the company OR the
+ * contact will resolve, never both (matches the quotes.customer_company_id ⊕
+ * customer_contact_id XOR constraint). Returns null when neither id is set,
+ * the row is missing, or the row has no discount on file.
+ */
+async function loadCustomerDiscount(
+  customer_company_id?: string,
+  customer_contact_id?: string,
+): Promise<CustomerDiscount | null> {
+  if (!customer_company_id && !customer_contact_id) return null;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  if (customer_company_id) {
+    const { data } = await supabase
+      .from('crm_companies')
+      .select('id, name, discount_percent, discount_notes')
+      .eq('id', customer_company_id)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      kind: 'company',
+      id: data.id,
+      name: data.name,
+      discount_percent: data.discount_percent ?? null,
+      discount_notes: data.discount_notes ?? null,
+    };
+  }
+
+  const { data } = await supabase
+    .from('crm_contacts')
+    .select('id, name, discount_percent, discount_notes')
+    .eq('id', customer_contact_id!)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    kind: 'contact',
+    id: data.id,
+    name: data.name,
+    discount_percent: data.discount_percent ?? null,
+    discount_notes: data.discount_notes ?? null,
+  };
+}
 
 interface PriceMatch {
   doc_id?: string;
@@ -44,12 +102,35 @@ export const createPriceLookupTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_name, sku, manufacturer, quantity, unit, category_slug = 'pricing', top_k = 8, product_id }) => {
+    async ({
+      product_name,
+      sku,
+      manufacturer,
+      quantity,
+      unit,
+      category_slug = 'pricing',
+      top_k = 8,
+      product_id,
+      customer_company_id,
+      customer_contact_id,
+    }) => {
       try {
         onChunk?.({
           type: 'tool_progress',
           status: `Searching price knowledge base for "${product_name}"...`,
           timestamp: Date.now(),
+        });
+
+        // Customer-side standing discount (CRM-managed). Looked up in parallel
+        // with the KB search so the agent's reasoning chain can compose both
+        // the supplier/contract layer (from KB docs) and the customer layer
+        // (from crm_companies/contacts) into a single proposed unit price.
+        const customerDiscountPromise = loadCustomerDiscount(
+          customer_company_id,
+          customer_contact_id,
+        ).catch((err) => {
+          console.warn('price_lookup: customer discount lookup failed', err);
+          return null;
         });
 
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
@@ -130,6 +211,14 @@ export const createPriceLookupTool = (
           manufacturer_hint: manufacturer,
         };
 
+        // Resolve the customer-side discount (await the parallel lookup we kicked off
+        // before the KB search). Either company or contact, never both.
+        const customerDiscount = await customerDiscountPromise;
+        const hasCustomerDiscount =
+          customerDiscount != null &&
+          customerDiscount.discount_percent != null &&
+          customerDiscount.discount_percent > 0;
+
         // Emit a progress update for the UI
         onChunk?.({
           type: 'tool_progress',
@@ -139,7 +228,7 @@ export const createPriceLookupTool = (
 
         // Emit a lightweight pre-proposal chunk so the UI can show the sources immediately.
         // The agent will produce the final price_proposal chunk from its reasoning in a follow-up message.
-        if (matches.length > 0) {
+        if (matches.length > 0 || hasCustomerDiscount) {
           onChunk?.({
             type: 'price_lookup_matches',
             product_name,
@@ -156,25 +245,51 @@ export const createPriceLookupTool = (
               relevance_score: m.relevance_score,
             })),
             hints,
+            customer_discount: customerDiscount,
             timestamp: Date.now(),
           });
         }
 
-        const guidance = matches.length === 0
-          ? 'No matching price documents found. Respond: "No pricing information found in the Knowledge Base for this product. Please enter price manually."'
+        const customerLine = hasCustomerDiscount
+          ? `CUSTOMER DISCOUNT — ${customerDiscount!.name} (CRM ${customerDiscount!.kind}) has a standing discount of ${customerDiscount!.discount_percent}% on file${
+              customerDiscount!.discount_notes ? ` ("${customerDiscount!.discount_notes}")` : ''
+            }. Apply this AFTER any supplier/catalog discounts: final = list × (1 - supplier_discount) × (1 - customer_discount).`
+          : null;
+
+        const baseSteps = [
+          '1. Identify the base LIST PRICE (from price_list docs). Prefer exact SKU matches.',
+          '2. Identify any applicable SUPPLIER DISCOUNTS or CONTRACT TERMS (same manufacturer, from KB docs).',
+          '3. Check effective dates — flag expired rules.',
+          '4. Verify UNIT (€/m² vs €/piece) matches the quote line expected unit.',
+          '5. Apply QUANTITY tiers / MOQ if present in snippets.',
+        ];
+        const compositionSteps = hasCustomerDiscount
+          ? [
+              '6. Compose the price in TWO layers: (a) supplier layer — list × (1 - supplier_discount); (b) customer layer — × (1 - customer_discount). Show both lines in the reasoning_chain so the admin can audit.',
+              '7. If a conflict exists (specific SKU price vs general rule), prefer specific and flag the conflict.',
+              '8. Emit a `price_proposal` chunk with: list_price, discount_percent (combined effective % after BOTH layers, computed as 1 - (1-supplier)(1-customer)), final_unit_price, currency, unit, quantity_applied, total, source_doc_ids[], reasoning_chain[] (show both layers as separate lines), warnings[], confidence (high|medium|low).',
+              '9. If you cannot determine a reliable LIST PRICE, set confidence="low" and ask the admin to confirm or enter manually. The customer discount alone (without a list price) is not enough.',
+            ]
           : [
-              'Compose a reasoning chain using the matches below.',
-              'Steps:',
-              '1. Identify the base LIST PRICE (from price_list docs). Prefer exact SKU matches.',
-              '2. Identify any applicable DISCOUNTS or CONTRACT TERMS (same manufacturer).',
-              '3. Check effective dates — flag expired rules.',
-              '4. Verify UNIT (€/m² vs €/piece) matches the quote line expected unit.',
-              '5. Apply QUANTITY tiers / MOQ if present in snippets.',
               '6. If price list and discount both exist: final = list × (1 - discount).',
               '7. If there is a conflict (specific SKU price vs general rule), prefer specific and flag the conflict.',
               '8. Emit a `price_proposal` chunk with: list_price, discount_percent, final_unit_price, currency, unit, quantity_applied, total, source_doc_ids[], reasoning_chain[], warnings[], confidence (high|medium|low).',
               '9. If you cannot determine a reliable price, set confidence="low" and ask the admin to confirm or enter manually.',
-            ].join('\n');
+            ];
+
+        const guidance = matches.length === 0 && !hasCustomerDiscount
+          ? 'No matching price documents found and no customer discount on file. Respond: "No pricing information found in the Knowledge Base for this product. Please enter price manually."'
+          : matches.length === 0 && hasCustomerDiscount
+            ? `No KB price documents matched, but ${customerDiscount!.name} has a ${customerDiscount!.discount_percent}% discount on file. Without a list price you cannot compute a final price. Respond: "No catalog price found in the Knowledge Base — please enter the list price manually. I will apply the ${customerDiscount!.discount_percent}% customer discount on top." Emit confidence="low".`
+            : [
+                'Compose a reasoning chain using the matches below.',
+                customerLine,
+                'Steps:',
+                ...baseSteps,
+                ...compositionSteps,
+              ]
+                .filter(Boolean)
+                .join('\n');
 
         return JSON.stringify({
           success: true,
@@ -182,7 +297,17 @@ export const createPriceLookupTool = (
           matches,
           hints,
           guidance,
-          product_context: { product_name, sku, manufacturer, quantity, unit, product_id },
+          customer_discount: customerDiscount,
+          product_context: {
+            product_name,
+            sku,
+            manufacturer,
+            quantity,
+            unit,
+            product_id,
+            customer_company_id,
+            customer_contact_id,
+          },
         });
       } catch (error) {
         console.error('price_lookup error:', error);
@@ -195,7 +320,7 @@ export const createPriceLookupTool = (
     },
     {
       name: 'price_lookup',
-      description: 'Look up a product price from the Pricing Knowledge Base (admin only). Returns structured chunks from price lists, discount rules, contract terms, and promotions — the agent composes the final price by combining them with a visible reasoning chain. Use when an admin asks for a price, or when triggered from the product detail page or a quote line. Always emit a final `price_proposal` chunk so the UI can show the proposal with a "Use this price" button.',
+      description: 'Look up a product price from the Pricing Knowledge Base (admin only). Returns structured chunks from price lists, discount rules, contract terms, and promotions — and, when a quote customer is in scope, the customer\'s standing CRM-managed discount. The agent composes the final price by combining the supplier/catalog layer with the customer layer and emits a `price_proposal` chunk with a visible reasoning chain. Use when an admin asks for a price, or when triggered from the product detail page or a quote line.',
       schema: z.object({
         product_name: z.string().describe('Full product name to look up.'),
         sku: z.string().optional().describe('SKU if known — strongest match signal.'),
@@ -205,6 +330,8 @@ export const createPriceLookupTool = (
         category_slug: z.string().default('pricing').describe('KB category slug to search. Defaults to "pricing".'),
         top_k: z.number().default(8).describe('Max number of price chunks to return.'),
         product_id: z.string().optional().describe('Product UUID — passed through to the price_proposal chunk so the UI can commit back to the right product.'),
+        customer_company_id: z.string().optional().describe('CRM company UUID of the quote customer (B2B). When set, the tool reads crm_companies.discount_percent and folds the customer-side discount into the reasoning chain. Mutually exclusive with customer_contact_id.'),
+        customer_contact_id: z.string().optional().describe('CRM contact UUID of the quote customer (B2C / private). When set, the tool reads crm_contacts.discount_percent and folds the customer-side discount into the reasoning chain. Mutually exclusive with customer_company_id.'),
       }),
     },
   );

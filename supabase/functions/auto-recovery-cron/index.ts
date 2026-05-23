@@ -745,7 +745,9 @@ async function scaleAllHfEndpointsToZero(reason: string): Promise<void> {
     console.warn('[AutoRecoveryCron] HF token not configured — cannot scale endpoints to zero');
     return;
   }
-  const endpoints = ['mh-qwen332binstruct', 'mh-slig', 'mh-yolo', 'mh-chandra'];
+  // Qwen endpoint retired 2026-05-01 (all vision now Claude). The PUT used to
+  // 404 silently every recovery sweep. Removed from the list.
+  const endpoints = ['mh-slig', 'mh-yolo', 'mh-chandra'];
   for (const ep of endpoints) {
     try {
       // Read current scaling config so we preserve maxReplica

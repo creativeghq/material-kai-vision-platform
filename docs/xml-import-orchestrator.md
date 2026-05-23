@@ -6,48 +6,100 @@ Edge Function for parsing XML files and orchestrating product imports into Mater
 
 ## Architecture
 
+```
 ┌─────────────────────────────────────────────────────────────┐
-│ LAYER 1: DATA INGESTION (EDGE FUNCTION)                    │
-│ ├─ Parse XML file (Deno XML parser)                        │
-│ ├─ Validate structure                                      │
-│ ├─ Extract product elements                                │
-│ ├─ Create data_import_jobs record                          │
-│ └─ Return job_id to frontend                               │
+│ STAGE 0: UPLOAD SCREEN (XMLImportTab.tsx)                  │
+│ ├─ Operator picks Material Category up-front (job-level)   │
+│ ├─ Selects file or pastes feed URL                         │
+│ └─ Clicks Detect Fields                                    │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ LAYER 2: DATA PROCESSING (PYTHON API)                      │
-│ ├─ Batch process products (10 at a time)                   │
-│ ├─ Download images (5 concurrent)                          │
-│ ├─ Extract metadata (AI-based)                             │
-│ ├─ Normalize to NormalizedProductData                      │
-│ ├─ Queue for product creation                              │
-│ └─ Update job status in real-time                          │
+│ STAGE 1: FIELD DETECTION (EDGE FUNCTION, preview_only)     │
+│ ├─ Parse XML (fast-xml-parser)                             │
+│ ├─ Walk ALL product nodes → per-field coverage stats       │
+│ │   (present_count, coverage_pct, distinct_values)         │
+│ ├─ Dictionary-first classification                         │
+│ │   (_shared/xml-field-dictionary.ts, ~150 entries +       │
+│ │    regex rules; ≥0.85 confidence skips AI)               │
+│ ├─ AI residual on Haiku for ambiguous/unknown only         │
+│ └─ Return detected_fields[] with coverage + suggestions    │
 └─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ STAGE 2: FILL-THE-GAPS PANEL (XMLFieldMappingModal.tsx)    │
+│ ├─ Per-target dynamic rendering by case:                   │
+│ │     🔴 blocking required (no mapping or 0% coverage)     │
+│ │     🟡 partial coverage (textarea for empty-row fallback)│
+│ │     🟠 conflict (≥2 XML tags → same target, picker)      │
+│ │     ✅ present (collapsed in "Auto-mapped" accordion)    │
+│ │     ⚪ optional missing/partial (optional textarea)      │
+│ ├─ Conflict-resolution: losing tags route to metadata      │
+│ └─ Submit blocked until no blocking required + no conflict │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ STAGE 3: PREVIEW + IMPORT (EDGE FUNCTION)                  │
+│ ├─ generate_preview: build sample product +                │
+│ │     preview_value_sources (xml | default per field)      │
+│ ├─ import: extract all products via buildProductWithMappings│
+│ │     - mapped tag → top-level + metadata under target name│
+│ │     - empty mapped tag → manual_values[target] fallback  │
+│ │     - job-level category → every product's category      │
+│ ├─ Chunk-insert into data_import_job_products              │
+│ ├─ Create data_import_jobs row                             │
+│ └─ POST /api/import/process to Python (auth header now     │
+│     correctly forwarded — was a latent bug pre-2026-05-23) │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ STAGE 4: PYTHON PROCESSING                                 │
+│ ├─ Page-read product_data from job_products (no full load) │
+│ ├─ Stage 4 product insert: top-level keys → columns,       │
+│ │     metadata → JSONB; external_sku dedup from product_id │
+│ │     / sku / metadata.product_id                          │
+│ ├─ Download images from product_data.images[]              │
+│ ├─ Voyage 1024D text embedding from top-level + metadata   │
+│ ├─ Facet canonicalization on whitelisted metadata keys     │
+│ └─ Update background_jobs status + heartbeat               │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## Supported XML Formats
 
-The function supports multiple common XML schemas. Each format uses a different root and item element name (e.g., `<products>/<product>`, `<items>/<item>`, `<materials>/<material>`), and each item may contain varying field names for name, manufacturer, category, description, and image URLs.
+`findProductNodes()` does a BFS for any of these container tags: `<product>`, `<item>`, `<material>`, `<producto>`, `<articulo>`, `<produit>` — the root element doesn't matter. Common roots seen in production: `<products>`, `<catalog>`, `<items>`, `<materials>`, `<catalogo>`, `<PanagoulasStore>`, etc.
 
 ## Required Fields
 
-Each product must have:
-- **name** (or title, product_name)
-- **factory_name** (or manufacturer, supplier, factory)
-- **material_category** (or category, material_type, type)
+Per product:
+- **name** (or title, product_name, nombre, όνομα, etc.) — must come from the XML
+- **factory_name** (or manufacturer, supplier, brand, fabricante, κατασκευαστής, etc.) — from XML OR job-level `manual_values.factory_name` fallback
+
+Job-level (NOT mapped from XML):
+- **material_category** — picked once on the upload screen, applied to every product
 
 ## Optional Fields
 
-- description (or desc)
-- factory_group_name (or factory_group, group)
-- images (image, img, picture tags)
-- price
-- color/colors
-- dimensions/size
-- designer
-- collection
-- finish
-- material
+All resolved via the same dictionary + AI residual pipeline. Mapped + present in XML → top-level on ProductData + mirrored in metadata. Mapped + empty → optional `manual_values[target]` fallback.
+
+| Target | Common aliases |
+|---|---|
+| `description` | desc, descripcion, περιγραφή |
+| `factory_group_name` | factory_group, group, brand_group |
+| `factory_address` / `factory_city` / `factory_country` / `factory_postal_code` | address, city, country, zip, διεύθυνση, πόλη, χώρα, τκ |
+| `factory_phone` / `factory_email` / `factory_website` | phone/tel, email, website/url/homepage, τηλέφωνο, ιστοσελίδα |
+| `factory_country_of_origin` | origin, made_in, χώρα_προέλευσης |
+| `images` | image, img, picture, photo, imagen, image_link, εικόνα, image1/image2/etc. (regex) |
+| `external_sku` | sku, product_id, product_code, item_id, mtrl, code, kodikos |
+| `price` | price, cost, precio, prix, preis, pricew, priceretail, τιμή |
+| `color` / `colors` | colour, colours, χρώμα, χρώματα |
+| `dimensions` / `size` | dimension, dim, dimensiones, sizes, διαστάσεις, μέγεθος, dim1/dim2/etc. (regex) |
+| `designer` | disenador, σχεδιαστής |
+| `collection` | coleccion, serie, series, model, modelname, συλλογή, σειρά |
+| `finish` | acabado, φινίρισμα, τελείωμα |
+| `material` | materia, υλικό |
+
+The full dictionary lives at [_shared/xml-field-dictionary.ts](../supabase/functions/_shared/xml-field-dictionary.ts) — add new entries there to extend coverage for new languages or supplier-specific naming conventions.
 
 ## API Endpoint
 
@@ -96,14 +148,21 @@ Common errors:
 - `Product validation failed` - Missing required fields
 - `No product elements found` - Unsupported XML schema
 
-## Performance
+## Performance / Safety Envelope
 
-- **Timeout**: 600 seconds (Edge Function limit)
-- **Memory**: 128MB (Edge Function limit)
-- **Recommended file size**: < 10MB
-- **Recommended product count**: < 1000 products per file
+Tunable via env vars on the edge-function deployment:
 
-For larger files, split into multiple smaller files.
+| Limit | Default | Env var |
+|---|---|---|
+| Max decoded XML size | 25 MB | `XML_IMPORT_MAX_MB` |
+| Max products per import | 20,000 | `XML_IMPORT_MAX_PRODUCTS` |
+| PostgREST INSERT chunk size | 100 rows | `XML_IMPORT_INSERT_CHUNK` |
+| Edge Function memory | 256 MB (Deno Deploy cap) | — |
+| Synchronous CPU per invocation | ~2 s | — |
+
+The chunk-insert into `data_import_job_products` happens in batches of `XML_IMPORT_INSERT_CHUNK` so a 20K-product feed doesn't exceed PostgREST's body limit. After the edge function returns, the Python service page-reads products via index and never holds more than one batch in memory.
+
+For files larger than the limits: split into multiple smaller imports.
 
 ## Environment Variables
 

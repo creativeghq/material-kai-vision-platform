@@ -32,6 +32,10 @@ export interface Quote {
   vat_amount?: number;
   grand_total?: number;
   currency?: string;
+  /** B2B customer. XOR with customer_contact_id at the DB level. */
+  customer_company_id?: string | null;
+  /** B2C / private customer. XOR with customer_company_id at the DB level. */
+  customer_contact_id?: string | null;
 }
 
 export interface QuoteItem {

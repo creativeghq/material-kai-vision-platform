@@ -94,6 +94,20 @@ interface PriceLookupDrawerProps {
   manufacturer?: string;
   quantity?: number;
   unit?: string;
+  /**
+   * CRM company UUID of the quote's customer (B2B). When provided, the
+   * price_lookup tool reads `crm_companies.discount_percent` and folds the
+   * customer-side discount into its reasoning chain so the proposed final
+   * price already reflects the standing agreement. Mutually exclusive with
+   * customerContactId.
+   */
+  customerCompanyId?: string | null;
+  /**
+   * CRM contact UUID of the quote's customer (B2C / private). Same behavior
+   * as customerCompanyId, sourced from `crm_contacts`. Mutually exclusive
+   * with customerCompanyId.
+   */
+  customerContactId?: string | null;
   /** Called when the admin clicks "Use this price" — returns the committed values to the caller. */
   onConfirm?: (payload: PriceConfirmPayload) => void | Promise<void>;
   /** When true, the drawer additionally upserts to product_prices after confirm. Defaults to false (quote flow). */
@@ -127,6 +141,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
   manufacturer,
   quantity,
   unit,
+  customerCompanyId,
+  customerContactId,
   onConfirm,
   commitToProductPrices = false,
   defaultMode = 'ai',
@@ -255,8 +271,16 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
         quantity != null ? `- Quantity: ${quantity}` : null,
         unit ? `- Expected unit: ${unit}` : null,
         productId ? `- Product ID: ${productId}` : null,
+        customerCompanyId ? `- Customer company ID: ${customerCompanyId}` : null,
+        customerContactId ? `- Customer contact ID: ${customerContactId}` : null,
         '',
-        'Call the price_lookup tool with category_slug="pricing" and compose a price_proposal chunk with a full reasoning chain. Cite source documents by title.',
+        'Call the price_lookup tool with category_slug="pricing"' +
+          (customerCompanyId
+            ? `, customer_company_id="${customerCompanyId}"`
+            : customerContactId
+              ? `, customer_contact_id="${customerContactId}"`
+              : '') +
+          ' and compose a price_proposal chunk with a full reasoning chain. Cite source documents by title. If a customer discount is on file, show the supplier-layer price and the customer-layer price as separate lines in the reasoning chain.',
       ].filter(Boolean).join('\n');
 
       const controller = new AbortController();
@@ -365,7 +389,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [productId, productName, sku, manufacturer, quantity, unit, reset, toast]);
+  }, [productId, productName, sku, manufacturer, quantity, unit, customerCompanyId, customerContactId, reset, toast]);
 
   const runLookup = useCallback(() => {
     return mode === 'quick' ? runQuickLookup() : runAILookup();

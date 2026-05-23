@@ -149,14 +149,19 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // pdf-documents is private — mint a signed URL for MIVAA to download from.
+      // 1h TTL is plenty: the backend downloads the file immediately on the upload
+      // request, then resume paths use storage_bucket/storage_object_path to re-mint.
+      const { data: signed, error: signError } = await supabase.storage
         .from('pdf-documents')
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 3600);
+      if (signError || !signed?.signedUrl) {
+        throw new Error(`Failed to sign upload URL: ${signError?.message ?? 'unknown error'}`);
+      }
 
       // Call MIVAA API to start processing using standardized client
       const formData = new FormData();
-      formData.append('file_url', publicUrl);
+      formData.append('file_url', signed.signedUrl);
       formData.append('categories', 'products'); // Extraction type: products, certificates, logos, specifications, all, extract_only
       formData.append('material_category', category); // Material category: tiles, wood, heating, sanitary, etc.
       formData.append('workspace_id', 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e'); // Default workspace ID

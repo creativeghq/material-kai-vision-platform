@@ -5,6 +5,10 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import {
+  classifyFields,
+  type MappingSuggestion,
+} from '../_shared/xml-field-dictionary.ts';
 
 // ---------------------------------------------------------------------------
 // XML parser setup
@@ -315,28 +319,80 @@ function detectXMLFields(xmlContent: string): {
 }
 
 /**
- * Use AI to suggest field mappings based on field names and sample values
+ * Hybrid field-mapping suggester.
+ *
+ * Architecture (see `_shared/xml-field-dictionary.ts`):
+ *   1. Dictionary first — `classifyFields` buckets every detected tag into
+ *      confident / ambiguous / unknown based on `AI_BYPASS_CONFIDENCE`.
+ *   2. AI only for the residual — `ambiguous` + `unknown` get sent to Haiku
+ *      in a single batched prompt. Confident dictionary hits are returned
+ *      as-is, no API call.
+ *   3. Cheap model — Haiku (claude-haiku-4-5) is plenty for "which target
+ *      does this XML tag map to". Opus would be ~20× the cost for marginal
+ *      gain on a simple categorization task.
+ *
+ * To extend coverage for a new language or supplier: edit the dictionary
+ * file, NOT this function. The dictionary is shared across edge functions
+ * and gets first crack at every field.
  */
 async function suggestFieldMappings(
   fieldSamples: Map<string, FieldDetection>,
   anthropicApiKey: string,
   supabase: SupabaseClient,
-): Promise<Map<string, { mapping: string; confidence: number }>> {
-  const suggestions = new Map<string, { mapping: string; confidence: number }>();
+): Promise<Map<string, MappingSuggestion>> {
+  const allFieldNames = Array.from(fieldSamples.keys());
+  const { confident, ambiguous, unknown } = classifyFields(allFieldNames);
 
-  // Build prompt for Claude
-  const fieldsInfo = Array.from(fieldSamples.entries()).map(([field, detection]) => ({
+  console.log(
+    `🔍 Dictionary classification: ${confident.size} confident, ` +
+    `${ambiguous.size} ambiguous, ${unknown.length} unknown ` +
+    `(${allFieldNames.length} total)`,
+  );
+
+  // Start with everything the dictionary was confident about — no API call
+  // needed for these.
+  const suggestions = new Map<string, MappingSuggestion>(confident);
+
+  // The residual: ambiguous (low-confidence dict hits) + unknown (no dict
+  // hit at all). If empty, we're done — the dictionary covered everything.
+  const residualFields = [...ambiguous.keys(), ...unknown];
+  if (residualFields.length === 0) {
+    console.log('✅ All fields resolved by dictionary, skipping AI call');
+    return suggestions;
+  }
+
+  // Default for the residual when AI isn't available or fails: use the
+  // ambiguous dict hits (which are better than nothing), and fall unknowns
+  // to `metadata` at 0.5 confidence.
+  const applyDefaults = () => {
+    for (const [field, hit] of ambiguous) suggestions.set(field, hit);
+    for (const field of unknown) {
+      suggestions.set(field, { mapping: 'metadata', confidence: 0.5 });
+    }
+  };
+
+  if (!anthropicApiKey) {
+    console.log('⚠️ No Anthropic API key, using dictionary-only fallback for residual');
+    applyDefaults();
+    return suggestions;
+  }
+
+  // Build AI prompt — only send the residual, not all fields. This is the
+  // cost lever: stable feeds with all-standard tag names skip the AI call
+  // entirely; messy feeds only pay for the weird fields.
+  const fieldsInfo = residualFields.map((field) => ({
     xml_field: field,
-    sample_values: detection.samples
+    sample_values: fieldSamples.get(field)?.samples || [],
+    dictionary_hint: ambiguous.get(field) || null, // hint at what dict guessed (low confidence)
   }));
 
-  // Load prompt from database (editable via /admin/ai-configs)
   const systemPrompt = await getToolPrompt(supabase, 'xml_field_mapper');
-
   const prompt = `${systemPrompt}
 
-XML Fields Found:
-${JSON.stringify(fieldsInfo, null, 2)}`;
+XML Fields Found (residual after dictionary lookup — only fields the dictionary couldn't confidently match):
+${JSON.stringify(fieldsInfo, null, 2)}
+
+For each xml_field, return its best target mapping with a confidence score 0.0-1.0. If a dictionary_hint is provided, it's a low-confidence guess — confirm or override.`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -347,145 +403,56 @@ ${JSON.stringify(fieldsInfo, null, 2)}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-7',
+        // Haiku is enough — categorization-with-context is well within its
+        // capability and ~20× cheaper than Opus per call.
+        model: 'claude-haiku-4-5',
         max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      })
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
     if (!response.ok) {
       console.error('Claude API error:', await response.text());
-      return fallbackMappings(fieldSamples);
+      applyDefaults();
+      return suggestions;
     }
 
     const data = await response.json();
     const content = data.content[0].text;
-
-    // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('No JSON found in Claude response');
-      return fallbackMappings(fieldSamples);
+      applyDefaults();
+      return suggestions;
     }
 
-    const mappings = JSON.parse(jsonMatch[0]);
+    const aiMappings = JSON.parse(jsonMatch[0]);
+    for (const [xmlField, suggestion] of Object.entries(aiMappings)) {
+      // Only accept AI verdicts for fields that were actually in the residual
+      // — guards against the model hallucinating mappings for fields we
+      // already resolved confidently via the dictionary.
+      if (residualFields.includes(xmlField)) {
+        suggestions.set(xmlField, suggestion as MappingSuggestion);
+      }
+    }
 
-    for (const [xmlField, suggestion] of Object.entries(mappings)) {
-      suggestions.set(xmlField, suggestion as { mapping: string; confidence: number });
+    // Backfill anything the AI didn't return (rare, but possible if it skips
+    // a field) using the ambiguous dict hint or metadata default.
+    for (const field of residualFields) {
+      if (!suggestions.has(field)) {
+        const fallback = ambiguous.get(field) || { mapping: 'metadata', confidence: 0.5 };
+        suggestions.set(field, fallback);
+      }
     }
 
     return suggestions;
   } catch (error) {
     console.error('Error calling Claude API:', error);
-    return fallbackMappings(fieldSamples);
+    applyDefaults();
+    return suggestions;
   }
 }
 
-/**
- * Fallback rule-based mapping when AI is unavailable
- */
-function fallbackMappings(fieldSamples: Map<string, FieldDetection>): Map<string, { mapping: string; confidence: number }> {
-  const suggestions = new Map<string, { mapping: string; confidence: number }>();
-
-  const mappingRules: Record<string, { mapping: string; confidence: number }> = {
-    // Name variations
-    'name': { mapping: 'name', confidence: 1.0 },
-    'title': { mapping: 'name', confidence: 0.95 },
-    'product_name': { mapping: 'name', confidence: 1.0 },
-    'productname': { mapping: 'name', confidence: 1.0 },
-    'nombre': { mapping: 'name', confidence: 0.95 },
-    'titulo': { mapping: 'name', confidence: 0.9 },
-    'nom': { mapping: 'name', confidence: 0.95 },
-
-    // Factory name variations
-    'factory': { mapping: 'factory_name', confidence: 1.0 },
-    'factory_name': { mapping: 'factory_name', confidence: 1.0 },
-    'manufacturer': { mapping: 'factory_name', confidence: 1.0 },
-    'supplier': { mapping: 'factory_name', confidence: 0.95 },
-    'brand': { mapping: 'factory_name', confidence: 0.9 },
-    'fabricante': { mapping: 'factory_name', confidence: 0.95 },
-    'fabricant': { mapping: 'factory_name', confidence: 0.95 },
-    // Factory group
-    'factory_group': { mapping: 'factory_group_name', confidence: 1.0 },
-    'factory_group_name': { mapping: 'factory_group_name', confidence: 1.0 },
-    'group': { mapping: 'factory_group_name', confidence: 0.85 },
-    'brand_group': { mapping: 'factory_group_name', confidence: 0.9 },
-    // Factory address/location
-    'address': { mapping: 'factory_address', confidence: 0.9 },
-    'factory_address': { mapping: 'factory_address', confidence: 1.0 },
-    'manufacturer_address': { mapping: 'factory_address', confidence: 1.0 },
-    'city': { mapping: 'factory_city', confidence: 0.9 },
-    'factory_city': { mapping: 'factory_city', confidence: 1.0 },
-    'country': { mapping: 'factory_country', confidence: 0.9 },
-    'factory_country': { mapping: 'factory_country', confidence: 1.0 },
-    'manufacturer_country': { mapping: 'factory_country', confidence: 1.0 },
-    'postal_code': { mapping: 'factory_postal_code', confidence: 0.9 },
-    'zip': { mapping: 'factory_postal_code', confidence: 0.85 },
-    // Contact
-    'phone': { mapping: 'factory_phone', confidence: 0.9 },
-    'factory_phone': { mapping: 'factory_phone', confidence: 1.0 },
-    'manufacturer_phone': { mapping: 'factory_phone', confidence: 1.0 },
-    'tel': { mapping: 'factory_phone', confidence: 0.85 },
-    'telephone': { mapping: 'factory_phone', confidence: 0.9 },
-    'email': { mapping: 'factory_email', confidence: 0.9 },
-    'factory_email': { mapping: 'factory_email', confidence: 1.0 },
-    'manufacturer_email': { mapping: 'factory_email', confidence: 1.0 },
-    'website': { mapping: 'factory_website', confidence: 0.9 },
-    'factory_website': { mapping: 'factory_website', confidence: 1.0 },
-    'manufacturer_website': { mapping: 'factory_website', confidence: 1.0 },
-    'url': { mapping: 'factory_website', confidence: 0.8 },
-    'homepage': { mapping: 'factory_website', confidence: 0.85 },
-    // Origin
-    'country_of_origin': { mapping: 'factory_country_of_origin', confidence: 1.0 },
-    'origin': { mapping: 'factory_country_of_origin', confidence: 0.9 },
-    'made_in': { mapping: 'factory_country_of_origin', confidence: 0.95 },
-    // Company details
-    'founded': { mapping: 'factory_founded_year', confidence: 0.9 },
-    'founded_year': { mapping: 'factory_founded_year', confidence: 1.0 },
-    'established': { mapping: 'factory_founded_year', confidence: 0.85 },
-    'employees': { mapping: 'factory_employee_count', confidence: 0.9 },
-    'employee_count': { mapping: 'factory_employee_count', confidence: 1.0 },
-    'linkedin': { mapping: 'factory_linkedin_url', confidence: 0.9 },
-    'linkedin_url': { mapping: 'factory_linkedin_url', confidence: 1.0 },
-
-    // Category variations
-    'category': { mapping: 'material_category', confidence: 1.0 },
-    'material_category': { mapping: 'material_category', confidence: 1.0 },
-    'type': { mapping: 'material_category', confidence: 0.9 },
-    'material_type': { mapping: 'material_category', confidence: 1.0 },
-    'categoria': { mapping: 'material_category', confidence: 0.95 },
-    'tipo': { mapping: 'material_category', confidence: 0.9 },
-    'categorie': { mapping: 'material_category', confidence: 0.95 },
-
-    // Description
-    'description': { mapping: 'description', confidence: 1.0 },
-    'desc': { mapping: 'description', confidence: 0.95 },
-    'descripcion': { mapping: 'description', confidence: 0.95 },
-
-    // Images
-    'image': { mapping: 'images', confidence: 1.0 },
-    'images': { mapping: 'images', confidence: 1.0 },
-    'img': { mapping: 'images', confidence: 0.95 },
-    'picture': { mapping: 'images', confidence: 0.9 },
-    'photo': { mapping: 'images', confidence: 0.9 },
-    'imagen': { mapping: 'images', confidence: 0.95 },
-  };
-
-  for (const [xmlField] of fieldSamples) {
-    const lowerField = xmlField.toLowerCase();
-    if (mappingRules[lowerField]) {
-      suggestions.set(xmlField, mappingRules[lowerField]);
-    } else {
-      // Unknown field -> metadata
-      suggestions.set(xmlField, { mapping: 'metadata', confidence: 0.5 });
-    }
-  }
-
-  return suggestions;
-}
 
 Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
   console.log(`XML Import Orchestrator called - Method: ${req.method}`);
@@ -626,15 +593,14 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       const { fields: fieldDetections, total_rows } = detectXMLFields(xmlString);
       console.log(`Detected ${fieldDetections.size} unique fields across ${total_rows} product rows`);
 
-      // Get AI suggestions if API key available
-      let aiSuggestions: Map<string, { mapping: string; confidence: number }>;
-      if (anthropicApiKey()) {
-        console.log('Using Claude AI for field mapping suggestions');
-        aiSuggestions = await suggestFieldMappings(fieldDetections, anthropicApiKey(), supabase);
-      } else {
-        console.log('Using fallback rule-based mapping');
-        aiSuggestions = fallbackMappings(fieldDetections);
-      }
+      // Dictionary-first, AI-for-residual. `suggestFieldMappings` handles
+      // both branches internally (no-AI fallback, AI residual on Haiku) — see
+      // the function docstring for the rationale.
+      const aiSuggestions = await suggestFieldMappings(
+        fieldDetections,
+        anthropicApiKey(),
+        supabase,
+      );
 
       // Build detected fields response
       const detectedFields: DetectedField[] = Array.from(fieldDetections.entries()).map(([xmlField, detection]) => {
