@@ -191,6 +191,16 @@ Deno.serve(async (req: Request) => {
 
     const aadeError = summarizeAadeError(xml);
     if (!httpOk || aadeError) {
+      // Surface the real ΑΑΔΕ message to Supabase logs so future failures don't
+      // require digging into the response body to diagnose.
+      console.error('[myaade-rgwspublic2] ΑΑΔΕ rejected lookup:', {
+        http_status: httpStatus,
+        aade_code: aadeError?.code,
+        aade_message: aadeError?.message,
+        creds_source: creds.sources,
+        // First 800 chars of the raw response so we can spot envelope/parse issues too
+        xml_head: xml.slice(0, 800),
+      });
       return jsonResponse({
         error: 'aade_error',
         message: aadeError?.message ?? `ΑΑΔΕ responded with HTTP ${httpStatus}.`,
