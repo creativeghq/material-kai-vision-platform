@@ -194,6 +194,8 @@ class MoodBoardAPI {
       items: [],
       createdAt: new Date(result.created_at),
       updatedAt: new Date(result.updated_at),
+      projectId: (result as any).project_id ?? null,
+      roomId: (result as any).room_id ?? null,
     };
   }
 
@@ -228,6 +230,8 @@ class MoodBoardAPI {
       items: [],
       createdAt: new Date(result.created_at),
       updatedAt: new Date(result.updated_at),
+      projectId: (result as any).project_id ?? null,
+      roomId: (result as any).room_id ?? null,
     };
   }
 

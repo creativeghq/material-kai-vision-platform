@@ -12,7 +12,10 @@ import {
   LayoutDashboard,
   Activity,
   FileImage,
+  UserPlus,
+  Eye,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -37,6 +40,7 @@ import { QuotesTab } from '../components/tabs/QuotesTab';
 import { TasksTab } from '../components/tabs/TasksTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
+import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: 'Planning',
@@ -58,9 +62,16 @@ export const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'sheets' | 'tasks' | 'timeline'>('overview');
+  const [showInvite, setShowInvite] = useState(false);
+
+  // Ownership: project.user_id is the creator. Anyone else who can read the project
+  // got here via a project_collaborators row (RLS guarantees this). Owner gets the
+  // management surface; collaborator gets a read-only view with budget + timeline hidden.
+  const isOwner = !!user && !!project && project.user_id === user.id;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -118,14 +129,28 @@ export const ProjectDetailPage: React.FC = () => {
         subtitle={project.description || undefined}
         actions={
           <>
+            {!isOwner && (
+              <Badge variant="outline" className="hidden sm:inline-flex bg-blue-500/15 text-blue-300 border-blue-500/30">
+                <Eye className="h-3 w-3 mr-1" />
+                Shared with you
+              </Badge>
+            )}
             <Badge variant="outline" className={`hidden sm:inline-flex ${STATUS_TONES[project.status]}`}>
               {STATUS_LABELS[project.status]}
             </Badge>
-            <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              All Projects
-            </Button>
-            {project.status !== 'archived' && (
+            {isOwner && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                All Projects
+              </Button>
+            )}
+            {isOwner && (
+              <Button size="sm" onClick={() => setShowInvite(true)} className="rounded-full">
+                <UserPlus className="h-4 w-4 mr-1" />
+                Invite client
+              </Button>
+            )}
+            {isOwner && project.status !== 'archived' && (
               <Button variant="outline" size="sm" onClick={handleArchive}>
                 <Archive className="h-4 w-4 mr-1" />
                 Archive
@@ -168,21 +193,33 @@ export const ProjectDetailPage: React.FC = () => {
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Activity className="h-3.5 w-3.5" />
-              Timeline
-            </TabsTrigger>
+            {/* Timeline is owner-only — it would expose internal task + status churn to clients. */}
+            {isOwner && (
+              <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Activity className="h-3.5 w-3.5" />
+                Timeline
+              </TabsTrigger>
+            )}
           </TabsList>
 
-          <TabsContent value="overview"><OverviewTab project={project} /></TabsContent>
-          <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} /></TabsContent>
+          <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
-          <TabsContent value="tasks"><TasksTab projectId={project.id} /></TabsContent>
-          <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>
+          <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>
+          {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>
+
+      {isOwner && (
+        <InviteCollaboratorsModal
+          projectId={project.id}
+          projectName={project.name}
+          open={showInvite}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
     </div>
   );
 };

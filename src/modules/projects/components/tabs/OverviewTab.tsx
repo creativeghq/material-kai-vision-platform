@@ -25,6 +25,8 @@ import {
 
 interface OverviewTabProps {
   project: ProjectWithClient;
+  /** When false (collaborator viewing a shared project), hide budget + task internals. */
+  isOwner?: boolean;
 }
 
 const formatMoney = (amount: number, currency: string) =>
@@ -43,7 +45,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true }) => {
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>([]);
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
@@ -136,32 +138,34 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
         </CardContent>
       </Card>
 
-      {/* Budget */}
-      <Card className="dashboard-card lg:col-span-1">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-primary" />
-            Budget
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {budget === 0 ? (
-            <p className="text-sm text-muted-foreground">No budget set.</p>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-light">{formatMoney(actual, project.budget_currency)}</span>
-                <span className="text-sm text-muted-foreground">of {formatMoney(budget, project.budget_currency)}</span>
-              </div>
-              <Progress value={pct} className={overBudget ? '[&>div]:bg-destructive' : ''} />
-              <p className={`text-xs ${overBudget ? 'text-destructive' : 'text-muted-foreground'}`}>
-                {pct}% spent — {project.accepted_quote_count} accepted {project.accepted_quote_count === 1 ? 'quote' : 'quotes'}
-                {overBudget && ' (over budget)'}
-              </p>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* Budget — owner only. Collaborators (shared client view) don't see financial internals. */}
+      {isOwner && (
+        <Card className="dashboard-card lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-primary" />
+              Budget
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {budget === 0 ? (
+              <p className="text-sm text-muted-foreground">No budget set.</p>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-2xl font-light">{formatMoney(actual, project.budget_currency)}</span>
+                  <span className="text-sm text-muted-foreground">of {formatMoney(budget, project.budget_currency)}</span>
+                </div>
+                <Progress value={pct} className={overBudget ? '[&>div]:bg-destructive' : ''} />
+                <p className={`text-xs ${overBudget ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {pct}% spent — {project.accepted_quote_count} accepted {project.accepted_quote_count === 1 ? 'quote' : 'quotes'}
+                  {overBudget && ' (over budget)'}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Deadline */}
       <Card className="dashboard-card lg:col-span-1">
@@ -210,7 +214,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
         </Card>
       )}
 
-      {hasMeaningfulRoomBudget && (
+      {hasMeaningfulRoomBudget && isOwner && (
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">

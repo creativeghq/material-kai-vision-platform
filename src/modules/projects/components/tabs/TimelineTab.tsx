@@ -28,7 +28,7 @@ interface TimelineTabProps {
 
 // Filter chip groups (matches the trigger-emitted event_types from the Phase 3 migration)
 const FILTER_GROUPS: Array<{ label: string; events: string[] }> = [
-  { label: 'Project', events: ['project.created', 'project.updated', 'project.status_changed', 'project.budget_changed', 'project.deadline_changed'] },
+  { label: 'Project', events: ['project.created', 'project.status_changed', 'project.budget_changed', 'project.deadline_changed'] },
   { label: 'Rooms', events: ['room.added', 'room.removed'] },
   { label: 'Moodboards', events: ['moodboard.attached', 'moodboard.detached'] },
   { label: 'Quotes', events: ['quote.attached', 'quote.detached', 'quote.status_changed', 'quote.revised'] },

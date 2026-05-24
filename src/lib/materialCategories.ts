@@ -49,15 +49,11 @@ export const CAT_COLORS: Record<string, string> = {
 };
 
 export const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
-  designer:          'Designer',
-  interior_designer: 'Interior Designer',
-  architect:         'Architect',
-  manufacturer:      'Manufacturer',
-  brand:             'Brand',
-  supplier:          'Supplier',
-  sourcing_agent:    'Sourcing Agent',
-  consultant:        'Consultant',
-  other:             'Other',
+  architect_designer: 'Architect / Interior Designer',
+  supplier:           'Supplier',
+  sourcing_agent:     'Sourcing Agent',
+  consultant:         'Consultant',
+  other:              'Other',
 };
 
 /**

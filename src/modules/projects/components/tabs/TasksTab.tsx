@@ -38,6 +38,8 @@ import {
 
 interface TasksTabProps {
   projectId: string;
+  /** Collaborators see client_visible tasks (filtered by RLS) but can't add/edit/delete. */
+  isOwner?: boolean;
 }
 
 const STATUS_ICON: Record<TaskStatus, React.ReactNode> = {
@@ -64,7 +66,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const TasksTab: React.FC<TasksTabProps> = ({ projectId }) => {
+export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true }) => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
@@ -173,7 +175,8 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId }) => {
 
   return (
     <div className="space-y-4">
-      {/* Add task */}
+      {/* Add task — owner-only. Collaborators read filtered (client_visible) list only. */}
+      {isOwner && (
       <Card className="dashboard-card">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-2">
@@ -200,6 +203,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId }) => {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Task list */}
       {loading ? (
@@ -210,7 +214,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId }) => {
         <Card className="dashboard-card">
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             <CheckSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            No tasks yet. Add one above to start tracking work.
+            {isOwner ? 'No tasks yet. Add one above to start tracking work.' : 'No tasks have been shared with you yet.'}
           </CardContent>
         </Card>
       ) : (
@@ -231,6 +235,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId }) => {
                   onSubtaskStatusChange={(id, s) => handleStatusChange(id, s)}
                   onSubtaskVisibilityToggle={(t) => handleVisibilityToggle(t)}
                   onSubtaskDelete={(id) => handleDelete(id, false)}
+                  readOnly={!isOwner}
                 />
               ))}
             </ul>
@@ -257,6 +262,8 @@ interface TaskRowProps {
   onSubtaskStatusChange: (id: string, s: TaskStatus) => void;
   onSubtaskVisibilityToggle: (t: ProjectTask) => void;
   onSubtaskDelete: (id: string) => void;
+  /** Collaborator view — disables status changes, visibility toggle, delete, add-subtask. */
+  readOnly?: boolean;
 }
 
 const TaskRow: React.FC<TaskRowProps> = ({
@@ -271,6 +278,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
   onSubtaskStatusChange,
   onSubtaskVisibilityToggle,
   onSubtaskDelete,
+  readOnly = false,
 }) => {
   const [subtaskInput, setSubtaskInput] = useState('');
   const hasSubtasks = task.subtasks.length > 0;
@@ -280,19 +288,26 @@ const TaskRow: React.FC<TaskRowProps> = ({
     <li>
       <div className="p-3 sm:p-4 hover:bg-muted/40 transition-colors">
         <div className="flex items-start gap-3">
-          {/* Status toggle (rotates through todo → in_progress → done → blocked → todo) */}
-          <Select value={task.status} onValueChange={(v) => onStatusChange(v as TaskStatus)}>
-            <SelectTrigger className="h-7 w-7 p-0 border-none bg-transparent hover:bg-muted/60 [&>svg]:hidden flex items-center justify-center shrink-0">
+          {/* Status toggle (rotates through todo → in_progress → done → blocked → todo).
+              Collaborators get a read-only icon — no Select. */}
+          {readOnly ? (
+            <span className="h-7 w-7 flex items-center justify-center shrink-0" title={STATUS_LABEL[task.status]}>
               {STATUS_ICON[task.status]}
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_ORDER.map(s => (
-                <SelectItem key={s} value={s}>
-                  <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            </span>
+          ) : (
+            <Select value={task.status} onValueChange={(v) => onStatusChange(v as TaskStatus)}>
+              <SelectTrigger className="h-7 w-7 p-0 border-none bg-transparent hover:bg-muted/60 [&>svg]:hidden flex items-center justify-center shrink-0">
+                <span className="flex items-center justify-center">{STATUS_ICON[task.status]}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_ORDER.map(s => (
+                  <SelectItem key={s} value={s}>
+                    <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {/* Title + meta */}
           <div className="flex-1 min-w-0">
@@ -330,15 +345,21 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" onClick={onVisibilityToggle} title={task.visibility === 'internal' ? 'Show to client' : 'Hide from client'}>
-              {task.visibility === 'client_visible' ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete}>
-              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onToggleExpand}>
-              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            </Button>
+            {!readOnly && (
+              <>
+                <Button variant="ghost" size="sm" onClick={onVisibilityToggle} title={task.visibility === 'internal' ? 'Show to client' : 'Hide from client'}>
+                  {task.visibility === 'client_visible' ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onDelete}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </>
+            )}
+            {(task.subtasks.length > 0 || !readOnly) && (
+              <Button variant="ghost" size="sm" onClick={onToggleExpand}>
+                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -349,18 +370,24 @@ const TaskRow: React.FC<TaskRowProps> = ({
               const subDays = daysUntil(sub.due_date);
               return (
                 <div key={sub.id} className="flex items-start gap-2 py-1.5">
-                  <Select value={sub.status} onValueChange={(v) => onSubtaskStatusChange(sub.id, v as TaskStatus)}>
-                    <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent hover:bg-muted/60 [&>svg]:hidden flex items-center justify-center shrink-0">
+                  {readOnly ? (
+                    <span className="h-6 w-6 flex items-center justify-center shrink-0" title={STATUS_LABEL[sub.status]}>
                       {STATUS_ICON[sub.status]}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_ORDER.map(s => (
-                        <SelectItem key={s} value={s}>
-                          <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    </span>
+                  ) : (
+                    <Select value={sub.status} onValueChange={(v) => onSubtaskStatusChange(sub.id, v as TaskStatus)}>
+                      <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent hover:bg-muted/60 [&>svg]:hidden flex items-center justify-center shrink-0">
+                        <span className="flex items-center justify-center">{STATUS_ICON[sub.status]}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_ORDER.map(s => (
+                          <SelectItem key={s} value={s}>
+                            <span className="flex items-center gap-2">{STATUS_ICON[s]}{STATUS_LABEL[s]}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm ${sub.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
                       {sub.title}
@@ -380,38 +407,44 @@ const TaskRow: React.FC<TaskRowProps> = ({
                       </div>
                     )}
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => onSubtaskVisibilityToggle(sub)}>
-                    {sub.visibility === 'client_visible' ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => onSubtaskDelete(sub.id)}>
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
+                  {!readOnly && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => onSubtaskVisibilityToggle(sub)}>
+                        {sub.visibility === 'client_visible' ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onSubtaskDelete(sub.id)}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               );
             })}
-            <div className="flex gap-2 pt-1">
-              <Input
-                value={subtaskInput}
-                onChange={e => setSubtaskInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    onAddSubtask(subtaskInput);
-                    setSubtaskInput('');
-                  }
-                }}
-                placeholder="Add a subtask..."
-                className="h-8 text-sm flex-1"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => { onAddSubtask(subtaskInput); setSubtaskInput(''); }}
-                disabled={!subtaskInput.trim()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2 pt-1">
+                <Input
+                  value={subtaskInput}
+                  onChange={e => setSubtaskInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      onAddSubtask(subtaskInput);
+                      setSubtaskInput('');
+                    }
+                  }}
+                  placeholder="Add a subtask..."
+                  className="h-8 text-sm flex-1"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { onAddSubtask(subtaskInput); setSubtaskInput(''); }}
+                  disabled={!subtaskInput.trim()}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

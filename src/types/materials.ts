@@ -345,6 +345,10 @@ export interface MoodBoard {
   items: MoodBoardItem[];
   createdAt: Date;
   updatedAt: Date;
+  /** Project Workspace linkage (Phase 1). Null for standalone moodboards. */
+  projectId?: string | null;
+  /** Project room linkage. Only meaningful when projectId is set. */
+  roomId?: string | null;
 }
 
 export interface MoodBoardItem {

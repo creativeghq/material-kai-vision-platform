@@ -34,12 +34,14 @@ const ROOM_TYPE_OPTIONS: Array<{ value: RoomType; label: string }> = [
 interface RoomsTabProps {
   projectId: string;
   budgetCurrency: string;
+  /** Collaborators see the room list but can't add/delete rooms. */
+  isOwner?: boolean;
 }
 
 const formatMoney = (amount: number, currency: string) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
 
-export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency }) => {
+export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true }) => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency })
 
   return (
     <div className="space-y-4">
+      {isOwner && (
       <Card className="dashboard-card">
         <CardContent className="p-4 space-y-3">
           <Label className="text-sm">Add a room</Label>
@@ -139,6 +142,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency })
           </div>
         </CardContent>
       </Card>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -163,9 +167,11 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency })
                       <p className="text-xs text-muted-foreground capitalize">{r.room_type}</p>
                     )}
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
+                  {isOwner && (
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   {r.budget_amount && (

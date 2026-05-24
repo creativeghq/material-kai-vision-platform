@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { User, Menu, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
+import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
-import { useEnabledModules } from '@/modules/_core';
+import { useEnabledModules, ModuleHeaderActions } from '@/modules/_core';
 import { Button } from '@/components/core/ui/button';
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from '@/components/core/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],

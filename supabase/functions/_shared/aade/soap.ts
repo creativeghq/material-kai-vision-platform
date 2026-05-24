@@ -107,12 +107,18 @@ export function pickAllTagBlocks(xml: string, tagName: string): string[] {
 
 /**
  * Locate the business error (ΑΑΔΕ wraps errors in <error_rec> or <pErrorRec_out>) or a SOAP
- * fault. Returns null when neither is present.
+ * fault. Returns null when neither is present, OR when an `<error_rec>` is present but BOTH
+ * its `<error_code>` and `<error_descr>` are empty / `xsi:nil` — ΑΑΔΕ always includes an
+ * `<error_rec>` block in its responses and leaves both children nil on success.
  */
 export function summarizeAadeError(xml: string): { code: string | null; message: string | null } | null {
   const errBlock = pickAllTagBlocks(xml, 'error_rec')[0] ?? pickAllTagBlocks(xml, 'pErrorRec_out')[0];
   if (errBlock) {
-    return { code: pickTag(errBlock, 'error_code'), message: pickTag(errBlock, 'error_descr') };
+    const code = pickTag(errBlock, 'error_code');
+    const message = pickTag(errBlock, 'error_descr');
+    // Both nil/empty → this is the "no error" sentinel, not an actual error.
+    if (code === null && message === null) return null;
+    return { code, message };
   }
   const faultBlock = pickAllTagBlocks(xml, 'Fault')[0];
   if (faultBlock) {

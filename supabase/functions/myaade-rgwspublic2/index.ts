@@ -101,8 +101,11 @@ function parseBasicRec(xml: string): BasicRec | null {
 }
 
 function parseActivities(xml: string): FirmActivity[] {
+  // ΑΑΔΕ returns activities as repeated <item> blocks inside <firm_act_tab>. The legacy
+  // <FirmActivity> shape (seen in some Go clients' docs) is kept as a fallback in case
+  // ΑΑΔΕ varies it across deployments.
   const blocks = [
-    ...pickAllTagBlocks(xml, 'firm_act_tab').flatMap((b) => pickAllTagBlocks(b, 'firm_act')),
+    ...pickAllTagBlocks(xml, 'firm_act_tab').flatMap((b) => pickAllTagBlocks(b, 'item')),
     ...pickAllTagBlocks(xml, 'FirmActivity'),
   ];
   return blocks.map((b) => ({

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Package, Tag } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerQuotesTab,
@@ -20,6 +20,8 @@ import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
+import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
+import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
   TableBody,
@@ -70,6 +72,8 @@ interface Contact {
   tags?: string[];
   discount_percent?: number | null;
   discount_notes?: string | null;
+  is_supplier?: boolean | null;
+  is_client?: boolean | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -119,6 +123,8 @@ export const ContactDetailPage: React.FC = () => {
     tags: [],
     discount_percent: null,
     discount_notes: '',
+    is_supplier: false,
+    is_client: false,
     created_at: new Date().toISOString(),
   } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
@@ -454,6 +460,12 @@ export const ContactDetailPage: React.FC = () => {
               <CreditCard className="h-4 w-4 mr-2" />
               Payments
             </TabsTrigger>
+            {contact.is_supplier && (
+              <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Package className="h-4 w-4 mr-2" />
+                Products
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -803,8 +815,63 @@ export const ContactDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
+            {/* Role — who this contact is to the workspace. Controls which
+                tabs (Products / supplier-bills) appear and how the finance
+                Parties view classifies them. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="h-4 w-4" />
+                  Role
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enables the Products tab below. Includes manufacturers, brands and distributors —
+                      anyone who supplies products to us.
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_supplier"
+                    checked={!!contact.is_supplier}
+                    onCheckedChange={(v) => updateField('is_supplier', v)}
+                    disabled={!editing}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Means we sell to them — quotes / invoices / statements get raised against this contact.
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_client"
+                    checked={!!contact.is_client}
+                    onCheckedChange={(v) => updateField('is_client', v)}
+                    disabled={!editing}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />
           </TabsContent>
+
+          {/* Products Tab — only when is_supplier=true. Matches products by name
+              against products.metadata.factory_name / manufacturer / brand /
+              supplier. Read-only view for now. */}
+          {contact.is_supplier && (
+            <TabsContent value="products" className="space-y-4">
+              <SupplierProductsTab
+                supplierName={contact.name}
+                aliases={[contact.company].filter((s): s is string => !!s)}
+              />
+            </TabsContent>
+          )}
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-4">

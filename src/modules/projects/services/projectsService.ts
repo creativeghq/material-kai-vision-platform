@@ -83,6 +83,32 @@ export interface ProjectEvent {
   occurred_at: string;
 }
 
+export interface ProjectCollaborator {
+  id: string;
+  project_id: string;
+  email: string;
+  user_id: string | null;
+  share_token: string;
+  role: 'client' | 'editor';
+  invited_by: string;
+  invited_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  expires_at: string;
+  message: string | null;
+  created_at: string;
+}
+
+export interface InvitationPreview {
+  project_name: string;
+  project_id: string;
+  invited_email_masked: string;
+  invited_by_name: string | null;
+  expires_at: string;
+  is_revoked: boolean;
+  is_expired: boolean;
+}
+
 export interface CreateProjectInput {
   name: string;
   description?: string;
@@ -494,6 +520,196 @@ class ProjectsService {
       ...s,
       moodboard_title: titleById.get(s.moodboard_id) ?? null,
     }));
+  }
+
+  // ---------- COLLABORATORS (Phase 4 — passwordless email-invite read access) ----------
+
+  /**
+   * Invite a collaborator by email. Creates a project_collaborators row + sends a branded
+   * invite email through email-api. Owner-only via RLS. Returns the new row (with share_token).
+   */
+  async inviteCollaborator(input: {
+    project_id: string;
+    email: string;
+    message?: string;
+  }): Promise<ProjectCollaborator> {
+    const email = input.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('Invalid email address');
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Check for existing active invite for the same email — prevent duplicates
+    const { data: existing } = await (supabase as any)
+      .from('project_collaborators')
+      .select('id, share_token')
+      .eq('project_id', input.project_id)
+      .ilike('email', email)
+      .is('revoked_at', null)
+      .maybeSingle();
+    if (existing) {
+      throw new Error('This email already has an active invitation. Revoke it first if you want to re-send.');
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('project_collaborators')
+      .insert({
+        project_id: input.project_id,
+        email,
+        invited_by: user.id,
+        message: input.message?.trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Fetch project name + inviter name for the email body
+    const { data: project } = await (supabase as any)
+      .from('projects')
+      .select('name')
+      .eq('id', input.project_id)
+      .single();
+    const inviterName = user.user_metadata?.full_name || user.email || 'Your collaborator';
+    const appUrl = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    const inviteUrl = `${appUrl}/projects/invite/${data.share_token}`;
+
+    // Best-effort send; on failure the row still exists and owner can re-send / share link manually
+    try {
+      await supabase.functions.invoke('email-api?action=send', {
+        body: {
+          to: email,
+          subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
+          emailType: 'transactional',
+          html: this._renderInviteEmailHtml({
+            projectName: project?.name || 'a project',
+            inviterName,
+            inviteUrl,
+            message: input.message?.trim() || null,
+          }),
+        },
+      });
+    } catch (sendErr) {
+      console.warn('[projectsService] invite email send failed (non-blocking):', sendErr);
+    }
+
+    return data as ProjectCollaborator;
+  }
+
+  async listCollaborators(projectId: string): Promise<ProjectCollaborator[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_collaborators')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('invited_at', { ascending: false });
+    if (error) throw error;
+    return (data || []) as ProjectCollaborator[];
+  }
+
+  async revokeCollaborator(id: string): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('project_collaborators')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  async resendCollaboratorInvite(id: string): Promise<void> {
+    const { data: row, error } = await (supabase as any)
+      .from('project_collaborators')
+      .select('email, share_token, project_id, message')
+      .eq('id', id)
+      .single();
+    if (error || !row) throw error || new Error('Invitation not found');
+
+    const { data: project } = await (supabase as any)
+      .from('projects')
+      .select('name')
+      .eq('id', row.project_id)
+      .single();
+    const { data: { user } } = await supabase.auth.getUser();
+    const inviterName = user?.user_metadata?.full_name || user?.email || 'Your collaborator';
+    const appUrl = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    const inviteUrl = `${appUrl}/projects/invite/${row.share_token}`;
+
+    await supabase.functions.invoke('email-api?action=send', {
+      body: {
+        to: row.email,
+        subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
+        emailType: 'transactional',
+        html: this._renderInviteEmailHtml({
+          projectName: project?.name || 'a project',
+          inviterName,
+          inviteUrl,
+          message: row.message || null,
+        }),
+      },
+    });
+  }
+
+  /**
+   * Pre-auth lookup of an invitation by its share_token. Returns a masked
+   * email + project name so the landing page can render context BEFORE the
+   * invitee enters their email. Uses a SECURITY DEFINER RPC.
+   */
+  async getInvitationPreview(shareToken: string): Promise<InvitationPreview | null> {
+    const { data, error } = await (supabase as any).rpc('get_project_invitation_preview', {
+      p_share_token: shareToken,
+    });
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+    return data[0] as InvitationPreview;
+  }
+
+  /**
+   * Called after the magic-link redirect lands the signed-in invitee on /projects/accept-invite.
+   * Verifies JWT email matches the invitation's email + stamps user_id.
+   */
+  async acceptInvitation(shareToken: string): Promise<{ project_id: string; project_name: string }> {
+    const { data, error } = await (supabase as any).rpc('accept_project_invitation', {
+      p_share_token: shareToken,
+    });
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error('Invitation accept returned no project');
+    return data[0];
+  }
+
+  /** Is the current viewer a collaborator on this project (vs the owner)? */
+  async isCollaborator(projectId: string): Promise<boolean> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await (supabase as any)
+      .from('project_collaborators')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .is('revoked_at', null)
+      .maybeSingle();
+    return Boolean(data);
+  }
+
+  private _renderInviteEmailHtml(input: {
+    projectName: string;
+    inviterName: string;
+    inviteUrl: string;
+    message: string | null;
+  }): string {
+    const escape = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const messageBlock = input.message
+      ? `<p style="margin:16px 0;padding:12px;background:#f5f5f5;border-left:3px solid #999;font-style:italic;">${escape(input.message)}</p>`
+      : '';
+    return `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:32px auto;padding:24px;color:#222;">
+  <h2 style="margin:0 0 16px;font-weight:300;">You've been invited</h2>
+  <p style="margin:0 0 12px;"><strong>${escape(input.inviterName)}</strong> invited you to view the project <strong>"${escape(input.projectName)}"</strong>.</p>
+  ${messageBlock}
+  <p style="margin:24px 0;">
+    <a href="${escape(input.inviteUrl)}" style="display:inline-block;padding:12px 24px;background:#8a3a6b;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;">View project</a>
+  </p>
+  <p style="margin:24px 0 0;font-size:13px;color:#666;">No password needed — just confirm your email on the next screen. Link expires in 90 days.</p>
+  <p style="margin:8px 0 0;font-size:12px;color:#999;word-break:break-all;">If the button doesn't work, paste this URL into your browser:<br>${escape(input.inviteUrl)}</p>
+</body></html>`;
   }
 
   // ---------- CRM LOOKUP (for the wizard) ----------

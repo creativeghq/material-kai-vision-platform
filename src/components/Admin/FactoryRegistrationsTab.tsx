@@ -59,13 +59,13 @@ export const FactoryRegistrationsTab: React.FC = () => {
       supabase.from('user_notifications').insert({
         user_id: req.user_id,
         type: 'factory_approved',
-        title: 'Factory registration approved!',
-        body: `Your registration for ${req.company_name} has been approved. You are now a verified factory.`,
+        title: 'Supplier verification approved!',
+        body: `Your verification request for ${req.company_name} has been approved. You are now a verified supplier.`,
         action_url: '/profile',
         is_read: false,
         metadata: { request_id: req.id, company_name: req.company_name },
       }).then(() => {});
-      toast({ title: 'Approved', description: `${req.company_name} is now a verified factory.` });
+      toast({ title: 'Approved', description: `${req.company_name} is now a verified supplier.` });
     } catch {
       toast({ title: 'Error', description: 'Could not approve request.', variant: 'destructive' });
     } finally {
@@ -89,8 +89,8 @@ export const FactoryRegistrationsTab: React.FC = () => {
       supabase.from('user_notifications').insert({
         user_id: req.user_id,
         type: 'factory_rejected',
-        title: 'Factory registration not approved',
-        body: rejectReason.trim() || `Your registration for ${req.company_name} was not approved at this time.`,
+        title: 'Supplier verification not approved',
+        body: rejectReason.trim() || `Your verification request for ${req.company_name} was not approved at this time.`,
         action_url: null,
         is_read: false,
         metadata: { request_id: req.id, company_name: req.company_name },
@@ -124,7 +124,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Building2 className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">Factory Registration Requests</h3>
+          <h3 className="font-semibold">Supplier Verification Requests</h3>
           {requests.filter((r) => r.status === 'pending').length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {requests.filter((r) => r.status === 'pending').length} pending

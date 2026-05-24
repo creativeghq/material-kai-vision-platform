@@ -13826,11 +13826,7 @@ export type Database = {
         | "failed"
         | "cancelled"
       professional_type:
-        | "designer"
-        | "interior_designer"
-        | "architect"
-        | "manufacturer"
-        | "brand"
+        | "architect_designer"
         | "supplier"
         | "sourcing_agent"
         | "consultant"
@@ -14077,11 +14073,7 @@ export const Constants = {
         "cancelled",
       ],
       professional_type: [
-        "designer",
-        "interior_designer",
-        "architect",
-        "manufacturer",
-        "brand",
+        "architect_designer",
         "supplier",
         "sourcing_agent",
         "consultant",

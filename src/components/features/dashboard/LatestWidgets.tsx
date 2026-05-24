@@ -240,7 +240,7 @@ function ProfilesWidget() {
       .from('user_profiles')
       .select('user_id, full_name, professional_type, location, avatar_url')
       .eq('is_public', true)
-      .not('professional_type', 'in', '("manufacturer","brand","supplier")')
+      .not('professional_type', 'in', '("supplier")')
       .order('created_at', { ascending: false })
       .limit(6)
       .then(({ data }) => {

@@ -43,8 +43,16 @@ Personas are computed from these sources:
 | `workspace_members.role` | `'admin'` \| `'owner'` | Grants admin privileges |
 
 **Derived flags** (from `useFactoryRole` hook):
-- `isFactory` = `factory_verified === true` AND `professional_type` ∈ `['manufacturer', 'brand', 'supplier']`
+- `isFactory` = `factory_verified === true` AND `professional_type === 'supplier'`
 - `isAdmin` = `workspace_members.role` ∈ `['admin', 'owner']`
+
+> Note: the `professional_type` enum was collapsed in 2026-05-24 from 9 values to 5
+> (`architect_designer` / `supplier` / `sourcing_agent` / `consultant` / `other`). The
+> legacy split between `manufacturer` / `brand` / `supplier` and between
+> `designer` / `interior_designer` / `architect` was needless surface area; suppliers are
+> the umbrella "anyone who supplies products" persona, and architects + designers behave
+> identically in the product. The hook name `isFactory` is kept as legacy shorthand for
+> "this user produces / supplies products and has been verified".
 
 ---
 
@@ -53,16 +61,10 @@ Personas are computed from these sources:
 | Level | How Determined | `isFactory` | `isAdmin` |
 |-------|---------------|-------------|-----------|
 | **Unauthenticated** | Not logged in | — | — |
-| **Designer** | `professional_type = 'designer'` | false | false |
-| **Interior Designer** | `professional_type = 'interior_designer'` | false | false |
-| **Architect** | `professional_type = 'architect'` | false | false |
+| **Architect / Interior Designer** | `professional_type = 'architect_designer'` | false | false |
 | **Sourcing Agent** | `professional_type = 'sourcing_agent'` | false | false |
 | **Consultant** | `professional_type = 'consultant'` | false | false |
 | **Other** | `professional_type = 'other'` | false | false |
-| **Manufacturer (unverified)** | `professional_type = 'manufacturer'`, `factory_verified = false` | false | false |
-| **Manufacturer (verified)** | `professional_type = 'manufacturer'`, `factory_verified = true` | **true** | false |
-| **Brand (unverified)** | `professional_type = 'brand'`, `factory_verified = false` | false | false |
-| **Brand (verified)** | `professional_type = 'brand'`, `factory_verified = true` | **true** | false |
 | **Supplier (unverified)** | `professional_type = 'supplier'`, `factory_verified = false` | false | false |
 | **Supplier (verified)** | `professional_type = 'supplier'`, `factory_verified = true` | **true** | false |
 | **Admin** | `workspace_members.role = 'admin'` | any | **true** |
@@ -85,7 +87,7 @@ Personas are computed from these sources:
 | Admin Panel (`/admin`) | ❌ | ❌² | ❌² | ❌² | ✅ |
 | Public Profiles (`/u/:id`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-> ¹ Standard Users = Designer, Interior Designer, Architect, Sourcing Agent, Consultant, Other
+> ¹ Standard Users = Architect / Interior Designer, Sourcing Agent, Consultant, Other
 > ² Sidebar shows the Admin link for all users; access is guarded by `AdminGuard` (redirects non-admins)
 
 ---

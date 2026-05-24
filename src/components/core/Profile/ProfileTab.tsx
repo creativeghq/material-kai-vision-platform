@@ -30,8 +30,7 @@ import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
 type ProfessionalType =
-  | 'designer' | 'interior_designer' | 'architect' | 'manufacturer'
-  | 'brand' | 'supplier' | 'sourcing_agent' | 'consultant' | 'other' | null;
+  | 'architect_designer' | 'supplier' | 'sourcing_agent' | 'consultant' | 'other' | null;
 
 // ─── Country codes ────────────────────────────────────────────────────────────
 const COUNTRY_CODES = [
@@ -1151,12 +1150,15 @@ export const ProfileTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Factory Verification */}
-      {['manufacturer', 'brand', 'supplier'].includes(personal.professional_type ?? '') && (
+      {/* Supplier Verification — gated on professional_type='supplier'. The
+          underlying column is factory_verified for historical reasons; the
+          user-facing label is "Supplier" since the merge of
+          brand/manufacturer/supplier → supplier (2026-05-24). */}
+      {personal.professional_type === 'supplier' && (
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />Factory Verification
+              <Building2 className="h-5 w-5 text-primary" />Supplier Verification
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1166,7 +1168,7 @@ export const ProfileTab: React.FC = () => {
                   <Check className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Verified Factory</p>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Verified Supplier</p>
                   {factoryClaimedName && (
                     <p className="text-xs text-muted-foreground">{factoryClaimedName}</p>
                   )}
@@ -1190,7 +1192,7 @@ export const ProfileTab: React.FC = () => {
                   </Badge>
                 </div>
                 {regRequest.status === 'pending' && (
-                  <p className="text-xs text-muted-foreground mt-1">Your factory registration is under review.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Your supplier verification request is under review.</p>
                 )}
                 {regRequest.status === 'rejected' && regRequest.rejection_reason && (
                   <p className="text-xs text-muted-foreground mt-1">{regRequest.rejection_reason}</p>
@@ -1246,7 +1248,7 @@ export const ProfileTab: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Register your factory to get a verified badge and unlock factory analytics.
+                  Verify your supplier identity to get a verified badge and unlock supplier analytics.
                 </p>
                 <Button
                   size="sm"
@@ -1255,7 +1257,7 @@ export const ProfileTab: React.FC = () => {
                     setShowRegForm(true);
                   }}
                 >
-                  <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as Verified Factory
+                  <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as Verified Supplier
                 </Button>
               </div>
             )}

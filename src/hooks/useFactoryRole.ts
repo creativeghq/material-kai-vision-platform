@@ -49,10 +49,8 @@ export function useFactoryRole(): FactoryRole {
       const profile = profileResult.data;
       const member = memberResult.data;
 
-      const FACTORY_TYPES = ['manufacturer', 'brand', 'supplier'];
-
       setState({
-        isFactory: !!(profile?.factory_verified && FACTORY_TYPES.includes(profile?.professional_type ?? '')),
+        isFactory: !!(profile?.factory_verified && profile?.professional_type === 'supplier'),
         isAdmin: isAdminRole(member?.role),
         factoryClaimedName: profile?.factory_claimed_name ?? null,
         professionalType: profile?.professional_type ?? null,

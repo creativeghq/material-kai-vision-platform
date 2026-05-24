@@ -84,6 +84,9 @@ const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategoriza
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
+// Project Workspace passwordless invite flow (public landing + auth-required accept)
+const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/InviteLandingPage').then(m => ({ default: m.InviteLandingPage })));
+const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
@@ -137,6 +140,11 @@ const App = () => (
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Public Tools"><PublicToolsPage /></PageErrorBoundary>} />
+                {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
+                    expects a Supabase session (established by the magic-link callback) — if it isn't there,
+                    its internal redirect bounces back to the invite landing. */}
+                <Route path="/projects/invite/:token" element={<PageErrorBoundary name="Project Invite"><ProjectInviteLandingPage /></PageErrorBoundary>} />
+                <Route path="/projects/accept-invite" element={<PageErrorBoundary name="Accept Project Invite"><ProjectAcceptInvitePage /></PageErrorBoundary>} />
 
                 <Route
                   path="/auth"

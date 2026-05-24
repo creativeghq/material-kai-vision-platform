@@ -117,7 +117,7 @@ export function PlatformOverviewTab() {
 
   // ── Community & Social ────────────────────────────────────────
   const [reviewVelocity, setReviewVelocity] = useState<{ week: string; count: number; avgRating: number }[]>([]);
-  const [creatorGrowth, setCreatorGrowth] = useState<{ week: string; manufacturers: number; brands: number; suppliers: number; designers: number }[]>([]);
+  const [creatorGrowth, setCreatorGrowth] = useState<{ week: string; suppliers: number; architects_designers: number }[]>([]);
   const [socialEngagement, setSocialEngagement] = useState<{ week: string; hires: number; reviews: number; boards: number; follows: number }[]>([]);
   const [moodboardActivity, setMoodboardActivity] = useState<{ week: string; boards: number; items: number }[]>([]);
   const [followsGrowth, setFollowsGrowth] = useState<{ week: string; count: number }[]>([]);
@@ -300,8 +300,9 @@ export function PlatformOverviewTab() {
     setMoodboardActivity(wks.map((week,i) => ({ week, boards:bsB[i], items:itB[i] })));
     setReviewVelocity(wks.map((week,i) => ({ week, count:rB[i], avgRating:4.1+(i%3)*0.1 })));
     setCreatorGrowth(wks.map((week,i) => ({
-      week, manufacturers:Math.floor(f[i]*0.15), brands:Math.floor(f[i]*0.12),
-      suppliers:Math.floor(f[i]*0.10), designers:Math.floor(f[i]*0.63),
+      week,
+      suppliers: Math.floor(f[i]*0.37),
+      architects_designers: Math.floor(f[i]*0.63),
     })));
     setSocialEngagement(wks.map((week,i) => ({ week, hires:hB[i], reviews:rB[i], boards:bsB[i], follows:fB[i] })));
     setFollowsGrowth(wks.map((week,i) => ({ week, count:fB[i] })));
@@ -394,14 +395,14 @@ export function PlatformOverviewTab() {
       setWeeklyGrowth(Array.from(growMap.entries()).map(([week, new_users]) => ({ week, new_users })));
 
       // Creator growth
-      const cgMap = new Map<string, { manufacturers: number; brands: number; suppliers: number; designers: number }>(wks12.map(w => [w, { manufacturers: 0, brands: 0, suppliers: 0, designers: 0 }]));
+      const cgMap = new Map<string, { suppliers: number; architects_designers: number }>(
+        wks12.map(w => [w, { suppliers: 0, architects_designers: 0 }]),
+      );
       (profiles ?? []).forEach((p: any) => {
         const l = weekLabel(new Date(p.created_at)); if (!cgMap.has(l)) return;
         const e = cgMap.get(l)!;
-        if (p.professional_type === 'manufacturer') e.manufacturers++;
-        else if (p.professional_type === 'brand') e.brands++;
-        else if (p.professional_type === 'supplier') e.suppliers++;
-        else e.designers++;
+        if (p.professional_type === 'supplier') e.suppliers++;
+        else e.architects_designers++;
       });
       setCreatorGrowth(Array.from(cgMap.entries()).map(([week, d]) => ({ week, ...d })));
 
@@ -1414,10 +1415,8 @@ export function PlatformOverviewTab() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="week" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip /><Legend />
-              <Bar dataKey="manufacturers" name="Manufacturers" fill="#8b5cf6" stackId="a" />
-              <Bar dataKey="brands" name="Brands" fill="#06b6d4" stackId="a" />
               <Bar dataKey="suppliers" name="Suppliers" fill="#10b981" stackId="a" />
-              <Bar dataKey="designers" name="Designers / Architects" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="architects_designers" name="Architects / Interior Designers" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
