@@ -62,6 +62,7 @@ import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
 import { PriceLookupsCard } from './PriceLookupsCard';
+import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
 import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { StorageAuditPanel } from '../StorageAuditPanel';
@@ -2050,6 +2051,12 @@ const OperationsDashboardInner: React.FC = () => {
                   <UnifiedProcessingMonitor />
                 </CardContent>
               </Card>
+
+              {/* Pipeline Strategy Metrics — chunking strategy distribution +
+                  Stage 1.5 failure rate. Surfaces silent regressions where the
+                  chunker falls back to text-only because layout precompute
+                  silently failed. See pipeline_strategy_metrics table. */}
+              <PipelineStrategyMetricsPanel />
             </div>
 
             {/* Old XML Stats - Keep for reference */}

@@ -92,6 +92,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [showTempCleanupModal, setShowTempCleanupModal] = useState(false);
   const [productProgress, setProductProgress] = useState<ProductProgress[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  // Map of product_id → total billed AI cost (USD) for the selected job.
+  // Populated alongside fetchProductProgress by summing ai_usage_logs.
+  const [productCosts, setProductCosts] = useState<Record<string, number>>({});
 
   // Debug log
 
@@ -107,21 +110,42 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     });
   };
 
-  // Fetch product progress for a job directly from Supabase
+  // Fetch product progress for a job directly from Supabase.
+  // Runs in parallel with a per-product cost aggregation from ai_usage_logs
+  // so the per-product table can render a `cost_usd` column. The cost query
+  // groups SUM(billed_cost_usd) by product_id for the given job_id; rows
+  // without a product_id (job-scoped costs) are excluded so the per-product
+  // total doesn't double-count Stage 0 / Stage 1.5 spend.
   const fetchProductProgress = async (jobId: string) => {
     try {
       setLoadingProducts(true);
 
-      // Query product_processing_status table (the correct table name)
-      const { data, error } = await supabase
-        .from('product_processing_status')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('product_index', { ascending: true });
+      const [{ data, error }, { data: costRows, error: costError }] = await Promise.all([
+        supabase
+          .from('product_processing_status')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('product_index', { ascending: true }),
+        supabase
+          .from('ai_usage_logs')
+          .select('product_id, billed_cost_usd')
+          .eq('job_id', jobId)
+          .not('product_id', 'is', null),
+      ]);
 
       if (error) {
         console.error('Error fetching product progress:', error);
       }
+      if (costError) {
+        console.error('Error fetching per-product costs:', costError);
+      }
+
+      const costMap: Record<string, number> = {};
+      for (const row of (costRows as Array<{ product_id: string | null; billed_cost_usd: number | null }> | null) || []) {
+        if (!row.product_id) continue;
+        costMap[row.product_id] = (costMap[row.product_id] || 0) + Number(row.billed_cost_usd || 0);
+      }
+      setProductCosts(costMap);
 
       // If we have products in the processing status table, use them
       if (data && data.length > 0) {
@@ -3384,9 +3408,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     </div>
                                   </div>
 
+                                  {/* Per-product AI cost (summed from ai_usage_logs).
+                                      Shown inline in the trigger so the expensive
+                                      products bubble up visually without expanding. */}
+                                  {product.product_id && productCosts[product.product_id] !== undefined && productCosts[product.product_id] > 0 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="ml-auto shadow-none bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                      title="Total AI cost for this product (sum of billed_cost_usd from ai_usage_logs)"
+                                    >
+                                      ${productCosts[product.product_id].toFixed(4)}
+                                    </Badge>
+                                  )}
+
                                   {/* Status Badge */}
                                   <Badge
-                                    className={`ml-auto shadow-none ${
+                                    className={`${product.product_id && productCosts[product.product_id] ? 'ml-2' : 'ml-auto'} shadow-none ${
                                       isFailed ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' :
                                       isProcessing ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20' :
                                       isCompleted ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20' :
@@ -3560,6 +3597,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                               })()}
                                             </div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">Processing</div>
+                                          </div>
+                                        )}
+
+                                        {/* AI Cost (summed from ai_usage_logs.billed_cost_usd) */}
+                                        {product.product_id && productCosts[product.product_id] !== undefined && (
+                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">AI Cost</div>
+                                            <div className="text-lg font-bold text-amber-400">
+                                              ${productCosts[product.product_id].toFixed(4)}
+                                            </div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">
+                                              Sum of billed_cost_usd
+                                            </div>
                                           </div>
                                         )}
 
