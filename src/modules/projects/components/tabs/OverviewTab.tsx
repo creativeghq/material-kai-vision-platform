@@ -45,12 +45,18 @@ const daysUntil = (date: string | null) => {
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
+  const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>([]);
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
 
   useEffect(() => {
     projectsService.listRooms(project.id).then(setRooms).catch(() => {});
+    projectsService.getRoomBudgetSummary(project.id).then(setRoomBudget).catch(() => {});
     projectsService.listTasks(project.id).then(setTasks).catch(() => {});
   }, [project.id]);
+
+  // Per-room budget card replaces the simple rooms-badge card when any room has either
+  // a budget set OR has accepted-quote spend (so the rollup is non-zero on at least one row).
+  const hasMeaningfulRoomBudget = roomBudget.some(r => r.room.budget_amount || r.actual_amount > 0);
 
   const budget = project.budget_amount || 0;
   const actual = Number(project.actual_amount) || 0;
@@ -181,8 +187,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
         </CardContent>
       </Card>
 
-      {/* Rooms summary */}
-      {rooms.length > 0 && (
+      {/* Rooms summary — switches between simple badge list and per-room budget rollup
+          based on whether any room actually has budget/spend data to show. */}
+      {rooms.length > 0 && !hasMeaningfulRoomBudget && (
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -198,6 +205,44 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project }) => {
                   {r.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {r.room_type}</span>}
                 </Badge>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasMeaningfulRoomBudget && (
+        <Card className="dashboard-card lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Home className="h-4 w-4 text-primary" />
+              Budget by Room
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {roomBudget.map(({ room, actual_amount, item_count }) => {
+                const budget = Number(room.budget_amount) || 0;
+                const pct = budget > 0 ? Math.min(100, Math.round((actual_amount / budget) * 100)) : 0;
+                const over = budget > 0 && actual_amount > budget;
+                return (
+                  <div key={room.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="truncate">
+                        {room.name}
+                        {room.room_type && <span className="ml-1.5 text-xs text-muted-foreground capitalize">· {room.room_type}</span>}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {formatMoney(actual_amount, project.budget_currency)}
+                        {budget > 0 && <> / {formatMoney(budget, project.budget_currency)}</>}
+                        {item_count > 0 && <> · {item_count} {item_count === 1 ? 'item' : 'items'}</>}
+                      </span>
+                    </div>
+                    {budget > 0 && (
+                      <Progress value={pct} className={over ? '[&>div]:bg-destructive' : ''} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Loader2, ArrowRight } from 'lucide-react';
+import { FileText, Loader2, ArrowRight, GitBranch } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -22,6 +22,15 @@ interface QuoteRow {
   quote_number: string | null;
   updated_at: string;
   created_at: string;
+  parent_quote_id: string | null;
+  revision_number: number | null;
+}
+
+interface ChainGroup {
+  /** Root quote id (parent_quote_id IS NULL) */
+  rootId: string;
+  /** Sorted by revision_number ascending (rev 1 first) */
+  revisions: QuoteRow[];
 }
 
 const STATUS_TONES: Record<string, string> = {
@@ -58,6 +67,27 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Group quotes by revision chain. Root = quote where parent_quote_id IS NULL.
+  // Revisions = quotes whose parent_quote_id === root.id.
+  // Sort revisions by revision_number ascending so the chain reads rev1 → rev2 → rev3.
+  const chains = useMemo<ChainGroup[]>(() => {
+    const byRoot = new Map<string, ChainGroup>();
+    for (const q of quotes) {
+      const rootId = q.parent_quote_id || q.id;
+      if (!byRoot.has(rootId)) byRoot.set(rootId, { rootId, revisions: [] });
+      byRoot.get(rootId)!.revisions.push(q);
+    }
+    for (const c of byRoot.values()) {
+      c.revisions.sort((a, b) => (a.revision_number || 1) - (b.revision_number || 1));
+    }
+    // Sort chains by newest activity (latest revision's created_at)
+    return Array.from(byRoot.values()).sort((a, b) => {
+      const aDate = a.revisions[a.revisions.length - 1]?.created_at || '';
+      const bDate = b.revisions[b.revisions.length - 1]?.created_at || '';
+      return bDate.localeCompare(aDate);
+    });
+  }, [quotes]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -84,39 +114,57 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
   }
 
   return (
-    <Card className="dashboard-card">
-      <CardContent className="p-0">
-        <div className="divide-y divide-white/8">
-          {quotes.map(q => (
-            <button
-              key={q.id}
-              onClick={() => navigate(`/admin/quotes/${q.id}`)}
-              className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center gap-3"
-            >
-              <FileText className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium truncate">{q.name || `Quote #${q.id.slice(0, 8)}`}</p>
-                  {q.quote_number && (
-                    <span className="text-xs text-muted-foreground">{q.quote_number}</span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {q.total_items} {q.total_items === 1 ? 'item' : 'items'} ·
-                  Updated {new Date(q.updated_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                </p>
+    <div className="space-y-3">
+      {chains.map(chain => {
+        const hasRevisions = chain.revisions.length > 1;
+        return (
+          <Card key={chain.rootId} className="dashboard-card">
+            {hasRevisions && (
+              <div className="px-4 py-2 border-b border-white/8 flex items-center gap-2 text-xs text-muted-foreground">
+                <GitBranch className="h-3.5 w-3.5" />
+                <span>Revision chain — {chain.revisions.length} versions</span>
               </div>
-              <div className="text-right shrink-0">
-                <p className="font-medium">{formatMoney(q.grand_total, q.currency)}</p>
-                <Badge variant="outline" className={`text-xs mt-1 ${STATUS_TONES[q.status] || ''}`}>
-                  {q.status}
-                </Badge>
+            )}
+            <CardContent className="p-0">
+              <div className="divide-y divide-white/8">
+                {chain.revisions.map(q => (
+                  <button
+                    key={q.id}
+                    onClick={() => navigate(`/admin/quotes/${q.id}`)}
+                    className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center gap-3"
+                  >
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium truncate">{q.name || `Quote #${q.id.slice(0, 8)}`}</p>
+                        {hasRevisions && (
+                          <Badge variant="outline" className="text-xs">
+                            rev {q.revision_number || 1}
+                          </Badge>
+                        )}
+                        {q.quote_number && (
+                          <span className="text-xs text-muted-foreground">{q.quote_number}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {q.total_items} {q.total_items === 1 ? 'item' : 'items'} ·
+                        Updated {new Date(q.updated_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-medium">{formatMoney(q.grand_total, q.currency)}</p>
+                      <Badge variant="outline" className={`text-xs mt-1 ${STATUS_TONES[q.status] || ''}`}>
+                        {q.status}
+                      </Badge>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
               </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 };

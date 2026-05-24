@@ -40,9 +40,17 @@ Individual people (customers, suppliers, prospects).
 
 ### Companies
 
-Organisation records (manufacturers, suppliers, clients).
+Organisation records (manufacturers, suppliers, clients). Also where a user's own business lives once they switch their profile to `entity_type='business'` — the platform creates a `crm_companies` row owned by the user and links it via `user_profiles.business_id`.
 
 **Key fields:** name, domain, industry, address, website, contact_count, linked_contacts[]
+
+**Business-profile fields** (populated by VIES + ΑΑΔΕ auto-fill): `vat_number`, `tax_office`, `profession`, `country_code`, `street`, `street_number`, `postal_code`, `city`, `country`.
+
+**VAT validation cache** (written by `vies-validate` and `myaade-rgwspublic2`): `vat_validated boolean`, `vat_validated_at timestamptz`, `vat_validated_name text`, `vat_validated_address text`, `vat_validation_source text` (today: `vies` or `aade`).
+
+**ΑΑΔΕ (Greek-business) fields** (written by `myaade-rgwspublic2`, see [`src/modules/myaade/README.md`](../src/modules/myaade/README.md)): `commercial_title`, `legal_status`, `kad_primary`, `kad_primary_description`, `kad_secondary jsonb`, `business_start_date`, `aade_data jsonb`, `aade_data_at` (90-day cache).
+
+**Oxygen e-invoicing field**: `oxygen_contact_id` (cached after first push to oxygen.gr).
 
 **Routes:**
 - `/admin/crm` (companies tab)
@@ -53,9 +61,9 @@ Organisation records (manufacturers, suppliers, clients).
 
 Platform user accounts. Admins can view all workspace users, update roles, and manage permissions.
 
-**Key fields:** email, role, workspace_id, created_at, last_sign_in_at, subscription status
+**Key fields:** email, role, workspace_id, entity_type (`solo` | `business`), business_id (FK → `crm_companies`), created_at, last_sign_in_at, subscription status
 
-**Roles:** `admin`, `owner`, `manager`, `member`, `factory`
+**Platform roles:** `admin`, `owner`, `super_admin` (admin tier) + `factory`, `dealer`, `user`. The `manager` role was removed 2026-05-23 (collapsed into admin). `dealer` and `factory` are **admin-granted only** — users self-apply via the Role Upgrade Requests flow on the Subscription tab; admins approve on the user detail page. See [user-levels-access.md](user-levels-access.md) for the full role table.
 
 **Routes:**
 - `/admin/crm/users/:id` (user detail)

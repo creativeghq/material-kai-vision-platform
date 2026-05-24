@@ -289,6 +289,7 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 | Service | Setting | Where Used | How to Get | Required? |
 |---------|---------|------------|------------|-----------|
 | **Oxygen** | `api_key` (or `OXYGEN_API_KEY` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | https://www.oxygen.gr → Dashboard → API settings → generate key | ✅ Required if `oxygen` module enabled |
+| **myAADE (ΑΑΔΕ)** | `AADE_USERNAME` + `AADE_PASSWORD` (also `AADE_AFM_CALLED_BY` optional) | Edge Function `myaade-rgwspublic2` (and any future `myaade-*` function) | https://www1.gsis.gr/sgsisapps/tokenservices/ → log in with TAXISnet → create "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" pair → authorize for `RgWsPublic2` service | ✅ Required if `myaade` module enabled (Greek business profile auto-fill) |
 | **Oxygen** | `api_base_url` (or `OXYGEN_API_BASE_URL` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | Optional override; defaults to `https://api.oxygen.gr/v1` | Optional |
 | **Oxygen** | `default_tax_id_24` (or `OXYGEN_DEFAULT_TAX_ID_24` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /taxes`) | ✅ Required if `oxygen` module enabled |
 | **Oxygen** | `default_warehouse_id` (or `OXYGEN_DEFAULT_WAREHOUSE_ID` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /warehouses`) | ✅ Required if `oxygen` module enabled |
@@ -431,6 +432,33 @@ Used by the `oxygen` module (`src/modules/oxygen/`) and two Edge Functions: `oxy
 > **Endpoints touched at Oxygen**: `POST /notices` (pre-invoice creation), `GET /contacts?vat=…` and `POST /contacts` (customer lookup or create-if-missing), `POST /products` (catalog create-if-missing), `GET /taxes` + `GET /warehouses` (dropdown lookup from the Settings tab). The function never calls `POST /invoices`.
 
 > **Greenfield deployment**: skip the env vars entirely. Deploy `oxygen-create-pre-invoice` + `oxygen-admin`, enable the module on `/admin/modules`, open Settings, paste the API key, click "Refresh dropdowns" → pick the 24% tax + your warehouse → "Test connection" → Save. Done.
+
+#### **myAADE — Greek Business Registry (ΑΑΔΕ)**
+
+Used by the `myaade` module (`src/modules/myaade/`) — family of `myaade-*` edge functions wrapping ΑΑΔΕ web services (SOAP 1.2 + WS-Security UsernameToken). Today there is one: `myaade-rgwspublic2` (RgWsPublic2 — Greek business lookup by ΑΦΜ). All `myaade-*` functions share helpers in `supabase/functions/_shared/aade/soap.ts` and reuse the same three secrets below.
+
+> **Primary configuration is the UI at `/admin/modules/myaade` → Settings card** (stored in `platform_secrets` rows with `primary_module_slug='myaade'`). Env vars are read first by `_shared/secrets.ts → resolveSecret()`; the DB row is the fallback an admin can edit without a redeploy.
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `AADE_USERNAME` | **Secret** | `myaade-rgwspublic2` (and any future `myaade-*`) | Username from "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" — NOT your regular TAXISnet login. Create at https://www1.gsis.gr/sgsisapps/tokenservices/ and authorize for the `RgWsPublic2` service. | `mhub_aade_user` |
+| `AADE_PASSWORD` | **Secret** | `myaade-rgwspublic2` (and any future `myaade-*`) | Password for the AADE_USERNAME above. Min 6 chars. | (free-form) |
+| `AADE_AFM_CALLED_BY` | Public | `myaade-rgwspublic2` (and any future `myaade-*`) | Optional. Platform's own 9-digit ΑΦΜ; logged by ΑΑΔΕ as the lookup originator. Leave empty if the platform has no own ΑΦΜ. | `802349569` |
+
+> **TAXISnet notification side-effect**: every successful ΑΑΔΕ lookup writes an audit entry to the **looked-up** ΑΦΜ's TAXISnet inbox (per ΑΑΔΕ policy, cannot be disabled). The module only calls ΑΑΔΕ when a user is verifying their **own** business — so the notification lands in the same person's inbox who triggered it. Cache TTL on `crm_companies.aade_data_at` is 90 days; same-ΑΦΜ refreshes within that window skip the SOAP call + the notification.
+
+> **Greenfield deployment**: skip the env vars entirely. Deploy `myaade-rgwspublic2`, enable the module on `/admin/modules`, open Settings, paste the two credentials, click "Look up" with any 9-digit ΑΦΜ to verify end-to-end. Done.
+
+> **Adding a new ΑΑΔΕ service**: drop a new `supabase/functions/myaade-<service-slug>/` folder; reuse the shared SOAP/cred helpers. No new secrets needed — the same three above gate the entire family. See `src/modules/myaade/README.md` for the recipe.
+
+#### **VIES — EU VAT Validation**
+
+Used by the `vies-validate` edge function (mounted in `src/components/core/Profile/BusinessSection.tsx` as "Verify via VIES") and by `role-upgrade-requests` on submit to snapshot VAT validity at application time. **No secrets required** — VIES is a public EU service at `https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number`, no auth.
+
+| Function | Purpose | Secrets |
+|----------|---------|---------|
+| `vies-validate` | EU VAT number validation + legal name + structured address extraction (per-country parser for EL/DE/FR/IT/ES/NL/AT/BE/PT). Caches result on `crm_companies.vat_validated*`. | none |
+| `role-upgrade-requests` | Dealer/Factory promotion workflow. Re-validates VAT via VIES on submit; snapshots `vat_validated*` on the request row. Sends email via `email-api` to admins on submission and to the user on approve/reject. | uses `RESEND_API_KEY` via `email-api` |
 
 #### **Cron Jobs & Backend URLs**
 

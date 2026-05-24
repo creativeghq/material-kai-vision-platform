@@ -1,0 +1,9 @@
+{
+  "slug": "myaade",
+  "name": "myAADE — Greek business lookup",
+  "description": "Look up Greek businesses by ΑΦΜ via the ΑΑΔΕ RgWsPublic2 SOAP service (TAXISnet). Auto-fills the Business profile with name, ΔΟΥ, ΚΑΔ, legal form, address.",
+  "category": "integration",
+  "priceTier": "pro",
+  "icon": "Building2",
+  "version": "0.1.0"
+}

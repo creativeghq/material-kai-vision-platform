@@ -236,6 +236,22 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🆕 New Features
 
+**myAADE Module — Greek Business Registry (ΑΑΔΕ)** ✨ NEW (2026-05-24) — see `src/modules/myaade/README.md`
+- Family of `myaade-*` edge functions wrapping ΑΑΔΕ web services (SOAP 1.2 + WS-Security)
+- Today: `myaade-rgwspublic2` — Greek business lookup by ΑΦΜ. Auto-fills legal name, ΔΟΥ, ΚΑΔ, legal form, structured address into the Business profile
+- Shared `_shared/aade/soap.ts` helpers: a new ΑΑΔΕ service is ~80 lines
+- 90-day cache on `crm_companies.aade_data_at` + TAXISnet quota-aware
+- Mounted in `BusinessSection.tsx` (Greek users) + admin overview at `/admin/modules/myaade`
+- Secrets via `platform_secrets` (env-first → DB): `AADE_USERNAME`, `AADE_PASSWORD`, `AADE_AFM_CALLED_BY`
+
+**Business Entity + Role Upgrade Requests** ✨ NEW (2026-05-23 / 24)
+- Users pick **Solo** or **Business** in their profile (`user_profiles.entity_type`); Business entities are linked to a `crm_companies` row (`business_id`)
+- "Apply for Dealer / Factory" card on the Subscription tab → opens a request, admin reviews on the user detail page → approve flips `user_profiles.role_id`
+- `role_upgrade_requests` table + `role-upgrade-requests` edge function (submit / approve / reject) — emails admins + user, bell notifications
+- VIES validation on every VAT entry (`vies-validate` edge function) — pre-fills name + address from EU VAT registry
+- ΑΑΔΕ enrichment for Greek users (see myAADE above)
+- Role `manager` removed (collapsed: user → dealer → factory → admin)
+
 **[ar-material-preview.md](ar-material-preview.md)** - AR Material Preview ✨ NEW
 - WebXR AR on Android, 3D swatch viewer on iOS/desktop
 - PBR map generation (albedo, normal, roughness, metalness)

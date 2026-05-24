@@ -10,6 +10,8 @@ import {
   FileText,
   CheckSquare,
   LayoutDashboard,
+  Activity,
+  FileImage,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -33,6 +35,8 @@ import { RoomsTab } from '../components/tabs/RoomsTab';
 import { MoodboardsTab } from '../components/tabs/MoodboardsTab';
 import { QuotesTab } from '../components/tabs/QuotesTab';
 import { TasksTab } from '../components/tabs/TasksTab';
+import { TimelineTab } from '../components/tabs/TimelineTab';
+import { SheetsTab } from '../components/tabs/SheetsTab';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: 'Planning',
@@ -56,7 +60,7 @@ export const ProjectDetailPage: React.FC = () => {
   const { toast } = useToast();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'tasks'>('overview');
+  const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'sheets' | 'tasks' | 'timeline'>('overview');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -156,9 +160,17 @@ export const ProjectDetailPage: React.FC = () => {
                 <Badge variant="outline" className="ml-1 text-xs h-5">{project.accepted_quote_count}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="sheets" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <FileImage className="h-3.5 w-3.5" />
+              Sheets
+            </TabsTrigger>
             <TabsTrigger value="tasks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              Timeline
             </TabsTrigger>
           </TabsList>
 
@@ -166,7 +178,9 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} /></TabsContent>
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
+          <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
           <TabsContent value="tasks"><TasksTab projectId={project.id} /></TabsContent>
+          <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>
         </Tabs>
       </main>
     </div>

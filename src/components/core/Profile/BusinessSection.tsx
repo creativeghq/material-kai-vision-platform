@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { validateVatViaVies, type ViesValidationResult } from '@/services/viesService';
+import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 
 export type EntityType = 'solo' | 'business';
 
@@ -72,6 +73,9 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   } | null>(null);
   const [viesChecking, setViesChecking] = useState(false);
   const [viesLastResult, setViesLastResult] = useState<ViesValidationResult | null>(null);
+
+  const [aadeChecking, setAadeChecking] = useState(false);
+  const [aadeLastResult, setAadeLastResult] = useState<AadeLookupResult | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -173,6 +177,52 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       city: parsed.city ?? p.city,
     }));
     toast({ title: 'Address pre-filled from VIES' });
+  };
+
+  /** Greek-only enrichment: pulls ΔΟΥ, ΚΑΔ, legal form, structured address from ΑΑΔΕ. */
+  const lookupAade = async () => {
+    const rawAfm = businessForm.vat_number.replace(/[^0-9]/g, '');
+    if (rawAfm.length !== 9) {
+      toast({ title: 'Need a 9-digit ΑΦΜ', description: 'Type the Greek ΑΦΜ digits in the VAT field first.', variant: 'destructive' });
+      return;
+    }
+    setAadeChecking(true);
+    const res = await aadeService.lookup({ afm: rawAfm, companyId: businessId ?? undefined });
+    setAadeChecking(false);
+
+    if ('error' in res && res.error) {
+      const msg = res.message || res.error;
+      toast({ title: 'ΑΑΔΕ lookup failed', description: msg, variant: 'destructive' });
+      setAadeLastResult(null);
+      return;
+    }
+    if ('ok' in res && res.ok) {
+      setAadeLastResult(res);
+      toast({ title: 'ΑΑΔΕ data fetched', description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia}` : 'Business details available.' });
+      // Refresh the cache snapshot from DB so the read-only badges update
+      if (businessId) void load();
+    }
+  };
+
+  const adoptAadeAll = (res: AadeLookupResult) => {
+    const r = res.basic_rec;
+    const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
+    setBusinessForm((p) => ({
+      ...p,
+      // Names — prefer AADE (authoritative for Greek businesses)
+      name: r.onomasia ?? p.name,
+      // Address — fully structured from AADE, no parsing needed
+      street: r.postal_address ?? p.street,
+      street_number: r.postal_address_no ?? p.street_number,
+      postal_code: r.postal_zip_code ?? p.postal_code,
+      city: r.postal_area_description ?? p.city,
+      country: r.postal_area_description ? (p.country || 'Greece') : p.country,
+      country_code: p.country_code || 'EL',
+      // ΔΟΥ + profession
+      tax_office: r.doy_descr ?? p.tax_office,
+      profession: primaryAct?.description ?? p.profession,
+    }));
+    toast({ title: 'Business profile pre-filled from ΑΑΔΕ' });
   };
 
   const startEdit = () => {
@@ -394,6 +444,13 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     onAdoptName={adoptViesName}
                     onAdoptAddress={adoptViesAddress}
                   />
+                  <AadeInline
+                    show={businessForm.country_code.toUpperCase() === 'EL' && businessForm.vat_number.replace(/[^0-9]/g, '').length === 9}
+                    checking={aadeChecking}
+                    result={aadeLastResult}
+                    onLookup={lookupAade}
+                    onAdopt={adoptAadeAll}
+                  />
                 </FormField>
                 <FormField label="Tax office">
                   <Input
@@ -603,6 +660,76 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
     );
   }
   return null;
+};
+
+interface AadeInlineProps {
+  show: boolean;
+  checking: boolean;
+  result: AadeLookupResult | null;
+  onLookup: () => void;
+  onAdopt: (res: AadeLookupResult) => void;
+}
+
+/** Greek-only enrichment panel — only renders when country=EL + 9-digit ΑΦΜ. */
+const AadeInline: React.FC<AadeInlineProps> = ({ show, checking, result, onLookup, onAdopt }) => {
+  if (!show) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs font-medium">
+          <span className="text-primary">myAADE:</span> auto-fill business profile from Greek tax registry
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onLookup}
+          disabled={checking}
+        >
+          {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
+          <span className="ml-1.5">Get full details from ΑΑΔΕ</span>
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        ⓘ This will create a lookup audit entry in your own ΑΦΜ's TAXISnet inbox — that is expected and confirms it was you.
+      </p>
+
+      {result && (
+        <div className="space-y-2 pt-2 border-t border-primary/15">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ShieldCheck className="h-3.5 w-3.5 text-green-700 dark:text-green-400" />
+            <span className="text-xs font-medium">{result.basic_rec.onomasia ?? '(no name)'}</span>
+            {result.basic_rec.commer_title && (
+              <span className="text-xs text-muted-foreground italic">trading as {result.basic_rec.commer_title}</span>
+            )}
+            {result.basic_rec.deactivation_flag === '1' ? (
+              <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30 text-[10px]">Active</Badge>
+            ) : (
+              <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
+            )}
+            {result.source === 'cache' && <Badge variant="secondary" className="text-[10px]">cache</Badge>}
+          </div>
+          <div className="text-[11px] text-muted-foreground space-y-0.5 pl-5">
+            {result.basic_rec.doy_descr && <div>ΔΟΥ: {result.basic_rec.doy_descr}</div>}
+            {result.basic_rec.legal_status_descr && <div>Νομική μορφή: {result.basic_rec.legal_status_descr}</div>}
+            {result.activities.find((a) => a.kind === 1) && (
+              <div>Κύριος ΚΑΔ: {result.activities.find((a) => a.kind === 1)?.code} — {result.activities.find((a) => a.kind === 1)?.description}</div>
+            )}
+            {result.basic_rec.postal_address && (
+              <div>
+                Διεύθυνση: {result.basic_rec.postal_address} {result.basic_rec.postal_address_no},
+                {' '}{result.basic_rec.postal_zip_code} {result.basic_rec.postal_area_description}
+              </div>
+            )}
+          </div>
+          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs ml-4" onClick={() => onAdopt(result)}>
+            <CornerDownLeft className="h-3 w-3 mr-1" />Pre-fill all fields from ΑΑΔΕ
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /** Compact badge for the read-only display under VAT number. */

@@ -4,6 +4,32 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
+## [unreleased] - 2026-05-23 / 2026-05-24
+
+**Role simplification, Solo/Business entity, Apply-for-Dealer/Factory flow, VIES + myAADE auto-fill**
+
+Motivation: signup landed every new user as a generic `user` with no path to becoming a verified dealer or factory, and the platform had no concept of "this user IS a registered business with VAT + address." Closed the loop end-to-end.
+
+- **`manager` role dropped.** Collapsed `manager` into `admin` — `public.roles` is now 4 rows (`user`, `dealer`, `factory`, `admin`). Zero users had it. Cleaned `allowedRoles` in `crm-contacts-api`, `crm-companies-api`, `reset-platform`; removed `ROLES.MANAGER` from `src/auth/roles.ts`. See [user-levels-access.md](docs/user-levels-access.md).
+
+- **Solo / Business entity on user profile.** `user_profiles.entity_type` (enum `solo` | `business`, default `solo`) + `user_profiles.business_id` (FK → `crm_companies(id)` ON DELETE SET NULL). New "Business" section in [`ProfileTab.tsx`](src/components/core/Profile/ProfileTab.tsx) with full company form. Saving Business creates/updates a `crm_companies` row owned by the user — so the business *is* a CRM company, naturally visible to admins in `/admin/crm`.
+
+- **Apply-for-Dealer/Factory workflow.** New `role_upgrade_requests` table + RLS (own SELECT/INSERT, admin SELECT/UPDATE/DELETE). New `role-upgrade-requests` edge function with `action: submit | approve | reject`. Submit is gated on `entity_type='business'`, fans out **bell notifications + emails** to every admin (template `role_upgrade_request.submitted`). Approve flips `user_profiles.role_id` + emails the user. Partial unique index blocks duplicate pending applications per (user, role). User-facing `<ApplyForRoleCard />` mounted above the plans grid in `SubscriptionTab`; admin-facing `<AdminRoleUpgradeRequestsPanel />` mounted on the Overview tab of the user detail page.
+
+- **VIES validation on every VAT entry.** New `vies-validate` edge function (no secrets — VIES is public). Returns `valid`, splits `legal_name||trade_name` on `||`, includes a per-country address parser for **EL / DE / FR / IT / ES / NL / AT / BE / PT**. "Verify via VIES" button in Business section; "Use this name" + "Use this address" actions one-click pre-fill the form. Caches `vat_validated`, `vat_validated_at`, `vat_validated_name`, `vat_validated_address`, `vat_validation_source` on `crm_companies`. `role-upgrade-requests` re-validates VIES at submit time and snapshots the result on the request row so the admin sees the verdict immediately.
+
+- **myAADE module — Greek business registry integration.** Self-contained module under `src/modules/myaade/` + family of `myaade-*` edge functions sharing `_shared/aade/soap.ts` helpers (WS-Security envelope builder, SOAP poster, XML helpers, credential resolver). Today: `myaade-rgwspublic2` wraps ΑΑΔΕ's `rgWsPublic2AfmMethod` (SOAP 1.2 + WS-Security UsernameToken). Returns legal name, trade name, ΔΟΥ, primary + secondary ΚΑΔ, legal form, registered start date, **fully structured** address. New columns on `crm_companies`: `commercial_title`, `legal_status`, `kad_primary`, `kad_primary_description`, `kad_secondary jsonb`, `business_start_date`, `aade_data jsonb`, `aade_data_at`. 90-day cache. Mounted as "Get full details from ΑΑΔΕ" button in `BusinessSection` (visible only when country_code='EL' AND vat_number has 9 digits). Admin overview at `/admin/modules/myaade` with step-by-step credential registration + live test-lookup panel.
+
+- **`platform_secrets` rows seeded** with `primary_module_slug='myaade'`: `AADE_USERNAME`, `AADE_PASSWORD` (sensitive), `AADE_AFM_CALLED_BY` (optional). Standard env-first → DB-fallback via `_shared/secrets.ts → resolveSecret()`. Setting up requires "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" at https://www1.gsis.gr/sgsisapps/tokenservices/ — separate from regular TAXISnet credentials. Every successful ΑΑΔΕ lookup writes an audit entry to the looked-up ΑΦΜ's TAXISnet inbox (per ΑΑΔΕ policy); the module only calls ΑΑΔΕ when a user is verifying their OWN business.
+
+- **Email templates seeded**: `role_upgrade_request.submitted` / `.approved` / `.rejected` (category `notification`). The submitted template includes `{{vat_status_html}}` + `{{vat_status_text}}` placeholders so admins see "✓ verified via VIES as <legal name>" or "✗ VIES says invalid" inline next to the VAT number.
+
+- **Docs**: `src/modules/myaade/README.md` (new), CLAUDE.md myAADE section, `docs/deployment-guide.md` myAADE + VIES sections, `docs/INDEX.md` new-features entries, `docs/api/README.md` business-profile/verification section, `docs/user-levels-access.md` platform-roles rewrite, `docs/crm-system.md` company-fields expansion.
+
+- **Naming convention for future ΑΑΔΕ services**: all `myaade-*` (mirrors the module slug; e.g. `myaade-mydata-issue-invoice`, `myaade-icisnet-customs`). Each new service reuses the shared SOAP helpers — typically ~80 lines.
+
+---
+
 ## [unreleased] - 2026-04-25
 
 **Price monitoring — Firecrawl price verification + on-page was/now pricing (Phase 7)**

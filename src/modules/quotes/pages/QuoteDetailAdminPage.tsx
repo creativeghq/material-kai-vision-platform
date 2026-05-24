@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck, FilePlus2 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -610,6 +610,29 @@ export const QuoteDetailPage: React.FC = () => {
 
             {/* Sales/Finance: Issue invoice (creates internal invoice row from accepted quote) */}
             {quote && <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />}
+
+            {/* Project Workspace: Issue revision — clones quote + items, bumps revision_number, sets parent_quote_id.
+                Available once the quote is no longer a draft (i.e. has been sent / quoted / accepted / rejected). */}
+            {quote && (quote.status === 'submitted' || quote.status === 'quoted' || quote.status === 'accepted' || quote.status === 'rejected' || quote.status === 'expired') && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  if (!confirm(`Create a new revision of this quote? The current quote stays as-is; a new draft revision is created with all items copied over.`)) return;
+                  try {
+                    const newQuote = await quotesService.issueRevision(quote.id);
+                    toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });
+                    navigate(`/admin/quotes/${newQuote.id}`);
+                  } catch (err) {
+                    toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                  }
+                }}
+                className="rounded-full"
+              >
+                <FilePlus2 className="h-4 w-4 mr-1" />
+                Issue Revision
+              </Button>
+            )}
           </div>
         </div>
 

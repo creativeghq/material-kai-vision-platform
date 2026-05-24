@@ -10,6 +10,11 @@ export interface Quote {
   id: string;
   user_id: string;
   workspace_id?: string;
+  /** Project Workspace linkage (Phase 1). Nullable for legacy + standalone quotes. */
+  project_id?: string | null;
+  /** Quote revisions (Phase 2). parent_quote_id points to the originating quote; revision_number starts at 1. */
+  parent_quote_id?: string | null;
+  revision_number?: number;
   name?: string;
   status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
   status_tag_id?: string;
@@ -59,6 +64,8 @@ export interface QuoteItem {
   line_total?: number;
   // FF&E fields
   room?: string;
+  /** Structured room linkage. Wins over freeform `room` when set. */
+  room_id?: string | null;
   dimensions?: string;
   installation_requirements?: string;
   delivery_date?: string;
@@ -432,6 +439,7 @@ export class QuotesService {
     selected_size?: string;
     selected_color?: string;
     room?: string;
+    room_id?: string | null;
     dimensions?: string;
     installation_requirements?: string;
     delivery_date?: string;
@@ -460,11 +468,12 @@ export class QuotesService {
         selected_size: data.selected_size,
         selected_color: data.selected_color,
         room: data.room || null,
+        room_id: data.room_id ?? null,
         dimensions: data.dimensions || null,
         installation_requirements: data.installation_requirements || null,
         delivery_date: data.delivery_date || null,
         custom_unit: customUnit,
-      })
+      } as any)
       .select()
       .single();
 
@@ -495,6 +504,7 @@ export class QuotesService {
     selected_color?: string;
     notes?: string;
     room?: string;
+    room_id?: string | null;
     dimensions?: string;
     installation_requirements?: string;
     delivery_date?: string;
@@ -518,10 +528,11 @@ export class QuotesService {
         notes: data.notes || null,
         added_from: 'manual',
         room: data.room || null,
+        room_id: data.room_id ?? null,
         dimensions: data.dimensions || null,
         installation_requirements: data.installation_requirements || null,
         delivery_date: data.delivery_date || null,
-      })
+      } as any)
       .select()
       .single();
 
@@ -543,6 +554,7 @@ export class QuotesService {
       discounted_price?: number | null;
       custom_unit?: string;
       room?: string;
+      room_id?: string | null;
       dimensions?: string;
       installation_requirements?: string;
       delivery_date?: string | null;
@@ -1507,6 +1519,102 @@ export class QuotesService {
 
     if (error) throw error;
     return data;
+  }
+
+  // =====================================================
+  // QUOTE REVISIONS (Phase 2)
+  // =====================================================
+
+  /**
+   * Issue a new revision of an existing quote.
+   * Clones the source quote + all its items, links via parent_quote_id,
+   * sets revision_number = max(siblings)+1, status='draft'.
+   * The revision becomes the new "live" doc; the original is kept untouched
+   * so the audit trail of what was sent + accepted remains intact.
+   */
+  async issueRevision(sourceQuoteId: string): Promise<Quote> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Pull the source quote
+    const { data: source, error: srcErr } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', sourceQuoteId)
+      .single();
+    if (srcErr || !source) throw srcErr || new Error('Source quote not found');
+
+    // Find the root of the chain (could be sourceQuote itself, or its parent if it's already a rev)
+    const rootId = (source as any).parent_quote_id || source.id;
+
+    // Find the max revision_number across the chain (root + all its revisions)
+    const { data: chain } = await (supabase as any)
+      .from('quotes')
+      .select('id, revision_number')
+      .or(`id.eq.${rootId},parent_quote_id.eq.${rootId}`);
+    const maxRev = (chain || []).reduce(
+      (m: number, r: any) => Math.max(m, r.revision_number || 1),
+      1,
+    );
+
+    // Insert the new revision
+    const { data: newQuote, error: insErr } = await (supabase as any)
+      .from('quotes')
+      .insert({
+        user_id: user.id,
+        workspace_id: source.workspace_id ?? null,
+        project_id: source.project_id ?? null,
+        parent_quote_id: rootId,
+        revision_number: maxRev + 1,
+        name: source.name ? `${source.name} (rev ${maxRev + 1})` : `Revision ${maxRev + 1}`,
+        notes: source.notes ?? null,
+        customer_company_id: source.customer_company_id ?? null,
+        customer_contact_id: source.customer_contact_id ?? null,
+        currency: source.currency ?? 'EUR',
+        vat_rate: source.vat_rate ?? null,
+        status: 'draft',
+      })
+      .select()
+      .single();
+    if (insErr) throw insErr;
+
+    // Clone items
+    const { data: items } = await supabase
+      .from('quote_items')
+      .select('*')
+      .eq('quote_id', sourceQuoteId);
+
+    if (items && items.length > 0) {
+      const rows = items.map((it: any) => {
+        const { id, quote_id, added_at, ...rest } = it;
+        return { ...rest, quote_id: newQuote.id };
+      });
+      const { error: itemsErr } = await (supabase as any).from('quote_items').insert(rows);
+      if (itemsErr) throw itemsErr;
+    }
+
+    return newQuote as Quote;
+  }
+
+  /**
+   * List the full revision chain for a quote (root + all its revisions, sorted by revision_number).
+   */
+  async listRevisionChain(quoteId: string): Promise<Quote[]> {
+    const { data: q } = await supabase
+      .from('quotes')
+      .select('id, parent_quote_id')
+      .eq('id', quoteId)
+      .single();
+    if (!q) return [];
+    const rootId = (q as any).parent_quote_id || (q as any).id;
+
+    const { data: chain, error } = await (supabase as any)
+      .from('quotes')
+      .select('*')
+      .or(`id.eq.${rootId},parent_quote_id.eq.${rootId}`)
+      .order('revision_number', { ascending: true });
+    if (error) throw error;
+    return (chain || []) as Quote[];
   }
 }
 

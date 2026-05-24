@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   projectsService,
   type RoomType,
@@ -55,6 +56,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onSuccess,
 }) => {
   const { toast } = useToast();
+  const { isAdmin } = useUserRole();
   const [processing, setProcessing] = useState(false);
 
   const [name, setName] = useState('');
@@ -96,6 +98,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const handleCreate = async () => {
     if (!name.trim()) {
       toast({ title: 'Project name required', variant: 'destructive' });
+      return;
+    }
+    // Non-admins must attach a client (admins can defer it).
+    if (!isAdmin && !client.client_company_id && !client.client_contact_id) {
+      toast({ title: 'Pick or add a client to continue', variant: 'destructive' });
       return;
     }
 
@@ -164,10 +171,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
           </div>
 
-          {/* Client */}
+          {/* Client — admins get the full CRM (B2B + B2C tabs); non-admins get a
+              contact-only picker scoped to their own contacts, with inline add-new. */}
           <div className="space-y-2">
-            <Label>Client (Optional)</Label>
-            <ClientPicker value={client} onChange={setClient} disabled={processing} />
+            <Label>{isAdmin ? 'Client (Optional)' : 'Client'}</Label>
+            <ClientPicker
+              value={client}
+              onChange={setClient}
+              disabled={processing}
+              mode={isAdmin ? 'admin' : 'simple'}
+            />
           </div>
 
           {/* Rooms */}

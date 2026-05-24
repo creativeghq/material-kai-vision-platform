@@ -863,6 +863,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
       'generate_catalog_pdf', 'publish_catalog',
+      // Project Workspace (all users; 0 cr — DB-only)
+      'create_project', 'list_my_projects', 'find_project', 'add_task',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -887,6 +889,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_presentation_sheet',
       // SEO research card — useful for inspiration-keyword exploration
       'seo_research_keyword',
+      // Project Workspace — interior designers benefit most from the container
+      'create_project', 'list_my_projects', 'find_project', 'add_task',
     ],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
@@ -1214,6 +1218,7 @@ async function executeAgent(
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
+  const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task'].includes(t));
   const CATALOG_TOOL_NAMES = [
     'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
     'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
@@ -1221,7 +1226,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1236,6 +1241,7 @@ async function executeAgent(
     needsMention      ? import('../_shared/tools/mention-tools.ts') : null,
     needsCatalog      ? import('../_shared/tools/catalog-tools.ts') : null,
     needsJobResearch  ? import('../_shared/tools/job-research-tools.ts') : null,
+    needsProjects     ? import('../_shared/tools/project-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1318,6 +1324,10 @@ async function executeAgent(
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
   const createGetJobDigestPreviewTool = jobResearchMod?.createGetJobDigestPreviewTool;
   const createManageJobSitesTool = jobResearchMod?.createManageJobSitesTool;
+  const createCreateProjectTool = projectsMod?.createCreateProjectTool;
+  const createListMyProjectsTool = projectsMod?.createListMyProjectsTool;
+  const createFindProjectTool = projectsMod?.createFindProjectTool;
+  const createAddTaskTool = projectsMod?.createAddTaskTool;
   const createCreateCatalogTool = catalogMod?.createCreateCatalogTool;
   const createAttachCatalogPdfsTool = catalogMod?.createAttachCatalogPdfsTool;
   const createExtractFromCatalogPdfsTool = catalogMod?.createExtractFromCatalogPdfsTool;
@@ -1528,6 +1538,20 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
     tools.push(createManageJobSitesTool(userId, undefined, onChunk));
+  }
+
+  // Project Workspace tools (all users; module-gated inside each tool; 0 cr — DB-only)
+  if (config.tools.includes('create_project') && createCreateProjectTool) {
+    tools.push(createCreateProjectTool(userId, onChunk));
+  }
+  if (config.tools.includes('list_my_projects') && createListMyProjectsTool) {
+    tools.push(createListMyProjectsTool(userId, onChunk));
+  }
+  if (config.tools.includes('find_project') && createFindProjectTool) {
+    tools.push(createFindProjectTool(userId, onChunk));
+  }
+  if (config.tools.includes('add_task') && createAddTaskTool) {
+    tools.push(createAddTaskTool(userId, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached

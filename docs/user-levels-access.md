@@ -4,14 +4,42 @@ Reference document for all user roles on the Material KAI Vision Platform, how t
 
 ---
 
-## How Roles Are Determined
+## Platform Roles
 
-Roles are computed from two database sources:
+The `public.roles` table currently has **4 rows** (the `manager` role was removed 2026-05-23 — collapsed into admin):
+
+| Level | Name | Description |
+|---|---|---|
+| 1 | `user` | Default for every signup. Basic access — view materials, create moodboards, view own profile. |
+| 2 | `dealer` | View materials, manage orders, limited inventory access, manage customer contacts. **Admin-granted only.** |
+| 3 | `factory` | Create/manage materials, manage inventory, view reports, manage production. **Admin-granted only.** |
+| 5 | `admin` | Full platform access — user management, system config, billing, CRM. |
+
+`super_admin` and `owner` also exist as code constants (workspace-level, not separate rows in `public.roles`) and count as admin for all platform-wide checks via `isAdmin()` in [`src/auth/roles.ts`](../src/auth/roles.ts).
+
+### Signup flow (added 2026-05-23 / 24)
+
+Public registration always lands a user at `role='user'`, `entity_type='solo'`, `subscription_tier='free'`. To become a dealer or factory:
+
+1. User switches their profile from **Solo** to **Business entity** (Profile tab → Business section). They fill VAT, company name, address. Greek users get one-click pre-fill via VIES + ΑΑΔΕ.
+2. User opens Subscription → "Apply for Dealer / Factory" card → picks role + writes optional justification → submits.
+3. `role-upgrade-requests` edge function fires: re-validates VAT via VIES, snapshots `vat_validated*` on the request row, emails admins + posts bell notifications.
+4. Admin reviews on the user detail page (`/admin/crm/users/{id}` → Role Upgrade Requests panel) → Approve flips `user_profiles.role_id` + emails the user (`role_upgrade_request.approved`).
+
+See [`src/modules/myaade/README.md`](../src/modules/myaade/README.md) for the Greek-business auto-fill that runs during step 1.
+
+---
+
+## How Personas Are Determined (legacy `professional_type` flow, separate from platform roles)
+
+Personas are computed from these sources:
 
 | Source | Field | Purpose |
 |--------|-------|---------|
 | `user_profiles.professional_type` | string enum | Determines persona / feature set |
 | `user_profiles.factory_verified` | boolean | Unlocks factory-side features |
+| `user_profiles.entity_type` | `'solo'` \| `'business'` (default `solo`) | Required = `'business'` before applying for dealer/factory role |
+| `user_profiles.business_id` | FK → `crm_companies(id)` | Set when entity_type='business'; links to a CRM company row |
 | `workspace_members.role` | `'admin'` \| `'owner'` | Grants admin privileges |
 
 **Derived flags** (from `useFactoryRole` hook):

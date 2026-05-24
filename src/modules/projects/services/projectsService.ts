@@ -74,6 +74,15 @@ export interface ProjectTaskWithSubtasks extends ProjectTask {
   subtask_total_count: number;
 }
 
+export interface ProjectEvent {
+  id: string;
+  project_id: string;
+  event_type: string;
+  actor_id: string | null;
+  payload: Record<string, any>;
+  occurred_at: string;
+}
+
 export interface CreateProjectInput {
   name: string;
   description?: string;
@@ -373,6 +382,48 @@ class ProjectsService {
 
   // ---------- LINKED ARTIFACTS ----------
 
+  /**
+   * Per-room budget rollup. Returns each room of the project with its budget_amount
+   * + the sum of line_total from accepted-quote items that reference that room_id.
+   */
+  async getRoomBudgetSummary(projectId: string): Promise<Array<{
+    room: ProjectRoom;
+    actual_amount: number;
+    quote_count: number;
+    item_count: number;
+  }>> {
+    const rooms = await this.listRooms(projectId);
+    if (rooms.length === 0) return [];
+
+    // Pull every accepted-quote item in this project that has a room_id set.
+    // Note: !inner join filter ensures we only get items whose parent quote is accepted + in this project.
+    const { data: items } = await (supabase as any)
+      .from('quote_items')
+      .select('room_id, line_total, quote_id, quote:quotes!inner(project_id, status)')
+      .eq('quote.project_id', projectId)
+      .eq('quote.status', 'accepted')
+      .not('room_id', 'is', null);
+
+    const rollup = new Map<string, { actual_amount: number; quotes: Set<string>; items: number }>();
+    for (const it of (items || []) as Array<{ room_id: string; line_total: number | null; quote_id: string }>) {
+      if (!rollup.has(it.room_id)) rollup.set(it.room_id, { actual_amount: 0, quotes: new Set(), items: 0 });
+      const agg = rollup.get(it.room_id)!;
+      agg.actual_amount += Number(it.line_total) || 0;
+      agg.quotes.add(it.quote_id);
+      agg.items += 1;
+    }
+
+    return rooms.map(r => {
+      const agg = rollup.get(r.id);
+      return {
+        room: r,
+        actual_amount: agg?.actual_amount || 0,
+        quote_count: agg?.quotes.size || 0,
+        item_count: agg?.items || 0,
+      };
+    });
+  }
+
   async listProjectMoodboards(projectId: string) {
     const { data, error } = await (supabase as any)
       .from('moodboards')
@@ -386,11 +437,63 @@ class ProjectsService {
   async listProjectQuotes(projectId: string) {
     const { data, error } = await (supabase as any)
       .from('quotes')
-      .select('id, name, status, grand_total, currency, total_items, quote_number, updated_at, created_at')
+      .select('id, name, status, grand_total, currency, total_items, quote_number, updated_at, created_at, parent_quote_id, revision_number')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
+  }
+
+  // ---------- TIMELINE (Phase 3) ----------
+
+  async listEvents(projectId: string, opts: { limit?: number; eventTypes?: string[] } = {}): Promise<ProjectEvent[]> {
+    let q = (supabase as any)
+      .from('project_events')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('occurred_at', { ascending: false })
+      .limit(opts.limit ?? 100);
+    if (opts.eventTypes && opts.eventTypes.length > 0) {
+      q = q.in('event_type', opts.eventTypes);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []) as ProjectEvent[];
+  }
+
+  // ---------- SHEETS (cross-moodboard roll-up — Phase 3) ----------
+
+  async listProjectSheets(projectId: string): Promise<Array<{
+    id: string;
+    moodboard_id: string;
+    moodboard_title: string | null;
+    sheet_type: string;
+    title: string | null;
+    status: string;
+    pdf_storage_path: string | null;
+    credits_used: number | null;
+    created_at: string;
+    updated_at: string;
+  }>> {
+    // Two-step (no FK join needed): get the project's moodboard ids, then pull sheets for them.
+    const { data: mbs } = await (supabase as any)
+      .from('moodboards')
+      .select('id, title')
+      .eq('project_id', projectId);
+    const ids = (mbs || []).map((m: any) => m.id);
+    if (ids.length === 0) return [];
+    const titleById = new Map((mbs || []).map((m: any) => [m.id, m.title]));
+
+    const { data, error } = await (supabase as any)
+      .from('moodboard_presentation_sheets')
+      .select('id, moodboard_id, sheet_type, title, status, pdf_storage_path, credits_used, created_at, updated_at')
+      .in('moodboard_id', ids)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((s: any) => ({
+      ...s,
+      moodboard_title: titleById.get(s.moodboard_id) ?? null,
+    }));
   }
 
   // ---------- CRM LOOKUP (for the wizard) ----------

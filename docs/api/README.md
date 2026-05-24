@@ -30,7 +30,7 @@ Multi-channel messaging (SMS, WhatsApp) using Twilio.
 Contact management for CRM system.
 - **Function:** `crm-contacts-api`
 - **Features:** CRUD operations, user linking, relationship management
-- **Access:** Admin, Manager, Factory roles
+- **Access:** Admin, Factory roles (`manager` role removed 2026-05-23)
 
 #### [CRM Users API](./crm-users-api.md)
 User account and profile management.
@@ -203,6 +203,29 @@ Import pins into moodboards (works pre-OAuth via oEmbed).
 - **Actions:** `extract-pin`, `import-pin`, `import-pins-bulk`
 - **Pipeline:** Extract → download image → MIVAA visual-search for matching catalog products
 - **Access:** JWT
+
+### Business Profile / Verification
+
+#### VIES VAT Validation
+Public EU VAT validation via the official VIES REST API. No secrets — VIES is unauthenticated.
+- **Function:** `vies-validate`
+- **Features:** EU-only (skips with `non_eu` reason for non-EU country codes); returns `valid`, `legal_name`, `trade_name`, `address`, `address_parsed` (per-country structured street/number/postal/city for EL/DE/FR/IT/ES/NL/AT/BE/PT). Caches result on `crm_companies.vat_validated*` (90-day refresh policy) when `company_id` is passed.
+- **Access:** JWT (any authenticated user)
+
+#### myAADE — RgWsPublic2 (Greek business lookup)
+SOAP wrapper for ΑΑΔΕ's `rgWsPublic2AfmMethod`. Returns the basic record + ΚΑΔ activities for a Greek ΑΦΜ.
+- **Function:** `myaade-rgwspublic2` (first of the `myaade-*` family)
+- **Features:** Auto-fill business profile (legal name, ΔΟΥ, ΚΑΔ, legal form, structured address). 90-day cache on `crm_companies.aade_data_at`. Every lookup writes an audit entry to the looked-up ΑΦΜ's TAXISnet inbox — module only calls when the user is verifying their OWN business.
+- **Secrets:** `AADE_USERNAME`, `AADE_PASSWORD`, `AADE_AFM_CALLED_BY` via `platform_secrets` (env-first → DB)
+- **Access:** JWT
+- **Documentation:** [`src/modules/myaade/README.md`](../../src/modules/myaade/README.md)
+
+#### Role Upgrade Requests
+Dealer/Factory promotion workflow. User submits → admin reviews → approval flips `user_profiles.role_id`.
+- **Function:** `role-upgrade-requests` (action: `submit` | `approve` | `reject` in body)
+- **Features:** Gated on `entity_type='business'`. Re-validates VAT via VIES on submit, snapshots `vat_validated*` on the request row. Fans out bell notifications + emails (templates `role_upgrade_request.{submitted,approved,rejected}`) via `email-api`. Partial unique index prevents duplicate pending applications per (user, role).
+- **Tables:** `role_upgrade_requests`
+- **Access:** JWT (submit own); admin/super_admin/owner (approve/reject)
 
 ### SEO Pipeline (admin/owner only)
 
