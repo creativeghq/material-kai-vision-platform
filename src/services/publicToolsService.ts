@@ -15,6 +15,8 @@ export interface PublicQuota {
   reset_at: string;
   turnstile_site_key: string | null;
   is_authenticated: boolean;
+  credits_balance: number | null;
+  credits_per_scan: number;
 }
 
 export interface PublicPriceResult {
@@ -77,6 +79,7 @@ export interface PublicMentionScanResponse {
 
 export type PublicScanError =
   | { kind: 'quota_exceeded'; quota: PublicQuota; message: string }
+  | { kind: 'insufficient_credits'; quota: PublicQuota; message: string }
   | { kind: 'captcha_failed'; message: string }
   | { kind: 'upstream'; message: string }
   | { kind: 'network'; message: string };
@@ -88,12 +91,16 @@ export class PublicToolsApiError extends Error {
   }
 }
 
-async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+function authHeaders(accessToken?: string | null): Record<string, string> {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
+async function postJson<T>(path: string, body: unknown, accessToken?: string | null, signal?: AbortSignal): Promise<T> {
   let resp: Response;
   try {
     resp = await fetch(`${MIVAA_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(accessToken) },
       body: JSON.stringify(body),
       signal,
     });
@@ -122,6 +129,13 @@ async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): P
       429,
     );
   }
+  if (resp.status === 402 && detail && typeof detail === 'object' && 'quota' in detail) {
+    const d = detail as { message?: string; quota: PublicQuota };
+    throw new PublicToolsApiError(
+      { kind: 'insufficient_credits', quota: d.quota, message: d.message || 'Insufficient credits.' },
+      402,
+    );
+  }
   const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
   if (resp.status === 400 && msg.toLowerCase().includes('captcha')) {
     throw new PublicToolsApiError({ kind: 'captcha_failed', message: msg }, 400);
@@ -129,8 +143,10 @@ async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): P
   throw new PublicToolsApiError({ kind: 'upstream', message: msg || `HTTP ${resp.status}` }, resp.status);
 }
 
-export async function fetchQuota(): Promise<PublicQuota> {
-  const resp = await fetch(`${MIVAA_BASE}/api/v1/public/quota`);
+export async function fetchQuota(accessToken?: string | null): Promise<PublicQuota> {
+  const resp = await fetch(`${MIVAA_BASE}/api/v1/public/quota`, {
+    headers: authHeaders(accessToken),
+  });
   if (!resp.ok) {
     throw new Error(`Quota fetch failed: HTTP ${resp.status}`);
   }
@@ -143,6 +159,7 @@ export async function priceScan(input: {
   manufacturer?: string;
   dimensions?: string;
   countryCode?: string;
+  accessToken?: string | null;
 }, signal?: AbortSignal): Promise<PublicPriceScanResponse> {
   return postJson<PublicPriceScanResponse>(
     '/api/v1/public/price-scan',
@@ -153,6 +170,7 @@ export async function priceScan(input: {
       dimensions: input.dimensions,
       country_code: input.countryCode,
     },
+    input.accessToken,
     signal,
   );
 }
@@ -162,6 +180,7 @@ export async function mentionScan(input: {
   subjectLabel: string;
   aliases?: string[];
   countryCode?: string;
+  accessToken?: string | null;
 }, signal?: AbortSignal): Promise<PublicMentionScanResponse> {
   return postJson<PublicMentionScanResponse>(
     '/api/v1/public/mention-scan',
@@ -171,6 +190,7 @@ export async function mentionScan(input: {
       aliases: input.aliases,
       country_code: input.countryCode,
     },
+    input.accessToken,
     signal,
   );
 }

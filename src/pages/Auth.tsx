@@ -59,14 +59,23 @@ export const Auth: React.FC = () => {
   const { signIn, signUp, resetPassword, updatePassword, user } = useAuth();
   const navigate = useNavigate();
 
+  // Allow callers to deep-link back to where they came from after sign-in.
+  // Only same-origin paths are accepted (must start with '/' and not '//') to
+  // avoid open-redirect via crafted external URLs.
+  const redirectTo = (() => {
+    const raw = searchParams.get('redirect');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+    return '/';
+  })();
+
   // Redirect if already authenticated — but NOT while completing a password reset,
   // because Supabase signs the user into a recovery session and we still need them
   // to set a new password before navigating away.
   useEffect(() => {
     if (user && !isResetMode) {
-      navigate('/');
+      navigate(redirectTo);
     }
-  }, [user, navigate, isResetMode]);
+  }, [user, navigate, isResetMode, redirectTo]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +86,7 @@ export const Auth: React.FC = () => {
     const { error } = await updatePassword(newPassword);
     setIsLoading(false);
     if (!error) {
-      navigate('/');
+      navigate(redirectTo);
     }
   };
 
@@ -88,7 +97,7 @@ export const Auth: React.FC = () => {
     const { error } = await signIn(email, password);
 
     if (!error) {
-      navigate('/');
+      navigate(redirectTo);
     }
 
     setIsLoading(false);
