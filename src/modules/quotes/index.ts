@@ -28,6 +28,9 @@ const UpsellsManagementPage = lazy(() =>
 const TimelineStepsManagementPage = lazy(() =>
   import('./pages/TimelineStepsManagementPage').then(m => ({ default: m.TimelineStepsManagement })),
 );
+const QuoteSettingsPage = lazy(() =>
+  import('./pages/QuoteSettingsPage').then(m => ({ default: m.QuoteSettingsPage })),
+);
 
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
@@ -41,6 +44,7 @@ const definition: ModuleDefinition = {
     { path: '/admin/status-tags', component: StatusTagsManagementPage, requireAdmin: true },
     { path: '/admin/upsells', component: UpsellsManagementPage, requireAdmin: true },
     { path: '/admin/timeline-steps', component: TimelineStepsManagementPage, requireAdmin: true },
+    { path: '/admin/quote-settings', component: QuoteSettingsPage, requireAdmin: true },
   ],
   navItems: [
     {

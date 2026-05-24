@@ -68,7 +68,10 @@ const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebugging
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
-const SystemSettingsPage = lazy(() => import('./components/Admin/SystemSettingsPage').then(m => ({ default: m.SystemSettingsPage })));
+// Quote Settings page lives in `src/modules/quotes/pages/QuoteSettingsPage.tsx` —
+// registered through buildModuleRoutes() at /admin/quote-settings, plus
+// embedded in /admin/quote-requests via a Sheet panel. (Previously here as a
+// SystemSettingsPage lazy import.)
 // QuoteRequestsAdmin + QuoteDetailPage live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // StatusTagsManagement, UpsellsManagement, TimelineStepsManagement live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
@@ -523,18 +526,6 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <DataImportHub />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/system-settings"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <SystemSettingsPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

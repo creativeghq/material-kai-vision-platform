@@ -35,6 +35,8 @@ function filterNavItems(
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { isFactory, isAdmin } = useFactoryRole();
   const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
@@ -50,6 +52,55 @@ export const Sidebar: React.FC = () => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  const profileMenu = user ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+            isActive('/profile')
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span className="font-light">Profile</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
+        <DropdownMenuItem disabled className="py-3">
+          <User className="mr-3 h-4 w-4" />
+          <span className="text-sm">{user.email}</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3">
+          <User className="mr-3 h-4 w-4" />
+          <span className="text-sm">My Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => signOut()}
+          className="py-3 text-destructive focus:text-destructive"
+        >
+          <LogOut className="mr-3 h-4 w-4" />
+          <span className="text-sm">Sign out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : (
+    <Link
+      to="/profile"
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+        isActive('/profile')
+          ? 'bg-primary text-primary-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+      }`}
+    >
+      <User className="w-4 h-4" />
+      <span className="font-light">Profile</span>
+    </Link>
+  );
 
   if (isMobile) {
     return (
@@ -114,7 +165,10 @@ export const Sidebar: React.FC = () => {
             <span className="font-light text-sm text-foreground tracking-tight">JARVIS</span>
           </div>
 
-          <div className="w-9" />
+          <div className="flex items-center gap-1">
+            <ModuleHeaderActions />
+            {profileMenu}
+          </div>
         </div>
         <div className="h-14 flex-shrink-0" />
       </>
@@ -150,17 +204,10 @@ export const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      <Link
-        to="/profile"
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-          isActive('/profile')
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-        }`}
-      >
-        <User className="w-4 h-4" />
-        <span className="font-light">Profile</span>
-      </Link>
+      <div className="flex items-center gap-2">
+        <ModuleHeaderActions />
+        {profileMenu}
+      </div>
     </header>
   );
 };

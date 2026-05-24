@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus, ListChecks, Gift } from 'lucide-react';
+import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus, ListChecks, Gift, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
@@ -43,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { TimelineStepsManagement } from './TimelineStepsManagementPage';
 import { UpsellsManagement } from './UpsellsManagementPage';
+import { QuoteSettingsPage } from './QuoteSettingsPage';
 
 interface UserProfile {
   id: string;
@@ -66,6 +67,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   // Slide-out panels state
   const [showTimelinePanel, setShowTimelinePanel] = useState(false);
   const [showUpsellsPanel, setShowUpsellsPanel] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   // Create quote form state
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -345,6 +347,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
               Global Upsells Elements
             </Button>
             <Button
+              variant="outline"
+              onClick={() => setShowSettingsPanel(true)}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Quote Settings
+            </Button>
+            <Button
               onClick={() => setShowCreateModal(true)}
               style={{
                 backgroundColor: 'hsl(var(--primary))',
@@ -569,6 +578,24 @@ export const QuoteRequestsAdmin: React.FC = () => {
           </SheetHeader>
           <div className="mt-6">
             <UpsellsManagement embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Quote Settings Slide-out Panel */}
+      <Sheet open={showSettingsPanel} onOpenChange={setShowSettingsPanel}>
+        <SheetContent side="right" className="w-[60vw] max-w-[60vw] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Quote Settings
+            </SheetTitle>
+            <SheetDescription>
+              Configure quote expiration days and PDF template (cover, intro, content, back-cover + company details).
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <QuoteSettingsPage embedded />
           </div>
         </SheetContent>
       </Sheet>
