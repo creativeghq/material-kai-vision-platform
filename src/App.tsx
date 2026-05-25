@@ -30,6 +30,9 @@ const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => (
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
+// Hidden KB sub-page — job-research SITES management (the operator-curated list
+// of where the engine searches). Admin-only. NOT linked from public KB.
+const JobResearchSitesPage = lazy(() => import('./pages/Admin/JobResearchSitesPage'));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
@@ -253,6 +256,21 @@ const App = () => (
                         <Layout>
                           <KnowledgeBaseManagement />
                         </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Hidden KB sub-page — job-research sites management. Operator-curated
+                    list of where the engine looks. Admin-only writes (RLS-enforced).
+                    NOT linked from the public KB. */}
+                <Route
+                  path="/admin/knowledge-base/job-sources"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <PageErrorBoundary name="Job Research Sites">
+                          <JobResearchSitesPage />
+                        </PageErrorBoundary>
                       </AdminGuard>
                     </AuthGuard>
                   }
