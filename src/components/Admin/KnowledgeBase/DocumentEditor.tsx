@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table } from 'lucide-react';
+import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+// Special-purpose inline editors mounted as extra tabs based on doc metadata.doc_kind
+import { JobResearchSitesEditor } from './JobResearchSitesEditor';
 
 import {
   Dialog,
@@ -471,6 +474,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     <Eye className="h-4 w-4 mr-2" />
                     Preview
                   </TabsTrigger>
+                  {/* Special-purpose Manage tab for docs that wire to a typed table.
+                      Driven by metadata.doc_kind. Today: job_research_sites only;
+                      pattern is generic so future internal-config docs (mention
+                      outlets, price retailers, etc.) plug in the same way. */}
+                  {(document.metadata as Record<string, unknown> | undefined)?.doc_kind === 'job_research_sites' && (
+                    <TabsTrigger value="manage" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Manage resources
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </div>
 
@@ -570,6 +583,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   )}
                 </div>
               </TabsContent>
+
+              {/* Manage tab — only for special-purpose docs (e.g. doc_kind=job_research_sites).
+                  The doc body is auto-generated from the underlying typed table; this tab
+                  edits the table directly. After every CRUD here, the sync helper
+                  rewrites the doc body so the Preview tab reflects the new state. */}
+              {(document.metadata as Record<string, unknown> | undefined)?.doc_kind === 'job_research_sites' && (
+                <TabsContent value="manage" className="flex-1 overflow-y-auto m-0">
+                  <JobResearchSitesEditor />
+                </TabsContent>
+              )}
             </Tabs>
 
             {/* Footer Actions */}
