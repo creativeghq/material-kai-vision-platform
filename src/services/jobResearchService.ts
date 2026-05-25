@@ -340,6 +340,54 @@ export const jobResearchService = {
   async deleteSite(siteId: string): Promise<void> {
     await api<{ ok: true }>(`/api/v1/job-research/sites/${siteId}`, { method: 'DELETE' });
   },
+
+  /** v0.5: bulk-insert multiple sites into the platform-wide default list.
+   *  Idempotent — duplicates are silently skipped. */
+  async createSitesBulk(body: {
+    site_type: JobSiteType;
+    urls: string[];
+    country_code?: string;
+    category?: string;
+    notes?: string;
+  }): Promise<{ site_type: string; requested: number; created: number; skipped: number; failed: Array<{ url_or_domain: string; error: string }> }> {
+    return api<{ site_type: string; requested: number; created: number; skipped: number; failed: Array<{ url_or_domain: string; error: string }> }>(
+      `/api/v1/job-research/sites/bulk`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
+
+  /** v0.5: bulk-append URLs to a specific tracked_job's careers_page_urls or
+   *  rss_feed_urls. Reads the row, merges (dedupe case-insensitively), PUTs back.
+   *  Also enables the corresponding sources_enabled flag if any URLs were added. */
+  async appendUrlsToTrackedJob(
+    trackedJobId: string,
+    field: 'careers_page_urls' | 'rss_feed_urls',
+    newUrls: string[],
+  ): Promise<{ added: number; skipped_dup: number; tracked_job: TrackedJob }> {
+    const current = await this.get(trackedJobId);
+    const existing = new Set(((current as any)[field] || []).map((u: string) => u.trim().toLowerCase()));
+    const cleaned = newUrls.map(u => u.trim()).filter(u => !!u);
+    const fresh: string[] = [];
+    let dup = 0;
+    for (const u of cleaned) {
+      if (existing.has(u.toLowerCase())) { dup++; continue; }
+      existing.add(u.toLowerCase());
+      fresh.push(u);
+    }
+    if (fresh.length === 0) {
+      return { added: 0, skipped_dup: dup, tracked_job: current };
+    }
+    const merged = [...((current as any)[field] || []), ...fresh];
+    const sourcesPatch = {
+      ...current.sources_enabled,
+      [field === 'careers_page_urls' ? 'careers_pages' : 'rss_feeds']: true,
+    };
+    const updated = await this.update(trackedJobId, {
+      [field]: merged,
+      sources_enabled: sourcesPatch,
+    } as any);
+    return { added: fresh.length, skipped_dup: dup, tracked_job: updated };
+  },
 };
 
 // ─── Sites config types ──────────────────────────────────────────────────
