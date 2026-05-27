@@ -40,13 +40,12 @@ export const PRODUCT_IMAGE_SELECT = `image_product_associations(
  */
 export function getManufacturer(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null;
+  const fn = metadata.factory_name;
   return (
-    // Canonical
-    metadata.factory_name ||
-    // Legacy fallbacks (will be backfilled away — kept for safety until then)
-    metadata.manufacturer ||
-    metadata.brand ||
-    metadata.supplier ||
+    (typeof fn === 'string' ? fn : typeof fn === 'object' && fn ? (fn as any).factory_name || String(fn) : null) ||
+    (typeof metadata.manufacturer === 'string' ? metadata.manufacturer : null) ||
+    (typeof metadata.brand === 'string' ? metadata.brand : null) ||
+    (typeof metadata.supplier === 'string' ? metadata.supplier : null) ||
     (typeof metadata.factory === 'string' ? metadata.factory : null) ||
     null
   );

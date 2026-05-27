@@ -184,5 +184,6 @@ verify_jwt = false
 
 [auth]
 # JWT secret key for token signing and verification
-jwt_secret = "env(SUPABASE_JWT_SECRET)"
+# LOCAL DEV ONLY — production uses Supabase-hosted secret (never committed)
+jwt_secret = "super-secret-jwt-token-with-at-least-32-characters-long-for-local-dev-only"
 jwt_expiry = 2592000  # 30 days in seconds
