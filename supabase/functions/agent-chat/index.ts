@@ -1385,10 +1385,11 @@ async function executeAgent(
     tools.push(createPresentationSheetTool(userId, onChunk));
   }
 
-  // SEO toolkit (all users — 0 user credits, calls MIVAA via x-cron-secret).
+  // SEO toolkit (admin-only — each call spends real DataForSEO credits on the platform's tab).
   // 25 tools across keyword research, SERP audit, URL audit, domain intel,
   // backlinks, OnPage crawl, content + domain analytics, LLM-mention native
   // search, multi-engine SERP, Google Trends, composite audits, escape hatch.
+  if (isAdmin) {
   if (config.tools.includes('seo_research_keyword') && createSEOResearchKeywordTool) {
     tools.push(createSEOResearchKeywordTool(userId, onChunk));
   }
@@ -1498,10 +1499,10 @@ async function executeAgent(
   if (config.tools.includes('seo_categories_for_domain') && createSEOCategoriesForDomainTool) {
     tools.push(createSEOCategoriesForDomainTool(userId, onChunk));
   }
-  // Escape hatch — admin only (lets the agent hit any DataForSEO endpoint by name)
-  if (isAdmin && config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
+  if (config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
     tools.push(createSEODataForSEOCallTool(userId, onChunk));
   }
+  } // end isAdmin SEO gate
 
   // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)
   if (config.tools.includes('track_product_mentions') && createTrackProductMentionsTool) {

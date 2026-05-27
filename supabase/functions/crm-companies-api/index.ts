@@ -39,6 +39,19 @@ Deno.serve(withApiLogging('crm-companies-api', async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
+    let workspaceId: string | null = null;
+    if (userId) {
+      const { data: mem } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      workspaceId = mem?.workspace_id ?? null;
+    }
+
     const url = new URL(req.url);
     const path = url.pathname.replace('/crm-companies-api', '').split('/').filter(Boolean);
     const method = req.method;
@@ -121,6 +134,7 @@ Deno.serve(withApiLogging('crm-companies-api', async (req) => {
         .select('*', { count: 'exact' })
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
 
       // Add search filter if provided — escape % and _ to prevent wildcard injection
       if (search) {

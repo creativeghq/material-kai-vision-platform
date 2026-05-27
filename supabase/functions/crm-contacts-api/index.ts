@@ -42,9 +42,21 @@ Deno.serve(withApiLogging('crm-contacts-api', async (req) => {
       );
     }
 
-    // For user context operations, use auth.userId (null for secret key access)
     const user = auth.user;
     const userId = auth.userId;
+
+    let workspaceId: string | null = null;
+    if (userId) {
+      const { data: mem } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      workspaceId = mem?.workspace_id ?? null;
+    }
 
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
@@ -88,11 +100,13 @@ Deno.serve(withApiLogging('crm-contacts-api', async (req) => {
       const limit = parseInt(url.searchParams.get('limit') || '50');
       const offset = parseInt(url.searchParams.get('offset') || '0');
 
-      const { data, error } = await supabase
+      let listQuery = supabase
         .from('crm_contacts')
         .select('*')
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
+      if (workspaceId) listQuery = listQuery.eq('workspace_id', workspaceId);
+      const { data, error } = await listQuery;
 
       if (error) {
         return new Response(
