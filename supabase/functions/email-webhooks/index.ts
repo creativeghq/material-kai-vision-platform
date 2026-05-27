@@ -116,6 +116,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      const tsAge = Math.abs(Date.now() / 1000 - Number(svixTimestamp));
+      if (isNaN(tsAge) || tsAge > 300) {
+        console.warn(`Svix timestamp too old or invalid: age=${tsAge}s`);
+        return new Response(JSON.stringify({ error: 'Webhook timestamp expired' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       const valid = await verifyResendSignature(rawBody, svixId, svixTimestamp, svixSignature, webhookSecret);
       if (!valid) {
         console.warn('Invalid webhook signature');

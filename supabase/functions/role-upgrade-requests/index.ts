@@ -357,6 +357,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (!request) return jsonResponse({ error: 'request_not_found' }, 404);
+      if (request.user_id === user.id) return jsonResponse({ error: 'Cannot approve or reject your own request' }, 403);
       if (request.status !== 'pending') {
         return jsonResponse({ error: 'already_reviewed', message: `Request is already ${request.status}.` }, 409);
       }

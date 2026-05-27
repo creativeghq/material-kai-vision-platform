@@ -158,6 +158,14 @@ Deno.serve(withApiLogging('late-publish', async (req) => {
 
   } catch (err) {
     console.error('[late-publish] Error:', err);
+    try {
+      await supabase.from('social_posts').update({
+        status: 'failed',
+        metadata: { error: String(err), failed_at: new Date().toISOString() },
+      }).eq('id', post_id);
+    } catch (updateErr) {
+      console.error('[late-publish] Failed to mark post as failed:', updateErr);
+    }
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
 }));

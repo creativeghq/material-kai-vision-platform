@@ -95,7 +95,6 @@ async function runReplicate(
         room,
         furniture_style: furnitureStyle,
         furniture_items: furnitureItems || 'Default (AI decides)',
-        replicate_api_key: replicateToken(),
       },
     }),
   });
