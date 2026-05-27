@@ -25,11 +25,11 @@ const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
 // Credit costs per model (raw cost × MARKUP_MULTIPLIER × 100 credits/$)
 // WorldLabs pricing: $1 = 1,250 WL credits
-// marble-1.0-draft: 230 WL cr = $0.184 raw × 1.50 = $0.276 → 18 credits
+// marble-1.0-draft: 230 WL cr = $0.184 raw × 1.50 = $0.276 → 28 credits
 // marble-1.1:      1580 WL cr = $1.264 raw × 1.50 = $1.896 → 190 credits
 const CREDIT_COSTS: Record<string, number> = {
-  'marble-1.0-draft': 18,  // 230 WL cr = $0.184 × 1.50 markup
-  'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
+  'marble-1.0-draft': 28,
+  'marble-1.1': 190,
 };
 
 // Max polling duration (3 minutes for draft, 7 minutes for 1.1)

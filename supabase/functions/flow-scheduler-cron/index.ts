@@ -138,7 +138,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Execute the flow via flow-engine
+      // Stamp last_run_at BEFORE dispatch to prevent concurrent ticks from
+      // double-firing the same flow (the 55s guard above reads this).
+      await supabase
+        .from('flows')
+        .update({ last_run_at: now.toISOString() })
+        .eq('id', flow.id);
+
       try {
         const response = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/flow-engine`,

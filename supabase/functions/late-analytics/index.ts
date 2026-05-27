@@ -52,6 +52,17 @@ Deno.serve(withApiLogging('late-analytics', async (req) => {
   const body = await req.json();
   const { action, workspace_id, social_account_id, post_ids, platform } = body;
 
+  if (workspace_id && auth.userId) {
+    const { data: membership } = await supabase
+      .from('workspace_members')
+      .select('id')
+      .eq('user_id', auth.userId)
+      .eq('workspace_id', workspace_id)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!membership) return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
+  }
+
   // ── GET BEST TIME ──────────────────────────────────────────────────────────
   if (action === 'get_best_time') {
     if (!platform && !social_account_id) {

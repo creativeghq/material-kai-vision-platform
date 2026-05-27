@@ -27,7 +27,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 /** Verify HMAC-SHA256 signature from Late.dev */
 async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise<boolean> {
-  if (!LATE_WEBHOOK_SECRET()) return true; // Skip verification if secret not configured
+  if (!LATE_WEBHOOK_SECRET()) return false;
 
   try {
     const key = await crypto.subtle.importKey(
