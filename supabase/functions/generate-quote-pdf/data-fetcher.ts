@@ -69,11 +69,8 @@ export async function fetchQuoteData(
     );
   }
 
-  // Resolve client details — use the bill-to customer (company or contact),
-  // NOT quote.user_id (which is the designer/operator who created the quote).
   const client = await fetchClientData(
     supabase,
-    quote.user_id,
     quote.customer_company_id ?? null,
     quote.customer_contact_id ?? null,
   );
@@ -131,19 +128,17 @@ export async function fetchQuoteData(
 }
 
 /**
- * Resolve client details. Priority:
+ * Resolve client details from the quote's explicit customer fields.
  * 1. customer_company_id → crm_companies (B2B bill-to)
  * 2. customer_contact_id → crm_contacts (B2C bill-to)
- * 3. Legacy fallback: user_id → crm_contacts (via user_id) → company chain
- * 4. user_profiles (last resort)
+ * If neither is set, the PDF renders with empty client details.
  */
 async function fetchClientData(
   supabase: SupabaseClient,
-  userId: string,
   customerCompanyId?: string | null,
   customerContactId?: string | null,
 ): Promise<ClientData> {
-  const emptyClient: ClientData = {
+  const client: ClientData = {
     contact_name: null,
     company_name: null,
     email: null,
@@ -155,7 +150,6 @@ async function fetchClientData(
     vat_number: null,
   };
 
-  // Priority 1: explicit B2B customer company
   if (customerCompanyId) {
     const { data: company } = await supabase
       .from('crm_companies')
@@ -163,19 +157,18 @@ async function fetchClientData(
       .eq('id', customerCompanyId)
       .single();
     if (company) {
-      emptyClient.company_name = company.name;
-      emptyClient.email = company.email;
-      emptyClient.phone = company.phone;
-      emptyClient.address = company.address;
-      emptyClient.city = company.city;
-      emptyClient.postal_code = company.postal_code;
-      emptyClient.country = company.country;
-      emptyClient.vat_number = company.vat_number;
-      return emptyClient;
+      client.company_name = company.name;
+      client.email = company.email;
+      client.phone = company.phone;
+      client.address = company.address;
+      client.city = company.city;
+      client.postal_code = company.postal_code;
+      client.country = company.country;
+      client.vat_number = company.vat_number;
+      return client;
     }
   }
 
-  // Priority 2: explicit B2C customer contact
   if (customerContactId) {
     const { data: contact } = await supabase
       .from('crm_contacts')
@@ -183,85 +176,20 @@ async function fetchClientData(
       .eq('id', customerContactId)
       .single();
     if (contact) {
-      emptyClient.contact_name = contact.name;
-      emptyClient.email = contact.email;
-      emptyClient.phone = contact.phone;
-      emptyClient.address = contact.address;
-      emptyClient.city = contact.city;
-      emptyClient.postal_code = contact.postal_code;
-      emptyClient.country = contact.country;
-      emptyClient.vat_number = contact.vat_number;
-      if (contact.company) emptyClient.company_name = contact.company;
-      return emptyClient;
+      client.contact_name = contact.name;
+      client.email = contact.email;
+      client.phone = contact.phone;
+      client.address = contact.address;
+      client.city = contact.city;
+      client.postal_code = contact.postal_code;
+      client.country = contact.country;
+      client.vat_number = contact.vat_number;
+      if (contact.company) client.company_name = contact.company;
+      return client;
     }
   }
 
-  // Legacy fallback: CRM contact linked to the quote's user_id
-  const { data: contact } = await supabase
-    .from('crm_contacts')
-    .select('id, name, email, phone, company, address, city, postal_code, country')
-    .eq('user_id', userId)
-    .limit(1)
-    .single();
-
-  if (contact) {
-    emptyClient.contact_name = contact.name;
-    emptyClient.email = contact.email;
-    emptyClient.phone = contact.phone;
-    emptyClient.address = contact.address;
-    emptyClient.city = contact.city;
-    emptyClient.postal_code = contact.postal_code;
-    emptyClient.country = contact.country;
-
-    // Try to get company via junction table
-    const { data: companyLink } = await supabase
-      .from('crm_company_contacts')
-      .select('company_id')
-      .eq('contact_id', contact.id)
-      .limit(1)
-      .single();
-
-    if (companyLink) {
-      const { data: company } = await supabase
-        .from('crm_companies')
-        .select('name, email, phone, address, city, postal_code, country, vat_number')
-        .eq('id', companyLink.company_id)
-        .single();
-
-      if (company) {
-        emptyClient.company_name = company.name;
-        emptyClient.vat_number = company.vat_number;
-        // Use company address if contact has none
-        if (!emptyClient.address) {
-          emptyClient.address = company.address;
-          emptyClient.city = company.city;
-          emptyClient.postal_code = company.postal_code;
-          emptyClient.country = company.country;
-        }
-      }
-    }
-
-    // Fallback company name from contact's inline company field
-    if (!emptyClient.company_name && contact.company) {
-      emptyClient.company_name = contact.company;
-    }
-
-    return emptyClient;
-  }
-
-  // Fallback: user_profiles
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('full_name, email')
-    .eq('user_id', userId)
-    .single();
-
-  if (profile) {
-    emptyClient.contact_name = profile.full_name;
-    emptyClient.email = profile.email;
-  }
-
-  return emptyClient;
+  return client;
 }
 
 /**
