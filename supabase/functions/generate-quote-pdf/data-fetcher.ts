@@ -69,8 +69,14 @@ export async function fetchQuoteData(
     );
   }
 
-  // Resolve client details
-  const client = await fetchClientData(supabase, quote.user_id);
+  // Resolve client details — use the bill-to customer (company or contact),
+  // NOT quote.user_id (which is the designer/operator who created the quote).
+  const client = await fetchClientData(
+    supabase,
+    quote.user_id,
+    quote.customer_company_id ?? null,
+    quote.customer_contact_id ?? null,
+  );
 
   // Map items (supports both catalog products and custom items)
   const mappedItems: QuoteItemData[] = items.map((item: any) => {
@@ -125,13 +131,17 @@ export async function fetchQuoteData(
 }
 
 /**
- * Resolve client details from CRM chain:
- * user_id → crm_contacts (via user_id) → crm_company_contacts → crm_companies
- * Fallback to user_profiles if no CRM link
+ * Resolve client details. Priority:
+ * 1. customer_company_id → crm_companies (B2B bill-to)
+ * 2. customer_contact_id → crm_contacts (B2C bill-to)
+ * 3. Legacy fallback: user_id → crm_contacts (via user_id) → company chain
+ * 4. user_profiles (last resort)
  */
 async function fetchClientData(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  customerCompanyId?: string | null,
+  customerContactId?: string | null,
 ): Promise<ClientData> {
   const emptyClient: ClientData = {
     contact_name: null,
@@ -145,7 +155,48 @@ async function fetchClientData(
     vat_number: null,
   };
 
-  // Try CRM contact linked to this user
+  // Priority 1: explicit B2B customer company
+  if (customerCompanyId) {
+    const { data: company } = await supabase
+      .from('crm_companies')
+      .select('name, email, phone, address, city, postal_code, country, vat_number')
+      .eq('id', customerCompanyId)
+      .single();
+    if (company) {
+      emptyClient.company_name = company.name;
+      emptyClient.email = company.email;
+      emptyClient.phone = company.phone;
+      emptyClient.address = company.address;
+      emptyClient.city = company.city;
+      emptyClient.postal_code = company.postal_code;
+      emptyClient.country = company.country;
+      emptyClient.vat_number = company.vat_number;
+      return emptyClient;
+    }
+  }
+
+  // Priority 2: explicit B2C customer contact
+  if (customerContactId) {
+    const { data: contact } = await supabase
+      .from('crm_contacts')
+      .select('name, email, phone, company, address, city, postal_code, country, vat_number')
+      .eq('id', customerContactId)
+      .single();
+    if (contact) {
+      emptyClient.contact_name = contact.name;
+      emptyClient.email = contact.email;
+      emptyClient.phone = contact.phone;
+      emptyClient.address = contact.address;
+      emptyClient.city = contact.city;
+      emptyClient.postal_code = contact.postal_code;
+      emptyClient.country = contact.country;
+      emptyClient.vat_number = contact.vat_number;
+      if (contact.company) emptyClient.company_name = contact.company;
+      return emptyClient;
+    }
+  }
+
+  // Legacy fallback: CRM contact linked to the quote's user_id
   const { data: contact } = await supabase
     .from('crm_contacts')
     .select('id, name, email, phone, company, address, city, postal_code, country')

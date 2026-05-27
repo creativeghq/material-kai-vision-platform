@@ -145,10 +145,10 @@ function evaluateComparison(
   }
 }
 
-function executeCondition(
+async function executeCondition(
   node: FlowNode,
   context: ExecutionContext,
-): { output: Record<string, unknown>; branch: string } {
+): Promise<{ output: Record<string, unknown>; branch: string }> {
   const { conditionType, config } = node.data;
 
   switch (conditionType) {
@@ -850,7 +850,7 @@ async function executeFlowGraph(
       if (node.type === 'triggerNode') {
         output = { ...triggerData };
       } else if (node.type === 'conditionNode') {
-        const result = executeCondition(node, context);
+        const result = await executeCondition(node, context);
         output = result.output;
         branch = result.branch;
 

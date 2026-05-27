@@ -91,6 +91,20 @@ Deno.serve(withApiLogging('late-oauth', async (req) => {
       return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
     }
 
+    // Verify caller belongs to the requested workspace
+    if (userId) {
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!membership) {
+        return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
+      }
+    }
+
     let query = supabase
       .from('social_accounts')
       .select('*')
@@ -226,6 +240,20 @@ Deno.serve(withApiLogging('late-oauth', async (req) => {
 
     if (fetchErr || !account) {
       return jsonResponse({ success: false, error: 'Account not found' }, 404);
+    }
+
+    // Verify caller belongs to the account's workspace
+    if (userId && account.workspace_id) {
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('workspace_id', account.workspace_id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!membership) {
+        return jsonResponse({ success: false, error: 'Not authorized to disconnect this account' }, 403);
+      }
     }
 
     // Revoke via Late.dev

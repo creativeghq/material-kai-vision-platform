@@ -258,7 +258,7 @@ async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
     .select('*')
     .eq('status', 'processing')
     .eq('job_type', 'xml_import')
-    .lt('created_at', thirtyMinutesAgo)
+    .lt('updated_at', thirtyMinutesAgo)
     .limit(100);
 
   if (error) {

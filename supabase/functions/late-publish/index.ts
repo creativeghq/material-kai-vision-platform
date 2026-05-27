@@ -67,26 +67,28 @@ Deno.serve(withApiLogging('late-publish', async (req) => {
     return jsonResponse({ success: false, error: 'scheduled_at is required for schedule action' }, 400);
   }
 
-  // Fetch post data
-  const { data: post, error: postErr } = await supabase
+  // Fetch post data — scoped to the authenticated user's workspace
+  const postQuery = supabase
     .from('social_posts')
     .select('*')
-    .eq('id', post_id)
-    .single();
+    .eq('id', post_id);
+  if (workspace_id) postQuery.eq('workspace_id', workspace_id);
+  const { data: post, error: postErr } = await postQuery.single();
 
   if (postErr || !post) {
     return jsonResponse({ success: false, error: 'Post not found' }, 404);
   }
 
-  // Fetch social account to get late_account_id
-  const { data: account, error: accountErr } = await supabase
+  // Fetch social account — verify it belongs to the same workspace
+  const accountQuery = supabase
     .from('social_accounts')
-    .select('late_account_id, platform, handle')
-    .eq('id', social_account_id)
-    .single();
+    .select('late_account_id, platform, handle, workspace_id')
+    .eq('id', social_account_id);
+  if (workspace_id) accountQuery.eq('workspace_id', workspace_id);
+  const { data: account, error: accountErr } = await accountQuery.single();
 
   if (accountErr || !account) {
-    return jsonResponse({ success: false, error: 'Social account not found' }, 404);
+    return jsonResponse({ success: false, error: 'Social account not found or not in your workspace' }, 404);
   }
 
   try {

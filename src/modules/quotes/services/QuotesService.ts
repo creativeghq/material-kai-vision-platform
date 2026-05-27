@@ -345,6 +345,19 @@ export class QuotesService {
       custom_request_text?: string;
     },
   ): Promise<Quote> {
+    if (data.status) {
+      const { data: current } = await supabase
+        .from('quotes')
+        .select('status, oxygen_notice_id')
+        .eq('id', quoteId)
+        .single();
+      if (current?.oxygen_notice_id && data.status !== 'accepted') {
+        throw new Error(
+          'Cannot change status of a quote that has been synced to Oxygen. Void the pre-invoice in Oxygen first.',
+        );
+      }
+    }
+
     const { data: quote, error } = await supabase
       .from('quotes')
       .update(data)
