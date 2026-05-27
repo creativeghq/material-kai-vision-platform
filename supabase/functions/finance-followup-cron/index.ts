@@ -123,13 +123,14 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Audit log — also stamps last_activity_at via dedup query above
-      await supabase.from('quote_activities').insert({
-        quote_id: r.id,
-        kind: 'reminder_dispatched',
-        body: title,
-        metadata: { stale, due_scheduled: dueScheduled, channel: 'bell' },
-      });
+      if (r.owner_user_id) {
+        await supabase.from('quote_activities').insert({
+          quote_id: r.id,
+          kind: 'reminder_dispatched',
+          body: title,
+          metadata: { stale, due_scheduled: dueScheduled, channel: 'bell' },
+        });
+      }
 
       dispatched += 1;
     }

@@ -18,7 +18,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const XAI_API_KEY = Deno.env.get('XAI_API_KEY') || '';
+const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
 const GEMINI_API_KEY = () => Deno.env.get('GEMINI_API_KEY') || '';
 const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
@@ -67,7 +67,7 @@ async function generateWithAurora(prompt: string, size: string): Promise<string>
   const res = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${XAI_API_KEY}`,
+      'Authorization': `Bearer ${XAI_API_KEY()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ model: 'grok-2-aurora', prompt, n: 1, size }),

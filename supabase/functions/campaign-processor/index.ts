@@ -74,16 +74,23 @@ serve(async (req) => {
       }
 
       if (!recipients || recipients.length === 0) {
-        // No more pending recipients, mark campaign as sent
+        const { count: failedCount } = await supabase
+          .from('campaign_recipients')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
+          .eq('status', 'failed');
+
+        const finalStatus = (failedCount ?? 0) > 0 ? 'partial_failure' : 'sent';
         await supabase
           .from('campaigns')
-          .update({ 
-            status: 'sent',
-            sent_at: new Date().toISOString()
+          .update({
+            status: finalStatus,
+            sent_at: new Date().toISOString(),
+            ...(failedCount ? { metadata: { failed_recipients: failedCount } } : {}),
           })
           .eq('id', campaign.id);
-        
-        console.log(`Completed campaign: ${campaign.id}`);
+
+        console.log(`Completed campaign: ${campaign.id} (${finalStatus}, ${failedCount ?? 0} failed)`);
         continue;
       }
 
