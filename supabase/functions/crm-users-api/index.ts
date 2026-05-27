@@ -124,6 +124,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           role_id,
           subscription_tier,
           status,
+          professional_type,
           created_at,
           full_name,
           roles(id, name, level)
@@ -154,6 +155,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           role_id: profile?.role_id,
           subscription_tier: profile?.subscription_tier || 'free',
           status: profile?.status || 'active',
+          professional_type: profile?.professional_type ?? null,
           credits: credits?.balance || 0,
           created_at: authUser.created_at,
           roles: profile?.roles,
@@ -179,6 +181,7 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
           role_id,
           subscription_tier,
           status,
+          professional_type,
           created_at,
           updated_at,
           roles(id, name, level, description)
@@ -288,16 +291,25 @@ Deno.serve(withApiLogging('crm-users-api', async (req) => {
       const userId = path[0];
       const body = await req.json();
 
-      const { role_id, status, subscription_tier } = body;
+      // Allow-list of admin-editable fields. `professional_type` lets admins
+      // re-categorise a user without asking them to change their own profile
+      // (the auto-synced crm_categories pick up the change on next resync).
+      // For professional_type / status we accept `null` to clear the value,
+      // not just truthy assignments.
+      const { role_id, status, subscription_tier, professional_type } = body;
+      const updates: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (role_id !== undefined && role_id !== '') updates.role_id = role_id;
+      if (status !== undefined && status !== '') updates.status = status;
+      if (subscription_tier !== undefined && subscription_tier !== null && subscription_tier !== '') {
+        updates.subscription_tier = subscription_tier;
+      }
+      if (professional_type !== undefined) updates.professional_type = professional_type;
 
       const { data, error } = await supabase
         .from('user_profiles')
-        .update({
-          ...(role_id && { role_id }),
-          ...(status && { status }),
-          ...(subscription_tier && { subscription_tier }),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updates)
         .eq('user_id', userId)
         .select();
 

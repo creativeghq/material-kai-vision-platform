@@ -460,9 +460,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       extra: { error_message: error instanceof Error ? error.message : String(error) },
     });
 
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const statusCode = errMsg.includes('Unauthorized') ? 401 : errMsg.includes('not allowed') ? 405 : 500;
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: errMsg }),
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 }));

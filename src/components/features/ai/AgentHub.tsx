@@ -572,6 +572,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [currentConversationId]);
 
+  const conversationIdRef = useRef(currentConversationId);
+  conversationIdRef.current = currentConversationId;
+
+  useEffect(() => {
+    setActiveToolkits((prev) => {
+      const filtered = prev.filter((id) => {
+        const tk = TOOLKITS.find((t) => t.id === id);
+        if (!tk) return false;
+        if (tk.alwaysOn) return true;
+        return getToolkitOwnerAgents(tk).includes(selectedAgent);
+      });
+      if (filtered.length === prev.length) return prev;
+      try { window.localStorage.setItem('mk_active_toolkits', JSON.stringify(filtered)); } catch { /* private mode */ }
+      const convId = conversationIdRef.current;
+      if (convId) {
+        agentChatHistoryService.updateConversationToolkits(convId, filtered).catch(() => {});
+      }
+      return filtered;
+    });
+  }, [selectedAgent]);
+
   /**
    * Boot a workflow LOCALLY without round-tripping through the agent. Used by
    * the toolkit quick-starts that carry a `workflow_id` — the user clicks
@@ -4567,6 +4588,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         enabledModules={enabledModulesArray}
         activeToolkitIds={activeToolkits}
         onChange={updateActiveToolkits}
+        currentAgentId={selectedAgent}
       />
 
 

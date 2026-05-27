@@ -33,6 +33,8 @@ import { usersAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { AdminRoleUpgradeRequestsPanel } from '@/modules/crm/components/AdminRoleUpgradeRequestsPanel';
+import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import { crmCategoriesService } from '@/services/crmCategoriesService';
 
 interface UserProfile {
   id: string;
@@ -41,6 +43,7 @@ interface UserProfile {
   role_id?: string;
   subscription_tier?: string;
   status?: string;
+  professional_type?: string | null;
   credits?: number;
   created_at: string;
   roles?: { id: string; name: string; level: number };
@@ -350,6 +353,35 @@ export const UserDetailPage: React.FC = () => {
     }
   };
 
+  /**
+   * Inline-save an admin classification field on user_profiles. Optimistic
+   * update + revert on failure. After professional_type changes we also
+   * trigger the auto-sync RPC so the user's crm_categories membership picks
+   * up the new value immediately (the resync is otherwise only run from the
+   * Categories admin page).
+   */
+  const patchInlineUser = async (updates: { role_id?: string; status?: string; professional_type?: string | null }) => {
+    if (!user || !id) return;
+    let snapshot: UserProfile | null = null;
+    setUser((prev) => { snapshot = prev; return prev ? { ...prev, ...updates } : prev; });
+    try {
+      await usersAPI.updateUser(id, updates);
+      if ('professional_type' in updates) {
+        try { await crmCategoriesService.resyncAuto(); } catch (e) {
+          console.warn('Category auto-resync after professional_type change failed:', e);
+        }
+      }
+    } catch (error) {
+      console.error('Inline patch failed:', error);
+      if (snapshot) setUser(snapshot);
+      toast({
+        title: 'Could not save',
+        description: error instanceof Error ? error.message : 'Try again',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!user || !id) return;
 
@@ -597,7 +629,10 @@ export const UserDetailPage: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Role & Permissions Card */}
+              {/* Role & Permissions Card — Role + Professional type are
+                  admin classifications, both inline-editable (no "Edit" mode
+                  required). Professional type drives the auto-synced CRM
+                  category for this user. */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -607,45 +642,56 @@ export const UserDetailPage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label>Role</Label>
-                    {editing ? (
-                      <Select value={roleId || ''} onValueChange={setRoleId}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select role...">
-                            {roleId && roles.length > 0
-                              ? roles.find(r => r.id === roleId)?.name || 'Select role...'
-                              : 'Select role...'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {roles.map((role) => (
-                            <SelectItem key={role.id} value={role.id}>
-                              <div className="flex items-center gap-2">
-                                <Shield className="h-4 w-4" />
-                                {role.name} (Level {role.level})
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline">
-                          <Shield className="h-3 w-3 mr-1" />
-                          {user.roles?.name || roles.find(r => r.id === user.role_id)?.name || 'No role'}
-                        </Badge>
-                        {(user.roles?.level !== undefined || user.role_id) && (
-                          <span className="text-xs text-muted-foreground">
-                            Level {user.roles?.level ?? roles.find(r => r.id === user.role_id)?.level ?? '?'}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <Label htmlFor="user-role">Role</Label>
+                    <Select
+                      value={user.role_id || ''}
+                      onValueChange={(v) => patchInlineUser({ role_id: v })}
+                    >
+                      <SelectTrigger id="user-role" className="mt-1">
+                        <SelectValue placeholder="Select role...">
+                          {user.role_id && roles.length > 0
+                            ? roles.find(r => r.id === user.role_id)?.name || 'Select role...'
+                            : 'Select role...'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              {role.name} (Level {role.level})
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Role determines platform permissions and access levels.
+                    </p>
                   </div>
+
                   <div className="pt-4 border-t">
-                    <Label className="text-sm text-muted-foreground">
-                      Role determines user permissions and access levels within the platform.
-                    </Label>
+                    <Label htmlFor="user-prof-type">Professional Type (Category)</Label>
+                    <Select
+                      value={user.professional_type ?? '__unset'}
+                      onValueChange={(v) =>
+                        patchInlineUser({ professional_type: v === '__unset' ? null : v })
+                      }
+                    >
+                      <SelectTrigger id="user-prof-type" className="mt-1">
+                        <SelectValue placeholder="Not set" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__unset">Not set</SelectItem>
+                        {Object.entries(PROFESSIONAL_TYPE_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Drives the auto-synced CRM category. Re-syncs the user's category
+                      membership immediately on change.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
