@@ -78,12 +78,21 @@ function transformReactCode(code: string, variables: Record<string, any>): strin
  * Renders a React Email template with simple variable replacement
  * This is a fallback for when the React rendering fails
  */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderTemplateWithVariables(
   template: string,
   variables: Record<string, any>
 ): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    return variables[key] !== undefined ? String(variables[key]) : `{{${key}}}`;
+    return variables[key] !== undefined ? escapeHtml(String(variables[key])) : `{{${key}}}`;
   });
 }
 

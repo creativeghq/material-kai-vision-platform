@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Package, Tag } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerQuotesTab,
@@ -20,7 +20,9 @@ import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
-import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
+import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
+import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
@@ -60,7 +62,6 @@ interface Contact {
   state?: string;
   postal_code?: string;
   country?: string;
-  notes?: string;
   linkedin?: string;
   twitter?: string;
   facebook?: string;
@@ -74,6 +75,10 @@ interface Contact {
   discount_notes?: string | null;
   is_supplier?: boolean | null;
   is_client?: boolean | null;
+  contact_type?: string | null;
+  vat_number?: string | null;
+  country_code?: string | null;
+  tax_office?: string | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -111,7 +116,6 @@ export const ContactDetailPage: React.FC = () => {
     state: '',
     postal_code: '',
     country: '',
-    notes: '',
     linkedin: '',
     twitter: '',
     facebook: '',
@@ -125,11 +129,16 @@ export const ContactDetailPage: React.FC = () => {
     discount_notes: '',
     is_supplier: false,
     is_client: false,
+    contact_type: null,
+    vat_number: '',
+    country_code: '',
+    tax_office: '',
     created_at: new Date().toISOString(),
   } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
   const [linking, setLinking] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFullName, setInviteFullName] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -223,6 +232,32 @@ export const ContactDetailPage: React.FC = () => {
   const updateField = (field: keyof Contact, value: any) => {
     if (!contact) return;
     setContact({ ...contact, [field]: value });
+  };
+
+  /**
+   * Inline patch for fields that should save on change without entering the
+   * page's "Edit" mode (admin role flags, contact type). Optimistic update +
+   * revert on failure. Skipped on the create-new flow (handleSave persists
+   * the whole row there).
+   */
+  const patchInline = async (updates: Partial<Contact>) => {
+    if (!contact || !id || isNew) {
+      if (contact) setContact((prev) => prev ? { ...prev, ...updates } : prev);
+      return;
+    }
+    let snapshot: Contact | null = null;
+    setContact((prev) => { snapshot = prev; return prev ? { ...prev, ...updates } : prev; });
+    try {
+      await contactsAPI.updateContact(id, updates);
+    } catch (error) {
+      console.error('Inline patch failed:', error);
+      if (snapshot) setContact(snapshot);
+      toast({
+        title: 'Could not save',
+        description: error instanceof Error ? error.message : 'Try again',
+        variant: 'destructive',
+      });
+    }
   };
 
   const loadLinkedUser = async (userId: string) => {
@@ -460,12 +495,6 @@ export const ContactDetailPage: React.FC = () => {
               <CreditCard className="h-4 w-4 mr-2" />
               Payments
             </TabsTrigger>
-            {contact.is_supplier && (
-              <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Package className="h-4 w-4 mr-2" />
-                Products
-              </TabsTrigger>
-            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -492,16 +521,29 @@ export const ContactDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={contact.email || ''}
-                        onChange={(e) => updateField('email', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1 pl-10"
-                      />
+                    <div className="relative flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="email"
+                          type="email"
+                          value={contact.email || ''}
+                          onChange={(e) => updateField('email', e.target.value)}
+                          disabled={!editing}
+                          className="mt-1 pl-10"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setShowEmailDialog(true)}
+                        disabled={!contact.email}
+                        title={contact.email ? `Send email to ${contact.email}` : 'No email on file'}
+                        className="mt-1 shrink-0"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                   <div>
@@ -815,9 +857,24 @@ export const ContactDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Role — who this contact is to the workspace. Controls which
-                tabs (Products / supplier-bills) appear and how the finance
-                Parties view classifies them. */}
+            {/* Tax & VAT — admin-managed billing details. If the contact is
+                attached to a Company (B2B), the company's VAT takes priority
+                for invoicing — this VAT is the contact's personal one (used
+                for B2C / sole-trader / self-employed invoicing). */}
+            <ContactTaxVatCard
+              vatNumber={contact.vat_number ?? null}
+              countryCode={contact.country_code ?? null}
+              taxOffice={contact.tax_office ?? null}
+              attachedCompanies={contact.companies ?? []}
+              onPatch={(updates) => patchInline(updates as Partial<Contact>)}
+            />
+
+            {/* Role — who this contact is to the workspace. Drives how the
+                finance Parties view classifies them. Note: contacts are people,
+                not businesses — products live on the company (see "Companies"
+                tab → open the company → Products). is_supplier is kept here
+                for sole-trader / freelancer contacts who supply directly
+                without a CRM company. */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -830,15 +887,14 @@ export const ContactDetailPage: React.FC = () => {
                   <div className="space-y-1">
                     <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
                     <p className="text-xs text-muted-foreground">
-                      Enables the Products tab below. Includes manufacturers, brands and distributors —
-                      anyone who supplies products to us.
+                      Use for freelancers / sole traders who supply directly. If they belong to a business,
+                      mark the company as supplier instead — products live on the business.
                     </p>
                   </div>
                   <Switch
                     id="is_supplier"
                     checked={!!contact.is_supplier}
-                    onCheckedChange={(v) => updateField('is_supplier', v)}
-                    disabled={!editing}
+                    onCheckedChange={(v) => patchInline({ is_supplier: v })}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -851,27 +907,35 @@ export const ContactDetailPage: React.FC = () => {
                   <Switch
                     id="is_client"
                     checked={!!contact.is_client}
-                    onCheckedChange={(v) => updateField('is_client', v)}
-                    disabled={!editing}
+                    onCheckedChange={(v) => patchInline({ is_client: v })}
                   />
+                </div>
+                <div className="flex items-center justify-between gap-4 pt-2 border-t">
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Drives B2C vs B2B billing — used by Oxygen pre-invoicing and quote VAT logic.
+                    </p>
+                  </div>
+                  <Select
+                    value={contact.contact_type ?? '__unset'}
+                    onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
+                  >
+                    <SelectTrigger id="contact_type" className="w-44">
+                      <SelectValue placeholder="Not set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__unset">Not set</SelectItem>
+                      <SelectItem value="private">Private (B2C)</SelectItem>
+                      <SelectItem value="company">Company (B2B)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
 
             <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />
           </TabsContent>
-
-          {/* Products Tab — only when is_supplier=true. Matches products by name
-              against products.metadata.factory_name / manufacturer / brand /
-              supplier. Read-only view for now. */}
-          {contact.is_supplier && (
-            <TabsContent value="products" className="space-y-4">
-              <SupplierProductsTab
-                supplierName={contact.name}
-                aliases={[contact.company].filter((s): s is string => !!s)}
-              />
-            </TabsContent>
-          )}
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-4">
@@ -970,29 +1034,10 @@ export const ContactDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Notes & Activity Tab */}
+          {/* Notes & Activity Tab — timeline of separate note entries
+              (replaced the single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Notes & Comments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div>
-                  <Label htmlFor="notes" className="text-sm">Internal Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={contact.notes || ''}
-                    onChange={(e) => updateField('notes', e.target.value)}
-                    disabled={!editing}
-                    className="mt-2 min-h-[300px] resize-none"
-                    placeholder="Add notes about this contact..."
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            <CrmNotesTimeline targetKind="contact" targetId={id ?? null} />
           </TabsContent>
 
           {/* Quotes Tab */}
@@ -1014,6 +1059,15 @@ export const ContactDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Send Email Dialog */}
+      <SendEmailDialog
+        open={showEmailDialog}
+        onClose={() => setShowEmailDialog(false)}
+        toEmail={contact.email || ''}
+        toName={contact.name || null}
+        recipientLabel={contact.name || 'Contact'}
+      />
 
       {/* Invite User Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>

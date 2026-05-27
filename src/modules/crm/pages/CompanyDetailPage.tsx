@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerQuotesTab,
@@ -21,6 +21,8 @@ import { companiesAPI } from '@/services/crm.service';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
+import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
@@ -60,7 +62,6 @@ interface Company {
   postal_code?: string;
   country?: string;
   description?: string;
-  notes?: string;
   linkedin?: string;
   twitter?: string;
   facebook?: string;
@@ -102,7 +103,6 @@ export const CompanyDetailPage: React.FC = () => {
     postal_code: '',
     country: '',
     description: '',
-    notes: '',
     linkedin: '',
     twitter: '',
     facebook: '',
@@ -114,6 +114,7 @@ export const CompanyDetailPage: React.FC = () => {
     contacts: [],
   } : null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [contactRole, setContactRole] = useState<string>('');
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
@@ -194,6 +195,31 @@ export const CompanyDetailPage: React.FC = () => {
   const updateField = (field: keyof Company, value: any) => {
     if (!company) return;
     setCompany({ ...company, [field]: value });
+  };
+
+  /**
+   * Inline patch for fields that should save on change without entering the
+   * page's "Edit" mode (admin role flags, etc). Optimistic update + revert on
+   * failure. Skipped on the create-new flow (no id yet).
+   */
+  const patchInline = async (updates: Partial<Company>) => {
+    if (!company || !id || isNew) {
+      if (company) setCompany((prev) => prev ? { ...prev, ...updates } : prev);
+      return;
+    }
+    let snapshot: Company | null = null;
+    setCompany((prev) => { snapshot = prev; return prev ? { ...prev, ...updates } : prev; });
+    try {
+      await companiesAPI.updateCompany(id, updates);
+    } catch (error) {
+      console.error('Inline patch failed:', error);
+      if (snapshot) setCompany(snapshot);
+      toast({
+        title: 'Could not save',
+        description: error instanceof Error ? error.message : 'Try again',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleAttachContact = async () => {
@@ -394,7 +420,7 @@ export const CompanyDetailPage: React.FC = () => {
                   {/* Email */}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-start">
                       <Mail className="h-4 w-4 mt-3 text-muted-foreground" />
                       <Input
                         id="email"
@@ -404,6 +430,17 @@ export const CompanyDetailPage: React.FC = () => {
                         disabled={!editing}
                         placeholder="contact@company.com"
                       />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setShowEmailDialog(true)}
+                        disabled={!company.email}
+                        title={company.email ? `Send email to ${company.email}` : 'No email on file'}
+                        className="shrink-0"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
 
@@ -617,8 +654,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <Switch
                     id="is_supplier"
                     checked={!!company.is_supplier}
-                    onCheckedChange={(v) => updateField('is_supplier', v)}
-                    disabled={!editing}
+                    onCheckedChange={(v) => patchInline({ is_supplier: v })}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -631,8 +667,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <Switch
                     id="is_customer"
                     checked={!!company.is_customer}
-                    onCheckedChange={(v) => updateField('is_customer', v)}
-                    disabled={!editing}
+                    onCheckedChange={(v) => patchInline({ is_customer: v })}
                   />
                 </div>
               </CardContent>
@@ -801,23 +836,10 @@ export const CompanyDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Notes Tab */}
+          {/* Notes Tab — timeline of separate note entries (replaced the
+              single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Internal Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={company.notes || ''}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                  disabled={!editing}
-                  placeholder="Add internal notes about this company..."
-                  rows={10}
-                  className="min-h-[200px]"
-                />
-              </CardContent>
-            </Card>
+            <CrmNotesTimeline targetKind="company" targetId={company.id || null} />
           </TabsContent>
 
           {/* SEO Tab — DataForSEO Domain Rank + persistent monitoring */}
@@ -849,6 +871,15 @@ export const CompanyDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Send Email Dialog */}
+      <SendEmailDialog
+        open={showEmailDialog}
+        onClose={() => setShowEmailDialog(false)}
+        toEmail={company.email || ''}
+        toName={company.name || null}
+        recipientLabel={company.name || 'Company'}
+      />
 
       {/* Add Contact Dialog */}
       <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
