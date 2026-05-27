@@ -143,12 +143,46 @@ Deno.serve(withApiLogging('crm-contacts-api', async (req) => {
       const contactId = path[0];
       const body = await req.json();
 
+      const {
+        name, email, phone, mobile, company, position, title,
+        linkedin, twitter, facebook, address, city, state, postal_code, country,
+        status, lead_source, contact_type, vat_number, country_code, tax_office,
+        first_name, last_name, profession, is_client, is_supplier,
+        discount_pct, discount_notes,
+      } = body;
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (name !== undefined) updates.name = name;
+      if (email !== undefined) updates.email = email;
+      if (phone !== undefined) updates.phone = phone;
+      if (mobile !== undefined) updates.mobile = mobile;
+      if (company !== undefined) updates.company = company;
+      if (position !== undefined) updates.position = position;
+      if (title !== undefined) updates.title = title;
+      if (linkedin !== undefined) updates.linkedin = linkedin;
+      if (twitter !== undefined) updates.twitter = twitter;
+      if (facebook !== undefined) updates.facebook = facebook;
+      if (address !== undefined) updates.address = address;
+      if (city !== undefined) updates.city = city;
+      if (state !== undefined) updates.state = state;
+      if (postal_code !== undefined) updates.postal_code = postal_code;
+      if (country !== undefined) updates.country = country;
+      if (status !== undefined) updates.status = status;
+      if (lead_source !== undefined) updates.lead_source = lead_source;
+      if (contact_type !== undefined) updates.contact_type = contact_type;
+      if (vat_number !== undefined) updates.vat_number = vat_number;
+      if (country_code !== undefined) updates.country_code = country_code;
+      if (tax_office !== undefined) updates.tax_office = tax_office;
+      if (first_name !== undefined) updates.first_name = first_name;
+      if (last_name !== undefined) updates.last_name = last_name;
+      if (profession !== undefined) updates.profession = profession;
+      if (is_client !== undefined) updates.is_client = is_client;
+      if (is_supplier !== undefined) updates.is_supplier = is_supplier;
+      if (discount_pct !== undefined) updates.discount_pct = discount_pct;
+      if (discount_notes !== undefined) updates.discount_notes = discount_notes;
+
       const { data, error } = await supabase
         .from('crm_contacts')
-        .update({
-          ...body,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updates)
         .eq('id', contactId)
         .select();
 

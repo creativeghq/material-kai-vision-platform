@@ -138,8 +138,9 @@ async function launchFirecrawlCrawl(
   const config = session.scraping_config || {};
   const maxPages = config.max_pages ?? 100;
 
-  // Webhook URL Firecrawl will call when done
-  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/firecrawl-webhook?session_id=${sessionId}`;
+  // Webhook URL Firecrawl will call when done — append secret so the webhook handler can verify
+  const firecrawlWebhookSecret = Deno.env.get('FIRECRAWL_WEBHOOK_SECRET') || '';
+  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/firecrawl-webhook?session_id=${sessionId}${firecrawlWebhookSecret ? `&webhook_secret=${firecrawlWebhookSecret}` : ''}`;
 
   const body: Record<string, unknown> = {
     url:           sourceUrl,

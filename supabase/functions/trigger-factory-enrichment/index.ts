@@ -26,6 +26,7 @@ const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import {
   propagateFactoryFieldsInScope,
@@ -44,10 +45,9 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Allow service-role calls (from Python backend) without user JWT
-  const authHeader = req.headers.get('Authorization') || '';
-  if (!authHeader.includes(SUPABASE_SERVICE_ROLE_KEY) && !authHeader.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const auth = await authenticate(req);
+  if (!auth.success) {
+    return new Response(JSON.stringify({ error: auth.error ?? 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

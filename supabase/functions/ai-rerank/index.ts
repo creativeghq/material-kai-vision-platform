@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateWithClaude } from '../_shared/ai-client.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
@@ -50,6 +51,12 @@ Deno.serve(withApiLogging('ai-rerank', async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  const auth = await authenticate(req);
+  if (!auth.success) {
+    return new Response(JSON.stringify({ error: auth.error ?? 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const startTime = Date.now();

@@ -810,8 +810,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
-      // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
-      'generate_presentation_sheet',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -887,8 +885,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'apply_lighting_preset', 'generate_vr_world',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
       'generate_presentation_sheet',
-      // SEO research card — useful for inspiration-keyword exploration
-      'seo_research_keyword',
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
     ],
@@ -2562,8 +2558,6 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Internal server error',
-        stack: error instanceof Error ? error.stack : undefined,
-        details: String(error),
       }),
       {
         status: 500,

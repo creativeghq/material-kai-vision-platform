@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
@@ -19,6 +20,12 @@ serve(withApiLogging('parse-sitemap', async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       );
+    }
+
+    const auth = await authenticate(req);
+    if (!auth.success) {
+      return new Response(JSON.stringify({ error: auth.error ?? 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { sitemapUrl, maxPages = 100 } = await req.json();

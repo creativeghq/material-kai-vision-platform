@@ -186,7 +186,42 @@ Deno.serve(withApiLogging('crm-companies-api', async (req) => {
     // PATCH /api/companies/{id} - Update company
     if (method === 'PATCH' && path.length === 1) {
       const companyId = path[0];
-      const updates = await req.json();
+      const body = await req.json();
+
+      const {
+        name, website, industry, employee_count, annual_revenue,
+        email, phone, address, city, state, postal_code, country,
+        linkedin, twitter, facebook, description,
+        is_supplier, is_customer, commercial_title, legal_status,
+        tax_office, profession, street, street_number, vat_number, country_code,
+      } = body;
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (name !== undefined) updates.name = name;
+      if (website !== undefined) updates.website = website;
+      if (industry !== undefined) updates.industry = industry;
+      if (employee_count !== undefined) updates.employee_count = employee_count;
+      if (annual_revenue !== undefined) updates.annual_revenue = annual_revenue;
+      if (email !== undefined) updates.email = email;
+      if (phone !== undefined) updates.phone = phone;
+      if (address !== undefined) updates.address = address;
+      if (city !== undefined) updates.city = city;
+      if (state !== undefined) updates.state = state;
+      if (postal_code !== undefined) updates.postal_code = postal_code;
+      if (country !== undefined) updates.country = country;
+      if (linkedin !== undefined) updates.linkedin = linkedin;
+      if (twitter !== undefined) updates.twitter = twitter;
+      if (facebook !== undefined) updates.facebook = facebook;
+      if (description !== undefined) updates.description = description;
+      if (is_supplier !== undefined) updates.is_supplier = is_supplier;
+      if (is_customer !== undefined) updates.is_customer = is_customer;
+      if (commercial_title !== undefined) updates.commercial_title = commercial_title;
+      if (legal_status !== undefined) updates.legal_status = legal_status;
+      if (tax_office !== undefined) updates.tax_office = tax_office;
+      if (profession !== undefined) updates.profession = profession;
+      if (street !== undefined) updates.street = street;
+      if (street_number !== undefined) updates.street_number = street_number;
+      if (vat_number !== undefined) updates.vat_number = vat_number;
+      if (country_code !== undefined) updates.country_code = country_code;
 
       const { data, error } = await supabase
         .from('crm_companies')

@@ -111,7 +111,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
           templateId = template.id;
           const variables = body.variables || {};
-          subject = renderTemplateWithVariables(template.subject || body.subject, variables);
+          // NB: schema columns are subject_template / html_template / text_template
+          // (this used to reference template.subject / .html_content / .text_content
+          // which silently fell through to the caller-supplied html — confusing the
+          // first send-email path that doesn't pre-render a fallback).
+          subject = renderTemplateWithVariables(template.subject_template || body.subject, variables);
 
           if (template.react_code) {
             try {
@@ -121,16 +125,16 @@ Deno.serve(withApiLogging('email-api', async (req) => {
               }
             } catch (error) {
               console.error('Error rendering React Email template, falling back to HTML:', error);
-              if (template.html_content) {
-                htmlBody = renderTemplateWithVariables(template.html_content, variables);
+              if (template.html_template) {
+                htmlBody = renderTemplateWithVariables(template.html_template, variables);
               } else {
                 throw new Error('Failed to render email template');
               }
             }
-          } else if (template.html_content) {
-            htmlBody = renderTemplateWithVariables(template.html_content, variables);
-            if (template.text_content) {
-              textBody = renderTemplateWithVariables(template.text_content, variables);
+          } else if (template.html_template) {
+            htmlBody = renderTemplateWithVariables(template.html_template, variables);
+            if (template.text_template) {
+              textBody = renderTemplateWithVariables(template.text_template, variables);
             }
           } else {
             throw new Error('Template has no content');
@@ -250,8 +254,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'add-domain': {
         if (req.method !== 'POST') throw new Error('Method not allowed');
 
-        const isAdmin = user.user_metadata?.role === 'admin';
-        if (!isAdmin) throw new Error('Unauthorized: Admin access required');
+        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
+        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
 
         const { domain } = requestBody;
         if (!domain) throw new Error('Domain is required');
@@ -281,8 +285,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'mark-domain-verified': {
         if (req.method !== 'POST') throw new Error('Method not allowed');
 
-        const isAdmin = user.user_metadata?.role === 'admin';
-        if (!isAdmin) throw new Error('Unauthorized: Admin access required');
+        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
+        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
 
         const { domain } = requestBody;
         if (!domain) throw new Error('Domain is required');
@@ -388,8 +392,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'sync-domains': {
         if (req.method !== 'POST') throw new Error('Method not allowed');
 
-        const isAdmin = user.user_metadata?.role === 'admin';
-        if (!isAdmin) throw new Error('Unauthorized: Admin access required');
+        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
+        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
 
         const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
         if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');

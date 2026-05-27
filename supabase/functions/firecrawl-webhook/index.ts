@@ -48,6 +48,16 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const webhookSecret = Deno.env.get('FIRECRAWL_WEBHOOK_SECRET') || '';
+  if (webhookSecret) {
+    const providedSecret = url.searchParams.get('webhook_secret');
+    if (providedSecret !== webhookSecret) {
+      return new Response(JSON.stringify({ error: 'Invalid webhook secret' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   let payload: Record<string, unknown>;
   try {
     payload = await req.json();
