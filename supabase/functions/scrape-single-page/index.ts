@@ -101,7 +101,7 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
 
     try {
       // Use Firecrawl v2 API for scraping
-      const result = await scrapeWithFirecrawl(pageUrl, options);
+      const result = await scrapeWithFirecrawl(pageUrl, options, supabase);
       materials = result.materials;
       markdownContent = result.markdown;
 
@@ -185,7 +185,7 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
   }
 }));
 
-async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materials: MaterialData[], markdown: string | null }> {
+async function scrapeWithFirecrawl(url: string, options: any, supabase?: any): Promise<{ materials: MaterialData[], markdown: string | null }> {
   const apiKey = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
   if (!apiKey()) {
     throw new Error('Firecrawl API key not configured');

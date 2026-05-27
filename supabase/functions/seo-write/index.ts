@@ -136,6 +136,18 @@ Deno.serve(withApiLogging('seo-write', async (req) => {
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-write] Error:', error);
+    try {
+      await supabase.rpc('credit_user_credits', {
+        p_user_id: userId,
+        p_amount: CREDIT_COST,
+        p_operation_type: 'seo_write_refund',
+        p_description: 'Refund: SEO writing failed',
+        p_metadata: { error: error.message },
+      });
+      console.log('[seo-write] Credits refunded');
+    } catch (refundErr) {
+      console.error('[seo-write] Refund failed:', refundErr);
+    }
     return jsonResponse(
       { success: false, error: error.message || 'Writing failed' },
       500,

@@ -108,15 +108,18 @@ async function handleCustomerCreated(customer: Stripe.Customer) {
   const email = customer.email;
   if (!email) return;
 
-  // Find user by email
-  const { data: user } = await supabase.auth.admin.listUsers();
-  const matchingUser = user.users.find(u => u.email === email);
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('user_id')
+    .ilike('email', email)
+    .limit(1)
+    .maybeSingle();
 
-  if (matchingUser) {
+  if (profile?.user_id) {
     await supabase
       .from('user_profiles')
       .update({ stripe_customer_id: customer.id })
-      .eq('user_id', matchingUser.id);
+      .eq('user_id', profile.user_id);
   }
 }
 
