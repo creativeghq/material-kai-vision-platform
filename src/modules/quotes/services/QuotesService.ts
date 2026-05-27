@@ -535,7 +535,7 @@ export class QuotesService {
         custom_unit: data.custom_unit || null,
         quantity: qty,
         unit_price: unitPrice,
-        line_total: unitPrice != null ? unitPrice * qty : null,
+        line_total: unitPrice != null ? Math.round(unitPrice * qty * 100) / 100 : null,
         selected_size: data.selected_size || null,
         selected_color: data.selected_color || null,
         notes: data.notes || null,
@@ -587,10 +587,10 @@ export class QuotesService {
         .single();
       if (current) {
         const qty = data.quantity ?? current.quantity ?? 1;
-        const effectivePrice = data.discounted_price !== undefined
-          ? data.discounted_price
-          : (current.discounted_price ?? (data.unit_price !== undefined ? data.unit_price : current.unit_price));
-        payload.line_total = effectivePrice != null ? Number(effectivePrice) * qty : null;
+        const discountedPrice = data.discounted_price !== undefined ? data.discounted_price : current.discounted_price;
+        const unitPrice = data.unit_price !== undefined ? data.unit_price : current.unit_price;
+        const effectivePrice = discountedPrice ?? unitPrice;
+        payload.line_total = effectivePrice != null ? Math.round(Number(effectivePrice) * qty * 100) / 100 : null;
       }
     }
 

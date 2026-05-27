@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
         if (ss.recommendation_frequency === 'weekly' && hoursSince < 167) continue;
       }
 
-      const since = ss.last_recommendation_sent_at ?? new Date(0).toISOString();
+      const since = ss.last_recommendation_sent_at ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       // 2. Find new products matching the saved query
       let productsQuery = admin

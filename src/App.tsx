@@ -640,10 +640,10 @@ const App = () => (
                   }
                 />
 
-                <Route path="/health" element={<HealthPage />} />
-                <Route path="/ready" element={<HealthPage />} />
-                <Route path="/coverage" element={<CoveragePage />} />
-                <Route path="/coverage/*" element={<CoveragePage />} />
+                <Route path="/health" element={<AuthGuard><HealthPage /></AuthGuard>} />
+                <Route path="/ready" element={<AuthGuard><HealthPage /></AuthGuard>} />
+                <Route path="/coverage" element={<AuthGuard><CoveragePage /></AuthGuard>} />
+                <Route path="/coverage/*" element={<AuthGuard><CoveragePage /></AuthGuard>} />
                 {/* AR Material Preview (public, no layout — for QR handoff from desktop) */}
                 <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
 

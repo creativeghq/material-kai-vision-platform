@@ -205,6 +205,19 @@ async function handleRequest(
   const room = body.room;
   const furnitureStyle = body.furniture_style || 'Default (AI decides)';
 
+  // Pre-check balance before the expensive Replicate call
+  const { data: creditData } = await supabase
+    .from('user_credits')
+    .select('balance')
+    .eq('user_id', userId)
+    .single();
+  if (!creditData || (creditData.balance ?? 0) < CREDIT_COST) {
+    return jsonResponse({
+      success: false,
+      error: `Insufficient credits. Required: ${CREDIT_COST}, Available: ${creditData?.balance ?? 0}`,
+    }, 402);
+  }
+
   try {
     const tempUrl = await runReplicate(body.source_image_url, room, furnitureStyle, body.furniture_items);
     const imageUrl = await uploadToStorage(supabase, tempUrl, jobId);
