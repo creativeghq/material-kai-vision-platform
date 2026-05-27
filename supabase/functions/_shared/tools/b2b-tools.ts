@@ -1006,7 +1006,6 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
             country: company.country,
             linkedin: company.linkedin,
             description: company.description,
-            notes: company.notes,
             created_by: userId,
           })
           .select('id')
@@ -1022,6 +1021,20 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
 
         const companyId = companyData.id;
         const contactIds: string[] = [];
+
+        // Persist initial research notes as a timeline entry on the new company
+        // (the legacy crm_companies.notes blob column was dropped 2026-05-25 in
+        // favour of the crm_notes timeline). Skip when empty so we don't seed
+        // a blank entry.
+        if (company.notes && String(company.notes).trim()) {
+          const { error: noteErr } = await supabase.from('crm_notes').insert({
+            target_kind: 'company',
+            target_id: companyId,
+            body: String(company.notes).trim(),
+            created_by: userId,
+          });
+          if (noteErr) console.warn(`Failed to save company research notes: ${noteErr.message}`);
+        }
 
         // Create contacts and link them to the company
         if (contacts && contacts.length > 0) {
@@ -1042,7 +1055,6 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
                 city: company.city,
                 lead_source: 'B2B Research Agent',
                 status: 'new',  // Using correct column name
-                notes: contact.notes,
                 created_by: userId,
               })
               .select('id')
@@ -1054,6 +1066,17 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
             }
 
             contactIds.push(contactData.id);
+
+            // Initial research notes for the contact → crm_notes timeline entry
+            if (contact.notes && String(contact.notes).trim()) {
+              const { error: noteErr } = await supabase.from('crm_notes').insert({
+                target_kind: 'contact',
+                target_id: contactData.id,
+                body: String(contact.notes).trim(),
+                created_by: userId,
+              });
+              if (noteErr) console.warn(`Failed to save contact research notes: ${noteErr.message}`);
+            }
 
             // Link contact to company
             await supabase

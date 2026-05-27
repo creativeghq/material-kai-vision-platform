@@ -32,7 +32,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getAccessibleToolkits,
-  toolkitTokenEstimate, resolveToolkitsToTools,
+  getToolkitOwnerAgents, toolkitTokenEstimate, resolveToolkitsToTools,
   type ToolkitDefinition,
 } from './agentToolsCatalog';
 
@@ -48,14 +48,28 @@ interface Props {
   enabledModules: string[];
   activeToolkitIds: string[];
   onChange: (toolkitIds: string[]) => void;
+  /** Current selected agent. Used to scope toolkits — KAI users only see KAI
+   *  toolkits, Interior Designer only sees Interior toolkits. Always-on
+   *  toolkits show regardless. */
+  currentAgentId?: string;
 }
 
 export const ToolkitPickerModal: React.FC<Props> = ({
   open, onClose, role, enabledModules, activeToolkitIds, onChange,
+  currentAgentId,
 }) => {
   const accessible = useMemo(
-    () => getAccessibleToolkits(role, enabledModules),
-    [role, enabledModules],
+    () => {
+      const byRoleAndModule = getAccessibleToolkits(role, enabledModules);
+      if (!currentAgentId) return byRoleAndModule;
+      // Strict-filter to the current agent: only show toolkits whose tools
+      // are actually bound to this agent. Always-on toolkits (Core) bypass
+      // the filter because they're loaded into every agent.
+      return byRoleAndModule.filter((t) =>
+        t.alwaysOn || getToolkitOwnerAgents(t).includes(currentAgentId),
+      );
+    },
+    [role, enabledModules, currentAgentId],
   );
 
   // Local draft so toggling doesn't immediately churn the parent. Apply on close.

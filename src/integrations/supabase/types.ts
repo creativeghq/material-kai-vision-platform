@@ -2457,7 +2457,6 @@ export type Database = {
           industry: string | null
           linkedin: string | null
           name: string
-          notes: string | null
           oxygen_contact_id: string | null
           phone: string | null
           postal_code: string | null
@@ -2487,7 +2486,6 @@ export type Database = {
           industry?: string | null
           linkedin?: string | null
           name: string
-          notes?: string | null
           oxygen_contact_id?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -2517,7 +2515,6 @@ export type Database = {
           industry?: string | null
           linkedin?: string | null
           name?: string
-          notes?: string | null
           oxygen_contact_id?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -2640,7 +2637,6 @@ export type Database = {
           linkedin: string | null
           mobile: string | null
           name: string
-          notes: string | null
           oxygen_contact_id: string | null
           phone: string | null
           position: string | null
@@ -2684,7 +2680,6 @@ export type Database = {
           linkedin?: string | null
           mobile?: string | null
           name: string
-          notes?: string | null
           oxygen_contact_id?: string | null
           phone?: string | null
           position?: string | null
@@ -2728,7 +2723,6 @@ export type Database = {
           linkedin?: string | null
           mobile?: string | null
           name?: string
-          notes?: string | null
           oxygen_contact_id?: string | null
           phone?: string | null
           position?: string | null
@@ -2745,6 +2739,39 @@ export type Database = {
           user_id?: string | null
           vat_number?: string | null
           website?: string | null
+        }
+        Relationships: []
+      }
+      crm_notes: {
+        Row: {
+          id: string
+          target_kind: Database["public"]["Enums"]["crm_note_target_kind"]
+          target_id: string
+          body: string
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          edited_by: string | null
+        }
+        Insert: {
+          id?: string
+          target_kind: Database["public"]["Enums"]["crm_note_target_kind"]
+          target_id: string
+          body: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          edited_by?: string | null
+        }
+        Update: {
+          id?: string
+          target_kind?: Database["public"]["Enums"]["crm_note_target_kind"]
+          target_id?: string
+          body?: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          edited_by?: string | null
         }
         Relationships: []
       }
@@ -13750,6 +13777,7 @@ export type Database = {
         | "marketplace_bestprice"
         | "marketplace_shopflix"
         | "idealo"
+      crm_note_target_kind: "contact" | "company"
       detection_method:
         | "visual"
         | "spectral"
@@ -13994,6 +14022,7 @@ export const Constants = {
         "marketplace_shopflix",
         "idealo",
       ],
+      crm_note_target_kind: ["contact", "company"],
       detection_method: [
         "visual",
         "spectral",

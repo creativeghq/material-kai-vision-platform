@@ -11,6 +11,8 @@ import {
   ExternalLink,
   Globe,
   Lock,
+  Filter,
+  X,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -41,6 +43,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  KbFilterModal,
+  EMPTY_KB_FILTERS,
+  countActiveFilters,
+  applyKbFiltersToQuery,
+  type KbDocFilters,
+} from './KbFilterModal';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
@@ -57,7 +66,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 }) => {
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [filters, setFilters] = useState<KbDocFilters>(EMPTY_KB_FILTERS);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [viewingDoc, setViewingDoc] = useState<KBDocument | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -73,7 +83,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     if (workspaceId) {
       loadDocuments();
     }
-  }, [workspaceId, statusFilter, refreshTrigger]);
+  }, [workspaceId, filters, refreshTrigger]);
 
   const loadWorkspace = async () => {
     try {
@@ -100,15 +110,13 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       setIsLoading(true);
 
       // Query kb_docs table directly
-      let query = supabase
+      let query: any = supabase
         .from('kb_docs')
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
+      query = applyKbFiltersToQuery(query, filters);
 
       const { data, error } = await query;
 
@@ -189,6 +197,34 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Bulk delete failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleDeleteAllMatching = async (matchFilters: KbDocFilters, matchCount: number) => {
+    setBulkBusy(true);
+    try {
+      let query: any = supabase
+        .from('kb_docs')
+        .delete()
+        .eq('workspace_id', workspaceId);
+      query = applyKbFiltersToQuery(query, matchFilters);
+      const { error } = await query;
+      if (error) throw error;
+      toast({
+        title: 'Deleted',
+        description: `${matchCount} document${matchCount === 1 ? '' : 's'} matching the filters deleted.`,
+      });
+      setSelectedIds(new Set());
+      loadDocuments();
+    } catch (error) {
+      console.error('Delete-all-matching failed:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Delete failed',
         variant: 'destructive',
       });
     } finally {
@@ -286,6 +322,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     doc.content.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
   const filteredIds = useMemo(() => filteredDocuments.map((d) => d.id), [filteredDocuments]);
   const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
   const someFilteredSelected = filteredIds.some((id) => selectedIds.has(id));
@@ -304,17 +341,28 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle>Documents</CardTitle>
           <div className="flex items-center gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
+            <Button
+              variant="outline"
+              className="rounded-full gap-2"
+              onClick={() => setFilterModalOpen(true)}
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="rounded-full ml-1">{activeFilterCount}</Badge>
+              )}
+            </Button>
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full"
+                onClick={() => setFilters(EMPTY_KB_FILTERS)}
+                title="Clear all filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
             <Button onClick={onCreate}>
               <Plus className="h-4 w-4 mr-2" />
               New Document
@@ -459,6 +507,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         )}
       </CardContent>
     </Card>
+
+    <KbFilterModal
+      open={filterModalOpen}
+      onClose={() => setFilterModalOpen(false)}
+      workspaceId={workspaceId}
+      initialFilters={filters}
+      onApply={(next) => setFilters(next)}
+      onDeleteAllMatching={handleDeleteAllMatching}
+    />
 
     {/* Document Viewer */}
     {viewingDoc && (

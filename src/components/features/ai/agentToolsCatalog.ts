@@ -91,16 +91,6 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
-  // ── Presentation sheets (all users; per-sheet credit cost) ─────────
-  {
-    id: 'generate_presentation_sheet', name: 'Presentation Sheet', category: 'Generation',
-    desc: 'Build A3-landscape moodboard presentation PDFs (material board / color palette / concept board / lighting plan / annotated render / elevation pair / FF&E schedule / full deck).',
-    examples: [
-      'Generate a material board for moodboard "Modern Athens Loft" with these 6 products',
-      'Build a color palette sheet from these swatches',
-    ],
-  },
-
   // ── Mention monitoring (all users; module-gated; per-tool credits) ─
   {
     id: 'track_product_mentions', name: 'Track Mentions', category: 'Mentions',
@@ -670,13 +660,6 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
     desc: 'Build A3 moodboard sheets (material board / color palette / concept board / lighting plan / annotated render / etc.).',
     examples: [
       'Generate a concept board for moodboard "Modern Athens Loft"',
-    ],
-  },
-  {
-    id: 'seo_research_keyword', name: 'SEO Research', category: 'SEO',
-    desc: 'Research keyword trends + Pinterest/YouTube competitor signal for a design aesthetic.',
-    examples: [
-      'Research "Mediterranean kitchen" — what\'s trending?',
     ],
   },
 ];
