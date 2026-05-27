@@ -78,7 +78,13 @@ Deno.serve(withApiLogging('stripe-checkout', async (req) => {
     let session: Stripe.Checkout.Session;
 
     if (type === 'credit_purchase') {
-      // One-time payment for credits
+      // Derive credit amount server-side from the payment amount.
+      // Exchange rate: 1 EUR = 100 credits. The client-supplied `credits`
+      // field is ignored — only `price` (EUR) is trusted.
+      const CREDITS_PER_EUR = 100;
+      const priceEur = Math.max(0.5, Number(price) || 0);
+      const serverCredits = Math.round(priceEur * CREDITS_PER_EUR);
+
       session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'payment',
@@ -87,7 +93,7 @@ Deno.serve(withApiLogging('stripe-checkout', async (req) => {
             price_data: {
               currency: 'eur',
               product: Deno.env.get('STRIPE_CREDITS_PRODUCT_ID') || '',
-              unit_amount: Math.round(price * 100), // Convert to cents
+              unit_amount: Math.round(priceEur * 100),
             },
             quantity: 1,
           },
@@ -96,7 +102,7 @@ Deno.serve(withApiLogging('stripe-checkout', async (req) => {
           metadata: {
             type: 'credit_purchase',
             user_id: userId,
-            credit_amount: credits.toString(),
+            credit_amount: serverCredits.toString(),
           },
         },
         success_url: successUrl,

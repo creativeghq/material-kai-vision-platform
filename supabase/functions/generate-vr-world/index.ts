@@ -149,9 +149,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       // because the catch block's refund relies on `vrWorldId` (which is null
       // here — the insert that would have set it just failed).
       try {
-        await supabase.rpc('debit_user_credits', {
+        await supabase.rpc('credit_user_credits', {
           p_user_id: userId,
-          p_amount: -creditCost,
+          p_amount: creditCost,
           p_operation_type: 'vr_generation_refund',
           p_description: 'VR World generation refund (insert_failed)',
           p_metadata: { model, reason: 'vr_worlds insert failed', error: insertError?.message },
@@ -293,9 +293,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
           .single();
 
         if (vrRecord?.credits_charged > 0) {
-          await supabase.rpc('debit_user_credits', {
+          await supabase.rpc('credit_user_credits', {
             p_user_id: userId,
-            p_amount: -vrRecord.credits_charged, // negative = refund
+            p_amount: vrRecord.credits_charged,
             p_operation_type: 'vr_generation_refund',
             p_description: `VR World generation refund (failed)`,
             p_metadata: { vr_world_id: vrWorldId },
@@ -313,9 +313,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       try {
         const creditCost = (typeof body !== 'undefined' && body?.model && CREDIT_COSTS[body.model])
           || CREDIT_COSTS['marble-1.0-draft'];
-        await supabase.rpc('debit_user_credits', {
+        await supabase.rpc('credit_user_credits', {
           p_user_id: userId,
-          p_amount: -creditCost,
+          p_amount: creditCost,
           p_operation_type: 'vr_generation_refund',
           p_description: 'VR World generation refund (record creation failed)',
           p_metadata: { failure_stage: 'pre_record_insert' },

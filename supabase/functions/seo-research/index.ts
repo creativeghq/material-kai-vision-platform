@@ -200,9 +200,9 @@ Deno.serve(withApiLogging('seo-research', async (req) => {
 
     // Attempt credit refund on failure
     try {
-      await supabase.rpc('debit_user_credits', {
+      await supabase.rpc('credit_user_credits', {
         p_user_id: userId,
-        p_amount: -CREDIT_COST,
+        p_amount: CREDIT_COST,
         p_operation_type: 'seo_research_refund',
         p_description: `Refund: SEO research failed`,
         p_metadata: { error: error.message },

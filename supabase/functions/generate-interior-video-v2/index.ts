@@ -205,9 +205,9 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     .single();
 
   if (recordErr || !videoRecord) {
-    await supabase.rpc('debit_user_credits', {
+    await supabase.rpc('credit_user_credits', {
       p_user_id: userId,
-      p_amount: -creditCost,
+      p_amount: creditCost,
       p_operation_type: 'interior_video_generation_v2_refund',
       p_description: 'Refund: failed to create generation record',
     });
@@ -386,9 +386,9 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   } catch (err) {
     // Refund and mark failed
-    await supabase.rpc('debit_user_credits', {
+    await supabase.rpc('credit_user_credits', {
       p_user_id: userId,
-      p_amount: -creditCost,
+      p_amount: creditCost,
       p_operation_type: 'interior_video_generation_v2_refund',
       p_description: `Refund: ${resolvedModel} generation failed`,
     });

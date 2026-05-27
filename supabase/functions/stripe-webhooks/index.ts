@@ -207,6 +207,19 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const creditAmount = paymentIntent.metadata?.credit_amount;
 
   if (creditAmount) {
+    // Idempotency: check if we already granted credits for this payment intent
+    const { data: existingGrant } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('user_id', profile.user_id)
+      .eq('stripe_payment_intent_id', paymentIntent.id)
+      .maybeSingle();
+
+    if (existingGrant) {
+      console.log(`Credits already granted for payment_intent ${paymentIntent.id}, skipping`);
+      return;
+    }
+
     // Grant credits to user
     const { data, error } = await supabase.rpc('grant_credits', {
       p_user_id: profile.user_id,
@@ -289,19 +302,39 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
+  // Derive tier from the invoice's subscription price, NOT from profile.subscription_tier.
+  // This closes the race where invoice.paid fires before subscription.updated sets the tier.
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+  let invoiceTier = profile.subscription_tier || 'free';
+  if (subscriptionId) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
+      const priceId = sub.items.data[0]?.price.id;
+      const proPriceId = Deno.env.get('STRIPE_PRO_PRICE_ID');
+      const enterprisePriceId = Deno.env.get('STRIPE_ENTERPRISE_PRICE_ID');
+      if (priceId === proPriceId) invoiceTier = 'pro';
+      else if (priceId === enterprisePriceId) invoiceTier = 'enterprise';
+      else if (priceId) {
+        console.error(`[handleInvoicePaid] Unknown price ID: ${priceId}. PRO=${proPriceId}, ENTERPRISE=${enterprisePriceId}. Falling back to profile tier.`);
+      }
+    } catch (subErr) {
+      console.warn(`[handleInvoicePaid] Could not retrieve subscription ${subscriptionId}, using profile tier:`, subErr);
+    }
+  }
+
   let monthlyCredits = 0;
-  if (profile.subscription_tier === 'pro') monthlyCredits = 1000;
-  else if (profile.subscription_tier === 'enterprise') monthlyCredits = 5000;
+  if (invoiceTier === 'pro') monthlyCredits = 1000;
+  else if (invoiceTier === 'enterprise') monthlyCredits = 5000;
 
   if (monthlyCredits > 0) {
     const { error } = await supabase.rpc('grant_credits', {
       p_user_id: profile.user_id,
       p_amount: monthlyCredits,
       p_transaction_type: 'monthly_grant',
-      p_description: `Monthly ${profile.subscription_tier} credits`,
+      p_description: `Monthly ${invoiceTier} credits`,
       p_stripe_invoice_id: invoice.id,
       p_metadata: {
-        subscription_tier: profile.subscription_tier,
+        subscription_tier: invoiceTier,
         period_start: invoice.period_start,
         period_end: invoice.period_end,
       },

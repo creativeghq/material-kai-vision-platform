@@ -504,9 +504,9 @@ export const createPresentationSheetTool = (
         if (insertError || !sheet) {
           // Refund on failure
           if (creditCost > 0) {
-            await supabase.rpc('debit_user_credits', {
+            await supabase.rpc('credit_user_credits', {
               p_user_id: userId,
-              p_amount: -creditCost,
+              p_amount: creditCost,
               p_operation_type: `presentation_sheet_${sheet_type}_refund`,
               p_description: `Refund: sheet creation failed`,
               p_metadata: { moodboard_id, sheet_type, reason: insertError?.message },
@@ -571,9 +571,9 @@ export const createPresentationSheetTool = (
           // (set by the PDF function) so the user can retry without paying again.
           if (creditCost > 0) {
             try {
-              await supabase.rpc('debit_user_credits', {
+              await supabase.rpc('credit_user_credits', {
                 p_user_id: userId,
-                p_amount: -creditCost,
+                p_amount: creditCost,
                 p_operation_type: `presentation_sheet_${sheet_type}_refund`,
                 p_description: `Refund: PDF generation failed`,
                 p_metadata: { moodboard_id, sheet_type, sheet_id: sheet.id, reason: pdfError?.message || pdfResult?.error || 'pdf_failed' },
