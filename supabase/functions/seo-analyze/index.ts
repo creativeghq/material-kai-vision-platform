@@ -154,6 +154,17 @@ Deno.serve(withApiLogging('seo-analyze', async (req) => {
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-analyze] Error:', error);
+    try {
+      await supabase.rpc('credit_user_credits', {
+        p_user_id: userId,
+        p_amount: ANALYSIS_CREDIT_COST,
+        p_operation_type: 'seo_analyze_refund',
+        p_description: 'Refund: SEO analysis failed',
+        p_metadata: { error: error.message },
+      });
+    } catch (refundErr) {
+      console.error('[seo-analyze] Refund failed:', refundErr);
+    }
     return jsonResponse(
       { success: false, error: error.message || 'Analysis failed' },
       500,

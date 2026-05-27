@@ -395,8 +395,12 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // Handle job status check via URL path
     // Example: /job-status/abc-123-def
     if (url.pathname.startsWith('/job-status/')) {
-      const jobId = url.pathname.replace('/job-status/', '');
-      console.log('🚀 MIVAA Gateway: Handling job status check');
+      const jobId = url.pathname.replace('/job-status/', '').replace(/[^a-zA-Z0-9\-]/g, '');
+      if (!jobId || jobId.length > 64) {
+        return new Response(JSON.stringify({ error: 'Invalid job ID' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return await handleJobStatus(jobId);
     }
 
@@ -413,28 +417,26 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL}`);
     console.log(`🔑 MIVAA API Key configured: ${!!Deno.env.get('MIVAA_API_KEY')}`);
 
+    // --- AUTH (all actions, not just billable) ---
+    const auth = await authenticate(req);
+    const isAdmin = isAdminAccess(auth);
+
+    if (!isAdmin && (!auth.success || !auth.userId)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', action }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // --- CREDIT BILLING MIDDLEWARE ---
     let pricing = getMivaaActionCost(action);
 
     if (pricing) {
-      // Special case: visual search costs more than text search
       if (action === 'rag_search' && payload &&
           (payload.image_url || payload.strategy === 'visual' || payload.image_base64)) {
         pricing = { creditCost: 1, operationType: 'visual_search', description: 'Visual RAG search' };
       }
 
-      // Authenticate user for billable actions
-      const auth = await authenticate(req);
-      const isAdmin = isAdminAccess(req);
-
-      if (!isAdmin && (!auth.success || !auth.userId)) {
-        return new Response(
-          JSON.stringify({ error: 'Authentication required for this action', action }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
-      }
-
-      // Skip billing for admin/service-key access
       if (!isAdmin && auth.userId) {
         const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -670,9 +672,6 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       error: 'Gateway error',
       message: errorMessage,
       timestamp: new Date().toISOString(),
-      mivaaServiceUrl: MIVAA_SERVICE_URL,
-      apiKeyConfigured: !!Deno.env.get('MIVAA_API_KEY'),
-      errorType: error instanceof Error ? error.constructor.name : typeof error,
     };
 
     console.error('❌ Error details:', JSON.stringify(errorDetails, null, 2));

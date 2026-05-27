@@ -184,5 +184,5 @@ verify_jwt = false
 
 [auth]
 # JWT secret key for token signing and verification
-jwt_secret = "Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s"
+jwt_secret = "env(SUPABASE_JWT_SECRET)"
 jwt_expiry = 2592000  # 30 days in seconds
