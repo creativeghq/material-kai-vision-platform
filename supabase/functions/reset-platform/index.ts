@@ -61,7 +61,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - brand_retailer_index            ← (brand, retailer_domain, country) cache
 //   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
 //
-// Storage Buckets (5 anchors post-consolidation 2026-05-23):
+// Storage Buckets (6 buckets post-consolidation 2026-05-23):
 //   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
 //   - pdf-tiles                ← extracted/ (KB) + catalog-extracted/
 //   - generation-images        ← AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/
@@ -449,9 +449,9 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       'image_slig_embeddings',          // Primary visual embeddings (SigLIP2, 768D)
       'image_color_embeddings',         // Color-focused SLIG (768D)
       'image_texture_embeddings',       // Texture pattern SLIG (768D)
-      'image_style_embeddings',         // Design style SLIG (768D)
-      'image_material_embeddings',      // Material type SLIG (768D)
-      'image_understanding_embeddings', // Voyage AI understanding embeddings from Qwen3-VL vision_analysis (1024D)
+      'image_style_embeddings',         // Design style Voyage (1024D)
+      'image_material_embeddings',      // Material type Voyage (1024D)
+      'image_understanding_embeddings', // Voyage AI understanding embeddings from Claude Opus vision_analysis (1024D)
     ];
     for (const collection of vecsCollections) {
       try {

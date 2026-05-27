@@ -54,7 +54,7 @@ body {
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
 }
 
-/* Legacy class kept for backwards compat — now identical to global */
+/* Scrollbar class — applied on containers that need thin scrollbars */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
