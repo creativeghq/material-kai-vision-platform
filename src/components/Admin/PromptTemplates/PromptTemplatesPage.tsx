@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { supabase } from '@/integrations/supabase/client';
 
 import {
   Card,
@@ -81,7 +82,7 @@ export const PromptTemplatesPage: React.FC = () => {
         `https://v1api.materialshub.gr/admin/prompt-templates?${params}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );

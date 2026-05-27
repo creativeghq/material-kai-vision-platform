@@ -90,17 +90,31 @@ Deno.serve(async (req) => {
 
       const { data: catalog } = await supabase
         .from('presentation_catalogs')
-        .select('id, status')
+        .select('id, status, owner_user_id')
         .eq('slug', slug)
         .maybeSingle();
       if (!catalog || catalog.status !== 'published') {
         return jsonResponse({ granted_access: false });
       }
 
+      // Resolve the catalog owner's workspace so CRM lookups are scoped
+      let ownerWorkspaceId: string | null = null;
+      if (catalog.owner_user_id) {
+        const { data: mem } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', catalog.owner_user_id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        ownerWorkspaceId = mem?.workspace_id ?? null;
+      }
+
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
       const ua = req.headers.get('user-agent') || null;
 
-      const match = await resolveEmailMatch(supabase, catalog.id, email);
+      const match = await resolveEmailMatch(supabase, catalog.id, email, ownerWorkspaceId);
 
       const tokenStr = match.granted ? generateToken() : null;
       const expiresAt = match.granted ? new Date(Date.now() + TOKEN_TTL_MS).toISOString() : null;
@@ -259,33 +273,51 @@ interface MatchResult {
   grantId: string | null;
 }
 
-async function resolveEmailMatch(supabase: any, catalogId: string, email: string): Promise<MatchResult> {
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .ilike('email', email)
-    .limit(1)
-    .maybeSingle();
-  if (profile?.user_id) {
-    return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
+async function resolveEmailMatch(supabase: any, catalogId: string, email: string, ownerWorkspaceId?: string | null): Promise<MatchResult> {
+  // Check 1: platform user who is a member of the catalog owner's workspace
+  if (ownerWorkspaceId) {
+    const { data: members } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', ownerWorkspaceId)
+      .eq('status', 'active');
+    const memberIds = (members || []).map((m: any) => m.user_id);
+    if (memberIds.length > 0) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('user_id')
+        .ilike('email', email)
+        .in('user_id', memberIds)
+        .limit(1)
+        .maybeSingle();
+      if (profile?.user_id) {
+        return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
+      }
+    }
+  } else {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle();
+    if (profile?.user_id) {
+      return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
+    }
   }
 
-  const { data: contact } = await supabase
-    .from('crm_contacts')
-    .select('id')
-    .ilike('email', email)
-    .limit(1)
-    .maybeSingle();
+  // Check 2: CRM contact in the catalog owner's workspace
+  const contactQuery = supabase.from('crm_contacts').select('id').ilike('email', email).limit(1);
+  if (ownerWorkspaceId) contactQuery.eq('workspace_id', ownerWorkspaceId);
+  const { data: contact } = await contactQuery.maybeSingle();
   if (contact?.id) {
     return { granted: true, kind: 'crm_contact', userId: null, crmContactId: contact.id, crmCompanyId: null, grantId: null };
   }
 
-  const { data: company } = await supabase
-    .from('crm_companies')
-    .select('id')
-    .ilike('email', email)
-    .limit(1)
-    .maybeSingle();
+  // Check 3: CRM company in the catalog owner's workspace
+  const companyQuery = supabase.from('crm_companies').select('id').ilike('email', email).limit(1);
+  if (ownerWorkspaceId) companyQuery.eq('workspace_id', ownerWorkspaceId);
+  const { data: company } = await companyQuery.maybeSingle();
   if (company?.id) {
     return { granted: true, kind: 'crm_company', userId: null, crmContactId: null, crmCompanyId: company.id, grantId: null };
   }

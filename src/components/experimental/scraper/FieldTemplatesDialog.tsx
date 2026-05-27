@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Save, Trash2, Download, Star, Globe, User } from 'lucide-react';
 import {
   Dialog,
@@ -83,7 +84,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
         `https://v1api.materialshub.gr/scraping/field-templates?workspace_id=${workspaceId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );
@@ -131,7 +132,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
           body: JSON.stringify({
             workspace_id: workspaceId,
@@ -176,7 +177,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );
@@ -209,7 +210,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
         {
           method: 'DELETE',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );

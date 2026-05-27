@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Sparkles, Check, X } from 'lucide-react';
 import {
   Dialog,
@@ -53,7 +54,7 @@ export const AISuggestFieldsDialog: React.FC<AISuggestFieldsDialogProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
           body: JSON.stringify({ url }),
         },

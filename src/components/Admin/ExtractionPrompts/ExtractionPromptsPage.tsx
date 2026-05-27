@@ -11,6 +11,7 @@ import {
   Code,
 } from 'lucide-react';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { supabase } from '@/integrations/supabase/client';
 
 import {
   Card,
@@ -111,7 +112,7 @@ export const ExtractionPromptsPage: React.FC = () => {
         `https://v1api.materialshub.gr/admin/extraction-prompts?${params}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );
@@ -150,7 +151,7 @@ export const ExtractionPromptsPage: React.FC = () => {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
           body: JSON.stringify({
             prompt_template: editedTemplate,
@@ -186,7 +187,7 @@ export const ExtractionPromptsPage: React.FC = () => {
         `https://v1api.materialshub.gr/admin/extraction-prompts/history/${prompt.id}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
         },
       );

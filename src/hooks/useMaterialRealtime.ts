@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 import {
   MaterialRealtimeService,
@@ -45,10 +46,12 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
 
   useEffect(() => {
     // Initialize service
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     const service = new MaterialRealtimeService({
-      supabaseUrl: (window as any).supabase?.supabaseUrl || '',
-      supabaseAnonKey: (window as any).supabase?.supabaseKey || '',
-      authToken: (window as any).supabase?.auth?.session()?.access_token,
+      supabaseUrl,
+      supabaseAnonKey,
+      authToken: undefined,
     });
 
     const callbacks: MaterialSubscriptionCallbacks = {

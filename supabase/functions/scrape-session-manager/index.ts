@@ -64,6 +64,18 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
+    // Verify the caller owns this scraping session
+    if (userId && sessionId) {
+      const { data: session } = await supabase
+        .from('scraping_sessions')
+        .select('user_id, workspace_id')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (session && session.user_id && session.user_id !== userId) {
+        throw new Error('Not authorized to manage this scraping session');
+      }
+    }
+
     switch (action) {
       case 'start':
       case 'resume':
