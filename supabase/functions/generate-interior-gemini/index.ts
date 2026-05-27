@@ -832,13 +832,20 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       return jsonResponse({ success: false, error: `Unknown mode: ${mode}` }, 400);
     }
 
-    // Deduct credits (modes 1-3)
     await deductCredits(
       supabase,
       resolvedUserId,
       credits,
       `Interior design generation (${model}, ${mode})`,
     );
+
+    await supabase.from('ai_usage_logs').insert({
+      user_id: resolvedUserId,
+      operation_type: 'interior_design_generation',
+      model_name: model,
+      credits_debited: credits,
+      metadata: { mode, model },
+    }).then(() => {}, () => {});
 
     // Persist to generation_3d
     await supabase.from('generation_3d').insert({

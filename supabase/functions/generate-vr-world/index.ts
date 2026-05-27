@@ -119,6 +119,14 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       return jsonResponse({ success: false, error: msg }, 402);
     }
 
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId,
+      operation_type: 'vr_generation',
+      model_name: model,
+      credits_debited: creditCost,
+      metadata: { model },
+    }).then(() => {}, () => {});
+
     // Build display name from prompt
     const displayName = body.prompt.length > 60
       ? body.prompt.substring(0, 57) + '...'

@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
 
       const { data: catalog } = await supabase
         .from('presentation_catalogs')
-        .select('id, owner_user_id, slug, title, subtitle, description, cover_data, body_data, back_cover_data, status, pdf_url')
+        .select('id, owner_user_id, slug, title, subtitle, description, cover_data, body_data, back_cover_data, status, pdf_url, pdf_storage_path')
         .eq('id', log.catalog_id)
         .maybeSingle();
       if (!catalog || catalog.status !== 'published' || catalog.slug !== slug) {
@@ -247,7 +247,9 @@ Deno.serve(async (req) => {
           cover_data: catalog.cover_data,
           body_data: catalog.body_data,
           back_cover_data: catalog.back_cover_data,
-          pdf_url: catalog.pdf_url,
+          pdf_url: catalog.pdf_storage_path
+            ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalog.pdf_storage_path, 604800))?.data?.signedUrl ?? catalog.pdf_url
+            : catalog.pdf_url,
         },
         branding: {
           logo_url: branding?.branding_logo_url || null,

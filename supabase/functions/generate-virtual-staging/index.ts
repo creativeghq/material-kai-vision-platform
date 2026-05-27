@@ -228,6 +228,14 @@ async function handleRequest(
       `Virtual staging (${room}, ${furnitureStyle})`,
     );
 
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId,
+      operation_type: 'virtual_staging',
+      model_name: 'replicate-virtual-staging',
+      credits_debited: CREDIT_COST,
+      metadata: { room, furniture_style: furnitureStyle },
+    }).then(() => {}, () => {});
+
     supabase.from('user_notifications').insert({
       user_id: userId,
       type: 'staging_ready',

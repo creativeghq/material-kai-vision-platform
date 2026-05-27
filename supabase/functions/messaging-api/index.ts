@@ -528,6 +528,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           throw new Error(`No ${body.channel} channel configured`);
         }
 
+        if (channel.daily_quota && body.recipients?.length > channel.daily_quota) {
+          throw new Error(`Recipient count (${body.recipients.length}) exceeds channel daily quota (${channel.daily_quota})`);
+        }
+
         const fromNumber = channel.sender_id;
         const results: MessageResult[] = [];
 

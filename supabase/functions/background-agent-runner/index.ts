@@ -462,6 +462,13 @@ async function triggerChainedAgents(
       .eq('parent_agent_id', parentAgentId)
       .eq('enabled', true);
 
+    const currentDepth = (output as any)?.chain_depth ?? 0;
+    const MAX_CHAIN_DEPTH = 5;
+    if (currentDepth >= MAX_CHAIN_DEPTH) {
+      console.warn(`[chain-trigger] Chain depth ${currentDepth} reached limit ${MAX_CHAIN_DEPTH} — stopping recursion`);
+      return;
+    }
+
     for (const child of chainedAgents || []) {
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/background-agent-runner`, {
@@ -473,7 +480,7 @@ async function triggerChainedAgents(
           body: JSON.stringify({
             agent_id:     child.id,
             triggered_by: 'chain',
-            input_data:   { ...output, parent_run_id: parentRunId },
+            input_data:   { ...output, parent_run_id: parentRunId, chain_depth: currentDepth + 1 },
           }),
         });
         if (!res.ok) {
