@@ -21,8 +21,10 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({
   children,
   fallbackPath = '/',
 }) => {
-  const { isAdmin, role } = useUserRole();
+  const { isAdmin, role, loading } = useUserRole();
   const navigate = useNavigate();
+
+  if (loading) return null;
 
   if (!isAdmin) {
     return (
