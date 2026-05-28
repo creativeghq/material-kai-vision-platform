@@ -171,7 +171,10 @@ export function JobResearchSitesEditor() {
   };
 
   return (
-    <div className="p-6 space-y-4">
+    // v0.5.1: was `p-6 space-y-4` — too much padding when this editor is mounted
+    // inside another TabsContent panel which already has spacing. Tighter padding
+    // so content sits flush with the parent tab's content area.
+    <div className="px-4 pt-3 pb-4 space-y-3">
       <Tabs value={tab} onValueChange={v => setTab(v as JobSiteType)}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           {SITE_TYPES.map(t => (
@@ -186,12 +189,8 @@ export function JobResearchSitesEditor() {
           ))}
         </TabsList>
 
-        <TabsContent value={tab} className="mt-4">
-          <Card className="dashboard-card mb-3">
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">{config.description}</p>
-            </CardContent>
-          </Card>
+        <TabsContent value={tab} className="mt-3">
+          <p className="text-xs text-muted-foreground mb-3">{config.description}</p>
 
           <Card className="dashboard-card">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">

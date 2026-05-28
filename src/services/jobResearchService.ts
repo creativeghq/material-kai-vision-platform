@@ -33,6 +33,18 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// v0.5.1: kick the MIVAA sync helper after a direct-Supabase CRUD on
+// job_research_sites. Fire-and-forget; if it fails the KB doc body lags by
+// the next refresh tick. We swallow errors silently — the source of truth is
+// the table, not the doc body.
+async function _kickSitesKbSync(_siteType: string): Promise<void> {
+  try {
+    await api('/api/v1/job-research/sites/_resync', { method: 'POST' });
+  } catch {
+    /* non-fatal — doc body will resync on next cron or next CRUD */
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────
@@ -300,10 +312,22 @@ export const jobResearchService = {
   // Surfaced at /admin/knowledge-base/job-sources; reads open, writes admin-only via RLS.
   // ─────────────────────────────────────────────────────────────────────
 
+  // v0.5.1: sites CRUD now goes via the Supabase client directly instead of
+  // MIVAA. Reasons:
+  //  - The data is just a typed table (`job_research_sites`) with RLS that
+  //    already enforces "authenticated read, admin-only write". MIVAA was
+  //    adding a redundant JWT-validation hop that was returning 401 in the
+  //    user's browser session.
+  //  - Faster (skips a network hop) and works regardless of MIVAA auth state.
+  //  - KB-doc sync still happens — kick it via the kb-doc-sync edge function
+  //    after each CRUD (fire-and-forget; doc body lags by a few seconds at most).
+
   async listSites(siteType?: JobSiteType): Promise<JobSite[]> {
-    const qs = siteType ? `?site_type=${encodeURIComponent(siteType)}` : '';
-    const r = await api<{ sites: JobSite[] }>(`/api/v1/job-research/sites${qs}`);
-    return r.sites ?? [];
+    let q = supabase.from('job_research_sites').select('*').order('site_type').order('url_or_domain');
+    if (siteType) q = q.eq('site_type', siteType);
+    const { data, error } = await q;
+    if (error) throw new Error(`listSites failed: ${error.message}`);
+    return (data ?? []) as JobSite[];
   },
 
   async createSite(body: {
@@ -315,11 +339,31 @@ export const jobResearchService = {
     is_enabled?: boolean;
     notes?: string;
   }): Promise<JobSite> {
-    const r = await api<{ site: JobSite }>(`/api/v1/job-research/sites`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-    return r.site;
+    const row = {
+      site_type: body.site_type,
+      url_or_domain: body.site_type === 'perplexity_domain'
+        ? body.url_or_domain.trim().toLowerCase()
+        : body.url_or_domain.trim(),
+      display_name: body.display_name ?? null,
+      country_code: body.country_code ? body.country_code.toUpperCase() : null,
+      category: body.category ?? null,
+      notes: body.notes ?? null,
+      is_enabled: body.is_enabled !== false,
+    };
+    const { data, error } = await supabase
+      .from('job_research_sites')
+      .insert(row)
+      .select('*')
+      .single();
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('duplicate') || msg.includes('unique') || error.code === '23505') {
+        throw new Error('Already exists for this site type');
+      }
+      throw new Error(`createSite failed: ${error.message}`);
+    }
+    await _kickSitesKbSync(body.site_type);
+    return data as JobSite;
   },
 
   async updateSite(siteId: string, patch: Partial<{
@@ -330,19 +374,40 @@ export const jobResearchService = {
     is_enabled: boolean;
     notes: string;
   }>): Promise<JobSite> {
-    const r = await api<{ site: JobSite }>(`/api/v1/job-research/sites/${siteId}`, {
-      method: 'PUT',
-      body: JSON.stringify(patch),
-    });
-    return r.site;
+    const clean: Record<string, unknown> = { ...patch };
+    if (typeof clean.country_code === 'string') clean.country_code = (clean.country_code as string).toUpperCase();
+    clean.updated_at = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('job_research_sites')
+      .update(clean)
+      .eq('id', siteId)
+      .select('*')
+      .single();
+    if (error) throw new Error(`updateSite failed: ${error.message}`);
+    const site = data as JobSite;
+    await _kickSitesKbSync(site.site_type);
+    return site;
   },
 
   async deleteSite(siteId: string): Promise<void> {
-    await api<{ ok: true }>(`/api/v1/job-research/sites/${siteId}`, { method: 'DELETE' });
+    // Read site_type before delete so we know which doc-section to resync
+    const { data: pre } = await supabase
+      .from('job_research_sites')
+      .select('site_type')
+      .eq('id', siteId)
+      .maybeSingle();
+    const { error } = await supabase
+      .from('job_research_sites')
+      .delete()
+      .eq('id', siteId);
+    if (error) throw new Error(`deleteSite failed: ${error.message}`);
+    if (pre?.site_type) await _kickSitesKbSync(pre.site_type as JobSiteType);
   },
 
   /** v0.5: bulk-insert multiple sites into the platform-wide default list.
-   *  Idempotent — duplicates are silently skipped. */
+   *  Idempotent — duplicates are silently skipped. v0.5.1: now goes via Supabase
+   *  client directly (same reason as the single-row CRUDs above — avoids the
+   *  MIVAA 401 path; RLS handles auth). KB doc kicked once at the end. */
   async createSitesBulk(body: {
     site_type: JobSiteType;
     urls: string[];
@@ -350,10 +415,37 @@ export const jobResearchService = {
     category?: string;
     notes?: string;
   }): Promise<{ site_type: string; requested: number; created: number; skipped: number; failed: Array<{ url_or_domain: string; error: string }> }> {
-    return api<{ site_type: string; requested: number; created: number; skipped: number; failed: Array<{ url_or_domain: string; error: string }> }>(
-      `/api/v1/job-research/sites/bulk`,
-      { method: 'POST', body: JSON.stringify(body) },
-    );
+    const cleaned = new Set<string>();
+    for (const raw of body.urls) {
+      const u = (raw || '').trim();
+      if (!u) continue;
+      const key = body.site_type === 'perplexity_domain' ? u.toLowerCase() : u;
+      cleaned.add(key);
+    }
+    const urls = Array.from(cleaned);
+    if (urls.length === 0) throw new Error('No valid URLs');
+    let created = 0;
+    let skipped = 0;
+    const failed: Array<{ url_or_domain: string; error: string }> = [];
+    for (const u of urls) {
+      const { error } = await supabase.from('job_research_sites').insert({
+        site_type: body.site_type,
+        url_or_domain: u,
+        country_code: body.country_code ? body.country_code.toUpperCase() : null,
+        category: body.category ?? null,
+        notes: body.notes ?? null,
+        is_enabled: true,
+      });
+      if (!error) {
+        created++;
+      } else if (error.code === '23505' || error.message.toLowerCase().includes('duplicate')) {
+        skipped++;
+      } else {
+        failed.push({ url_or_domain: u, error: error.message });
+      }
+    }
+    await _kickSitesKbSync(body.site_type);
+    return { site_type: body.site_type, requested: urls.length, created, skipped, failed };
   },
 
   /** v0.5: bulk-append URLs to a specific tracked_job's careers_page_urls or
