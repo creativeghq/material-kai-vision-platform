@@ -550,10 +550,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        h1: ({ children }) => <h1 className="text-2xl font-semibold text-foreground mt-6 mb-2">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-xl font-semibold text-foreground mt-5 mb-2">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-lg font-semibold text-foreground mt-4 mb-1.5">{children}</h3>,
-                        h4: ({ children }) => <h4 className="text-base font-semibold text-foreground mt-3 mb-1">{children}</h4>,
+                        // first:mt-0 — the very first heading in the markdown body sits at
+                        // the top of the preview area. Without this, mt-6 stacks on top of
+                        // the document.title/summary already rendered above, creating ~60px
+                        // of empty space before content starts ("content pushed down" bug).
+                        h1: ({ children }) => <h1 className="text-2xl font-semibold text-foreground mt-6 mb-2 first:mt-0">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-xl font-semibold text-foreground mt-5 mb-2 first:mt-0">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-lg font-semibold text-foreground mt-4 mb-1.5 first:mt-0">{children}</h3>,
+                        h4: ({ children }) => <h4 className="text-base font-semibold text-foreground mt-3 mb-1 first:mt-0">{children}</h4>,
                         p: ({ children }) => <p className="text-sm text-foreground/80 leading-relaxed my-2">{children}</p>,
                         strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
                         em: ({ children }) => <em className="italic text-foreground/80">{children}</em>,
