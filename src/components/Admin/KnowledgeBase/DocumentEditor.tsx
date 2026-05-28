@@ -487,7 +487,13 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 </TabsList>
               </div>
 
-              <TabsContent value="edit" className="flex-1 flex flex-col m-0 overflow-hidden">
+              {/* IMPORTANT — flex display gated by data-state=active. Without this,
+                  Tailwind's `flex flex-col` (display:flex) overrides the browser's
+                  default `[hidden] { display:none }` that Radix sets on inactive
+                  TabsContent — so the Edit panel keeps taking ~32px of layout space
+                  (markdown toolbar) when you're viewing Preview or Manage, visibly
+                  pushing the active tab's content down. */}
+              <TabsContent value="edit" className="flex-1 m-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
                 {/* Markdown toolbar */}
                 <div className="border-b px-4 py-1.5 flex flex-wrap gap-0.5 bg-muted/30">
                   {[
