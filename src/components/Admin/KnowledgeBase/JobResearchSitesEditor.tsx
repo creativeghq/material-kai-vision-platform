@@ -45,14 +45,14 @@ const SITE_TYPES: Array<{ key: JobSiteType; label: string; description: string; 
     key: 'rss_feed_default',
     label: 'Default RSS feeds',
     description:
-      'RSS / Atom feeds offered to new tracked_jobs when sources_enabled.rss_feeds=true. Per-tracked_job rss_feed_urls override.',
+      'RSS / Atom feeds polled directly via httpx + XML parse on every refresh, UNIONed with each tracked_job\'s own rss_feed_urls. Gives per-item dates that Perplexity search can\'t. New tracked_jobs auto-enable the rss_feeds source when any default exists.',
     example: 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss',
   },
   {
     key: 'careers_page_default',
     label: 'Default career pages',
     description:
-      'Company career pages offered to new tracked_jobs when sources_enabled.careers_pages=true. Per-tracked_job careers_page_urls override.',
+      'Company career pages scraped via Firecrawl with schema-guided extraction on every refresh, UNIONed with each tracked_job\'s own careers_page_urls. Handles JS-rendered job lists that Perplexity can\'t see. New tracked_jobs auto-enable the careers_pages source when any default exists. Firecrawl credits apply per page.',
     example: 'https://stripe.com/jobs',
   },
 ];
