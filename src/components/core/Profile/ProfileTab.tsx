@@ -26,6 +26,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { ConnectedWebsitesTab } from '@/components/core/Profile/ConnectedWebsitesTab';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
+import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -914,6 +915,9 @@ export const ProfileTab: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Appearance / theme */}
+      <AppearanceSection />
 
       {/* Avatar + name */}
       <Card className="rounded-2xl">

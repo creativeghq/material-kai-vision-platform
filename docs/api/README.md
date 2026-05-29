@@ -47,8 +47,17 @@ Company records management.
 #### [Quotes API](./quotes-api.md)
 Quote requests and proposal management.
 - **Function:** `quotes-api`
-- **Features:** Quote requests, proposals, status tracking, **price audit fields** (`price_source`, `price_lookup_call_id`), `product_prices` cache table
+- **Features:** Quote requests, proposals, status tracking, **price audit fields** (`price_source`, `price_lookup_call_id`), `product_prices` cache table, **revision chain** (`parent_quote_id` + `revision_number`)
 - **Access:** Authenticated users (admin/owner for pricing fields)
+
+#### [Project Workspace API](./projects-api.md) <span style="color:#ec4899">(NEW — 2026-05-24)</span>
+Container above moodboards and quotes for one engagement — rooms, budget vs actual, tasks (with subtasks), revisions, append-only timeline, passwordless email collaborator invites.
+- **Endpoint surface:** MIVAA Python — `/api/v1/projects/*` (16 endpoints across project CRUD, rooms, tasks, collaborators, events)
+- **Auth:** `Authorization: Bearer kai_*` (same `api_keys` flow as price / mention / job tracking)
+- **Tag in OpenAPI:** `Project Workspace (Public API)` — filter at https://v1api.materialshub.gr/docs
+- **Credits:** writes 0 cr (DB-only) except `invite_collaborator` = 1 cr (covers the transactional email)
+- **Module doc:** [docs/projects.md](../projects.md) — full architecture, RLS, triggers, frontend integration
+- **Access:** Authenticated users (every project / room / task / collaborator scoped to the API key's user via RLS)
 
 #### [Pricing API](./pricing-api.md) <span style="color:#ec4899">(NEW — 2026-04)</span>
 Admin-only API for sourcing, composing, and committing prices from the

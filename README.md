@@ -24,6 +24,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - 🏠 **Spatial Analysis**: AI-powered room layout optimization and accessibility analysis
 - 💰 **Price Monitoring**: Competitive price tracking across multiple sources
 - 🎨 **Interior Design**: Multi-model AI interior design generation (14 models)
+- 📁 **Project Workspace**: Container above moodboards/quotes for one engagement — rooms, budget vs actual, tasks (with subtasks), revisions, timeline, passwordless email collaborator invites ([docs](docs/projects.md) · [API](docs/api/projects-api.md))
 
 ### **Production Stats**
 - **Active Users**: 5,000+

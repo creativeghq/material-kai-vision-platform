@@ -7,11 +7,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme - modern dark background */
+/* Theme-driven background — resolves to dark by default (:root) or light (html.light). */
 body {
-  background: hsl(0, 0%, 7%);  /* #121212 - Near black */
+  background: hsl(var(--background));  /* Dark: #121212 · Light: #f7f8f3 */
   min-height: 100vh;
-  color: hsl(0, 0%, 92%);  /* Light text */
+  color: hsl(var(--foreground));
   font-family: var(--font-sans);
   font-weight: var(--font-normal);  /* Regular weight by default */
   -webkit-font-smoothing: antialiased;
@@ -299,6 +299,150 @@ All colors MUST be HSL.
 
 .dark {
     /* Already dark by default */
+  }
+
+  /* ========================================
+     LIGHT THEME
+     Activated by `html.light` (set by ThemeProvider).
+     Overrides only the COLOR tokens — spacing, radii,
+     typography and font weights are shared with dark.
+     Base surface: #f7f8f3 (hsl 72 24% 96%).
+     ======================================== */
+  html.light {
+    /* Main background — soft warm off-white #f7f8f3 */
+    --background: 72 24% 96%;
+    --foreground: 0 0% 13%;  /* Near-black ink */
+
+    --page-background: 72 24% 96%;
+
+    /* Cards — pure white for elevation against the off-white page */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13%;
+
+    /* Primary — plum, slightly deepened so white text stays AA on light */
+    --primary: 330 52% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary — muted warm grey surface */
+    --secondary: 72 12% 91%;
+    --secondary-foreground: 0 0% 20%;
+
+    /* Muted */
+    --muted: 72 12% 92%;
+    --muted-foreground: 0 0% 42%;
+
+    /* Accent — warm peach tint */
+    --accent: 22 70% 92%;
+    --accent-foreground: 22 75% 30%;
+
+    /* Amber */
+    --amber: 32 90% 42%;
+    --amber-bg: 32 90% 92%;
+    --amber-foreground: 32 90% 28%;
+
+    /* Destructive */
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders / inputs — gentle warm grey lines */
+    --border: 72 10% 87%;
+    --input: 72 10% 87%;
+    --ring: 330 52% 40%;
+
+    /* Sidebar / TopNav — white with grey text, plum active */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 40%;
+    --sidebar-accent: 330 52% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 72 10% 87%;
+
+    /* Hero */
+    --hero-background: 0 0% 100%;
+
+    /* Stat bubble colors — coloured fills with white text still read fine */
+    --bubble-sage: 95 25% 45%;
+    --bubble-green: 142 55% 40%;
+    --bubble-purple: 271 50% 52%;
+    --bubble-orange: 32 85% 50%;
+    --bubble-text: 0 0% 100%;
+    --bubble-text-muted: 0 0% 92%;
+
+    /* Card gradients */
+    --card-gradient-start: 0 0% 100%;
+    --card-gradient-end: 72 20% 97%;
+
+    /* Subtle gradients — black-based low-alpha so they show on light */
+    --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
+    --gradient-gray: linear-gradient(180deg, rgba(0, 0, 0, 0.035) 0%, rgba(0, 0, 0, 0.006) 100%);
+
+    /* Shadows — lighter, lower alpha for light surfaces */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.10);
+    --shadow-lg: 0 4px 12px 0 rgb(0 0 0 / 0.12);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07);
+
+    /* Status colors — saturated foreground + pale tinted backgrounds */
+    --success: 142 65% 35%;
+    --success-foreground: 0 0% 100%;
+    --success-bg: 142 55% 92%;
+
+    --warning: 32 90% 40%;
+    --warning-foreground: 0 0% 100%;
+    --warning-bg: 32 85% 92%;
+
+    --error: 0 72% 46%;
+    --error-foreground: 0 0% 100%;
+    --error-bg: 0 80% 95%;
+
+    --info: 210 85% 44%;
+    --info-foreground: 0 0% 100%;
+    --info-bg: 210 85% 94%;
+
+    /* Chart colors — slightly deepened for contrast on light */
+    --chart-1: 142 60% 40%;
+    --chart-2: 210 80% 48%;
+    --chart-3: 271 60% 52%;
+    --chart-4: 32 90% 48%;
+    --chart-5: 349 72% 52%;
+
+    /* Badge color system — pale tint bg, deep text */
+    --badge-pending-bg: 45 90% 90%;
+    --badge-pending-text: 45 85% 30%;
+    --badge-pending-border: 45 80% 75%;
+
+    --badge-updated-bg: 210 90% 93%;
+    --badge-updated-text: 210 80% 35%;
+    --badge-updated-border: 210 75% 78%;
+
+    --badge-approved-bg: 142 55% 90%;
+    --badge-approved-text: 142 65% 27%;
+    --badge-approved-border: 142 50% 70%;
+
+    --badge-rejected-bg: 0 80% 95%;
+    --badge-rejected-text: 0 70% 42%;
+    --badge-rejected-border: 0 70% 82%;
+
+    --badge-sent-bg: 271 70% 94%;
+    --badge-sent-text: 271 55% 42%;
+    --badge-sent-border: 271 55% 80%;
+
+    --badge-draft-bg: 0 0% 94%;
+    --badge-draft-text: 0 0% 40%;
+    --badge-draft-border: 0 0% 82%;
+
+    /* ===== GLASSMORPHISM SYSTEM (Light) ===== */
+    --glass-background: rgba(255, 255, 255, 0.65);
+    --glass-blur: 12px;
+    --glass-border: rgba(0, 0, 0, 0.06);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+
+    /* ===== REFINED SHADOWS (Light) ===== */
+    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.14), 0 5px 20px -5px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -727,4 +871,64 @@ All colors MUST be HSL.
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
+}
+
+/* ============================================================
+   LIGHT THEME — component overrides
+   These rules patch the handful of places that hardcode
+   white-on-dark overlays (rgba(255,255,255,…)). The token
+   block above (html.light) handles everything variable-driven;
+   this block flips the literal overlays so glass/hover surfaces
+   read correctly on the light background. Kept un-layered so it
+   wins over @layer components regardless of source order.
+   ============================================================ */
+
+/* Subtle hover that legacy code routes through .hover:bg-primary/10 */
+html.light .hover\:bg-primary\/10:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* White overlay utilities (bg-white/5·10·20, incl. hover:) read as nothing on a
+   light surface. Flip them to equivalent black-based overlays so the subtle
+   contrast they were meant to add survives the theme switch. Higher specificity
+   (html.light …) wins over the base Tailwind utility without needing !important. */
+html.light .bg-white\/5,
+html.light .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+html.light .bg-white\/10,
+html.light .hover\:bg-white\/10:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html.light .bg-white\/20,
+html.light .hover\:bg-white\/20:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Neutral badge */
+html.light .badge-neutral {
+  background-color: hsl(0 0% 95%);
+  color: hsl(0 0% 40%);
+  border-color: hsl(0 0% 85%);
+}
+
+/* Glass cards — darken the hover/border overlays */
+html.light .dashboard-card:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Stat bubbles — frosted white base on light */
+html.light .stat-bubble {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07);
+}
+
+/* Scrollbar thumb a touch darker so it stays visible on light */
+html.light *::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+html.light *::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }

@@ -38,6 +38,21 @@
   </head>
 
   <body>
+    <!-- Apply the saved theme before first paint to avoid a flash of the wrong theme.
+         Mirrors the logic in src/contexts/ThemeContext.tsx (key: mk-theme, default: dark). -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('mk-theme');
+          if (t !== 'light' && t !== 'dark') t = 'dark';
+          var root = document.documentElement;
+          root.classList.toggle('dark', t === 'dark');
+          root.classList.toggle('light', t === 'light');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
