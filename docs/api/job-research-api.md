@@ -11,6 +11,17 @@ Background job-discovery agent. Each tracked search runs hourly on a volatility-
 
 ## Changelog
 
+### v0.5.2 — 2026-05-28 — RSS feed + careers page defaults are no longer inert
+
+Closes a P0 UX gap. The "Default RSS feeds" and "Default career pages" sub-lists in the **Manage resources** tab existed since v0.3.1 but **nothing in the engine read them** — they were aspirational UI. Three concrete changes:
+
+- 🆕 **Per-refresh UNION with global defaults.** `JobResearchService._run_refresh_pipeline` now, when `sources_enabled.rss_feeds` or `sources_enabled.careers_pages` is true, reads BOTH the tracked_job's own URLs AND the operator-curated rows in `job_research_sites` (`site_type='rss_feed_default'` / `'careers_page_default'`), de-dupes case-insensitively, and runs the adapter once over the merged list. Mirrors the existing pattern for `perplexity_domain` (`_load_perplexity_domains_from_db`).
+- 🆕 **Auto-enable source toggles when global defaults exist.** `create()` now defaults `sources_enabled.rss_feeds` / `careers_pages` to `true` if the operator has curated any default entries of that type. So adding a default in **Manage resources** is enough — no separate toggle to flip. Explicit per-request `sources_enabled` still wins outright. Existing rows aren't touched.
+- 🆕 **`rss_feed_urls` added to the internal-flow Pydantic.** `POST/PUT /api/v1/job-research/track` now accept `rss_feed_urls: string[]`. Was missing — even though the DB column + engine existed, no route would let you set it via session JWT. The external `/api/v1/jobs/track` already had it.
+- ✏️ **New helper** `job_search_service.load_site_defaults_from_db(site_type) → list[str]` for any future site_type to follow the same pattern.
+- ✏️ **KB doc body** now explains that defaults are UNIONed with per-tracked URLs on every refresh, not merely "suggested to new tracked_jobs" (the old wording was honest that the lists were dead).
+- 📋 **Smoke verified** on prod 2026-05-28: seeded one rss_feed_default + one careers_page_default → POST `/jobs/track` with no `sources_enabled` → response shows `{rss_feeds: true, careers_pages: true}` auto-set + `by_source: {rss_feeds: 8, careers_pages: 20, ...}` in `first_refresh`.
+
 ### v0.3.3 — 2026-05-15 — Admin-stop bridge + KB consolidation + scoped pause
 
 Three related fixes addressing "how do I stop a search?" and "where do platform configs live in the KB?":
@@ -124,13 +135,41 @@ A separate cron `job-research-digest-hourly` runs at :05 every hour. It computes
 
 Even when no new matches were found in the last 24h, the dispatcher stamps `last_digest_sent_at` so the same row isn't re-evaluated until tomorrow (silent stamp, no email sent). Set `digest_enabled: false` on the row to stop digests entirely.
 
+### Three engines, one refresh — why the three tabs in Manage Resources?
+
+The **Manage resources** tab inside the *Job Research Sites* KB doc has three sub-lists: **Perplexity domain filter**, **Default RSS feeds**, **Default career pages**. They look like three flavors of the same thing — they're not. Each drives a different upstream engine because no single engine does all three jobs well.
+
+**Concrete example — putting the same site (`kariera.gr`) in each tab does THREE different things:**
+
+| Tab | What you'd add | What the engine does | When you'd use it |
+|---|---|---|---|
+| Perplexity domain filter | `kariera.gr` (bare domain) | Sonar runs an **LLM-driven web search** restricted to that host, scored against the tracked_job's keywords. Returns ~5-10 relevant pages. Like `site:kariera.gr "senior python developer"` on Google, but read by an LLM. | Big multi-company job boards where you want **keyword-filtered** results, not every job. Capped at 10 domains by Sonar. |
+| Default RSS feeds | `https://kariera.gr/feed.rss` (or whatever feed URL the site exposes) | **Direct XML poll** via httpx — no browser, no LLM. Parses `<item>` / `<entry>` elements with their real `<pubDate>` and canonical `<link>`. | Anywhere with a published feed. **Best freshness signal** (web search has to guess "is this recent?"). Free — no per-call billing. |
+| Default career pages | `https://kariera.gr/jobs/it` (a specific landing page URL) | **Firecrawl** loads that exact URL in a real browser, waits for JS, hands the rendered HTML to an LLM with a strict `JobListing[]` schema. Returns **every** job visible on the page. | Single-company careers pages, or category pages where you want **all** roles (the tracked_job's keywords filter afterward). Firecrawl credits apply per page. |
+
+**Why not just one engine?**
+
+- **Sonar alone** would degrade RSS and Careers: an RSS URL given to Sonar comes back as "this page has XML" not "47 jobs with dates"; client-rendered company pages return nothing because Sonar doesn't run JS.
+- **Firecrawl alone** would be expensive (one credit per page per refresh × hundreds of aggregator pages) and miss Sonar's strength: keyword-aware retrieval across a large catalog.
+- **RSS alone** doesn't work for any site that doesn't publish a feed (most company careers pages don't).
+
+**How defaults interact with per-tracked_job URLs (v0.5.2+):** the engine reads BOTH on every refresh and UNIONs them. `tracked_jobs.rss_feed_urls + job_research_sites WHERE site_type='rss_feed_default'`, de-duped case-insensitively. Per-tracked entries come first so the user's choice wins on tie. Same for `careers_page_urls + careers_page_default`.
+
+**Picking the right tab — quick rule:**
+- Bare domain (no scheme, no path) → **Perplexity**
+- URL ending in `.rss` / `.atom` / `/feed` / `?format=rss` → **RSS**
+- Any specific URL on a company's careers page → **Careers**
+
+You CAN put the same site in two tabs (e.g. `kariera.gr` in Perplexity + `kariera.gr/feed.rss` in RSS). Engine-side de-dupe handles overlap; you just pay for both adapter calls. Usually pick one.
+
 ### Source priority on dedupe
 
 When the same posting is found by multiple sources, the dedupe keeps the highest-priority source:
 
 1. `firecrawl_careers` (direct from company)
-2. `perplexity_sonar` (read the page)
-3. `google_jobs` (via Google for Jobs feed)
+2. `rss_feed` (per-item dates + canonical link, no LLM interpretation)
+3. `perplexity_sonar` (read the page)
+4. `google_jobs` (via Google for Jobs feed)
 
 ### Classifier verdicts
 
