@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 // =====================================================
 // TYPES
@@ -574,24 +575,21 @@ class ProjectsService {
     const appUrl = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
     const inviteUrl = `${appUrl}/projects/invite/${data.share_token}`;
 
-    // Best-effort send; on failure the row still exists and owner can re-send / share link manually
-    try {
-      await supabase.functions.invoke('email-api?action=send', {
-        body: {
-          to: email,
-          subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
-          emailType: 'transactional',
-          html: this._renderInviteEmailHtml({
-            projectName: project?.name || 'a project',
-            inviterName,
-            inviteUrl,
-            message: input.message?.trim() || null,
-          }),
-        },
-      });
-    } catch (sendErr) {
-      console.warn('[projectsService] invite email send failed (non-blocking):', sendErr);
-    }
+    // The invite email is delivered by the "Project Invite Sent" flow (Send
+    // Email action), so an admin can pause/edit/redirect it without code changes.
+    flowEventService.emit('project_invitation_sent', {
+      to: email,
+      subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
+      body: this._renderInviteEmailHtml({
+        projectName: project?.name || 'a project',
+        inviterName,
+        inviteUrl,
+        message: input.message?.trim() || null,
+      }),
+      project_id: input.project_id,
+      project_name: project?.name || 'a project',
+      inviter_name: inviterName,
+    });
 
     return data as ProjectCollaborator;
   }
@@ -632,18 +630,19 @@ class ProjectsService {
     const appUrl = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
     const inviteUrl = `${appUrl}/projects/invite/${row.share_token}`;
 
-    await supabase.functions.invoke('email-api?action=send', {
-      body: {
-        to: row.email,
-        subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
-        emailType: 'transactional',
-        html: this._renderInviteEmailHtml({
-          projectName: project?.name || 'a project',
-          inviterName,
-          inviteUrl,
-          message: row.message || null,
-        }),
-      },
+    // Delivered by the "Project Invite Resent" flow (Send Email action).
+    flowEventService.emit('project_invitation_resent', {
+      to: row.email,
+      subject: `${inviterName} invited you to view "${project?.name || 'a project'}"`,
+      body: this._renderInviteEmailHtml({
+        projectName: project?.name || 'a project',
+        inviterName,
+        inviteUrl,
+        message: row.message || null,
+      }),
+      project_id: row.project_id,
+      project_name: project?.name || 'a project',
+      inviter_name: inviterName,
     });
   }
 

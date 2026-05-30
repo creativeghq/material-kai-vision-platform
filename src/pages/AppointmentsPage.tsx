@@ -89,27 +89,20 @@ function AppointmentDetailDrawer({
       status === 'confirmed' ? 'appointment_confirmed' :
       status === 'completed' ? 'appointment_completed' :
       'appointment_cancelled';
+    // The client notification (confirmed/cancelled, registered users only) is
+    // delivered by the matching appointment flow; the event carries the payload.
+    const notifyClient = !!appt.client_user_id && (status === 'confirmed' || status === 'cancelled');
+    const apptTitle = status === 'confirmed'
+      ? `Your appointment on ${formatDate(appt.appointment_date)} has been confirmed`
+      : `Your appointment on ${formatDate(appt.appointment_date)} was cancelled`;
     flowEventService.emit(eventType, {
+      user_id: notifyClient ? appt.client_user_id : null, // recipient (client)
+      type: eventType,
+      title: notifyClient ? apptTitle : '',
+      body: appt.service_name ? `Service: ${appt.service_name}` : '',
       appointment_id: appt.id,
       professional_user_id: appt.professional_user_id,
     });
-
-    // Notify the client directly if they are a registered user
-    if (appt.client_user_id && (status === 'confirmed' || status === 'cancelled')) {
-      const notifType = status === 'confirmed' ? 'appointment_confirmed' : 'appointment_cancelled';
-      const title = status === 'confirmed'
-        ? `Your appointment on ${formatDate(appt.appointment_date)} has been confirmed`
-        : `Your appointment on ${formatDate(appt.appointment_date)} was cancelled`;
-      supabase.from('user_notifications').insert({
-        user_id: appt.client_user_id,
-        type: notifType,
-        title,
-        body: appt.service_name ? `Service: ${appt.service_name}` : null,
-        action_url: null,
-        is_read: false,
-        metadata: { appointment_id: appt.id },
-      }).then(() => {});
-    }
 
     toast({ title: `Appointment ${status}` });
     onUpdated();

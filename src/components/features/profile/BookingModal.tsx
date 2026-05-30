@@ -66,8 +66,14 @@ export const BookingModal: React.FC<{
       return;
     }
 
-    // Emit flow event
+    // The professional's notification is delivered by the "Appointment Booked"
+    // flow; the event carries the full payload so an admin can pause/edit it.
     flowEventService.emit('appointment_booked', {
+      user_id: professionalUserId, // recipient (the professional)
+      type: 'appointment_booked',
+      title: `New appointment request from ${name.trim()}`,
+      body: `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatSlot(timeSlot)}${selectedService ? ` · ${selectedService.name}` : ''}`,
+      action_url: '/appointments',
       appointment_id: data.id,
       professional_user_id: professionalUserId,
       client_name: name.trim(),
@@ -76,17 +82,6 @@ export const BookingModal: React.FC<{
       time: timeSlot,
       service_name: selectedService?.name ?? null,
     });
-
-    // Direct notification to the professional
-    supabase.from('user_notifications').insert({
-      user_id: professionalUserId,
-      type: 'appointment_booked',
-      title: `New appointment request from ${name.trim()}`,
-      body: `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatSlot(timeSlot)}${selectedService ? ` · ${selectedService.name}` : ''}`,
-      action_url: '/appointments',
-      is_read: false,
-      metadata: { appointment_id: data.id, client_name: name.trim(), client_email: email.trim() },
-    }).then(() => {});
 
     toast({ title: 'Appointment requested', description: `${professionalName} will confirm your booking.` });
     onBooked();

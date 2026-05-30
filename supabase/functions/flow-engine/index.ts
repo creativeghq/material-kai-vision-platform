@@ -248,10 +248,17 @@ async function executeAction(
     }
 
     case 'send_email': {
+      // Same migration safety guard as create_notification: if the recipient
+      // template didn't resolve (older client predating the notification→flow
+      // migration), skip rather than send a broken email.
+      const emailTo = String(resolved.to ?? '');
+      if (!emailTo || emailTo.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_to' } };
+      }
       const { data, error } = await supabase.functions.invoke('email-api', {
         body: {
           action: 'send',
-          to: resolved.to,
+          to: emailTo,
           from: resolved.from || undefined,
           subject: resolved.subject,
           html: resolved.body,

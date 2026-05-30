@@ -20,6 +20,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -243,15 +244,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         completed_at: new Date().toISOString(),
       }).eq('id', jobId);
 
-      supabase.from('user_notifications').insert({
+      emitFlowEvent('video_generation_completed', {
         user_id: userId,
         type: 'video_ready',
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
-        action_url: null,
-        is_read: false,
-        metadata: { job_id: jobId, video_type },
-      }).then(() => {});
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
 
       return jsonResponse({
         success: true,
@@ -284,15 +284,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         completed_at: new Date().toISOString(),
       }).eq('id', jobId);
 
-      supabase.from('user_notifications').insert({
+      emitFlowEvent('video_generation_completed', {
         user_id: userId,
         type: 'video_ready',
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
-        action_url: null,
-        is_read: false,
-        metadata: { job_id: jobId, video_type },
-      }).then(() => {});
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
 
       return jsonResponse({
         success: true,
@@ -345,15 +344,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           completed_at: new Date().toISOString(),
         }).eq('id', jobId);
 
-        supabase.from('user_notifications').insert({
+        emitFlowEvent('video_generation_completed', {
           user_id: userId,
           type: 'video_ready',
           title: 'Your video is ready!',
           body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
-          action_url: null,
-          is_read: false,
-          metadata: { job_id: jobId, video_type },
-        }).then(() => {});
+          job_id: jobId,
+          video_type,
+        }).catch(() => {});
 
         return jsonResponse({
           success: true,
@@ -398,15 +396,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       error_message: String(err),
     }).eq('id', jobId);
 
-    supabase.from('user_notifications').insert({
+    emitFlowEvent('video_generation_failed', {
       user_id: userId,
       type: 'video_failed',
       title: 'Video generation failed',
       body: 'Something went wrong generating your video. Any credits used have been refunded.',
-      action_url: null,
-      is_read: false,
-      metadata: { job_id: jobId, video_type },
-    }).then(() => {});
+      job_id: jobId,
+      video_type,
+    }).catch(() => {});
 
     console.error('[generate-interior-video-v2] Error:', err);
     return jsonResponse({ success: false, error: String(err) }, 500);

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 export interface SVBRDFExtractionRequest {
   user_id: string;
@@ -65,15 +66,14 @@ export class SVBRDFExtractionAPI {
         throw new Error(response.error || 'SVBRDF extraction failed');
       }
 
-      supabase.from('user_notifications').insert({
+      // Delivered by the "SVBRDF Extracted" flow (Flows dashboard).
+      flowEventService.emit('svbrdf_extraction_complete', {
         user_id: user.id,
         type: 'svbrdf_ready',
         title: 'Material maps ready',
         body: 'Your SVBRDF material maps have been extracted and are ready to use.',
-        action_url: null,
-        is_read: false,
-        metadata: { extraction_id: (response.data as SVBRDFExtractionResult).extraction_id },
-      }).then(() => {});
+        extraction_id: (response.data as SVBRDFExtractionResult).extraction_id,
+      });
 
       return response.data as SVBRDFExtractionResult;
     } catch (error) {

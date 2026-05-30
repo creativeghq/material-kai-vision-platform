@@ -14,6 +14,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -236,15 +237,15 @@ async function handleRequest(
       metadata: { room, furniture_style: furnitureStyle },
     }).then(() => {}, () => {});
 
-    supabase.from('user_notifications').insert({
+    // Delivered by the "Virtual Staging Done" flow (Flows dashboard).
+    emitFlowEvent('virtual_staging_completed', {
       user_id: userId,
       type: 'staging_ready',
       title: 'Virtual staging complete!',
       body: `Your ${room} has been virtually staged and is ready to view.`,
-      action_url: null,
-      is_read: false,
-      metadata: { job_id: jobId, room },
-    }).then(() => {});
+      job_id: jobId,
+      room,
+    }).catch(() => {});
 
     return jsonResponse({
       success: true,

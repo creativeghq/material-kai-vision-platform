@@ -224,24 +224,17 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
 
     console.log(`[generate-vr-world] Record ${vrWorldId} completed successfully`);
 
-    // Emit flow event (fire-and-forget)
+    // Notification is delivered by the "VR World Created" flow (Flows dashboard).
+    // The event carries the full notification payload so an admin can pause/edit it.
     emitFlowEvent('vr_world_created', {
-      world_id: vrWorldId,
-      source_image: assets.thumbnail || assets.panorama,
-      quality_tier: model,
-      user_id: userId,
-    }).catch(() => {});
-
-    // Notify user their VR world is ready
-    supabase.from('user_notifications').insert({
       user_id: userId,
       type: 'vr_world_ready',
       title: 'Your VR world is ready!',
       body: 'Your 3D environment has been generated and is ready to explore.',
-      action_url: null,
-      is_read: false,
-      metadata: { vr_world_id: vrWorldId },
-    }).then(() => {});
+      world_id: vrWorldId,
+      source_image: assets.thumbnail || assets.panorama,
+      quality_tier: model,
+    }).catch(() => {});
 
     // Return constructed response directly (avoids an extra DB read)
     return jsonResponse({
@@ -279,17 +272,15 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
         console.error('[generate-vr-world] Failed to update status:', updateError);
       }
 
-      // Notify user of failure
+      // Failure notification is delivered by the "VR World Failed" flow.
       if (userId) {
-        supabase.from('user_notifications').insert({
+        emitFlowEvent('vr_world_failed', {
           user_id: userId,
           type: 'vr_world_failed',
           title: 'VR world generation failed',
           body: 'Something went wrong generating your 3D world. Any credits used have been refunded.',
-          action_url: null,
-          is_read: false,
-          metadata: { vr_world_id: vrWorldId },
-        }).then(() => {});
+          world_id: vrWorldId,
+        }).catch(() => {});
       }
 
       // Refund credits (always runs even if status update fails)
