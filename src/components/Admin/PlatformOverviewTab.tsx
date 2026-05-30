@@ -94,6 +94,7 @@ export function PlatformOverviewTab() {
   const [vrStatusTrend, setVrStatusTrend] = useState<{ week: string; completed: number; failed: number }[]>([]);
   const [vrTotalCredits, setVrTotalCredits] = useState(0);
   const [featureKpis, setFeatureKpis] = useState({ vrWorldsGenerated: 0, agentRuns: 0, moodboardsCreated: 0 });
+  const [projectKpis, setProjectKpis] = useState({ total: 0, active: 0, withDeadline: 0, budgetSumUsd: 0 });
 
   // ── 3D Generation ─────────────────────────────────────────────
   const [gen3dTrend, setGen3dTrend] = useState<{ week: string; jobs: number; segments: number }[]>([]);
@@ -357,6 +358,7 @@ export function PlatformOverviewTab() {
         { data: quotes }, { data: profiles }, { data: qItems },
         { data: hireMe }, { data: agentRuns }, { data: vrWorlds },
         { data: moodboards }, { data: moodboardItems },
+        { data: projects },
         { data: searches }, { data: searchLogs },
       ] = await Promise.all([
         supabase.from('quote_requests').select('id,status,created_at').gte('created_at', ago12.toISOString()),
@@ -367,6 +369,7 @@ export function PlatformOverviewTab() {
         supabase.from('vr_worlds').select('created_at,status,quality_preset,credits_used').gte('created_at', ago12.toISOString()),
         supabase.from('moodboards').select('id,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('moodboard_items').select('created_at,material_id').gte('created_at', ago12.toISOString()).limit(3000),
+        supabase.from('projects').select('id,status,deadline,budget_amount,budget_currency,created_at,last_activity_at'),
         supabase.from('search_queries').select('query,created_at,result_count,strategy,execution_time_ms,agent_id,results_clicked').gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('search_feedback').select('rating,created_at').gte('created_at', ago12.toISOString()),
       ]);
@@ -437,6 +440,20 @@ export function PlatformOverviewTab() {
       (moodboards ?? []).forEach((b: any) => { const l = weekLabel(new Date(b.created_at)); if (mbMap.has(l)) mbMap.get(l)!.boards++; });
       (moodboardItems ?? []).forEach((i: any) => { const l = weekLabel(new Date(i.created_at)); if (mbMap.has(l)) mbMap.get(l)!.items++; });
       setMoodboardActivity(Array.from(mbMap.entries()).map(([week, d]) => ({ week, ...d })));
+
+      // Project KPIs — Studio workflow signal. All-time counts (projects table is small).
+      // "Active" = status not in the terminal set; "Budget allocated" sums USD-quoted projects only
+      // to avoid mixing currencies into a single sum (mixed-currency rollup would need FX normalization).
+      const TERMINAL_PROJECT_STATUSES = new Set(['completed', 'archived', 'cancelled']);
+      const allProjects = projects ?? [];
+      const activeProjects = allProjects.filter((p: any) => !TERMINAL_PROJECT_STATUSES.has(p.status));
+      const withDeadline = allProjects.filter((p: any) => p.deadline != null).length;
+      const budgetSumUsd = allProjects.reduce((sum: number, p: any) => {
+        if (!p.budget_amount) return sum;
+        if (p.budget_currency && p.budget_currency !== 'USD') return sum;
+        return sum + Number(p.budget_amount);
+      }, 0);
+      setProjectKpis({ total: allProjects.length, active: activeProjects.length, withDeadline, budgetSumUsd });
 
       // VR worlds
       const vrMap = new Map<string, number>(wks12.map(w => [w, 0]));
@@ -1308,14 +1325,20 @@ export function PlatformOverviewTab() {
         </CardContent>
       </Card>
 
-      {/* ─── 6. Community & Social Graph ────────────────────────── */}
-      <SectionHeader title="Community & Social Graph" desc="Follow network growth, review sentiment, hire me conversions, and moodboard activity" icon={Users} />
+      {/* ─── 6. Community & Studio Workflow ────────────────────────── */}
+      <SectionHeader title="Community & Studio Workflow" desc="Follow network growth, review sentiment, hire me conversions, moodboard activity, and project pipeline" icon={Users} />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <KpiCard label="Total Follows" value={totalFollowers.toLocaleString()} icon={Users} color="text-violet-600" />
         <KpiCard label="Reviews (12w)" value={reviewKpis.total} icon={Star} color="text-amber-500" sub={reviewKpis.avgRating !== '—' ? `avg ${reviewKpis.avgRating}★` : undefined} />
         <KpiCard label="Hire Me (12w)" value={kpis.hireTotal} icon={Award} color="text-cyan-600" />
         <KpiCard label="Moodboards (12w)" value={featureKpis.moodboardsCreated} icon={Package} color="text-green-600" />
         <KpiCard label="Avg Rating" value={reviewKpis.avgRating !== '—' ? `${reviewKpis.avgRating}★` : '—'} icon={Star} color="text-amber-500" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard label="Projects (all-time)" value={projectKpis.total} icon={Package} color="text-primary" />
+        <KpiCard label="Active Projects" value={projectKpis.active} icon={Package} color="text-green-600" sub={projectKpis.total > 0 ? `${Math.round((projectKpis.active / projectKpis.total) * 100)}% of total` : undefined} />
+        <KpiCard label="With Deadline" value={projectKpis.withDeadline} icon={Award} color="text-amber-500" />
+        <KpiCard label="Budget Allocated (USD)" value={`$${projectKpis.budgetSumUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Award} color="text-cyan-600" sub="USD-quoted projects only" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
