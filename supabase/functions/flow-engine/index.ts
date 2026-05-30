@@ -192,6 +192,12 @@ async function executeCondition(
       return { output: { delayed: true, requested_ms: ms, actual_ms: cappedMs }, branch: 'output' };
     }
 
+    case 'stop': {
+      // Hard short-circuit of this branch. Placed after an if_else/filter false
+      // branch to halt a flow (e.g. "already notified in last 7d → stop").
+      return { output: { stopped: true }, branch: '__stop__' };
+    }
+
     default:
       return { output: {}, branch: 'output' };
   }
@@ -296,12 +302,28 @@ async function executeAction(
     }
 
     case 'create_notification': {
+      // Safety guard for the notification→flow migration: if the trigger
+      // payload predates the migration (older client still emitting id-only
+      // events), the templates won't resolve. Skip rather than insert a row
+      // with literal "{{trigger.data.x}}" text. Makes the cutover safe in any
+      // deploy order (the legacy hardcoded insert still delivers until the
+      // enriched-emit client ships).
+      const notifUserId = String(resolved.user_id ?? '');
+      if (!notifUserId || notifUserId.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_user_id' } };
+      }
+      const notifTitle = String(resolved.title ?? '');
+      if (!notifTitle || notifTitle.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_title' } };
+      }
+      const notifBody = String(resolved.body ?? '');
+
       const { error } = await supabase.from('user_notifications').insert({
-        user_id: resolved.user_id,
-        title: resolved.title,
-        body: resolved.body,
+        user_id: notifUserId,
+        title: notifTitle,
+        body: notifBody.includes('{{') ? '' : notifBody,
         type: resolved.type || 'info',
-        action_url: resolved.action_url || null,
+        action_url: (resolved.action_url && !String(resolved.action_url).includes('{{')) ? resolved.action_url : null,
         metadata: resolved.metadata || {},
         is_read: false,
       });
@@ -778,6 +800,82 @@ async function executeAction(
           lastname: zbData.lastname || '',
         },
       };
+    }
+
+    case 'send_push': {
+      // Resolve the target user's active web-push subscriptions, then dispatch
+      // through the notification-dispatcher (which holds the VAPID keys).
+      const pushUserId = String(resolved.user_id || '');
+      if (!pushUserId) throw new Error('send_push requires user_id');
+
+      const { data: subs, error: subErr } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh_key, auth_key')
+        .eq('user_id', pushUserId)
+        .eq('is_active', true);
+      if (subErr) throw new Error(`Push subscription lookup failed: ${subErr.message}`);
+      if (!subs || subs.length === 0) {
+        return { output: { sent: false, reason: 'no_active_subscriptions' } };
+      }
+
+      const { data, error } = await supabase.functions.invoke('notification-dispatcher', {
+        body: {
+          action: 'send-push',
+          subscriptions: subs,
+          notification: {
+            title: resolved.title,
+            body: resolved.body,
+            icon: resolved.icon || undefined,
+            badge: resolved.badge || undefined,
+            data: resolved.data || { action_url: resolved.action_url || null },
+          },
+        },
+      });
+      if (error) throw new Error(`Push failed: ${error.message}`);
+      return { output: { sent: true, ...(data || {}) } };
+    }
+
+    case 'log_event': {
+      // Generic audit / dedup-marker insert. Lets a flow write a row (e.g. a
+      // "reminder already sent" marker) so a later `if_else` + `stop` can
+      // de-duplicate recurring scheduled flows.
+      // config: { table: string, row: string(JSON) | object }
+      const table = String(resolved.table || '');
+      if (!table) throw new Error('log_event requires a table name');
+      let row: Record<string, unknown> = {};
+      if (typeof resolved.row === 'string' && resolved.row.trim()) {
+        try {
+          row = JSON.parse(resolved.row);
+        } catch {
+          throw new Error('log_event: row is not valid JSON');
+        }
+      } else if (resolved.row && typeof resolved.row === 'object') {
+        row = resolved.row as Record<string, unknown>;
+      }
+      const { error } = await supabase.from(table).insert(row);
+      if (error) throw new Error(`log_event insert failed: ${error.message}`);
+      return { output: { logged: true, table } };
+    }
+
+    case 'run_edge_function': {
+      // Invoke another edge function from a flow (e.g. catalog-send-to-customers,
+      // finance-send-statement) without reimplementing it in the graph.
+      // config: { function_name: string, payload: string(JSON) | object }
+      const fnName = String(resolved.function_name || '');
+      if (!fnName) throw new Error('run_edge_function requires function_name');
+      let payload: Record<string, unknown> = {};
+      if (typeof resolved.payload === 'string' && resolved.payload.trim()) {
+        try {
+          payload = JSON.parse(resolved.payload);
+        } catch {
+          throw new Error('run_edge_function: payload is not valid JSON');
+        }
+      } else if (resolved.payload && typeof resolved.payload === 'object') {
+        payload = resolved.payload as Record<string, unknown>;
+      }
+      const { data, error } = await supabase.functions.invoke(fnName, { body: payload });
+      if (error) throw new Error(`run_edge_function(${fnName}) failed: ${error.message}`);
+      return { output: { invoked: true, function_name: fnName, result: data ?? null } };
     }
 
     default:

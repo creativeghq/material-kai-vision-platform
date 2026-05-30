@@ -561,21 +561,24 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       return (
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Event Name</Label>
+            <Label className="text-xs">Table</Label>
             <Input
-              value={cfg.event_name || ''}
-              onChange={(e) => onChange({ ...cfg, event_name: e.target.value })}
-              placeholder="e.g., flow_completed"
-              className="h-8 text-sm"
+              value={cfg.table || ''}
+              onChange={(e) => onChange({ ...cfg, table: e.target.value })}
+              placeholder="e.g., quote_activities"
+              className="h-8 text-sm font-mono"
             />
+            <p className="text-[10px] text-muted-foreground">
+              Writes an audit / dedup-marker row. Pair with an If/Else + Stop to de-duplicate recurring flows.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Event Data (JSON)</Label>
+            <Label className="text-xs">Row (JSON)</Label>
             <Textarea
-              value={cfg.event_data || ''}
-              onChange={(e) => onChange({ ...cfg, event_data: e.target.value })}
-              placeholder='{"source": "{{trigger.type}}"}'
-              rows={2}
+              value={cfg.row || ''}
+              onChange={(e) => onChange({ ...cfg, row: e.target.value })}
+              placeholder='{"quote_id": "{{trigger.data.quote_id}}", "type": "reminder_sent"}'
+              rows={3}
               className="text-sm font-mono"
             />
           </div>

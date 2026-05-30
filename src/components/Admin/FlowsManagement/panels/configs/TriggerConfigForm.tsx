@@ -49,7 +49,9 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
     case 'manual':
       return (
         <div className="text-xs text-muted-foreground">
-          This flow will be triggered manually from the Flows dashboard.
+          Manual triggers are deprecated — you can remove this node. Every flow can be
+          run on demand with the <strong>Run Now</strong> button on the Flows dashboard,
+          regardless of its trigger.
         </div>
       );
 
@@ -443,6 +445,36 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
       return (
         <div className="text-xs text-muted-foreground">
           Fires when a user adds a factory to their preferred factories list. Available data: user_id, factory_name, added_at.
+        </div>
+      );
+
+    // ── 2026-05-30 notification→flow migration events ──
+    // These carry a standard notification payload so a Create Notification /
+    // Send Email action can template them uniformly.
+    case 'quote_pdf_generated':
+    case 'factory_approved':
+    case 'factory_rejected':
+    case 'appointment_booked':
+    case 'appointment_confirmed':
+    case 'appointment_cancelled':
+    case 'svbrdf_extraction_complete':
+    case 'virtual_staging_completed':
+    case 'vr_world_failed':
+    case 'video_generation_completed':
+    case 'video_generation_failed':
+    case 'background_agent_failed':
+    case 'role_upgrade_request_submitted':
+    case 'role_upgrade_approved':
+    case 'role_upgrade_rejected':
+    case 'stripe_payment_succeeded':
+    case 'stripe_payment_failed':
+    case 'project_invitation_sent':
+    case 'project_invitation_resent':
+      return (
+        <div className="text-xs text-muted-foreground">
+          Fires on this platform event. Standard payload under <code>trigger.data</code>:
+          {' '}<code>user_id</code> (recipient), <code>title</code>, <code>body</code>, <code>action_url</code>,
+          plus event-specific fields. Use these in a Create Notification or Send Email action.
         </div>
       );
 

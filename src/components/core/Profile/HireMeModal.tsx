@@ -81,19 +81,19 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         description: `Your message has been sent to ${toUserName}.`,
       });
 
-      // Direct notification to the recipient
-      supabase.from('user_notifications').insert({
-        user_id: toUserId,
+      // Recipient notification is delivered by the "Hire Me Received" flow
+      // (Flows dashboard). The event carries the full notification payload so
+      // the flow's Create Notification action can template it directly, which
+      // lets an admin pause/edit/redirect the notification without code changes.
+      flowEventService.emit('hire_me_received', {
+        user_id: toUserId, // recipient — consumed by create_notification
+        to_user_id: toUserId, // retained for filters / back-compat
         type: 'hire_me',
         title: `New hire request from ${form.name.trim()}`,
-        body: selectedNames.length > 0 ? `Interested in: ${selectedNames.join(', ')}` : form.message.trim().slice(0, 100),
+        body: selectedNames.length > 0
+          ? `Interested in: ${selectedNames.join(', ')}`
+          : form.message.trim().slice(0, 100),
         action_url: '/profile?tab=inbox',
-        is_read: false,
-        metadata: { from_name: form.name.trim(), from_email: form.email.trim(), services_requested: selectedNames },
-      }).then(() => {});
-
-      flowEventService.emit('hire_me_received', {
-        to_user_id: toUserId,
         from_name: form.name.trim(),
         from_email: form.email.trim(),
         services_requested: selectedNames,

@@ -801,13 +801,9 @@ export const ProfileTab: React.FC = () => {
     setFactories(next); setSelectedFactoryName(''); setAddingFactory(false);
     const ok = await patch({ preferred_factories: next });
     if (ok && user) {
-      flowEventService.emit('preferred_factory_added', {
-        user_id: user.id,
-        factory_name: factoryToAdd,
-        added_at: new Date().toISOString(),
-      });
-
-      // Notify the factory user if we can find them by their claimed factory name
+      // Look up the verified factory user first so the event carries the
+      // notification recipient (factory_user_id). The "Preferred Factory Added"
+      // flow delivers the notification; an admin can pause/edit it in Flows.
       supabase
         .from('user_profiles')
         .select('user_id, full_name')
@@ -815,17 +811,16 @@ export const ProfileTab: React.FC = () => {
         .eq('factory_verified', true)
         .maybeSingle()
         .then(({ data: factoryProfile }) => {
-          if (factoryProfile?.user_id) {
-            supabase.from('user_notifications').insert({
-              user_id: factoryProfile.user_id,
-              type: 'preferred_factory',
-              title: 'A user added your factory as a preferred factory',
-              body: null,
-              action_url: '/analytics/factory',
-              is_read: false,
-              metadata: { added_by_user_id: user.id, factory_name: factoryToAdd },
-            }).then(() => {});
-          }
+          flowEventService.emit('preferred_factory_added', {
+            user_id: user.id, // the user who added the factory (documented semantics)
+            factory_user_id: factoryProfile?.user_id ?? null, // recipient
+            factory_name: factoryToAdd,
+            added_at: new Date().toISOString(),
+            type: 'preferred_factory',
+            title: 'A user added your factory as a preferred factory',
+            body: '',
+            action_url: '/analytics/factory',
+          });
         });
     }
   };

@@ -18,12 +18,14 @@ export function validateGraph(graph: FlowGraphDefinition): ValidationResult {
     return { valid: false, errors, warnings };
   }
 
-  // Must have exactly one trigger node
+  // A flow may have at most one trigger node. Zero trigger nodes is valid —
+  // such a flow is on-demand / manual-only and runs via the "Run Now" button.
   const triggerNodes = nodes.filter(n => n.type === 'triggerNode');
-  if (triggerNodes.length === 0) {
-    errors.push('Flow must have a trigger node');
-  } else if (triggerNodes.length > 1) {
+  if (triggerNodes.length > 1) {
     errors.push('Flow can only have one trigger node');
+  }
+  if (triggerNodes.length === 0) {
+    warnings.push('No trigger node — this flow runs only on demand via "Run Now"');
   }
 
   // Check for orphan nodes (no connections)
