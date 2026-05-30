@@ -4,6 +4,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -56,15 +57,16 @@ export const FactoryRegistrationsTab: React.FC = () => {
       setRequests((prev) =>
         prev.map((r) => r.id === req.id ? { ...r, status: 'approved' } : r),
       );
-      supabase.from('user_notifications').insert({
+      // Delivered by the "Factory Approved" flow (Flows dashboard).
+      flowEventService.emit('factory_approved', {
         user_id: req.user_id,
         type: 'factory_approved',
         title: 'Supplier verification approved!',
         body: `Your verification request for ${req.company_name} has been approved. You are now a verified supplier.`,
         action_url: '/profile',
-        is_read: false,
-        metadata: { request_id: req.id, company_name: req.company_name },
-      }).then(() => {});
+        request_id: req.id,
+        company_name: req.company_name,
+      });
       toast({ title: 'Approved', description: `${req.company_name} is now a verified supplier.` });
     } catch {
       toast({ title: 'Error', description: 'Could not approve request.', variant: 'destructive' });
@@ -86,15 +88,15 @@ export const FactoryRegistrationsTab: React.FC = () => {
       setRequests((prev) =>
         prev.map((r) => r.id === req.id ? { ...r, status: 'rejected', rejection_reason: rejectReason.trim() || null } : r),
       );
-      supabase.from('user_notifications').insert({
+      // Delivered by the "Factory Rejected" flow (Flows dashboard).
+      flowEventService.emit('factory_rejected', {
         user_id: req.user_id,
         type: 'factory_rejected',
         title: 'Supplier verification not approved',
         body: rejectReason.trim() || `Your verification request for ${req.company_name} was not approved at this time.`,
-        action_url: null,
-        is_read: false,
-        metadata: { request_id: req.id, company_name: req.company_name },
-      }).then(() => {});
+        request_id: req.id,
+        company_name: req.company_name,
+      });
       setRejectingId(null);
       setRejectReason('');
       toast({ title: 'Rejected', description: 'Request has been rejected.' });

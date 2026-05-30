@@ -22,6 +22,7 @@ const MIVAA_API_KEY            = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders }        from '../_shared/cors.ts';
 import { authenticate }       from '../_shared/auth.ts';
+import { emitFlowEvent }      from '../_shared/flow-events.ts';
 import { createLogHelper, createHeartbeatHelper } from '../_shared/agents/base-agent.ts';
 import { getRunnerGated, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
 import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
@@ -252,15 +253,16 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
       if (ownerMember?.user_id) {
-        supabase.from('user_notifications').insert({
+        // Delivered by the "Agent Run Completed" flow (Flows dashboard).
+        emitFlowEvent('agent_search_completed', {
           user_id: ownerMember.user_id,
           type: 'agent_run_done',
           title: `Agent "${agentConfig.name}" completed`,
           body: 'Background agent run finished successfully.',
           action_url: '/admin/background-agents',
-          is_read: false,
-          metadata: { agent_id, run_id: run.id },
-        }).then(() => {});
+          agent_id,
+          run_id: run.id,
+        }).catch(() => {});
       }
     }
 
@@ -375,15 +377,16 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
       if (ownerMember?.user_id) {
-        supabase.from('user_notifications').insert({
+        // Delivered by the "Agent Run Failed" flow (Flows dashboard).
+        emitFlowEvent('background_agent_failed', {
           user_id: ownerMember.user_id,
           type: 'agent_run_failed',
           title: `Agent "${agentConfig.name}" failed`,
           body: errMsg,
           action_url: '/admin/background-agents',
-          is_read: false,
-          metadata: { agent_id, run_id: run.id },
-        }).then(() => {});
+          agent_id,
+          run_id: run.id,
+        }).catch(() => {});
       }
     }
 

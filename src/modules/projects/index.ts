@@ -1,5 +1,4 @@
 import { lazy } from 'react';
-import { FolderKanban } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -16,17 +15,7 @@ const definition: ModuleDefinition = {
     { path: '/projects', component: ProjectsListPage },
     { path: '/projects/:id', component: ProjectDetailPage },
   ],
-  navItems: [
-    {
-      label: 'Projects',
-      path: '/projects',
-      icon: FolderKanban,
-      location: 'admin-dashboard',
-      adminCategory: 'Studio',
-      adminDescription: 'Container above moodboards and quotes — rooms, budget vs actual, task checklists.',
-      adminCount: 'Workspace',
-    },
-  ],
+  navItems: [],
 };
 
 export default definition;

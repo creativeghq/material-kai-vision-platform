@@ -104,31 +104,32 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
       await loadReviews();
       setEditing(false);
       if (!myReview) {
-        // Only emit on new reviews, not edits
-        flowEventService.emit('material_reviewed', {
-          product_id: productId,
-          user_id: currentUserId,
-          rating: form.rating,
-          has_text: !!form.text.trim(),
-        });
-        // Notify the product owner
+        // Only emit on new reviews, not edits. Look up the product owner first
+        // so the event carries the notification recipient (owner_user_id). The
+        // "Material Reviewed" flow delivers the notification; an admin can
+        // pause/edit it without a code change.
         supabase
           .from('products')
           .select('user_id')
           .eq('id', productId)
           .maybeSingle()
           .then(({ data: product }) => {
-            if (product?.user_id && product.user_id !== currentUserId) {
-              supabase.from('user_notifications').insert({
-                user_id: product.user_id,
-                type: 'review_received',
-                title: 'New review on your material',
-                body: form.text.trim() ? `"${form.text.trim().slice(0, 80)}"` : `${form.rating} star review received.`,
-                action_url: `/products/${productId}`,
-                is_read: false,
-                metadata: { product_id: productId, reviewer_id: currentUserId, rating: form.rating },
-              }).then(() => {});
-            }
+            const ownerUserId =
+              product?.user_id && product.user_id !== currentUserId ? product.user_id : null;
+            flowEventService.emit('material_reviewed', {
+              product_id: productId,
+              user_id: currentUserId, // reviewer (documented trigger semantics)
+              reviewer_id: currentUserId,
+              owner_user_id: ownerUserId, // recipient — consumed by create_notification
+              rating: form.rating,
+              has_text: !!form.text.trim(),
+              type: 'review_received',
+              title: 'New review on your material',
+              body: form.text.trim()
+                ? `"${form.text.trim().slice(0, 80)}"`
+                : `${form.rating} star review received.`,
+              action_url: `/products/${productId}`,
+            });
           });
       }
     }

@@ -5,10 +5,9 @@ export const paletteItems: NodePaletteItem[] = [
   //  TRIGGERS
   // ════════════════════════════════════════════════════
 
-  // ── Manual ──
-  { type: 'triggerNode', category: 'trigger', subType: 'manual', group: 'Manual',
-    label: 'Manual Trigger', description: 'Run this flow manually', icon: 'Hand', color: 'emerald',
-    defaultData: { label: 'Manual Trigger', category: 'trigger', triggerType: 'manual', config: {} } as TriggerNodeData },
+  // NOTE: There is no "Manual Trigger" node. Any flow can be run on demand via
+  // the "Run Now" button on the Flows dashboard, regardless of its trigger.
+  // A flow with no trigger node is treated as on-demand / manual-only.
 
   // ── Developer ──
   { type: 'triggerNode', category: 'trigger', subType: 'webhook', group: 'Developer',
@@ -89,6 +88,75 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Factory Added to Profile', description: 'User adds a preferred factory to their profile', icon: 'Building2', color: 'emerald',
     defaultData: { label: 'Factory Added to Profile', category: 'trigger', triggerType: 'preferred_factory_added', config: {} } as TriggerNodeData },
 
+  // ── Quotes (PDF) ──
+  { type: 'triggerNode', category: 'trigger', subType: 'quote_pdf_generated', group: 'Quotes',
+    label: 'Quote PDF Ready', description: 'A quote PDF finished generating', icon: 'FileText', color: 'emerald',
+    defaultData: { label: 'Quote PDF Ready', category: 'trigger', triggerType: 'quote_pdf_generated', config: {} } as TriggerNodeData },
+
+  // ── Suppliers ──
+  { type: 'triggerNode', category: 'trigger', subType: 'factory_approved', group: 'Suppliers',
+    label: 'Factory Approved', description: 'Admin approves a factory registration', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Factory Approved', category: 'trigger', triggerType: 'factory_approved', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'factory_rejected', group: 'Suppliers',
+    label: 'Factory Rejected', description: 'Admin rejects a factory registration', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Factory Rejected', category: 'trigger', triggerType: 'factory_rejected', config: {} } as TriggerNodeData },
+
+  // ── Appointments ──
+  { type: 'triggerNode', category: 'trigger', subType: 'appointment_booked', group: 'Appointments',
+    label: 'Appointment Booked', description: 'A booking is created', icon: 'Clock', color: 'emerald',
+    defaultData: { label: 'Appointment Booked', category: 'trigger', triggerType: 'appointment_booked', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'appointment_confirmed', group: 'Appointments',
+    label: 'Appointment Confirmed', description: 'A booking is confirmed', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Appointment Confirmed', category: 'trigger', triggerType: 'appointment_confirmed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'appointment_cancelled', group: 'Appointments',
+    label: 'Appointment Cancelled', description: 'A booking is cancelled', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Appointment Cancelled', category: 'trigger', triggerType: 'appointment_cancelled', config: {} } as TriggerNodeData },
+
+  // ── AI & 3D (completion / failure) ──
+  { type: 'triggerNode', category: 'trigger', subType: 'svbrdf_extraction_complete', group: 'AI & 3D',
+    label: 'SVBRDF Extracted', description: 'Material map extraction finished', icon: 'ScanEye', color: 'emerald',
+    defaultData: { label: 'SVBRDF Extracted', category: 'trigger', triggerType: 'svbrdf_extraction_complete', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'virtual_staging_completed', group: 'AI & 3D',
+    label: 'Virtual Staging Done', description: 'A virtual staging render finished', icon: 'ImagePlus', color: 'emerald',
+    defaultData: { label: 'Virtual Staging Done', category: 'trigger', triggerType: 'virtual_staging_completed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'vr_world_failed', group: 'AI & 3D',
+    label: 'VR World Failed', description: 'A VR world generation failed', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'VR World Failed', category: 'trigger', triggerType: 'vr_world_failed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'video_generation_completed', group: 'AI & 3D',
+    label: 'Video Generated', description: 'An interior video finished', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Video Generated', category: 'trigger', triggerType: 'video_generation_completed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'video_generation_failed', group: 'AI & 3D',
+    label: 'Video Failed', description: 'An interior video generation failed', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Video Failed', category: 'trigger', triggerType: 'video_generation_failed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'background_agent_failed', group: 'AI & 3D',
+    label: 'Agent Failed', description: 'A background agent run failed', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Agent Failed', category: 'trigger', triggerType: 'background_agent_failed', config: {} } as TriggerNodeData },
+
+  // ── Account & Billing ──
+  { type: 'triggerNode', category: 'trigger', subType: 'role_upgrade_request_submitted', group: 'Account & Billing',
+    label: 'Role Upgrade Requested', description: 'A user requests a role upgrade', icon: 'UserPlus', color: 'emerald',
+    defaultData: { label: 'Role Upgrade Requested', category: 'trigger', triggerType: 'role_upgrade_request_submitted', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'role_upgrade_approved', group: 'Account & Billing',
+    label: 'Role Upgrade Approved', description: 'A role upgrade is approved', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Role Upgrade Approved', category: 'trigger', triggerType: 'role_upgrade_approved', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'role_upgrade_rejected', group: 'Account & Billing',
+    label: 'Role Upgrade Rejected', description: 'A role upgrade is rejected', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Role Upgrade Rejected', category: 'trigger', triggerType: 'role_upgrade_rejected', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'stripe_payment_succeeded', group: 'Account & Billing',
+    label: 'Payment Succeeded', description: 'A Stripe payment succeeded', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Payment Succeeded', category: 'trigger', triggerType: 'stripe_payment_succeeded', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'stripe_payment_failed', group: 'Account & Billing',
+    label: 'Payment Failed', description: 'A Stripe payment failed', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Payment Failed', category: 'trigger', triggerType: 'stripe_payment_failed', config: {} } as TriggerNodeData },
+
+  // ── Projects ──
+  { type: 'triggerNode', category: 'trigger', subType: 'project_invitation_sent', group: 'Projects',
+    label: 'Project Invite Sent', description: 'A project collaboration invite is sent', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Project Invite Sent', category: 'trigger', triggerType: 'project_invitation_sent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'project_invitation_resent', group: 'Projects',
+    label: 'Project Invite Resent', description: 'A project collaboration invite is resent', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Project Invite Resent', category: 'trigger', triggerType: 'project_invitation_resent', config: {} } as TriggerNodeData },
+
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC
   // ════════════════════════════════════════════════════
@@ -168,8 +236,8 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Update Product', description: 'Edit product fields', icon: 'PackageCheck', color: 'blue',
     defaultData: { label: 'Update Product', category: 'action', actionType: 'update_product', config: { product_id: '', fields: {} } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'log_event', group: 'Data',
-    label: 'Log Event', description: 'Record analytics event', icon: 'ScrollText', color: 'blue',
-    defaultData: { label: 'Log Event', category: 'action', actionType: 'log_event', config: { event_name: '', event_data: '' } } as ActionNodeData },
+    label: 'Log Event', description: 'Write an audit / dedup-marker row', icon: 'ScrollText', color: 'blue',
+    defaultData: { label: 'Log Event', category: 'action', actionType: 'log_event', config: { table: '', row: '{}' } } as ActionNodeData },
 
   // ── Developer ──
   { type: 'actionNode', category: 'action', subType: 'http_request', group: 'Developer',

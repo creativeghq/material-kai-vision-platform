@@ -35,7 +35,27 @@ export type TriggerType =
   | 'profile_followed'
   | 'profile_published'
   | 'material_reviewed'
-  | 'preferred_factory_added';
+  | 'preferred_factory_added'
+  // ── Added 2026-05-30: event vocabulary for notification→flow migration ──
+  | 'quote_pdf_generated'
+  | 'factory_approved'
+  | 'factory_rejected'
+  | 'appointment_booked'
+  | 'appointment_confirmed'
+  | 'appointment_cancelled'
+  | 'svbrdf_extraction_complete'
+  | 'virtual_staging_completed'
+  | 'vr_world_failed'
+  | 'video_generation_completed'
+  | 'video_generation_failed'
+  | 'background_agent_failed'
+  | 'role_upgrade_request_submitted'
+  | 'role_upgrade_approved'
+  | 'role_upgrade_rejected'
+  | 'stripe_payment_succeeded'
+  | 'stripe_payment_failed'
+  | 'project_invitation_sent'
+  | 'project_invitation_resent';
 
 export interface ManualTriggerConfig {}
 
@@ -122,6 +142,28 @@ export interface MaterialReviewedTriggerConfig {
 
 export interface PreferredFactoryAddedTriggerConfig {}
 
+// ── Added 2026-05-30: notification→flow migration events. These carry their
+// full notification payload in trigger.data, so no filter config is needed. ──
+export interface QuotePdfGeneratedTriggerConfig {}
+export interface FactoryApprovedTriggerConfig {}
+export interface FactoryRejectedTriggerConfig {}
+export interface AppointmentBookedTriggerConfig {}
+export interface AppointmentConfirmedTriggerConfig {}
+export interface AppointmentCancelledTriggerConfig {}
+export interface SvbrdfExtractionCompleteTriggerConfig {}
+export interface VirtualStagingCompletedTriggerConfig {}
+export interface VRWorldFailedTriggerConfig {}
+export interface VideoGenerationCompletedTriggerConfig {}
+export interface VideoGenerationFailedTriggerConfig {}
+export interface BackgroundAgentFailedTriggerConfig {}
+export interface RoleUpgradeRequestSubmittedTriggerConfig {}
+export interface RoleUpgradeApprovedTriggerConfig {}
+export interface RoleUpgradeRejectedTriggerConfig {}
+export interface StripePaymentSucceededTriggerConfig {}
+export interface StripePaymentFailedTriggerConfig {}
+export interface ProjectInvitationSentTriggerConfig {}
+export interface ProjectInvitationResentTriggerConfig {}
+
 export type TriggerConfigMap = {
   manual: ManualTriggerConfig;
   scheduled: ScheduledTriggerConfig;
@@ -150,6 +192,25 @@ export type TriggerConfigMap = {
   profile_published: ProfilePublishedTriggerConfig;
   material_reviewed: MaterialReviewedTriggerConfig;
   preferred_factory_added: PreferredFactoryAddedTriggerConfig;
+  quote_pdf_generated: QuotePdfGeneratedTriggerConfig;
+  factory_approved: FactoryApprovedTriggerConfig;
+  factory_rejected: FactoryRejectedTriggerConfig;
+  appointment_booked: AppointmentBookedTriggerConfig;
+  appointment_confirmed: AppointmentConfirmedTriggerConfig;
+  appointment_cancelled: AppointmentCancelledTriggerConfig;
+  svbrdf_extraction_complete: SvbrdfExtractionCompleteTriggerConfig;
+  virtual_staging_completed: VirtualStagingCompletedTriggerConfig;
+  vr_world_failed: VRWorldFailedTriggerConfig;
+  video_generation_completed: VideoGenerationCompletedTriggerConfig;
+  video_generation_failed: VideoGenerationFailedTriggerConfig;
+  background_agent_failed: BackgroundAgentFailedTriggerConfig;
+  role_upgrade_request_submitted: RoleUpgradeRequestSubmittedTriggerConfig;
+  role_upgrade_approved: RoleUpgradeApprovedTriggerConfig;
+  role_upgrade_rejected: RoleUpgradeRejectedTriggerConfig;
+  stripe_payment_succeeded: StripePaymentSucceededTriggerConfig;
+  stripe_payment_failed: StripePaymentFailedTriggerConfig;
+  project_invitation_sent: ProjectInvitationSentTriggerConfig;
+  project_invitation_resent: ProjectInvitationResentTriggerConfig;
 };
 
 // =====================================================
@@ -333,8 +394,10 @@ export interface RunEdgeFunctionConfig {
 }
 
 export interface LogEventConfig {
-  event_name: string;
-  event_data: string;
+  /** Table to insert the marker/audit row into (e.g. quote_activities, material_alerts). */
+  table: string;
+  /** JSON object of templated columns to insert. Supports {{trigger.data.x}} templates. */
+  row: string;
 }
 
 export interface SendAgentMessageConfig {

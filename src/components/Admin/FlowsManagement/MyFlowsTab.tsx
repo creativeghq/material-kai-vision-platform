@@ -5,6 +5,7 @@ import {
   Copy,
   Trash2,
   Play,
+  PlayCircle,
   Pause,
   Pencil,
   MoreHorizontal,
@@ -91,6 +92,25 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   profile_published: UserPlus,
   material_reviewed: CheckCircle2,
   preferred_factory_added: Package,
+  quote_pdf_generated: FileCheck,
+  factory_approved: CheckCircle2,
+  factory_rejected: XCircle,
+  appointment_booked: Clock,
+  appointment_confirmed: CheckCircle2,
+  appointment_cancelled: XCircle,
+  svbrdf_extraction_complete: ScanEye,
+  virtual_staging_completed: Image,
+  vr_world_failed: XCircle,
+  video_generation_completed: CheckCircle2,
+  video_generation_failed: XCircle,
+  background_agent_failed: XCircle,
+  role_upgrade_request_submitted: UserPlus,
+  role_upgrade_approved: CheckCircle2,
+  role_upgrade_rejected: XCircle,
+  stripe_payment_succeeded: CheckCircle2,
+  stripe_payment_failed: XCircle,
+  project_invitation_sent: Share2,
+  project_invitation_resent: Share2,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -121,6 +141,25 @@ const triggerLabels: Record<TriggerType, string> = {
   profile_published: 'Profile Published',
   material_reviewed: 'Material Reviewed',
   preferred_factory_added: 'Preferred Factory Added',
+  quote_pdf_generated: 'Quote PDF Ready',
+  factory_approved: 'Factory Approved',
+  factory_rejected: 'Factory Rejected',
+  appointment_booked: 'Appointment Booked',
+  appointment_confirmed: 'Appointment Confirmed',
+  appointment_cancelled: 'Appointment Cancelled',
+  svbrdf_extraction_complete: 'SVBRDF Extracted',
+  virtual_staging_completed: 'Virtual Staging Done',
+  vr_world_failed: 'VR World Failed',
+  video_generation_completed: 'Video Generated',
+  video_generation_failed: 'Video Failed',
+  background_agent_failed: 'Agent Failed',
+  role_upgrade_request_submitted: 'Role Upgrade Requested',
+  role_upgrade_approved: 'Role Upgrade Approved',
+  role_upgrade_rejected: 'Role Upgrade Rejected',
+  stripe_payment_succeeded: 'Payment Succeeded',
+  stripe_payment_failed: 'Payment Failed',
+  project_invitation_sent: 'Project Invite Sent',
+  project_invitation_resent: 'Project Invite Resent',
 };
 
 const statusColors: Record<FlowStatus, string> = {
@@ -138,8 +177,30 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
 }) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [runningId, setRunningId] = useState<string | null>(null);
   const [newFlow, setNewFlow] = useState({ name: '', description: '' });
   const { toast } = useToast();
+
+  const handleRunNow = async (flow: Flow) => {
+    try {
+      setRunningId(flow.id);
+      const run = await flowService.executeFlow(flow.id, {});
+      toast({
+        title: run.status === 'failed' ? 'Flow run failed' : 'Flow ran',
+        description: `"${flow.name}" — ${run.status}`,
+        variant: run.status === 'failed' ? 'destructive' : undefined,
+      });
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to run flow',
+        variant: 'destructive',
+      });
+    } finally {
+      setRunningId(null);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newFlow.name.trim()) {
@@ -289,6 +350,20 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      size="sm"
+                      onClick={() => handleRunNow(flow)}
+                      disabled={runningId === flow.id}
+                      className="gap-1"
+                    >
+                      {runningId === flow.id ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <PlayCircle className="h-3.5 w-3.5" />
+                      )}
+                      Run Now
+                    </Button>
+
                     <Button
                       size="sm"
                       variant="outline"

@@ -23,6 +23,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -306,21 +307,15 @@ Deno.serve(async (req: Request) => {
       for (const admin of adminRows) {
         // deno-lint-ignore no-explicit-any
         const a = admin as any;
-        await supabase.from('user_notifications').insert({
+        // Per-admin emit (fan-out happens in this loop). Delivered by the
+        // "Role Upgrade Requested" flow (Flows dashboard).
+        emitFlowEvent('role_upgrade_request_submitted', {
           user_id: a.user_id,
           type: 'role_upgrade_request',
           title: `New ${requestedRoleLabel} application`,
           body: `${profile.full_name || profile.email || 'A user'} applied to become a ${requestedRoleLabel}. VAT: ${viesSnapshot.status_text}.`,
           action_url: actionUrl,
-          is_read: false,
-          metadata: {
-            request_id: inserted.id,
-            applicant_user_id: user.id,
-            requested_role: body.requested_role,
-            vat_validated: viesSnapshot.vat_validated,
-            vat_validated_name: viesSnapshot.vat_validated_name,
-          },
-        });
+        }).catch(() => {});
 
         if (a.email) {
           await sendEmail(supabase, a.email, `New ${requestedRoleLabel} application from ${profile.full_name || profile.email || 'a user'}`, 'role_upgrade_request.submitted', {
@@ -402,15 +397,16 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        await supabase.from('user_notifications').insert({
+        // Delivered by the "Role Upgrade Approved" flow (Flows dashboard).
+        emitFlowEvent('role_upgrade_approved', {
           user_id: request.user_id,
           type: 'role_upgrade_approved',
           title: `You are now a ${requestedRoleLabel}`,
           body: 'Your application has been approved.',
           action_url: actionUrl,
-          is_read: false,
-          metadata: { request_id: body.request_id, requested_role: requestedRoleName },
-        });
+          request_id: body.request_id,
+          requested_role: requestedRoleName,
+        }).catch(() => {});
 
         return jsonResponse({ success: true, status: 'approved' });
       }
@@ -437,15 +433,16 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await supabase.from('user_notifications').insert({
+      // Delivered by the "Role Upgrade Rejected" flow (Flows dashboard).
+      emitFlowEvent('role_upgrade_rejected', {
         user_id: request.user_id,
         type: 'role_upgrade_rejected',
         title: `Your ${requestedRoleLabel} application`,
         body: body.admin_note?.trim() || 'Your application was not approved at this time.',
         action_url: actionUrl,
-        is_read: false,
-        metadata: { request_id: body.request_id, requested_role: requestedRoleName },
-      });
+        request_id: body.request_id,
+        requested_role: requestedRoleName,
+      }).catch(() => {});
 
       return jsonResponse({ success: true, status: 'rejected' });
     }
