@@ -5,6 +5,7 @@ import {
   Clock,
   CheckCircle2,
   Settings,
+  LayoutGrid,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -12,6 +13,7 @@ import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { MyFlowsTab } from './MyFlowsTab';
 import { FlowBuilderTab } from './FlowBuilderTab';
 import { RunHistoryTab } from './RunHistoryTab';
+import { SystemAreasTab } from './SystemAreasTab';
 import { flowService } from '@/services/flows';
 import type { Flow } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
@@ -124,6 +126,10 @@ export const FlowsManagement: React.FC = () => {
               <Settings className="h-4 w-4" />
               Flow Builder
             </TabsTrigger>
+            <TabsTrigger value="areas" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <LayoutGrid className="h-4 w-4" />
+              System Areas
+            </TabsTrigger>
             <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Clock className="h-4 w-4" />
               Run History
@@ -144,6 +150,17 @@ export const FlowsManagement: React.FC = () => {
 
           <TabsContent value="builder">
             <FlowBuilderTab flowId={selectedFlowId} />
+          </TabsContent>
+
+          <TabsContent value="areas">
+            <SystemAreasTab
+              flows={flows}
+              onRefresh={loadData}
+              onOpenBuilder={(flowId) => {
+                setSelectedFlowId(flowId);
+                setActiveTab('builder');
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="history">

@@ -16,6 +16,7 @@ export type {
   FlowGraphNode,
   FlowGraphEdge,
   Flow,
+  FlowAreaRegistryEntry,
   FlowRun,
   FlowRunStep,
   NodePaletteItem,

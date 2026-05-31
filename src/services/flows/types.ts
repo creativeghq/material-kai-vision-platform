@@ -527,10 +527,30 @@ export interface Flow {
   graph_definition: FlowGraphDefinition;
   version: number;
   tags: string[];
+  /** When true, the flow cannot be deleted (also enforced by a DB trigger). */
+  is_locked?: boolean;
   created_by: string | null;
   updated_by: string | null;
   last_run_at: string | null;
   run_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * A platform "area" that should always have a flow pointed at it. Each area maps
+ * to a trigger_type; `bound_flow_id` records the canonical handler flow. The
+ * System Areas tab surfaces each area as filled or empty so coverage is visible.
+ */
+export interface FlowAreaRegistryEntry {
+  area_key: string;
+  title: string;
+  description: string | null;
+  category: string;
+  trigger_type: TriggerType;
+  required: boolean;
+  bound_flow_id: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

@@ -31,6 +31,8 @@ import {
   LayoutGrid,
   ImagePlus,
   Share2,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -202,6 +204,25 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
     }
   };
 
+  const handleToggleLock = async (flow: Flow) => {
+    try {
+      await flowService.setFlowLocked(flow.id, !flow.is_locked);
+      toast({
+        title: flow.is_locked ? 'Unlocked' : 'Locked',
+        description: flow.is_locked
+          ? `"${flow.name}" can now be deleted.`
+          : `"${flow.name}" is protected from deletion.`,
+      });
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update lock',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleCreate = async () => {
     if (!newFlow.name.trim()) {
       toast({ title: 'Error', description: 'Flow name is required', variant: 'destructive' });
@@ -332,6 +353,12 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                         <Badge variant="outline" className={statusColors[flow.status]}>
                           {flow.status}
                         </Badge>
+                        {flow.is_locked && (
+                          <Badge variant="outline" className="gap-1 bg-amber-500/10 text-amber-500">
+                            <Lock className="h-3 w-3" />
+                            Locked
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>Trigger: {triggerLabels[flow.trigger_type] || flow.trigger_type}</span>
@@ -398,13 +425,27 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleLock(flow)}>
+                          {flow.is_locked ? (
+                            <>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Unlock (allow delete)
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-4 w-4 mr-2" />
+                              Lock (prevent delete)
+                            </>
+                          )}
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => handleDelete(flow)}
+                          disabled={flow.is_locked}
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
+                          {flow.is_locked ? 'Delete (locked)' : 'Delete'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
