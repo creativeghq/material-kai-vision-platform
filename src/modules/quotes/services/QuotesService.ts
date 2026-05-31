@@ -371,61 +371,32 @@ export class QuotesService {
 
     if (error) throw error;
 
-    if (data.status === 'accepted') {
-      flowEventService.emit('quote_approved', {
-        quote_id: quote.id,
-        user_id: quote.user_id,
-      });
-      // Notify workspace admins
+    if (data.status === 'accepted' || data.status === 'rejected') {
+      // Admin fan-out is delivered by the "Quote Accepted/Rejected → Notify
+      // Admins" flow (Loop over admin_ids → Create Notification). The event
+      // carries the admin recipient list + payload so an admin can pause/edit it.
+      const accepted = data.status === 'accepted';
+      const eventName = accepted ? 'quote_approved' : 'quote_rejected';
+      const quoteRef = quote.quote_number || quote.id.slice(0, 8);
+      const emitQuoteEvent = (adminIds: string[]) =>
+        flowEventService.emit(eventName, {
+          quote_id: quote.id,
+          user_id: quote.user_id,
+          admin_ids: adminIds,
+          type: accepted ? 'quote_accepted' : 'quote_rejected',
+          title: accepted ? `Quote ${quoteRef} accepted` : `Quote ${quoteRef} declined`,
+          body: accepted ? 'A client has accepted the quote.' : 'A client has declined the quote.',
+          action_url: `/admin/quotes/${quote.id}`,
+        });
       if (quote.workspace_id) {
         supabase
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', quote.workspace_id)
           .in('role', ADMIN_ROLES)
-          .then(({ data: admins }) => {
-            if (admins?.length) {
-              supabase.from('user_notifications').insert(
-                admins.map((m) => ({
-                  user_id: m.user_id,
-                  type: 'quote_accepted',
-                  title: `Quote ${quote.quote_number || quote.id.slice(0, 8)} accepted`,
-                  body: 'A client has accepted the quote.',
-                  action_url: `/admin/quotes/${quote.id}`,
-                  is_read: false,
-                  metadata: { quote_id: quote.id },
-                })),
-              ).then(() => {});
-            }
-          });
-      }
-    } else if (data.status === 'rejected') {
-      flowEventService.emit('quote_rejected', {
-        quote_id: quote.id,
-        user_id: quote.user_id,
-      });
-      // Notify workspace admins
-      if (quote.workspace_id) {
-        supabase
-          .from('workspace_members')
-          .select('user_id')
-          .eq('workspace_id', quote.workspace_id)
-          .in('role', ADMIN_ROLES)
-          .then(({ data: admins }) => {
-            if (admins?.length) {
-              supabase.from('user_notifications').insert(
-                admins.map((m) => ({
-                  user_id: m.user_id,
-                  type: 'quote_rejected',
-                  title: `Quote ${quote.quote_number || quote.id.slice(0, 8)} declined`,
-                  body: 'A client has declined the quote.',
-                  action_url: `/admin/quotes/${quote.id}`,
-                  is_read: false,
-                  metadata: { quote_id: quote.id },
-                })),
-              ).then(() => {});
-            }
-          });
+          .then(({ data: admins }) => emitQuoteEvent((admins || []).map((m) => m.user_id)));
+      } else {
+        emitQuoteEvent([]);
       }
     }
 

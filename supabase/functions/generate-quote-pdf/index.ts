@@ -5,6 +5,7 @@ import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile } from './data-fe
 import { buildQuotePDF } from './pdf-builder.ts';
 import type { QuotePDFRequest, QuotePDFResponse } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -149,15 +150,14 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       .eq('id', quoteId)
       .single();
     if (quoteRecord?.user_id) {
-      supabase.from('user_notifications').insert({
+      emitFlowEvent('quote_pdf_generated', {
         user_id: quoteRecord.user_id,
         type: 'pdf_ready',
         title: 'Your quote PDF is ready',
         body: `Quote ${quoteData.quote_number || ''} PDF has been generated and is ready to download.`,
         action_url: `/quotes/${quoteId}`,
-        is_read: false,
-        metadata: { quote_id: quoteId },
-      }).then(() => {});
+        quote_id: quoteId,
+      }).catch(() => {});
     }
 
     const response: QuotePDFResponse = {
