@@ -4,18 +4,20 @@ import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getMivaaActionCost } from '../_shared/mivaa-pricing.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
-// Environment variables
-// Try to use local API first (for server environment), fall back to external domain
-const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
+// Lazy env getters — resolved per-request so the secrets-bootstrap pass
+// (called at the top of the handler) can populate Deno.env from
+// platform_secrets first. Previously MIVAA_API_KEY was captured at module
+// load AND a missing key threw at parse time — silently ignoring DB-fallback
+// secrets and crashing the worker before bootstrap could rescue it.
+const MIVAA_LOCAL_URL = () => Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
 const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
-const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_URL;
-const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
-if (!MIVAA_API_KEY) {
-  throw new Error('MIVAA_API_KEY environment variable is required but not set');
-}
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const MIVAA_SERVICE_URL = () => Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_URL;
+const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
+const SUPABASE_URL = () => Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE_KEY = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // Available MIVAA endpoints (COMPREHENSIVE - API Consolidation v2.3.0)
 const MIVAA_ENDPOINTS = {
@@ -200,7 +202,7 @@ async function handleFileUpload(req: Request): Promise<Response> {
     // `/upload-async` previously which silently 404'd — the actual route is
     // `/upload` (rag_routes.py:539). All uploads through this gateway have
     // been hitting a 404 until this fix (2026-05-23 round-3 audit).
-    const mivaaUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/upload`;
+    const mivaaUrl = `${MIVAA_SERVICE_URL()}/api/rag/documents/upload`;
     console.log(`📡 Forwarding to MIVAA upload endpoint: POST ${mivaaUrl}`);
 
     // Forward the caller's JWT (not the service key) so MIVAA's
@@ -211,7 +213,7 @@ async function handleFileUpload(req: Request): Promise<Response> {
     const callerAuth = req.headers.get('authorization');
     const forwardedAuth = callerAuth && callerAuth.startsWith('Bearer ')
       ? callerAuth
-      : `Bearer ${MIVAA_API_KEY}`;
+      : `Bearer ${MIVAA_API_KEY()}`;
 
     const response = await fetch(mivaaUrl, {
       method: 'POST',
@@ -329,11 +331,11 @@ async function handleJobStatus(jobId: string): Promise<Response> {
   try {
     console.log(`🔍 Checking job status for: ${jobId}`);
 
-    const statusUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/job/${jobId}`;
+    const statusUrl = `${MIVAA_SERVICE_URL()}/api/rag/documents/job/${jobId}`;
 
     const response = await fetch(statusUrl, {
       headers: {
-        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+        'Authorization': `Bearer ${MIVAA_API_KEY()}`,
       },
     });
 
@@ -388,6 +390,25 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Populate Deno.env from platform_secrets BEFORE any env reads. This is the
+  // central MIVAA gateway — silently ignoring admin-saved DB secrets here
+  // would block every Python backend call across the platform.
+  await bootstrapForFunction();
+
+  // Pre-flight: MIVAA_API_KEY MUST be configured (env or DB fallback). Return
+  // a clean 503 with admin-actionable message rather than passing an empty
+  // Bearer token upstream (which would manifest as cryptic MIVAA 401s).
+  if (!MIVAA_API_KEY()) {
+    return notConfiguredResponse(
+      {
+        provider: 'MIVAA',
+        envVarHint: 'Set the MIVAA_API_KEY env var on the edge function host, or paste it',
+        settingsPath: '/admin/operations → Keys',
+      },
+      corsHeaders,
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const contentType = req.headers.get('content-type') || '';
@@ -414,7 +435,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     const { action, payload } = await req.json();
 
     console.log(`🚀 MIVAA Gateway Request: ${action}`, payload);
-    console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL}`);
+    console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL()}`);
     console.log(`🔑 MIVAA API Key configured: ${!!Deno.env.get('MIVAA_API_KEY')}`);
 
     // --- AUTH (all actions, not just billable) ---
@@ -438,7 +459,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       }
 
       if (!isAdmin && auth.userId) {
-        const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const supabaseAdmin = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
 
         const { data: debitData, error: debitError } = await supabaseAdmin.rpc('debit_user_credits', {
           p_user_id: auth.userId,
@@ -576,14 +597,14 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     }
 
     // Make request to MIVAA service
-    const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`;
+    const mivaaUrl = `${MIVAA_SERVICE_URL()}${finalPath}`;
     console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`);
 
     const fetchOptions: RequestInit = {
       method: endpoint.method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+        'Authorization': `Bearer ${MIVAA_API_KEY()}`,
       },
     };
 

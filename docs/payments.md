@@ -255,9 +255,58 @@ Applied via `mcp__supabase__apply_migration` per the platform's [SQL workflow ru
 
 ---
 
+## Shared edge-function helpers
+
+Two complementary helpers cover every edge function that calls an external API:
+
+### 1. [`_shared/api-provider-errors.ts`](../supabase/functions/_shared/api-provider-errors.ts) — generic
+
+Used by `email-api`, `messaging-api`, `messaging-processor`, `mivaa-gateway`, `generate-pbr-maps`, and any other edge function that calls a third-party API (Resend, Twilio, Replicate, OpenAI, Anthropic, MIVAA, etc.) when the required secret is unset.
+
+```typescript
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
+
+if (!resendApiKey()) {
+  return notConfiguredResponse({
+    provider: 'Resend',
+    envVarHint: 'Set RESEND_API_KEY on the host, or paste it',
+    settingsPath: '/admin/modules/email/settings → Keys',
+  });
+}
+```
+
+Returns 503 with uniform shape `{ error, code: 'provider_not_configured', provider: '<lowercase-slug>' }` so a single frontend hook can branch on the code regardless of which provider failed.
+
+### 2. [`_shared/stripe-clients.ts`](../supabase/functions/_shared/stripe-clients.ts) — Stripe-specific
+
+Stripe-touching edge functions (`stripe-api/*`, `stripe-webhooks`, `finance-pay-invoice`, future processors) get extra ergonomics on top of the generic helper:
+
+- `stripeSecretKey()`, `stripeWebhookSecret()`, `supabaseUrlEnv()`, `supabaseServiceKeyEnv()` — lazy env getters
+- `getStripe(): Stripe | null` — memoised Stripe client built on first call
+- `getSupabase(): SupabaseClient | null` — same for the service-role Supabase client
+- `noPaymentProviderResponse(extraHeaders)` — wraps `notConfiguredResponse({ provider: 'Stripe', ... })` with the canonical customer-facing copy and `code: 'no_payment_provider_configured'` (the customer-facing variant; admin-facing services use `provider_not_configured`)
+- `resetStripeClients()` — drops memoised clients for tests / post-rotation flows
+
+```typescript
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { getStripe, getSupabase, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
+
+Deno.serve(async (req) => {
+  await bootstrapForFunction();           // populate Deno.env from platform_secrets
+  const stripe = getStripe();
+  const supabase = getSupabase();
+  if (!stripe || !supabase) return noPaymentProviderResponse();
+  // … use stripe / supabase normally
+});
+```
+
+Both helpers are the canonical pattern for new and existing edge functions touching external APIs. The error-code split (`provider_not_configured` vs `no_payment_provider_configured`) lets the frontend distinguish customer-facing payment failures from back-office service outages.
+
+---
+
 ## Pending follow-ups
 
-- **`stripe-customer-portal` and `stripe-checkout` env var resolution** — should swap to `resolveSecret()` so the platform_secrets DB row is honored when env is unset (matches the pattern for FIRECRAWL_API_KEY etc.). Trivial change per function.
+- **Wire the shared `stripe-clients.ts` helper into existing call sites** — `stripe-api/handlers/checkout.ts`, `stripe-api/handlers/customer-portal.ts`, `stripe-webhooks/index.ts`, and `finance-pay-invoice/index.ts` are still on the per-file module-load capture pattern. The helper is ready; adopting it makes DB-fallback secrets work without a cold restart and surfaces a clean 503 (`no_payment_provider_configured`) when Stripe isn't configured.
 - **Multi-ERP picker** when a second ERP integration ships (Xero / QuickBooks). See "Multi-ERP priority" above.
 - **Checkout-time provider picker** when there's a second payment provider (PayPal etc.) — today the platform implicitly assumes Stripe; the UI needs a small refactor to ask the customer which provider to use.
 - **Invoice template preview in PDF context** — today the cover/footer uploader shows the raw image. A side-by-side preview rendering the cover + a fake invoice body + the footer would help operators verify alignment before issuing real invoices.

@@ -17,6 +17,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -360,6 +361,24 @@ async function handleRequest(
   }
   if (!source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
+  }
+
+  // ── Pre-flight: REPLICATE_API_TOKEN must be configured ───────────────────
+  // The function's promise is "reliable PBR maps". MIVAA SVBRDF is tried first
+  // and may succeed without Replicate, but Replicate is the fallback safety
+  // net — without it, a MIVAA outage silently degrades to status='partial'
+  // or 'failed'. Failing pre-flight is honest (admin sees a clear 503 + fix
+  // path) instead of letting a deep callReplicate() throw surface as a 500
+  // after work + IO is already in flight.
+  if (!replicateToken()) {
+    return notConfiguredResponse(
+      {
+        provider: 'Replicate',
+        envVarHint: 'PBR map generation requires Replicate as the fallback. Set REPLICATE_API_TOKEN on the host, or paste it',
+        settingsPath: '/admin/operations → Keys',
+      },
+      corsHeaders,
+    );
   }
 
   // ── Check credits ──────────────────────────────────────────────────────────

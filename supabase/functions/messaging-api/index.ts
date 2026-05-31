@@ -16,6 +16,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
 // =====================================================
 // Types
@@ -362,12 +363,23 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
-    // Get Twilio credentials from environment
+    // Get Twilio credentials from environment / platform_secrets fallback
     const twilioAccountSid = () => Deno.env.get('TWILIO_ACCOUNT_SID') || '';
     const twilioAuthToken = () => Deno.env.get('TWILIO_AUTH_TOKEN') || '';
 
+    // Pre-flight: missing Twilio creds previously threw and surfaced as a
+    // 500 with raw exception text. Return a clean 503 with admin-actionable
+    // settings path instead — every call site of this function (web checkout,
+    // bulk send, opt-in flows) gets uniform error handling.
     if (!twilioAccountSid() || !twilioAuthToken()) {
-      throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN secrets.');
+      return notConfiguredResponse(
+        {
+          provider: 'Twilio',
+          envVarHint: 'Set TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN on the host, or paste them',
+          settingsPath: '/admin/modules/messaging/settings → Keys',
+        },
+        corsHeaders,
+      );
     }
 
     const provider = new TwilioProvider(twilioAccountSid(), twilioAuthToken());

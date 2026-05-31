@@ -13,6 +13,9 @@ import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTex
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
+
+const resendApiKey = () => Deno.env.get('RESEND_API_KEY') || '';
 
 interface SendEmailRequest {
   to: string | string[];
@@ -89,6 +92,21 @@ Deno.serve(withApiLogging('email-api', async (req) => {
     switch (action) {
       case 'send': {
         if (req.method !== 'POST') throw new Error('Method not allowed');
+
+        // Pre-flight: require Resend API key. Without this, sendViaResend()
+        // throws deep inside the send pipeline and surfaces as an opaque 500.
+        // Returning 503 with code='provider_not_configured' lets the frontend
+        // surface a meaningful "ask your admin to set this" message.
+        if (!resendApiKey()) {
+          return notConfiguredResponse(
+            {
+              provider: 'Resend',
+              envVarHint: 'Set RESEND_API_KEY on the host, or paste it',
+              settingsPath: '/admin/modules/email/settings → Keys',
+            },
+            corsHeaders,
+          );
+        }
 
         const body: SendEmailRequest = requestBody;
 

@@ -12,6 +12,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
 // Configuration
 const BATCH_SIZE = 10; // Messages per batch
@@ -227,8 +228,17 @@ serve(async (req) => {
     const twilioAccountSid = () => Deno.env.get('TWILIO_ACCOUNT_SID') || '';
     const twilioAuthToken = () => Deno.env.get('TWILIO_AUTH_TOKEN') || '';
 
+    // Skip the cron tick when Twilio isn't configured. Returns 503 with the
+    // canonical `provider_not_configured` code instead of throwing a raw
+    // "Twilio credentials not configured" 500 — keeps the cron monitor
+    // dashboard's failure reason structured and clear about the fix.
     if (!twilioAccountSid() || !twilioAuthToken()) {
-      throw new Error('Twilio credentials not configured');
+      console.warn('[messaging-processor] Twilio not configured — skipping this tick');
+      return notConfiguredResponse({
+        provider: 'Twilio',
+        envVarHint: 'Cron tick skipped — set TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN on the host, or paste them',
+        settingsPath: '/admin/modules/messaging/settings → Keys',
+      });
     }
 
     const twilio = new TwilioProvider(twilioAccountSid(), twilioAuthToken());
