@@ -72,12 +72,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Optional Oxygen push (reuses existing oxygen-create-pre-invoice function)
+    // 3. Optional Oxygen push (reuses oxygen-api action=create_pre_invoice)
     let oxygenResult: any = null;
     if (body.push_to_oxygen) {
       try {
         const oxygenRes = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/oxygen-create-pre-invoice`,
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/oxygen-api`,
           {
             method: 'POST',
             headers: {
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
               Authorization: req.headers.get('Authorization') ?? '',
               apikey: req.headers.get('apikey') ?? '',
             },
-            body: JSON.stringify({ quote_id: body.quote_id }),
+            body: JSON.stringify({ action: 'create_pre_invoice', quote_id: body.quote_id }),
           },
         );
         oxygenResult = await oxygenRes.json();

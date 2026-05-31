@@ -10797,7 +10797,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_synced_at: string | null
-          late_account_id: string
+          zernio_account_id: string
           metadata: Json | null
           platform: string
           user_id: string
@@ -10814,7 +10814,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
-          late_account_id: string
+          zernio_account_id: string
           metadata?: Json | null
           platform: string
           user_id: string
@@ -10831,7 +10831,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_synced_at?: string | null
-          late_account_id?: string
+          zernio_account_id?: string
           metadata?: Json | null
           platform?: string
           user_id?: string
@@ -10913,7 +10913,7 @@ export type Database = {
           hashtags: string[] | null
           id: string
           image_urls: string[] | null
-          late_post_id: string | null
+          zernio_post_id: string | null
           metadata: Json | null
           platform: string
           post_type: string
@@ -10935,7 +10935,7 @@ export type Database = {
           hashtags?: string[] | null
           id?: string
           image_urls?: string[] | null
-          late_post_id?: string | null
+          zernio_post_id?: string | null
           metadata?: Json | null
           platform: string
           post_type?: string
@@ -10957,7 +10957,7 @@ export type Database = {
           hashtags?: string[] | null
           id?: string
           image_urls?: string[] | null
-          late_post_id?: string | null
+          zernio_post_id?: string | null
           metadata?: Json | null
           platform?: string
           post_type?: string

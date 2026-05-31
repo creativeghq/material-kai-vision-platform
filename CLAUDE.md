@@ -1005,7 +1005,7 @@ Seeded keys (one row per key, sharing via `platform_secret_module_links`):
 | `DATAFORSEO_LOGIN/PASSWORD` | mention-monitoring | job-research |
 | `YOUTUBE_DATA_API_KEY` | mention-monitoring | — |
 | `TWILIO_ACCOUNT_SID/AUTH_TOKEN` | messaging | — |
-| `LATE_API_KEY/WEBHOOK_SECRET` | social-media | — |
+| `ZERNIO_API_KEY/WEBHOOK_SECRET` | social-media | — |
 | `RESEND_API_KEY` | email | — |
 | `OXYGEN_*` (4 keys) | oxygen | — |
 
@@ -1115,6 +1115,16 @@ Self-contained module that wraps ΑΑΔΕ web services (SOAP 1.2 + WS-Security U
 - **Source image**: `source_image_url` now included in `virtualStagingData` (from both edge function chunk and frontend direct call)
 - **Quality analysis**: "Analyze Quality" button sends both images to KAI for Claude Vision assessment (lighting, perspective, scale, materials, edge blending — scored 1-10)
 - **Toggle**: "Before / After" button shows/hides the comparison slider
+
+## Social publishing — Zernio (renamed from Late.dev, 2026-05-30)
+
+The social-media backbone (`docs/social-media-system.md`) migrated off **Late.dev** to its renamed-and-rebuilt successor **Zernio** (`https://zernio.com/api/v1`, [docs.zernio.com](https://docs.zernio.com/sdks)). Full de-Late-ification:
+
+- **Edge functions**: `late-api` → `zernio-api` (router + `handlers/{oauth,publish,analytics}.ts` + shared `zernio.ts`), `late-webhook-handler` → `zernio-webhook-handler`. Old function dirs deleted; `config.toml` updated (the prior split `late-oauth/publish/analytics` entries are gone). Frontend `SocialAccountsTab`, agent tools (`tools.ts`), and the two background agents (`social-analytics-sync`, `social-insights-sync`) all call `zernio-api` / Zernio REST.
+- **DB**: `social_accounts.late_account_id` → `zernio_account_id`, `social_posts.late_post_id` → `zernio_post_id` (+ unique constraint renamed). New `social_zernio_profiles(workspace_id PK, zernio_profile_id)` mapping table — Zernio groups accounts under a **profile**, so we lazily find-or-create **one Zernio profile per workspace** (`ws:{workspace_id}`) and cache its id; falls back to the default profile if Zernio's plan ceiling (402/403) blocks creation. A profile holds many accounts, so multi-account-per-workspace is unchanged.
+- **Secrets**: `ZERNIO_API_KEY` / `ZERNIO_WEBHOOK_SECRET` seeded in `platform_secrets` (module `social-media`). Resolver is **ZERNIO_\* first, legacy LATE_\* fallback**, so existing deploys keep working until the new key is pasted at `/admin/modules/social-media → Settings`. The Late key/service won't authenticate against Zernio — a real Zernio key is required.
+- **API shape changes**: connect is `GET /v1/connect/{platform}?profileId=&redirect_url=` → `{authUrl}` (browser returns to the app with `?connected=&accountId=`; `SocialAccountsTab` finishes via `action:'callback'`). Publish is `POST /v1/posts` with `{content, platforms:[{platform,accountId}], mediaItems, publishNow|scheduledFor}`. Analytics: post → `GET /v1/analytics?postId=` (camelCase, `engagementRate`); best-time → `GET /v1/analytics/best-time?accountId=`; account insights → `GET /v1/accounts/follower-stats?accountIds=`. Webhook payload is `{event, post|account}` (not `{type,data}`) with `X-Zernio-Signature` HMAC-SHA256.
+- **Activate after deploy**: (1) `supabase functions deploy zernio-api zernio-webhook-handler`; (2) paste `ZERNIO_API_KEY` + `ZERNIO_WEBHOOK_SECRET`; (3) in the Zernio dashboard register the OAuth redirect (the app profile page) and the webhook URL (`.../functions/v1/zernio-webhook-handler`).
 
 ## Design System Summary
 Full reference: `.claude/design-system.md`

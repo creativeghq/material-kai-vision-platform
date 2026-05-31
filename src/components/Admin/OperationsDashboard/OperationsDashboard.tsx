@@ -783,7 +783,7 @@ const OperationsDashboardInner: React.FC = () => {
       'apollo-enrich', 'apollo-people-match',
       'hunter-email-finder', 'hunter-domain-search',
       'zerobounce-validate', 'firecrawl-scrape',
-      'late-publish', 'social-caption',
+      'zernio-publish', 'social-caption',
       'xai-aurora', 'flux-2-pro', 'flux-dev',
     ];
     supabase
@@ -1302,7 +1302,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, and Late.dev (social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
+                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
             </div>
 
@@ -1339,7 +1339,7 @@ const OperationsDashboardInner: React.FC = () => {
                       { key: 'hunter-domain-search',  label: 'Hunter Domain Search', category: 'B2B Data',     unit: 'search',     raw: 0.01,   billed: 0.015 },
                       { key: 'zerobounce-validate',   label: 'ZeroBounce Validate',  category: 'Email',        unit: 'email',      raw: 0.008,  billed: 0.012 },
                       { key: 'firecrawl-scrape',      label: 'Firecrawl Scrape',     category: 'Web Scraping', unit: 'page',       raw: 0.001,  billed: 0.0015 },
-                      { key: 'late-publish',          label: 'Late.dev Publish',     category: 'Social',       unit: 'post',       raw: 0.0,    billed: null },
+                      { key: 'zernio-publish',        label: 'Zernio Publish',       category: 'Social',       unit: 'post',       raw: 0.0,    billed: null },
                       { key: 'social-caption',        label: 'Social Caption Gen',   category: 'Social',       unit: 'generation', raw: 0.002,  billed: 0.003 },
                       { key: 'xai-aurora',            label: 'xAI Aurora Image',     category: 'Social',       unit: 'image',      raw: 0.07,   billed: 0.105 },
                       { key: 'flux-2-pro',            label: 'FLUX 2 Pro Image',     category: 'Social',       unit: 'image',      raw: 0.04,   billed: 0.06 },

@@ -88,10 +88,12 @@ const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategoriza
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
+const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
 // Project Workspace passwordless invite flow (public landing + auth-required accept)
 const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/InviteLandingPage').then(m => ({ default: m.InviteLandingPage })));
 const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
+const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
 
@@ -144,6 +146,7 @@ const App = () => (
                 {/* Public routes — no auth required */}
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
+                <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Public Tools"><PublicToolsPage /></PageErrorBoundary>} />
                 {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
                     expects a Supabase session (established by the magic-link callback) — if it isn't there,
@@ -651,6 +654,9 @@ const App = () => (
 
                 {/* Public Presentation Catalog (email-gated, no layout) */}
                 <Route path="/c/:slug" element={<PageErrorBoundary name="Public Catalog"><PublicCatalogPage /></PageErrorBoundary>} />
+
+                {/* Public invoice payment (token-gated, no auth, no layout) */}
+                <Route path="/pay/:token" element={<PageErrorBoundary name="Pay invoice"><PayInvoicePage /></PageErrorBoundary>} />
 
                 {/* Admin: Modules registry */}
                 <Route

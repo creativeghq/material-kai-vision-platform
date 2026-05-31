@@ -119,8 +119,9 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
       // Direct call needs cron-secret. Without it, we'll get 401.
       // The proper path is to invoke our seo-toolkit-research edge function:
       if (resp.status === 401) {
-        const inv = await (supabase as any).functions.invoke('seo-toolkit-research', {
+        const inv = await (supabase as any).functions.invoke('seo-api', {
           body: {
+            action: 'toolkit_research',
             kind: 'keyword_research',
             subject: targetKeyword,
             params: {

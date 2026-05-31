@@ -56,6 +56,14 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
   const [savingNew, setSavingNew] = useState(false);
 
   useEffect(() => {
+    // Lazy search: don't show any results until the user actually types. Clears
+    // any lingering rows when the box is empty so the picker stays clean.
+    if (!search.trim()) {
+      setCompanies([]);
+      setContacts([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     const run = async () => {
       setLoading(true);
@@ -177,7 +185,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
               {loading && <div className="text-sm text-muted-foreground py-2">Searching...</div>}
               {!loading && contacts.length === 0 && (
                 <div className="text-sm text-muted-foreground py-4 text-center">
-                  {search ? 'No clients matched.' : 'No clients yet — add your first one below.'}
+                  {search ? 'No clients matched.' : 'Start typing to find a client, or add a new one below.'}
                 </div>
               )}
               {contacts.map(c => {

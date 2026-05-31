@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Loader2, Search, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Building2, Home, Loader2, Search, ShieldCheck, ShieldAlert, ExternalLink, Package, KeyRound } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -49,9 +49,17 @@ const MyAadeModulePage: React.FC = () => {
         title="myAADE — Greek business lookup"
         subtitle="ΑΑΔΕ RgWsPublic2 (TAXISnet). Looks up Greek businesses by ΑΦΜ and auto-fills the Business profile."
         actions={
-          <Button asChild variant="ghost" size="sm" className="gap-2">
-            <Link to="/admin"><Home className="h-4 w-4" />Back to Admin</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm" className="gap-2" title="Module Settings (API credentials)">
+              <Link to="/admin/modules/myaade/settings"><KeyRound className="h-4 w-4" />Keys</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/admin/modules"><Package className="h-4 w-4" />All Modules</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/admin"><Home className="h-4 w-4" />Back to Admin</Link>
+            </Button>
+          </div>
         }
       />
 

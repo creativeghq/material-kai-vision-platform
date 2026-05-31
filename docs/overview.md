@@ -35,7 +35,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 🎬 **Interior Video Generation**: 4 AI models — Veo-2, Kling, Wan, Runway Gen4
 - 🛋️ **Virtual Staging**: AI-furnished room renders from empty photos (Replicate, 20cr)
 - ✏️ **Region Editing**: Pixel-precise inpainting with SAM 2 masks + Grok Aurora
-- 📱 **Social Media Suite**: Generate captions, images, videos + publish via Late.dev
+- 📱 **Social Media Suite**: Generate captions, images, videos + publish via Zernio
 - 🤖 **Background Agents**: Scheduled autonomous agents with chain triggers + auto-recovery
 - 💳 **Billing & Credits**: Stripe subscriptions + credit packages
 - 📊 **CRM System**: Contacts, companies, user management
@@ -75,7 +75,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - Google Gemini (gemini-3.1-flash-image-preview, gemini-3-pro-image-preview — interior generation)
 - xAI Aurora (grok-2-aurora — region edit inpainting, social image generation)
 - Kling (kling-v3.0, kling-1.6-pro — interior and social video generation)
-- Late.dev (social media OAuth broker + publishing platform)
+- Zernio (social media OAuth broker + publishing platform)
 
 ### System Flow
 
@@ -443,7 +443,7 @@ The platform uses **6 embedding types** for comprehensive search:
 **Supabase Edge Functions** (60+ total):
 - Agent & AI: `agent-chat`, `ai-rerank`, `background-agent-runner`, `mivaa-gateway`
 - Interior Design: `generate-interior-gemini`, `generate-interior-video-v2`, `generate-region-edit`, `generate-virtual-staging`, `generate-vr-world`, `generate-quote-pdf`, `generate-social-content`, `generate-social-image`, `generate-social-video`
-- Social: `late-oauth`, `late-publish`, `late-analytics`, `late-webhook-handler`
+- Social: `zernio-api`, `zernio-webhook-handler`
 - CRM & Billing: `crm-companies-api`, `crm-contacts-api`, `crm-users-api`, `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks`
 - Automation: `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
 - Messaging: `email-api`, `messaging-api`, `notification-dispatcher`
@@ -540,7 +540,7 @@ The platform uses **6 embedding types** for comprehensive search:
 - ✨ Interior Video Generation — 4 AI models: Veo-2, Kling v3, Wan 2.1, Runway Gen4 (2026-03)
 - ✨ Virtual Staging — AI-furnished room renders via Replicate proplabs (2026-03)
 - ✨ Region Editing — Pixel-precise masked inpainting with Grok Aurora + SAM 2 (2026-03)
-- ✨ Social Media Suite — Content/image/video generation + Late.dev publishing (2026-03)
+- ✨ Social Media Suite — Content/image/video generation + Zernio publishing (2026-03)
 - ✨ Background Agents — Autonomous scheduled agents with chain triggers + auto-recovery (2026-03)
 - ✨ Gemini Interior Generation — 4 modes: text-to-image, image-edit, floor plan render/diagram (2026-03)
 - ✨ AI Re-ranking — Claude-powered post-retrieval result re-ordering (2026-03)

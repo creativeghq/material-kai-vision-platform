@@ -4,8 +4,8 @@ import type { OxygenSyncResult, CrmContactSearchRow, CrmCompanySearchRow } from 
 class OxygenService {
   // ── Pre-invoice flow ────────────────────────────────────────────────
   async createPreInvoice(quoteId: string): Promise<OxygenSyncResult> {
-    const { data, error } = await supabase.functions.invoke('oxygen-create-pre-invoice', {
-      body: { quote_id: quoteId },
+    const { data, error } = await supabase.functions.invoke('oxygen-api', {
+      body: { action: 'create_pre_invoice', quote_id: quoteId },
     });
     if (error) {
       const message = (data as { error?: string } | null)?.error ?? error.message;

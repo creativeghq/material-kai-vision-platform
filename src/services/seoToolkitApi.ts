@@ -259,8 +259,8 @@ export async function triggerAuditNow(trackedDomainId: string): Promise<{ ok: bo
   // (a) reads the tracked_domain row, (b) calls MIVAA /site-review with
   // x-cron-secret, (c) writes a seo_domain_audit_history row, (d) updates
   // the denormalised current_* fields on seo_tracked_domains.
-  const { data, error } = await (supabase as any).functions.invoke('seo-toolkit-audit', {
-    body: { tracked_domain_id: trackedDomainId, source: 'manual' },
+  const { data, error } = await (supabase as any).functions.invoke('seo-api', {
+    body: { action: 'toolkit_audit', tracked_domain_id: trackedDomainId, source: 'manual' },
   });
   if (error) return { ok: false, error: error.message || String(error) };
   return { ok: true, audit_id: data?.audit_id };

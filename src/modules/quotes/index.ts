@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Image as ImageIcon } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -55,6 +55,18 @@ const definition: ModuleDefinition = {
       adminCategory: 'CRM & User Management',
       adminDescription: 'View and manage customer quote requests with pricing.',
       adminCount: 'Quote System',
+    },
+  ],
+  // Module Settings page (/admin/modules/quotes/settings) auto-mounts these
+  // alongside the "Keys" tab. PDF template uploads + company info + default
+  // VAT now live there instead of being hidden at /admin/quote-settings
+  // (the original route still works — same component).
+  settingsPanels: [
+    {
+      id: 'pdf-templates',
+      label: 'PDF & Templates',
+      icon: ImageIcon,
+      component: QuoteSettingsPage,
     },
   ],
 };

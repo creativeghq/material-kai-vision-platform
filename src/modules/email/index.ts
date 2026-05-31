@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Mail } from 'lucide-react';
+import { Mail, AtSign } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -8,6 +8,9 @@ const EmailManagementPage = lazy(() =>
 );
 const EmailTemplateBuilderPage = lazy(() =>
   import('./pages/EmailTemplateBuilderPage').then(m => ({ default: m.EmailTemplateBuilder })),
+);
+const EmailSettingsPanel = lazy(() =>
+  import('./components/EmailSettingsPanel').then(m => ({ default: m.EmailSettingsPanel })),
 );
 
 const definition: ModuleDefinition = {
@@ -26,6 +29,17 @@ const definition: ModuleDefinition = {
       adminDescription:
         'Manage email domains, templates, and monitor delivery analytics with Resend.',
       adminCount: 'Resend',
+    },
+  ],
+  // Default sender settings (`email_settings` table). Was previously hidden
+  // behind a modal triggered from the email management page — now also
+  // surfaced on the generic Module Settings page so admins find it.
+  settingsPanels: [
+    {
+      id: 'sender-defaults',
+      label: 'Default Sender',
+      icon: AtSign,
+      component: EmailSettingsPanel,
     },
   ],
 };

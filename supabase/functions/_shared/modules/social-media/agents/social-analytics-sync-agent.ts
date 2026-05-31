@@ -1,11 +1,11 @@
 /**
  * Background Agent: Social Analytics Sync
  *
- * Syncs post-level analytics from Late.dev for all published social_posts
+ * Syncs post-level analytics from Zernio for all published social_posts
  * that haven't been synced in the last 2 hours.
  *
  * Runs every 2 hours via pg_cron.
- * Processes posts in batches of 20 to avoid Late.dev rate limits.
+ * Processes posts in batches of 20 to avoid Zernio rate limits.
  *
  * Config params (background_agents.config):
  *   batch_size         number   Posts per run (default 20, max 50)
@@ -15,19 +15,25 @@
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
-const LATE_API_KEY = Deno.env.get('LATE_API_KEY') || '';
-const LATE_BASE_URL = 'https://api.late.dev/v1';
+const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
+const zernioKey = () => Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';
 
-async function fetchLateAnalytics(latePostId: string): Promise<{
+async function fetchZernioAnalytics(zernioPostId: string): Promise<{
   impressions?: number; reach?: number; likes?: number; comments?: number;
   shares?: number; saves?: number; clicks?: number; engagement_rate?: number;
 } | null> {
   try {
-    const res = await fetch(`${LATE_BASE_URL}/posts/${latePostId}/analytics`, {
-      headers: { 'Authorization': `Bearer ${LATE_API_KEY}` },
+    // Zernio: GET /v1/analytics?postId= → AnalyticsSinglePostResponse { analytics: {...camelCase} }
+    const res = await fetch(`${ZERNIO_BASE_URL}/analytics?postId=${encodeURIComponent(zernioPostId)}`, {
+      headers: { 'Authorization': `Bearer ${zernioKey()}` },
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    const a = data.analytics ?? {};
+    return {
+      impressions: a.impressions, reach: a.reach, likes: a.likes, comments: a.comments,
+      shares: a.shares, saves: a.saves, clicks: a.clicks, engagement_rate: a.engagementRate,
+    };
   } catch {
     return null;
   }
@@ -36,7 +42,7 @@ async function fetchLateAnalytics(latePostId: string): Promise<{
 export class SocialAnalyticsSyncAgent implements AgentRunner {
   readonly agentType    = 'social-analytics-sync';
   readonly name         = 'Social Analytics Sync';
-  readonly description  = 'Syncs post performance metrics from Late.dev every 2 hours';
+  readonly description  = 'Syncs post performance metrics from Zernio every 2 hours';
   readonly defaultTools = [];
   readonly defaultModel = 'claude-haiku-4-5';
 
@@ -50,15 +56,15 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
 
     await log('info', 'Starting social analytics sync', { batchSize, minAgeHours, staleAfterHours });
 
-    // Find published posts with a Late.dev ID that haven't been synced recently
+    // Find published posts with a Zernio ID that haven't been synced recently
     const staleThreshold = new Date(Date.now() - staleAfterHours * 3600000).toISOString();
     const minPublishedAt = new Date(Date.now() - minAgeHours * 3600000).toISOString();
 
     const { data: posts, error: fetchErr } = await supabase
       .from('social_posts')
-      .select('id, late_post_id, workspace_id, platform')
+      .select('id, zernio_post_id, workspace_id, platform')
       .eq('status', 'published')
-      .not('late_post_id', 'is', null)
+      .not('zernio_post_id', 'is', null)
       .lte('published_at', minPublishedAt) // at least N hours old
       .or(`metadata->>'last_analytics_sync'.is.null,metadata->>'last_analytics_sync'.lte.${staleThreshold}`)
       .order('published_at', { ascending: true })
@@ -82,9 +88,9 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
     for (const post of posts) {
       await heartbeat();
 
-      if (!post.late_post_id) continue;
+      if (!post.zernio_post_id) continue;
 
-      const analytics = await fetchLateAnalytics(post.late_post_id);
+      const analytics = await fetchZernioAnalytics(post.zernio_post_id);
 
       if (!analytics) {
         await log('warn', `Failed to fetch analytics for post ${post.id}`);

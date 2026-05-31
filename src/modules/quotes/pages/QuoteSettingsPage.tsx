@@ -224,7 +224,11 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
       toast({ title: 'Image uploaded', description: `${targetPath} saved successfully.` });
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast({ title: 'Upload failed', description: 'Failed to upload image.', variant: 'destructive' });
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Failed to upload image.',
+        variant: 'destructive',
+      });
     } finally {
       setUploadingImage(null);
     }
@@ -257,7 +261,11 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
       toast({ title: 'Image deleted', description: `${storagePath} removed.` });
     } catch (error) {
       console.error('Error deleting image:', error);
-      toast({ title: 'Delete failed', description: 'Failed to delete image.', variant: 'destructive' });
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete image.',
+        variant: 'destructive',
+      });
     } finally {
       setUploadingImage(null);
     }

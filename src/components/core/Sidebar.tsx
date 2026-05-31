@@ -105,14 +105,14 @@ export const Sidebar: React.FC = () => {
   if (isMobile) {
     return (
       <>
-        <div className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 bg-[hsl(0,0%,9%)] border-b border-white/8">
+        <div className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 bg-sidebar border-b border-white/8">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 text-foreground/70 hover:text-foreground hover:bg-white/5">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0 bg-[hsl(0,0%,9%)] border-r border-white/8">
+            <SheetContent side="left" className="w-72 p-0 bg-sidebar border-r border-white/8">
               <div className="flex flex-col h-full py-8 px-4">
                 <div className="mb-8">
                   <div className="flex items-center gap-3">
@@ -176,7 +176,7 @@ export const Sidebar: React.FC = () => {
   }
 
   return (
-    <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-[hsl(0,0%,9%)] border-b border-white/8">
+    <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-sidebar border-b border-white/8">
       <Link to="/" className="flex items-center gap-2.5 mr-8 flex-shrink-0">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
           <span className="text-primary-foreground font-light text-sm">J</span>

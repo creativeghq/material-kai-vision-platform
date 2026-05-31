@@ -252,11 +252,11 @@ Surfaced to the `kai` agent as sub-agent tools (admin-gated).
 
 ### Social Media APIs
 
-#### [Late.dev Social API](./late-social-api.md)
+#### [Zernio Social API](./zernio-social-api.md)
 Social media OAuth, publishing, analytics, and content generation.
-- **Functions:** `late-oauth`, `late-publish`, `late-analytics`, `generate-social-content`, `generate-social-image`, `generate-social-video`
+- **Functions:** `zernio-api`, `zernio-webhook-handler`, `generate-social-content`, `generate-social-image`, `generate-social-video`
 - **Features:** 8 platforms, publish/schedule, engagement sync, AI caption/image/video generation
-- **Credits:** 2–30 per generation; publishing uses Late.dev subscription
+- **Credits:** 2–30 per generation; publishing uses Zernio subscription
 - **Access:** Authenticated users
 
 ### Payment APIs

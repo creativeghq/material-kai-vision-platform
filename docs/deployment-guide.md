@@ -144,8 +144,8 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | **xAI / Aurora** | `XAI_API_KEY` | Edge Functions (`generate-social-image`) | https://console.x.ai/ | Pay-per-use — for Aurora image generation |
 | **Kling AI** | `KLINGAI_ACCESS_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
 | **Kling AI** | `KLINGAI_SECRET_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
-| **Later.com** | `LATE_API_KEY` | Edge Functions (`late-analytics`, `late-oauth`, `late-publish`, social background agents) | https://app.later.com/ → Settings → API | Social media scheduling |
-| **Later.com** | `LATE_WEBHOOK_SECRET` | Edge Functions (`late-webhook-handler`) | Later.com webhook settings | HMAC-SHA256 signature verification |
+| **Zernio** | `ZERNIO_API_KEY` | Edge Functions (`zernio-api`, `zernio-webhook-handler`, social background agents) | https://zernio.com/ → Settings → API | Social media scheduling |
+| **Zernio** | `ZERNIO_WEBHOOK_SECRET` | Edge Functions (`zernio-webhook-handler`) | Zernio webhook settings | HMAC-SHA256 signature verification |
 | **HuggingFace** | `HF_TOKEN` | Backend (Chandra, YOLO endpoint management) | https://huggingface.co/settings/tokens — needs **write** permission | Inference Endpoints pause/resume — auto-pause enabled |
 | **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. YOLO and Chandra v2 read `HUGGING_FACE_ACCESS_TOKEN` directly — no per-endpoint token vars needed. (Qwen retired 2026-05-01.) |
 | **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | Set as GitHub repo secret — same value as `HF_TOKEN` |
@@ -393,12 +393,12 @@ See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)
 |------------|------|----------------------|-------------|----------------|
 | `WORLDLABS_API_KEY` | **Secret** | `generate-vr-world` | WorldLabs Marble API key for 3D Gaussian Splat world generation | `wl_xxxxxxxxxxxxxxxx` |
 
-#### **Social Media (Later.com)**
+#### **Social Media (Zernio)**
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
-| `LATE_API_KEY` | **Secret** | `late-analytics`, `late-oauth`, `late-publish`, social background agents | Later.com API key for social media scheduling & analytics | Obtained from https://app.later.com/ → Settings → API |
-| `LATE_WEBHOOK_SECRET` | **Secret** | `late-webhook-handler` | Later.com webhook signing secret for HMAC-SHA256 verification | Set in Later.com webhook configuration |
+| `ZERNIO_API_KEY` | **Secret** | `zernio-api`, `zernio-webhook-handler`, social background agents | Zernio API key for social media scheduling & analytics | Obtained from https://zernio.com/ → Settings → API |
+| `ZERNIO_WEBHOOK_SECRET` | **Secret** | `zernio-webhook-handler` | Zernio webhook signing secret for HMAC-SHA256 verification | Set in Zernio webhook configuration |
 
 #### **HuggingFace (Edge Functions)**
 

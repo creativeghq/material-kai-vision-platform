@@ -267,7 +267,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 | **Flow Automation** ✨ | **Admin flow canvas** | **Claude (actions)** | **Real-time** | **Automated actions** |
 | **Interior Video** ✨ | **Video type + image** | **Veo-2/Kling/Wan/Runway** | **1-5 min** | **MP4 video** |
 | **Virtual Staging** ✨ | **Empty room image** | **Replicate proplabs** | **~56s** | **Furnished render** |
-| **Social Publish** ✨ | **Post content + account** | **Claude + Late.dev** | **<5s** | **Published post** |
+| **Social Publish** ✨ | **Post content + account** | **Claude + Zernio** | **<5s** | **Published post** |
 | **Background Agent** ✨ | **Cron / event / manual** | **Claude + MIVAA API** | **Varies** | **Enriched data** |
 
 ---
@@ -312,9 +312,9 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **User Journey:**
 1. User connects social account at `/profile` (Social Accounts tab)
    ↓
-2. `late-oauth` redirects to Late.dev OAuth → returns `late_account_id`
+2. `zernio-api action=connect` returns a Zernio `authUrl`; user authorises; Zernio redirects back with `?connected&accountId`
    ↓
-3. Account stored in `social_accounts`
+3. Frontend calls `zernio-api action=callback` → account stored in `social_accounts` (`zernio_account_id`)
    ↓
 4. User (or KAI agent) generates content:
    - Caption: `generate-social-content` (2cr) → 3 variants
@@ -323,13 +323,13 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 5. User selects caption variant + media → clicks Publish or Schedule
    ↓
-6. `late-publish` action: `publish_now` or `schedule` with `scheduled_at`
+6. `zernio-api` action: `publish_now` or `schedule` with `scheduled_at`
    ↓
-7. Late.dev publishes to connected platform
+7. Zernio publishes to connected platform
    ↓
-8. `late-analytics` syncs engagement metrics back to `social_post_analytics`
+8. `zernio-api` syncs engagement metrics back to `social_post_analytics`
 
-**Edge Functions:** `late-oauth`, `generate-social-content`, `generate-social-image`, `generate-social-video`, `late-publish`, `late-analytics`
+**Edge Functions:** `zernio-api`, `zernio-webhook-handler`, `generate-social-content`, `generate-social-image`, `generate-social-video`
 **Admin UI:** `/admin/social-media/accounts`
 **Documentation:** [social-media-system.md](social-media-system.md)
 

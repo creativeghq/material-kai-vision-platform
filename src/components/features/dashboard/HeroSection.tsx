@@ -11,7 +11,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   return (
-    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center rounded-xl border border-white/8 bg-[hsl(0,0%,11%)]">
+    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center rounded-xl border border-white/8 bg-card">
       {/* Subtle backdrop gradient for depth */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
 

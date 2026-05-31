@@ -17,7 +17,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* AI Insights panel */}
-        <div className="col-span-12 lg:col-span-4 rounded-xl border border-white/8 bg-[hsl(0,0%,11%)] p-6 flex flex-col justify-between">
+        <div className="col-span-12 lg:col-span-4 rounded-xl border border-white/8 bg-card p-6 flex flex-col justify-between">
           <div>
             <h3 className="text-xl font-semibold mb-2">AI Insights</h3>
             <p className="text-sm text-muted-foreground mb-4">

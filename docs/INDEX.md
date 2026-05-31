@@ -105,8 +105,8 @@ Complete documentation for Material Kai Vision Platform.
 
 **[social-media-system.md](social-media-system.md)** - Social media creation & monitoring system
 - KAI agent tools for social content (captions, images, videos)
-- Late.dev OAuth integration for per-user platform connections
-- Publishing, scheduling, analytics via Late.dev API
+- Zernio OAuth integration for per-user platform connections
+- Publishing, scheduling, analytics via Zernio API
 - xAI Aurora / Gemini Flash / FLUX Dev image generation routing
 - Multi-model interior video (Veo 2, Kling 1.6 Pro, Wan, Runway)
 - Background agents for analytics sync
@@ -652,7 +652,7 @@ All documentation follows these standards:
 - ✨ **NEW**: Interior Video Generation — 4 AI models: Veo-2, Kling v3, Wan 2.1, Runway Gen4 (`interior-video-generation.md`)
 - ✨ **NEW**: Virtual Staging — Replicate proplabs room staging (`virtual-staging.md`)
 - ✨ **NEW**: Region Editing — Grok Aurora masked inpainting + SAM 2 (`segmentation-inpainting.md`)
-- ✨ **NEW**: Social Media Suite — Content/image/video + Late.dev publishing (see `social-media-system.md`)
+- ✨ **NEW**: Social Media Suite — Content/image/video + Zernio publishing (see `social-media-system.md`)
 - ✨ **NEW**: Background Agents — Scheduled autonomous agents with chain triggers (`background-agents.md`)
 - ✨ **NEW**: Gemini Interior Generation — 4 modes including floor plan rendering
 - ✨ **NEW**: AI Re-ranking — Claude post-retrieval result re-ordering (`ai-reranking.md`)

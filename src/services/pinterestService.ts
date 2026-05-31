@@ -70,7 +70,7 @@ async function callEdgeFunction<T>(
  */
 export async function extractPin(pinUrl: string): Promise<PinterestPin> {
   const data = await callEdgeFunction<{ success: boolean; pin: PinterestPin }>(
-    'pinterest-import',
+    'pinterest-api',
     { action: 'extract_pin', pin_url: pinUrl },
   );
   return data.pin;
@@ -85,7 +85,7 @@ export async function importPin(
   autoMatch = true,
 ): Promise<PinterestImportResult> {
   return callEdgeFunction<PinterestImportResult>(
-    'pinterest-import',
+    'pinterest-api',
     { action: 'import_pin', pin_url: pinUrl, moodboard_id: moodboardId, auto_match: autoMatch },
   );
 }
@@ -99,7 +99,7 @@ export async function importPinsBulk(
   autoMatch = true,
 ): Promise<{ success: boolean; imported: number; failed: number; results: PinterestImportResult[] }> {
   return callEdgeFunction(
-    'pinterest-import',
+    'pinterest-api',
     { action: 'import_pins_bulk', pin_urls: pinUrls, moodboard_id: moodboardId, auto_match: autoMatch },
   );
 }
@@ -111,7 +111,7 @@ export async function importPinsBulk(
  */
 export async function getAuthUrl(): Promise<string> {
   const data = await callEdgeFunction<{ success: boolean; auth_url: string }>(
-    'pinterest-oauth',
+    'pinterest-api',
     { action: 'get_auth_url' },
   );
   return data.auth_url;
@@ -121,7 +121,7 @@ export async function getAuthUrl(): Promise<string> {
  * Complete OAuth callback with authorization code
  */
 export async function completeOAuth(code: string, state: string): Promise<void> {
-  await callEdgeFunction('pinterest-oauth', { action: 'callback', code, state });
+  await callEdgeFunction('pinterest-api', { action: 'callback', code, state });
 }
 
 /**
@@ -146,7 +146,7 @@ export async function getConnectionStatus(): Promise<PinterestConnection> {
  */
 export async function getBoards(): Promise<PinterestBoard[]> {
   const data = await callEdgeFunction<{ success: boolean; boards: PinterestBoard[] }>(
-    'pinterest-oauth',
+    'pinterest-api',
     { action: 'get_boards' },
   );
   return data.boards;
@@ -160,7 +160,7 @@ export async function getBoardPins(
   bookmark?: string,
 ): Promise<{ pins: PinterestPin[]; bookmark?: string }> {
   const data = await callEdgeFunction<{ success: boolean; pins: PinterestPin[]; bookmark?: string }>(
-    'pinterest-oauth',
+    'pinterest-api',
     { action: 'get_board_pins', board_id: boardId, bookmark },
   );
   return { pins: data.pins, bookmark: data.bookmark };
@@ -170,7 +170,7 @@ export async function getBoardPins(
  * Disconnect Pinterest account
  */
 export async function disconnect(): Promise<void> {
-  await callEdgeFunction('pinterest-oauth', { action: 'disconnect' });
+  await callEdgeFunction('pinterest-api', { action: 'disconnect' });
 }
 
 export const pinterestService = {

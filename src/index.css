@@ -309,33 +309,35 @@ All colors MUST be HSL.
      Base surface: #f7f8f3 (hsl 72 24% 96%).
      ======================================== */
   html.light {
-    /* Main background — soft warm off-white #f7f8f3 */
-    --background: 72 24% 96%;
-    --foreground: 0 0% 13%;  /* Near-black ink */
+    /* Layered warm off-whites — the page is the deeper tone so cards read as
+       elevated WITHOUT being stark white. base #edefe6 → cards ~#f6f8f1. */
+    --background: 72 16% 93%;        /* page — soft warm off-white, not blinding */
+    --foreground: 0 0% 14%;          /* near-black ink */
 
-    --page-background: 72 24% 96%;
+    --page-background: 72 16% 93%;
 
-    /* Cards — pure white for elevation against the off-white page */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 13%;
+    /* Cards — warm off-white (~the #f7f8f3 the brief specified), one step
+       lighter than the page so panels lift without going pure white. */
+    --card: 72 26% 97%;
+    --card-foreground: 0 0% 14%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 13%;
+    --popover: 72 30% 98%;
+    --popover-foreground: 0 0% 14%;
 
     /* Primary — plum, slightly deepened so white text stays AA on light */
     --primary: 330 52% 40%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — muted warm grey surface */
-    --secondary: 72 12% 91%;
+    /* Secondary — muted warm grey surface, clearly deeper than cards */
+    --secondary: 72 13% 88%;
     --secondary-foreground: 0 0% 20%;
 
     /* Muted */
-    --muted: 72 12% 92%;
-    --muted-foreground: 0 0% 42%;
+    --muted: 72 13% 89%;
+    --muted-foreground: 0 0% 38%;
 
     /* Accent — warm peach tint */
-    --accent: 22 70% 92%;
+    --accent: 22 55% 90%;
     --accent-foreground: 22 75% 30%;
 
     /* Amber */
@@ -347,20 +349,20 @@ All colors MUST be HSL.
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders / inputs — gentle warm grey lines */
-    --border: 72 10% 87%;
-    --input: 72 10% 87%;
+    /* Borders / inputs — gentle warm grey lines, visible against cards */
+    --border: 72 11% 82%;
+    --input: 72 11% 83%;
     --ring: 330 52% 40%;
 
-    /* Sidebar / TopNav — white with grey text, plum active */
-    --sidebar-background: 0 0% 100%;
+    /* Sidebar / TopNav — clean card-toned bar with grey text, plum active */
+    --sidebar-background: 72 26% 97%;
     --sidebar-foreground: 0 0% 40%;
     --sidebar-accent: 330 52% 40%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 72 10% 87%;
+    --sidebar-border: 72 11% 82%;
 
     /* Hero */
-    --hero-background: 0 0% 100%;
+    --hero-background: 72 26% 97%;
 
     /* Stat bubble colors — coloured fills with white text still read fine */
     --bubble-sage: 95 25% 45%;
@@ -371,8 +373,8 @@ All colors MUST be HSL.
     --bubble-text-muted: 0 0% 92%;
 
     /* Card gradients */
-    --card-gradient-start: 0 0% 100%;
-    --card-gradient-end: 72 20% 97%;
+    --card-gradient-start: 72 30% 98%;
+    --card-gradient-end: 72 18% 95%;
 
     /* Subtle gradients — black-based low-alpha so they show on light */
     --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
@@ -436,9 +438,10 @@ All colors MUST be HSL.
     --badge-draft-border: 0 0% 82%;
 
     /* ===== GLASSMORPHISM SYSTEM (Light) ===== */
-    --glass-background: rgba(255, 255, 255, 0.65);
+    /* Warm frosted off-white, not pure white, so glass cards match the palette */
+    --glass-background: rgba(249, 250, 244, 0.72);
     --glass-blur: 12px;
-    --glass-border: rgba(0, 0, 0, 0.06);
+    --glass-border: rgba(0, 0, 0, 0.07);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
 
     /* ===== REFINED SHADOWS (Light) ===== */
@@ -551,6 +554,15 @@ All colors MUST be HSL.
     background: rgba(255, 255, 255, 0.08);
     transform: translateY(-1px);
     border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* A card that holds a table must NOT repaint/lift its whole surface on
+     hover — only the hovered row should change colour (accessibility). The
+     table's own `tr:hover` / `hover:bg-muted/50` handles the row highlight. */
+  .dashboard-card:has(table):hover {
+    background: var(--glass-background);
+    transform: none;
+    border-color: var(--glass-border);
   }
 
   /* Tabs where item-level card lift should be suppressed */
@@ -874,61 +886,185 @@ All colors MUST be HSL.
 }
 
 /* ============================================================
-   LIGHT THEME — component overrides
-   These rules patch the handful of places that hardcode
-   white-on-dark overlays (rgba(255,255,255,…)). The token
-   block above (html.light) handles everything variable-driven;
-   this block flips the literal overlays so glass/hover surfaces
-   read correctly on the light background. Kept un-layered so it
-   wins over @layer components regardless of source order.
+   LIGHT THEME — global compatibility layer
+   ------------------------------------------------------------
+   The html.light token block above re-themes everything that is
+   token-driven (bg-card, text-foreground, border-border, …) and
+   every component authored for a light surface (text-gray-900,
+   bg-gray-50, …) is already correct on light. This layer patches
+   the remaining DARK-ASSUMING utilities so dark-built components
+   become light too — flipping a component's dark surface AND its
+   light text TOGETHER so nothing is left half-converted.
+
+   Photo/scrim overlays (bg-black/NN + text-white) are the one
+   case that must stay light-on-dark in BOTH themes; they are
+   protected at the end of this block.
+
+   Kept un-layered so it wins over @layer components regardless
+   of source order; the html.light prefix gives it the specificity
+   to beat the base Tailwind utility without !important.
    ============================================================ */
 
-/* Subtle hover that legacy code routes through .hover:bg-primary/10 */
-html.light .hover\:bg-primary\/10:hover {
-  background-color: rgba(0, 0, 0, 0.04) !important;
-}
+/* ---- 1. White overlay surfaces (bg-white/NN, incl. hover:) ----
+   Used by buttons, glass panels, sidebars, dashboards as a subtle
+   light tint on dark. Flip to an equivalent black-based tint. */
+html.light .bg-white\/5,  html.light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.03); }
+html.light .bg-white\/6,  html.light .hover\:bg-white\/6:hover  { background-color: rgba(0,0,0,0.035); }
+html.light .bg-white\/8,  html.light .hover\:bg-white\/8:hover  { background-color: rgba(0,0,0,0.045); }
+html.light .bg-white\/10, html.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05); }
+html.light .bg-white\/12, html.light .hover\:bg-white\/12:hover { background-color: rgba(0,0,0,0.06); }
+html.light .bg-white\/15, html.light .hover\:bg-white\/15:hover { background-color: rgba(0,0,0,0.07); }
+html.light .bg-white\/20, html.light .hover\:bg-white\/20:hover { background-color: rgba(0,0,0,0.09); }
+html.light .bg-white\/25, html.light .hover\:bg-white\/25:hover { background-color: rgba(0,0,0,0.11); }
+html.light .bg-white\/30, html.light .hover\:bg-white\/30:hover { background-color: rgba(0,0,0,0.13); }
 
-/* White overlay utilities (bg-white/5·10·20, incl. hover:) read as nothing on a
-   light surface. Flip them to equivalent black-based overlays so the subtle
-   contrast they were meant to add survives the theme switch. Higher specificity
-   (html.light …) wins over the base Tailwind utility without needing !important. */
-html.light .bg-white\/5,
-html.light .hover\:bg-white\/5:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-html.light .bg-white\/10,
-html.light .hover\:bg-white\/10:hover {
-  background-color: rgba(0, 0, 0, 0.06);
-}
-html.light .bg-white\/20,
-html.light .hover\:bg-white\/20:hover {
-  background-color: rgba(0, 0, 0, 0.08);
-}
+/* Legacy reroute of hover:bg-primary/10 */
+html.light .hover\:bg-primary\/10:hover { background-color: rgba(0,0,0,0.04) !important; }
 
-/* Neutral badge */
+/* ---- 2. White borders (border-white/NN) ---- */
+html.light .border-white\/8,  html.light .hover\:border-white\/8:hover  { border-color: rgba(0,0,0,0.08); }
+html.light .border-white\/10, html.light .hover\:border-white\/10:hover { border-color: rgba(0,0,0,0.10); }
+html.light .border-white\/12, html.light .hover\:border-white\/12:hover { border-color: rgba(0,0,0,0.10); }
+html.light .border-white\/15, html.light .hover\:border-white\/15:hover { border-color: rgba(0,0,0,0.12); }
+html.light .border-white\/20, html.light .hover\:border-white\/20:hover { border-color: rgba(0,0,0,0.14); }
+
+/* ---- 3. Literal white surfaces → warm off-white card tone ----
+   Fixes the "extra white" panels: bg-white in light-built components
+   becomes the same soft off-white as token cards. */
+html.light .bg-white   { background-color: hsl(72 26% 97%); }
+html.light .bg-white\/95 { background-color: hsl(72 26% 97% / 0.95); }
+html.light .bg-white\/90 { background-color: hsl(72 26% 97% / 0.90); }
+html.light .bg-white\/80 { background-color: hsl(72 26% 97% / 0.80); }
+html.light .bg-white\/70 { background-color: hsl(72 26% 97% / 0.70); }
+html.light .bg-white\/60 { background-color: hsl(72 26% 97% / 0.60); }
+html.light .bg-white\/50 { background-color: hsl(72 26% 97% / 0.50); }
+
+/* ---- 4. Dark gray SURFACES → layered light surfaces ----
+   gray/slate/zinc/neutral/stone 700–950 are unambiguously dark
+   panels; no light-built component uses them as a light surface. */
+html.light .bg-gray-700,   html.light .bg-slate-700,  html.light .bg-zinc-700,
+html.light .bg-neutral-700,html.light .bg-stone-700  { background-color: hsl(72 14% 90%); }
+html.light .bg-gray-800,   html.light .bg-slate-800,  html.light .bg-zinc-800,
+html.light .bg-neutral-800,html.light .bg-stone-800  { background-color: hsl(72 16% 92%); }
+html.light .bg-gray-900,   html.light .bg-slate-900,  html.light .bg-zinc-900,
+html.light .bg-neutral-900,html.light .bg-stone-900  { background-color: hsl(72 24% 96%); }
+html.light .bg-gray-950,   html.light .bg-slate-950,  html.light .bg-zinc-950,
+html.light .bg-neutral-950,html.light .bg-stone-950  { background-color: hsl(72 20% 94%); }
+
+/* hover: variants of the same */
+html.light .hover\:bg-gray-700:hover,  html.light .hover\:bg-slate-700:hover,
+html.light .hover\:bg-zinc-700:hover,  html.light .hover\:bg-neutral-700:hover { background-color: hsl(72 13% 88%); }
+html.light .hover\:bg-gray-800:hover,  html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-zinc-800:hover,  html.light .hover\:bg-neutral-800:hover { background-color: hsl(72 14% 90%); }
+
+/* Opacity-suffixed dark-gray surfaces actually used in the codebase
+   (semi-transparent sub-panels) → solid light sub-panel tone. */
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/30,
+html.light .bg-gray-700\/30 { background-color: hsl(72 16% 92%); }
+
+/* 4b. Named arbitrary-hex surfaces (AgentHub chat bubbles).
+   Dark mode keeps the exact #1f2937 / #3E192A bubbles; light mode gets a
+   neutral bubble (user) + soft plum bubble (assistant). Their text-white is
+   flipped to dark ink by rule 5 since no scrim/colored protection matches. */
+html.light .bg-\[\#1f2937\] { background-color: hsl(72 14% 91%); }
+html.light .bg-\[\#3E192A\] { background-color: hsl(330 36% 92%); }
+
+/* ---- 5. Light TEXT → dark ink ----
+   Solid light text + the very-light gray text shades only make sense
+   on a dark surface; flip to foreground / muted-foreground. */
+html.light .text-white,
+html.light .text-gray-50,  html.light .text-gray-100,
+html.light .text-slate-50, html.light .text-slate-100,
+html.light .text-zinc-50,  html.light .text-zinc-100,
+html.light .text-neutral-50, html.light .text-neutral-100 { color: hsl(0 0% 14%); }
+
+html.light .text-gray-200,  html.light .text-gray-300,
+html.light .text-slate-200, html.light .text-slate-300,
+html.light .text-zinc-200,  html.light .text-zinc-300,
+html.light .text-neutral-200, html.light .text-neutral-300,
+html.light .text-white\/90, html.light .text-white\/80,
+html.light .text-white\/70, html.light .text-white\/60,
+html.light .text-white\/50, html.light .text-white\/40,
+html.light .text-white\/30, html.light .text-white\/20 { color: hsl(0 0% 38%); }
+
+/* ---- 6. Dark BORDERS → light border ---- */
+html.light .border-gray-700,  html.light .border-gray-800,  html.light .border-gray-900,
+html.light .border-slate-700, html.light .border-slate-800, html.light .border-slate-900,
+html.light .border-zinc-700,  html.light .border-zinc-800,  html.light .border-zinc-900,
+html.light .border-neutral-700, html.light .border-neutral-800 { border-color: hsl(72 11% 82%); }
+
+/* ---- 7. Dark scrim / dark gradient protection ----
+   Photo scrims (bg-black/NN) and intentional dark gradient surfaces
+   (from-gray-900 hero pages, etc.) keep a dark background in BOTH
+   themes, so white text on them must stay white. These win over
+   rule 5 via higher specificity, and rule 4 leaves gradient color
+   stops untouched, so these surfaces stay self-consistent. */
+html.light [class*="bg-black"] .text-white,
+html.light [class*="bg-black"].text-white,
+html.light [class*="from-black"] .text-white,
+html.light [class*="from-black"].text-white,
+html.light [class*="from-gray-7"] .text-white, html.light [class*="from-gray-8"] .text-white, html.light [class*="from-gray-9"] .text-white,
+html.light [class*="from-slate-7"] .text-white, html.light [class*="from-slate-8"] .text-white, html.light [class*="from-slate-9"] .text-white,
+html.light [class*="from-zinc-7"] .text-white, html.light [class*="from-zinc-8"] .text-white, html.light [class*="from-zinc-9"] .text-white,
+html.light [class*="from-neutral-7"] .text-white, html.light [class*="from-neutral-8"] .text-white, html.light [class*="from-neutral-9"] .text-white,
+html.light [class*="bg-black"] [class*="text-white\/"],
+html.light [class*="from-black"] [class*="text-white\/"] { color: #fff; }
+
+/* ---- 7b. Saturated colored surfaces keep white text ----
+   White text on a brand/semantic/colored fill (plum buttons, colored
+   badges, status pills) is correct in BOTH themes. Re-assert white so
+   rule 5 doesn't darken it. Substring match is safe here: only saturated
+   color fills ever carry white text, and a stray "stays white" is
+   harmless (unlike a wrongful darken). */
+html.light .bg-primary .text-white, html.light .bg-primary.text-white,
+html.light .bg-destructive .text-white, html.light .bg-destructive.text-white,
+html.light .bg-success .text-white, html.light .bg-success.text-white,
+html.light .bg-error .text-white, html.light .bg-error.text-white,
+html.light .bg-warning .text-white, html.light .bg-warning.text-white,
+html.light .bg-info .text-white, html.light .bg-info.text-white,
+html.light [class*="bg-red-"] .text-white,    html.light [class*="bg-red-"].text-white,
+html.light [class*="bg-orange-"] .text-white, html.light [class*="bg-orange-"].text-white,
+html.light [class*="bg-amber-"] .text-white,  html.light [class*="bg-amber-"].text-white,
+html.light [class*="bg-yellow-"] .text-white, html.light [class*="bg-yellow-"].text-white,
+html.light [class*="bg-lime-"] .text-white,   html.light [class*="bg-lime-"].text-white,
+html.light [class*="bg-green-"] .text-white,  html.light [class*="bg-green-"].text-white,
+html.light [class*="bg-emerald-"] .text-white,html.light [class*="bg-emerald-"].text-white,
+html.light [class*="bg-teal-"] .text-white,   html.light [class*="bg-teal-"].text-white,
+html.light [class*="bg-cyan-"] .text-white,   html.light [class*="bg-cyan-"].text-white,
+html.light [class*="bg-sky-"] .text-white,    html.light [class*="bg-sky-"].text-white,
+html.light [class*="bg-blue-"] .text-white,   html.light [class*="bg-blue-"].text-white,
+html.light [class*="bg-indigo-"] .text-white, html.light [class*="bg-indigo-"].text-white,
+html.light [class*="bg-violet-"] .text-white, html.light [class*="bg-violet-"].text-white,
+html.light [class*="bg-purple-"] .text-white, html.light [class*="bg-purple-"].text-white,
+html.light [class*="bg-fuchsia-"] .text-white,html.light [class*="bg-fuchsia-"].text-white,
+html.light [class*="bg-pink-"] .text-white,   html.light [class*="bg-pink-"].text-white,
+html.light [class*="bg-rose-"] .text-white,   html.light [class*="bg-rose-"].text-white,
+html.light [class*="from-primary"] .text-white, html.light [class*="from-primary"].text-white,
+html.light [class*="from-purple-"] .text-white, html.light [class*="from-blue-"] .text-white,
+html.light [class*="from-indigo-"] .text-white, html.light [class*="from-pink-"] .text-white,
+html.light [class*="from-emerald-"] .text-white, html.light [class*="from-green-"] .text-white { color: #fff; }
+
+/* ---- 8. Design-system component patches ---- */
 html.light .badge-neutral {
   background-color: hsl(0 0% 95%);
   color: hsl(0 0% 40%);
   border-color: hsl(0 0% 85%);
 }
-
-/* Glass cards — darken the hover/border overlays */
 html.light .dashboard-card:hover {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
 }
-
-/* Stat bubbles — frosted white base on light */
+/* Same row-only-hover rule for light theme: a card wrapping a table keeps its
+   resting surface on hover so only the hovered row changes colour. */
+html.light .dashboard-card:has(table):hover {
+  background: var(--glass-background);
+  border-color: var(--glass-border);
+}
 html.light .stat-bubble {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(0, 0, 0, 0.06);
+  background: rgba(255,255,255,0.7);
+  border-color: rgba(0,0,0,0.06);
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07);
 }
-
-/* Scrollbar thumb a touch darker so it stays visible on light */
-html.light *::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-}
-html.light *::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
-}
+html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
+html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }

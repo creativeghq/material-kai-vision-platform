@@ -10,6 +10,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { registeredModules, useEnabledModules, refreshModuleRegistry } from '@/modules/_core';
+import { invalidateInvoiceProviderCache } from '@/modules/payments/services/invoiceProviderService';
 import { MIVAA_API_URL } from '@/config/mivaa';
 
 async function invalidateMivaaCache(): Promise<void> {
@@ -63,6 +64,10 @@ const ModulesPage: React.FC = () => {
         variant: 'destructive',
       });
     } else {
+      // Drop the invoice-provider cache so any visible IssueInvoiceButton /
+      // OxygenPreInvoiceButton re-resolves on the next render (otherwise the
+      // 30s TTL keeps the old provider visible after toggling Oxygen).
+      invalidateInvoiceProviderCache();
       await Promise.all([refreshModuleRegistry(), invalidateMivaaCache()]);
       toast({
         title: next ? 'Module enabled' : 'Module disabled',
@@ -88,7 +93,7 @@ const ModulesPage: React.FC = () => {
         }
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {orphanedRows.length > 0 && (
           <Card className="border-yellow-500/30 bg-yellow-500/5">
             <CardHeader>

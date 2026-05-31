@@ -1,8 +1,8 @@
 /**
  * Background Agent: Social Insights Sync
  *
- * Takes daily account-level snapshots from Late.dev for all active social accounts.
- * Captures follower count, engagement rate, reach/impressions over 7 days.
+ * Takes daily account-level snapshots from Zernio for all active social accounts.
+ * Captures follower / following / posts counts.
  *
  * Runs once daily at 6am UTC via pg_cron.
  * Creates one row per social_account per day in social_account_insights.
@@ -10,19 +10,33 @@
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
-const LATE_API_KEY = Deno.env.get('LATE_API_KEY') || '';
-const LATE_BASE_URL = 'https://api.late.dev/v1';
+const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
+const zernioKey = () => Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';
 
-async function fetchAccountInsights(lateAccountId: string): Promise<{
-  followers_count?: number; following_count?: number; media_count?: number;
-  avg_engagement_rate?: number; reach_7d?: number; impressions_7d?: number;
-} | null> {
+interface AccountInsights {
+  followers_count: number;
+  following_count: number;
+  posts_count: number;
+}
+
+/** Fetch account-level follower stats from Zernio. */
+async function fetchAccountInsights(zernioAccountId: string): Promise<AccountInsights | null> {
   try {
-    const res = await fetch(`${LATE_BASE_URL}/accounts/${lateAccountId}/insights`, {
-      headers: { 'Authorization': `Bearer ${LATE_API_KEY}` },
-    });
+    const res = await fetch(
+      `${ZERNIO_BASE_URL}/accounts/follower-stats?accountIds=${encodeURIComponent(zernioAccountId)}&granularity=daily`,
+      { headers: { 'Authorization': `Bearer ${zernioKey()}` } },
+    );
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    const a = (data.accounts || [])[0];
+    if (!a) return null;
+    const stats = a.accountStats ?? {};
+    const postsCount = stats.mediaCount ?? stats.videoCount ?? stats.postsCount ?? stats.tweetCount ?? stats.pinCount ?? 0;
+    return {
+      followers_count: a.currentFollowers ?? 0,
+      following_count: stats.followingCount ?? 0,
+      posts_count: postsCount,
+    };
   } catch {
     return null;
   }
@@ -43,7 +57,7 @@ export class SocialInsightsSyncAgent implements AgentRunner {
     // Fetch all active social accounts
     const { data: accounts, error: fetchErr } = await supabase
       .from('social_accounts')
-      .select('id, late_account_id, platform, workspace_id, handle')
+      .select('id, zernio_account_id, platform, workspace_id, handle')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 
@@ -66,7 +80,7 @@ export class SocialInsightsSyncAgent implements AgentRunner {
     for (const account of accounts) {
       await heartbeat();
 
-      const insights = await fetchAccountInsights(account.late_account_id);
+      const insights = await fetchAccountInsights(account.zernio_account_id);
 
       if (!insights) {
         await log('warn', `Failed to fetch insights for account ${account.id} (${account.platform}:${account.handle})`);
@@ -81,12 +95,12 @@ export class SocialInsightsSyncAgent implements AgentRunner {
           social_account_id: account.id,
           workspace_id:      account.workspace_id,
           snapshot_date:     today,
-          followers_count:   insights.followers_count   ?? 0,
-          following_count:   insights.following_count   ?? 0,
-          posts_count:       insights.media_count       ?? 0,
-          avg_engagement:    insights.avg_engagement_rate ?? 0,
-          reach_7d:          insights.reach_7d          ?? 0,
-          impressions_7d:    insights.impressions_7d    ?? 0,
+          followers_count:   insights.followers_count,
+          following_count:   insights.following_count,
+          posts_count:       insights.posts_count,
+          avg_engagement:    0,
+          reach_7d:          0,
+          impressions_7d:    0,
           metadata:          { raw: insights },
         }, { onConflict: 'social_account_id,snapshot_date' });
 
@@ -100,8 +114,8 @@ export class SocialInsightsSyncAgent implements AgentRunner {
       await supabase
         .from('social_accounts')
         .update({
-          followers_count:  insights.followers_count  ?? 0,
-          following_count:  insights.following_count  ?? 0,
+          followers_count:  insights.followers_count,
+          following_count:  insights.following_count,
           last_synced_at:   new Date().toISOString(),
         })
         .eq('id', account.id);

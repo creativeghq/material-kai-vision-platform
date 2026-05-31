@@ -13,6 +13,7 @@ import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { QuoteDocument } from '../components/QuoteDocument';
+import { trackQuotePreview } from '@/services/quoteAnalyticsService';
 
 export function QuotePreviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,12 @@ export function QuotePreviewPage() {
   const { data, loading, error } = useQuoteDocument(id || '');
   const documentRef = useRef<HTMLDivElement>(null);
   const autoPrint = searchParams.get('print') === '1';
+
+  // Log the preview-open once per mount (when the quote id is known).
+  useEffect(() => {
+    if (id) trackQuotePreview(id, 'preview', { auto_print: autoPrint });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // Auto-print when ?print=1 is set and data has loaded.
   // Wait for all <img> elements to finish loading so background images

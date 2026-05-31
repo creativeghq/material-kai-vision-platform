@@ -98,6 +98,31 @@ Deno.serve(async (req) => {
     const invoices = invs.data ?? [];
     const supplierBills = bills.data ?? [];
 
+    // Mint pay tokens for every open invoice so the email body can link directly.
+    // We do this in-line rather than via the mint_invoice_pay_token RPC because the
+    // RPC role-gates on the caller; here the service role acts on behalf of the workspace.
+    const publicAppUrl = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
+    const payLinks = new Map<string, string>();
+    const openInvoices = invoices.filter((i: any) =>
+      Number(i.amount_due || 0) > 0
+      && i.status !== 'void'
+      && i.status !== 'credit_noted',
+    );
+    for (const inv of openInvoices) {
+      // Skip if a non-expired token already exists
+      if (inv.pay_token && (!inv.pay_token_expires_at || new Date(inv.pay_token_expires_at) > new Date())) {
+        payLinks.set(inv.id, `${publicAppUrl}/pay/${inv.pay_token}`);
+        continue;
+      }
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, '0')).join('');
+      const expires = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString();
+      const { error: tkErr } = await supabase
+        .from('invoices')
+        .update({ pay_token: token, pay_token_expires_at: expires })
+        .eq('id', inv.id);
+      if (!tkErr) payLinks.set(inv.id, `${publicAppUrl}/pay/${token}`);
+    }
+
     // 4. Build PDF
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -195,6 +220,23 @@ Deno.serve(async (req) => {
           fmtMoney(Number(inv.amount_due || 0), inv.currency),
         ]);
       }
+
+      // Quick-pay links section (one link per open invoice)
+      const linkedOpen = openInvoices.filter((i: any) => payLinks.has(i.id));
+      if (linkedOpen.length > 0) {
+        y -= 16;
+        if (y < MARGIN + 60) { page = pdf.addPage([PAGE_W, PAGE_H]); drawBackdrop(page); y = PAGE_H - MARGIN - 20; }
+        page.drawText('PAY BY CARD', { x: MARGIN, y, size: 11, font: bold, color: COLOR_ACCENT });
+        y -= 14;
+        for (const inv of linkedOpen) {
+          const url = payLinks.get(inv.id)!;
+          const label = `${inv.internal_number}: ${fmtMoney(Number(inv.amount_due || 0), inv.currency)}`;
+          page.drawText(label, { x: MARGIN, y, size: 9, font, color: COLOR_DARK });
+          page.drawText(url, { x: MARGIN + 200, y, size: 8, font, color: COLOR_ACCENT });
+          y -= 12;
+          if (y < MARGIN + 40) { page = pdf.addPage([PAGE_W, PAGE_H]); drawBackdrop(page); y = PAGE_H - MARGIN - 20; }
+        }
+      }
     }
 
     if (supplierBills.length > 0) {
@@ -261,12 +303,34 @@ Deno.serve(async (req) => {
     const subject = settings.statement_email_subject ?? 'Your account statement';
     const bodyText = settings.statement_email_body
       ?? `Please find your account statement attached. Total outstanding: ${fmtMoney(Number(party.receivable_outstanding || 0))}.`;
+    const payLinksHtml = openInvoices.length > 0 ? `
+      <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+        <thead><tr style="background:#f3f3f3;">
+          <th style="text-align:left; padding:8px; font-size:12px;">Invoice</th>
+          <th style="text-align:right; padding:8px; font-size:12px;">Due</th>
+          <th style="text-align:right; padding:8px; font-size:12px;">Pay by card</th>
+        </tr></thead>
+        <tbody>
+          ${openInvoices.map((i: any) => `
+            <tr>
+              <td style="padding:8px; font-family:monospace; font-size:12px;">${i.internal_number}</td>
+              <td style="padding:8px; text-align:right; font-size:12px;">${fmtMoney(Number(i.amount_due || 0), i.currency)}</td>
+              <td style="padding:8px; text-align:right;">
+                ${payLinks.get(i.id) ? `<a href="${payLinks.get(i.id)}" style="background:#883366; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:12px;">Pay now</a>` : '—'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '';
+
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 600px;">
         <p>Hello ${party.display_name ?? ''},</p>
         <p>${bodyText.replace(/\n/g, '<br>')}</p>
-        <p><a href="${pdfUrl}">Download PDF statement</a></p>
-        <p style="color: #666; font-size: 12px; margin-top: 32px;">This statement was generated on ${issuedToday}.</p>
+        ${payLinksHtml}
+        <p><a href="${pdfUrl}">Download full PDF statement</a></p>
+        <p style="color: #666; font-size: 12px; margin-top: 32px;">This statement was generated on ${issuedToday}. Pay links expire after 90 days.</p>
       </div>
     `;
 

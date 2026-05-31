@@ -10,20 +10,46 @@ import { financeService, formatMoney, formatPct } from '@/modules/finance/servic
 
 type ReportKind =
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
-  | 'purchases_per_product' | 'receipts_per_product' | 'open_tasks';
+  | 'sales_per_factory' | 'sales_per_designer'
+  | 'purchases_per_product' | 'receipts_per_product'
+  | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
+  | 'top_customer_outstanding' | 'top_supplier_outstanding'
+  | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 type SortDir = 'desc' | 'asc';
 
-const REPORTS: { value: ReportKind; label: string; group: 'sales' | 'purchases' | 'tasks' }[] = [
-  { value: 'sales_per_day', label: 'Sales per day', group: 'sales' },
-  { value: 'sales_per_customer', label: 'Sales per customer', group: 'sales' },
-  { value: 'sales_per_product', label: 'Sales per product', group: 'sales' },
-  { value: 'sales_per_category', label: 'Sales per category', group: 'sales' },
-  { value: 'purchases_per_product', label: 'Purchases per product', group: 'purchases' },
-  { value: 'receipts_per_product', label: 'Receipts per product', group: 'purchases' },
-  { value: 'open_tasks', label: 'Open tasks / follow-ups', group: 'tasks' },
+type ReportGroup = 'sales' | 'purchases' | 'payments' | 'outstanding' | 'tasks';
+
+const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
+  // Sales
+  { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
+  { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
+  { value: 'sales_per_factory',   label: 'Sales per factory',       group: 'sales',       period: 'range' },
+  { value: 'sales_per_product',   label: 'Sales per product',       group: 'sales',       period: 'range' },
+  { value: 'sales_per_category',  label: 'Sales per category',      group: 'sales',       period: 'range' },
+  { value: 'sales_per_designer',  label: 'Sales per designer',      group: 'sales',       period: 'range' },
+  // Purchases
+  { value: 'purchases_per_product', label: 'Purchases per product', group: 'purchases',   period: 'range' },
+  { value: 'receipts_per_product',  label: 'Receipts per product',  group: 'purchases',   period: 'range' },
+  { value: 'spend_per_supplier',    label: 'Spend per supplier',    group: 'purchases',   period: 'range' },
+  // Payments / cash
+  { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
+  { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
+  // Outstanding snapshots (no period)
+  { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
+  { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
+  // Tasks
+  { value: 'open_tasks', label: 'Open tasks / follow-ups', group: 'tasks', period: 'snapshot' },
 ];
+
+const GROUP_LABELS: Record<ReportGroup, string> = {
+  sales: 'Sales',
+  purchases: 'Purchases',
+  payments: 'Payments (cash movements)',
+  outstanding: 'Outstanding (snapshot)',
+  tasks: 'Tasks',
+};
 
 function rangeForPeriod(p: Period): { from: string; to: string } {
   const today = new Date();
@@ -66,6 +92,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
   const [rows, setRows] = useState<any[]>([]);
 
   const range = period === 'custom' ? { from: customFrom, to: customTo } : rangeForPeriod(period);
+  const isSnapshot = REPORTS.find((r) => r.value === report)?.period === 'snapshot';
 
   useEffect(() => { void runReport(); }, [report, period, customFrom, customTo, workspaceId]);
 
@@ -75,26 +102,33 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
       let data: any[] = [];
       switch (report) {
         case 'sales_per_day':
-          data = await financeService.reportSalesPerDay(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportSalesPerDay(workspaceId, range.from, range.to); break;
         case 'sales_per_customer':
-          data = await financeService.reportSalesPerCustomer(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportSalesPerCustomer(workspaceId, range.from, range.to); break;
         case 'sales_per_product':
-          data = await financeService.reportSalesPerProduct(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportSalesPerProduct(workspaceId, range.from, range.to); break;
         case 'sales_per_category':
-          data = await financeService.reportSalesPerCategory(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportSalesPerCategory(workspaceId, range.from, range.to); break;
+        case 'sales_per_factory':
+          data = await financeService.reportSalesPerFactory(workspaceId, range.from, range.to); break;
+        case 'sales_per_designer':
+          data = await financeService.reportSalesPerDesigner(workspaceId, range.from, range.to); break;
         case 'purchases_per_product':
-          data = await financeService.reportPurchasesPerProduct(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportPurchasesPerProduct(workspaceId, range.from, range.to); break;
         case 'receipts_per_product':
-          data = await financeService.reportReceiptsPerProduct(workspaceId, range.from, range.to);
-          break;
+          data = await financeService.reportReceiptsPerProduct(workspaceId, range.from, range.to); break;
+        case 'spend_per_supplier':
+          data = await financeService.reportSpendPerSupplier(workspaceId, range.from, range.to); break;
+        case 'payments_out_per_counterparty':
+          data = await financeService.reportPaymentsOutPerCounterparty(workspaceId, range.from, range.to); break;
+        case 'payments_in_per_counterparty':
+          data = await financeService.reportPaymentsInPerCounterparty(workspaceId, range.from, range.to); break;
+        case 'top_customer_outstanding':
+          data = await financeService.reportTopCustomerOutstanding(workspaceId); break;
+        case 'top_supplier_outstanding':
+          data = await financeService.reportTopSupplierOutstanding(workspaceId); break;
         case 'open_tasks':
-          data = await financeService.reportOpenTasks(workspaceId);
-          break;
+          data = await financeService.reportOpenTasks(workspaceId); break;
       }
       setRows(data);
     } catch (err: any) {
@@ -127,26 +161,37 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
             <Select value={report} onValueChange={(v) => setReport(v as ReportKind)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {REPORTS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                ))}
+                {(['sales', 'purchases', 'payments', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
+                  const inGroup = REPORTS.filter((r) => r.group === g);
+                  if (inGroup.length === 0) return null;
+                  return (
+                    <React.Fragment key={g}>
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">{GROUP_LABELS[g]}</div>
+                      {inGroup.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Period</Label>
-            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="this_month">This month</SelectItem>
-                <SelectItem value="last_month">Last month</SelectItem>
-                <SelectItem value="last_quarter">Last 3 months</SelectItem>
-                <SelectItem value="ytd">Year to date</SelectItem>
-                <SelectItem value="last_year">Last year</SelectItem>
-                <SelectItem value="custom">Custom range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!isSnapshot && (
+            <div className="space-y-1">
+              <Label className="text-xs">Period</Label>
+              <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="this_month">This month</SelectItem>
+                  <SelectItem value="last_month">Last month</SelectItem>
+                  <SelectItem value="last_quarter">Last 3 months</SelectItem>
+                  <SelectItem value="ytd">Year to date</SelectItem>
+                  <SelectItem value="last_year">Last year</SelectItem>
+                  <SelectItem value="custom">Custom range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {period === 'custom' && (
             <>
               <div className="space-y-1">
@@ -194,7 +239,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
       {/* Period label */}
       <p className="text-xs text-muted-foreground">
-        {report === 'open_tasks' ? 'All open / scheduled activities.' : `Period: ${range.from} → ${range.to}`}
+        {isSnapshot ? 'Snapshot — current state, no period.' : `Period: ${range.from} → ${range.to}`}
       </p>
     </div>
   );
@@ -202,13 +247,27 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
 function primarySortKey(report: ReportKind): string {
   switch (report) {
-    case 'sales_per_day': return 'revenue_net';
-    case 'sales_per_customer': return 'revenue_net';
-    case 'sales_per_product': return 'revenue_net';
-    case 'sales_per_category': return 'revenue_net';
-    case 'purchases_per_product': return 'total_cost';
-    case 'receipts_per_product': return 'total_cost';
-    case 'open_tasks': return 'scheduled_for';
+    case 'sales_per_day':
+    case 'sales_per_customer':
+    case 'sales_per_product':
+    case 'sales_per_category':
+    case 'sales_per_factory':
+    case 'sales_per_designer':
+      return 'revenue_net';
+    case 'purchases_per_product':
+    case 'receipts_per_product':
+      return 'total_cost';
+    case 'spend_per_supplier':
+      return 'billed_total';
+    case 'payments_out_per_counterparty':
+      return 'total_paid';
+    case 'payments_in_per_counterparty':
+      return 'total_received';
+    case 'top_customer_outstanding':
+    case 'top_supplier_outstanding':
+      return 'outstanding';
+    case 'open_tasks':
+      return 'scheduled_for';
   }
 }
 
@@ -217,7 +276,9 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
     case 'sales_per_day':
     case 'sales_per_customer':
     case 'sales_per_product':
-    case 'sales_per_category': {
+    case 'sales_per_category':
+    case 'sales_per_factory':
+    case 'sales_per_designer': {
       let revenue = 0, margin = 0;
       for (const r of rows) { revenue += Number(r.revenue_net || 0); margin += Number(r.gross_margin || 0); }
       const pct = revenue > 0 ? (margin / revenue) * 100 : null;
@@ -234,6 +295,47 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       return [
         { label: 'Total quantity', value: qty.toFixed(2) },
         { label: 'Total cost', value: formatMoney(cost) },
+      ];
+    }
+    case 'spend_per_supplier': {
+      let billed = 0, paid = 0, outstanding = 0;
+      for (const r of rows) { billed += Number(r.billed_total || 0); paid += Number(r.paid_total || 0); outstanding += Number(r.outstanding || 0); }
+      return [
+        { label: 'Billed', value: formatMoney(billed) },
+        { label: 'Paid', value: formatMoney(paid) },
+        { label: 'Outstanding', value: formatMoney(outstanding) },
+      ];
+    }
+    case 'payments_out_per_counterparty': {
+      let total = 0;
+      for (const r of rows) total += Number(r.total_paid || 0);
+      return [
+        { label: 'Suppliers paid', value: String(rows.length) },
+        { label: 'Total sent', value: formatMoney(total) },
+      ];
+    }
+    case 'payments_in_per_counterparty': {
+      let total = 0;
+      for (const r of rows) total += Number(r.total_received || 0);
+      return [
+        { label: 'Customers paying', value: String(rows.length) },
+        { label: 'Total received', value: formatMoney(total) },
+      ];
+    }
+    case 'top_customer_outstanding': {
+      let total = 0;
+      for (const r of rows) total += Number(r.outstanding || 0);
+      return [
+        { label: 'Customers with open balance', value: String(rows.length) },
+        { label: 'Total AR outstanding', value: formatMoney(total) },
+      ];
+    }
+    case 'top_supplier_outstanding': {
+      let total = 0;
+      for (const r of rows) total += Number(r.outstanding || 0);
+      return [
+        { label: 'Suppliers with open balance', value: String(rows.length) },
+        { label: 'Total AP outstanding', value: formatMoney(total) },
       ];
     }
     case 'open_tasks':
@@ -281,6 +383,55 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
     return (
       <Table headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']} totals={totals} rows={rows.map((r: any) => [
         r.quote_label, r.kind, new Date(r.scheduled_for).toLocaleString(), `${r.days_until}d`, r.body ?? '—',
+      ])} />
+    );
+  }
+  if (report === 'sales_per_factory') {
+    return (
+      <Table headers={['Factory', 'Lines', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
+        r.factory_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+      ])} />
+    );
+  }
+  if (report === 'sales_per_designer') {
+    return (
+      <Table headers={['Designer', 'Invoices', 'Accepted quotes', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.invoice_count ?? 0), String(r.accepted_quote_count ?? 0), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+      ])} />
+    );
+  }
+  if (report === 'spend_per_supplier') {
+    return (
+      <Table headers={['Supplier', 'Bills', 'Billed', 'Paid', 'Outstanding']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.bill_count ?? 0), formatMoney(Number(r.billed_total || 0)), formatMoney(Number(r.paid_total || 0)), formatMoney(Number(r.outstanding || 0)),
+      ])} />
+    );
+  }
+  if (report === 'payments_out_per_counterparty') {
+    return (
+      <Table headers={['Supplier', 'Payments', 'Total sent']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_paid || 0)),
+      ])} />
+    );
+  }
+  if (report === 'payments_in_per_counterparty') {
+    return (
+      <Table headers={['Customer', 'Payments', 'Total received']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_received || 0)),
+      ])} />
+    );
+  }
+  if (report === 'top_customer_outstanding') {
+    return (
+      <Table headers={['Customer', 'Open invoices', 'Outstanding', 'Oldest due', 'Max overdue']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.open_invoice_count ?? 0), formatMoney(Number(r.outstanding || 0)), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
+      ])} />
+    );
+  }
+  if (report === 'top_supplier_outstanding') {
+    return (
+      <Table headers={['Supplier', 'Open bills', 'Outstanding', 'Oldest due', 'Max overdue']} totals={totals} rows={rows.map((r: any) => [
+        r.display_name, String(r.open_bill_count ?? 0), formatMoney(Number(r.outstanding || 0)), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
       ])} />
     );
   }

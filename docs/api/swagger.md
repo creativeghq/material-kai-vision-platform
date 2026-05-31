@@ -65,7 +65,7 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 37. [Social Content Generation](#37-social-content-generation)
 38. [Social Image Generation](#38-social-image-generation)
 39. [Social Video Generation](#39-social-video-generation)
-40. [Social Publishing (Late.dev)](#40-social-publishing-latedev)
+40. [Social Publishing (Zernio)](#40-social-publishing-zernio)
 41. [Pinterest Integration](#41-pinterest-integration)
 42. [Webhook Receivers](#42-webhook-receivers)
 43. [Internal Utilities](#43-internal-utilities)
@@ -2602,16 +2602,16 @@ When `status: "processing"`, poll using `prediction_id`.
 
 ---
 
-## 40. Social Publishing (Late.dev)
+## 40. Social Publishing (Zernio)
 
-### POST /functions/v1/late-oauth
+### POST /functions/v1/zernio-api
 
 **Auth**: User JWT
-**Description**: Manage social account connections via Late.dev OAuth.
+**Description**: Manage social account connections via Zernio OAuth.
 
 **GET** — List connected accounts:
 ```
-GET /functions/v1/late-oauth?workspace_id=uuid&include_inactive=false
+GET /functions/v1/zernio-api?workspace_id=uuid&include_inactive=false
 ```
 
 **POST** — Connect/disconnect:
@@ -2619,24 +2619,25 @@ GET /functions/v1/late-oauth?workspace_id=uuid&include_inactive=false
 {
   "action": "connect",
   "platform": "instagram",
-  "workspace_id": "uuid"
+  "workspace_id": "uuid",
+  "redirect_url": "https://app.example.com/profile"
 }
 ```
 
 | Action | Description |
 |--------|-------------|
-| `connect` | Returns `oauth_url` to redirect user to |
-| `callback` | Complete OAuth (pass `code`, `state`) |
-| `disconnect` | Disconnect account (`late_account_id`) |
+| `connect` | Returns `oauth_url` (Zernio `authUrl`). Optional `redirect_url` = where Zernio returns the browser (defaults to the app profile page). |
+| `callback` | Persist the account after OAuth. Pass `zernio_account_id` (the `accountId` from the redirect query), `platform`, `workspace_id`. |
+| `disconnect` | Disconnect account (`social_account_id`) |
 
 Supported platforms: `instagram`, `facebook`, `linkedin`, `tiktok`, `pinterest`, `youtube`, `twitter`, `threads`
 
 ---
 
-### POST /functions/v1/late-publish
+### POST /functions/v1/zernio-api
 
 **Auth**: User JWT
-**Description**: Publish or schedule social posts via Late.dev.
+**Description**: Publish or schedule social posts via Zernio.
 
 ```json
 {
@@ -2661,7 +2662,7 @@ Supported platforms: `instagram`, `facebook`, `linkedin`, `tiktok`, `pinterest`,
   "success": true,
   "action": "publish_now",
   "post_id": "uuid",
-  "late_post_id": "late-uuid",
+  "zernio_post_id": "zernio-uuid",
   "platform": "instagram",
   "handle": "@materialkai"
 }
@@ -2669,10 +2670,10 @@ Supported platforms: `instagram`, `facebook`, `linkedin`, `tiktok`, `pinterest`,
 
 ---
 
-### POST /functions/v1/late-analytics
+### POST /functions/v1/zernio-api
 
 **Auth**: User JWT
-**Description**: Fetch and sync analytics from Late.dev.
+**Description**: Fetch and sync analytics from Zernio.
 
 ```json
 {
@@ -2690,12 +2691,12 @@ Supported platforms: `instagram`, `facebook`, `linkedin`, `tiktok`, `pinterest`,
 
 ---
 
-### POST /functions/v1/late-webhook-handler
+### POST /functions/v1/zernio-webhook-handler
 
-**Auth**: None (validates `X-Late-Signature` HMAC-SHA256)
-**Description**: Webhook receiver from Late.dev. Updates social_posts status on publish/fail/schedule events.
+**Auth**: None (validates `X-Zernio-Signature` HMAC-SHA256)
+**Description**: Webhook receiver from Zernio. Updates social_posts status on publish/fail/schedule events.
 
-Event types: `post.published`, `post.failed`, `account.disconnected`, `post.scheduled`
+Event types: `post.published`, `post.partial`, `post.failed`, `post.cancelled`, `post.scheduled`, `account.disconnected`. Payload shape: `{ event, post | account, timestamp }`.
 
 ---
 

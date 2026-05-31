@@ -626,8 +626,8 @@ Complete reference of all platform features and capabilities.
 - ✅ `kai-task` — Runs arbitrary KAI tool calls autonomously
 - ✅ `product-enrichment` — Fills missing product metadata via Claude + web search
 - ✅ `material-tagger` — Auto-classifies products with material tags
-- ✅ `social-analytics-sync` — Syncs engagement metrics from Late.dev
-- ✅ `social-insights-sync` — Syncs account-level insights from Late.dev
+- ✅ `social-analytics-sync` — Syncs engagement metrics from Zernio
+- ✅ `social-insights-sync` — Syncs account-level insights from Zernio
 - ✅ `factory-enrichment` — Enriches factory records via Apollo/Firecrawl/Hunter.io
 
 **Infrastructure:**
@@ -719,21 +719,21 @@ Complete reference of all platform features and capabilities.
 
 ### 24. Social Media Suite
 
-**Purpose**: Generate, schedule, and publish social media content across 8 platforms via Late.dev
+**Purpose**: Generate, schedule, and publish social media content across 8 platforms via Zernio
 
 **Status:** ✅ Complete (Production Ready)
 
-**Documentation**: [social-media-system.md](social-media-system.md) | **API**: [api/late-social-api.md](api/late-social-api.md)
+**Documentation**: [social-media-system.md](social-media-system.md) | **API**: [api/zernio-social-api.md](api/zernio-social-api.md)
 
 **Content Generation:**
 - ✅ Caption generation (3 variants) for Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads — 2 credits
 - ✅ Image generation: xAI Aurora (10cr), Gemini Imagen (5cr), FLUX Dev (6cr) — auto-routed by image type
 - ✅ Video generation: Kling 1.6 Pro (15cr), Veo-2 (30cr)
 
-**Publishing (Late.dev):**
+**Publishing (Zernio):**
 - ✅ OAuth account connect/disconnect for all 8 platforms
 - ✅ Publish immediately or schedule for a future datetime
-- ✅ No credit cost — uses workspace's Late.dev subscription
+- ✅ No credit cost — uses workspace's Zernio subscription
 - ✅ Analytics sync: post engagement + account insights
 - ✅ Best posting time recommendations
 

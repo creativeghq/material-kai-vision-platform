@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone, RotateCcw, CreditCard } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -14,7 +16,10 @@ import { QuoteItemsList } from '../components/QuoteItemsList';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
+import { QuoteShareButton } from '../components/QuoteShareButton';
+import { QuoteEmailButton } from '../components/QuoteEmailButton';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
+import { trackQuoteView } from '@/services/quoteAnalyticsService';
 
 /**
  * Customer-facing Quote Detail Page
@@ -33,12 +38,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [acceptingQuote, setAcceptingQuote] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [showAddProducts, setShowAddProducts] = useState(false);
+  const [openInvoice, setOpenInvoice] = useState<{ id: string; internal_number: string; amount_due: number; currency: string; status: string } | null>(null);
+  const [payingNow, setPayingNow] = useState(false);
 
   const { data: docData } = useQuoteDocument(id || '');
 
   useEffect(() => {
     if (id) {
       loadQuoteDetails();
+      trackQuoteView(id, 'customer');
     }
   }, [id]);
 
@@ -54,6 +62,21 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       setQuote(quoteData);
       setQuoteUpsells(upsells);
       setQuoteTimeline(timeline);
+
+      // Look up an open invoice for this quote so we can render the Pay-now action.
+      if (quoteData?.status === 'accepted') {
+        const { data: inv } = await supabase
+          .from('invoices')
+          .select('id, internal_number, amount_due, currency, status')
+          .eq('quote_id', id)
+          .in('status', ['issued', 'partially_paid', 'overdue'])
+          .order('issued_at', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+        if (inv && Number((inv as any).amount_due) > 0) {
+          setOpenInvoice(inv as any);
+        }
+      }
     } catch (error) {
       console.error('Error loading quote:', error);
       toast({
@@ -261,14 +284,51 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 Accept Quote
               </Button>
             )}
+            {openInvoice && (
+              <Button
+                onClick={async () => {
+                  try {
+                    setPayingNow(true);
+                    const successUrl = `${window.location.origin}/quotes/${quote.id}?payment=success`;
+                    const cancelUrl = `${window.location.origin}/quotes/${quote.id}?payment=cancelled`;
+                    const res = await financeService.payInvoiceAsCustomer(openInvoice.id, { successUrl, cancelUrl });
+                    if (res.checkout_url) {
+                      window.location.href = res.checkout_url;
+                    } else if (res.error) {
+                      toast({ title: 'Cannot pay', description: res.error, variant: 'destructive' });
+                    }
+                  } catch (err: any) {
+                    toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
+                  } finally {
+                    setPayingNow(false);
+                  }
+                }}
+                disabled={payingNow}
+                className="rounded-full bg-primary hover:bg-primary/90"
+              >
+                {payingNow ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+                Pay {formatMoney(openInvoice.amount_due, openInvoice.currency)} by card
+              </Button>
+            )}
             {/* Preview & PDF download — available whenever the quote has items */}
             {(quote.items?.length || quote.total_items || 0) > 0 && (
-              <QuoteDownloadButtons
-                quoteId={quote.id}
-                quoteNumber={quote.quote_number}
-                data={docData}
-                headerMode
-              />
+              <>
+                <QuoteShareButton
+                  quoteId={quote.id}
+                  enabled={quote.public_share_enabled ?? false}
+                  token={quote.public_share_token ?? null}
+                  onChange={loadQuoteDetails}
+                  headerMode
+                />
+                <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
+                <QuoteDownloadButtons
+                  quoteId={quote.id}
+                  quoteNumber={quote.quote_number}
+                  data={docData}
+                  headerMode
+                  viewContext="customer"
+                />
+              </>
             )}
           </div>
         }

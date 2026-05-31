@@ -41,6 +41,10 @@ export interface Quote {
   customer_company_id?: string | null;
   /** B2C / private customer. XOR with customer_company_id at the DB level. */
   customer_contact_id?: string | null;
+  /** Public share link. Token is a random uuid surfaced at /q/:token. */
+  public_share_enabled?: boolean;
+  public_share_token?: string | null;
+  public_share_created_at?: string | null;
 }
 
 export interface QuoteItem {
@@ -845,6 +849,30 @@ export class QuotesService {
 
     if (error) throw error;
     return quote;
+  }
+
+  // =====================================================
+  // PUBLIC SHARE LINK
+  // =====================================================
+
+  /**
+   * Enable or disable the public share link for a quote.
+   * Enabling mints a fresh random token if none exists; disabling keeps the
+   * token row but flips `public_share_enabled=false` so the /q/:token page
+   * stops resolving (re-enabling reuses the same link). Admin-only via RLS.
+   */
+  async setQuotePublicShare(quoteId: string, enabled: boolean): Promise<Quote> {
+    // Routed through a SECURITY DEFINER RPC so the quote OWNER (not just admins)
+    // can toggle sharing at any status — the table's UPDATE RLS otherwise blocks
+    // owner writes once the quote leaves draft/submitted. The RPC mints a random
+    // token on first enable and reuses it afterwards.
+    const { data, error } = await supabase.rpc('set_quote_public_share', {
+      p_quote_id: quoteId,
+      p_enabled: enabled,
+    });
+
+    if (error) throw error;
+    return data as Quote;
   }
 
   // =====================================================

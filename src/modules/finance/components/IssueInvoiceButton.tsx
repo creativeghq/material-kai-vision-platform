@@ -1,7 +1,12 @@
 // Issue-invoice button for the quote admin page. Renders when the quote is in
-// 'accepted' status. Calls the finance-issue-invoice edge function (which
-// creates the invoice row + items via the issue_invoice_from_quote RPC) and
-// then navigates to the invoice detail page.
+// 'accepted' status AND the built-in Payments provider is active (no ERP
+// module like Oxygen winning the invoice-provider lookup — see
+// useInvoiceProvider). When an ERP wins, this button hides for new quotes,
+// since the ERP's own button (OxygenPreInvoiceButton, etc.) takes over.
+//
+// Calls the finance-issue-invoice edge function (which creates the invoice row
+// + items via the issue_invoice_from_quote RPC) and then navigates to the
+// invoice detail page.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Receipt, ExternalLink } from 'lucide-react';
@@ -9,6 +14,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService } from '@/modules/finance/services/financeService';
+import { useInvoiceProvider } from '@/modules/payments/services/invoiceProviderService';
 
 interface Props {
   quoteId: string;
@@ -18,6 +24,7 @@ interface Props {
 export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const provider = useInvoiceProvider();
   const [existingInvoiceId, setExistingInvoiceId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,6 +45,9 @@ export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) =>
 
   if (quoteStatus !== 'accepted' && !existingInvoiceId) return null;
 
+  // An existing internal invoice (created before an ERP was enabled, or in a
+  // workspace where the built-in provider was active when issued) always gets
+  // an "Open invoice" link — we don't hide history.
   if (existingInvoiceId) {
     return (
       <Button
@@ -49,6 +59,12 @@ export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) =>
       </Button>
     );
   }
+
+  // Provider gate: when an ERP module wins, hide the issue button for new
+  // quotes. The ERP's own button (OxygenPreInvoiceButton today) is the active
+  // surface for creating an invoice. provider===null = still loading; we
+  // render nothing until we know, to avoid flicker.
+  if (!provider || provider.isErp) return null;
 
   const handleIssue = async () => {
     try {

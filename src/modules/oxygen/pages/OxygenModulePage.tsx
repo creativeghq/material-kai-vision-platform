@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, FileText, CheckCircle2, AlertCircle, Loader2, ExternalLink, RefreshCw, Settings as SettingsIcon, Activity } from 'lucide-react';
+import { Home, FileText, CheckCircle2, AlertCircle, Loader2, ExternalLink, RefreshCw, Settings as SettingsIcon, Activity, Package, KeyRound } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -83,6 +83,18 @@ const OxygenModulePage: React.FC = () => {
             <Button variant="ghost" size="sm" className="gap-2" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="gap-2" title="Module Settings (API credentials)">
+              <Link to="/admin/modules/oxygen/settings">
+                <KeyRound className="h-4 w-4" />
+                Keys
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/admin/modules">
+                <Package className="h-4 w-4" />
+                All Modules
+              </Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="gap-2">
               <Link to="/admin">

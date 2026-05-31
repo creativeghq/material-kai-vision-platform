@@ -1,0 +1,9 @@
+{
+  "slug": "payments",
+  "name": "Payments",
+  "description": "Payment processing (Stripe today; pluggable provider model). Owns business details, Stripe configuration, and the built-in invoice generator — defers to ERP modules like Oxygen when one is enabled.",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "CreditCard",
+  "version": "0.1.0"
+}

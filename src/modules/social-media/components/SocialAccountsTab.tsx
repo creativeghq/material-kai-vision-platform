@@ -69,6 +69,46 @@ export const SocialAccountsTab: React.FC = () => {
     loadAccounts();
   }, [user]);
 
+  // Zernio redirects the OAuth tab back here with ?connected=<platform>&accountId=<id>.
+  // This tab shares the user's Supabase session, so we persist the account via the
+  // edge function callback, then clean the URL.
+  useEffect(() => {
+    if (!user || !workspaceId) return;
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const accountId = params.get('accountId');
+    if (!connected || !accountId) return;
+
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'callback',
+            zernio_account_id: accountId,
+            platform: connected,
+            workspace_id: workspaceId,
+          }),
+        });
+        toast({ title: `${connected} connected` });
+        await loadAccounts();
+      } catch (err: any) {
+        toast({ title: 'Could not finish connecting', description: err?.message ?? String(err), variant: 'destructive' });
+      } finally {
+        // Strip the Zernio OAuth params from the URL.
+        const clean = new URL(window.location.href);
+        ['connected', 'accountId', 'username', 'profileId', 'social_connected'].forEach(k => clean.searchParams.delete(k));
+        window.history.replaceState({}, '', clean.toString());
+      }
+    })();
+  }, [user, workspaceId]);
+
   const loadAccounts = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -98,7 +138,7 @@ export const SocialAccountsTab: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/late-oauth`, {
+      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -108,13 +148,15 @@ export const SocialAccountsTab: React.FC = () => {
           action: 'connect',
           platform,
           workspace_id: workspaceId,
+          // Zernio redirects back here after OAuth; this tab finishes the connection.
+          redirect_url: `${window.location.origin}${window.location.pathname}`,
         }),
       });
 
       const result = await res.json();
       if (!result.success) throw new Error(result.error || 'Failed to get OAuth URL');
 
-      // Open Late.dev OAuth in a new tab
+      // Open Zernio OAuth in a new tab
       window.open(result.oauth_url, '_blank', 'noopener,noreferrer');
 
       toast({
@@ -135,7 +177,7 @@ export const SocialAccountsTab: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/late-oauth`, {
+      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

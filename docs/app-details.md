@@ -465,19 +465,19 @@ Actions: send email (Amazon SES), Slack notification, call webhook, trigger AI a
 
 ### Feature 12 — Social Media Suite
 
-AI-powered social media content generation and cross-platform publishing via Late.dev:
+AI-powered social media content generation and cross-platform publishing via Zernio:
 
 **Content Generation:**
 - **Captions**: Claude generates 3 variants per platform (Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads), each respecting character limits, hashtag conventions, and platform tone. 2 credits.
 - **Images**: Auto-routed by content type — xAI Aurora for lifestyle/people (10cr), Gemini Imagen for product/interior (5cr), FLUX Dev for artistic/textured (6cr). 1:1, 4:5, 9:16, 16:9 aspect ratios.
 - **Videos**: Kling 1.6 Pro (15cr, fast) or Veo-2 (30cr, premium) for short-form social videos. Async polling for longer renders.
 
-**Publishing (Late.dev):**
+**Publishing (Zernio):**
 - Users connect Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, or Threads via OAuth at their profile settings page
 - Accounts are per-user (not per workspace — each professional manages their own presence)
 - Publish immediately or schedule for a future datetime
-- No credit cost for publishing — uses the workspace's Late.dev subscription
-- Engagement metrics (likes, comments, shares, reach) synced back to local database via `late-analytics`
+- No credit cost for publishing — uses the workspace's Zernio subscription
+- Engagement metrics (likes, comments, shares, reach) synced back to local database via `zernio-api`
 - Best posting time recommendations per platform
 
 **Business value for the platform:**
@@ -746,7 +746,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Virtual staging (AI-furnished rooms from empty photos — Replicate proplabs, 20cr)
 - Region editing / masked inpainting (SAM 2 + Grok Aurora, 20cr)
 - Interior video generation (4 models: Veo-2 30cr, Kling v3.0 20cr, Wan 2.1 12cr, Runway 40cr)
-- Social media suite (caption/image/video generation + Late.dev publishing across 8 platforms)
+- Social media suite (caption/image/video generation + Zernio publishing across 8 platforms)
 - VR world generation (WorldLabs Marble + Spark.js, orbit + first-person walk navigation)
 - Professional marketplace (profiles, services, Hire Me, Discover directory)
 - Moodboards (private + public, comments, featured board)

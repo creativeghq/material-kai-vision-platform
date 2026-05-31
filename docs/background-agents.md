@@ -46,8 +46,8 @@ chain triggers: child agents with parent_agent_id auto-dispatch on completion
 | `kai-task` | KAI Task Agent | Runs arbitrary KAI agent tool calls autonomously |
 | `product-enrichment` | Product Enrichment | Fills missing product metadata using Claude + web search |
 | `material-tagger` | Material Tagger | Auto-tags products with structured material classifications |
-| `social-analytics-sync` | Social Analytics Sync | Syncs per-post engagement metrics from Late.dev |
-| `social-insights-sync` | Social Insights Sync | Syncs account-level follower/reach snapshots from Late.dev |
+| `social-analytics-sync` | Social Analytics Sync | Syncs per-post engagement metrics from Zernio |
+| `social-insights-sync` | Social Insights Sync | Syncs account-level follower/reach snapshots from Zernio |
 | `factory-enrichment` | Factory Enrichment | Enriches factory/manufacturer records via Apollo, Firecrawl, Hunter.io |
 
 To add a new agent type: implement `AgentRunner` in `_shared/agents/your-agent.ts`, import and add to `_shared/agents/registry.ts`.

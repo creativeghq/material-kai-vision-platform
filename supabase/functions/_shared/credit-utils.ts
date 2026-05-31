@@ -47,7 +47,7 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'wan2.1-i2v':           { cost_per_unit: 0.05,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
   'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
   'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER },
-  'late-publish':         { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },
+  'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },
 };
 
 async function fetchPricingFromDB(supabase: SupabaseClient): Promise<Record<string, ServicePricing>> {

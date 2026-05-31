@@ -65,10 +65,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       /* ignore */
     }
     if (user?.id) {
+      // NB: the supabase query builder is lazy — the request only fires when
+      // `.then()`/`await` is invoked. `void supabase…eq()` (no then) silently
+      // never sends, which is why theme writes used to no-op and reload reverted
+      // to the stale DB value. Calling `.then()` here is what actually persists.
       void supabase
         .from('user_profiles')
         .update({ theme_preference: next, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.warn('[theme] failed to persist preference:', error.message);
+          }
+        });
     }
   }, [user?.id]);
 

@@ -15,7 +15,7 @@ For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoin
 |-------|--------|-------------|
 | **JWT** | `Authorization: Bearer <supabase_access_token>` | Frontend (normal user sessions) |
 | **Service-role** | `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` | Cron jobs, server-to-server, admin-only functions |
-| **Webhook signature** | Provider-specific (Svix `svix-signature`, Stripe `stripe-signature`, Twilio `x-twilio-signature`, AWS SNS, Late.dev) | Inbound webhooks — no bearer token |
+| **Webhook signature** | Provider-specific (Svix `svix-signature`, Stripe `stripe-signature`, Twilio `x-twilio-signature`, AWS SNS, Zernio) | Inbound webhooks — no bearer token |
 | **API key** | `Authorization: Bearer <MIVAA_API_KEY>` | Server-to-server calls into MIVAA Python backend |
 | **Public** | — | Health checks, OAuth callbacks, debug stubs |
 
@@ -144,14 +144,12 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 | PostgREST `/rest/v1/product_prices` | POST / PATCH | JWT (admin/owner via RLS) | Commit confirmed prices with source doc IDs and `price_lookup_call_id` audit link | ↑ |
 | PostgREST `/rest/v1/quote_items` | PATCH | JWT (admin/owner via RLS) | Writes `unit_price` + `price_source` + `price_lookup_call_id` for auditable quote pricing | ↑ |
 
-### 1.11 Social (Late.dev)
+### 1.11 Social (Zernio)
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `late-oauth` | GET/POST | public | Late.dev OAuth callback handler | [late-social-api](api/late-social-api.md) |
-| `late-publish` | POST | JWT | Publish / schedule posts to 8 platforms via Late.dev | ↑ |
-| `late-analytics` | POST | JWT | Actions: `get-post-analytics`, `get-account-insights`, `get-best-time` | ↑ |
-| `late-webhook-handler` | POST | signature | Receives `post.published` / `post.failed` events | ↑ |
+| `zernio-api` | GET/POST | JWT | Unified router; `action` selects handler — oauth (`connect`/`callback`/`disconnect`/`list`), publish (`publish_now`/`schedule`), analytics (`get_post_analytics`/`get_account_insights`/`get_best_time`). Publishes to 8 platforms via Zernio. | [zernio-social-api](api/zernio-social-api.md) |
+| `zernio-webhook-handler` | POST | signature (`X-Zernio-Signature`) | Receives `post.published` / `post.partial` / `post.failed` / `post.cancelled` / `post.scheduled` / `account.disconnected` | ↑ |
 | `generate-social-content` | POST | JWT | 3 caption variants + hashtags per platform | ↑ |
 | `generate-social-image` | POST | JWT | Routes to best image model (Aurora / Gemini / FLUX) by content type | ↑ |
 | `generate-social-video` | POST | JWT | Short-form video (Kling / Veo2 via Replicate) | ↑ |
@@ -263,7 +261,7 @@ The platform is divided into 7 toggleable modules. Frontend modules live in `src
 | `messaging` | yes | yes (`/api/messaging/*`) | edge fns: `messaging-api`, `messaging-processor`, `messaging-webhook` |
 | `quotes` | yes | no | edge fns: `quotes-api`, `generate-quote-pdf` |
 | `notifications` | yes (header bell-icon) | no | edge fn: `notification-dispatcher` |
-| `social-media` | yes | no | edge fns: `late-{oauth,publish,analytics,webhook-handler}`, `generate-social-{content,image,video}` + 11 LLM tool factories under `_shared/modules/social-media/` |
+| `social-media` | yes | no | edge fns: `zernio-api`, `zernio-webhook-handler`, `generate-social-{content,image,video}` + 11 LLM tool factories under `_shared/modules/social-media/` |
 
 **Top-level MIVAA endpoints owned by the module system (always present, regardless of which modules are enabled):**
 

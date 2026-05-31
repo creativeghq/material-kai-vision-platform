@@ -8,6 +8,8 @@ import {
   ExternalLink,
   AlertCircle,
   ArrowLeft,
+  CreditCard,
+  Copy,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -37,6 +39,8 @@ const InvoiceDetailPage: React.FC = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
   const [oxygenLegalNumber, setOxygenLegalNumber] = useState('');
+  const [payLink, setPayLink] = useState<string | null>(null);
+  const [payLinkBusy, setPayLinkBusy] = useState(false);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -165,6 +169,33 @@ const InvoiceDetailPage: React.FC = () => {
               Push to Oxygen
             </Button>
           )}
+          {invoice.status !== 'void' && invoice.status !== 'credit_noted' && Number(invoice.amount_due) > 0 && (
+            <Button
+              onClick={async () => {
+                if (!invoice) return;
+                try {
+                  setPayLinkBusy(true);
+                  const res = await financeService.getInvoicePayLink(invoice.id, { linkOnly: true });
+                  setPayLink(res.pay_link);
+                  try {
+                    await navigator.clipboard.writeText(res.pay_link);
+                    toast({ title: 'Pay link copied', description: 'Send this to the customer to collect payment by card.' });
+                  } catch {
+                    toast({ title: 'Pay link ready', description: res.pay_link });
+                  }
+                } catch (err: any) {
+                  toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
+                } finally {
+                  setPayLinkBusy(false);
+                }
+              }}
+              disabled={payLinkBusy}
+              variant="outline"
+            >
+              {payLinkBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+              Card pay link
+            </Button>
+          )}
           {invoice.status !== 'void' && invoice.status !== 'credit_noted' && (
             <Button onClick={() => setPaymentDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Record payment
@@ -177,6 +208,26 @@ const InvoiceDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {payLink && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex items-center justify-between gap-3 p-3 text-sm">
+            <div className="min-w-0">
+              <div className="font-medium">Public pay link (valid 90 days)</div>
+              <code className="block truncate text-xs text-muted-foreground">{payLink}</code>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="outline" onClick={async () => { await navigator.clipboard.writeText(payLink); toast({ title: 'Copied' }); }}>
+                <Copy className="h-3 w-3 mr-1" /> Copy
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => window.open(payLink, '_blank')}>
+                <ExternalLink className="h-3 w-3 mr-1" /> Open
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setPayLink(null)}>Hide</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="dashboard-card border-0">

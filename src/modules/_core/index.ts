@@ -22,7 +22,7 @@ export {
   syncSubscribersToEnabledSet,
 } from './subscribers';
 
-export type { ModuleSubscriber } from './ModuleDefinition';
+export type { ModuleSubscriber, ModuleHeaderAction, ModuleSettingsPanel } from './ModuleDefinition';
 
 export {
   useAdminDashboardCards,

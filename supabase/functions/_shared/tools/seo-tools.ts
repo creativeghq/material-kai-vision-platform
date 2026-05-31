@@ -24,19 +24,24 @@ type ChunkSink = ((chunk: any) => void) | undefined;
 // SEO Article Pipeline Tools
 // ═══════════════════════════════════════════════════════════════
 
-/** Helper to call SEO edge functions from agent tools */
+/** Helper to call the unified seo-api edge function from agent tools.
+ *  Legacy callers pass functionName='seo-X' — we map that to action='X' on /seo-api. */
 export async function callSEOFunction(functionName: string, body: any, timeoutMs = 120_000): Promise<any> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  // Convert legacy seo-X name → action; e.g. seo-toolkit-research → toolkit_research
+  const action = functionName.replace(/^seo-/, '').replace(/-/g, '_');
+  const payload = { action, ...body };
+
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/seo-api`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

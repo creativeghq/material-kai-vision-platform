@@ -5,5 +5,6 @@
   "category": "billing",
   "priceTier": "pro",
   "icon": "FileText",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "provides": { "invoicing": true }
 }

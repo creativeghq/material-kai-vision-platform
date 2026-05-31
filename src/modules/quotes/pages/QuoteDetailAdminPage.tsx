@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck, FilePlus2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck, FilePlus2, Eye } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -13,6 +13,9 @@ import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, Timeline
 import { quotePDFService } from '../services/QuotePDFService';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
+import { trackQuoteView } from '@/services/quoteAnalyticsService';
+import { QuoteAnalyticsPanel } from '../components/QuoteAnalyticsPanel';
+import { QuoteEmailButton } from '../components/QuoteEmailButton';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { QuoteItemsList } from '../components/QuoteItemsList';
@@ -94,6 +97,7 @@ export const QuoteDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
+      trackQuoteView(id, 'admin');
       loadQuoteDetails();
       loadStatusTags();
       loadUpsells();
@@ -584,7 +588,11 @@ export const QuoteDetailPage: React.FC = () => {
               quoteId={quote.id}
               quoteNumber={quote.quote_number}
               data={docData}
+              viewContext="admin"
             />
+
+            {/* Email the quote to the customer (or a typed recipient) */}
+            <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
 
             {/* Send Quote to Customer — only when submitted/draft and all items priced */}
             {(quote.status === 'submitted' || quote.status === 'draft') && allItemsHavePrices && (
@@ -802,6 +810,10 @@ export const QuoteDetailPage: React.FC = () => {
             <TabsTrigger value="activity" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Activity
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Eye className="h-4 w-4" />
+              Analytics
             </TabsTrigger>
           </TabsList>
 
@@ -1469,6 +1481,18 @@ export const QuoteDetailPage: React.FC = () => {
           {/* Activity Tab */}
           <TabsContent value="activity" className="mt-5">
             {id && <QuoteActivityPanel quoteId={id} />}
+          </TabsContent>
+
+          {/* Analytics Tab — views / previews / downloads + public share link */}
+          <TabsContent value="analytics" className="mt-5">
+            {id && (
+              <QuoteAnalyticsPanel
+                quoteId={id}
+                publicShareEnabled={(quote as any).public_share_enabled ?? false}
+                publicShareToken={(quote as any).public_share_token ?? null}
+                onShareChange={loadQuoteDetails}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

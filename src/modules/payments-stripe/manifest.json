@@ -1,0 +1,10 @@
+{
+  "slug": "payments-stripe",
+  "name": "Stripe",
+  "description": "Stripe as a payment provider — Checkout sessions for subscriptions + credits + invoice pay-links, webhook reconciliation, customer billing portal. Sibling to the parent Payments module; future processors (PayPal, Adyen) slot in alongside.",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "CreditCard",
+  "version": "0.1.0",
+  "provides": { "payments": true }
+}

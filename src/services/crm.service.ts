@@ -31,7 +31,7 @@ export const usersAPI = {
       ...(search && { search }),
     });
 
-    const response = await fetch(`${getApiBase()}/crm-users-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/users?${params}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -48,7 +48,7 @@ export const usersAPI = {
   async getUser(userId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/users/${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -65,7 +65,7 @@ export const usersAPI = {
   async updateUser(userId: string, updates: any) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/users/${userId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -85,7 +85,7 @@ export const usersAPI = {
   async deleteUser(userId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-users-api/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/users/${userId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -103,7 +103,7 @@ export const usersAPI = {
   async inviteUser(email: string, fullName?: string, contactId?: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-users-api`, {
+    const response = await fetch(`${getApiBase()}/crm-api/users`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -128,7 +128,7 @@ export const stripeAPI = {
     const token = await getAuthToken();
 
     const response = await fetch(
-      `${getApiBase()}/crm-stripe-api/subscriptions/create-checkout`,
+      `${getApiBase()}/crm-api/stripe/subscriptions/create-checkout`,
       {
         method: 'POST',
         headers: {
@@ -151,7 +151,7 @@ export const stripeAPI = {
     const token = await getAuthToken();
 
     const response = await fetch(
-      `${getApiBase()}/crm-stripe-api/credits/purchase`,
+      `${getApiBase()}/crm-api/stripe/credits/purchase`,
       {
         method: 'POST',
         headers: {
@@ -173,7 +173,7 @@ export const stripeAPI = {
   async getSubscription() {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-stripe-api/subscriptions`, {
+    const response = await fetch(`${getApiBase()}/crm-api/stripe/subscriptions`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -190,7 +190,7 @@ export const stripeAPI = {
   async getCredits() {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-stripe-api/credits`, {
+    const response = await fetch(`${getApiBase()}/crm-api/stripe/credits`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -211,7 +211,7 @@ export const contactsAPI = {
   async createContact(contact: any) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -236,7 +236,7 @@ export const contactsAPI = {
       offset: offset.toString(),
     });
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts?${params}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -253,7 +253,7 @@ export const contactsAPI = {
   async getContact(contactId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/${contactId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -270,7 +270,7 @@ export const contactsAPI = {
   async updateContact(contactId: string, updates: any) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/${contactId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -290,7 +290,7 @@ export const contactsAPI = {
   async deleteContact(contactId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/${contactId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -310,7 +310,7 @@ export const contactsAPI = {
   async linkUserToContact(contactId: string, userId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}/link-user`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/${contactId}/link-user`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -330,7 +330,7 @@ export const contactsAPI = {
   async unlinkUserFromContact(contactId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/${contactId}/unlink-user`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/${contactId}/unlink-user`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -348,7 +348,7 @@ export const contactsAPI = {
   async getPotentialMatches() {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/potential-matches`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/potential-matches`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -365,7 +365,7 @@ export const contactsAPI = {
   async bulkLinkContacts(links: Array<{ contactId: string; userId: string }>) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/bulk-link`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/bulk-link`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -385,7 +385,7 @@ export const contactsAPI = {
   async getContactByUserId(userId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-contacts-api/by-user/${userId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/contacts/by-user/${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -405,7 +405,7 @@ export const companiesAPI = {
   async createCompany(company: any) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -431,7 +431,7 @@ export const companiesAPI = {
       ...(search && { search }),
     });
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api?${params}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies?${params}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -448,7 +448,7 @@ export const companiesAPI = {
   async getCompany(companyId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -465,7 +465,7 @@ export const companiesAPI = {
   async updateCompany(companyId: string, updates: any) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -485,7 +485,7 @@ export const companiesAPI = {
   async deleteCompany(companyId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -503,7 +503,7 @@ export const companiesAPI = {
   async attachContact(companyId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}/contacts`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}/contacts`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -528,7 +528,7 @@ export const companiesAPI = {
   async detachContact(companyId: string, relationshipId: string) {
     const token = await getAuthToken();
 
-    const response = await fetch(`${getApiBase()}/crm-companies-api/${companyId}/contacts/${relationshipId}`, {
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}/contacts/${relationshipId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,

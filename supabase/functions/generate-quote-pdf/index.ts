@@ -131,6 +131,17 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       })
       .eq('id', quoteId);
 
+    // Log a download/generation analytics event (best-effort, service role).
+    supabase.from('quote_analytics_events').insert({
+      event_type: 'downloaded',
+      view_context: 'admin',
+      quote_id: quoteId,
+      user_id: auth.userId ?? null,
+      session_id: auth.userId ?? 'server',
+      source_page: 'generate-quote-pdf',
+      metadata: { method: 'server_generate', quote_number: quoteData.quote_number ?? null },
+    }).then(() => {});
+
     // Notify quote owner that PDF is ready
     const { data: quoteRecord } = await supabase
       .from('quotes')

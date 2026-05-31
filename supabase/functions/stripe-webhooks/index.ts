@@ -195,6 +195,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  // Route by metadata.type FIRST — invoice payments don't require a registered user.
+  if (paymentIntent.metadata?.type === 'invoice_payment') {
+    await handleInvoicePaymentSucceeded(paymentIntent);
+    return;
+  }
+
   const customerId = paymentIntent.customer as string;
   if (!customerId) return;
 
@@ -250,6 +256,93 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
         metadata: { credit_amount: parseFloat(creditAmount), payment_intent_id: paymentIntent.id },
       }).then(() => {});
     }
+  }
+}
+
+/**
+ * Sales/Finance — Stripe PaymentIntent for an invoice in public.invoices.
+ * Inserts payments + payment_allocations; the status-keeper trigger then flips
+ * the invoice to paid / partially_paid via amount_paid. Idempotent on payment_intent.id.
+ */
+async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const invoiceId = paymentIntent.metadata?.invoice_id;
+  if (!invoiceId) {
+    console.warn('invoice_payment metadata missing invoice_id', paymentIntent.id);
+    return;
+  }
+
+  // Idempotency: skip if we already recorded a payment for this intent
+  const { data: existing } = await supabase
+    .from('payments')
+    .select('id')
+    .eq('stripe_payment_intent_id', paymentIntent.id)
+    .maybeSingle();
+  if (existing) {
+    console.log(`invoice_payment ${paymentIntent.id} already recorded as payment ${existing.id}`);
+    return;
+  }
+
+  const { data: inv, error: invErr } = await supabase
+    .from('invoices')
+    .select('*, contact:crm_contacts!customer_contact_id(id, email, name), company:crm_companies!customer_company_id(id, email, name)')
+    .eq('id', invoiceId)
+    .single();
+  if (invErr || !inv) {
+    console.error('invoice not found for invoice_payment', invoiceId, invErr?.message);
+    return;
+  }
+
+  const amount = paymentIntent.amount_received
+    ? paymentIntent.amount_received / 100
+    : paymentIntent.amount / 100;
+  const currency = (paymentIntent.currency || inv.currency || 'eur').toUpperCase();
+
+  const { data: paymentRow, error: payErr } = await supabase
+    .from('payments')
+    .insert({
+      workspace_id: inv.workspace_id,
+      direction: 'in',
+      amount,
+      currency,
+      method: 'card',
+      paid_at: new Date().toISOString(),
+      counterparty_contact_id: inv.customer_contact_id,
+      counterparty_company_id: inv.customer_company_id,
+      reference: `Stripe ${paymentIntent.id}`,
+      notes: `Inv ${inv.internal_number} via Stripe Checkout`,
+      stripe_payment_intent_id: paymentIntent.id,
+      stripe_checkout_session_id: inv.stripe_checkout_session_id,
+    })
+    .select('id')
+    .single();
+  if (payErr || !paymentRow) {
+    console.error('payments insert failed for invoice_payment', payErr?.message);
+    return;
+  }
+
+  const { error: allocErr } = await supabase.from('payment_allocations').insert({
+    payment_id: paymentRow.id,
+    invoice_id: inv.id,
+    amount,
+  });
+  if (allocErr) {
+    console.error('payment_allocations insert failed', allocErr.message);
+    return;
+  }
+
+  console.log(`Recorded Stripe payment ${paymentRow.id} for invoice ${inv.internal_number} (${amount} ${currency})`);
+
+  // Bell notify the invoice creator (if known)
+  if (inv.created_by) {
+    supabase.from('user_notifications').insert({
+      user_id: inv.created_by,
+      type: 'invoice_paid',
+      title: `Invoice ${inv.internal_number} paid`,
+      body: `${currency} ${amount.toFixed(2)} received via card.`,
+      action_url: `/admin/finance/invoices/${inv.id}`,
+      is_read: false,
+      metadata: { invoice_id: inv.id, amount, currency, payment_intent_id: paymentIntent.id },
+    }).then(() => {});
   }
 }
 

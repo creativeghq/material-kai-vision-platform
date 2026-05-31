@@ -42,14 +42,14 @@ export async function callSocialFunction(functionName: string, body: unknown, ti
 
 /**
  * Social Media Tool: Connect Account
- * Returns a Late.dev OAuth URL for the user to connect a social platform
+ * Returns a Zernio OAuth URL for the user to connect a social platform
  */
 export const createSocialConnectAccountTool = (userId: string, workspaceId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ platform }) => {
       try {
         onProgress?.(`Generating OAuth URL for ${platform}...`);
-        const result = await callSocialFunction('late-oauth', {
+        const result = await callSocialFunction('zernio-api', {
           action: 'connect',
           platform,
           workspace_id: workspaceId,
@@ -83,7 +83,7 @@ export const createSocialListAccountsTool = (userId: string, workspaceId: string
   return tool(
     async ({ include_inactive }) => {
       try {
-        const result = await callSocialFunction('late-oauth', {
+        const result = await callSocialFunction('zernio-api', {
           action: 'list',
           workspace_id: workspaceId,
           include_inactive: include_inactive ?? false,
@@ -129,7 +129,7 @@ export const createSocialDisconnectAccountTool = (userId: string, workspaceId: s
     async ({ social_account_id }) => {
       try {
         onProgress?.('Disconnecting account...');
-        const result = await callSocialFunction('late-oauth', {
+        const result = await callSocialFunction('zernio-api', {
           action: 'disconnect',
           social_account_id,
         });
@@ -286,7 +286,7 @@ export const createSocialPublishPostTool = (userId: string, workspaceId: string,
     async ({ post_id, social_account_id }) => {
       try {
         onProgress?.('Publishing post...');
-        const result = await callSocialFunction('late-publish', {
+        const result = await callSocialFunction('zernio-api', {
           user_id: userId,
           workspace_id: workspaceId,
           post_id,
@@ -300,7 +300,7 @@ export const createSocialPublishPostTool = (userId: string, workspaceId: string,
     },
     {
       name: 'social_publish_post',
-      description: 'Publish a post immediately to a connected social media account via Late.dev. No credit cost — uses your Late.dev subscription.',
+      description: 'Publish a post immediately to a connected social media account via Zernio. No credit cost — uses your Zernio subscription.',
       schema: z.object({
         post_id: z.string().describe('UUID of the social_posts draft to publish'),
         social_account_id: z.string().describe('UUID of the social account to publish to'),
@@ -317,7 +317,7 @@ export const createSocialSchedulePostTool = (userId: string, workspaceId: string
     async ({ post_id, social_account_id, scheduled_at }) => {
       try {
         onProgress?.(`Scheduling post for ${scheduled_at}...`);
-        const result = await callSocialFunction('late-publish', {
+        const result = await callSocialFunction('zernio-api', {
           user_id: userId,
           workspace_id: workspaceId,
           post_id,
@@ -332,7 +332,7 @@ export const createSocialSchedulePostTool = (userId: string, workspaceId: string
     },
     {
       name: 'social_schedule_post',
-      description: 'Schedule a social media post for a future date/time via Late.dev. No credit cost.',
+      description: 'Schedule a social media post for a future date/time via Zernio. No credit cost.',
       schema: z.object({
         post_id: z.string().describe('UUID of the social_posts draft to schedule'),
         social_account_id: z.string().describe('UUID of the social account to post to'),
@@ -349,7 +349,7 @@ export const createSocialGetBestTimeTool = (userId: string, workspaceId: string)
   return tool(
     async ({ platform, social_account_id }) => {
       try {
-        const result = await callSocialFunction('late-analytics', {
+        const result = await callSocialFunction('zernio-api', {
           user_id: userId,
           workspace_id: workspaceId,
           action: 'get_best_time',
@@ -363,7 +363,7 @@ export const createSocialGetBestTimeTool = (userId: string, workspaceId: string)
     },
     {
       name: 'social_get_best_time',
-      description: 'Get the best times to post on a specific platform based on your account\'s historical engagement data from Late.dev.',
+      description: 'Get the best times to post on a specific platform based on your account\'s historical engagement data from Zernio.',
       schema: z.object({
         platform: z.string().describe('Platform to get best times for'),
         social_account_id: z.string().optional().describe('UUID of the social account (optional, uses first active account for platform if omitted)'),

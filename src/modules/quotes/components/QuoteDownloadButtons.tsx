@@ -19,6 +19,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { QuoteDocumentData } from '../hooks/useQuoteDocument';
 import { QuoteDocument } from './QuoteDocument';
+import { trackQuoteDownload } from '@/services/quoteAnalyticsService';
 
 interface QuoteDownloadButtonsProps {
   quoteId: string;
@@ -29,6 +30,8 @@ interface QuoteDownloadButtonsProps {
   onPreview?: () => void;
   /** When true, applies glass/white-tinted styling for use on dark primary headers */
   headerMode?: boolean;
+  /** Who is downloading — used for analytics attribution. */
+  viewContext?: 'customer' | 'admin';
 }
 
 export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
@@ -37,6 +40,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
   data,
   onPreview,
   headerMode = false,
+  viewContext = 'customer',
 }) => {
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
@@ -110,6 +114,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
       const filename = `quote-${quoteNumber || quoteId.slice(0, 8)}.pdf`;
       pdf.save(filename);
 
+      trackQuoteDownload(quoteId, 'client_pdf', viewContext);
       toast({ title: 'PDF downloaded', description: filename });
     } catch (err: any) {
       console.error('PDF generation error:', err);

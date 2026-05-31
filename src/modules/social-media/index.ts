@@ -20,8 +20,8 @@ const definition: ModuleDefinition = {
       location: 'admin-dashboard',
       adminCategory: 'Communications',
       adminDescription:
-        'View all workspace social accounts connected via Late.dev. Users connect their own accounts from their profile.',
-      adminCount: 'Late.dev',
+        'View all workspace social accounts connected via Zernio. Users connect their own accounts from their profile.',
+      adminCount: 'Zernio',
     },
   ],
 };

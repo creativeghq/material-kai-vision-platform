@@ -11,6 +11,7 @@ import {
   FileCheck,
   Loader2,
   Download,
+  Building2,
 } from 'lucide-react';
 
 import {
@@ -33,6 +34,7 @@ import {
 } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { DocumentFactoriesCrmLinker } from '@/components/Admin/DocumentFactoriesCrmLinker';
 
 interface DocumentDetails {
   id: string;
@@ -350,6 +352,10 @@ export const PDFDocumentDetails: React.FC = () => {
             <FileCheck className="h-4 w-4 mr-2" />
             Entities ({document.document_entities.length})
           </TabsTrigger>
+          <TabsTrigger value="businesses" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Building2 className="h-4 w-4 mr-2" />
+            Businesses
+          </TabsTrigger>
           <TabsTrigger value="metadata" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <FileText className="h-4 w-4 mr-2" />
             Metadata
@@ -625,6 +631,15 @@ export const PDFDocumentDetails: React.FC = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Businesses Tab — every distinct factory/brand the extractor found
+            in this document, with one-click promotion to a CRM Business. */}
+        <TabsContent value="businesses" className="space-y-4">
+          <DocumentFactoriesCrmLinker
+            entities={document.document_entities ?? []}
+            products={document.products ?? []}
+          />
         </TabsContent>
 
         {/* Metadata Tab */}

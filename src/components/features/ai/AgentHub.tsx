@@ -2892,7 +2892,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   return (
     <div className="flex flex-1 min-h-0">
       {/* Middle Panel - Conversation List (desktop only) */}
-      <div className="hidden md:flex w-72 flex-col bg-[hsl(0,0%,9%)] border-r border-white/8 overflow-hidden flex-shrink-0">
+      <div className="hidden md:flex w-72 flex-col bg-sidebar border-r border-white/8 overflow-hidden flex-shrink-0">
         {/* Header */}
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3 mb-4">
@@ -3032,7 +3032,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   <MessageSquare className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-[hsl(0,0%,9%)] border-r border-white/8" aria-describedby={undefined}>
+              <SheetContent side="left" className="w-80 p-0 bg-sidebar border-r border-white/8" aria-describedby={undefined}>
                 <SheetTitle className="sr-only">Chat History</SheetTitle>
                 <div className="flex flex-col h-full">
                   <div className="p-5 border-b border-white/10">
@@ -3319,7 +3319,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           borderColor: 'hsl(var(--primary))',
                         }}
                       >
-                        <Bot className="h-4 w-4 text-white" />
+                        <Bot className="h-4 w-4" style={{ color: '#fff' }} />
                       </div>
                     </div>
                   )}
@@ -3999,7 +3999,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           borderColor: '#1f2937',
                         }}
                       >
-                        <User className="h-4 w-4 text-white" />
+                        <User className="h-4 w-4" style={{ color: '#fff' }} />
                       </div>
                     </div>
                   )}

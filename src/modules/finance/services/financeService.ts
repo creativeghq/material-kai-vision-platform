@@ -837,6 +837,12 @@ export interface FinanceSettings {
   statement_template_footer_path: string | null;
   default_payment_terms_days: number;
   default_vat_rate: number;
+  digest_enabled: boolean;
+  digest_frequency: 'daily' | 'weekly' | 'monthly';
+  digest_day_of_week: number | null;
+  digest_hour_utc: number;
+  digest_recipients: string[];
+  digest_last_sent_at: string | null;
   updated_at: string;
 }
 
@@ -846,6 +852,22 @@ export interface SalesPerProductRow { product_id: string | null; product_name: s
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number }
 export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }
+
+export interface SalesPerFactoryRow { factory_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
+export interface SpendPerSupplierRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; bill_count: number; billed_total: number; paid_total: number; outstanding: number }
+export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number }
+export interface PaymentsPerCounterpartyInRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_received: number }
+export interface SalesPerDesignerRow { user_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number; accepted_quote_count: number }
+export interface TopOutstandingRow {
+  party_type: 'company'|'contact';
+  party_id: string | null;
+  display_name: string;
+  open_invoice_count?: number;
+  open_bill_count?: number;
+  outstanding: number;
+  oldest_due_at: string | null;
+  max_days_overdue: number;
+}
 
 // v2 method bundle — merged into financeService below so callers see one symbol.
 const _financeServiceV2 = {
@@ -1024,6 +1046,7 @@ const _financeServiceV2 = {
       'statements_enabled','statement_email_subject','statement_email_body',
       'statement_template_cover_path','statement_template_footer_path',
       'default_payment_terms_days','default_vat_rate',
+      'digest_enabled','digest_frequency','digest_day_of_week','digest_hour_utc','digest_recipients',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }
@@ -1086,6 +1109,41 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as OpenTaskRow[];
   },
+  async reportSalesPerFactory(workspaceId: string, from: string, to: string): Promise<SalesPerFactoryRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_factory', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as SalesPerFactoryRow[];
+  },
+  async reportSpendPerSupplier(workspaceId: string, from: string, to: string): Promise<SpendPerSupplierRow[]> {
+    const { data, error } = await supabase.rpc('report_spend_per_supplier', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as SpendPerSupplierRow[];
+  },
+  async reportPaymentsOutPerCounterparty(workspaceId: string, from: string, to: string): Promise<PaymentsPerCounterpartyOutRow[]> {
+    const { data, error } = await supabase.rpc('report_payments_out_per_counterparty', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as PaymentsPerCounterpartyOutRow[];
+  },
+  async reportPaymentsInPerCounterparty(workspaceId: string, from: string, to: string): Promise<PaymentsPerCounterpartyInRow[]> {
+    const { data, error } = await supabase.rpc('report_payments_in_per_counterparty', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as PaymentsPerCounterpartyInRow[];
+  },
+  async reportSalesPerDesigner(workspaceId: string, from: string, to: string): Promise<SalesPerDesignerRow[]> {
+    const { data, error } = await supabase.rpc('report_sales_per_designer', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as SalesPerDesignerRow[];
+  },
+  async reportTopCustomerOutstanding(workspaceId: string): Promise<TopOutstandingRow[]> {
+    const { data, error } = await supabase.rpc('report_top_customer_outstanding', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as TopOutstandingRow[];
+  },
+  async reportTopSupplierOutstanding(workspaceId: string): Promise<TopOutstandingRow[]> {
+    const { data, error } = await supabase.rpc('report_top_supplier_outstanding', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as TopOutstandingRow[];
+  },
 
   // -------- Send statement --------
 
@@ -1096,6 +1154,109 @@ const _financeServiceV2 = {
     dryRun?: boolean;
   }): Promise<{ ok: boolean; email_sent_to: string | null; pdf_url: string | null; lines: number; total_outstanding: number; error?: string }> {
     const { data, error } = await supabase.functions.invoke('finance-send-statement', { body: input });
+    if (error) throw error;
+    return data as any;
+  },
+
+  // -------- Stripe pay link / checkout --------
+
+  /**
+   * Admin-side: mint a public pay token + (optionally) create a Stripe Checkout session.
+   * Returns the public pay link in either case; checkout_url is null when link_only=true.
+   */
+  async getInvoicePayLink(invoiceId: string, opts: { linkOnly?: boolean; successUrl?: string; cancelUrl?: string } = {}): Promise<{
+    pay_link: string;
+    pay_token: string;
+    invoice_id: string;
+    checkout_url: string | null;
+    session_id: string | null;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: {
+        invoice_id: invoiceId,
+        link_only: opts.linkOnly === true,
+        success_url: opts.successUrl,
+        cancel_url: opts.cancelUrl,
+      },
+    });
+    if (error) throw error;
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as any;
+  },
+
+  /**
+   * Customer-self path: an authenticated user (the invoice's customer) creates a
+   * Stripe Checkout session for an invoice they're allowed to read via RLS.
+   * Returns the hosted Stripe URL — caller redirects to it.
+   */
+  async payInvoiceAsCustomer(invoiceId: string, opts: { successUrl: string; cancelUrl: string }): Promise<{
+    ok: boolean;
+    checkout_url?: string;
+    error?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: {
+        invoice_id: invoiceId,
+        link_only: false,
+        success_url: opts.successUrl,
+        cancel_url: opts.cancelUrl,
+      },
+    });
+    if (error) throw error;
+    return data as any;
+  },
+
+  /**
+   * Public-side: redeem a pay_token → Stripe Checkout URL. Called from the /pay/:token page.
+   * No auth required.
+   */
+  /** Admin "Send digest now" — emails the digest immediately to the configured recipients
+   *  (or the override list). Used by the Settings tab's "Send test" button. */
+  async sendDigestNow(opts: { workspaceId?: string; recipientsOverride?: string[] } = {}): Promise<{
+    ok: boolean;
+    recipients_attempted: number;
+    recipients_delivered: number;
+    errors: string[];
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-digest-aggregate', {
+      body: { mode: 'now', workspace_id: opts.workspaceId, recipients_override: opts.recipientsOverride },
+    });
+    if (error) throw error;
+    return data as any;
+  },
+
+  /** Returns the seeded 'Finance digest' flow row (if it exists) so the Settings
+   *  panel can deep-link to the FlowsManagement editor for schedule changes. */
+  async getDigestFlowId(): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('flows')
+      .select('id')
+      .eq('name', 'Finance digest')
+      .eq('trigger_type', 'scheduled')
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    return (data as any)?.id ?? null;
+  },
+
+  async resolvePayToken(payToken: string, opts: { successUrl?: string; cancelUrl?: string } = {}): Promise<{
+    ok: boolean;
+    checkout_url?: string;
+    invoice_id?: string;
+    internal_number?: string;
+    amount?: number;
+    currency?: string;
+    customer_display?: string;
+    already_paid?: boolean;
+    error?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: {
+        pay_token: payToken,
+        success_url: opts.successUrl,
+        cancel_url: opts.cancelUrl,
+      },
+    });
     if (error) throw error;
     return data as any;
   },

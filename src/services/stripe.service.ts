@@ -71,13 +71,14 @@ export const stripeAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_BASE}/stripe-checkout`, {
+    const response = await fetch(`${API_BASE}/stripe-api`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        action: 'checkout',
         type: 'credit_purchase',
         credits,
         price,
@@ -103,13 +104,14 @@ export const stripeAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_BASE}/stripe-checkout`, {
+    const response = await fetch(`${API_BASE}/stripe-api`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        action: 'checkout',
         type: 'subscription',
         priceId,
         successUrl: `${window.location.origin}/profile?tab=subscription&success=true`,
@@ -133,13 +135,14 @@ export const stripeAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_BASE}/stripe-customer-portal`, {
+    const response = await fetch(`${API_BASE}/stripe-api`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        action: 'customer_portal',
         returnUrl: `${window.location.origin}/profile?tab=subscription`,
       }),
     });

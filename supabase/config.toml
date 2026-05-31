@@ -170,16 +170,10 @@ verify_jwt = false
 [functions.generate-social-video]
 verify_jwt = false
 
-[functions.late-oauth]
+[functions.zernio-api]
 verify_jwt = false
 
-[functions.late-publish]
-verify_jwt = false
-
-[functions.late-analytics]
-verify_jwt = false
-
-[functions.late-webhook-handler]
+[functions.zernio-webhook-handler]
 verify_jwt = false
 
 [auth]
