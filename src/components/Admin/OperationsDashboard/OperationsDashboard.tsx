@@ -331,7 +331,7 @@ const OperationsDashboardInner: React.FC = () => {
           (item: unknown) =>
             (item as any).created_at &&
             (item as any).id &&
-            (item as any).status_code !== null,
+            (item as any).response_status !== null,
         ) as ApiUsageLog[];
 
       setSearchAnalytics(filteredSearchData);
@@ -345,7 +345,7 @@ const OperationsDashboardInner: React.FC = () => {
           ?.map((s: unknown) => (s as any).user_id)
           .filter(Boolean) || []),
         ...(apiData
-          ?.map((a: unknown) => (a as any).api_key_id)
+          ?.map((a: unknown) => (a as any).user_id)
           .filter(Boolean) || []),
         ...agentChatMessages.map((m) => m.user_id).filter(Boolean),
       ]).size;
@@ -1243,11 +1243,11 @@ const OperationsDashboardInner: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Path</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Response Time</TableHead>
-                        <TableHead>User</TableHead>
+                        <TableHead>Source</TableHead>
                         <TableHead>Time</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1255,24 +1255,22 @@ const OperationsDashboardInner: React.FC = () => {
                       {apiUsage.slice(0, 15).map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="font-mono text-sm max-w-xs truncate">
-                            {log.endpoint}
+                            {log.request_path}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="font-mono text-xs">
-                              {log.method}
+                              {log.request_method}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className={getStatusColor(log.status_code)}>
-                              {log.status_code}
+                            <span className={getStatusColor(log.response_status ?? 0)}>
+                              {log.response_status ?? '—'}
                             </span>
                           </TableCell>
                           <TableCell>{log.response_time_ms || 0}ms</TableCell>
                           <TableCell>
                             <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
-                              {log.api_key_id
-                                ? log.api_key_id.slice(0, 8) + '...'
-                                : 'Anonymous'}
+                              {log.is_internal_request ? 'Internal' : 'External'}
                             </code>
                           </TableCell>
                           <TableCell>

@@ -79,18 +79,19 @@ export interface SearchAnalytic {
   response_time_ms: number;
 }
 
+// Mirrors the real public.api_usage_logs columns (request-shaped).
 export interface ApiUsageLog {
   id: string;
-  api_key_id: string;
-  endpoint: string;
-  method: string;
-  status_code: number;
+  user_id: string | null;
+  endpoint_id: string | null;
+  request_path: string;
+  request_method: string;
+  response_status: number | null;
   response_time_ms: number | null;
-  request_size_bytes: number | null;
-  response_size_bytes: number | null;
   ip_address: string | null;
   user_agent: string | null;
-  error_message: string | null;
+  is_internal_request: boolean;
+  rate_limit_exceeded: boolean;
   created_at: string | null;
 }
 
