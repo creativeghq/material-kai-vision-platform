@@ -77,7 +77,7 @@ export const ApiGatewayAdmin: React.FC = () => {
     rateLimitedRequests: number;
     avgResponseTime: number;
     topEndpoints: Array<{ path: string; count: number }>;
-    recentLogs: Array<{ endpoint: string; method: string; status_code: number; response_time_ms: number | null; created_at: string | null; ip_address: string | null }>;
+    recentLogs: Array<{ request_path: string; request_method: string; response_status: number | null; response_time_ms: number | null; created_at: string | null; ip_address: string | null }>;
   }>({
     totalRequests: 0, successfulRequests: 0, rateLimitedRequests: 0, avgResponseTime: 0,
     topEndpoints: [], recentLogs: [],
@@ -111,13 +111,13 @@ export const ApiGatewayAdmin: React.FC = () => {
     try {
       const logs = await apiGatewayService.getApiUsageLogs({ limit: 500 });
       const totalRequests = logs.length;
-      const successfulRequests = logs.filter((l) => l.status_code >= 200 && l.status_code < 400).length;
-      const rateLimitedRequests = logs.filter((l) => l.status_code === 429).length;
+      const successfulRequests = logs.filter((l) => (l.response_status ?? 0) >= 200 && (l.response_status ?? 0) < 400).length;
+      const rateLimitedRequests = logs.filter((l) => l.response_status === 429).length;
       const times = logs.map((l) => l.response_time_ms).filter((t): t is number => t != null);
       const avgResponseTime = times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0;
 
       const endpointCounts: Record<string, number> = {};
-      logs.forEach((l) => { endpointCounts[l.endpoint] = (endpointCounts[l.endpoint] || 0) + 1; });
+      logs.forEach((l) => { endpointCounts[l.request_path] = (endpointCounts[l.request_path] || 0) + 1; });
       const topEndpoints = Object.entries(endpointCounts)
         .map(([path, count]) => ({ path, count }))
         .sort((a, b) => b.count - a.count)
@@ -462,15 +462,15 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <TableBody>
                       {analyticsData.recentLogs.map((log, i) => (
                         <TableRow key={i}>
-                          <TableCell className="font-mono text-xs max-w-[200px] truncate">{log.endpoint}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{log.method}</Badge></TableCell>
+                          <TableCell className="font-mono text-xs max-w-[200px] truncate">{log.request_path}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{log.request_method}</Badge></TableCell>
                           <TableCell>
                             <Badge className={
-                              log.status_code >= 200 && log.status_code < 300 ? 'bg-green-500/20 text-green-700 text-xs'
-                                : log.status_code === 429 ? 'bg-orange-500/20 text-orange-700 text-xs'
-                                : log.status_code >= 400 ? 'bg-red-500/20 text-red-700 text-xs'
+                              (log.response_status ?? 0) >= 200 && (log.response_status ?? 0) < 300 ? 'bg-green-500/20 text-green-700 text-xs'
+                                : log.response_status === 429 ? 'bg-orange-500/20 text-orange-700 text-xs'
+                                : (log.response_status ?? 0) >= 400 ? 'bg-red-500/20 text-red-700 text-xs'
                                 : 'text-xs'
-                            }>{log.status_code}</Badge>
+                            }>{log.response_status ?? '—'}</Badge>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{log.response_time_ms != null ? `${log.response_time_ms}ms` : '—'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono">{log.ip_address || '—'}</TableCell>

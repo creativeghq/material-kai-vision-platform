@@ -14,18 +14,19 @@ export interface ApiKey {
   updated_at: string;
 }
 
+// Mirrors the real public.api_usage_logs columns (request-shaped).
 export interface ApiUsageLog {
   id: string;
-  api_key_id: string;
-  endpoint: string;
-  method: string;
-  status_code: number;
+  user_id: string | null;
+  endpoint_id: string | null;
+  request_path: string;
+  request_method: string;
+  response_status: number | null;
   response_time_ms: number | null;
-  request_size_bytes: number | null;
-  response_size_bytes: number | null;
   ip_address: string | null;
   user_agent: string | null;
-  error_message: string | null;
+  is_internal_request: boolean;
+  rate_limit_exceeded: boolean;
   created_at: string | null;
 }
 
@@ -100,7 +101,7 @@ class ApiGatewayService {
     startDate?: string;
     endDate?: string;
     endpoint?: string;
-    apiKeyId?: string;
+    userId?: string;
     limit?: number;
   }): Promise<ApiUsageLog[]> {
     let query = supabase
@@ -115,10 +116,11 @@ class ApiGatewayService {
       query = query.lte('created_at', options.endDate);
     }
     if (options?.endpoint) {
-      query = query.eq('endpoint', options.endpoint);
+      // `endpoint` here is the request path (the function name / route).
+      query = query.eq('request_path', options.endpoint);
     }
-    if (options?.apiKeyId) {
-      query = query.eq('api_key_id', options.apiKeyId);
+    if (options?.userId) {
+      query = query.eq('user_id', options.userId);
     }
     if (options?.limit) {
       query = query.limit(options.limit);

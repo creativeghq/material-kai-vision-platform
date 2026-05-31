@@ -445,17 +445,23 @@ export class Logger {
     error_message?: string;
   }): Promise<void> {
     try {
+      // Map the friendly input shape onto the real `api_usage_logs` columns
+      // (request_path / request_method / response_status; ip_address NOT NULL).
+      // The previous insert used endpoint/method/status_code/api_key_id/
+      // error_message — none of which exist on the table — so every call
+      // silently failed. The table has no error column; errors go to the log.
+      if (logData.error_message) {
+        console.error(`[Logger] ${logData.endpoint} ${logData.status_code}: ${logData.error_message}`);
+      }
       const { error } = await supabase
         .from('api_usage_logs')
         .insert({
-          api_key_id: logData.api_key_id ?? 'anonymous',
-          endpoint: logData.endpoint,
-          method: logData.method,
-          status_code: logData.status_code,
+          request_path: logData.endpoint,
+          request_method: logData.method,
+          response_status: logData.status_code,
           response_time_ms: logData.response_time_ms ?? null,
-          ip_address: logData.ip_address ?? null,
+          ip_address: logData.ip_address ?? '0.0.0.0',
           user_agent: logData.user_agent ?? null,
-          error_message: logData.error_message ?? null,
           created_at: new Date().toISOString(),
         });
 
