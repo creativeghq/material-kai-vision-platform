@@ -6,6 +6,7 @@ import type {
   FlowRunStep,
   FlowGraphDefinition,
   TriggerType,
+  FlowAreaRegistryEntry,
 } from './types';
 
 interface ListFlowsFilters {
@@ -92,7 +93,39 @@ class FlowService {
 
   async deleteFlow(id: string): Promise<void> {
     const { error } = await supabase.from('flows').delete().eq('id', id);
-    if (error) throw new Error(`Failed to delete flow: ${error.message}`);
+    if (error) {
+      // The DB trigger raises a clear message for locked flows; surface it.
+      throw new Error(
+        /locked/i.test(error.message)
+          ? 'This flow is locked and cannot be deleted. Unlock it first.'
+          : `Failed to delete flow: ${error.message}`,
+      );
+    }
+  }
+
+  /** Lock or unlock a flow. Locked flows are protected from deletion. */
+  async setFlowLocked(id: string, locked: boolean): Promise<void> {
+    const { error } = await supabase.from('flows').update({ is_locked: locked }).eq('id', id);
+    if (error) throw new Error(`Failed to ${locked ? 'lock' : 'unlock'} flow: ${error.message}`);
+  }
+
+  // ── System Areas (coverage registry) ────────────────────
+  async listAreas(): Promise<FlowAreaRegistryEntry[]> {
+    const { data, error } = await supabase
+      .from('flow_area_registry')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`Failed to list areas: ${error.message}`);
+    return (data ?? []) as unknown as FlowAreaRegistryEntry[];
+  }
+
+  /** Point an area at a specific flow (or clear it by passing null). */
+  async bindArea(areaKey: string, flowId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('flow_area_registry')
+      .update({ bound_flow_id: flowId })
+      .eq('area_key', areaKey);
+    if (error) throw new Error(`Failed to bind area: ${error.message}`);
   }
 
   async duplicateFlow(id: string, newName: string): Promise<Flow> {
