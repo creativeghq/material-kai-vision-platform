@@ -10,6 +10,40 @@ interface SessionManagerRequest {
 }
 
 /**
+ * SSRF guard. Returns true only for public http(s) URLs. Rejects non-http
+ * schemes and private / loopback / link-local / unspecified hosts so a
+ * user-supplied source_url can't reach internal services or cloud metadata.
+ */
+function isPublicHttpUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal')) return false;
+
+  // IPv6 loopback / unspecified / link-local / unique-local
+  if (host === '::1' || host === '::' || host.startsWith('fe80:') ||
+      host.startsWith('fc') || host.startsWith('fd')) return false;
+
+  // IPv4 private / loopback / link-local / metadata ranges
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10) return false;                          // 10.0.0.0/8
+    if (a === 127) return false;                         // loopback
+    if (a === 0) return false;                           // 0.0.0.0/8
+    if (a === 169 && b === 254) return false;            // link-local + 169.254.169.254 metadata
+    if (a === 172 && b >= 16 && b <= 31) return false;   // 172.16.0.0/12
+    if (a === 192 && b === 168) return false;            // 192.168.0.0/16
+  }
+  return true;
+}
+
+/**
  * Scrape Session Manager
  *
  * Authentication:
@@ -147,8 +181,16 @@ async function launchFirecrawlCrawl(
     return null;
   }
 
+  // SSRF guard: only crawl public http(s) URLs. Reject non-http schemes and
+  // private/loopback/link-local hosts so a user-supplied source_url can't be
+  // pointed at internal services or cloud metadata endpoints (169.254.169.254).
+  if (!isPublicHttpUrl(sourceUrl)) {
+    throw new Error(`Refusing to crawl non-public or invalid source URL: ${sourceUrl}`);
+  }
+
   const config = session.scraping_config || {};
-  const maxPages = config.max_pages ?? 100;
+  // Clamp max_pages to a sane server-side ceiling regardless of client input.
+  const maxPages = Math.min(Math.max(1, Number(config.max_pages) || 100), 500);
 
   // Webhook URL Firecrawl will call when done — append secret so the webhook handler can verify
   const firecrawlWebhookSecret = Deno.env.get('FIRECRAWL_WEBHOOK_SECRET') || '';
@@ -231,7 +273,9 @@ async function launchFirecrawlCrawl(
       .from('scraping_sessions')
       .update({
         status:              'crawling',
-        firecrawl_crawl_id:  crawlId,
+        // firecrawl_crawl_id is not a top-level column on scraping_sessions —
+        // it lives in metadata (below). Writing it here rejected the whole
+        // update, so the session never flipped to 'crawling'.
         last_heartbeat_at:   new Date().toISOString(),
         metadata: {
           ...((session.metadata as any) ?? {}),
@@ -344,6 +388,56 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
     const batchSize = 3; // Process 3 pages concurrently
     const delayBetweenBatches = 2000; // 2 second delay between batches
 
+    // Seed scraping_pages if none exist yet. The loop below only ever consumes
+    // 'pending' rows but nothing else creates them on this fallback path, so
+    // without this the loop sees zero pages and immediately marks the session
+    // 'completed' having scraped nothing.
+    const { count: existingPageCount } = await supabase
+      .from('scraping_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+
+    if (!existingPageCount) {
+      const rawUrls: string[] = Array.isArray(config.page_urls) && config.page_urls.length
+        ? config.page_urls
+        : (session.source_url ? [session.source_url] : []);
+      const seedUrls = rawUrls.filter((u: string) => isPublicHttpUrl(u));
+
+      if (seedUrls.length === 0) {
+        await supabase
+          .from('scraping_sessions')
+          .update({
+            status: 'failed',
+            scraping_config: {
+              ...config,
+              error: 'No valid public page URLs to scrape (page-by-page fallback)',
+              failed_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', sessionId);
+        console.error(`[scrape-session-manager] Session ${sessionId} has no valid URLs to scrape`);
+        return;
+      }
+
+      const seedRows = seedUrls.map((u: string, idx: number) => ({
+        session_id: sessionId,
+        url: u,
+        status: 'pending',
+        page_index: idx,
+      }));
+      const { error: seedErr } = await supabase
+        .from('scraping_pages')
+        .upsert(seedRows, { onConflict: 'session_id,url', ignoreDuplicates: true });
+      if (seedErr) {
+        throw new Error(`Failed to seed scraping_pages: ${seedErr.message}`);
+      }
+      await supabase
+        .from('scraping_sessions')
+        .update({ total_pages: seedUrls.length })
+        .eq('id', sessionId);
+      console.log(`[scrape-session-manager] Seeded ${seedUrls.length} page(s) for fallback scraping`);
+    }
+
     while (true) {
       // ✅ Send heartbeat and check if session is still processing
       const { data: currentSession } = await supabase
@@ -433,12 +527,17 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
       fingerprint: ['scraping-session-failed', sessionData?.source_url || 'unknown'],
     });
 
-    // Mark session as failed
+    // Mark session as failed. scraping_sessions has no error_message column —
+    // the status route reads the failure reason from scraping_config.error.
     await supabase
       .from('scraping_sessions')
       .update({
         status: 'failed',
-        error_message: error.message,
+        scraping_config: {
+          ...((sessionData?.scraping_config as any) ?? {}),
+          error: error.message,
+          failed_at: new Date().toISOString(),
+        },
       })
       .eq('id', sessionId);
   }
@@ -524,10 +623,40 @@ async function updateJobProgress(supabase: any, sessionId: string) {
       return; // No background_job linked, skip
     }
 
-    // Calculate progress percentage
-    const totalPages = session.total_pages || 0;
-    const completedPages = session.completed_pages || 0;
-    const progressPercent = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
+    // Compute progress from the authoritative scraping_pages rows, not the
+    // session counters (the page-by-page path never incremented them). Counting
+    // is race-free under concurrent page processing; we write the fresh counts
+    // back to the session so the status route + UI reflect reality.
+    const { count: totalCount } = await supabase
+      .from('scraping_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+    const { count: completedCount } = await supabase
+      .from('scraping_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('status', 'completed');
+    const { count: failedCount } = await supabase
+      .from('scraping_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('status', 'failed');
+
+    const totalPages = totalCount || 0;
+    const completedPages = completedCount || 0;
+    const failedPages = failedCount || 0;
+    const done = completedPages + failedPages;
+    const progressPercent = totalPages > 0 ? Math.round((done / totalPages) * 100) : 0;
+
+    // Persist fresh counts back to the session.
+    await supabase
+      .from('scraping_sessions')
+      .update({
+        total_pages: totalPages,
+        completed_pages: completedPages,
+        failed_pages: failedPages,
+      })
+      .eq('id', sessionId);
 
     // Append the stage event to background_jobs.stage_history.
     await supabase.rpc('append_stage_history', {
@@ -539,26 +668,28 @@ async function updateJobProgress(supabase: any, sessionId: string) {
         completed_at: new Date().toISOString(),
         data: {
           completed_pages: completedPages,
-          failed_pages: session.failed_pages || 0,
+          failed_pages: failedPages,
           materials_found: session.materials_processed || 0,
           current_url: session.current_page_url,
-          current_step: `Page ${completedPages}/${totalPages}`,
+          current_step: `Page ${done}/${totalPages}`,
         },
         source: 'scrape_session_manager',
       },
     });
 
-    // Update background_jobs progress and heartbeat
+    // Update background_jobs progress and heartbeat.
+    // NOTE: the progress column is `progress`, not `progress_percent` (which
+    // doesn't exist — writing it makes PostgREST reject the whole update).
     await supabase
       .from('background_jobs')
       .update({
-        progress_percent: progressPercent,
+        progress: progressPercent,
         last_heartbeat: new Date().toISOString(),
         metadata: {
           ...session.metadata,
           total_pages: totalPages,
           completed_pages: completedPages,
-          failed_pages: session.failed_pages || 0,
+          failed_pages: failedPages,
           materials_processed: session.materials_processed || 0,
         },
       })
@@ -731,7 +862,7 @@ async function triggerProductCreation(supabase: any, sessionId: string, session:
             .from('background_jobs')
             .update({
               status: 'completed',
-              progress_percent: 100,
+              progress: 100,  // column is `progress`, not `progress_percent`
               completed_at: new Date().toISOString(),
               metadata: {
                 ...session.metadata,

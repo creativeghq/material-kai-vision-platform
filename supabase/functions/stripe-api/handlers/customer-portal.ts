@@ -1,17 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const stripeSecretKey = () => Deno.env.get('STRIPE_SECRET_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const stripe = new Stripe(stripeSecretKey(), {
-  apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
-});
+import { getStripe, getSupabase, noPaymentProviderResponse } from '../../_shared/stripe-clients.ts';
 
 /**
  * Stripe Customer Portal Session Creator
@@ -32,6 +21,11 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
         { status: 401, headers: corsHeaders }
       );
     }
+
+    // Resolve clients AFTER auth → bootstrap is guaranteed to have run.
+    const stripe = getStripe();
+    const supabase = getSupabase();
+    if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
     const userId = auth.userId;
 

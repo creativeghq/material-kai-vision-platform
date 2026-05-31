@@ -90,20 +90,22 @@ Deno.serve(async (req: Request) => {
   if (pages.length > 0) {
     const pageRows = pages
       .filter((p: any) => p.url)
-      .map((p: any, idx: number) => ({
-        session_id:     sessionId,
-        url:            p.url,
-        status:         'completed',
-        page_index:     idx,
-        scraped_data:   {
-          markdown:    p.markdown    || p.content || '',
-          title:       p.metadata?.title       || '',
-          description: p.metadata?.description || '',
-          extract:     p.extract               || null,
-          metadata:    p.metadata              || {},
-        },
-        completed_at:   new Date().toISOString(),
-      }));
+      .map((p: any, idx: number) => {
+        // scraping_pages stores page text in `markdown_content` — that is the
+        // column the Python discovery path reads (_fetch_scraped_markdown).
+        // There is no structured column on scraping_pages for title/extract, so
+        // fold the title in as a heading rather than writing a phantom column.
+        const title = p.metadata?.title || '';
+        const body  = p.markdown || p.content || '';
+        return {
+          session_id:       sessionId,
+          url:              p.url,
+          status:           'completed',
+          page_index:       idx,
+          markdown_content: title ? `# ${title}\n\n${body}` : body,
+          completed_at:     new Date().toISOString(),
+        };
+      });
 
     if (pageRows.length > 0) {
       const { error: insertErr } = await supabase
@@ -111,7 +113,23 @@ Deno.serve(async (req: Request) => {
         .upsert(pageRows, { onConflict: 'session_id,url', ignoreDuplicates: false });
 
       if (insertErr) {
+        // Fail loudly: if pages don't persist, discovery has nothing to read and
+        // the session would otherwise complete with zero products silently.
         console.error('[firecrawl-webhook] Failed to insert pages:', insertErr.message);
+        await supabase
+          .from('scraping_sessions')
+          .update({
+            status: 'failed',
+            scraping_config: {
+              ...((session.scraping_config as any) ?? {}),
+              error: `Failed to persist scraped pages: ${insertErr.message}`,
+              failed_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', sessionId);
+        return new Response(JSON.stringify({ ok: false, error: 'page_insert_failed' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       } else {
         console.log(`[firecrawl-webhook] Stored ${pageRows.length} pages`);
       }
@@ -153,7 +171,14 @@ Deno.serve(async (req: Request) => {
 
     await supabase
       .from('scraping_sessions')
-      .update({ status: 'completed', firecrawl_crawl_id: crawlId })
+      .update({
+        status: 'completed',
+        // firecrawl_crawl_id is not a column on scraping_sessions — keep it in metadata.
+        metadata: {
+          ...((session.metadata as any) ?? {}),
+          firecrawl_crawl_id: crawlId,
+        },
+      })
       .eq('id', sessionId);
 
     // Trigger Python backend to create products from scraped pages
@@ -216,7 +241,16 @@ Deno.serve(async (req: Request) => {
     console.error(`[firecrawl-webhook] Crawl failed for session ${sessionId}`);
     await supabase
       .from('scraping_sessions')
-      .update({ status: 'failed', error_message: 'Firecrawl crawl job failed' })
+      .update({
+        status: 'failed',
+        // error_message is not a column on scraping_sessions — the status route
+        // reads the failure reason from scraping_config.error.
+        scraping_config: {
+          ...((session.scraping_config as any) ?? {}),
+          error: 'Firecrawl crawl job failed',
+          failed_at: new Date().toISOString(),
+        },
+      })
       .eq('id', sessionId);
   }
 

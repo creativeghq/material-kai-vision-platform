@@ -7,10 +7,15 @@
 // crm-stripe-api is reachable through crm-api as { resource: 'stripe' }.
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { handleCheckout } from './handlers/checkout.ts';
 import { handleCustomerPortal } from './handlers/customer-portal.ts';
 
 Deno.serve(async (req) => {
+  // Populate Deno.env from platform_secrets BEFORE dispatching — handlers
+  // create their Stripe client per-request from env, env-first DB-fallback.
+  await bootstrapForFunction();
+
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {

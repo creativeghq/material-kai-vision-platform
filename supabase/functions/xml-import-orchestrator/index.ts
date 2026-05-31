@@ -741,9 +741,25 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     );
     console.log(`Created import job: ${jobId}`);
 
-    // Non-blocking Python handoff — failures are captured in webhook_calls + Sentry
-    callPythonAPI(supabase, jobId, workspace_id, authHeader).catch((error) => {
+    // Non-blocking Python handoff — failures are captured in webhook_calls + Sentry.
+    // When the handoff exhausts its retries, mark the job 'failed' so it reaches a
+    // terminal state. Previously the throw landed here and only logged, leaving the
+    // data_import_jobs row stuck in 'pending' forever (Python never started, so
+    // nothing else would ever transition it).
+    callPythonAPI(supabase, jobId, workspace_id, authHeader).catch(async (error) => {
       console.error(`Error calling Python API for job ${jobId}:`, error);
+      try {
+        await supabase
+          .from('data_import_jobs')
+          .update({
+            status: 'failed',
+            error_message: `Python handoff failed: ${error?.message ?? String(error)}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+      } catch (markErr) {
+        console.error(`Failed to mark job ${jobId} as failed after handoff error:`, markErr);
+      }
     });
 
     const message = droppedCount > 0

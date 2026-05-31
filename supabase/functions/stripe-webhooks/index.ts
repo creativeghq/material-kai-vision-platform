@@ -1,23 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { getStripe, getSupabase, stripeWebhookSecret } from '../_shared/stripe-clients.ts';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-// These must be set — fail loud at startup rather than silently accepting
-// unsigned webhooks (which would allow anyone to forge payment events).
-const stripeSecretKey = () => Deno.env.get('STRIPE_SECRET_KEY') || '';
-const stripeWebhookSecret = () => Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
-if (!stripeSecretKey())    throw new Error('STRIPE_SECRET_KEY env var is required');
-if (!stripeWebhookSecret()) throw new Error('STRIPE_WEBHOOK_SECRET env var is required');
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const stripe = new Stripe(stripeSecretKey()!, {
-  apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
-});
+// Module-level handles re-assigned per-request from the memoised shared
+// factories. The downstream `handle*` functions reference these by name to
+// avoid threading clients through 9 handler signatures. After the first
+// successful request, the factories return the same singleton — these
+// references just stay in scope.
+let stripe!: Stripe;
+let supabase!: SupabaseClient;
 
 /**
  * Stripe Webhooks Handler
@@ -25,6 +18,26 @@ const stripe = new Stripe(stripeSecretKey()!, {
  */
 Deno.serve(async (req) => {
   await bootstrapForFunction();
+
+  // Verify configuration AFTER bootstrap. Both secrets MUST be set; rejecting
+  // webhooks when unsigned is critical (otherwise anyone could forge payment
+  // events). 503 rather than throwing keeps the function alive and recovers
+  // automatically when an admin pastes the secrets into the DB.
+  const _stripe = getStripe();
+  const _supabase = getSupabase();
+  const webhookSecret = stripeWebhookSecret();
+  if (!_stripe || !_supabase || !webhookSecret) {
+    return new Response(
+      JSON.stringify({
+        error: 'Stripe webhooks not configured — set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET at /admin/modules/payments-stripe/settings → Keys.',
+        code: 'stripe_webhooks_not_configured',
+      }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  stripe = _stripe;
+  supabase = _supabase;
+
   const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
@@ -39,7 +52,7 @@ Deno.serve(async (req) => {
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      stripeWebhookSecret()
+      webhookSecret
     );
 
     console.log(`Received Stripe event: ${event.type}`);
