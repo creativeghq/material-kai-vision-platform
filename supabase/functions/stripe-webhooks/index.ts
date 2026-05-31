@@ -246,15 +246,17 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       console.error('Error granting credits:', error);
     } else {
       console.log(`Granted ${creditAmount} credits to user ${profile.user_id}`);
-      supabase.from('user_notifications').insert({
+      // Credits are granted above (must stay in the webhook). The notification
+      // is delivered by the "Payment Succeeded" flow (Flows dashboard).
+      emitFlowEvent('stripe_payment_succeeded', {
         user_id: profile.user_id,
         type: 'payment_success',
         title: 'Credits added to your account',
         body: `${creditAmount} credits have been added to your account.`,
         action_url: '/settings/billing',
-        is_read: false,
-        metadata: { credit_amount: parseFloat(creditAmount), payment_intent_id: paymentIntent.id },
-      }).then(() => {});
+        credit_amount: parseFloat(creditAmount),
+        payment_intent_id: paymentIntent.id,
+      }).catch(() => {});
     }
   }
 }
@@ -359,15 +361,15 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   if (!profile) return;
 
-  supabase.from('user_notifications').insert({
+  // Delivered by the "Payment Failed" flow (Flows dashboard).
+  emitFlowEvent('stripe_payment_failed', {
     user_id: profile.user_id,
     type: 'payment_failed',
     title: 'Payment failed',
     body: 'Your payment could not be processed. Please update your payment details.',
     action_url: '/settings/billing',
-    is_read: false,
-    metadata: { payment_intent_id: paymentIntent.id },
-  }).then(() => {});
+    payment_intent_id: paymentIntent.id,
+  }).catch(() => {});
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
