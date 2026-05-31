@@ -49,17 +49,30 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────
-  try {
-    const auth = await authenticate(req, supabase);
-    if (!auth.success) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+  // This function is invoked server-to-server by the scheduler cron, the event
+  // emitter, chain triggers, and agent-chat — all of which present the project
+  // service-role key as `Authorization: Bearer <service_role_key>`. Accept that
+  // directly; any other caller must carry a valid user/secret credential.
+  //
+  // CRITICAL: authenticate() returns { success:false } (it does NOT throw) for a
+  // service-role bearer — it falls through to validateUserToken() and getUser()
+  // resolves to "no user" without raising. So the service-role check MUST run on
+  // the !success path, not only inside a catch. The previous catch-only fallback
+  // was dead code: every cron/event/chain dispatch was rejected with 401, which
+  // is why these agents never produced a single run since creation.
+  const authHeader = req.headers.get('Authorization') || '';
+  const isServiceRole =
+    !!SUPABASE_SERVICE_ROLE_KEY && authHeader.includes(SUPABASE_SERVICE_ROLE_KEY);
+
+  if (!isServiceRole) {
+    let authed = false;
+    try {
+      const auth = await authenticate(req);
+      authed = auth.success;
+    } catch {
+      authed = false;
     }
-  } catch (authErr) {
-    // Allow service-role requests (from scheduler / event emitter) without user JWT
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.includes(SUPABASE_SERVICE_ROLE_KEY)) {
+    if (!authed) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
