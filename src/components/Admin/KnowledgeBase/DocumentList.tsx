@@ -72,6 +72,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const [viewingDoc, setViewingDoc] = useState<KBDocument | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  // category_id → access_level — used to mirror the kb_block_locked_doc_delete
+  // trigger client-side so the delete button can be disabled BEFORE the user
+  // gets a SQL error toast. Source of truth is still the DB trigger.
+  const [categoryAccess, setCategoryAccess] = useState<Map<string, string>>(new Map());
 
   const { toast } = useToast();
 
@@ -82,8 +86,27 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   useEffect(() => {
     if (workspaceId) {
       loadDocuments();
+      loadCategoryAccessMap();
     }
   }, [workspaceId, filters, refreshTrigger]);
+
+  const loadCategoryAccessMap = async () => {
+    const { data } = await supabase
+      .from('kb_categories')
+      .select('id, access_level')
+      .eq('workspace_id', workspaceId);
+    const m = new Map<string, string>();
+    (data ?? []).forEach((c: any) => m.set(c.id, c.access_level));
+    setCategoryAccess(m);
+  };
+
+  // Mirrors the SQL `kb_is_doc_protected(uuid)` function — keep these in sync.
+  const isDocLocked = (doc: KBDocument): boolean => {
+    const cat = doc.category_id ? categoryAccess.get(doc.category_id) : undefined;
+    if (cat === 'agent') return true;
+    const autoSynced = (doc.metadata as Record<string, unknown> | undefined)?.auto_synced;
+    return autoSynced === true || autoSynced === 'true';
+  };
 
   const loadWorkspace = async () => {
     try {
@@ -149,6 +172,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   };
 
   const handleDelete = async (docId: string) => {
+    const doc = documents.find((d) => d.id === docId);
+    if (doc && isDocLocked(doc)) {
+      toast({
+        title: 'Locked',
+        description: 'This document is locked because it lives in an agent-readable internal category or is auto-synced. Delete is intentionally disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
@@ -177,19 +209,37 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected document${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    // Strip locked docs out of the delete set — the DB trigger would reject
+    // the whole batch otherwise, killing the unlocked ones too.
+    const lockedInBatch = documents.filter((d) => selectedIds.has(d.id) && isDocLocked(d));
+    const deletable = Array.from(selectedIds).filter((id) => {
+      const d = documents.find((x) => x.id === id);
+      return d && !isDocLocked(d);
+    });
+    if (deletable.length === 0) {
+      toast({
+        title: 'All selected docs are locked',
+        description: 'None of the selected documents can be deleted — they all live in agent-readable internal categories or are auto-synced.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const confirmMsg = lockedInBatch.length > 0
+      ? `Delete ${deletable.length} document${deletable.length === 1 ? '' : 's'}? ${lockedInBatch.length} locked doc${lockedInBatch.length === 1 ? '' : 's'} in the selection will be skipped. This cannot be undone.`
+      : `Delete ${deletable.length} selected document${deletable.length === 1 ? '' : 's'}? This cannot be undone.`;
+    if (!confirm(confirmMsg)) return;
 
     setBulkBusy(true);
     try {
       const { error } = await supabase
         .from('kb_docs')
         .delete()
-        .in('id', Array.from(selectedIds))
+        .in('id', deletable)
         .eq('workspace_id', workspaceId);
 
       if (error) throw error;
 
-      toast({ title: 'Deleted', description: `${selectedIds.size} document${selectedIds.size === 1 ? '' : 's'} deleted.` });
+      toast({ title: 'Deleted', description: `${deletable.length} document${deletable.length === 1 ? '' : 's'} deleted${lockedInBatch.length > 0 ? ` · ${lockedInBatch.length} locked skipped` : ''}.` });
       setSelectedIds(new Set());
       loadDocuments();
     } catch (error) {
@@ -207,16 +257,35 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const handleDeleteAllMatching = async (matchFilters: KbDocFilters, matchCount: number) => {
     setBulkBusy(true);
     try {
-      let query: any = supabase
+      // First fetch the candidate IDs + the fields needed to evaluate isDocLocked,
+      // so we can strip locked rows out of the batch — otherwise the DB trigger
+      // rejects the whole DELETE and zero rows get removed.
+      let selectQ: any = supabase
+        .from('kb_docs')
+        .select('id, category_id, metadata')
+        .eq('workspace_id', workspaceId);
+      selectQ = applyKbFiltersToQuery(selectQ, matchFilters);
+      const { data: candidates, error: selErr } = await selectQ;
+      if (selErr) throw selErr;
+      const deletable = (candidates ?? []).filter((d: any) => !isDocLocked(d as KBDocument));
+      const skipped = (candidates ?? []).length - deletable.length;
+      if (deletable.length === 0) {
+        toast({
+          title: 'All matching docs are locked',
+          description: `${matchCount} doc${matchCount === 1 ? '' : 's'} matched the filters but every one is locked (agent-readable or auto-synced).`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const { error } = await supabase
         .from('kb_docs')
         .delete()
+        .in('id', deletable.map((d: any) => d.id))
         .eq('workspace_id', workspaceId);
-      query = applyKbFiltersToQuery(query, matchFilters);
-      const { error } = await query;
       if (error) throw error;
       toast({
         title: 'Deleted',
-        description: `${matchCount} document${matchCount === 1 ? '' : 's'} matching the filters deleted.`,
+        description: `${deletable.length} document${deletable.length === 1 ? '' : 's'} matching the filters deleted${skipped > 0 ? ` · ${skipped} locked skipped` : ''}.`,
       });
       setSelectedIds(new Set());
       loadDocuments();
@@ -441,7 +510,14 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                       aria-label={`Select ${doc.title}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{doc.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      {isDocLocked(doc) && (
+                        <Lock className="h-3.5 w-3.5 text-amber-500" aria-label="Locked — agent-readable or auto-synced" />
+                      )}
+                      {doc.title}
+                    </span>
+                  </TableCell>
                   <TableCell>{getStatusBadge(doc.status)}</TableCell>
                   <TableCell>{getVisibilityBadge(doc.visibility)}</TableCell>
                   <TableCell>
@@ -494,9 +570,11 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
+                        disabled={isDocLocked(doc)}
+                        title={isDocLocked(doc) ? 'Locked — agent-readable or auto-synced doc' : 'Delete'}
                         onClick={() => handleDelete(doc.id)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className={`h-4 w-4 ${isDocLocked(doc) ? 'opacity-30' : ''}`} />
                       </Button>
                     </div>
                   </TableCell>

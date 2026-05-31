@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderTree, Plus, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { FolderTree, Plus, Edit, Trash2, ExternalLink, Lock } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -132,7 +132,22 @@ export const CategoryManager: React.FC = () => {
     setShowEditor(true);
   };
 
+  // Mirrors the SQL `kb_is_category_protected(uuid)` function. Categories with
+  // access_level='agent' (Internal Configuration, Materials Bank, HeatPumps
+  // Manuals) host docs the agent reads at runtime — deletion is intentionally
+  // disabled. The DB trigger `kb_categories_block_locked_delete` is the real
+  // guardrail; this just stops the button before the user hits a SQL error.
+  const isCategoryLocked = (c: KBCategory): boolean => c.access_level === 'agent';
+
   const handleDelete = async (category: KBCategory) => {
+    if (isCategoryLocked(category)) {
+      toast({
+        title: 'Locked',
+        description: 'Agent-readable categories cannot be deleted because they host docs the platform reads at runtime (e.g. Internal Configuration → Job Research Sites).',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!confirm(`Delete category "${category.name}"? Documents in this category will become uncategorized.`)) return;
 
     try {
@@ -293,8 +308,16 @@ export const CategoryManager: React.FC = () => {
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(category)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(category)}>
-                            <Trash2 className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isCategoryLocked(category)}
+                            title={isCategoryLocked(category) ? 'Locked — agent-readable category' : 'Delete'}
+                            onClick={() => handleDelete(category)}
+                          >
+                            {isCategoryLocked(category)
+                              ? <Lock className="h-4 w-4 text-amber-500 opacity-60" />
+                              : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
                       </TableCell>
