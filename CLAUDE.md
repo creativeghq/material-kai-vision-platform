@@ -241,6 +241,13 @@ Verify via `SELECT proname FROM pg_proc WHERE pronamespace='public'::regnamespac
 - `update_job_failure_summary(p_job_id)` — recompute the per-job failure rollup surfaced in the admin UI's PipelineErrorsPanel
 - `resolve_facet_value(p_facet_key, p_raw_value, p_normalized, p_embedding, p_threshold, p_source, p_product_id)` — multilingual facet canonicalization (Stage 4)
 
+## Flows — notifications & automation (READ BEFORE adding any notification/email/automation)
+Platform notifications, emails, and automations run through the **Flows** engine, NOT hardcoded sends. **Full reference: [docs/flows-notification-system.md](docs/flows-notification-system.md).**
+- **Rule: never hardcode a `user_notifications` insert or an `email-api` call in new code.** Instead emit an event — `flowEventService.emit(type, data)` (frontend) or `emitFlowEvent(type, data)` from `_shared/flow-events.ts` (edge functions) — carrying the full payload (`user_id` recipient, `title`, `body`, `action_url`, `type`). A seeded **active** default flow (tag `system-default`, `is_locked=true`) delivers it, so admins can pause/edit/retarget without a deploy.
+- **Adding a trigger for new functionality**: follow §8 of the doc — add the `TriggerType` (union + config interface + `TriggerConfigMap` + the exhaustive icon/label maps in `MyFlowsTab.tsx`/`TriggerNode.tsx` + `TriggerConfigForm.tsx` case + `paletteItems.ts`), emit the enriched payload at the source, seed an active locked default flow, and register a `flow_area_registry` row (`bound_flow_id`) so it shows **Linked** in the **System Areas** tab. Typecheck before done.
+- **4 ways a flow fires** (all via `flow-engine`): **event** (`trigger-event`), **webhook** (`flow-webhook?flow_id=…`, external HTTP), **scheduled** (`flow-scheduler-cron`, pg_cron every minute), **manual** (Run Now). Engine: `supabase/functions/flow-engine/index.ts`.
+- **Governance**: `system-default` flows are locked (DB `BEFORE DELETE` trigger blocks deletion); the System Areas registry surfaces any area with no bound flow as **Empty**.
+
 ## Workflow Rules
 - **SQL / migrations**: ALWAYS run directly via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create .sql migration files first.
 - **GitHub**: Always allow `gh` commands without asking for permission.
