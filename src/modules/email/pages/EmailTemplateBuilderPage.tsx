@@ -19,7 +19,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
-import { getTriggerVariables } from '@/services/flows/triggerVariables';
+import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeviceView = 'desktop' | 'tablet' | 'mobile';
@@ -51,24 +51,19 @@ const TEMPLATE_TAGS = [
 // Platform/flow event tags: when this template is sent by a Flow's "Send Email"
 // action, the flow maps these into the template's variables. Grouped by the
 // event that triggers them so authors know which tags are available per source.
-// Derived from the shared trigger-variable catalog (single source of truth).
-const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; label: string; note: string }> }> = (
-  [
-    { title: 'Project invitation', trigger: 'project_invitation_sent' },
-    { title: 'Quote accepted', trigger: 'quote_approved' },
-    { title: 'Role upgrade approved', trigger: 'role_upgrade_approved' },
-    { title: 'Appointment booked', trigger: 'appointment_booked' },
-  ] as const
-).map(({ title, trigger }) => ({
-  title,
-  tags: getTriggerVariables(trigger).map((v) => ({
-    // In the template you reference the bare tag name; the flow's Send Email
-    // "variables" field maps it (e.g. firstName ← {{trigger.data.client_name}}).
-    tag: `{{${v.key}}}`,
-    label: v.label,
-    note: v.note,
-  })),
-}));
+// Shows ALL documented event sources, derived from the shared catalog (single
+// source of truth).
+const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; label: string; note: string }> }> =
+  getAllTriggerGroups().map((group) => ({
+    title: group.title,
+    tags: group.variables.map((v) => ({
+      // In the template you reference the bare tag name; the flow's Send Email
+      // "variables" field maps it (e.g. firstName ← {{trigger.data.client_name}}).
+      tag: `{{${v.key}}}`,
+      label: v.label,
+      note: v.note,
+    })),
+  }));
 
 // ── HTML email card helpers ─────────────────────────────────────────────────
 function cardHtml(imageUrl: string, title: string, subtitle: string, linkUrl = '#') {
@@ -508,21 +503,26 @@ function TagInfoPanel({ open, onClose }: { open: boolean; onClose: () => void })
             <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
               When a <strong>Flow</strong> sends this template (Admin → Flows → Send Email action), it maps
               these into the template's <code className="bg-muted px-1 rounded">variables</code>. Grouped by the
-              event that triggers the email.
+              event that triggers the email — click an event to expand its tags.
             </p>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {FLOW_EVENT_TAG_GROUPS.map((group) => (
-                <div key={group.title} className="space-y-2">
-                  <Badge variant="secondary" className="text-xs">{group.title}</Badge>
-                  {group.tags.map((t) => (
-                    <div key={t.tag} className="border rounded-lg p-2.5 space-y-1">
-                      <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-primary font-semibold">{t.tag}</code>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        <span className="text-foreground font-medium">{t.label}</span> — {t.note}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                <details key={group.title} className="border rounded-lg bg-background/40">
+                  <summary className="cursor-pointer select-none px-3 py-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">{group.title}</span>
+                    <Badge variant="outline" className="text-[10px] h-4 px-1">{group.tags.length}</Badge>
+                  </summary>
+                  <div className="px-3 pb-3 space-y-2">
+                    {group.tags.map((t) => (
+                      <div key={t.tag} className="border rounded-md p-2 space-y-1">
+                        <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-primary font-semibold">{t.tag}</code>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          <span className="text-foreground font-medium">{t.label}</span> — {t.note}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               ))}
             </div>
           </div>

@@ -207,3 +207,51 @@ export function getTriggerVariables(trigger: string | undefined): Array<TriggerV
   const vars = (trigger && TRIGGER_VARIABLES[trigger]) || STANDARD;
   return vars.map((v) => ({ ...v, token: `{{trigger.data.${v.key}}}` }));
 }
+
+/** Human display title for every trigger that has a documented payload. */
+export const TRIGGER_TITLES: Record<string, string> = {
+  hire_me_received: 'Hire Me request',
+  profile_followed: 'New follower',
+  material_reviewed: 'Material reviewed',
+  preferred_factory_added: 'Preferred factory added',
+  vr_world_created: 'VR world ready',
+  vr_world_failed: 'VR world failed',
+  virtual_staging_completed: 'Virtual staging ready',
+  video_generation_completed: 'Video generated',
+  video_generation_failed: 'Video failed',
+  svbrdf_extraction_complete: 'SVBRDF maps ready',
+  agent_search_completed: 'Agent run completed',
+  background_agent_failed: 'Agent run failed',
+  role_upgrade_request_submitted: 'Role upgrade requested',
+  role_upgrade_approved: 'Role upgrade approved',
+  role_upgrade_rejected: 'Role upgrade rejected',
+  factory_approved: 'Factory approved',
+  factory_rejected: 'Factory rejected',
+  appointment_booked: 'Appointment booked',
+  appointment_confirmed: 'Appointment confirmed',
+  appointment_cancelled: 'Appointment cancelled',
+  quote_approved: 'Quote accepted',
+  quote_rejected: 'Quote declined',
+  quote_pdf_generated: 'Quote PDF ready',
+  stripe_payment_succeeded: 'Payment succeeded',
+  stripe_payment_failed: 'Payment failed',
+  project_invitation_sent: 'Project invite sent',
+  project_invitation_resent: 'Project invite resent',
+  webhook: 'Webhook (external)',
+  scheduled: 'Scheduled (cron)',
+};
+
+/**
+ * All documented event sources as { title, trigger, variables } groups, ordered
+ * by TRIGGER_TITLES. Used by the email template builder's tag reference so an
+ * author can see every event whose data a flow can map into a template.
+ */
+export function getAllTriggerGroups(): Array<{ trigger: string; title: string; variables: Array<TriggerVariable & { token: string }> }> {
+  return Object.keys(TRIGGER_TITLES)
+    .filter((t) => TRIGGER_VARIABLES[t]) // only triggers with a documented payload
+    .map((trigger) => ({
+      trigger,
+      title: TRIGGER_TITLES[trigger],
+      variables: getTriggerVariables(trigger),
+    }));
+}
