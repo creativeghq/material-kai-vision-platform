@@ -120,25 +120,48 @@ class CrmCategoriesService {
   }
 
   async listMembers(categoryId: string): Promise<CrmCategoryMember[]> {
+    // NOTE: platform_user display fields are fetched separately rather than via a
+    // PostgREST embed. crm_category_members.user_id has a FK to auth.users (not
+    // user_profiles), so `user_profiles!crm_category_members_user_id_fkey(...)`
+    // raises PGRST200 ("no relationship found") and fails the whole query. The
+    // crm_contacts / crm_companies embeds are valid and stay inline.
     const { data, error } = await supabase
       .from('crm_category_members')
-      .select('id, category_id, member_kind, user_id, crm_contact_id, crm_company_id, source, added_at, user_profiles!crm_category_members_user_id_fkey(full_name, email), crm_contacts!crm_category_members_crm_contact_id_fkey(name, email), crm_companies!crm_category_members_crm_company_id_fkey(name, email)')
+      .select('id, category_id, member_kind, user_id, crm_contact_id, crm_company_id, source, added_at, crm_contacts!crm_category_members_crm_contact_id_fkey(name, email), crm_companies!crm_category_members_crm_company_id_fkey(name, email)')
       .eq('category_id', categoryId)
       .order('added_at', { ascending: false })
       .limit(500);
     if (error) throw error;
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      category_id: row.category_id,
-      member_kind: row.member_kind,
-      user_id: row.user_id,
-      crm_contact_id: row.crm_contact_id,
-      crm_company_id: row.crm_company_id,
-      source: row.source,
-      added_at: row.added_at,
-      display_email: row.user_profiles?.email ?? row.crm_contacts?.email ?? row.crm_companies?.email ?? null,
-      display_name: row.user_profiles?.full_name ?? row.crm_contacts?.name ?? row.crm_companies?.name ?? null,
-    }));
+    const rows = data || [];
+
+    // Batch-resolve platform_user display info via user_profiles.user_id.
+    const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))] as string[];
+    const profileById = new Map<string, { full_name: string | null; email: string | null }>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('user_id, full_name, email')
+        .in('user_id', userIds);
+      for (const p of (profiles || []) as any[]) {
+        profileById.set(p.user_id, { full_name: p.full_name ?? null, email: p.email ?? null });
+      }
+    }
+
+    return rows.map((row: any) => {
+      const profile = row.user_id ? profileById.get(row.user_id) : undefined;
+      return {
+        id: row.id,
+        category_id: row.category_id,
+        member_kind: row.member_kind,
+        user_id: row.user_id,
+        crm_contact_id: row.crm_contact_id,
+        crm_company_id: row.crm_company_id,
+        source: row.source,
+        added_at: row.added_at,
+        display_email: profile?.email ?? row.crm_contacts?.email ?? row.crm_companies?.email ?? null,
+        display_name: profile?.full_name ?? row.crm_contacts?.name ?? row.crm_companies?.name ?? null,
+      };
+    });
   }
 
   async listMembershipsForUser(userId: string): Promise<string[]> {
