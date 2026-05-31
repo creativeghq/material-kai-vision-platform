@@ -116,13 +116,31 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Template ID (optional)</Label>
+            <Label className="text-xs">Template slug (optional)</Label>
             <Input
               value={cfg.template_id || ''}
               onChange={(e) => onChange({ ...cfg, template_id: e.target.value })}
               placeholder="welcome-email"
               className="h-8 text-sm"
             />
+            <p className="text-[10px] text-muted-foreground">
+              An <code>email_templates</code> slug. When set, the template's {'{{tag}}'} placeholders
+              are filled from the variables below (Subject/Body above are ignored).
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template variables (JSON, optional)</Label>
+            <Textarea
+              value={cfg.variables || ''}
+              onChange={(e) => onChange({ ...cfg, variables: e.target.value })}
+              placeholder={'{ "firstName": "{{trigger.data.client_name}}" }'}
+              rows={3}
+              className="text-sm font-mono"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Maps the template's {'{{tag}}'} names to values. Values can use {'{{trigger.data.*}}'} —
+              see Available variables above.
+            </p>
           </div>
         </div>
       );

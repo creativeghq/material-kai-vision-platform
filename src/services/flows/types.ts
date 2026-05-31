@@ -319,6 +319,8 @@ export interface SendEmailConfig {
   body: string;
   template_id?: string;
   from?: string;
+  /** JSON object mapping email-template {{tag}} names → values (values may use {{trigger.data.*}}). */
+  variables?: string;
 }
 
 export interface SendPushConfig {
