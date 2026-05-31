@@ -82,6 +82,23 @@ Deno.serve(async (req: Request) => {
       branding,
     });
 
+    // Clear any previous output for this catalog before writing the new one, so
+    // a rebuild deletes the prior PDF instead of accumulating timestamped files
+    // under catalog-output/{catalogId}/ (2026-05-31 storage reorg).
+    try {
+      const { data: existing } = await supabase.storage
+        .from('pdf-documents')
+        .list(`catalog-output/${catalogId}`);
+      if (existing && existing.length > 0) {
+        await supabase.storage
+          .from('pdf-documents')
+          .remove(existing.map((f) => `catalog-output/${catalogId}/${f.name}`));
+      }
+    } catch (_) {
+      // Best-effort: a failed cleanup should not block regeneration. The orphan
+      // cron's grace sweep + the presentation_catalogs delete trigger backstop it.
+    }
+
     const storagePath = `catalog-output/${catalogId}/catalog-${Date.now()}.pdf`;
     const { error: upErr } = await supabase.storage
       .from('pdf-documents')

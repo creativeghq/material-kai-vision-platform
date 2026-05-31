@@ -18,6 +18,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
   generateImageWithGemini,
   editImageWithGrok,
@@ -361,6 +362,7 @@ interface GenerateInteriorRequest {
   // User context
   user_id?: string;
   workspace_id?: string;
+  conversation_id?: string;
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -384,10 +386,11 @@ async function uploadToStorage(
   base64: string,
   mimeType: string,
   jobId: string,
+  ctx: Partial<SessionPathCtx> = {},
   suffix = '',
 ): Promise<string> {
   const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
-  const path = `gemini/${jobId}${suffix}.${ext}`;
+  const path = resolveOutputPath(ctx, 'gemini', `${jobId}${suffix}.${ext}`);
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
   const { error } = await supabase.storage
@@ -528,6 +531,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   }
 
   const jobId = crypto.randomUUID();
+  const uploadCtx: Partial<SessionPathCtx> = { userId: resolvedUserId, conversationId: body.conversation_id };
   const useGrok = body.model_tier === 'grok';
   const model: GeminiImageModel =
     body.model_tier === 'pro'
@@ -568,7 +572,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
 
       const result = await generateImageWithGemini(prompt, { model, aspectRatio });
-      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
     // ── Mode 2: image-edit ─────────────────────────────────────────────────
@@ -600,7 +604,7 @@ DESIGN CHANGES to apply exactly as instructed:
 OUTPUT: Photorealistic professional interior photography. Ultra-realistic textures, accurate reflections. 24mm architectural lens, corrected verticals, no fisheye.`;
 
         const result = await editImageWithGrok(grokPrompt, sourceBuffer);
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else if (body.style_reference_url) {
         // Two-step style-transfer (Gemini):
         //   Step 1 — Vision: send inspiration to Gemini text model → extract design spec
@@ -621,7 +625,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic textur
           { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Gemini direct edit
         const editText = `You are redesigning the interior shown in the reference photo.
@@ -646,7 +650,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
           { text: editText, images: [sourceBuffer] },
           { model, aspectRatio },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
     }
 
@@ -664,7 +668,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
       // Download from Replicate (temp URL) and persist to Supabase Storage
       const imgBuffer = await fetchImageBuffer(replicateUrl);
       const base64 = toBase64(imgBuffer);
-      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId);
+      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId, uploadCtx);
     }
 
     // ── Mode 4: copy-style ─────────────────────────────────────────────────
@@ -712,7 +716,7 @@ INSPIRATION IMAGE (base64): data:image/jpeg;base64,${inspirationB64}
 OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected verticals, ultra-realistic textures.`;
 
         const result = await editImageWithGrok(grokCopyStylePrompt, roomBuffer);
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Gemini + Flux 2-step pipeline (primary for non-grok)
         const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
@@ -730,7 +734,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
           const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
           if (!replicateUrl) throw new Error('Flux returned empty output URL');
           const imgBuffer = await fetchImageBuffer(replicateUrl);
-          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId);
+          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId, uploadCtx);
         } catch (fluxErr) {
           console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
           const roomBuffer = await fetchImageBuffer(body.reference_image_url);
@@ -740,14 +744,14 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
               { text: applyPrompt, images: [roomBuffer] },
               { model, aspectRatio },
             );
-            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
           } else {
             const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
             const result = await generateImageWithGemini(
               { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
               { model, aspectRatio },
             );
-            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+            imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
           }
         }
       }
@@ -779,7 +783,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
           { text: applyPrompt, images: [sourceBuffer] },
           { model, aspectRatio: '1:1' },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Single image: floor plan → perspective render, or style reference → new design
         const renderPrompt = buildFloorPlanRenderPrompt(body.style, body.prompt);
@@ -787,7 +791,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
           { text: renderPrompt, images: [sourceBuffer] },
           { model, aspectRatio: '1:1' },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
     }
 
@@ -804,7 +808,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
         diagramPrompt,
         { model, aspectRatio: '1:1' },
       );
-      imageUrl = await uploadToStorage(supabase, diagramResult.base64, diagramResult.mimeType, jobId);
+      imageUrl = await uploadToStorage(supabase, diagramResult.base64, diagramResult.mimeType, jobId, uploadCtx);
     }
 
     // ── Mode 5: materials-selection-board ──────────────────────────────────
@@ -825,7 +829,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
         { text: boardPrompt, images: [sourceBuffer] },
         { model, aspectRatio: body.aspect_ratio ?? '1:1' },
       );
-      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId);
+      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
     else {

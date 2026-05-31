@@ -51,10 +51,9 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
   const handleSave = async (moodboard: MoodBoard) => {
     try {
       setSaving(moodboard.id);
-      await moodboardAPI.addMoodBoardItem({
+      await moodboardAPI.addMediaFromChat({
         moodboard_id: moodboard.id,
-        material_id: null,
-        media_url: mediaUrl,
+        source_url: mediaUrl,
         media_type: mediaType,
         media_title: mediaTitle,
       });
@@ -72,10 +71,9 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
     try {
       setCreating(true);
       const newMoodboard = await moodboardAPI.createMoodBoard({ title: newTitle.trim() });
-      await moodboardAPI.addMoodBoardItem({
+      await moodboardAPI.addMediaFromChat({
         moodboard_id: newMoodboard.id,
-        material_id: null,
-        media_url: mediaUrl,
+        source_url: mediaUrl,
         media_type: mediaType,
         media_title: mediaTitle,
       });

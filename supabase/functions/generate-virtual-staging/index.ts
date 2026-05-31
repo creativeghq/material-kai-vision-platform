@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -30,6 +31,7 @@ interface VirtualStagingRequest {
   furniture_items?: string;
   workspace_id?: string;
   user_id?: string; // For internal server-to-server calls from agent-chat
+  conversation_id?: string;
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -43,13 +45,14 @@ async function uploadToStorage(
   supabase: ReturnType<typeof createClient>,
   imageUrl: string,
   jobId: string,
+  ctx: Partial<SessionPathCtx> = {},
 ): Promise<string> {
   const resp = await fetch(imageUrl);
   if (!resp.ok) throw new Error(`Failed to download staged image: ${resp.status}`);
   const bytes = new Uint8Array(await resp.arrayBuffer());
   const contentType = resp.headers.get('content-type') || 'image/jpeg';
   const ext = contentType.includes('png') ? 'png' : 'jpg';
-  const path = `virtual-staging/${jobId}.${ext}`;
+  const path = resolveOutputPath(ctx, 'virtual-staging', `${jobId}.${ext}`);
 
   const { error } = await supabase.storage
     .from('generation-images')
@@ -220,7 +223,7 @@ async function handleRequest(
 
   try {
     const tempUrl = await runReplicate(body.source_image_url, room, furnitureStyle, body.furniture_items);
-    const imageUrl = await uploadToStorage(supabase, tempUrl, jobId);
+    const imageUrl = await uploadToStorage(supabase, tempUrl, jobId, { userId, conversationId: body.conversation_id });
 
     await deductCredits(
       supabase,

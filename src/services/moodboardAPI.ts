@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { getProductName } from '@/utils/productMetadata';
+import { moodboardPath, generationPathFromUrl } from '@/utils/storagePaths';
 
 export interface CreateMoodBoardData {
   title: string;
@@ -386,6 +387,56 @@ class MoodBoardAPI {
         thumbnail_url,
       } : null,
     };
+  }
+
+  // Add chat-generated/attached media to a moodboard (copy-on-promote).
+  //
+  // Chat media lives under the per-session prefix
+  // `generation-images/u/{user_id}/sessions/{conversation_id}/...`, which is
+  // prefix-deleted when the originating chat is deleted. To make the image
+  // survive that, we COPY the bytes into a moodboard-owned folder
+  // (`u/{user_id}/moodboards/{moodboard_id}/...`, outside any session prefix)
+  // and store the copy's URL on the moodboard_items row. The original stays in
+  // the chat. Non-generation-images URLs (external pins, VR splat URLs) are
+  // stored as-is — they have their own lifecycle.
+  async addMediaFromChat(params: {
+    moodboard_id: string;
+    source_url: string;
+    media_type: 'image' | 'video' | 'vr_world';
+    media_title?: string;
+    notes?: string;
+  }): Promise<MoodBoardItem> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    let mediaUrl = params.source_url;
+    const srcPath = generationPathFromUrl(params.source_url);
+    // Only copy real generation-images objects that aren't already moodboard-owned.
+    if (srcPath && !srcPath.startsWith(`u/${user.id}/moodboards/`)) {
+      const ext = srcPath.split('.').pop()?.split('?')[0] || 'jpg';
+      const itemId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const destPath = moodboardPath(user.id, params.moodboard_id, `${itemId}.${ext}`);
+      const { error: copyErr } = await supabase.storage
+        .from('generation-images')
+        .copy(srcPath, destPath);
+      if (!copyErr) {
+        mediaUrl = supabase.storage.from('generation-images').getPublicUrl(destPath).data.publicUrl;
+      }
+      // Best-effort: if the copy fails we keep the original URL. The orphan cron
+      // still protects it while the source chat is alive.
+    }
+
+    return this.addMoodBoardItem({
+      moodboard_id: params.moodboard_id,
+      material_id: null,
+      media_url: mediaUrl,
+      media_type: params.media_type,
+      media_title: params.media_title,
+      notes: params.notes,
+    });
   }
 
   // Update moodboard item

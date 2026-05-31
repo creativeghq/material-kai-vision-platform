@@ -1566,14 +1566,14 @@ async function executeAgent(
     if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {
       tools.push(create3DGenerationTool(userId, workspaceId, onChunk, images, conversationImages));
     }
-    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages, generationMode));
-    tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk));
+    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
+    tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
     tools.push(createGenerationStatusTool());
   }
 
   // Lighting variants — re-render an existing room under a different lighting preset
   if (config.tools.includes('apply_lighting_preset') && createApplyLightingPresetTool) {
-    tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk));
+    tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
   }
 
   // VR world generation — turn a room image into an explorable 3D Gaussian Splat

@@ -23,6 +23,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { editImageWithGrok } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -61,9 +62,10 @@ async function uploadResult(
   base64: string,
   mimeType: string,
   jobId: string,
+  ctx: Partial<SessionPathCtx> = {},
 ): Promise<string> {
   const ext = mimeType.includes('png') ? 'png' : 'jpg';
-  const path = `region-edit/${jobId}.${ext}`;
+  const path = resolveOutputPath(ctx, 'region-edit', `${jobId}.${ext}`);
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
   const { error } = await supabase.storage
@@ -88,6 +90,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     prompt: string;
     user_id?: string;
     workspace_id?: string;
+    conversation_id?: string;
   };
   try {
     body = await req.json();
@@ -163,7 +166,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     }
 
     // Upload result
-    const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId);
+    const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
 
     return jsonResponse({
       success: true,

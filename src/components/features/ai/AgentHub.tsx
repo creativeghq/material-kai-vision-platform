@@ -54,6 +54,7 @@ import {
 } from '@/components/core/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveUploadPath } from '@/utils/storagePaths';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/core/ui/sheet';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
@@ -63,6 +64,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
+import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal';
 // PromptLibrary merged into PromptBuilderModal — its 35 design templates,
 // 10 room-filter chips, image-aware mode, and virtual-staging wizard hook
 // now live inside the "Prompt Library" tab when the active agent is
@@ -479,6 +481,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
+  // Generic collect-then-send form for toolkit quick-starts that declare a `form`.
+  const [toolkitFormState, setToolkitFormState] = useState<ToolkitFormModalState>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -1261,6 +1265,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         body: JSON.stringify({
           source_image_url: imageUrl,
           workspace_id: workspaceId,
+          conversation_id: conversationIdRef.current ?? undefined,
           video_type: resolvedVideoType,
           model: resolvedModel,
         }),
@@ -1357,6 +1362,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           model_tier: 'pro',
           aspect_ratio: boardMode === 'photorealistic-render' ? '16:9' : '1:1',
           workspace_id: workspaceId,
+          conversation_id: conversationIdRef.current ?? undefined,
         }),
       });
 
@@ -1423,6 +1429,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           furniture_style: params.style,
           furniture_items: params.furnitureItems,
           workspace_id: workspaceId,
+          conversation_id: conversationIdRef.current ?? undefined,
         }),
       });
 
@@ -1504,35 +1511,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       } = await supabase.auth.getSession();
       if (!session) throw new Error('User not authenticated');
 
-      // Create or get conversation
+      // Create or get the conversation FIRST so any attached images upload under
+      // the per-session folder (u/{user_id}/sessions/{conversation_id}/uploads/...).
+      // If we uploaded before the conversation existed, first-message attachments
+      // would leak into the legacy flat prefix and never be tied to this chat.
       let conversationId = currentConversationId;
-      // Upload images first so URLs are available for both the API call and DB persistence
-      let resolvedImageUrls: string[] = [];
-      if (userAttachedImages.length > 0) {
-        resolvedImageUrls = await Promise.all(
-          userAttachedImages.map(async (img, idx) => {
-            if (!img.startsWith('data:')) return img;
-            try {
-              const commaIdx = img.indexOf(',');
-              const mimeType = img.slice(5, img.indexOf(';'));
-              const ext = mimeType.split('/')[1] || 'jpg';
-              const base64Data = img.slice(commaIdx + 1);
-              const binaryStr = atob(base64Data);
-              const bytes = new Uint8Array(binaryStr.length);
-              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-              const fileName = `user-uploads/${Date.now()}-${idx}.${ext}`;
-              const { data: up, error } = await supabase.storage
-                .from('generation-images')
-                .upload(fileName, bytes, { contentType: mimeType, upsert: true });
-              if (error || !up) return img;
-              return supabase.storage.from('generation-images').getPublicUrl(up.path).data.publicUrl;
-            } catch {
-              return img;
-            }
-          }),
-        );
-      }
-
       let newConversation: ChatConversation | null = null;
       if (!conversationId) {
         const conversation = await agentChatHistoryService.createConversation({
@@ -1556,6 +1539,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           onConversationChange?.(conversationId);
           newConversation = conversation;
         }
+      }
+
+      // Upload attached images under the session folder so URLs are available for
+      // both the API call and DB persistence.
+      let resolvedImageUrls: string[] = [];
+      if (userAttachedImages.length > 0) {
+        resolvedImageUrls = await Promise.all(
+          userAttachedImages.map(async (img, idx) => {
+            if (!img.startsWith('data:')) return img;
+            try {
+              const commaIdx = img.indexOf(',');
+              const mimeType = img.slice(5, img.indexOf(';'));
+              const ext = mimeType.split('/')[1] || 'jpg';
+              const base64Data = img.slice(commaIdx + 1);
+              const binaryStr = atob(base64Data);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              const fileName = resolveUploadPath(
+                { userId, conversationId: conversationId ?? undefined },
+                'user-uploads',
+                `${Date.now()}-${idx}.${ext}`,
+              );
+              const { data: up, error } = await supabase.storage
+                .from('generation-images')
+                .upload(fileName, bytes, { contentType: mimeType, upsert: true });
+              if (error || !up) return img;
+              return supabase.storage.from('generation-images').getPublicUrl(up.path).data.publicUrl;
+            } catch {
+              return img;
+            }
+          }),
+        );
       }
 
       // Save user message to database, including image URLs so they survive page refresh
@@ -3165,6 +3180,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 onLaunch={(prompt, qs, tkParam) => {
                   setJustEnabledToolkitId(null);
                   ensureAgentAndToolkit(tkParam);
+                  // Form-bearing quick-starts collect their fields first, then
+                  // auto-send one complete message (takes priority over the
+                  // step-by-step workflow tracker).
+                  if (qs.form?.length) {
+                    setToolkitFormState({ quickStart: qs, toolkit: tkParam });
+                    return;
+                  }
                   if (qs.workflow_id) {
                     bootWorkflowLocally(qs.workflow_id);
                   } else {
@@ -3206,6 +3228,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   // ready before the message fires, regardless of wizard or
                   // prompt-fire path. No more "I don't have those tools" replies.
                   ensureAgentAndToolkit(tk);
+                  // Form-bearing quick-starts collect their fields first, then
+                  // auto-send one complete message (takes priority over the
+                  // step-by-step workflow tracker).
+                  if (qs.form?.length) {
+                    setToolkitFormState({ quickStart: qs, toolkit: tk });
+                    return;
+                  }
                   if (qs.workflow_id) {
                     bootWorkflowLocally(qs.workflow_id);
                   } else {
@@ -4481,6 +4510,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       }
                     }}
                     onUseExample={(prompt) => setInput(prompt)}
+                    onLaunchForm={(qs, tk) => {
+                      // Form-bearing quick-start picked from the slash palette —
+                      // collect fields first, then auto-send (same flow as cards).
+                      setPaletteOpen(false);
+                      setPaletteQuery('');
+                      setToolkitFormState({ quickStart: qs, toolkit: tk });
+                    }}
                   />
                   <Textarea
                     value={input}
@@ -4603,8 +4639,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         currentAgentId={selectedAgent}
         hasUploadedImage={attachedImages.length > 0}
         enabledModules={enabledModulesArray}
-        onQuickStart={({ agentId, prompt }) => {
+        onQuickStart={({ agentId, prompt, quickStart, toolkit }) => {
           if (agentId !== selectedAgent) setSelectedAgent(agentId);
+          // Form-bearing quick-starts collect their fields first, then auto-send.
+          if (quickStart?.form?.length && toolkit) {
+            setToolkitFormState({ quickStart, toolkit });
+            return;
+          }
           setInput(prompt);
           // Auto-send on next tick so the agent switch (if any) settles + the
           // input state is committed before send. handleSendMessageRef reads
@@ -4770,6 +4811,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   mask_data_url: result.maskDataUrl,
                   prompt: result.prompt,
                   workspace_id: session.user?.user_metadata?.workspace_id,
+                  conversation_id: conversationIdRef.current ?? undefined,
                 }),
               });
 
@@ -4838,6 +4880,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       )}
 
       {/* Job-sites modal — triggered by the manage_job_sites agent tool when user is vague */}
+      <ToolkitFormModal
+        state={toolkitFormState}
+        onClose={() => setToolkitFormState(null)}
+        onSubmit={(renderedPrompt) => {
+          // Collected the fields — inject the complete message and auto-send it.
+          setInput(renderedPrompt);
+          setToolkitFormState(null);
+          setTimeout(() => { handleSendMessageRef.current(); }, 0);
+        }}
+      />
+
       <JobSitesFormModal
         state={jobSitesFormState}
         onClose={() => setJobSitesFormState(null)}

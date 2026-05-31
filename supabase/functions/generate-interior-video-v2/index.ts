@@ -21,6 +21,7 @@ import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-clie
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -64,8 +65,9 @@ async function uploadVideoToStorage(
   videoData: string | ArrayBuffer,
   jobId: string,
   isBase64 = false,
+  ctx: Partial<SessionPathCtx> = {},
 ): Promise<string> {
-  const path = `videos/v2/${jobId}.mp4`;
+  const path = resolveOutputPath(ctx, 'videos/v2', `${jobId}.mp4`);
   let bytes: Uint8Array;
 
   if (isBase64 && typeof videoData === 'string') {
@@ -216,6 +218,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   }
 
   const jobId = videoRecord.id;
+  const uploadCtx: Partial<SessionPathCtx> = { userId, conversationId: body.conversation_id };
 
   try {
     // ③ Generate video
@@ -236,7 +239,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         },
       );
 
-      const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true);
+      const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true, uploadCtx);
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -276,7 +279,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         mode: 'pro',
       });
 
-      const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true);
+      const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -336,7 +339,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       if (pollResult.status === 'succeeded') {
         const rawUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output as string;
-        const videoUrl = await uploadVideoToStorage(supabase, rawUrl, jobId);
+        const videoUrl = await uploadVideoToStorage(supabase, rawUrl, jobId, false, uploadCtx);
 
         await supabase.from('generation_videos').update({
           status: 'completed',

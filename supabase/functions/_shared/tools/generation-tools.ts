@@ -228,6 +228,7 @@ export const createGeminiGenerationTool = (
   onChunk?: (chunk: any) => void,
   pinnedMaterialImages: string[] = [],
   forcedMode?: string, // Explicit mode override from UI chip selection
+  conversationId?: string, // Per-session storage folder key
 ) => {
   return tool(
     async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, modelTier: agentModelTier, materialImages, sqm, boardMode }) => {
@@ -405,6 +406,7 @@ export const createGeminiGenerationTool = (
           model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok',
           user_id: userId,
           workspace_id: workspaceId,
+          conversation_id: conversationId,
           // Mode-specific image fields
           ...(resolvedMode === 'redesign' && redesignReferenceUrl
             ? { reference_image_url: redesignReferenceUrl }
@@ -566,6 +568,7 @@ export const createVirtualStagingTool = (
   workspaceId: string,
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
+  conversationId?: string, // Per-session storage folder key
 ) => {
   return tool(
     async ({ sourceImageUrl, room, furnitureStyle, furnitureItems }) => {
@@ -599,6 +602,7 @@ export const createVirtualStagingTool = (
               furniture_items: furnitureItems,
               workspace_id: workspaceId,
               user_id: userId,
+              conversation_id: conversationId,
             }),
             signal: stagingController.signal,
           });
@@ -747,6 +751,7 @@ export const createApplyLightingPresetTool = (
   workspaceId: string,
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
+  conversationId?: string, // Per-session storage folder key
 ) => {
   const PRESET_PROMPTS: Record<string, string> = {
     golden_hour:    'golden hour — warm amber sunlight at a low angle, long soft shadows, cosy',
@@ -792,6 +797,7 @@ export const createApplyLightingPresetTool = (
             body: JSON.stringify({
               user_id: userId,
               workspace_id: workspaceId,
+              conversation_id: conversationId,
               mode: 'image-edit',
               prompt: editInstruction,
               edit_instruction: editInstruction,

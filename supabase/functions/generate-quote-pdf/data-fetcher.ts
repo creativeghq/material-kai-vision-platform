@@ -234,12 +234,19 @@ export async function fetchStorageFile(
   supabase: SupabaseClient,
   bucket: string,
   path: string
-): Promise<Uint8Array> {
-  const { data, error } = await supabase.storage.from(bucket).download(path);
-
-  if (error || !data) {
-    throw new Error(`Missing template image: ${path}. Please upload via System Settings.`);
+): Promise<Uint8Array | null> {
+  // Template backgrounds are optional: a missing one renders the PDF without
+  // that image rather than hard-failing generation. Upload them via Quote
+  // Settings for branded output.
+  try {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (error || !data) {
+      console.warn(`[generate-quote-pdf] Missing template image: ${bucket}/${path} — rendering without it.`);
+      return null;
+    }
+    return new Uint8Array(await data.arrayBuffer());
+  } catch (e) {
+    console.warn(`[generate-quote-pdf] Failed to fetch template image ${bucket}/${path}:`, e instanceof Error ? e.message : e);
+    return null;
   }
-
-  return new Uint8Array(await data.arrayBuffer());
 }

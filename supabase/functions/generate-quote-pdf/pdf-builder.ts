@@ -55,9 +55,9 @@ const COLUMNS = [
 export async function buildQuotePDF(
   quoteData: QuoteData,
   templateConfig: TemplateConfig,
-  coverBytes: Uint8Array,
-  bgBytes: Uint8Array,
-  backcoverBytes: Uint8Array
+  coverBytes: Uint8Array | null,
+  bgBytes: Uint8Array | null,
+  backcoverBytes: Uint8Array | null
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
@@ -65,13 +65,14 @@ export async function buildQuotePDF(
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Embed images
+  // Embed images (each is optional — a missing template background just skips
+  // that visual rather than failing PDF generation).
   const coverImage = await embedImage(pdfDoc, coverBytes);
   const bgImage = await embedImage(pdfDoc, bgBytes);
   const backcoverImage = await embedImage(pdfDoc, backcoverBytes);
 
-  // Page 1: Cover
-  addFullPageImage(pdfDoc, coverImage);
+  // Page 1: Cover (skipped if no cover template uploaded)
+  if (coverImage) addFullPageImage(pdfDoc, coverImage);
 
   // Page 2: Client Details
   addClientDetailsPage(pdfDoc, quoteData, templateConfig, fontRegular, fontBold);
@@ -79,8 +80,8 @@ export async function buildQuotePDF(
   // Pages 3+: Items Table
   addItemsPages(pdfDoc, quoteData, bgImage, fontRegular, fontBold);
 
-  // Last Page: Back Cover
-  addFullPageImage(pdfDoc, backcoverImage);
+  // Last Page: Back Cover (skipped if no back-cover template uploaded)
+  if (backcoverImage) addFullPageImage(pdfDoc, backcoverImage);
 
   // Set metadata
   pdfDoc.setTitle(`Quote ${quoteData.quote_number || quoteData.id}`);
@@ -96,8 +97,9 @@ export async function buildQuotePDF(
 
 async function embedImage(
   pdfDoc: PDFDocument,
-  bytes: Uint8Array
-): Promise<PDFImage> {
+  bytes: Uint8Array | null
+): Promise<PDFImage | null> {
+  if (!bytes || bytes.length === 0) return null;
   // PNG magic bytes: 0x89 0x50 0x4E 0x47
   if (bytes[0] === 0x89 && bytes[1] === 0x50) {
     return pdfDoc.embedPng(bytes);
@@ -245,7 +247,7 @@ function addClientDetailsPage(
 function addItemsPages(
   pdfDoc: PDFDocument,
   quote: QuoteData,
-  bgImage: PDFImage,
+  bgImage: PDFImage | null,
   font: PDFFont,
   fontBold: PDFFont
 ): void {
@@ -255,8 +257,8 @@ function addItemsPages(
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
 
-    // Draw background image
-    page.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    // Draw background image (optional — plain page when no template uploaded)
+    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
 
     // Page title area
     page.drawText('QUOTE ITEMS', {
@@ -319,7 +321,7 @@ function addItemsPages(
         if (ffeY < 120) {
           // Not enough space — add new page
           const ffePage = pdfDoc.addPage([PAGE_W, PAGE_H]);
-          ffePage.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+          if (bgImage) ffePage.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
           ffeY = PAGE_H - 80;
           drawFFENotes(ffePage, ffeItems, ffeY, font, fontBold);
         } else {
