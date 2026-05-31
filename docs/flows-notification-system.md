@@ -61,12 +61,63 @@ for each matching flow -> execute graph (BFS over nodes)
 
 ---
 
+## 2a. Trigger entry points (how a flow actually fires)
+
+There are **four** ways a flow runs. All converge on the `flow-engine` edge function.
+
+| Trigger | How it fires | Entry point | Verified |
+|---|---|---|---|
+| **Event** (platform actions) | code calls `flowEventService.emit(type, data)` / `emitFlowEvent(type, data)` → runs **all active** flows with matching `trigger_type` | `flow-engine` `trigger-event` | ✅ live (the 27 notification flows) |
+| **Webhook** (external code/HTTP) | external system `POST`s to the flow's URL | `flow-webhook` edge fn → `flow-engine` `execute-flow` | ✅ smoke-tested 2026-05-31 |
+| **Scheduled** (cron) | `flow-scheduler-cron` runs every minute, matches each `scheduled` flow's cron + timezone | `flow-scheduler-cron` → `flow-engine` `execute-flow` | ✅ running in prod (pg_cron `* * * * *`) |
+| **Manual** (Run Now) | the **Run Now** button on the Flows dashboard | `flow-engine` `execute-flow` | ✅ live |
+| **Test** | dry-run in the builder (resolves templates, doesn't fire actions) | `flow-engine` `test-flow` | ✅ live |
+
+> Note on the action names: `flow-engine`'s top-level switch has only
+> `execute-flow` / `test-flow` / `trigger-event`. There is **no** `webhook` or
+> `scheduled` action — those edge functions each call `execute-flow` after their
+> own validation. So "webhook" and "scheduled" are *entry points*, not engine actions.
+
+### Webhook usage (triggering a flow from outside code)
+
+A flow whose trigger is `webhook` gets a unique URL. External systems call:
+
+```
+POST https://<project-ref>.supabase.co/functions/v1/flow-webhook?flow_id=<uuid>
+X-Webhook-Secret: <secret from the flow's trigger_config>   # optional
+Content-Type: application/json
+
+{ "any": "json", "you": "want" }
+```
+
+- The request JSON body becomes `trigger.data.*` in the graph (so an action can
+  template `{{trigger.data.any}}`). Query params land under `trigger.data._webhook.query_params`.
+- The function validates: flow exists, `trigger_type = 'webhook'`, `status = 'active'`,
+  the HTTP method matches `trigger_config.method`, and (if set) the `X-Webhook-Secret`
+  header matches `trigger_config.secret`.
+- On success returns `{ success: true, data: { flow_id, run_id, status } }`.
+- Secret validation is **verified working** (smoke test 2026-05-31: wrong secret →
+  `401 Invalid webhook secret`, correct secret → `200`). The `timingSafeEqual`
+  double-HMAC (both operands hashed under the same per-call random key, digests
+  compared) is a legitimate constant-time compare.
+- File: `supabase/functions/flow-webhook/index.ts`.
+
+### Scheduled usage
+
+Set the flow's trigger to `scheduled` with `trigger_config = { cron, timezone }`.
+`flow-scheduler-cron` (pg_cron, every minute) finds due flows, stamps `last_run_at`
+before dispatch (55s double-fire guard), and calls `execute-flow`. File:
+`supabase/functions/flow-scheduler-cron/index.ts`.
+
+---
+
 ## 3. Triggers, actions, conditions
 
 ### Trigger types (event vocabulary)
 Defined in `src/services/flows/types.ts` (`TriggerType`). Beyond the originals
-(`manual` is removed — use **Run Now**; plus `scheduled`, `webhook`, `user_signup`,
-quote/moodboard/profile events, etc.), the migration added:
+(the `manual` **palette node** was removed — use **Run Now** instead — but the
+`manual` *type* still exists and is the default; plus `scheduled`, `webhook`,
+`user_signup`, quote/moodboard/profile events, etc.), the migration added:
 
 `quote_pdf_generated`, `factory_approved`, `factory_rejected`,
 `appointment_booked/confirmed/cancelled`, `svbrdf_extraction_complete`,
@@ -192,16 +243,35 @@ transition clean in **any** order:
 
 ## 8. How to add a NEW converted event
 
-1. Add the trigger string to `TriggerType` (+ config interface + the exhaustive
-   icon/label maps + palette entry) in `src/services/flows/types.ts`,
-   `MyFlowsTab.tsx`, `nodes/TriggerNode.tsx`, `panels/configs/TriggerConfigForm.tsx`,
-   `utils/paletteItems.ts`.
-2. In the source, replace the hardcoded send with an emit carrying the full
-   payload (`user_id`/recipient, `title`, `body`, `action_url`, `type`).
-3. Seed an **active** default flow (trigger -> `create_notification` / `send_email`),
-   tag it `system-default`, and lock it.
-4. Add a `flow_area_registry` row for the new area and bind it to the seeded flow.
-5. Typecheck (`npx tsc -p tsconfig.json --noEmit`) and deploy.
+1. **Add the trigger string to `TriggerType`** in `src/services/flows/types.ts`
+   (the union + a `*TriggerConfig` interface + a `TriggerConfigMap` entry), then
+   update the **exhaustive `Record<TriggerType, …>` maps** — TypeScript fails the
+   build if you miss one, which is the safety net:
+   - `MyFlowsTab.tsx` — **two** maps: `triggerIcons` AND `triggerLabels`.
+   - `nodes/TriggerNode.tsx` — `triggerIcons`.
+   - `utils/paletteItems.ts` — add a trigger palette item so it's draggable in the builder.
+   - `panels/configs/TriggerConfigForm.tsx` — **only if** the trigger needs a custom
+     config form. Payload-only events (the common case) need nothing here; they fall
+     through the `default` and the shared migration-events block. Add a `case` only
+     for filter/config UI.
+2. **In the source, replace the hardcoded send with an emit** carrying the full
+   payload the action will template — `user_id` (recipient), `title`, `body`,
+   `action_url`, `type`, plus any event-specific fields.
+   - Frontend: `flowEventService.emit('your_event', {...})`.
+   - Edge function: `import { emitFlowEvent } from '../_shared/flow-events.ts'`
+     then `emitFlowEvent('your_event', {...})` (remember the import!).
+3. **Seed an active default flow** (trigger -> `create_notification` / `send_email`),
+   tag it `system-default`, and set `is_locked = true`. Copy the `graph_definition`
+   shape from an existing `system-default` flow (trigger node + action node + one edge,
+   config values as `{{trigger.data.*}}`). Seed via `mcp__supabase__execute_sql`.
+4. **Register the area:** insert a `flow_area_registry` row and set `bound_flow_id`
+   to the seeded flow, so it shows **Linked** in the System Areas tab.
+5. **Verify:** `npx tsc -p tsconfig.json --noEmit` (0 errors), commit. Edge functions +
+   frontend deploy via the **"Deploy FE & Supabase"** GitHub Action on merge to `main`.
+
+If the new feature instead needs an **external/webhook** or **scheduled** trigger
+(not a platform event), you don't add a new `TriggerType` value — reuse
+`webhook` / `scheduled` and configure the flow in the builder (see §2a).
 
 ---
 
@@ -223,6 +293,8 @@ transition clean in **any** order:
 | Concern | File |
 |---|---|
 | Engine (actions, conditions, loop, guards) | `supabase/functions/flow-engine/index.ts` |
+| Webhook trigger receiver | `supabase/functions/flow-webhook/index.ts` |
+| Scheduled trigger driver | `supabase/functions/flow-scheduler-cron/index.ts` |
 | Frontend emit | `src/services/flows/flowEventService.ts` |
 | Edge emit | `supabase/functions/_shared/flow-events.ts` |
 | Types (Flow, triggers, area registry) | `src/services/flows/types.ts` |
