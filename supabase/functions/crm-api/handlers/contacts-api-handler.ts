@@ -45,19 +45,6 @@ export async function handleContacts(req: Request): Promise<Response> {
     const user = auth.user;
     const userId = auth.userId;
 
-    let workspaceId: string | null = null;
-    if (userId) {
-      const { data: mem } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      workspaceId = mem?.workspace_id ?? null;
-    }
-
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
@@ -105,7 +92,6 @@ export async function handleContacts(req: Request): Promise<Response> {
         .select('*')
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
-      if (workspaceId) listQuery = listQuery.eq('workspace_id', workspaceId);
       const { data, error } = await listQuery;
 
       if (error) {

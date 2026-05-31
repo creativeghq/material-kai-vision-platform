@@ -37,20 +37,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
     }
 
     const user = auth.user;
-    const userId = auth.userId;
-
-    let workspaceId: string | null = null;
-    if (userId) {
-      const { data: mem } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      workspaceId = mem?.workspace_id ?? null;
-    }
 
     const url = new URL(req.url);
     const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/companies/, '').split('/').filter(Boolean);
@@ -134,7 +120,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
         .select('*', { count: 'exact' })
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
-      if (workspaceId) query = query.eq('workspace_id', workspaceId);
 
       // Add search filter if provided — escape % and _ to prevent wildcard injection
       if (search) {
