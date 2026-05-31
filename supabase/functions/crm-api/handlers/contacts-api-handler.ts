@@ -26,15 +26,16 @@ export async function handleContacts(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const method = req.method;
     // Use replace + filter for robust path parsing (same as crm-companies-api)
-    const path = url.pathname.replace(/^(\/functions\/v1\/crm-api)?\/contacts/, '').split('/').filter(Boolean);
+    const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/contacts/, '').split('/').filter(Boolean);
 
     // Authenticate request
     const auth = await authenticate(req, {
       allowedRoles: ['admin', 'factory'],
     });
 
-    // Secret key bypasses role check
-    if (!auth.success && !isAdminAccess(auth)) {
+    // authenticate() already grants success for secret-key (level='secret') access and
+    // enforces the role gate for user tokens, so a failed auth is simply rejected here.
+    if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
         { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },

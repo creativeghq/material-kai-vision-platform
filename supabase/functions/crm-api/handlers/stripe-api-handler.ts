@@ -31,7 +31,7 @@ export async function handleCrmStripe(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    const path = url.pathname.replace(/^(\/functions\/v1\/crm-api)?\/stripe/, '').split('/').filter(Boolean);
+    const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/stripe/, '').split('/').filter(Boolean);
 
     // Authenticate request
     const auth = await authenticate(req);

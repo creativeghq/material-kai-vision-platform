@@ -25,15 +25,16 @@ export async function handleUsers(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    const path = url.pathname.replace(/^(\/functions\/v1\/crm-api)?\/users/, '').split('/').filter(Boolean);
+    const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/users/, '').split('/').filter(Boolean);
 
     // Authenticate request - admin only
     const auth = await authenticate(req, {
       allowedRoles: ['admin'],
     });
 
-    // Secret key bypasses role check
-    if (!auth.success && !isAdminAccess(auth)) {
+    // authenticate() already grants success for secret-key (level='secret') access and
+    // enforces the admin role gate for user tokens, so a failed auth is simply rejected here.
+    if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
         { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
