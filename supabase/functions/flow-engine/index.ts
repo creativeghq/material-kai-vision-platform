@@ -954,6 +954,52 @@ async function executeFlowGraph(
 
       if (node.type === 'triggerNode') {
         output = { ...triggerData };
+      } else if (node.type === 'conditionNode' && node.data.conditionType === 'loop') {
+        // Fan-out: run the directly-connected downstream action node(s) once per
+        // item in a collection. config: { collection_field: 'trigger.data.items',
+        // item_variable: 'item', max_iterations: 100 }. Single-level body (direct
+        // action children); each iteration exposes context[item_variable] +
+        // context.loop_index, so an action can template {{item}} or {{item.field}}.
+        const loopCfg = node.data.config as {
+          collection_field?: string;
+          item_variable?: string;
+          max_iterations?: number;
+        };
+        const loopPath = String(loopCfg.collection_field || '').replace(/\{\{|\}\}/g, '').trim();
+        const loopRaw = getNestedValue(context as unknown as Record<string, unknown>, loopPath);
+        const hardCap = Math.min(Number(loopCfg.max_iterations) || 100, 1000);
+        const loopItems = Array.isArray(loopRaw) ? loopRaw.slice(0, hardCap) : [];
+        const itemVar = loopCfg.item_variable || 'item';
+        const loopChildIds = edges.filter((e) => e.source === nodeId).map((e) => e.target);
+
+        for (let i = 0; i < loopItems.length; i++) {
+          (context as Record<string, unknown>)[itemVar] = loopItems[i];
+          (context as Record<string, unknown>).loop_index = i;
+          for (const cid of loopChildIds) {
+            const child = nodes.find((n) => n.id === cid);
+            if (!child || child.type !== 'actionNode') continue;
+            const iterStart = Date.now();
+            const res = await executeAction(supabase, child, context, isTestRun, userId);
+            await supabase.from('flow_run_steps').insert({
+              flow_run_id: runId,
+              node_id: child.id,
+              node_type: 'action',
+              node_label: `${child.data.label} [#${i}]`,
+              node_config: child.data.config,
+              status: 'completed',
+              output_data: res.output,
+              execution_order: executionOrder++,
+              started_at: new Date(iterStart).toISOString(),
+              completed_at: new Date().toISOString(),
+              duration_ms: Date.now() - iterStart,
+            });
+          }
+        }
+        delete (context as Record<string, unknown>)[itemVar];
+        delete (context as Record<string, unknown>).loop_index;
+        // Children ran inline — mark visited so the BFS doesn't re-run them.
+        for (const cid of loopChildIds) visited.add(cid);
+        output = { looped: true, item_count: loopItems.length };
       } else if (node.type === 'conditionNode') {
         const result = await executeCondition(node, context);
         output = result.output;
