@@ -8,6 +8,7 @@ import { useFlowBuilder } from '../hooks/useFlowBuilder';
 import { TriggerConfigForm } from './configs/TriggerConfigForm';
 import { ConditionConfigForm } from './configs/ConditionConfigForm';
 import { ActionConfigForm } from './configs/ActionConfigForm';
+import { VariablesHelper } from './VariablesHelper';
 import type { FlowNodeData, TriggerNodeData, ConditionNodeData, ActionNodeData } from '@/services/flows/types';
 
 const categoryLabels: Record<string, string> = {
@@ -25,6 +26,7 @@ const categoryColors: Record<string, string> = {
 export function NodeConfigPanel() {
   const selectedNodeId = useFlowBuilder((s) => s.selectedNodeId);
   const nodes = useFlowBuilder((s) => s.nodes);
+  const edges = useFlowBuilder((s) => s.edges);
   const updateNodeData = useFlowBuilder((s) => s.updateNodeData);
   const deleteNode = useFlowBuilder((s) => s.deleteNode);
   const selectNode = useFlowBuilder((s) => s.selectNode);
@@ -34,6 +36,21 @@ export function NodeConfigPanel() {
   if (!selectedNode) return null;
 
   const nodeData = selectedNode.data as FlowNodeData;
+
+  // The flow's trigger drives which {{trigger.data.*}} variables are offered.
+  const triggerNode = nodes.find((n) => (n.data as FlowNodeData).category === 'trigger');
+  const triggerType = triggerNode
+    ? (triggerNode.data as TriggerNodeData).triggerType
+    : undefined;
+
+  // Is the selected node directly downstream of a Loop condition? If so it can
+  // also use {{item}} / {{loop_index}}.
+  const insideLoop = edges.some((e) => {
+    if (e.target !== selectedNode.id) return false;
+    const src = nodes.find((n) => n.id === e.source);
+    const d = src?.data as FlowNodeData | undefined;
+    return d?.category === 'condition' && (d as ConditionNodeData).conditionType === 'loop';
+  });
 
   const handleLabelChange = (label: string) => {
     updateNodeData(selectedNode.id, { label } as Partial<FlowNodeData>);
@@ -95,16 +112,22 @@ export function NodeConfigPanel() {
           />
         )}
         {nodeData.category === 'condition' && (
-          <ConditionConfigForm
-            data={nodeData as ConditionNodeData}
-            onChange={handleConfigChange}
-          />
+          <>
+            <VariablesHelper triggerType={triggerType} insideLoop={insideLoop} />
+            <ConditionConfigForm
+              data={nodeData as ConditionNodeData}
+              onChange={handleConfigChange}
+            />
+          </>
         )}
         {nodeData.category === 'action' && (
-          <ActionConfigForm
-            data={nodeData as ActionNodeData}
-            onChange={handleConfigChange}
-          />
+          <>
+            <VariablesHelper triggerType={triggerType} insideLoop={insideLoop} />
+            <ActionConfigForm
+              data={nodeData as ActionNodeData}
+              onChange={handleConfigChange}
+            />
+          </>
         )}
 
         <Separator />

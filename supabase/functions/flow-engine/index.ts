@@ -255,6 +255,20 @@ async function executeAction(
       if (!emailTo || emailTo.includes('{{')) {
         return { output: { skipped: true, reason: 'unresolved_to' } };
       }
+      // `variables` lets a flow fill an email template's {{tag}} placeholders.
+      // The config holds it as a JSON object (templated values already resolved
+      // by resolveAllTemplates), so an operator can map trigger.data → template tags.
+      let emailVariables: Record<string, unknown> | undefined;
+      if (resolved.variables && typeof resolved.variables === 'object') {
+        emailVariables = resolved.variables as Record<string, unknown>;
+      } else if (typeof resolved.variables === 'string' && resolved.variables.trim()) {
+        try {
+          emailVariables = JSON.parse(resolved.variables);
+        } catch {
+          // leave undefined — a malformed map shouldn't block the send
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('email-api', {
         body: {
           action: 'send',
@@ -262,7 +276,10 @@ async function executeAction(
           from: resolved.from || undefined,
           subject: resolved.subject,
           html: resolved.body,
-          template_id: resolved.template_id || undefined,
+          // email-api expects templateSlug (not template_id); template fields
+          // (subject/body) are rendered from `variables` server-side.
+          templateSlug: resolved.template_id || resolved.template_slug || undefined,
+          variables: emailVariables,
         },
       });
       if (error) throw new Error(`Email failed: ${error.message}`);

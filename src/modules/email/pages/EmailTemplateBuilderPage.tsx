@@ -19,6 +19,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
+import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeviceView = 'desktop' | 'tablet' | 'mobile';
@@ -35,6 +36,7 @@ const BRAND = {
 };
 
 // ── Template tag documentation ─────────────────────────────────────────────
+// Always-available recipient/platform tags (filled by the email send pipeline).
 const TEMPLATE_TAGS = [
   { tag: '{{firstName}}',     label: 'First Name',       example: 'Jane',                          note: 'Populated from recipient contact data when sending a campaign, or passed explicitly in the send API call.' },
   { tag: '{{lastName}}',      label: 'Last Name',        example: 'Smith',                         note: 'Same as firstName — comes from the recipient record.' },
@@ -45,6 +47,23 @@ const TEMPLATE_TAGS = [
   { tag: '{{platformUrl}}',   label: 'Platform URL',     example: 'https://materialkai.com',       note: 'The main platform URL. Set in Email Settings.' },
   { tag: '{{unsubscribeUrl}}',label: 'Unsubscribe Link', example: 'https://…/unsubscribe?token=…', note: 'Required for marketing emails. Automatically generated.' },
 ];
+
+// Platform/flow event tags: when this template is sent by a Flow's "Send Email"
+// action, the flow maps these into the template's variables. Grouped by the
+// event that triggers them so authors know which tags are available per source.
+// Shows ALL documented event sources, derived from the shared catalog (single
+// source of truth).
+const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; label: string; note: string }> }> =
+  getAllTriggerGroups().map((group) => ({
+    title: group.title,
+    tags: group.variables.map((v) => ({
+      // In the template you reference the bare tag name; the flow's Send Email
+      // "variables" field maps it (e.g. firstName ← {{trigger.data.client_name}}).
+      tag: `{{${v.key}}}`,
+      label: v.label,
+      note: v.note,
+    })),
+  }));
 
 // ── HTML email card helpers ─────────────────────────────────────────────────
 function cardHtml(imageUrl: string, title: string, subtitle: string, linkUrl = '#') {
@@ -475,6 +494,37 @@ function TagInfoPanel({ open, onClose }: { open: boolean; onClose: () => void })
               Any key–value pair passed in the <code className="bg-muted px-1 rounded">variables</code> field
               of the send API call can be used as <code className="bg-muted px-1 rounded">{'{{variableName}}'}</code>.
             </p>
+          </div>
+
+          {/* Platform / flow event tags — available when this template is sent
+              by a Flow's Send Email action (Admin → Flows). */}
+          <div className="pt-2">
+            <p className="text-xs font-semibold mb-1">Platform event tags</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+              When a <strong>Flow</strong> sends this template (Admin → Flows → Send Email action), it maps
+              these into the template's <code className="bg-muted px-1 rounded">variables</code>. Grouped by the
+              event that triggers the email — click an event to expand its tags.
+            </p>
+            <div className="space-y-2">
+              {FLOW_EVENT_TAG_GROUPS.map((group) => (
+                <details key={group.title} className="border rounded-lg bg-background/40">
+                  <summary className="cursor-pointer select-none px-3 py-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">{group.title}</span>
+                    <Badge variant="outline" className="text-[10px] h-4 px-1">{group.tags.length}</Badge>
+                  </summary>
+                  <div className="px-3 pb-3 space-y-2">
+                    {group.tags.map((t) => (
+                      <div key={t.tag} className="border rounded-md p-2 space-y-1">
+                        <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-primary font-semibold">{t.tag}</code>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          <span className="text-foreground font-medium">{t.label}</span> — {t.note}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
           </div>
         </div>
       </SheetContent>
