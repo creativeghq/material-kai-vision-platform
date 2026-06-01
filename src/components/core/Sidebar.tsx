@@ -115,15 +115,7 @@ export const Sidebar: React.FC = () => {
             <SheetContent side="left" className="w-72 p-0 bg-sidebar border-r border-white/8">
               <div className="flex flex-col h-full py-8 px-4">
                 <div className="mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-                      <span className="text-primary-foreground font-light text-lg">J</span>
-                    </div>
-                    <div>
-                      <h2 className="font-light text-base text-foreground tracking-tight">JARVIS</h2>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-light">Platform</p>
-                    </div>
-                  </div>
+                  <img src="/mh-logo.png" alt="materials&decor" className="h-10 w-auto brightness-0 invert" />
                 </div>
                 <nav className="flex-1 flex flex-col space-y-1">
                   {navigationItems.map((item) => (
@@ -158,11 +150,8 @@ export const Sidebar: React.FC = () => {
             </SheetContent>
           </Sheet>
 
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-light text-xs">J</span>
-            </div>
-            <span className="font-light text-sm text-foreground tracking-tight">JARVIS</span>
+          <div className="flex items-center">
+            <img src="/mh-logo.png" alt="materials&decor" className="h-8 w-auto brightness-0 invert" />
           </div>
 
           <div className="flex items-center gap-1">
@@ -177,14 +166,9 @@ export const Sidebar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-sidebar border-b border-white/8">
-      <Link to="/" className="flex items-center gap-2.5 mr-8 flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-          <span className="text-primary-foreground font-light text-sm">J</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-light text-sm text-foreground tracking-tight leading-tight">JARVIS</span>
-          <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-light leading-tight">Platform</span>
-        </div>
+      <Link to="/" className="flex items-center mr-8 flex-shrink-0">
+        {/* Dark-text logo inverted to white for the dark nav */}
+        <img src="/mh-logo.png" alt="materials&decor" className="h-9 w-auto brightness-0 invert" />
       </Link>
 
       <nav className="flex items-center gap-1 flex-1">
