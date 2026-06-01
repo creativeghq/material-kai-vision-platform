@@ -89,6 +89,7 @@ const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
+const PublicClientViewPage = lazy(() => import('./pages/PublicClientViewPage'));
 // Project Workspace passwordless invite flow (public landing + auth-required accept)
 const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/InviteLandingPage').then(m => ({ default: m.InviteLandingPage })));
 const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
@@ -147,6 +148,7 @@ const App = () => (
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
+                <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Public Tools"><PublicToolsPage /></PageErrorBoundary>} />
                 {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
                     expects a Supabase session (established by the magic-link callback) — if it isn't there,

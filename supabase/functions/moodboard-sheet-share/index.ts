@@ -1,17 +1,18 @@
 /**
- * Public share lookup for moodboard presentation sheets.
+ * Public share lookup for presentation artifacts. Handles BOTH:
+ *   1. A single moodboard presentation sheet  → { sheet, pdf_url, expired }
+ *   2. A project Client View deliverable       → { client_view }  (+ feedback write)
  *
- * POST /functions/v1/moodboard-sheet-share { token }
- *   → { sheet: { ... } | null, pdf_url: signed-1h-url | null, expired: bool }
+ * One function, two token namespaces (random uuids, no collision). The client
+ * view path was folded in here rather than living in its own function — see the
+ * merge-functions rule.
  *
- * Anonymous-friendly: the route accepts the project anon key in
- * Authorization: Bearer (Supabase enforces this at the gateway), then uses
- * the service role internally to bypass RLS. Increments `share_view_count`
- * on every successful lookup so admins can see traction.
+ * POST /functions/v1/moodboard-sheet-share
+ *   { token }                                  → sheet OR client_view payload
+ *   { token, feedback, session_id }            → write client feedback
  *
- * Security: only returns sheets where `share_token` matches AND
- * `share_expires_at` is in the future. Token is cryptographically random
- * (uuid v4); attempting all guesses is computationally infeasible.
+ * Anonymous-friendly: the gateway accepts the project anon key in
+ * Authorization: Bearer, then the service role is used internally to bypass RLS.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -32,12 +33,130 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { token } = await req.json().catch(() => ({}));
+  const { token, session_id, feedback } = await req.json().catch(() => ({}));
 
   if (!token || typeof token !== 'string' || token.length < 32) {
     return jsonResponse({ error: 'Invalid token' }, 400);
   }
 
+  // ---------- 1. CLIENT VIEW token? ----------
+  const { data: view } = await supabase
+    .from('project_client_views')
+    .select('id, project_id, title, cover, sheet_ids, pdf_storage_path, ' +
+      'public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, ' +
+      'feedback_enabled, vr_world_id, quote_id')
+    .eq('public_share_token', token)
+    .maybeSingle();
+
+  if (view) {
+    if (!view.public_share_enabled) return jsonResponse({ client_view: null, not_found: true });
+    if (view.share_expires_at && new Date(view.share_expires_at).getTime() < Date.now()) {
+      return jsonResponse({ client_view: null, not_found: true });
+    }
+
+    // Feedback write path
+    if (feedback && typeof feedback === 'object') {
+      if (!view.feedback_enabled) return jsonResponse({ error: 'Feedback disabled' }, 403);
+      const kind = ['comment', 'approval', 'change_request'].includes(feedback.kind) ? feedback.kind : 'comment';
+      const status = ['approved', 'changes_requested'].includes(feedback.status) ? feedback.status : null;
+      const { error: fErr } = await supabase.from('client_view_feedback').insert({
+        client_view_id: view.id,
+        sheet_id: feedback.sheet_id ?? null,
+        author_name: typeof feedback.author_name === 'string' ? feedback.author_name.slice(0, 120) : null,
+        session_id: typeof session_id === 'string' ? session_id : null,
+        kind,
+        status,
+        body: typeof feedback.body === 'string' ? feedback.body.slice(0, 4000) : null,
+      });
+      if (fErr) return jsonResponse({ error: 'Could not save feedback' }, 500);
+      return jsonResponse({ success: true });
+    }
+
+    // Read path
+    supabase.rpc('increment_client_view_count', { p_view_id: view.id }).then(() => {}).catch(() => {});
+
+    const { data: project } = await supabase
+      .from('projects').select('name').eq('id', view.project_id).maybeSingle();
+
+    const sheetIds: string[] = Array.isArray(view.sheet_ids) ? view.sheet_ids : [];
+    let sheets: { id: string; sheet_type: string; title: string }[] = [];
+    let lightingImageUrl: string | null = null;
+    if (sheetIds.length > 0) {
+      const { data: rows } = await supabase
+        .from('moodboard_presentation_sheets')
+        .select('id, sheet_type, title, data')
+        .in('id', sheetIds);
+      const byId = new Map((rows || []).map((r: any) => [r.id, r]));
+      const ordered = sheetIds.map((id) => byId.get(id)).filter(Boolean) as any[];
+      sheets = ordered.map((r) => ({ id: r.id, sheet_type: r.sheet_type, title: r.title }));
+      lightingImageUrl = deriveLightingImage(ordered) || (view.cover?.cover_image_url ?? null);
+    }
+
+    let pdf_url: string | null = null;
+    if (view.pdf_storage_path) {
+      const { data: signed } = await supabase.storage
+        .from('pdf-documents').createSignedUrl(view.pdf_storage_path, 60 * 60);
+      pdf_url = signed?.signedUrl ?? null;
+    }
+
+    let vr_world: any = null;
+    if (view.embed_vr && view.vr_world_id) {
+      const { data: w } = await supabase
+        .from('vr_worlds')
+        .select('id, status, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, thumbnail_url')
+        .eq('id', view.vr_world_id).maybeSingle();
+      if (w && w.status === 'completed') vr_world = w;
+    }
+
+    let ffe: any = null;
+    if (view.embed_ffe && view.quote_id) {
+      const { data: q } = await supabase
+        .from('quotes')
+        .select('currency, subtotal, vat_rate, vat_amount, grand_total')
+        .eq('id', view.quote_id).maybeSingle();
+      const { data: items } = await supabase
+        .from('quote_items')
+        .select('room, name, dimensions, quantity, unit_price, line_total, custom_product_name, products(name)')
+        .eq('quote_id', view.quote_id)
+        .order('added_at', { ascending: true });
+      ffe = {
+        currency: q?.currency || 'EUR',
+        subtotal: q?.subtotal != null ? Number(q.subtotal) : null,
+        vat_rate: q?.vat_rate != null ? Number(q.vat_rate) : null,
+        vat_amount: q?.vat_amount != null ? Number(q.vat_amount) : null,
+        grand_total: q?.grand_total != null ? Number(q.grand_total) : null,
+        items: (items || []).map((it: any) => ({
+          room: it.room ?? null,
+          name: it.products?.name || it.custom_product_name || it.name || 'Item',
+          dimensions: it.dimensions ?? null,
+          quantity: it.quantity ?? 1,
+          unit_price: it.unit_price != null ? Number(it.unit_price) : null,
+          line_total: it.line_total != null ? Number(it.line_total) : null,
+        })),
+      };
+    }
+
+    return jsonResponse({
+      not_found: false,
+      client_view: {
+        id: view.id,
+        title: view.title,
+        project_name: project?.name ?? null,
+        cover: view.cover ?? {},
+        sheets,
+        pdf_url,
+        embed_vr: view.embed_vr,
+        embed_lighting: view.embed_lighting,
+        embed_ffe: view.embed_ffe,
+        feedback_enabled: view.feedback_enabled,
+        vr_world,
+        ffe,
+        lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
+      },
+    });
+  }
+
+  // ---------- 2. SINGLE SHEET token ----------
   const { data: sheet, error } = await supabase
     .from('moodboard_presentation_sheets')
     .select('id, moodboard_id, sheet_type, title, status, page_count, pdf_storage_path, share_expires_at, share_view_count')
@@ -48,25 +167,21 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ sheet: null, pdf_url: null, expired: false });
   }
 
-  const now = Date.now();
   const exp = sheet.share_expires_at ? new Date(sheet.share_expires_at).getTime() : 0;
-  if (!exp || exp < now) {
+  if (!exp || exp < Date.now()) {
     return jsonResponse({ sheet: null, pdf_url: null, expired: true });
   }
 
-  // Bump view counter (best-effort; ignore errors)
   supabase
     .from('moodboard_presentation_sheets')
     .update({ share_view_count: (sheet.share_view_count ?? 0) + 1 })
     .eq('id', sheet.id)
     .then(() => {});
 
-  // Issue a fresh 1-hour signed URL for the PDF
   let pdf_url: string | null = null;
   if (sheet.pdf_storage_path) {
     const { data: signed } = await supabase.storage
-      .from('pdf-documents')
-      .createSignedUrl(sheet.pdf_storage_path, 60 * 60);
+      .from('pdf-documents').createSignedUrl(sheet.pdf_storage_path, 60 * 60);
     pdf_url = signed?.signedUrl ?? null;
   }
 
@@ -82,6 +197,18 @@ Deno.serve(async (req: Request) => {
     expired: false,
   });
 });
+
+/** Pick a representative image for the client view's CSS lighting-mood preview. */
+function deriveLightingImage(orderedSheets: any[]): string | null {
+  for (const s of orderedSheets) {
+    const d = s?.data || {};
+    if (d.hero_image_url) return d.hero_image_url;
+    if (d.backdrop_image_url) return d.backdrop_image_url;
+    if (d.render_image_url) return d.render_image_url;
+    if (Array.isArray(d.layout) && d.layout[0]?.image_url) return d.layout[0].image_url;
+  }
+  return null;
+}
 
 function jsonResponse(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), {

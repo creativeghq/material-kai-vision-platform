@@ -46,6 +46,7 @@ import {
 } from './data-fetcher.ts';
 import {
   buildAnnotatedRender,
+  buildAreaBreakdown,
   buildColorPalette,
   buildConceptBoard,
   buildElevationRenderPair,
@@ -85,9 +86,17 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: SheetPdfRequest = await req.json();
-    sheetId = body.sheet_id;
+
+    // Project-level Client View deck — assembled from sheets across any of the
+    // project's moodboards. Same builders, project scope. (Folded in here rather
+    // than a separate function — see the merge-functions rule.)
+    if (body.client_view_id) {
+      return await buildClientViewPdf(supabase, auth, body.client_view_id, !!body.regenerate);
+    }
+
+    sheetId = body.sheet_id || '';
     if (!sheetId) {
-      return jsonResponse({ success: false, error: 'Missing sheet_id' }, 400);
+      return jsonResponse({ success: false, error: 'Missing sheet_id or client_view_id' }, 400);
     }
 
     const sheet = await fetchSheet(supabase, sheetId);
@@ -198,6 +207,9 @@ Deno.serve(async (req: Request) => {
         buildFfeSchedule(pdfDoc, fonts, td, items);
         break;
       }
+      case 'area_breakdown':
+        await buildAreaBreakdown(pdfDoc, fonts, td, sheet.data || {});
+        break;
       case 'full_deck': {
         const includedIds: string[] = sheet.data.included_sheet_ids || [];
         const subSheets = await fetchSheets(supabase, includedIds);
@@ -326,6 +338,120 @@ function jsonResponse(body: SheetPdfResponse, status = 200): Response {
 }
 
 /**
+ * Render a project-level Client View into a single deck PDF. Reuses the exact
+ * same builders as a moodboard full_deck (cover + each sheet in order), but the
+ * sheet set spans every moodboard in the project. Mirrors the quote PDF flow:
+ * pdf-documents storage, pdf_storage_path/pdf_generation_status columns, 7-day
+ * signed URL, AFTER DELETE trigger cleanup.
+ */
+async function buildClientViewPdf(
+  supabase: ReturnType<typeof createClient>,
+  auth: { isService?: boolean; userId?: string },
+  viewId: string,
+  regenerate: boolean,
+): Promise<Response> {
+  try {
+    const { data: view, error: viewErr } = await supabase
+      .from('project_client_views')
+      .select('id, project_id, created_by, title, sheet_ids, cover, pdf_storage_path, pdf_generation_status')
+      .eq('id', viewId)
+      .single();
+    if (viewErr || !view) return jsonResponse({ success: false, error: 'Client view not found' }, 404);
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, name, user_id')
+      .eq('id', view.project_id)
+      .single();
+
+    if (!auth.isService && auth.userId) {
+      const owns = view.created_by === auth.userId || project?.user_id === auth.userId;
+      if (!owns) return jsonResponse({ success: false, error: 'Not authorized for this client view' }, 403);
+    }
+
+    if (!regenerate && view.pdf_storage_path && view.pdf_generation_status === 'completed') {
+      const { data: signed } = await supabase.storage
+        .from('pdf-documents')
+        .createSignedUrl(view.pdf_storage_path, 60 * 60 * 24 * 7);
+      return jsonResponse({ success: true, pdf_url: signed?.signedUrl, pdf_storage_path: view.pdf_storage_path });
+    }
+
+    await supabase.from('project_client_views').update({ pdf_generation_status: 'generating' }).eq('id', viewId);
+
+    const sheetIds: string[] = Array.isArray(view.sheet_ids) ? view.sheet_ids : [];
+    const sheets = await fetchSheets(supabase, sheetIds);
+    sheets.sort((a, b) => sheetIds.indexOf(a.id) - sheetIds.indexOf(b.id));
+
+    const ownerId = view.created_by || project?.user_id;
+    const branding = ownerId ? await fetchOwnerBranding(supabase, ownerId) : undefined;
+
+    const cover = (view.cover && Object.keys(view.cover).length > 0)
+      ? { ...view.cover }
+      : { title: view.title || project?.name || 'Client Presentation', date: new Date().toISOString() };
+    if (!cover.date) cover.date = new Date().toISOString();
+    if (!cover.title) cover.title = view.title || project?.name || 'Client Presentation';
+
+    const pdfDoc = await PDFDocument.create();
+    const fonts = await loadFonts(pdfDoc);
+
+    const td: TitleBlockData = {
+      project_title: project?.name || cover.title,
+      sheet_title: cover.title,
+      sheet_label: 'PRESENTATION DECK',
+      date_iso: cover.date,
+      client_name: cover.client_name || branding?.client_fallback_name,
+      branding_logo_url: branding?.logo_url,
+      branding_company_name: branding?.company_name,
+      branding_contact_line: branding?.contact_line,
+    };
+
+    await buildFullDeckCover(pdfDoc, fonts, td, cover);
+    for (let i = 0; i < sheets.length; i++) {
+      await buildSheetForDeck(
+        pdfDoc, fonts,
+        { ...td, sheet_label: sheetLabel(sheets[i].sheet_type) },
+        sheets[i], i + 2, sheets.length + 1,
+        (ids) => fetchProductChips(supabase, ids),
+        (qid) => fetchQuoteFfeItems(supabase, qid),
+      );
+    }
+    const pageCount = sheets.length + 1;
+
+    pdfDoc.setTitle(`${project?.name || ''} — ${cover.title}`);
+    pdfDoc.setSubject('Client Presentation');
+    pdfDoc.setCreator('Material Kai');
+
+    const pdfBytes = await pdfDoc.save();
+    const storagePath = `client-view-output/${view.project_id}/cv-${viewId}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('pdf-documents')
+      .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+    const { data: signed } = await supabase.storage
+      .from('pdf-documents')
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+    await supabase.from('project_client_views').update({
+      pdf_storage_path: storagePath,
+      pdf_generated_at: new Date().toISOString(),
+      pdf_generation_status: 'completed',
+      page_count: pageCount,
+      error_message: null,
+    }).eq('id', viewId);
+
+    return jsonResponse({ success: true, pdf_url: signed?.signedUrl, pdf_storage_path: storagePath, page_count: pageCount });
+  } catch (err) {
+    console.error('Client view PDF error:', err);
+    await supabase.from('project_client_views').update({
+      pdf_generation_status: 'failed',
+      error_message: err instanceof Error ? err.message : String(err),
+    }).eq('id', viewId);
+    return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'PDF generation failed' }, 500);
+  }
+}
+
+/**
  * Final pre-render content guard. Stricter than the agent-tool validator
  * because by render time the user has gone through the canvas — interactive
  * sheets must have non-empty annotations / dimensions / symbols, not just
@@ -381,6 +507,14 @@ function validatePdfContent(sheet_type: string, data: Record<string, any> | unde
       if (!hasQuote && !hasItems) return 'Missing quote_id or items[] for ffe_schedule.';
       return null;
     }
+    case 'area_breakdown':
+      if (!d.hero_image_url
+        && !d.plan_image_url
+        && !d.elevation_image_url
+        && !(Array.isArray(d.finishes) && d.finishes.length)) {
+        return 'area_breakdown needs at least a hero_image_url (or a plan/elevation image, or finishes).';
+      }
+      return null;
     case 'full_deck':
       if (!Array.isArray(d.included_sheet_ids) || d.included_sheet_ids.length === 0) {
         return 'No sheets selected — full_deck needs at least one entry in included_sheet_ids[].';

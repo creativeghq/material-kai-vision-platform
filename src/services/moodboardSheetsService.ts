@@ -8,6 +8,7 @@ export type SheetType =
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
+  | 'area_breakdown'
   | 'full_deck';
 
 export type SheetStatus = 'draft' | 'generating' | 'ready' | 'failed';
@@ -55,6 +56,7 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   annotated_render: 'Annotated Render Sheet',
   elevation_render_pair: 'Elevation + Render Pair',
   ffe_schedule: 'FF&E Schedule',
+  area_breakdown: 'Area Breakdown',
   full_deck: 'Full Presentation Deck',
 };
 
@@ -67,6 +69,7 @@ export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
   lighting_plan: 3,
   annotated_render: 4,
   elevation_render_pair: 3,
+  area_breakdown: 2,
   full_deck: 5,
 };
 

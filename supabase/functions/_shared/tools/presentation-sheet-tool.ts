@@ -34,6 +34,7 @@ type SheetType =
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
+  | 'area_breakdown'
   | 'full_deck';
 
 // Every tool costs credits. The simple/passive ones charge less because they
@@ -48,6 +49,7 @@ const SHEET_CREDITS: Record<SheetType, number> = {
   lighting_plan: 3,          // canvas + diagram render
   annotated_render: 4,       // Claude Vision auto-detection + canvas + render
   elevation_render_pair: 3,  // dimensioned-image render + canvas
+  area_breakdown: 2,         // composited board: hero + plan + elevation + finishes
   full_deck: 5,              // multi-page assembly + cover + reorder canvas
 };
 
@@ -56,6 +58,7 @@ const PASSIVE_TYPES: SheetType[] = [
   'color_palette',
   'concept_board',
   'ffe_schedule',
+  'area_breakdown',
 ];
 
 const INTERACTIVE_TYPES: SheetType[] = [
@@ -140,6 +143,13 @@ function validateInitialData(sheet_type: SheetType, data: Record<string, any> | 
         for (const it of d.items) {
           if (!it?.name) return 'Every ffe_schedule item must have a name.';
         }
+      }
+      return null;
+
+    case 'area_breakdown':
+      if (!d.hero_image_url && !d.plan_image_url && !d.elevation_image_url &&
+          !(Array.isArray(d.finishes) && d.finishes.length > 0)) {
+        return 'area_breakdown needs at least a hero_image_url (the main render), or a plan/elevation image, or a finishes[] list. Ask the user for the room render.';
       }
       return null;
 
@@ -625,8 +635,10 @@ export const createPresentationSheetTool = (
         'concept_board (inspiration collage, 0), lighting_plan (fixture layout, 3 credits), ' +
         'annotated_render (render with AI-detected callouts, 3 credits), ' +
         'elevation_render_pair (uploaded elevation + render with user dimensions, 2), ' +
-        'ffe_schedule (FF&E table from quote, 0), full_deck (multi-page deck, 3). ' +
-        'Passive types (material_board, color_palette, concept_board, ffe_schedule, full_deck) ' +
+        'ffe_schedule (FF&E table from quote, 0), ' +
+        'area_breakdown (single composited board: hero render + dimensioned plan + elevation + ' +
+        'finishes + fitting columns + palette, 2 credits), full_deck (multi-page deck, 3). ' +
+        'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown, full_deck) ' +
         'generate the PDF immediately. Interactive types (lighting_plan, annotated_render, ' +
         'elevation_render_pair) open a canvas widget for user input first. ALWAYS pass a sensible ' +
         'initial_data payload — see the schema for each sheet_type.',
@@ -640,6 +652,7 @@ export const createPresentationSheetTool = (
           'annotated_render',
           'elevation_render_pair',
           'ffe_schedule',
+          'area_breakdown',
           'full_deck',
         ]).describe('Sheet type to generate'),
         title: z.string().describe('Display title for the sheet, e.g. "Bathroom Wall Sheet"'),
@@ -710,6 +723,26 @@ export const createPresentationSheetTool = (
             qty: z.number(),
             price: z.number().nullable().optional(),
           })).optional().describe('ffe_schedule: explicit items if no quote_id'),
+          // area_breakdown — single composited design board
+          subtitle: z.string().optional().describe('area_breakdown: e.g. "Modern Bathroom Design"'),
+          hero_image_url: z.string().optional().describe('area_breakdown: main room render'),
+          plan_image_url: z.string().optional().describe('area_breakdown: dimensioned plan / layout image'),
+          elevation_image_url: z.string().optional().describe('area_breakdown: elevation / front-view image'),
+          finishes: z.array(z.object({
+            label: z.string().describe('e.g. "Wall Tile"'),
+            spec: z.string().optional().describe('e.g. "Matt Stone Finish — Light Grey"'),
+            hex: z.string().optional().describe('swatch color #rrggbb when no image'),
+            image_url: z.string().optional(),
+          })).optional().describe('area_breakdown: Material & Finishes column'),
+          fitting_columns: z.array(z.object({
+            title: z.string().describe('e.g. "Sanitary Ware & Fittings"'),
+            items: z.array(z.object({
+              label: z.string(),
+              note: z.string().optional(),
+            })),
+          })).optional().describe('area_breakdown: 1–3 titled accessory/fitting columns'),
+          notes: z.array(z.string()).optional().describe('area_breakdown: bullet notes'),
+          features: z.array(z.string()).optional().describe('area_breakdown: optional key-feature chips'),
           // full_deck
           included_sheet_ids: z.array(z.string()).optional().describe('full_deck: ordered list of sheet IDs to include'),
           cover: z.object({

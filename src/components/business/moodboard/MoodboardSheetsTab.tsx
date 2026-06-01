@@ -34,11 +34,12 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   annotated_render: 'Render with AI-detected callouts',
   elevation_render_pair: 'Uploaded elevation with dimensions + render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
+  area_breakdown: 'Composited design board: hero render + plan + elevation + finishes',
   full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
-  { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board'] },
+  { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
   { label: 'Plans', types: ['lighting_plan', 'annotated_render', 'elevation_render_pair'] },
   { label: 'Schedules', types: ['ffe_schedule'] },
   { label: 'Decks', types: ['full_deck'] },

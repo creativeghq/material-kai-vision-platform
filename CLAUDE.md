@@ -12,7 +12,7 @@ The platform uses **6 buckets** (down from 17). Routing is path-based; feature i
 
 | Bucket | Public | Folders / use |
 |---|---|---|
-| `pdf-documents` | 🔒 private (signed URLs) | KB raw PDFs at `{user_id}/...` · `catalog-source/{catalog_id}/...` · `catalog-output/{catalog_id}/...` · `quote-output/{quote_id}/...` · `moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf` |
+| `pdf-documents` | 🔒 private (signed URLs) | KB raw PDFs at `{user_id}/...` · `catalog-source/{catalog_id}/...` · `catalog-output/{catalog_id}/...` · `quote-output/{quote_id}/...` · `moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf` · `client-view-output/{project_id}/cv-{client_view_id}.pdf` |
 | `pdf-tiles` | 🔒 RLS read=authenticated (not literally public) | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
 | `generation-images` | ✅ public, 100 MB, image/video | `{user_id}/...`, `gemini/`, `videos/`, `user-uploads/`, `social/`, `product-crops/...` (SAM crops + segmentation), `agent/` (chat uploads), `3d/` (3D models), `designer/` (designer module) |
 | `quote-templates` | 🔒 private, 50 MB | Quote template PNGs at root (`template-cover.png`, `template-content.png`, `template-backcover.png`, `template-intro.png`) · `catalog/cover.png` / `catalog/backcover.png` (catalog templates) |
@@ -987,6 +987,27 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 1. Auto Vision pre-fill for `annotated_render`. Today the agent passes `annotations: []` and the user adds them all in the canvas. The schema already supports `source: 'ai' | 'auto'` so plugging in a Claude Vision pass over the backdrop is a tool-side change only.
 2. Auto color extraction for `color_palette`. Today the agent supplies the swatches manually. The `image_color_embeddings` (768D SLIG) collection plus a "top-K-cluster" service would auto-extract from any moodboard image.
 3. Custom branding on title block. Spec says no branding for v1; user-profile-driven branding (logo, contact info) was deferred — the title block has 4 columns with PROJECT / SHEET / TYPE / DATE only.
+
+### `area_breakdown` sheet type (2026-06-01)
+
+Ninth sheet type added to the same machinery: a **single composited "design breakdown" board** (the Zubexa-style one-page room spec — hero render + dimensioned plan + elevation + Material & Finishes column + accessory/fitting columns + notes + color-palette strip). Passive (2 credits). Data shape `AreaBreakdownData` in [types.ts](supabase/functions/generate-moodboard-sheet-pdf/types.ts) — `{subtitle, hero_image_url, plan_image_url, elevation_image_url, finishes[], fitting_columns[], palette[], notes[]}`. Builder `buildAreaBreakdown` in [builders.ts](supabase/functions/generate-moodboard-sheet-pdf/builders.ts); wired into the agent tool, the router, the deck dispatch, and the frontend sheet picker/preview. Renders inside `full_deck` and Client Views like any other sheet.
+
+## Project Client Views (2026-06-01 — project-scoped client deliverable, mirrors the quote PDF/share pattern)
+
+A **Client View** is a project-level deliverable that bundles selected presentation sheets (across **any** of the project's moodboards) into one client-ready **PDF + revocable online page**. It sits one level above `full_deck`: `full_deck` stays the lightweight single-moodboard PDF sheet; a Client View selects sheets project-wide and adds an interactive HTML surface. **Zero overlap** — Sheets are content blocks, the moodboard is the working surface, the Client View is the deliverable.
+
+Deliberately built to mirror the **quotes** generation/sharing pattern so artifacts are cleaned up identically — and **folded into the existing sheet functions** (no standalone client-view functions; see the merge-functions rule):
+- **PDF**: handled by [`generate-moodboard-sheet-pdf`](supabase/functions/generate-moodboard-sheet-pdf/index.ts) — pass `{ client_view_id }` instead of `{ sheet_id }` and it renders the project-scoped deck via the same `buildFullDeckCover` + `buildSheetForDeck` builders → uploads to `pdf-documents/client-view-output/{project_id}/cv-{id}.pdf` → stores `pdf_storage_path` + `pdf_generation_status` (never a stale URL; re-signs on read).
+- **HTML**: handled by [`moodboard-sheet-share`](supabase/functions/moodboard-sheet-share/index.ts) — it resolves BOTH a single-sheet `share_token` (→ `{sheet}`) and a Client View `public_share_token` (→ `{client_view}`), and accepts a `feedback` body for inline approve/comment. Public route `/cv/:token` ([PublicClientViewPage.tsx](src/pages/PublicClientViewPage.tsx)) embeds the deck PDF (iframe) **plus** what the PDF can't carry: live **Marble 3D walkthrough** (`vr_worlds`), **CSS lighting moods** over the hero render, **live FF&E table** from a linked quote, and inline **approve/comment** writing to `client_view_feedback`.
+
+**Tables** (applied via `mcp__supabase__apply_migration`, NOT local SQL files):
+- `project_client_views` — `sheet_ids uuid[]` (ordered, cross-moodboard) + `cover jsonb` + embed toggles (`embed_vr/embed_lighting/embed_ffe/feedback_enabled`) + `vr_world_id`/`quote_id` + quote-style PDF columns (`pdf_storage_path`, `pdf_generation_status`, `pdf_generated_at`, `page_count`, `error_message`) + quote-style share columns (`public_share_token` unique, `public_share_enabled`, `share_expires_at`, `share_view_count`). RLS: project owner full control; public read via the service-role share fn only.
+- `client_view_feedback` — inline approvals/comments from the online page (service-role writes via share fn, owner reads).
+- Cleanup wiring mirrors quotes: `_cleanup_client_view_pdf_storage()` AFTER DELETE trigger + **`build_storage_reference_set()` extended** with `project_client_views.pdf_storage_path` so the 72h orphan cron never reaps a live deliverable. `increment_client_view_count(uuid)` RPC bumps the view counter.
+
+**Frontend**: [clientViewsService.ts](src/services/clientViewsService.ts) (list/get/create/update/remove/generatePdf/refreshPdfUrl/share/revokeShare/listFeedback/listVrWorlds) + a **Client View tab** on the project detail page ([ClientViewTab.tsx](src/modules/projects/components/tabs/ClientViewTab.tsx), owner-only) — pick + order sheets, toggle embeds, choose FF&E quote + 3D world, generate PDF, copy/disable share link, read client feedback inline.
+
+**To activate** after pulling: `supabase functions deploy generate-moodboard-sheet-pdf moodboard-sheet-share agent-chat` (sheet PDF fn now also renders client views + `area_breakdown`; share fn now also resolves client-view tokens; agent-chat for the new `area_breakdown` tool option). Migrations already applied to the live DB. Frontend ships with the next build.
 
 ## FF&E Specification on Quotes
 - **New fields on `quote_items`**: `room`, `dimensions`, `installation_requirements`, `delivery_date`

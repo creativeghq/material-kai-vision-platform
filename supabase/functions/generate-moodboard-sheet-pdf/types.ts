@@ -6,6 +6,7 @@ export type SheetType =
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
+  | 'area_breakdown'
   | 'full_deck';
 
 export interface SheetRow {
@@ -25,7 +26,12 @@ export interface MoodboardRow {
 }
 
 export interface SheetPdfRequest {
-  sheet_id: string;
+  // Render a single sheet / deck …
+  sheet_id?: string;
+  // … or render a project-level Client View (a deck assembled from sheets across
+  // any of the project's moodboards). Exactly one of these is provided.
+  client_view_id?: string;
+  regenerate?: boolean;
 }
 
 export interface SheetPdfResponse {
@@ -85,4 +91,31 @@ export interface FfeItem {
   delivery: string | null;
   qty: number;
   price?: number | null;
+}
+
+// area_breakdown — a single composited "design breakdown" board (one A3 page)
+// combining a hero render, a dimensioned plan + elevation, a finishes column,
+// fitting/accessory columns, a notes column, and a color-palette strip.
+export interface AreaFinish {
+  label: string;       // e.g. "Wall Tile"
+  spec?: string;       // e.g. "Matt Stone Finish — Light Grey"
+  hex?: string;        // swatch color when no image
+  image_url?: string;  // swatch image when available
+}
+
+export interface AreaFittingColumn {
+  title: string;                                  // e.g. "Sanitary Ware & Fittings"
+  items: { label: string; note?: string }[];     // e.g. { label: "Wall Hung WC" }
+}
+
+export interface AreaBreakdownData {
+  subtitle?: string;            // e.g. "Modern Bathroom Design"
+  hero_image_url?: string;      // main render
+  plan_image_url?: string;      // dimensions & layout
+  elevation_image_url?: string; // elevation / front view
+  finishes?: AreaFinish[];      // material & finishes column
+  fitting_columns?: AreaFittingColumn[]; // sanitary ware / storage / etc (cap 3)
+  palette?: { hex: string; name?: string }[]; // bottom color strip (cap 8)
+  notes?: string[];             // notes column bullets
+  features?: string[];          // optional key-feature chips
 }

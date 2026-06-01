@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
-import { Sparkles, FileImage, Layers, Lightbulb, Ruler, ListTree, FileText, Album } from 'lucide-react';
+import { Sparkles, FileImage, Layers, Lightbulb, Ruler, ListTree, FileText, Album, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   SHEET_TYPE_LABELS,
@@ -88,6 +88,13 @@ const SHEET_TYPE_META: Record<SheetType, SheetTypeMeta> = {
     produces: 'A 1-page A3 PDF with an 8-column table (#, Room, Item, Dimensions, Install, Delivery, Qty, Price), one row per item.',
     inputs: ['A quote ID linked to this moodboard (preferred) — or enter items inline'],
     bestFor: 'The procurement deliverable: sending the contractor exactly what to buy and when it arrives.',
+  },
+  area_breakdown: {
+    icon: LayoutGrid,
+    what: 'A single composited "design breakdown" board — hero render, dimensioned plan, elevation, a Material & Finishes column, accessory/fitting columns, notes, and a color-palette strip, all on one page (like a Zubexa-style spec board).',
+    produces: 'A 1-page A3 PDF: big hero render top-left, plan + elevation stacked top-right, then finishes + fitting columns + notes below, with a palette strip along the bottom.',
+    inputs: ['A hero render image', 'Optional plan + elevation images', 'Finishes (label + spec + swatch)', 'Fitting/accessory columns', 'Color palette + notes'],
+    bestFor: 'A complete single-board summary of one room or area you can hand a client or contractor.',
   },
   full_deck: {
     icon: FileText,

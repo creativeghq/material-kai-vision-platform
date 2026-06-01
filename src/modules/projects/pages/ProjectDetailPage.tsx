@@ -14,6 +14,7 @@ import {
   FileImage,
   UserPlus,
   Eye,
+  Presentation,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -40,6 +41,7 @@ import { QuotesTab } from '../components/tabs/QuotesTab';
 import { TasksTab } from '../components/tabs/TasksTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
+import { ClientViewTab } from '../components/tabs/ClientViewTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -65,7 +67,7 @@ export const ProjectDetailPage: React.FC = () => {
   const { user } = useAuth();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'sheets' | 'tasks' | 'timeline'>('overview');
+  const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'sheets' | 'client-view' | 'tasks' | 'timeline'>('overview');
   const [showInvite, setShowInvite] = useState(false);
 
   // Ownership: project.user_id is the creator. Anyone else who can read the project
@@ -189,6 +191,12 @@ export const ProjectDetailPage: React.FC = () => {
               <FileImage className="h-3.5 w-3.5" />
               Sheets
             </TabsTrigger>
+            {isOwner && (
+              <TabsTrigger value="client-view" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Presentation className="h-3.5 w-3.5" />
+                Client View
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tasks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
@@ -207,6 +215,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
+          {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
           <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>

@@ -13,6 +13,7 @@ import {
   MARGIN,
   PAGE_H,
   PAGE_W,
+  TITLE_BLOCK_H,
   drawSheetHeader,
   drawTitleBlock,
   embedImageBytes,
@@ -26,6 +27,7 @@ import {
 } from './layout.ts';
 import type {
   AnnotationData,
+  AreaBreakdownData,
   DimensionData,
   FfeItem,
   FixtureSymbolData,
@@ -42,6 +44,7 @@ const SHEET_LABELS: Record<string, string> = {
   annotated_render: 'ANNOTATED RENDER',
   elevation_render_pair: 'ELEVATION + RENDER',
   ffe_schedule: 'FF&E SCHEDULE',
+  area_breakdown: 'AREA BREAKDOWN',
   full_deck: 'PRESENTATION DECK',
 };
 
@@ -751,6 +754,208 @@ export function buildFfeSchedule(
 }
 
 // ============================================================
+// 7b. AREA BREAKDOWN — single composited design board.
+//     Hero render + dimensioned plan + elevation + finishes column +
+//     fitting/accessory columns + notes + color palette strip.
+// ============================================================
+export async function buildAreaBreakdown(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  data: AreaBreakdownData,
+): Promise<void> {
+  const page = newSheetPage(pdfDoc);
+  const cy = drawSheetHeader(page, fonts, td.sheet_title, data.subtitle || 'Design breakdown');
+
+  const bottomY = MARGIN + TITLE_BLOCK_H + 14;
+  const availH = cy - bottomY;
+  const gap = 12;
+
+  // ---- TOP ZONE: hero (left ~58%) + plan/elevation stacked (right) ----
+  const topH = availH * 0.54;
+  const topY = cy - topH; // y of the zone's bottom edge
+  const heroW = CONTENT_W * 0.58;
+  const rightX = MARGIN + heroW + gap;
+  const rightW = CONTENT_W - heroW - gap;
+
+  await drawImageFramed(pdfDoc, page, data.hero_image_url, MARGIN, topY, heroW, topH);
+
+  const rHalf = (topH - gap) / 2;
+  await drawLabeledImage(pdfDoc, page, fonts, 'DIMENSIONS & LAYOUT',
+    data.plan_image_url, rightX, topY + rHalf + gap, rightW, rHalf);
+  await drawLabeledImage(pdfDoc, page, fonts, 'ELEVATION (FRONT VIEW)',
+    data.elevation_image_url, rightX, topY, rightW, rHalf);
+
+  // ---- BOTTOM ZONE: finishes + fitting columns + notes ----
+  const palette = (data.palette || []).slice(0, 8);
+  const paletteH = palette.length ? 42 : 0;
+  const colsTop = topY - gap;
+  const colsBottom = bottomY + (paletteH ? paletteH + gap : 0);
+
+  const finishes = data.finishes || [];
+  const fittingCols = (data.fitting_columns || []).slice(0, 3);
+  const notes = data.notes || [];
+
+  type Col = { title: string; kind: 'finishes' | 'fittings' | 'notes'; payload: any };
+  const cols: Col[] = [];
+  if (finishes.length) cols.push({ title: 'Material & Finishes', kind: 'finishes', payload: finishes });
+  for (const fc of fittingCols) cols.push({ title: fc.title, kind: 'fittings', payload: fc.items || [] });
+  if (notes.length) cols.push({ title: 'Notes', kind: 'notes', payload: notes });
+
+  const nCols = Math.max(1, cols.length);
+  const colGap = 14;
+  const colW = (CONTENT_W - colGap * (nCols - 1)) / nCols;
+
+  for (let i = 0; i < cols.length; i++) {
+    const col = cols[i];
+    const cx = MARGIN + i * (colW + colGap);
+    let by = drawColumnHeader(page, fonts, col.title, cx, colsTop, colW);
+
+    if (col.kind === 'finishes') {
+      for (const f of col.payload as AreaFinishLike[]) {
+        if (by < colsBottom + 18) break;
+        const sw = 16;
+        if (f.image_url) {
+          const bytes = await fetchImageBytes(f.image_url);
+          const img = bytes ? await embedImageBytes(pdfDoc, bytes) : null;
+          if (img) {
+            const d = img.scaleToFit(sw, sw);
+            page.drawImage(img, { x: cx, y: by - sw, width: d.width, height: d.height });
+          }
+        } else {
+          page.drawRectangle({
+            x: cx, y: by - sw, width: sw, height: sw,
+            color: hexToRgb(f.hex || '#cccccc'),
+            borderColor: COLOR_BORDER, borderWidth: 0.3,
+          });
+        }
+        page.drawText(truncate(f.label, 22), {
+          x: cx + sw + 5, y: by - 5, size: 7.5, font: fonts.bold,
+          color: COLOR_DARK, maxWidth: colW - sw - 8,
+        });
+        if (f.spec) {
+          page.drawText(truncate(f.spec, 30), {
+            x: cx + sw + 5, y: by - 14, size: 6.5, font: fonts.regular,
+            color: COLOR_GRAY, maxWidth: colW - sw - 8,
+          });
+        }
+        by -= (sw + 8);
+      }
+    } else if (col.kind === 'fittings') {
+      for (const it of col.payload as { label: string; note?: string }[]) {
+        if (by < colsBottom + 10) break;
+        page.drawCircle({ x: cx + 2, y: by - 4, size: 1.4, color: COLOR_DARK });
+        page.drawText(truncate(it.label, 30), {
+          x: cx + 9, y: by - 6, size: 7.5, font: fonts.regular,
+          color: COLOR_DARK, maxWidth: colW - 12,
+        });
+        by -= 11;
+        if (it.note) {
+          page.drawText(truncate(it.note, 34), {
+            x: cx + 9, y: by - 2, size: 6.5, font: fonts.regular,
+            color: COLOR_GRAY, maxWidth: colW - 12,
+          });
+          by -= 9;
+        }
+        by -= 2;
+      }
+    } else {
+      for (const n of col.payload as string[]) {
+        if (by < colsBottom + 10) break;
+        const lines = wrapText(n, fonts.regular, 7.5, colW - 12).slice(0, 4);
+        page.drawCircle({ x: cx + 2, y: by - 4, size: 1.4, color: COLOR_DARK });
+        let ly = by;
+        for (const line of lines) {
+          page.drawText(line, { x: cx + 9, y: ly - 6, size: 7.5, font: fonts.regular, color: COLOR_DARK });
+          ly -= 10;
+        }
+        by = ly - 4;
+      }
+    }
+  }
+
+  // ---- PALETTE STRIP (bottom) ----
+  if (palette.length) {
+    const pGap = 8;
+    const pW = (CONTENT_W - pGap * (palette.length - 1)) / palette.length;
+    const py = bottomY;
+    palette.forEach((p, i) => {
+      const px = MARGIN + i * (pW + pGap);
+      page.drawRectangle({
+        x: px, y: py, width: pW, height: 20,
+        color: hexToRgb(p.hex), borderColor: COLOR_BORDER, borderWidth: 0.3,
+      });
+      page.drawText(truncate(p.name || p.hex, 16), {
+        x: px + 2, y: py + 24, size: 6.5, font: fonts.regular,
+        color: COLOR_GRAY, maxWidth: pW,
+      });
+    });
+  }
+
+  drawTitleBlock(page, fonts, td);
+}
+
+type AreaFinishLike = { label: string; spec?: string; hex?: string; image_url?: string };
+
+/** Frame + contain-fit an image into a box; draws an empty frame if no image. */
+async function drawImageFramed(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  url: string | undefined,
+  x: number, y: number, w: number, h: number,
+): Promise<void> {
+  page.drawRectangle({
+    x, y, width: w, height: h,
+    color: COLOR_BG, borderColor: COLOR_BORDER, borderWidth: 0.5,
+  });
+  if (!url) return;
+  const bytes = await fetchImageBytes(url);
+  const img = bytes ? await embedImageBytes(pdfDoc, bytes) : null;
+  if (!img) return;
+  const d = img.scaleToFit(w - 4, h - 4);
+  page.drawImage(img, {
+    x: x + (w - d.width) / 2,
+    y: y + (h - d.height) / 2,
+    width: d.width, height: d.height,
+  });
+}
+
+/** Small label above a framed image (used for the plan + elevation panels). */
+async function drawLabeledImage(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  fonts: SheetFonts,
+  label: string,
+  url: string | undefined,
+  x: number, y: number, w: number, h: number,
+): Promise<void> {
+  const labelH = 13;
+  page.drawText(label, {
+    x: x + 1, y: y + h - 9, size: 7, font: fonts.bold, color: COLOR_GRAY,
+  });
+  await drawImageFramed(pdfDoc, page, url, x, y, w, h - labelH);
+}
+
+/** Column header (title + underline). Returns the y at which the body starts. */
+function drawColumnHeader(
+  page: PDFPage,
+  fonts: SheetFonts,
+  title: string,
+  x: number,
+  topY: number,
+  w: number,
+): number {
+  page.drawText(title.toUpperCase(), {
+    x, y: topY - 9, size: 8.5, font: fonts.bold, color: COLOR_DARK, maxWidth: w,
+  });
+  page.drawLine({
+    start: { x, y: topY - 14 }, end: { x: x + w, y: topY - 14 },
+    color: COLOR_BORDER, thickness: 0.5,
+  });
+  return topY - 26;
+}
+
+// ============================================================
 // 8. FULL DECK — cover page + included sheets in order.
 // ============================================================
 export async function buildFullDeckCover(
@@ -878,6 +1083,9 @@ export async function buildSheetForDeck(
       buildFfeSchedule(pdfDoc, fonts, td, items);
       break;
     }
+    case 'area_breakdown':
+      await buildAreaBreakdown(pdfDoc, fonts, td, sheet.data as AreaBreakdownData);
+      break;
     default:
       // Unknown sub-sheet type — emit a placeholder page
       const page = newSheetPage(pdfDoc);
