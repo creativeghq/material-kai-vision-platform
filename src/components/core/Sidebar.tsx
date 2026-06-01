@@ -115,7 +115,8 @@ export const Sidebar: React.FC = () => {
             <SheetContent side="left" className="w-72 p-0 bg-sidebar border-r border-white/8">
               <div className="flex flex-col h-full py-8 px-4">
                 <div className="mb-8">
-                  <img src="/mh-logo-white.png" alt="materialshub" className="h-8 w-auto" />
+                  <img src="/mh-logo.png" alt="materialshub" className="h-8 w-auto block dark:hidden" />
+                  <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
                 </div>
                 <nav className="flex-1 flex flex-col space-y-1">
                   {navigationItems.map((item) => (
@@ -151,7 +152,8 @@ export const Sidebar: React.FC = () => {
           </Sheet>
 
           <div className="flex items-center">
-            <img src="/mh-logo-white.png" alt="materialshub" className="h-7 w-auto" />
+            <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
+            <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
           </div>
 
           <div className="flex items-center gap-1">
@@ -167,8 +169,9 @@ export const Sidebar: React.FC = () => {
   return (
     <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-sidebar border-b border-white/8">
       <Link to="/" className="flex items-center mr-8 flex-shrink-0">
-        {/* White logo variant for the dark nav (dark variant at /mh-logo.png for light surfaces) */}
-        <img src="/mh-logo-white.png" alt="materialshub" className="h-8 w-auto" />
+        {/* Logo swaps with theme: dark wordmark on light nav, white wordmark on dark nav */}
+        <img src="/mh-logo.png" alt="materialshub" className="h-8 w-auto block dark:hidden" />
+        <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
       </Link>
 
       <nav className="flex items-center gap-1 flex-1">
