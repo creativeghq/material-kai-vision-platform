@@ -63,7 +63,7 @@ const MyAadeModulePage: React.FC = () => {
         }
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
         {/* Credentials */}
         <SecretsManagerCard
           scope={{ mode: 'module', moduleSlug: 'myaade' }}

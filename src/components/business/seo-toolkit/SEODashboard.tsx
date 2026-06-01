@@ -16,7 +16,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, RefreshCw, Plus, Star, Trash2, ExternalLink, TrendingUp, Globe2, Link2, Target } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, RefreshCw, Plus, Star, Trash2, ExternalLink, TrendingUp, Globe2, Link2, Target, Waypoints } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
@@ -31,6 +32,7 @@ import {
   getDashboardStats,
   type SeoResearchRun, type SeoTrackedDomain, type SeoDomainAuditSnapshot,
 } from '@/services/seoToolkitApi';
+import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
 
 const fmtNum = (n: any): string => {
   const v = Number(n);
@@ -44,9 +46,24 @@ const fmtNum = (n: any): string => {
 // Dashboard root
 // ───────────────────────────────────────────────────────────────────
 
+const SEO_INNER_TABS = new Set(['research', 'domains', 'backlinks', 'competitive', 'interlinking']);
+
 export const SEODashboardPanel: React.FC = () => {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState<{ research_run_count_30d: number; tracked_domain_count: number; total_audit_cost_30d: number; starred_count: number } | null>(null);
+
+  // Inner-tab selection is mirrored into ?seotab= so the legacy
+  // /admin/modules/seo-interlinking redirect can deep-link straight to the
+  // Inter-linking sub-tab (it now lives under SEO Toolkit).
+  const requestedSeoTab = searchParams.get('seotab') || '';
+  const activeSeoTab = SEO_INNER_TABS.has(requestedSeoTab) ? requestedSeoTab : 'research';
+  const handleSeoTabChange = useCallback((value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === 'research') next.delete('seotab');
+    else next.set('seotab', value);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -92,7 +109,7 @@ export const SEODashboardPanel: React.FC = () => {
         </CardContent></Card>
       </div>
 
-      <Tabs defaultValue="research">
+      <Tabs value={activeSeoTab} onValueChange={handleSeoTabChange}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="research" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Search className="h-3.5 w-3.5" /> Keyword Research
@@ -105,6 +122,9 @@ export const SEODashboardPanel: React.FC = () => {
           </TabsTrigger>
           <TabsTrigger value="competitive" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Target className="h-3.5 w-3.5" /> Competitive Intel
+          </TabsTrigger>
+          <TabsTrigger value="interlinking" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Waypoints className="h-3.5 w-3.5" /> Inter-linking
           </TabsTrigger>
         </TabsList>
 
@@ -119,6 +139,9 @@ export const SEODashboardPanel: React.FC = () => {
         </TabsContent>
         <TabsContent value="competitive" className="mt-4">
           <CompetitiveIntelTab />
+        </TabsContent>
+        <TabsContent value="interlinking" className="mt-4">
+          <SeoInterlinkingPanel />
         </TabsContent>
       </Tabs>
     </div>

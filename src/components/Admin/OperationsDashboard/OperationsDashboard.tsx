@@ -69,7 +69,6 @@ import { StorageAuditPanel } from '../StorageAuditPanel';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
-import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 
 import type {
@@ -94,7 +93,7 @@ import { StatCard } from './components/StatCard';
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'ai-performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
-  'seo-toolkit', 'seo-interlinking', 'keys',
+  'seo-toolkit', 'keys',
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
@@ -870,10 +869,6 @@ const OperationsDashboardInner: React.FC = () => {
             <TabsTrigger value="seo-toolkit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="h-4 w-4 mr-2" />
               SEO Toolkit
-            </TabsTrigger>
-            <TabsTrigger value="seo-interlinking" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Globe className="h-4 w-4 mr-2" />
-              SEO Inter-linking
             </TabsTrigger>
             <TabsTrigger value="keys" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <KeyRound className="h-4 w-4 mr-2" />
@@ -2259,12 +2254,6 @@ const OperationsDashboardInner: React.FC = () => {
               Pulled out of /admin/seo into the operations dashboard. */}
           <TabsContent value="seo-toolkit" className="space-y-4">
             <SEODashboardPanel />
-          </TabsContent>
-
-          {/* SEO Inter-linking Tab — connected user websites + sitemap status.
-              Pulled out of /admin/modules/seo-interlinking into the operations dashboard. */}
-          <TabsContent value="seo-interlinking" className="space-y-4">
-            <SeoInterlinkingPanel />
           </TabsContent>
 
           {/* Keys Tab — platform-wide secrets (AI keys, Stripe, VAPID, cron secret, …).

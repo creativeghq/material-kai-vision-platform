@@ -95,6 +95,11 @@ interface Props {
     agentId: string;
     prompt: string;
     workflowId?: string;
+    /** Full quick-start — present for code-defined toolkit quick-starts. When it
+     *  carries a `form`, the caller opens ToolkitFormModal to collect first. */
+    quickStart?: ToolkitQuickStart;
+    /** The owning toolkit — passed alongside `quickStart` for the form modal. */
+    toolkit?: ToolkitDefinition;
   }) => void;
   /**
    * Optional callback for the virtual-staging subcategory in Interior
@@ -524,6 +529,8 @@ const PromptBuilderModal: React.FC<Props> = ({
                               agentId: targetAgent,
                               prompt: qs.prompt,
                               workflowId: qs.workflow_id,
+                              quickStart: qs,
+                              toolkit: t,
                             });
                             onClose();
                           }}

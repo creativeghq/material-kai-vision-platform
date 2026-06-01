@@ -56,7 +56,7 @@ export const CatalogsListPage: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div>
       <PageHeader
         title="Presentation Catalogs"
         subtitle="Build email-gated catalog landing pages and PDFs from manufacturer source PDFs."
@@ -76,6 +76,7 @@ export const CatalogsListPage: React.FC = () => {
         }
       />
 
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
       {loading ? (
         <div className="flex items-center gap-2 py-12 justify-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading catalogs…
@@ -147,6 +148,7 @@ export const CatalogsListPage: React.FC = () => {
           }}
         />
       )}
+      </div>
     </div>
   );
 };

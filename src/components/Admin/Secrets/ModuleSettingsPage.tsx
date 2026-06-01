@@ -83,7 +83,7 @@ const ModuleSettingsPage: React.FC = () => {
           </>
         }
       />
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4">
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4">
         {panels.length === 0 ? (
           // Backwards-compat path: modules that haven't declared panels render
           // the original single-card layout untouched.

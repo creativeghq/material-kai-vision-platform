@@ -106,7 +106,7 @@ const OxygenModulePage: React.FC = () => {
         }
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-transparent p-0 gap-2 flex-wrap">
             <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

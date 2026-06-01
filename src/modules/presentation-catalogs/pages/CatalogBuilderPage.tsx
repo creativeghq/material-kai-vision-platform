@@ -200,7 +200,7 @@ export const CatalogBuilderPage: React.FC = () => {
 
   if (loading || !catalog) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="px-3 sm:px-6 py-8">
         <div className="flex items-center gap-2 py-12 justify-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading catalog…
         </div>
@@ -211,7 +211,7 @@ export const CatalogBuilderPage: React.FC = () => {
   const publicUrl = catalog.slug ? `/c/${catalog.slug}` : null;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div>
       <PageHeader
         title={catalog.title}
         subtitle={catalog.subtitle || ''}
@@ -254,6 +254,7 @@ export const CatalogBuilderPage: React.FC = () => {
         }
       />
 
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
       <Tabs defaultValue="builder">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="builder" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Builder</TabsTrigger>
@@ -616,6 +617,7 @@ export const CatalogBuilderPage: React.FC = () => {
         catalog={catalog}
         onSent={() => load()}
       />
+      </div>
     </div>
   );
 };

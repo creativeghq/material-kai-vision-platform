@@ -15,10 +15,14 @@
  *   - Tool → calls onUseToolPrompt(prompt). Parent fills the chat input.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Wrench, ArrowRight, Lock, AlertCircle } from 'lucide-react';
+import { Sparkles, Wrench, ArrowRight, Lock, AlertCircle, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/core/ui/badge';
-import { AGENTS, type AgentToolEntry, getAccessibleAgents } from '../agentToolsCatalog';
+import {
+  AGENTS, type AgentToolEntry, getAccessibleAgents,
+  getAccessibleToolkits, getToolkitOwnerAgents,
+  type ToolkitQuickStart, type ToolkitDefinition,
+} from '../agentToolsCatalog';
 import { WORKFLOWS, getWorkflowsForRole } from './workflowRegistry';
 import type { WorkflowDefinition } from './types';
 
@@ -31,10 +35,12 @@ interface Props {
   enabledModules: string[];
   onLaunchWorkflow: (workflow: WorkflowDefinition) => void;
   onUseExample: (prompt: string) => void;
+  /** Launch a form-bearing quick-start — opens the collect-then-send modal. */
+  onLaunchForm: (quickStart: ToolkitQuickStart, toolkit: ToolkitDefinition) => void;
 }
 
 interface PaletteEntry {
-  kind: 'workflow' | 'tool';
+  kind: 'workflow' | 'tool' | 'quickstart';
   id: string;
   name: string;
   description: string;
@@ -42,12 +48,15 @@ interface PaletteEntry {
   examples?: string[];
   workflow?: WorkflowDefinition;
   tool?: AgentToolEntry;
+  quickStart?: ToolkitQuickStart;
+  toolkit?: ToolkitDefinition;
   disabled?: boolean;
   disabledReason?: string;
 }
 
 export const CommandPalette: React.FC<Props> = ({
   open, onClose, query, agentId, role, enabledModules, onLaunchWorkflow, onUseExample,
+  onLaunchForm,
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,6 +64,28 @@ export const CommandPalette: React.FC<Props> = ({
   const entries = useMemo<PaletteEntry[]>(() => {
     const out: PaletteEntry[] = [];
     const isAdmin = role === 'admin' || role === 'owner';
+
+    // Form-bearing quick-starts first — picking one opens the collect-then-send
+    // modal (same flow as the toolkit cards) instead of injecting an editable
+    // example. Scoped to toolkits the current agent owns.
+    for (const tk of getAccessibleToolkits(role, enabledModules)) {
+      if (!(tk.alwaysOn || getToolkitOwnerAgents(tk).includes(agentId))) continue;
+      for (const qs of tk.quick_starts || []) {
+        if (!qs.form?.length) continue;
+        out.push({
+          kind: 'quickstart',
+          id: `qs-${tk.id}-${qs.label}`,
+          name: qs.label,
+          description: qs.description,
+          badges: [
+            { label: tk.name, variant: 'secondary' },
+            { label: 'form', variant: 'outline' },
+          ],
+          quickStart: qs,
+          toolkit: tk,
+        });
+      }
+    }
 
     // Workflows first
     for (const wf of getWorkflowsForRole(role, enabledModules)) {
@@ -155,6 +186,11 @@ export const CommandPalette: React.FC<Props> = ({
 
   const launch = (entry: PaletteEntry) => {
     if (entry.disabled) return;
+    if (entry.kind === 'quickstart' && entry.quickStart && entry.toolkit) {
+      onLaunchForm(entry.quickStart, entry.toolkit);
+      onClose();
+      return;
+    }
     if (entry.kind === 'workflow' && entry.workflow) {
       if (entry.examples && entry.examples.length > 0) {
         onUseExample(entry.examples[0]);
@@ -201,9 +237,13 @@ export const CommandPalette: React.FC<Props> = ({
             >
               <div className={cn(
                 'h-7 w-7 rounded shrink-0 flex items-center justify-center',
-                entry.kind === 'workflow' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                entry.kind === 'workflow' || entry.kind === 'quickstart' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
               )}>
-                {entry.kind === 'workflow' ? <Sparkles className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
+                {entry.kind === 'workflow'
+                  ? <Sparkles className="h-3.5 w-3.5" />
+                  : entry.kind === 'quickstart'
+                  ? <ListChecks className="h-3.5 w-3.5" />
+                  : <Wrench className="h-3.5 w-3.5" />}
               </div>
 
               <div className="flex-1 min-w-0">
@@ -211,6 +251,9 @@ export const CommandPalette: React.FC<Props> = ({
                   <span className="text-sm font-medium truncate">{entry.name}</span>
                   {entry.kind === 'workflow' && (
                     <Badge variant="default" className="text-[9px] py-0">workflow</Badge>
+                  )}
+                  {entry.kind === 'quickstart' && (
+                    <Badge variant="default" className="text-[9px] py-0">form</Badge>
                   )}
                   {entry.badges?.map((b, i) => (
                     <Badge key={i} variant={b.variant || 'outline'} className="text-[9px] py-0 capitalize">

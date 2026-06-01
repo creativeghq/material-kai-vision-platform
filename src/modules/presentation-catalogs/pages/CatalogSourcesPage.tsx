@@ -72,7 +72,7 @@ export const CatalogSourcesPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div>
       <PageHeader
         title="Catalog Source PDFs"
         subtitle="Upload manufacturer catalogs that the KAI agent can extract from."
@@ -84,6 +84,7 @@ export const CatalogSourcesPage: React.FC = () => {
         }
       />
 
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
       <Card className="dashboard-card">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -165,6 +166,7 @@ export const CatalogSourcesPage: React.FC = () => {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };
