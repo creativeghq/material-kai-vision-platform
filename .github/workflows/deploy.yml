@@ -252,9 +252,16 @@ jobs:
           export -f deploy_one
           export PROJECT_REF SUPABASE_ACCESS_TOKEN
 
-          # Parallel batch of 4. Each function takes ~10–30s; 4-way parallel
-          # is safe with Supabase's per-project rate limits.
-          echo "$FUNCS" | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'deploy_one "$@"' _ {}
+          # Deploy SEQUENTIALLY (-P 1). The Supabase CLI is NOT safe to run
+          # concurrently against one project from one runner: parallel
+          # `supabase functions deploy` processes share ~/.supabase (auth/config)
+          # and the esbuild bundling temp dir, and contend on the Management API.
+          # Under contention some functions silently get a no-op/stale upload
+          # while still exiting 0 — the job prints ✅ but the content never
+          # changes. This bit us on 2026-06-01 (functions reported deployed but
+          # ran old code). The pre-2026-05-23 job was sequential and correct;
+          # keep it that way. Slower, but every deploy actually lands.
+          echo "$FUNCS" | tr ' ' '\n' | xargs -P 1 -I {} bash -c 'deploy_one "$@"' _ {}
 
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
