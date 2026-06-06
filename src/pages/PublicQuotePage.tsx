@@ -46,6 +46,14 @@ interface PublicQuote {
   items: PublicQuoteItem[];
 }
 
+interface QuoteSeller {
+  name: string;
+  logo_url: string | null;
+  website: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 const money = (v: number | null | undefined, currency: string) =>
   v == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v);
 
@@ -53,6 +61,7 @@ export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<PublicQuote | null>(null);
+  const [seller, setSeller] = useState<QuoteSeller | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -72,6 +81,7 @@ export default function PublicQuotePage() {
         });
         if (cancelled) return;
         setQuote(data?.quote ?? null);
+        setSeller(data?.seller ?? null);
         setPdfUrl(data?.pdf_url ?? null);
         setNotFound(!!data?.not_found || !data?.quote);
       } catch {
@@ -127,6 +137,20 @@ export default function PublicQuotePage() {
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-4xl mx-auto space-y-5">
+        {/* Seller branding (white-label) */}
+        {seller && (
+          <div className="flex items-center gap-3 pb-1 border-b border-white/10">
+            {seller.logo_url
+              ? <img src={seller.logo_url} alt={seller.name} className="h-9 max-w-[160px] object-contain" />
+              : <span className="text-base font-semibold">{seller.name}</span>}
+            <div className="ml-auto text-right text-[11px] text-muted-foreground leading-tight">
+              {seller.logo_url && <div className="font-medium text-foreground">{seller.name}</div>}
+              {seller.website && <div>{seller.website}</div>}
+              {seller.phone && <div>{seller.phone}</div>}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center gap-2 flex-wrap">
           <FileText className="h-5 w-5 text-primary" />
@@ -231,7 +255,7 @@ export default function PublicQuotePage() {
         )}
 
         <div className="text-[11px] text-muted-foreground text-center pt-4">
-          Shared from Material Kai
+          {seller ? `Prepared by ${seller.name}` : 'Shared from Material Kai'}
         </div>
       </div>
     </div>

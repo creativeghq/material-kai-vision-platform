@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     .select(
       'id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, ' +
       'grand_total, extras_total, expires_at, created_at, pdf_storage_path, ' +
-      'public_share_enabled, customer_company_id, customer_contact_id',
+      'public_share_enabled, customer_company_id, customer_contact_id, workspace_id',
     )
     .eq('public_share_token', token)
     .maybeSingle();
@@ -94,6 +94,31 @@ Deno.serve(async (req: Request) => {
     client_name = c?.name ?? null;
   }
 
+  // #177 white-label: render the public quote under the seller workspace's identity
+  // (business name + logo + contact) instead of the platform default.
+  let seller: any = null;
+  if (quote.workspace_id) {
+    const { data: fs } = await supabase
+      .from('finance_settings')
+      .select('business_name, business_logo_path, contact_website, contact_phone, contact_email, business_email, business_phone')
+      .eq('workspace_id', quote.workspace_id)
+      .maybeSingle();
+    if (fs?.business_name) {
+      let logo_url: string | null = null;
+      if (fs.business_logo_path) {
+        const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(fs.business_logo_path);
+        logo_url = pub?.publicUrl ?? null;
+      }
+      seller = {
+        name: fs.business_name,
+        logo_url,
+        website: fs.contact_website ?? null,
+        phone: fs.contact_phone ?? fs.business_phone ?? null,
+        email: fs.contact_email ?? fs.business_email ?? null,
+      };
+    }
+  }
+
   // Log the public event (best-effort — never block the response).
   const eventType = event === 'download' ? 'downloaded' : 'viewed';
   const sid = (typeof session_id === 'string' && session_id.length > 0)
@@ -141,6 +166,7 @@ Deno.serve(async (req: Request) => {
       client_name,
       items,
     },
+    seller,
     pdf_url,
     not_found: false,
   });
