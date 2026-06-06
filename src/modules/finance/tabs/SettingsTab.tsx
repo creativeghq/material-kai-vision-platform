@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
+import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -132,6 +133,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <BusinessIdentityCard workspaceId={workspaceId} />
+
+      <DocumentSetupCard workspaceId={workspaceId} />
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module settings</CardTitle></CardHeader>
