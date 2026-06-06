@@ -156,6 +156,27 @@ Deno.serve(async (req) => {
 
     // Header
     page.drawText('ACCOUNT STATEMENT', { x: MARGIN, y, size: 22, font: bold, color: COLOR_DARK });
+
+    // Issuer identity ("FROM") — right column, from finance_settings.business_* so the
+    // recipient knows who sent the statement (was previously unlabelled).
+    if (settings.business_name) {
+      const rightX = PAGE_W - MARGIN - 220;
+      let fy = y;
+      page.drawText(String(settings.business_name), { x: rightX, y: fy, size: 11, font: bold, color: COLOR_DARK });
+      fy -= 13;
+      const fromLines = [
+        [settings.business_address, settings.business_street_number].filter(Boolean).join(' '),
+        [settings.business_postal_code, settings.business_city].filter(Boolean).join(' '),
+        settings.business_vat ? `VAT: ${settings.business_vat}` : '',
+        settings.business_phone || settings.contact_phone || '',
+        settings.business_email || settings.contact_email || '',
+      ].filter((l) => l && String(l).trim());
+      for (const line of fromLines) {
+        page.drawText(String(line), { x: rightX, y: fy, size: 9, font, color: COLOR_GRAY });
+        fy -= 12;
+      }
+    }
+
     y -= 28;
     page.drawText(`To: ${party.display_name ?? ''}`, { x: MARGIN, y, size: 11, font, color: COLOR_GRAY });
     y -= 14;
