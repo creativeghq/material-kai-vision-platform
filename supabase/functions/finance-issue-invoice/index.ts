@@ -19,7 +19,10 @@ import { buildInvoiceInputFromDb, type FiscalOverrides } from '../_shared/fiscal
 // Auth: admin / super_admin / owner / finance.
 
 interface RequestBody {
-  quote_id: string;
+  /** Create/find the invoice from this quote. Provide this OR invoice_id. */
+  quote_id?: string;
+  /** Operate on an existing invoice directly (e.g. submit a manual invoice to myDATA). */
+  invoice_id?: string;
   issue_now?: boolean;
   push_to_oxygen?: boolean;
   /** Transmit the invoice to the workspace's `legal_invoice` connector (e.g. Novus → myDATA). */
@@ -49,7 +52,9 @@ Deno.serve(async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id) return json({ error: 'quote_id is required' }, 400);
+    if (!body.quote_id && !body.invoice_id) {
+      return json({ error: 'quote_id or invoice_id is required' }, 400);
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -57,11 +62,17 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
 
-    // 1. Idempotent create of invoice draft via RPC
-    const { data: invoiceId, error: rpcErr } = await supabase.rpc('issue_invoice_from_quote', {
-      p_quote_id: body.quote_id,
-    });
-    if (rpcErr) return json({ error: `issue_invoice_from_quote failed: ${rpcErr.message}` }, 500);
+    // 1. Resolve the invoice: existing invoice_id, or idempotent create from quote.
+    let invoiceId: string;
+    if (body.invoice_id) {
+      invoiceId = body.invoice_id;
+    } else {
+      const { data: created, error: rpcErr } = await supabase.rpc('issue_invoice_from_quote', {
+        p_quote_id: body.quote_id,
+      });
+      if (rpcErr) return json({ error: `issue_invoice_from_quote failed: ${rpcErr.message}` }, 500);
+      invoiceId = created as string;
+    }
 
     // 2. Optional issue (draft → issued)
     let invoiceState: any = null;
@@ -82,7 +93,7 @@ Deno.serve(async (req) => {
 
     // 3. Optional Oxygen push (reuses oxygen-api action=create_pre_invoice)
     let oxygenResult: any = null;
-    if (body.push_to_oxygen) {
+    if (body.push_to_oxygen && body.quote_id) {
       try {
         const oxygenRes = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/oxygen-api`,

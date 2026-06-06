@@ -6,9 +6,9 @@
  * passes a no-op `onSettingsChanged` callback (the FinancePage uses that
  * callback to refresh its own state; the Module Settings page doesn't care).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { SettingsTab } from '../tabs/SettingsTab';
 
 interface Props {
@@ -16,34 +16,11 @@ interface Props {
 }
 
 export const FinanceSettingsPanel: React.FC<Props> = (_props) => {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { if (!cancelled) { setError('Not authenticated'); setLoading(false); } return; }
-        const { data: member } = await (supabase as any)
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (!cancelled) {
-          setWorkspaceId(member?.workspace_id ?? null);
-          setLoading(false);
-        }
-      } catch (err: any) {
-        if (!cancelled) { setError(err?.message || 'Failed to resolve workspace'); setLoading(false); }
-      }
-    };
-    void run();
-    return () => { cancelled = true; };
-  }, []);
+  // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
+  // oldest-membership query that broke for multi-workspace users (#194).
+  const { activeWorkspaceId, loading } = useWorkspace();
+  const workspaceId = activeWorkspaceId;
+  const error: string | null = null;
 
   const handleSettingsChanged = useCallback(() => {
     // No-op when mounted inside the Module Settings page — there's no parent

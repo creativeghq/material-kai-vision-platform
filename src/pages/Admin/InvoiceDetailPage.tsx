@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   CreditCard,
   Copy,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -26,6 +27,7 @@ import {
   type InvoiceWithItems,
   type PaymentMethod,
 } from '@/modules/finance/services/financeService';
+import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
 
@@ -41,6 +43,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [oxygenLegalNumber, setOxygenLegalNumber] = useState('');
   const [payLink, setPayLink] = useState<string | null>(null);
   const [payLinkBusy, setPayLinkBusy] = useState(false);
+  const [fiscalBusy, setFiscalBusy] = useState(false);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -93,6 +96,36 @@ const InvoiceDetailPage: React.FC = () => {
       await load();
     } catch (err: any) {
       toast({ title: 'Push failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleSubmitFiscal = async () => {
+    if (!invoice) return;
+    try {
+      setFiscalBusy(true);
+      const res = await fiscalConnectorService.submitInvoice(invoice.id);
+      const f: any = res?.fiscal;
+      if (!f) {
+        toast({ title: 'No fiscal response', variant: 'destructive' });
+      } else if (f.ok === false) {
+        // not_configured / no_binding / build error — surfaced verbatim
+        toast({ title: 'Not submitted', description: f.error, variant: 'destructive' });
+      } else if (f.skipped) {
+        toast({ title: 'Already transmitted', description: 'This invoice has a myDATA MARK already.' });
+      } else if (f.status === 'accepted') {
+        toast({ title: 'Transmitted to myDATA', description: `MARK ${f.mark}` });
+      } else if (f.status === 'offline') {
+        toast({ title: 'Accepted — AADE offline', description: 'The final MARK will be assigned automatically shortly.' });
+      } else if (f.status === 'rejected') {
+        toast({ title: 'Rejected by myDATA', description: f.errorMessage ?? f.errorCode ?? 'Validation error', variant: 'destructive' });
+      } else {
+        toast({ title: 'Submitted', description: String(f.status ?? 'done') });
+      }
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Submit failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setFiscalBusy(false);
     }
   };
 
@@ -167,6 +200,12 @@ const InvoiceDetailPage: React.FC = () => {
           {invoice.quote_id && !invoice.oxygen_notice_id && (
             <Button onClick={handlePushOxygen} variant="outline">
               Push to Oxygen
+            </Button>
+          )}
+          {(invoice as any).fiscal_status !== 'accepted' && invoice.status !== 'draft' && (
+            <Button onClick={handleSubmitFiscal} variant="outline" disabled={fiscalBusy}>
+              {fiscalBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+              Submit to myDATA
             </Button>
           )}
           {invoice.status !== 'void' && invoice.status !== 'credit_noted' && Number(invoice.amount_due) > 0 && (
@@ -367,6 +406,59 @@ const InvoiceDetailPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {(() => {
+        const f = invoice as any;
+        if (!f.fiscal_status) return null;
+        const tone =
+          f.fiscal_status === 'accepted' ? 'default'
+          : f.fiscal_status === 'offline' ? 'secondary'
+          : f.fiscal_status === 'rejected' || f.fiscal_status === 'error' ? 'destructive'
+          : 'outline';
+        return (
+          <Card>
+            <CardHeader className="border-b border-border/60 px-5 py-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> myDATA / e-Invoicing
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 p-5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant={tone as any}>{f.fiscal_status}{f.fiscal_connector_slug ? ` · ${f.fiscal_connector_slug}` : ''}</Badge>
+              </div>
+              {f.fiscal_mark && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">MARK</span>
+                  <span className="font-mono text-xs">{f.fiscal_mark}</span>
+                </div>
+              )}
+              {f.fiscal_uid && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">UID</span>
+                  <span className="font-mono text-xs break-all">{f.fiscal_uid}</span>
+                </div>
+              )}
+              {f.fiscal_submitted_at && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Submitted</span>
+                  <span className="text-xs">{new Date(f.fiscal_submitted_at).toLocaleString()}</span>
+                </div>
+              )}
+              {f.fiscal_qr_url && (
+                <Button size="sm" variant="outline" onClick={() => window.open(f.fiscal_qr_url, '_blank')}>
+                  <ExternalLink className="h-3 w-3 mr-1" /> View on AADE
+                </Button>
+              )}
+              {f.fiscal_status === 'offline' && (
+                <p className="text-xs text-muted-foreground">
+                  AADE was offline at submission. The provider will transmit automatically and the final MARK will appear shortly.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <RecordPaymentDialog
         open={paymentDialogOpen}
