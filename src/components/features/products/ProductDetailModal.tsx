@@ -30,6 +30,7 @@ import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { WorkspaceCostBadge } from '@/components/business/marketplace/WorkspaceCostBadge';
 import { ProductMydataCard } from '@/components/business/marketplace/ProductMydataCard';
+import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
@@ -1829,6 +1830,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
             </div>
             <WorkspaceCostBadge productId={product.id} className="mt-2" />
+            <ProductPricingCard productId={product.id} />
             {isAdmin && <ProductMydataCard productId={product.id} />}
           </div>
           {/* Description moved to Details tab — avoids duplication with the
