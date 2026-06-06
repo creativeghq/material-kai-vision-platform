@@ -837,6 +837,8 @@ export interface FinanceSettings {
   statement_template_footer_path: string | null;
   default_payment_terms_days: number;
   default_vat_rate: number;
+  /** #176 blanket sell uplift on catalog products this workspace resells. */
+  default_markup_pct: number;
   digest_enabled: boolean;
   digest_frequency: 'daily' | 'weekly' | 'monthly';
   digest_day_of_week: number | null;
@@ -1045,7 +1047,7 @@ const _financeServiceV2 = {
     for (const k of [
       'statements_enabled','statement_email_subject','statement_email_body',
       'statement_template_cover_path','statement_template_footer_path',
-      'default_payment_terms_days','default_vat_rate',
+      'default_payment_terms_days','default_vat_rate','default_markup_pct',
       'digest_enabled','digest_frequency','digest_day_of_week','digest_hour_utc','digest_recipients',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];

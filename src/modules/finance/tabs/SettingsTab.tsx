@@ -74,6 +74,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         statement_email_body: settings.statement_email_body,
         default_payment_terms_days: settings.default_payment_terms_days,
         default_vat_rate: settings.default_vat_rate,
+        default_markup_pct: settings.default_markup_pct,
       });
       setSettings(updated);
       onSettingsChanged(updated);
@@ -168,6 +169,15 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <Input type="number" step="0.01" min="0" value={settings.default_vat_rate}
                 onChange={(e) => set('default_vat_rate', parseFloat(e.target.value) || 0)} />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Default catalog markup %</Label>
+            <Input type="number" step="0.5" min="0" value={settings.default_markup_pct ?? 0}
+              onChange={(e) => set('default_markup_pct', parseFloat(e.target.value) || 0)} />
+            <p className="text-[11px] text-muted-foreground">
+              Blanket sell uplift applied over your cost when you add a catalog product to a quote (you can still edit each line).
+            </p>
           </div>
 
           <Button onClick={save} disabled={saving} className="w-full">

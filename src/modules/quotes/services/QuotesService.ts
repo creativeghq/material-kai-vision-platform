@@ -470,10 +470,12 @@ export class QuotesService {
         const p: any = priced;
         if (p && typeof p === 'object') {
           const basis = p.cost_basis != null ? Number(p.cost_basis) : null;
-          if (basis != null && !Number.isNaN(basis)) {
-            unitPrice = basis;
-            if (p.mode === 'operator_catalog') costSnapshot = basis;
-          }
+          const sell = p.suggested_sell != null ? Number(p.suggested_sell) : null;
+          // Prefill the sell price (cost × default markup); fall back to bare cost.
+          if (sell != null && !Number.isNaN(sell)) unitPrice = sell;
+          else if (basis != null && !Number.isNaN(basis)) unitPrice = basis;
+          // Snapshot the procurement cost so the margin/profit block is honest.
+          if (p.mode === 'operator_catalog' && basis != null && !Number.isNaN(basis)) costSnapshot = basis;
         }
       }
     } catch { /* non-fatal — leaves the line unpriced for manual entry */ }
