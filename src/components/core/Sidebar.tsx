@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
+import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
@@ -157,6 +158,7 @@ export const Sidebar: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1">
+            <WorkspaceSwitcher />
             <ModuleHeaderActions />
             {profileMenu}
           </div>
@@ -192,6 +194,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="flex items-center gap-2">
+        <WorkspaceSwitcher />
         <ModuleHeaderActions />
         {profileMenu}
       </div>
