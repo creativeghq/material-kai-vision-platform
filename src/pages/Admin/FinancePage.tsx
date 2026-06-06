@@ -48,6 +48,7 @@ import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
 import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
+import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
@@ -290,7 +291,9 @@ const FinancePage: React.FC = () => {
                     <div className="p-6 text-center text-sm text-muted-foreground">No invoices yet. Click <strong>New</strong> to create one, or accept a quote and use <em>Issue invoice</em>.</div>
                   ) : (
                     <ul className="divide-y divide-border/40">
-                      {recentInvoices.slice(0, 6).map((i) => (
+                      {recentInvoices.slice(0, 6).map((i) => {
+                        const mD = (i as any).fiscal_status === 'accepted' || (i as any).fiscal_status === 'offline';
+                        return (
                         <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-3">
                           <div className="min-w-0">
                             <Link to={`${financeBase}/invoices/${i.id}`} className="text-sm font-mono text-primary hover:underline">
@@ -301,12 +304,26 @@ const FinancePage: React.FC = () => {
                               {i.due_at && ` · Due ${i.due_at}`}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <Badge variant={i.status === 'overdue' ? 'destructive' : i.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{i.status}</Badge>
-                            <div className="mt-1 text-sm font-medium">{formatMoney(i.amount_due, i.currency)}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {mD && <span title="Transmitted to myDATA" className="text-emerald-500 text-xs">mD ✓</span>}
+                                <Badge variant={i.status === 'overdue' ? 'destructive' : i.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{i.status}</Badge>
+                              </div>
+                              <div className="mt-1 text-sm font-medium">{formatMoney(i.amount_due, i.currency)}</div>
+                            </div>
+                            <InvoiceActionsMenu
+                              invoiceId={i.id}
+                              financeBase={financeBase}
+                              status={i.status}
+                              fiscalStatus={(i as any).fiscal_status ?? null}
+                              fiscalMark={(i as any).fiscal_mark ?? null}
+                              onChanged={() => loadAll(workspaceId)}
+                            />
                           </div>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   )}
                 </CardContent>
@@ -348,11 +365,12 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due date</th>
                       <th className="px-4 py-2 text-right">Days overdue</th>
+                      <th className="px-4 py-2 w-10" />
                     </tr>
                   </thead>
                   <tbody>
                     {ar.length === 0 && (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No open invoices.</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No open invoices.</td></tr>
                     )}
                     {ar.map((r) => (
                       <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${r.id}`)}>
@@ -365,6 +383,9 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
+                        <td className="px-4 py-2 text-right">
+                          <InvoiceActionsMenu invoiceId={r.id} financeBase={financeBase} onChanged={() => loadAll(workspaceId)} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
