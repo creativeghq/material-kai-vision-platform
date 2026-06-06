@@ -71,6 +71,7 @@ export interface InvoiceItem {
 export interface InvoiceWithItems extends Invoice {
   items: InvoiceItem[];
   payments?: PaymentWithAllocation[];
+  credit_notes?: CreditNote[];
 }
 
 export type PaymentDirection = 'in' | 'out';
@@ -328,7 +329,18 @@ const _financeServiceCore = {
       payments.push(...byPayment.values());
     }
 
-    return { ...(invoice as Invoice), items: (items ?? []) as InvoiceItem[], payments };
+    const { data: creditNotes } = await supabase
+      .from('credit_notes')
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('issued_at', { ascending: false });
+
+    return {
+      ...(invoice as Invoice),
+      items: (items ?? []) as InvoiceItem[],
+      payments,
+      credit_notes: (creditNotes ?? []) as CreditNote[],
+    };
   },
 
   async issueInvoiceFromQuote(

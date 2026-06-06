@@ -380,6 +380,43 @@ const InvoiceDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {(invoice.credit_notes ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="border-b border-border/60 px-5 py-3">
+            <CardTitle className="text-sm">Credit notes</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border/60 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2 text-left">Number</th>
+                  <th className="px-4 py-2 text-left">Date</th>
+                  <th className="px-4 py-2 text-left">Type / myDATA</th>
+                  <th className="px-4 py-2 text-left">Reason</th>
+                  <th className="px-4 py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(invoice.credit_notes ?? []).map((cn: any) => (
+                  <tr key={cn.id} className="border-b border-border/30">
+                    <td className="px-4 py-2 font-mono text-xs">{cn.credit_note_number}</td>
+                    <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant="outline" className="mr-1">{cn.document_type ?? '—'}</Badge>
+                      {cn.fiscal_mark
+                        ? <span className="font-mono text-[11px] text-muted-foreground">{cn.fiscal_mark}</span>
+                        : <span className="text-[11px] text-muted-foreground italic">{cn.fiscal_status ?? 'not sent'}</span>}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">{cn.reason ?? '—'}</td>
+                    <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="text-sm">Oxygen sync</CardTitle>
