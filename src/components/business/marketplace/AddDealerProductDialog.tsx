@@ -1,0 +1,280 @@
+/**
+ * #174 — dealer/supplier "Add Product" dialog.
+ *
+ * Creates a product in the dealer's workspace through the shared MIVAA ingest core. The
+ * attribute form is category-driven: descriptive facets (whitelist) + spec fields pulled
+ * from material_metadata_fields for the chosen category, each with canonical-value
+ * autocomplete. Images upload to storage and run the full embedding suite server-side.
+ */
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, Plus, X, Upload, ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  dealerProductsService, COMMON_FACET_KEYS, type CategoryField, type ManualImageRef,
+} from '@/services/dealerProductsService';
+
+const CATEGORY_SUGGESTIONS = [
+  'tiles', 'wood', 'stone', 'furniture', 'lighting', 'textiles', 'wallpaper',
+  'paint', 'flooring', 'sanitary', 'kitchen', 'outdoor', 'metal', 'glass',
+];
+
+export const AddDealerProductDialog: React.FC<{
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated?: (productId: string) => void;
+}> = ({ open, onOpenChange, onCreated }) => {
+  const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [supplyMode, setSupplyMode] = useState<'platform_sold' | 'reference_only'>('platform_sold');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState('EUR');
+  const [unit, setUnit] = useState('');
+  const [dimensions, setDimensions] = useState('');
+  const [sku, setSku] = useState('');
+
+  const [attrs, setAttrs] = useState<Record<string, string>>({});
+  const [categoryFields, setCategoryFields] = useState<CategoryField[]>([]);
+  const [facetOptions, setFacetOptions] = useState<Record<string, string[]>>({});
+  const [customKey, setCustomKey] = useState('');
+
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(''); setDescription(''); setCategory(''); setSupplyMode('platform_sold');
+      setPrice(''); setCurrency('EUR'); setUnit(''); setDimensions(''); setSku('');
+      setAttrs({}); setCategoryFields([]); setFacetOptions({}); setCustomKey(''); setFiles([]);
+    }
+  }, [open]);
+
+  // Load category spec fields + facet autocomplete when the category changes.
+  useEffect(() => {
+    if (!category) { setCategoryFields([]); return; }
+    let cancelled = false;
+    (async () => {
+      const fields = await dealerProductsService.loadCategoryFields(category);
+      if (cancelled) return;
+      setCategoryFields(fields);
+    })();
+    return () => { cancelled = true; };
+  }, [category]);
+
+  // The full set of attribute keys shown: common facets + category spec fields + custom.
+  const attrKeys = useMemo(() => {
+    const keys = new Set<string>([...COMMON_FACET_KEYS, ...categoryFields.map((f) => f.field_name)]);
+    Object.keys(attrs).forEach((k) => keys.add(k));
+    return Array.from(keys);
+  }, [categoryFields, attrs]);
+
+  // Lazy-load canonical-value autocomplete for whitelist facets.
+  useEffect(() => {
+    COMMON_FACET_KEYS.forEach(async (k) => {
+      if (facetOptions[k]) return;
+      const vals = await dealerProductsService.loadFacetValues(k);
+      if (vals.length) setFacetOptions((prev) => ({ ...prev, [k]: vals }));
+    });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const labelFor = (key: string) =>
+    categoryFields.find((f) => f.field_name === key)?.label
+    || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const setAttr = (k: string, v: string) => setAttrs((prev) => ({ ...prev, [k]: v }));
+  const removeAttr = (k: string) => setAttrs((prev) => { const n = { ...prev }; delete n[k]; return n; });
+
+  const addCustom = () => {
+    const k = customKey.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!k) return;
+    setAttrs((prev) => ({ ...prev, [k]: '' }));
+    setCustomKey('');
+  };
+
+  const handleSave = async () => {
+    if (!activeWorkspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    if (!name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
+    setBusy(true);
+    try {
+      // Upload images first.
+      const images: ManualImageRef[] = [];
+      for (let i = 0; i < files.length; i++) {
+        images.push(await dealerProductsService.uploadImage(activeWorkspaceId, files[i], i));
+      }
+
+      // Build dynamic metadata from the attribute rows (skip empties). available_colors
+      // accepts a comma list → array (matches the catalog metadata shape).
+      const metadata: Record<string, any> = {};
+      for (const [k, v] of Object.entries(attrs)) {
+        const val = (v ?? '').trim();
+        if (!val) continue;
+        metadata[k] = (k === 'available_colors' || k === 'colors' || k === 'available_sizes')
+          ? val.split(',').map((s) => s.trim()).filter(Boolean)
+          : val;
+      }
+
+      const productId = await dealerProductsService.createManualProduct(activeWorkspaceId, {
+        name: name.trim(),
+        description: description.trim(),
+        material_category: category || undefined,
+        supply_mode: supplyMode,
+        price: price ? Number(price) : null,
+        currency,
+        unit: unit || undefined,
+        dimensions: dimensions || undefined,
+        external_sku: sku || undefined,
+        metadata,
+        images,
+      });
+
+      toast({ title: 'Product created', description: 'Embeddings are generating in the background.' });
+      onCreated?.(productId);
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: 'Create failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Add product</DialogTitle></DialogHeader>
+
+        <div className="space-y-4">
+          {/* Basics */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1 col-span-2">
+              <Label>Name *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Calacatta Lux" />
+            </div>
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Input list="dealer-cat-suggestions" value={category} onChange={(e) => setCategory(e.target.value.toLowerCase())} placeholder="tiles, wood…" />
+              <datalist id="dealer-cat-suggestions">
+                {CATEGORY_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-1">
+              <Label>SKU</Label>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="optional" />
+            </div>
+            <div className="space-y-1">
+              <Label>Price</Label>
+              <Input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{['EUR', 'USD', 'GBP'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Unit</Label>
+                <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m², pcs" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Dimensions</Label>
+              <Input value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="60×60 cm" />
+            </div>
+            <div className="space-y-1">
+              <Label>Supply mode</Label>
+              <Select value={supplyMode} onValueChange={(v: any) => setSupplyMode(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="platform_sold">Platform-sold</SelectItem>
+                  <SelectItem value="reference_only">Reference only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Description</Label>
+            <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+
+          {/* Dynamic attributes */}
+          <div className="space-y-2 rounded-md border border-border/60 p-3">
+            <div className="text-sm font-medium">
+              Attributes {category && <span className="text-xs text-muted-foreground">— for {category}</span>}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {attrKeys.map((k) => (
+                <div key={k} className="space-y-1">
+                  <Label className="text-xs flex items-center justify-between">
+                    {labelFor(k)}
+                    {!COMMON_FACET_KEYS.includes(k) && !categoryFields.some((f) => f.field_name === k) && (
+                      <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeAttr(k)}><X className="h-3 w-3" /></button>
+                    )}
+                  </Label>
+                  <Input
+                    className="h-8 text-xs"
+                    list={facetOptions[k] ? `facet-${k}` : undefined}
+                    value={attrs[k] ?? ''}
+                    onChange={(e) => setAttr(k, e.target.value)}
+                    placeholder={k === 'available_colors' ? 'comma,separated' : ''}
+                  />
+                  {facetOptions[k] && (
+                    <datalist id={`facet-${k}`}>
+                      {facetOptions[k].map((v) => <option key={v} value={v} />)}
+                    </datalist>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Input className="h-8 text-xs" value={customKey} onChange={(e) => setCustomKey(e.target.value)}
+                placeholder="add attribute key…" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} />
+              <Button type="button" size="sm" variant="outline" onClick={addCustom}><Plus className="h-3 w-3" /></Button>
+            </div>
+          </div>
+
+          {/* Images */}
+          <div className="space-y-2">
+            <Label className="text-sm">Images</Label>
+            <div className="flex flex-wrap gap-2">
+              {files.map((f, i) => (
+                <div key={i} className="relative h-16 w-16 rounded-md overflow-hidden border border-border/60">
+                  <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
+                  <button type="button" className="absolute top-0 right-0 bg-black/60 p-0.5" onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <X className="h-3 w-3 text-white" />
+                  </button>
+                </div>
+              ))}
+              <label className="h-16 w-16 rounded-md border border-dashed border-border/60 flex items-center justify-center cursor-pointer hover:bg-muted/30">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <input type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => { setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])]); e.target.value = ''; }} />
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <ImageIcon className="h-3 w-3" /> Images run the full visual-search embedding suite, same as catalog products.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={handleSave} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Create product
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

@@ -10,9 +10,11 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
-import { Loader2, Package, Search, Filter } from 'lucide-react';
+import { Loader2, Package, Search, Filter, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 import type { Material } from '@/types/materials';
 import {
   PRODUCT_IMAGE_SELECT,
@@ -35,6 +37,8 @@ export const MaterialsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const { canSupplyProducts } = useCapabilities();
 
   useEffect(() => {
     loadMaterials();
@@ -198,12 +202,23 @@ export const MaterialsPage: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className="text-sm sm:text-lg px-3 sm:px-4 py-1.5 sm:py-2 self-start sm:self-auto">
-              {materials.length} Materials
-            </Badge>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {canSupplyProducts && (
+                <Button onClick={() => setAddOpen(true)} className="rounded-full">
+                  <Plus className="h-4 w-4 mr-1" /> New product
+                </Button>
+              )}
+              <Badge variant="outline" className="text-sm sm:text-lg px-3 sm:px-4 py-1.5 sm:py-2">
+                {materials.length} Materials
+              </Badge>
+            </div>
           </div>
         </div>
       </div>
+
+      {canSupplyProducts && (
+        <AddDealerProductDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => loadMaterials()} />
+      )}
 
       {/* Main Content */}
       <div className="page-container py-6">
