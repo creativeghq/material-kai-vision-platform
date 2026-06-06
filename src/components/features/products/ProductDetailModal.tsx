@@ -28,6 +28,7 @@ import { ProductMonitorTab } from '@/components/business/price-monitoring/Produc
 import { MentionMonitorTab } from '@/components/business/mention-monitoring/MentionMonitorTab';
 import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
+import { WorkspaceCostBadge } from '@/components/business/marketplace/WorkspaceCostBadge';
 import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
@@ -1826,6 +1827,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </Button>
               )}
             </div>
+            <WorkspaceCostBadge productId={product.id} className="mt-2" />
           </div>
           {/* Description moved to Details tab — avoids duplication with the
               full description card that also falls back to chunk content. */}
