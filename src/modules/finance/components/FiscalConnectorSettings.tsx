@@ -2,29 +2,22 @@
  * e-Invoicing (myDATA / AADE) settings — mounted inside Finance → Settings.
  *
  * Two blocks:
- *  1. Operator master key (platform-operator only): the single Novus key every
- *     tenant transmits through. Stored on the root workspace; env NOVUS_API_KEY
- *     wins at runtime if set.
- *  2. Per-workspace enablement: bind this workspace's `legal_invoice` capability
- *     to a connector. Reminder that the workspace VAT must be authorized in the
- *     master Novus portal first.
+ *  1. Master keys (platform-operator only): the standard SecretsManagerCard for the
+ *     sales-finance module — NOVUS_API_KEY / NOVUS_SANDBOX / NOVUS_API_BASE_URL, the
+ *     same env-first/DB-second mechanism as every other key. One operator key; all
+ *     tenants transmit through it.
+ *  2. Per-workspace enablement: bind this workspace's `legal_invoice` capability to a
+ *     connector, with the VAT-authorization reminder.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Save, ShieldCheck, KeyRound, Info, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Loader2, Info, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import {
-  fiscalConnectorService,
-  type FiscalConnector,
-  type MasterCredentialStatus,
-} from '@/services/fiscalConnectorService';
+import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
+import { fiscalConnectorService, type FiscalConnector } from '@/services/fiscalConnectorService';
 
 interface Props {
   workspaceId: string;
@@ -32,22 +25,12 @@ interface Props {
 
 export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
   const { toast } = useToast();
-  const { isPlatformOperator, memberships } = useWorkspace();
-  const rootWorkspaceId = useMemo(
-    () => memberships.find((m) => m.workspace.isRoot)?.workspaceId ?? null,
-    [memberships],
-  );
+  const { isPlatformOperator } = useWorkspace();
 
   const [connectors, setConnectors] = useState<FiscalConnector[]>([]);
   const [boundSlug, setBoundSlug] = useState<string>('none');
   const [loading, setLoading] = useState(true);
   const [savingBinding, setSavingBinding] = useState(false);
-
-  // master key (operator)
-  const [masterStatus, setMasterStatus] = useState<MasterCredentialStatus>({ is_sandbox: true, is_configured: false });
-  const [apiKey, setApiKey] = useState('');
-  const [sandbox, setSandbox] = useState(true);
-  const [savingKey, setSavingKey] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,13 +44,6 @@ export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
         if (cancelled) return;
         setConnectors(conns);
         setBoundSlug(binding?.connector_slug ?? 'none');
-        if (isPlatformOperator && rootWorkspaceId) {
-          const status = await fiscalConnectorService.getMasterCredentialStatus(rootWorkspaceId);
-          if (!cancelled) {
-            setMasterStatus(status);
-            setSandbox(status.is_sandbox);
-          }
-        }
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load e-Invoicing settings', description: err?.message, variant: 'destructive' });
       } finally {
@@ -75,7 +51,7 @@ export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, isPlatformOperator, rootWorkspaceId]);
+  }, [workspaceId]);
 
   const legalConnectors = connectors.filter((c) => c.capabilities.includes('legal_invoice'));
 
@@ -92,83 +68,26 @@ export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
     }
   };
 
-  const saveKey = async () => {
-    if (!rootWorkspaceId) return;
-    if (!masterStatus.is_configured && !apiKey.trim()) {
-      toast({ title: 'Enter the master Novus API key', variant: 'destructive' });
-      return;
-    }
-    try {
-      setSavingKey(true);
-      await fiscalConnectorService.saveMasterCredential(rootWorkspaceId, { apiKey: apiKey.trim() || undefined, isSandbox: sandbox });
-      setApiKey('');
-      setMasterStatus({ is_configured: masterStatus.is_configured || !!apiKey.trim(), is_sandbox: sandbox });
-      toast({ title: 'Master key saved' });
-    } catch (err: any) {
-      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
-    } finally {
-      setSavingKey(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <Card className="lg:col-span-2">
-        <CardContent className="flex justify-center py-10">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" /> e-Invoicing (myDATA / AADE)
-        </CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2">e-Invoicing (myDATA / AADE)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
-        {/* Operator master key */}
+        {/* Operator master keys — standard secrets registry */}
         {isPlatformOperator && (
-          <div className="rounded-md border border-primary/30 bg-primary/5 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <KeyRound className="h-4 w-4 text-primary" /> Master Novus key (operator)
-              {masterStatus.is_configured ? (
-                <Badge variant="secondary" className="ml-1">Configured</Badge>
-              ) : (
-                <Badge variant="outline" className="ml-1 border-amber-500/50 text-amber-500">Key needed</Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground leading-snug">
-              One key for the whole platform. Every tenant transmits through it with their own VAT as issuer.
-              The environment variable <code>NOVUS_API_KEY</code> takes precedence if set on the backend.
-            </p>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label>API key {masterStatus.is_configured && <span className="text-muted-foreground">(leave blank to keep current)</span>}</Label>
-                <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={masterStatus.is_configured ? '••••••••••••' : 'Paste the Novus API key'} />
-              </div>
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Switch checked={sandbox} onCheckedChange={setSandbox} />
-                  <span className="text-sm">{sandbox ? 'Sandbox (provider-dev)' : 'Production'}</span>
-                </div>
-                <Button onClick={saveKey} disabled={savingKey}>
-                  {savingKey ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Save key
-                </Button>
-              </div>
-            </div>
-          </div>
+          <SecretsManagerCard
+            scope={{ mode: 'module', moduleSlug: 'sales-finance' }}
+            title="e-Invoicing keys (operator)"
+            description="One master Novus key for the whole platform — every tenant transmits through it with their own issuer VAT. NOVUS_SANDBOX=false switches to production."
+          />
         )}
 
         {/* Per-workspace enablement */}
         <div className="space-y-2">
           <Label>Legal invoice connector for this workspace</Label>
           <div className="flex items-center gap-3">
-            <Select value={boundSlug} onValueChange={saveBinding} disabled={savingBinding}>
+            <Select value={boundSlug} onValueChange={saveBinding} disabled={savingBinding || loading}>
               <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Disabled (no e-Invoicing)</SelectItem>
@@ -177,7 +96,7 @@ export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
                 ))}
               </SelectContent>
             </Select>
-            {savingBinding && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            {(savingBinding || loading) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
           {boundSlug !== 'none' && (
             <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs flex items-start gap-2">

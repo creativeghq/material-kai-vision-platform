@@ -16,6 +16,7 @@
 // clear "add the master key" message instead of calling with an empty key.
 
 import { novusConnector, novusBaseUrl } from './novus.ts';
+import { resolveSecret } from '../secrets.ts';
 import type { FiscalCapability, FiscalConnector, FiscalConnectorContext } from './types.ts';
 
 const CONNECTORS: Record<string, FiscalConnector> = {
@@ -59,23 +60,18 @@ export async function resolveWorkspaceConnector(
     return { ok: false, error: `Connector "${slug}" is not implemented yet.`, code: 'not_implemented' };
   }
 
-  // MASTER credentials: resolve from the ROOT (operator) workspace, never the
-  // submitting tenant. Env wins (deploy-time master key); else the root credential
-  // row (admin-configurable). The submitting tenant only supplies its issuer VAT.
-  const { data: root } = await supabase.from('workspaces').select('id').eq('is_root', true).maybeSingle();
-  const { data: cred } = root?.id
-    ? await supabase
-        .from('workspace_fiscal_credentials')
-        .select('credentials, is_sandbox')
-        .eq('workspace_id', root.id)
-        .eq('connector_slug', slug)
-        .maybeSingle()
-    : { data: null };
+  // MASTER credentials from the standard platform_secrets registry (env-first,
+  // DB-second). One operator key for everyone; the submitting tenant only supplies
+  // its issuer VAT (built in invoice-builder).
+  const [keyRes, sandboxRes, baseRes] = await Promise.all([
+    resolveSecret(supabase, 'NOVUS_API_KEY'),
+    resolveSecret(supabase, 'NOVUS_SANDBOX'),
+    resolveSecret(supabase, 'NOVUS_API_BASE_URL'),
+  ]);
 
-  const isSandbox: boolean = cred?.is_sandbox ?? (Deno.env.get('NOVUS_SANDBOX') !== 'false');
-  const apiKey: string = Deno.env.get('NOVUS_API_KEY') ?? (cred?.credentials?.api_key as string | undefined) ?? '';
-  const baseUrl: string =
-    (cred?.credentials?.base_url as string | undefined) ?? (slug === 'novus' ? novusBaseUrl(isSandbox) : '');
+  const isSandbox = (sandboxRes.value ?? 'true') !== 'false';
+  const apiKey = keyRes.value ?? '';
+  const baseUrl = baseRes.value || (slug === 'novus' ? novusBaseUrl(isSandbox) : '');
 
   const ctx: FiscalConnectorContext = { baseUrl, apiKey, isSandbox };
   const isConfigured = !!apiKey && !!baseUrl;

@@ -26,11 +26,6 @@ export interface FiscalBinding {
   is_active: boolean;
 }
 
-export interface MasterCredentialStatus {
-  is_sandbox: boolean;
-  is_configured: boolean;
-}
-
 export interface FiscalSubmission {
   id: string;
   invoice_id: string | null;
@@ -85,37 +80,6 @@ export const fiscalConnectorService = {
       { workspace_id: workspaceId, capability, connector_slug: connectorSlug, is_active: true, updated_at: new Date().toISOString() },
       { onConflict: 'workspace_id,capability' },
     );
-    if (error) throw error;
-  },
-
-  async getMasterCredentialStatus(rootWorkspaceId: string): Promise<MasterCredentialStatus> {
-    const { data } = await supabase
-      .from('workspace_fiscal_credentials')
-      .select('is_sandbox, is_configured')
-      .eq('workspace_id', rootWorkspaceId)
-      .eq('connector_slug', 'novus')
-      .maybeSingle();
-    return (data as MasterCredentialStatus) ?? { is_sandbox: true, is_configured: false };
-  },
-
-  /** Operator-only (RLS: finance manager of root). apiKey optional → toggle sandbox without re-entering. */
-  async saveMasterCredential(
-    rootWorkspaceId: string,
-    opts: { apiKey?: string; isSandbox: boolean },
-  ): Promise<void> {
-    const patch: Record<string, unknown> = {
-      workspace_id: rootWorkspaceId,
-      connector_slug: 'novus',
-      is_sandbox: opts.isSandbox,
-      updated_at: new Date().toISOString(),
-    };
-    if (opts.apiKey && opts.apiKey.trim()) {
-      patch.credentials = { api_key: opts.apiKey.trim() };
-      patch.is_configured = true;
-    }
-    const { error } = await supabase
-      .from('workspace_fiscal_credentials')
-      .upsert(patch, { onConflict: 'workspace_id,connector_slug' });
     if (error) throw error;
   },
 
