@@ -7,6 +7,7 @@ import { Toaster } from '@/components/core/ui/toaster';
 import { Toaster as Sonner } from '@/components/core/ui/sonner';
 import { TooltipProvider } from '@/components/core/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
@@ -137,6 +138,7 @@ const App = () => (
   <CriticalErrorBoundary name="Application Root">
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <WorkspaceProvider>
         <ThemeProvider>
         <TooltipProvider>
           <Toaster />
@@ -700,6 +702,7 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
         </ThemeProvider>
+        </WorkspaceProvider>
       </AuthProvider>
     </QueryClientProvider>
   </CriticalErrorBoundary>
