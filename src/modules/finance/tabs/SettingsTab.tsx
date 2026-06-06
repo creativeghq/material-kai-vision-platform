@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -8,6 +8,7 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
@@ -17,6 +18,16 @@ import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCar
 import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
+
+const SETTINGS_SECTIONS = [
+  { value: 'general', label: 'General', icon: SlidersHorizontal },
+  { value: 'identity', label: 'Business identity', icon: Building2 },
+  { value: 'documents', label: 'Documents', icon: FileText },
+  { value: 'pricing', label: 'Pricing', icon: Tag },
+  { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
+  { value: 'digest', label: 'Finance digest', icon: Mail },
+  { value: 'payments', label: 'Payments', icon: CreditCard },
+] as const;
 
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
@@ -133,11 +144,37 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <BusinessIdentityCard workspaceId={workspaceId} />
+    <Tabs defaultValue="general" orientation="vertical" className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+        {SETTINGS_SECTIONS.map((s) => (
+          <TabsTrigger
+            key={s.value}
+            value={s.value}
+            className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            <s.icon className="h-4 w-4" /> {s.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
 
-      <DocumentSetupCard workspaceId={workspaceId} />
+      <div className="w-full min-w-0 flex-1 space-y-4">
+        <TabsContent value="identity" className="mt-0">
+          <BusinessIdentityCard workspaceId={workspaceId} />
+        </TabsContent>
 
+        <TabsContent value="documents" className="mt-0">
+          <DocumentSetupCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="pricing" className="mt-0">
+          <PricingRulesCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="payments" className="mt-0">
+          <PaymentRoutingCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="general" className="mt-0">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module settings</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
@@ -187,7 +224,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           </Button>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="statements" className="mt-0">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Statement PDF design</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
@@ -216,8 +255,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('footer', f); e.target.value = ''; }} />
         </CardContent>
       </Card>
+        </TabsContent>
 
-      <Card className="lg:col-span-2">
+        <TabsContent value="digest" className="mt-0">
+      <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Finance digest</CardTitle>
         </CardHeader>
@@ -231,11 +272,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           />
         </CardContent>
       </Card>
-
-      <PricingRulesCard workspaceId={workspaceId} />
-
-      <PaymentRoutingCard workspaceId={workspaceId} />
-    </div>
+        </TabsContent>
+      </div>
+    </Tabs>
   );
 };
 
