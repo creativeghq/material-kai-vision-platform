@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 // =====================================================
 // INTERFACES
@@ -193,7 +194,9 @@ export class QuotesService {
       .insert({
         user_id: user.id, // required for RLS policy
         name: data?.name,
-        workspace_id: data?.workspace_id,
+        // Default to the user's ACTIVE workspace so quotes (and the invoices/myDATA
+        // docs derived from them) land in the workspace they're working in, not root.
+        workspace_id: data?.workspace_id ?? getActiveWorkspaceId(user.id) ?? undefined,
         project_id: data?.project_id ?? null,
         notes: data?.notes,
         custom_request_text: data?.custom_request_text,

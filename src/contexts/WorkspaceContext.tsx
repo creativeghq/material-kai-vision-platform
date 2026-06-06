@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLES } from '@/auth/roles';
 import { workspaceManagementService, REFERRAL_STORAGE_KEY } from '@/services/workspaceManagementService';
+import { ACTIVE_WORKSPACE_KEY } from '@/utils/activeWorkspace';
 
 /**
  * WorkspaceContext — the single source of truth for the *active* workspace and
@@ -75,7 +76,7 @@ export const useWorkspace = (): WorkspaceContextType => {
   return ctx;
 };
 
-const activeKey = (userId: string) => `mk_active_workspace_${userId}`;
+const activeKey = ACTIVE_WORKSPACE_KEY;
 
 function rankOf(node: WorkspaceNode | null): MarketplaceRank | null {
   if (!node) return null;
