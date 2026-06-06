@@ -35,6 +35,7 @@ const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePa
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
+const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage'));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -194,6 +195,16 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <MaterialRecognition />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/network"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <MarketplaceNetworkPage />
                       </Layout>
                     </AuthGuard>
                   }

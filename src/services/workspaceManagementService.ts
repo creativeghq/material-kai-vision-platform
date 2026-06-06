@@ -28,4 +28,18 @@ export const workspaceManagementService = {
     if (error) throw error;
     return data ?? [];
   },
+
+  /** Edit a direct child's per-edge settings (caller must own/admin the parent). */
+  async updateChildSettings(
+    workspaceId: string,
+    patch: { catalogAccess?: 'operator_catalog' | 'own_products_only'; commissionPct?: number; canSupplyProducts?: boolean },
+  ): Promise<void> {
+    const { error } = await supabase.rpc('update_child_workspace_settings', {
+      p_workspace_id: workspaceId,
+      p_catalog_access: patch.catalogAccess ?? null,
+      p_commission_pct: patch.commissionPct ?? null,
+      p_can_supply_products: patch.canSupplyProducts ?? null,
+    });
+    if (error) throw error;
+  },
 };
