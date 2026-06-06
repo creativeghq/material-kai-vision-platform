@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService } from '../services/QuotesService';
 import {
   getAvailableSizes,
+  getAvailableColors,
   getManufacturer,
   getCollection,
   getProductName,
@@ -71,6 +72,7 @@ interface ProductWithImage {
 interface SelectedProduct extends ProductWithImage {
   quantity: number;
   selectedSize?: string;
+  selectedColor?: string;
   room?: string;
   dimensions?: string;
 }
@@ -171,13 +173,19 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   // Add catalog product to selection
   const handleSelectProduct = useCallback((product: ProductWithImage) => {
     const sizes = getAvailableSizes(product.metadata);
+    const colors = getAvailableColors(product.metadata);
     setSelectedProducts(prev => [...prev, {
       ...product,
       quantity: 1,
       selectedSize: sizes.length > 0 ? sizes[0] : undefined,
+      selectedColor: colors.length > 0 ? colors[0] : undefined,
     }]);
     setSearchQuery('');
     setSearchResults([]);
+  }, []);
+
+  const handleColorChange = useCallback((productId: string, color: string) => {
+    setSelectedProducts(prev => prev.map(p => p.id === productId ? { ...p, selectedColor: color } : p));
   }, []);
 
   const handleQuantityChange = useCallback((productId: string, delta: number) => {
@@ -202,13 +210,19 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     try {
       setAdding(true);
       for (const product of selectedProducts) {
-        const notes = product.selectedSize ? `Size: ${product.selectedSize}` : undefined;
+        const variantBits = [product.selectedSize && `Size: ${product.selectedSize}`, product.selectedColor && `Colour: ${product.selectedColor}`].filter(Boolean);
         await quotesService.addItem({
           quote_id: quoteId,
           product_id: product.id,
           quantity: product.quantity,
           added_from: 'manual',
-          notes,
+          notes: variantBits.length ? variantBits.join(' · ') : undefined,
+          selected_size: product.selectedSize || undefined,
+          selected_color: product.selectedColor || undefined,
+          selected_attributes: {
+            ...(product.selectedSize ? { size: product.selectedSize } : {}),
+            ...(product.selectedColor ? { color: product.selectedColor } : {}),
+          },
           room: product.room || undefined,
           dimensions: product.dimensions || undefined,
         });
@@ -434,16 +448,26 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                               />
                             </TableCell>
                             <TableCell>
-                              {availableSizes.length > 0 ? (
-                                <Select value={product.selectedSize || availableSizes[0]} onValueChange={(v) => handleSizeChange(product.id, v)}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Size" /></SelectTrigger>
-                                  <SelectContent>
-                                    {availableSizes.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">N/A</span>
-                              )}
+                              <div className="space-y-1">
+                                {availableSizes.length > 0 && (
+                                  <Select value={product.selectedSize || availableSizes[0]} onValueChange={(v) => handleSizeChange(product.id, v)}>
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Size" /></SelectTrigger>
+                                    <SelectContent>{availableSizes.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                )}
+                                {(() => {
+                                  const availableColors = getAvailableColors(product.metadata);
+                                  return availableColors.length > 0 ? (
+                                    <Select value={product.selectedColor || availableColors[0]} onValueChange={(v) => handleColorChange(product.id, v)}>
+                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Colour" /></SelectTrigger>
+                                      <SelectContent>{availableColors.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                  ) : null;
+                                })()}
+                                {availableSizes.length === 0 && getAvailableColors(product.metadata).length === 0 && (
+                                  <span className="text-xs text-muted-foreground">N/A</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center gap-1">

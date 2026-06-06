@@ -429,6 +429,7 @@ export class QuotesService {
     added_from?: QuoteItem['added_from'];
     selected_size?: string;
     selected_color?: string;
+    selected_attributes?: Record<string, any>;
     room?: string;
     room_id?: string | null;
     dimensions?: string;
@@ -458,6 +459,7 @@ export class QuotesService {
         added_from: data.added_from || 'manual',
         selected_size: data.selected_size,
         selected_color: data.selected_color,
+        selected_attributes: data.selected_attributes ?? {},
         room: data.room || null,
         room_id: data.room_id ?? null,
         dimensions: data.dimensions || null,
