@@ -196,6 +196,26 @@ Deno.serve(async (req) => {
             } else {
               await supabase.from('invoices').update({ fiscal_status: result.status }).eq('id', invoiceId);
             }
+
+            // #181 meter the transmission against the issuing user's platform credits.
+            // The operator root transmits free; sub-tenants are billed per accepted doc.
+            if ((result.status === 'accepted' || result.status === 'offline') && auth.userId) {
+              try {
+                const { data: wsRow } = await supabase
+                  .from('workspaces').select('is_root').eq('id', invRow!.workspace_id).single();
+                if (!wsRow?.is_root) {
+                  await supabase.rpc('debit_user_credits', {
+                    p_user_id: auth.userId,
+                    p_amount: 2, // platform cost per myDATA transmission (markup on Novus ~0.5-1 cr)
+                    p_operation_type: 'einvoice_transmission',
+                    p_description: `myDATA transmission for invoice ${invoiceId}`,
+                  });
+                }
+              } catch (e) {
+                console.warn('einvoice credit debit skipped', e);
+              }
+            }
+
             fiscalResult = { ok: true, ...result };
           } catch (err: any) {
             fiscalResult = { ok: false, error: err?.message ?? 'fiscal submission failed' };
