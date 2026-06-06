@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService } from '@/services/invoicingSetupService';
+import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -34,6 +35,8 @@ interface LineItem {
   unit_cost: string;
   income_classification_type: string;
   income_classification_category: string;
+  product_id?: string | null;       // set when the line came from a service/product
+  vat_category?: number | null;      // myDATA VAT category for this line (e.g. a service)
   expanded?: boolean;
 }
 
@@ -81,6 +84,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
   const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
   const [withholdingCode, setWithholdingCode] = useState<string>('');
+  const [services, setServices] = useState<ServiceItem[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -107,6 +111,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       ]);
       setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
       setWithholdingCode('');
+      servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       // Only types the workspace enabled; if none configured, show all.
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
@@ -164,6 +169,29 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   const addLine = () => setLines((prev) => [...prev, emptyLine()]);
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
+
+  // #203 — drop a service in as a prefilled line (price + VAT + classification from the service).
+  const addServiceLine = (serviceId: string) => {
+    const s = services.find((x) => x.id === serviceId);
+    if (!s) return;
+    setLines((prev) => {
+      const next = [...prev];
+      const line: LineItem = {
+        description: s.name,
+        sku: '',
+        quantity: '1',
+        unit_price: s.list_price != null ? String(s.list_price) : '0',
+        unit_cost: '',
+        income_classification_type: s.income_classification_type ?? '',
+        income_classification_category: s.income_classification_category ?? '',
+        product_id: s.id,
+        vat_category: s.vat_category,
+      };
+      // Replace a single empty starter row, otherwise append.
+      if (next.length === 1 && !next[0].description.trim()) return [line];
+      return [...next, line];
+    });
+  };
 
   const totals = (() => {
     let subtotal = 0;
@@ -239,6 +267,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           line_total: Number((q * p).toFixed(2)),
           income_classification_type: l.income_classification_type || null,
           income_classification_category: l.income_classification_category || null,
+          product_id: l.product_id || null,
+          vat_category: l.vat_category ?? null,
         };
       });
 
@@ -349,9 +379,23 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
           {/* Line items */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label>Line items</Label>
-              <Button size="sm" variant="outline" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
+              <div className="flex items-center gap-2">
+                {services.length > 0 && (
+                  <Select value="" onValueChange={addServiceLine}>
+                    <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Add service" /></SelectTrigger>
+                    <SelectContent>
+                      {services.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}{s.list_price != null ? ` — ${s.list_price} ${s.currency}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button size="sm" variant="outline" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
+              </div>
             </div>
             <div className="overflow-x-auto rounded-md border border-border/60">
               <table className="w-full text-sm">

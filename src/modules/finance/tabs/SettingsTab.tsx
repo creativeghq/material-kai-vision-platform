@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -16,6 +16,7 @@ import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingC
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
 import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
+import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -24,6 +25,7 @@ const SETTINGS_SECTIONS = [
   { value: 'identity', label: 'Business identity', icon: Building2 },
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'pricing', label: 'Pricing', icon: Tag },
+  { value: 'services', label: 'Services', icon: Wrench },
   { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
   { value: 'digest', label: 'Finance digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
@@ -168,6 +170,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="pricing" className="mt-0">
           <PricingRulesCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="services" className="mt-0">
+          <ServicesCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="payments" className="mt-0">

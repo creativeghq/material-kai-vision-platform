@@ -88,6 +88,7 @@ export const MaterialsPage: React.FC = () => {
         .from('products')
         .select(`*, ${PRODUCT_IMAGE_SELECT}`)
         .eq('workspace_id', workspaceData.workspace_id)
+        .neq('item_type', 'service') // services are sold via Finance, not shown as materials
         .order('created_at', { ascending: false });
 
       if (productsError) {
