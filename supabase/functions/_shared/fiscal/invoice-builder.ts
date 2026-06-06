@@ -89,12 +89,25 @@ export async function buildInvoiceInputFromDb(
 
   const rate = Number(inv.vat_rate ?? fs?.default_vat_rate ?? 24);
   const cat = vatCategory(rate);
-  const incType = overrides.incomeClassificationType ?? 'E3_561_001';
-  const incCat = overrides.incomeClassificationCategory ?? 'category1_1';
+  const incType = overrides.incomeClassificationType ?? fs?.default_income_classification_type ?? 'E3_561_001';
+  const incCat = overrides.incomeClassificationCategory ?? fs?.default_income_classification_category ?? 'category1_1';
+
+  // Pull per-product myDATA defaults (#178) for income classification + vat category.
+  const productIds = [...new Set((items ?? []).map((it: any) => it.product_id).filter(Boolean))];
+  const prodMap: Record<string, any> = {};
+  if (productIds.length) {
+    const { data: prods } = await supabase
+      .from('products')
+      .select('id, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category')
+      .in('id', productIds);
+    for (const p of prods ?? []) prodMap[p.id] = p;
+  }
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
-    const net = round2(Number(it.line_total ?? Number(it.unit_price ?? 0) * Number(it.quantity ?? 1)));
-    const vat = round2((net * rate) / 100);
+    const prod = it.product_id ? prodMap[it.product_id] : null;
+    const net = round2(Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * Number(it.quantity ?? 1)));
+    const lineCat = it.vat_category ?? prod?.mydata_vat_category ?? cat;
+    const vat = round2(Number(it.vat_amount ?? (net * rate) / 100));
     return {
       lineNumber: i + 1,
       code: it.sku ?? undefined,
@@ -103,11 +116,11 @@ export async function buildInvoiceInputFromDb(
       measurementUnitLabel: it.unit ?? 'ΤΜΧ',
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
-      vatCategory: cat,
+      vatCategory: lineCat,
       vatPercent: rate,
       vatAmount: vat,
-      incomeClassificationType: incType,
-      incomeClassificationCategory: incCat,
+      incomeClassificationType: it.income_classification_type ?? prod?.mydata_income_classification_type ?? incType,
+      incomeClassificationCategory: it.income_classification_category ?? prod?.mydata_income_classification_category ?? incCat,
     };
   });
 
@@ -115,7 +128,7 @@ export async function buildInvoiceInputFromDb(
   const totalVat = round2(lines.reduce((s, l) => s + l.vatAmount, 0));
   const totalGross = round2(totalNet + totalVat);
 
-  const invoiceType = overrides.invoiceType ?? (counterpart.vatNumber ? '1.1' : '11.1');
+  const invoiceType = overrides.invoiceType ?? inv.document_type ?? (counterpart.vatNumber ? '1.1' : '11.1');
   const series = overrides.series ?? (fs?.invoice_number_prefix || 'A');
   const aa = overrides.aa ?? String(inv.legal_number ?? inv.internal_number ?? '');
   const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
@@ -128,7 +141,8 @@ export async function buildInvoiceInputFromDb(
     summary: {
       totalNetValue: totalNet,
       totalVatAmount: totalVat,
-      totalGrossValue: totalGross,
+      totalGrossValue: round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + Number(inv.total_other_taxes_amount ?? 0) - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0)),
+      totalWithheldAmount: Number(inv.total_withheld_amount ?? 0),
       incomeClassificationType: incType,
       incomeClassificationCategory: incCat,
     },
