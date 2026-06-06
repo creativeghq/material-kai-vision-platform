@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
-import { buildInvoiceInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
+import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 //
@@ -23,6 +23,8 @@ interface RequestBody {
   quote_id?: string;
   /** Operate on an existing invoice directly (e.g. submit a manual invoice to myDATA). */
   invoice_id?: string;
+  /** Submit a credit note (myDATA 5.1) to the workspace's legal_invoice connector. */
+  credit_note_id?: string;
   issue_now?: boolean;
   push_to_oxygen?: boolean;
   /** Transmit the invoice to the workspace's `legal_invoice` connector (e.g. Novus → myDATA). */
@@ -52,8 +54,8 @@ Deno.serve(async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id) {
-      return json({ error: 'quote_id or invoice_id is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id) {
+      return json({ error: 'quote_id, invoice_id or credit_note_id is required' }, 400);
     }
 
     const supabase = createClient(
@@ -61,6 +63,86 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+
+    // ── Credit-note submission path (myDATA 5.1) ──────────────────────────────
+    // A credit note is already created + the invoice already netted by issue_credit_note;
+    // here we transmit it to the legal_invoice connector and stamp the MARK back.
+    if (body.credit_note_id) {
+      const { data: cnRow } = await supabase
+        .from('credit_notes').select('workspace_id, fiscal_status, invoice_id')
+        .eq('id', body.credit_note_id).single();
+      if (!cnRow) return json({ error: 'credit note not found' }, 404);
+
+      if (cnRow.fiscal_status === 'accepted') {
+        return json({ ok: true, credit_note_id: body.credit_note_id, fiscal: { ok: true, skipped: true, reason: 'already_accepted' } });
+      }
+
+      const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
+        p_workspace_id: cnRow.workspace_id, p_module_slug: 'e-invoicing',
+      });
+      if (!entitled) {
+        return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
+      }
+
+      const resolved = await resolveWorkspaceConnector(supabase, cnRow.workspace_id, 'legal_invoice');
+      if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
+
+      try {
+        const input = await buildCreditNoteInputFromDb(supabase, body.credit_note_id, body.fiscal_overrides ?? {});
+        const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+          skipSignature: body.skip_signature,
+        });
+
+        await supabase.from('fiscal_submissions').insert({
+          workspace_id: cnRow.workspace_id,
+          invoice_id: cnRow.invoice_id, // correlated source invoice, for audit linkage
+          connector_slug: resolved.resolved.slug,
+          capability: 'legal_invoice',
+          status: result.status,
+          mark: result.mark ?? null,
+          uid: result.uid ?? null,
+          authentication_code: result.authenticationCode ?? null,
+          qr_url: result.qrUrl ?? null,
+          invoice_url: result.invoiceUrl ?? null,
+          fiscal_invoice_type: input.header.invoiceType,
+          series: input.header.series,
+          aa: input.header.aa,
+          is_offline: result.isOffline,
+          transmission_failure: result.transmissionFailure ?? false,
+          provider_credits: result.providerCredits ?? null,
+          request_payload: input,
+          response_payload: result.raw ?? null,
+          error_code: result.errorCode ?? null,
+          error_message: result.errorMessage ?? null,
+        });
+
+        const accepted = result.status === 'accepted' || result.status === 'offline';
+        await supabase.from('credit_notes').update({
+          fiscal_status: result.status,
+          fiscal_mark: result.mark ?? null,
+          status: accepted ? 'submitted' : 'failed',
+          updated_at: new Date().toISOString(),
+        }).eq('id', body.credit_note_id);
+
+        if (accepted && auth.userId) {
+          try {
+            const { data: wsRow } = await supabase.from('workspaces').select('is_root').eq('id', cnRow.workspace_id).single();
+            if (!wsRow?.is_root) {
+              await supabase.rpc('debit_user_credits', {
+                p_user_id: auth.userId, p_amount: 2,
+                p_operation_type: 'einvoice_transmission',
+                p_description: `myDATA credit note ${body.credit_note_id}`,
+              });
+            }
+          } catch (e) { console.warn('credit-note credit debit skipped', e); }
+        }
+
+        const { data: finalCn } = await supabase.from('credit_notes').select('*').eq('id', body.credit_note_id).single();
+        return json({ ok: true, credit_note_id: body.credit_note_id, credit_note: finalCn, fiscal: { ok: true, ...result } });
+      } catch (err: any) {
+        return json({ ok: false, error: err?.message ?? 'credit note submission failed' }, 500);
+      }
+    }
 
     // 1. Resolve the invoice: existing invoice_id, or idempotent create from quote.
     let invoiceId: string;

@@ -20,6 +20,7 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import {
   financeService,
@@ -489,21 +490,29 @@ const RecordPaymentDialog: React.FC<{
 }> = ({ open, onOpenChange, invoice, onSaved }) => {
   const { toast } = useToast();
   const [amount, setAmount] = useState<string>('');
+  const [currency, setCurrency] = useState<string>(invoice.currency || 'EUR');
+  const [fxRate, setFxRate] = useState<string>('1');        // payment currency → invoice currency
+  const [fxRateToBase, setFxRateToBase] = useState<string>('1'); // payment currency → base (EUR)
   const [method, setMethod] = useState<PaymentMethod>('bank_transfer');
   const [reference, setReference] = useState('');
   const [paidAt, setPaidAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const foreign = currency !== (invoice.currency || 'EUR');
+
   useEffect(() => {
     if (open) {
       setAmount(invoice.amount_due ? String(invoice.amount_due) : '');
+      setCurrency(invoice.currency || 'EUR');
+      setFxRate('1');
+      setFxRateToBase('1');
       setMethod('bank_transfer');
       setReference('');
       setPaidAt(new Date().toISOString().slice(0, 10));
       setNotes('');
     }
-  }, [open, invoice.amount_due]);
+  }, [open, invoice.amount_due, invoice.currency]);
 
   const handleSave = async () => {
     const num = parseFloat(amount);
@@ -511,20 +520,29 @@ const RecordPaymentDialog: React.FC<{
       toast({ title: 'Invalid amount', variant: 'destructive' });
       return;
     }
+    const rate = foreign ? (parseFloat(fxRate) || 0) : 1;
+    if (foreign && rate <= 0) {
+      toast({ title: 'Enter a valid exchange rate', variant: 'destructive' });
+      return;
+    }
     try {
       setBusy(true);
+      // `num` is in the payment currency; the value applied to the invoice is num×rate
+      // (invoice currency). amount_doc/fx_rate let the RPC compute realized FX gain/loss.
+      const appliedToInvoice = Math.round(num * rate * 100) / 100;
       await financeService.recordPayment({
         workspaceId: invoice.workspace_id,
         direction: 'in',
         amount: num,
-        currency: invoice.currency,
+        currency,
+        fxRateToBase: parseFloat(fxRateToBase) || 1,
         method,
         paidAt: new Date(paidAt).toISOString(),
         counterpartyContactId: invoice.customer_contact_id ?? null,
         counterpartyCompanyId: invoice.customer_company_id ?? null,
         reference: reference || null,
         notes: notes || null,
-        allocations: [{ target_id: invoice.id, target_type: 'invoice', amount: num }],
+        allocations: [{ target_id: invoice.id, target_type: 'invoice', amount: appliedToInvoice, amount_doc: num, fx_rate: rate }],
       });
       toast({ title: 'Payment recorded' });
       onSaved();
@@ -542,11 +560,36 @@ const RecordPaymentDialog: React.FC<{
           <DialogTitle>Record payment</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Amount</Label>
-            <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Outstanding on this invoice: {formatMoney(invoice.amount_due, invoice.currency)}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1 col-span-2">
+              <Label>Amount</Label>
+              <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['EUR', 'USD', 'GBP', 'CHF'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">Outstanding on this invoice: {formatMoney(invoice.amount_due, invoice.currency)}</p>
+          {foreign && (
+            <div className="grid grid-cols-2 gap-3 rounded-md border border-border/60 p-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Rate → {invoice.currency}</Label>
+                <Input type="number" step="0.0001" min="0" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">1 {currency} = X {invoice.currency}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Rate → EUR (base)</Label>
+                <Input type="number" step="0.0001" min="0" value={fxRateToBase} onChange={(e) => setFxRateToBase(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">drives realized FX gain/loss</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Method</Label>
@@ -595,12 +638,14 @@ const CreditNoteDialog: React.FC<{
   const { toast } = useToast();
   const [amount, setAmount] = useState<string>('');
   const [reason, setReason] = useState<string>('');
+  const [submitFiscal, setSubmitFiscal] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
       setAmount(String(invoice.total));
       setReason('');
+      setSubmitFiscal(!!(invoice as any).fiscal_mark); // only meaningful if the invoice was transmitted
     }
   }, [open, invoice.total]);
 
@@ -617,13 +662,14 @@ const CreditNoteDialog: React.FC<{
     try {
       setBusy(true);
       await financeService.createCreditNote({
-        workspaceId: invoice.workspace_id,
         invoiceId: invoice.id,
         amount: num,
         currency: invoice.currency,
         reason: reason.trim(),
+        correlated: !!(invoice as any).fiscal_mark, // 5.1 if the invoice has a MARK, else 5.2
+        submitFiscal,
       });
-      toast({ title: 'Credit note created' });
+      toast({ title: 'Credit note issued' });
       onSaved();
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message, variant: 'destructive' });
@@ -650,6 +696,15 @@ const CreditNoteDialog: React.FC<{
             <Label>Reason</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Customer return — chipped tile" />
           </div>
+          {(invoice as any).fiscal_mark && (
+            <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
+              <div>
+                <div className="text-sm font-medium">Transmit to myDATA (5.1)</div>
+                <p className="text-xs text-muted-foreground">Correlated credit note referencing the invoice MARK.</p>
+              </div>
+              <Switch checked={submitFiscal} onCheckedChange={setSubmitFiscal} />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

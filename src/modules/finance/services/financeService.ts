@@ -390,23 +390,53 @@ const _financeServiceCore = {
     counterpartyCompanyId?: string | null;
     reference?: string | null;
     notes?: string | null;
-    allocations: Array<{ target_id: string; target_type: 'invoice' | 'supplier_bill'; amount: number }>;
+    /** Payment currency → workspace base currency, at paid_at. Defaults to 1. */
+    fxRateToBase?: number;
+    /**
+     * Allocations may sum to LESS than the payment (remainder = customer credit) but not
+     * more. `amount` is the value applied to the target in the TARGET's currency; for a
+     * cross-currency payment also pass `amount_doc` (payment currency) + `fx_rate`
+     * (payment→target). When omitted they default to `amount` / 1 (same-currency).
+     */
+    allocations: Array<{
+      target_id: string; target_type: 'invoice' | 'supplier_bill';
+      amount: number; amount_doc?: number; fx_rate?: number;
+    }>;
   }): Promise<string> {
-    const { data, error } = await supabase.rpc('record_payment_with_allocations', {
+    const { data, error } = await supabase.rpc('record_payment_fx', {
       p_workspace_id: input.workspaceId,
       p_direction: input.direction,
       p_amount: input.amount,
       p_currency: input.currency ?? 'EUR',
+      p_fx_rate_to_base: input.fxRateToBase ?? 1,
       p_method: input.method ?? null,
       p_paid_at: input.paidAt ?? new Date().toISOString(),
       p_counterparty_contact_id: input.counterpartyContactId ?? null,
       p_counterparty_company_id: input.counterpartyCompanyId ?? null,
       p_reference: input.reference ?? null,
       p_notes: input.notes ?? null,
-      p_allocations: input.allocations,
+      p_allocations: input.allocations.map((a) => ({
+        target_type: a.target_type,
+        target_id: a.target_id,
+        amount_doc: a.amount_doc ?? a.amount,
+        fx_rate: a.fx_rate ?? 1,
+      })),
     });
     if (error) throw error;
     return data as string;
+  },
+
+  /** Customer open balance: Σ open-invoice amount_due − Σ unallocated inbound payments. */
+  async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
+    open_invoices_due: number; customer_credit: number; net_balance: number; currency: string;
+  }> {
+    const { data, error } = await supabase.rpc('get_customer_open_balance', {
+      p_workspace_id: workspaceId,
+      p_company_id: party.companyId ?? null,
+      p_contact_id: party.contactId ?? null,
+    });
+    if (error) throw error;
+    return data as any;
   },
 
   async listPayments(opts: {
@@ -575,46 +605,64 @@ const _financeServiceCore = {
 
   // -------- Credit notes --------
 
+  /**
+   * Issue a standalone correlated credit note (myDATA 5.1). Splits the gross amount into
+   * net+VAT using the invoice's VAT rate, then calls issue_credit_note, which creates the
+   * note + line + a netting allocation that reduces the invoice's amount_due (and flips it
+   * to credit_noted when fully covered). The original invoice stays immutable.
+   * Pass submitFiscal to immediately transmit it to the workspace's legal connector.
+   */
   async createCreditNote(input: {
-    workspaceId: string;
+    workspaceId?: string;
     invoiceId: string;
-    amount: number;
+    amount: number;          // gross (net + VAT)
     currency?: string;
     reason: string;
-  }): Promise<CreditNote> {
-    const { data: nextNum, error: numErr } = await supabase.rpc('next_credit_note_number', {
-      p_workspace_id: input.workspaceId,
-    });
-    if (numErr) throw numErr;
-
-    const { data: cn, error: insErr } = await supabase
-      .from('credit_notes')
-      .insert({
-        workspace_id: input.workspaceId,
-        credit_note_number: nextNum,
-        invoice_id: input.invoiceId,
-        amount: input.amount,
-        currency: input.currency ?? 'EUR',
-        reason: input.reason,
-      })
-      .select()
-      .single();
-    if (insErr) throw insErr;
-
-    // Flip invoice to credit_noted if the credit note matches the invoice total
-    const { data: invSnap } = await supabase
+    correlated?: boolean;    // 5.1 (correlated, default) vs 5.2
+    submitFiscal?: boolean;
+  }): Promise<{ credit_note_id: string }> {
+    const { data: inv } = await supabase
       .from('invoices')
-      .select('total, amount_paid, currency')
+      .select('vat_rate')
       .eq('id', input.invoiceId)
       .single();
-    if (invSnap && Number(input.amount) >= Number((invSnap as any).total)) {
-      await supabase
-        .from('invoices')
-        .update({ status: 'credit_noted' })
-        .eq('id', input.invoiceId);
-    }
+    const rate = Number((inv as any)?.vat_rate ?? 24);
+    const net = Math.round((input.amount / (1 + rate / 100)) * 100) / 100;
+    const vat = Math.round((input.amount - net) * 100) / 100;
+    const vatCat = rate >= 24 ? 1 : rate >= 13 ? 2 : rate >= 6 ? 3 : rate > 0 ? 4 : 7;
 
-    return cn as CreditNote;
+    const lines = [{
+      description: input.reason || 'Credit',
+      quantity: 1,
+      unit_price: net,
+      net_value: net,
+      vat_percent: rate,
+      vat_category: vatCat,
+      vat_amount: vat,
+    }];
+
+    const { data: cnId, error } = await supabase.rpc('issue_credit_note', {
+      p_invoice_id: input.invoiceId,
+      p_lines: lines,
+      p_reason: input.reason,
+      p_correlated: input.correlated ?? true,
+    });
+    if (error) throw error;
+
+    if (input.submitFiscal) {
+      // Best-effort transmit; the note already exists + nets the invoice regardless.
+      try { await this.submitCreditNoteFiscal(cnId as string); } catch { /* surfaced via list */ }
+    }
+    return { credit_note_id: cnId as string };
+  },
+
+  /** Transmit an existing credit note to the workspace's legal connector (myDATA 5.1). */
+  async submitCreditNoteFiscal(creditNoteId: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { credit_note_id: creditNoteId, submit_fiscal: true },
+    });
+    if (error) throw error;
+    return data;
   },
 
   async listCreditNotes(opts: { workspaceId?: string; invoiceId?: string } = {}): Promise<CreditNote[]> {

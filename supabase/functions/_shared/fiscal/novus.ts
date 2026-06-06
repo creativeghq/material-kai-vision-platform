@@ -82,6 +82,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           issueDate: header.issueDate,
           invoiceType: header.invoiceType,
           currency: header.currency,
+          // 5.1 credit note: reference the original invoice MARK(s) being corrected.
+          ...(input.correlatedInvoices?.length
+            ? { correlatedInvoices: input.correlatedInvoices }
+            : {}),
         },
         paymentMethods: input.paymentMethods?.length
           ? input.paymentMethods

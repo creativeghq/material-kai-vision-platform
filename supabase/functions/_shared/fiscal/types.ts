@@ -57,9 +57,11 @@ export interface FiscalInvoiceInput {
     series: string;
     aa: string;
     issueDate: string; // YYYY-MM-DD
-    invoiceType: string; // myDATA type code, e.g. '1.1', '2.1', '11.1'
+    invoiceType: string; // myDATA type code, e.g. '1.1', '2.1', '11.1', '5.1' (credit note)
     currency: string; // 'EUR'
   };
+  /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
+  correlatedInvoices?: number[];
   lines: FiscalLine[];
   paymentMethods?: { type: number; amount: number }[];
   summary: {

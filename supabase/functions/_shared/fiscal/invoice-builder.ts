@@ -168,3 +168,98 @@ export async function buildInvoiceInputFromDb(
     documentComments: inv.notes ?? undefined,
   };
 }
+
+/**
+ * Build a myDATA 5.1 credit-note FiscalInvoiceInput from a credit_notes row. The
+ * issuer is the workspace; the counterpart + correlated MARK come from the original
+ * invoice. Lines come from credit_note_items. Type 5.1 (correlated) when the original
+ * carries a fiscal_mark, else 5.2.
+ */
+export async function buildCreditNoteInputFromDb(
+  supabase: any,
+  creditNoteId: string,
+  overrides: FiscalOverrides = {},
+): Promise<FiscalInvoiceInput> {
+  const { data: cn, error: cnErr } = await supabase.from('credit_notes').select('*').eq('id', creditNoteId).single();
+  if (cnErr || !cn) throw new Error(`credit note ${creditNoteId} not found`);
+
+  const [{ data: items }, { data: inv }, { data: fs }] = await Promise.all([
+    supabase.from('credit_note_items').select('*').eq('credit_note_id', creditNoteId).order('created_at'),
+    supabase.from('invoices').select('*').eq('id', cn.invoice_id).single(),
+    supabase.from('finance_settings').select('*').eq('workspace_id', cn.workspace_id).maybeSingle(),
+  ]);
+  if (!inv) throw new Error(`source invoice for credit note ${creditNoteId} not found`);
+
+  const issuer: FiscalParty = {
+    vatNumber: fs?.business_vat ?? '',
+    country: fs?.business_country_code ?? 'GR',
+    branch: 0,
+    name: fs?.business_name ?? '',
+    profession: fs?.business_profession ?? undefined,
+    taxOffice: fs?.business_tax_office ?? undefined,
+    address: {
+      street: fs?.business_address ?? '', number: fs?.business_street_number ?? '',
+      postalCode: fs?.business_postal_code ?? '', city: fs?.business_city ?? '',
+      country: fs?.business_country_code ?? 'GR',
+    },
+    phone: fs?.business_phone ?? undefined,
+    email: fs?.business_email ?? undefined,
+  };
+
+  let counterpart: FiscalParty = { vatNumber: '', country: 'GR', branch: 0 };
+  if (inv.customer_company_id) {
+    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).single();
+    if (c) counterpart = partyFromCrm(c);
+  } else if (inv.customer_contact_id) {
+    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
+    if (c) counterpart = partyFromCrm(c);
+  }
+
+  const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
+    const net = round2(Number(it.net_value ?? 0));
+    const linePct = Number(it.vat_percent ?? inv.vat_rate ?? 24);
+    const lineCat = it.vat_category ?? vatCategory(linePct);
+    return {
+      lineNumber: i + 1,
+      code: it.sku ?? undefined,
+      description: it.description ?? 'Credit',
+      quantity: Number(it.quantity ?? 1),
+      measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+      unitPrice: Number(it.unit_price ?? 0),
+      netValue: net,
+      vatCategory: lineCat,
+      vatPercent: linePct,
+      vatAmount: round2((net * linePct) / 100),
+      incomeClassificationType: it.income_classification_type ?? fs?.default_income_classification_type ?? 'E3_561_001',
+      incomeClassificationCategory: it.income_classification_category ?? fs?.default_income_classification_category ?? 'category1_1',
+    };
+  });
+
+  const totalNet = round2(lines.reduce((s, l) => s + l.netValue, 0));
+  const totalVat = round2(lines.reduce((s, l) => s + l.vatAmount, 0));
+  const correlatedMark = cn.correlated_mark ?? inv.fiscal_mark ?? null;
+  const isCorrelated = !!correlatedMark;
+
+  return {
+    issuer,
+    counterpart,
+    header: {
+      series: overrides.series ?? (fs?.invoice_number_prefix || 'A'),
+      aa: overrides.aa ?? String(cn.credit_note_number ?? ''),
+      issueDate: String(cn.issued_at ?? cn.created_at ?? new Date().toISOString()).slice(0, 10),
+      invoiceType: overrides.invoiceType ?? cn.document_type ?? (isCorrelated ? '5.1' : '5.2'),
+      currency: cn.currency ?? inv.currency ?? 'EUR',
+    },
+    correlatedInvoices: isCorrelated ? [Number(correlatedMark)] : undefined,
+    lines,
+    summary: {
+      totalNetValue: totalNet,
+      totalVatAmount: totalVat,
+      totalGrossValue: round2(totalNet + totalVat),
+      incomeClassificationType: fs?.default_income_classification_type ?? 'E3_561_001',
+      incomeClassificationCategory: fs?.default_income_classification_category ?? 'category1_1',
+    },
+    documentLabel: overrides.documentLabel ?? 'Πιστωτικό Τιμολόγιο',
+    documentComments: cn.reason ?? undefined,
+  };
+}
