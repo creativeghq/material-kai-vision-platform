@@ -43,6 +43,9 @@ export async function resolveWorkspaceConnector(
   workspaceId: string,
   capability: FiscalCapability,
 ): Promise<ResolveResult> {
+  // Every workspace below the operator transmits through the SAME master Novus
+  // connector by default — there is no per-workspace connector choice. An explicit
+  // binding can still override (e.g. oxygen), but absence means the platform default.
   const { data: binding } = await supabase
     .from('workspace_fiscal_bindings')
     .select('connector_slug, is_active')
@@ -50,9 +53,12 @@ export async function resolveWorkspaceConnector(
     .eq('capability', capability)
     .maybeSingle();
 
-  const slug: string | undefined = binding?.connector_slug;
-  if (!slug || binding?.is_active === false) {
-    return { ok: false, error: `No connector is bound for "${capability}" in this workspace.`, code: 'no_binding' };
+  // Default to Novus for the legal-invoice/tax-submission capabilities.
+  const DEFAULT_SLUG = (capability === 'legal_invoice' || capability === 'pre_invoice_notice' || capability === 'tax_submission')
+    ? 'novus' : undefined;
+  const slug: string | undefined = (binding?.is_active === false ? undefined : binding?.connector_slug) ?? DEFAULT_SLUG;
+  if (!slug) {
+    return { ok: false, error: `No connector available for "${capability}".`, code: 'no_binding' };
   }
 
   const connector = getConnector(slug);

@@ -26,7 +26,7 @@ export const PaymentRoutingCard: React.FC<{ workspaceId: string }> = ({ workspac
   const onboard = async () => {
     try {
       setBusy(true);
-      const { url } = await paymentRoutingService.onboard(workspaceId, `${window.location.origin}/admin/finance`);
+      const { url } = await paymentRoutingService.onboard(workspaceId, `${window.location.origin}/finance`);
       window.location.href = url; // Stripe-hosted onboarding
     } catch (err: any) {
       toast({ title: 'Could not start onboarding', description: err?.message, variant: 'destructive' });

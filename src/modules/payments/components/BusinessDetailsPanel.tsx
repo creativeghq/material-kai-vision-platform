@@ -3,7 +3,7 @@
  *
  * Stored on `finance_settings.business_*` columns (one row per workspace, single
  * source of truth). The Finance module SettingsTab edits the same fields, so
- * updates here are immediately visible at /admin/finance → Settings.
+ * updates here are immediately visible at /finance → Settings.
  *
  * Mounted as a settingsPanel on /admin/modules/payments/settings → Business.
  */
@@ -122,7 +122,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
         <CardDescription>
           The legal entity that processes payments. Shown on invoices, used as the Stripe
           statement descriptor source, and printed on every customer-facing document. One
-          source of truth — also editable at <code>/admin/finance → Settings</code>.
+          source of truth — also editable at <code>/finance → Settings</code>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

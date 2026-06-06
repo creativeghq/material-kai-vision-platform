@@ -66,10 +66,11 @@ export async function buildInvoiceInputFromDb(
     country: fs?.business_country_code ?? 'GR',
     branch: 0,
     name: fs?.business_name ?? '',
+    profession: fs?.business_profession ?? undefined,
     taxOffice: fs?.business_tax_office ?? undefined,
     address: {
       street: fs?.business_address ?? '',
-      number: '',
+      number: fs?.business_street_number ?? '',
       postalCode: fs?.business_postal_code ?? '',
       city: fs?.business_city ?? '',
       country: fs?.business_country_code ?? 'GR',

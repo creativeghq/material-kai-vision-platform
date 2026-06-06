@@ -53,7 +53,7 @@ export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) =>
       <Button
         size="sm"
         variant="outline"
-        onClick={() => navigate(`/admin/finance/invoices/${existingInvoiceId}`)}
+        onClick={() => navigate(`/finance/invoices/${existingInvoiceId}`)}
       >
         <Receipt className="h-4 w-4 mr-1" /> Open invoice <ExternalLink className="ml-1 h-3 w-3" />
       </Button>
@@ -71,7 +71,7 @@ export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) =>
       setBusy(true);
       const result = await financeService.issueInvoiceFromQuote(quoteId, { issueNow: true });
       toast({ title: 'Invoice issued', description: result.invoice?.internal_number });
-      navigate(`/admin/finance/invoices/${result.invoice_id}`);
+      navigate(`/finance/invoices/${result.invoice_id}`);
     } catch (err: any) {
       toast({ title: 'Issue failed', description: err?.message, variant: 'destructive' });
     } finally {

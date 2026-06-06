@@ -173,7 +173,7 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
                   <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
                   <td className="px-4 py-2 text-right">{i.due_at ?? '—'}</td>
                   <td className="px-4 py-2 text-right">
-                    <Link to={`/admin/finance/invoices/${i.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
+                    <Link to={`/finance/invoices/${i.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
                   </td>
                 </tr>
               ))}
@@ -238,7 +238,7 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
                           {p.allocations.map((a) => (
                             <li key={a.id} className="flex items-center gap-2">
                               {a.invoice_id && (
-                                <Link to={`/admin/finance/invoices/${a.invoice_id}`} className="text-primary hover:underline font-mono">
+                                <Link to={`/finance/invoices/${a.invoice_id}`} className="text-primary hover:underline font-mono">
                                   invoice {a.invoice_id.slice(0, 8)}
                                 </Link>
                               )}

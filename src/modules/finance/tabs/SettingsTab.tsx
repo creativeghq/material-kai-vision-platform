@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
-import { FiscalConnectorSettings } from '@/modules/finance/components/FiscalConnectorSettings';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
+import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -131,6 +131,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <BusinessIdentityCard workspaceId={workspaceId} />
+
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module settings</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
@@ -215,8 +217,6 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           />
         </CardContent>
       </Card>
-
-      <FiscalConnectorSettings workspaceId={workspaceId} />
 
       <PaymentRoutingCard workspaceId={workspaceId} />
     </div>
