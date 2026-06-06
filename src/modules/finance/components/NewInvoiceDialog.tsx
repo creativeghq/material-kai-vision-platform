@@ -2,7 +2,7 @@
 // lives on the QuoteDetailAdminPage as IssueInvoiceButton). Use this for sales
 // that never went through the Quotes pipeline.
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Tag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { invoicingSetupService } from '@/services/invoicingSetupService';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -31,6 +32,9 @@ interface LineItem {
   quantity: string;
   unit_price: string;
   unit_cost: string;
+  income_classification_type: string;
+  income_classification_category: string;
+  expanded?: boolean;
 }
 
 interface Props {
@@ -46,6 +50,8 @@ const emptyLine = (): LineItem => ({
   quantity: '1',
   unit_price: '0',
   unit_cost: '',
+  income_classification_type: '',
+  income_classification_category: '',
 });
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
@@ -67,6 +73,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Line items
   const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
 
+  // myDATA document type + income-classification catalog (image 7/8)
+  const [documentType, setDocumentType] = useState<string>('1.1');
+  const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
+  const [incTypes, setIncTypes] = useState<{ code: string; description: string }[]>([]);
+  const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
+  const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
+
   useEffect(() => {
     if (!open) return;
     setCustomer(null);
@@ -78,6 +91,33 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setLines([emptyLine()]);
     setIssueNow(true);
   }, [open]);
+
+  // Load the enabled doc types (+ per-type default classification) and the income catalog.
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const [allTypes, enabled, ic, cat] = await Promise.all([
+        invoicingSetupService.listReference('invoice_type'),
+        invoicingSetupService.getDocTypeSettings(workspaceId),
+        invoicingSetupService.listReference('income_classification_type'),
+        invoicingSetupService.listReference('income_classification_category'),
+      ]);
+      // Only types the workspace enabled; if none configured, show all.
+      const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
+      const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
+      setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
+      setIncTypes(ic.map((t) => ({ code: t.code, description: t.description })));
+      setIncCats(cat.map((t) => ({ code: t.code, description: t.description })));
+      setDocDefaults(Object.fromEntries(Object.values(enabled).map((e) => [e.code, { type: e.default_income_classification_type, category: e.default_income_classification_category }])));
+      if (visible.length && !visible.some((t) => t.code === '1.1')) setDocumentType(visible[0].code);
+    })();
+  }, [open, workspaceId]);
+
+  // Default each line's classification from the selected doc type's default.
+  const applyDocDefault = (code: string) => {
+    const def = docDefaults[code];
+    if (def?.type) setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
+  };
 
   // Customer search (contacts + companies)
   useEffect(() => {
@@ -169,6 +209,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           total: Number(totals.total.toFixed(2)),
           payment_terms_days: parseInt(paymentTermsDays, 10) || 30,
           notes: notes || null,
+          document_type: documentType,
           issued_at: issueNow ? new Date().toISOString() : null,
           due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
         })
@@ -188,6 +229,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           unit_price: p,
           unit_cost_snapshot: c,
           line_total: Number((q * p).toFixed(2)),
+          income_classification_type: l.income_classification_type || null,
+          income_classification_category: l.income_classification_category || null,
         };
       });
 
@@ -214,6 +257,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Document type (myDATA) */}
+          <div className="space-y-1">
+            <Label>Document type (myDATA)</Label>
+            <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
+              <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
+              <SelectContent>
+                {(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((t) => (
+                  <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Customer */}
           <div className="space-y-2">
             <Label>Customer *</Label>
@@ -306,7 +362,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   {lines.map((l, idx) => {
                     const lineTotal = (parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price) || 0);
                     return (
-                      <tr key={idx} className="border-b border-border/30">
+                      <React.Fragment key={idx}>
+                      <tr className="border-b border-border/30">
                         <td className="px-2 py-1">
                           <Input value={l.description} onChange={(e) => updateLine(idx, 'description', e.target.value)} placeholder="Description" className="h-8" />
                         </td>
@@ -324,11 +381,36 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums">{lineTotal.toFixed(2)}</td>
                         <td className="px-1 py-1">
-                          {lines.length > 1 && (
-                            <Button size="sm" variant="ghost" onClick={() => removeLine(idx)}><Trash2 className="h-3 w-3" /></Button>
-                          )}
+                          <div className="flex items-center gap-0.5">
+                            <Button size="sm" variant="ghost" title="Income classification (myDATA)"
+                              className={l.income_classification_type ? 'text-primary' : ''}
+                              onClick={() => setLines((ls) => ls.map((x, i) => i === idx ? { ...x, expanded: !x.expanded } : x))}>
+                              <Tag className="h-3 w-3" />
+                            </Button>
+                            {lines.length > 1 && (
+                              <Button size="sm" variant="ghost" onClick={() => removeLine(idx)}><Trash2 className="h-3 w-3" /></Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
+                      {l.expanded && (
+                        <tr className="bg-muted/20">
+                          <td colSpan={7} className="px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-3 text-xs">
+                              <span className="text-muted-foreground">Characterization (myDATA income classification)</span>
+                              <Select value={l.income_classification_type || undefined} onValueChange={(v) => updateLine(idx, 'income_classification_type', v)}>
+                                <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Income type…" /></SelectTrigger>
+                                <SelectContent>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                              </Select>
+                              <Select value={l.income_classification_category || undefined} onValueChange={(v) => updateLine(idx, 'income_classification_category', v)}>
+                                <SelectTrigger className="h-8 w-56"><SelectValue placeholder="Income category…" /></SelectTrigger>
+                                <SelectContent>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
