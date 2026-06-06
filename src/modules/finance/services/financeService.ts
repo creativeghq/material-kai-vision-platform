@@ -438,6 +438,42 @@ const _financeServiceCore = {
     return data as string;
   },
 
+  // -------- Pricing rules (#176 markup overrides) --------
+
+  async listPricingRules(workspaceId: string): Promise<Array<{
+    id: string; scope: 'category' | 'product'; target_id: string;
+    markup_pct: number | null; sell_price: number | null; currency: string;
+  }>> {
+    const { data, error } = await supabase
+      .from('pricing_rules')
+      .select('id, scope, target_id, markup_pct, sell_price, currency')
+      .eq('workspace_id', workspaceId)
+      .order('scope', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as any;
+  },
+
+  async upsertPricingRule(input: {
+    workspaceId: string; scope: 'category' | 'product'; targetId: string;
+    markupPct?: number | null; sellPrice?: number | null; currency?: string;
+  }): Promise<void> {
+    const { error } = await supabase.from('pricing_rules').upsert({
+      workspace_id: input.workspaceId,
+      scope: input.scope,
+      target_id: input.targetId,
+      markup_pct: input.markupPct ?? null,
+      sell_price: input.sellPrice ?? null,
+      currency: input.currency ?? 'EUR',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,scope,target_id' });
+    if (error) throw error;
+  },
+
+  async deletePricingRule(id: string): Promise<void> {
+    const { error } = await supabase.from('pricing_rules').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   /** Customer open balance: Σ open-invoice amount_due − Σ unallocated inbound payments. */
   async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
     open_invoices_due: number; customer_credit: number; net_balance: number; currency: string;

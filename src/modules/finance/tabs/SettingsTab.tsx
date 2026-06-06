@@ -14,6 +14,7 @@ import { financeService, type FinanceSettings } from '@/modules/finance/services
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
+import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -230,6 +231,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           />
         </CardContent>
       </Card>
+
+      <PricingRulesCard workspaceId={workspaceId} />
 
       <PaymentRoutingCard workspaceId={workspaceId} />
     </div>
