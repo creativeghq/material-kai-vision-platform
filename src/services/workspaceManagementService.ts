@@ -42,4 +42,22 @@ export const workspaceManagementService = {
     });
     if (error) throw error;
   },
+
+  /** Owner/admin: get-or-create this workspace's referral code (enables referral join). */
+  async generateReferral(workspaceId: string): Promise<string> {
+    const { data, error } = await supabase.rpc('generate_workspace_referral', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return data as string;
+  },
+
+  /** Signed-in user redeems a referral code → becomes a member of that workspace. */
+  async redeemReferral(code: string): Promise<{ ok: boolean; workspace_name?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('redeem_workspace_referral', { p_code: code });
+    if (error) throw error;
+    return data as any;
+  },
 };
+
+/** Stash a referral code seen in the URL (?ref=) until the user is authenticated. */
+export const REFERRAL_STORAGE_KEY = 'mk_pending_referral';
+

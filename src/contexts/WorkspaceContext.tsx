@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLES } from '@/auth/roles';
+import { workspaceManagementService, REFERRAL_STORAGE_KEY } from '@/services/workspaceManagementService';
 
 /**
  * WorkspaceContext — the single source of truth for the *active* workspace and
@@ -116,6 +117,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     setLoading(true);
+
+    // Redeem a pending referral (signed-up under a dealer/architect) before reading memberships.
+    try {
+      const ref = localStorage.getItem(REFERRAL_STORAGE_KEY);
+      if (ref) {
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
+        await workspaceManagementService.redeemReferral(ref).catch(() => {});
+      }
+    } catch { /* localStorage unavailable */ }
+
     const { data, error } = await supabase
       .from('workspace_members')
       .select(
@@ -148,6 +159,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActiveWorkspaceId(next);
     setLoading(false);
   }, [user?.id]);
+
+  // Capture a ?ref= referral code into storage so it survives signup/login.
+  useEffect(() => {
+    try {
+      const code = new URLSearchParams(window.location.search).get('ref');
+      if (code) localStorage.setItem(REFERRAL_STORAGE_KEY, code);
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;

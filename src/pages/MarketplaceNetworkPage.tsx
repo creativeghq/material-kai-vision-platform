@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Network, Save } from 'lucide-react';
+import { Loader2, Network, Save, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -71,6 +71,18 @@ const MarketplaceNetworkPage: React.FC = () => {
 
   const editable = (r: WsRow) => !!r.parent_workspace_id && ownedIds.has(r.parent_workspace_id);
 
+  // Owner/admin of a node can mint a referral link for people to sign up under it.
+  const copyReferral = async (workspaceId: string) => {
+    try {
+      const code = await workspaceManagementService.generateReferral(workspaceId);
+      const url = `${window.location.origin}/auth?mode=signup&ref=${code}`;
+      await navigator.clipboard.writeText(url).catch(() => {});
+      toast({ title: 'Referral link copied', description: url });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="container max-w-5xl space-y-6 py-6">
       <div className="flex items-center gap-3">
@@ -133,11 +145,18 @@ const MarketplaceNetworkPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {canEdit && (
-                          <Button size="sm" variant="outline" onClick={() => save(r)} disabled={savingId === r.id}>
-                            {savingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {ownedIds.has(r.id) && (
+                            <Button size="sm" variant="ghost" onClick={() => copyReferral(r.id)} title="Copy sign-up referral link">
+                              <Link2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <Button size="sm" variant="outline" onClick={() => save(r)} disabled={savingId === r.id}>
+                              {savingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
