@@ -641,6 +641,34 @@ export const QuoteDetailPage: React.FC = () => {
                 Issue Revision
               </Button>
             )}
+
+            {/* Marketplace: derive an end-user (client) quote at +margin from this (procurement) quote. */}
+            {quote && (quote as any).quote_role !== 'client' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  const raw = window.prompt('Margin % to add on top for the end user?', '20');
+                  if (raw === null) return;
+                  const margin = parseFloat(raw);
+                  if (!Number.isFinite(margin) || margin < 0) {
+                    toast({ title: 'Enter a valid margin %', variant: 'destructive' });
+                    return;
+                  }
+                  try {
+                    const newId = await quotesService.generateClientQuote(quote.id, margin);
+                    toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
+                    navigate(`/admin/quotes/${newId}`);
+                  } catch (err) {
+                    toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                  }
+                }}
+                className="rounded-full"
+              >
+                <FilePlus2 className="h-4 w-4 mr-1" />
+                Generate for end user
+              </Button>
+            )}
           </div>
         </div>
 

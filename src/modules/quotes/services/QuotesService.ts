@@ -1544,6 +1544,16 @@ export class QuotesService {
    * The revision becomes the new "live" doc; the original is kept untouched
    * so the audit trail of what was sent + accepted remains intact.
    */
+  /** Derive an end-user (client) quote from this quote at +margin% (#177). Returns the new quote id. */
+  async generateClientQuote(sourceQuoteId: string, marginPct: number): Promise<string> {
+    const { data, error } = await supabase.rpc('generate_client_quote', {
+      p_source_quote_id: sourceQuoteId,
+      p_margin_pct: marginPct,
+    });
+    if (error) throw error;
+    return data as string;
+  }
+
   async issueRevision(sourceQuoteId: string): Promise<Quote> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
