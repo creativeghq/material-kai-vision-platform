@@ -19,6 +19,8 @@ export interface SidebarNavItem {
   icon: LucideIcon;
   /** Optional role gate. When undefined, item is visible to every authenticated user. */
   requireRole?: NavRoleRequirement;
+  /** Platform-operator only (owner/admin of the root workspace). Hides from dealers/architects/end-users. */
+  requirePlatform?: boolean;
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
 }
@@ -43,5 +45,5 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     icon: BarChart3,
     requireRole: 'factory',
   },
-  { id: 'admin', label: 'Admin', path: '/admin', icon: Settings },
+  { id: 'admin', label: 'Admin', path: '/admin', icon: Settings, requirePlatform: true },
 ];

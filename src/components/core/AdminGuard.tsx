@@ -21,12 +21,14 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({
   children,
   fallbackPath = '/',
 }) => {
-  const { isAdmin, role, loading } = useUserRole();
+  // Platform /admin surface is operator-only (owner/admin of the root workspace),
+  // NOT every workspace admin — a dealer/architect owner must not reach it.
+  const { isPlatformOperator, role, loading } = useUserRole();
   const navigate = useNavigate();
 
   if (loading) return null;
 
-  if (!isAdmin) {
+  if (!isPlatformOperator) {
     return (
       <div className="container mx-auto py-12">
         <Card className="max-w-md mx-auto">

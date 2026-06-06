@@ -24,9 +24,10 @@ import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
-  ctx: { isFactory: boolean; isAdmin: boolean; enabledSlugs: Set<string> },
+  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; enabledSlugs: Set<string> },
 ): SidebarNavItem[] {
   return items.filter((item) => {
+    if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     if (item.requireRole === 'factory' && !(ctx.isFactory || ctx.isAdmin)) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     if (item.moduleSlug && !ctx.enabledSlugs.has(item.moduleSlug)) return false;
@@ -38,12 +39,12 @@ export const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { isFactory, isAdmin } = useFactoryRole();
+  const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
   const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, enabledSlugs });
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, enabledSlugs });
 
   useEffect(() => {
     setMobileOpen(false);
