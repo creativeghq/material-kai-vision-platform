@@ -228,6 +228,44 @@ export async function fetchTemplateConfig(
 }
 
 /**
+ * #177 white-label: overlay the quote's workspace business identity (finance_settings)
+ * onto the global PDF template's "FROM" block, so each seller's quote renders under
+ * their own company name/address/contact/VAT — not the platform default. Only overlays
+ * when the workspace has set a business_name; otherwise the global template stands.
+ */
+export async function applyWorkspaceBranding(
+  supabase: SupabaseClient,
+  config: TemplateConfig,
+  workspaceId: string | null | undefined
+): Promise<TemplateConfig> {
+  if (!workspaceId) return config;
+  try {
+    const { data: fs } = await supabase
+      .from('finance_settings')
+      .select('business_name, business_address, business_street_number, business_city, business_postal_code, business_phone, business_email, business_vat, contact_phone, contact_email')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (!fs || !fs.business_name) return config;
+
+    const addressLine = [
+      [fs.business_address, fs.business_street_number].filter(Boolean).join(' '),
+      [fs.business_postal_code, fs.business_city].filter(Boolean).join(' '),
+    ].filter(Boolean).join(', ');
+
+    return {
+      ...config,
+      company_name: fs.business_name || config.company_name,
+      company_address: addressLine || config.company_address,
+      company_phone: fs.business_phone || fs.contact_phone || config.company_phone,
+      company_email: fs.business_email || fs.contact_email || config.company_email,
+      company_vat: fs.business_vat || config.company_vat,
+    };
+  } catch {
+    return config; // non-fatal — fall back to the global template identity
+  }
+}
+
+/**
  * Fetch a file from Supabase Storage as Uint8Array
  */
 export async function fetchStorageFile(
