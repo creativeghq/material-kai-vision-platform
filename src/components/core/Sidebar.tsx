@@ -28,7 +28,8 @@ function filterNavItems(
 ): SidebarNavItem[] {
   return items.filter((item) => {
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
-    if (item.requireRole === 'factory' && !(ctx.isFactory || ctx.isAdmin)) return false;
+    // Factory analytics is for verified factories only — not dealers/operators.
+    if (item.requireRole === 'factory' && !ctx.isFactory) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     if (item.moduleSlug && !ctx.enabledSlugs.has(item.moduleSlug)) return false;
     return true;

@@ -8,7 +8,6 @@ import {
   Settings,
   FolderKanban,
   Wallet,
-  Network,
   Contact,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -45,7 +44,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // architect), hidden from end-users. Part of unifying admin into the front-end (#174).
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireRole: 'admin' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireRole: 'admin' },
-  { id: 'network', label: 'Network', path: '/network', icon: Network, requireRole: 'admin' },
+  // Network is reached from the workspace switcher ("Manage network"), not the top nav.
   {
     id: 'factory-analytics',
     label: 'Factory Analytics',

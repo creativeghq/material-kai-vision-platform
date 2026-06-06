@@ -9,6 +9,23 @@ import { initializeGlobalErrorHandlers } from './utils/globalErrorHandler';
 // Initialize global error handlers (sends errors to backend database)
 initializeGlobalErrorHandlers();
 
+// Auto-recover from stale chunk references. After a new deploy the hashed chunk
+// filenames change; a browser still running the old index.html will 404 on a lazy
+// import ("Failed to fetch dynamically imported module") and otherwise hit the
+// critical error boundary. Reload once to pull the fresh index + chunks. The 15s
+// guard prevents a reload loop if the failure is genuine (not a stale deploy).
+window.addEventListener('vite:preloadError', (e) => {
+  try {
+    const last = Number(sessionStorage.getItem('mk-chunk-reload-at') || 0);
+    if (Date.now() - last < 15000) return;
+    sessionStorage.setItem('mk-chunk-reload-at', String(Date.now()));
+    e.preventDefault();
+    window.location.reload();
+  } catch {
+    window.location.reload();
+  }
+});
+
 // Initialize Sentry for error tracking and monitoring
 Sentry.init({
   dsn: 'https://3f930a475eb29d63b5e78b1ebabaef78@o4509716458045440.ingest.de.sentry.io/4510301517316176',
