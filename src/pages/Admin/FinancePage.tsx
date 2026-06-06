@@ -338,7 +338,10 @@ const FinancePage: React.FC = () => {
                 <h3 className="text-sm font-semibold">Receivables — all open invoices</h3>
                 <p className="text-xs text-muted-foreground">Invoices issued, partially paid, or overdue. To invoice an accepted quote, use the Issue invoice button on the quote page.</p>
               </div>
-              <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+              <div className="flex items-center gap-2">
+                <Link to={`${financeBase}/documents`}><Button variant="outline"><Receipt className="h-4 w-4 mr-1" /> All documents</Button></Link>
+                <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

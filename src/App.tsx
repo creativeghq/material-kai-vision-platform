@@ -39,6 +39,7 @@ const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
+const FinanceDocumentsPage = lazy(() => import('./modules/finance/pages/DocumentsPage'));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -228,6 +229,16 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <CRMPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance/documents"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <FinanceDocumentsPage />
                       </Layout>
                     </AuthGuard>
                   }
