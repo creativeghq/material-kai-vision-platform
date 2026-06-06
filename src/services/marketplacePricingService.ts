@@ -41,4 +41,22 @@ export const marketplacePricingService = {
     if (error) throw error;
     return (data as CommissionSummary) ?? { total_earned: 0, currency: 'EUR', lines: 0, by_seller: [] };
   },
+
+  /** Per-sale commission ledger rows for the beneficiary (operator/dealer earnings detail). */
+  async getCommissionLedger(workspaceId: string): Promise<CommissionLedgerRow[]> {
+    const { data, error } = await supabase.rpc('get_commission_ledger', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as CommissionLedgerRow[];
+  },
 };
+
+export interface CommissionLedgerRow {
+  occurred_at: string;
+  seller: string;
+  seller_rank: string;
+  product: string;
+  base_price: number;
+  commission_pct: number;
+  commission_amount: number;
+  currency: string;
+}

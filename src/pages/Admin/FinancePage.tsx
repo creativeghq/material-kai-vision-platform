@@ -45,6 +45,7 @@ import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
+import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -186,6 +187,9 @@ const FinancePage: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="followups" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
             </TabsTrigger>
             <TabsTrigger value="warehouse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Package className="h-4 w-4 mr-2" /> Warehouse
@@ -444,6 +448,10 @@ const FinancePage: React.FC = () => {
           </TabsContent>
 
           {/* ─────────── SETTINGS ─────────── */}
+          <TabsContent value="marketplace" className="space-y-4">
+            <MarketplaceEarningsTab />
+          </TabsContent>
+
           <TabsContent value="warehouse" className="space-y-4">
             <WarehousePanel workspaceId={workspaceId} />
           </TabsContent>
