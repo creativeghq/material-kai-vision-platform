@@ -7,6 +7,8 @@ import {
   BarChart3,
   Settings,
   FolderKanban,
+  Wallet,
+  Network,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -38,6 +40,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText },
+  // Business-workspace surfaces — visible to a workspace owner/admin (operator, dealer,
+  // architect), hidden from end-users. Part of unifying admin into the front-end (#174).
+  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireRole: 'admin' },
+  { id: 'network', label: 'Network', path: '/network', icon: Network, requireRole: 'admin' },
   {
     id: 'factory-analytics',
     label: 'Factory Analytics',

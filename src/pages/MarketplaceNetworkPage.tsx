@@ -7,6 +7,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
 
@@ -101,15 +102,13 @@ const MarketplaceNetworkPage: React.FC = () => {
   };
 
   return (
-    <div className="container max-w-5xl space-y-6 py-6">
-      <div className="flex items-center gap-3">
-        <Network className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <h1 className="text-xl font-semibold">Network</h1>
-          <p className="text-sm text-muted-foreground">Your dealers, architects and their commission. You set the cut on each node's operator-catalog sales.</p>
-        </div>
-      </div>
-
+    <div>
+      <PageHeader
+        icon={Network}
+        title="Network"
+        subtitle="Your dealers, architects and their commission — you set the cut on each node's operator-catalog sales."
+      />
+      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Sub-workspaces</CardTitle></CardHeader>
         <CardContent className="p-0">
@@ -191,6 +190,7 @@ const MarketplaceNetworkPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

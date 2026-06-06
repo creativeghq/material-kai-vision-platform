@@ -36,6 +36,7 @@ const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m =>
 const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
 const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage'));
+const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -205,6 +206,16 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <MarketplaceNetworkPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <FinancePage />
                       </Layout>
                     </AuthGuard>
                   }

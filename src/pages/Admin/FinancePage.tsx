@@ -47,13 +47,17 @@ import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
+  // oldest-membership query so Finance follows the workspace switcher (#194).
+  const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const workspaceId = activeWorkspaceId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,25 +77,9 @@ const FinancePage: React.FC = () => {
     void financeService.getSettings(workspaceId).then(setSettings).catch(() => { /* ignore */ });
   }, [workspaceId]);
 
-  useEffect(() => { void resolveWorkspace(); }, []);
   useEffect(() => { if (workspaceId) void loadAll(workspaceId); }, [workspaceId]);
-
-  const resolveWorkspace = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setError('Not authenticated');
-      setLoading(false);
-      return;
-    }
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .limit(1)
-      .maybeSingle();
-    setWorkspaceId(member?.workspace_id ?? null);
-  };
+  // No workspace once context settled → stop the spinner so the empty-state renders.
+  useEffect(() => { if (!wsLoading && !workspaceId) setLoading(false); }, [wsLoading, workspaceId]);
 
   const loadAll = async (wsId: string) => {
     try {
