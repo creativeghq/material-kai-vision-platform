@@ -25,6 +25,9 @@ function vatCategory(pct: number): number {
   return 7;
 }
 
+/** Inverse: the VAT percent myDATA expects for each category. 8 = without-VAT/exempt → 0. */
+const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
+
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function partyFromCrm(c: any): FiscalParty {
@@ -107,8 +110,22 @@ export async function buildInvoiceInputFromDb(
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
     const prod = it.product_id ? prodMap[it.product_id] : null;
     const net = round2(Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * Number(it.quantity ?? 1)));
-    const lineCat = it.vat_category ?? prod?.mydata_vat_category ?? cat;
-    const vat = round2(Number(it.vat_amount ?? (net * rate) / 100));
+    // Keep category ↔ percent ↔ amount mutually consistent or myDATA rejects the line.
+    // If the line/product carries an explicit VAT category, the percent is derived from it
+    // (not the invoice rate); otherwise fall back to the invoice rate and derive the category.
+    const explicitCat = it.vat_category ?? prod?.mydata_vat_category ?? null;
+    let lineCat: number;
+    let linePct: number;
+    if (explicitCat != null && VAT_PCT_BY_CATEGORY[Number(explicitCat)] !== undefined) {
+      lineCat = Number(explicitCat);
+      linePct = VAT_PCT_BY_CATEGORY[lineCat];
+    } else {
+      lineCat = cat;
+      linePct = rate;
+    }
+    // Recompute VAT deterministically from net × percent — don't trust a possibly-drifted
+    // stored vat_amount (rounding drift here is the #1 myDATA ValidationError cause).
+    const vat = round2((net * linePct) / 100);
     return {
       lineNumber: i + 1,
       code: it.sku ?? undefined,
@@ -118,7 +135,7 @@ export async function buildInvoiceInputFromDb(
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,
-      vatPercent: rate,
+      vatPercent: linePct,
       vatAmount: vat,
       incomeClassificationType: it.income_classification_type ?? prod?.mydata_income_classification_type ?? incType,
       incomeClassificationCategory: it.income_classification_category ?? prod?.mydata_income_classification_category ?? incCat,
