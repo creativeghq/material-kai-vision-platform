@@ -56,6 +56,23 @@ export const workspaceManagementService = {
     if (error) throw error;
     return data as any;
   },
+
+  /** Operator/ancestor grants or revokes a module entitlement for a workspace (#181). */
+  async setEntitlement(workspaceId: string, moduleSlug: string, enabled: boolean): Promise<void> {
+    const { error } = await supabase.rpc('set_workspace_entitlement', {
+      p_workspace_id: workspaceId, p_module_slug: moduleSlug, p_enabled: enabled,
+    });
+    if (error) throw error;
+  },
+
+  /** Map of workspace_id → enabled for a given module entitlement. */
+  async getEntitlements(moduleSlug: string): Promise<Record<string, boolean>> {
+    const { data } = await supabase
+      .from('workspace_module_entitlements')
+      .select('workspace_id, enabled')
+      .eq('module_slug', moduleSlug);
+    return Object.fromEntries((data ?? []).map((r: any) => [r.workspace_id, r.enabled]));
+  },
 };
 
 /** Stash a referral code seen in the URL (?ref=) until the user is authenticated. */

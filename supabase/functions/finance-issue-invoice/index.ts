@@ -133,8 +133,20 @@ Deno.serve(async (req) => {
         .eq('id', invoiceId)
         .single();
 
+      // Monetization gate (#181): the workspace must be entitled to e-invoicing.
+      const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
+        p_workspace_id: invRow!.workspace_id,
+        p_module_slug: 'e-invoicing',
+      });
+
       if (invRow?.fiscal_status === 'accepted') {
         fiscalResult = { ok: true, skipped: true, reason: 'already_accepted' };
+      } else if (!entitled) {
+        fiscalResult = {
+          ok: false,
+          code: 'not_entitled',
+          error: 'This workspace is not entitled to e-Invoicing. The operator must enable it for this workspace.',
+        };
       } else {
         const resolved = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
         if (!resolved.ok) {

@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
@@ -26,6 +27,7 @@ const MarketplaceNetworkPage: React.FC = () => {
   const { memberships, refresh } = useWorkspace();
   const [rows, setRows] = useState<WsRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { commission_pct: string; catalog_access: string }>>({});
+  const [einvoicing, setEinvoicing] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -39,8 +41,12 @@ const MarketplaceNetworkPage: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const data = (await workspaceManagementService.listManageable()) as WsRow[];
+      const [data, ent] = await Promise.all([
+        workspaceManagementService.listManageable() as Promise<WsRow[]>,
+        workspaceManagementService.getEntitlements('e-invoicing'),
+      ]);
       setRows(data);
+      setEinvoicing(ent);
       setDrafts(Object.fromEntries(data.map((r) => [r.id, { commission_pct: String(r.commission_pct), catalog_access: r.catalog_access }])));
     } catch (err: any) {
       toast({ title: 'Failed to load network', description: err?.message, variant: 'destructive' });
@@ -70,6 +76,17 @@ const MarketplaceNetworkPage: React.FC = () => {
   };
 
   const editable = (r: WsRow) => !!r.parent_workspace_id && ownedIds.has(r.parent_workspace_id);
+
+  const toggleEinvoicing = async (workspaceId: string, enabled: boolean) => {
+    setEinvoicing((s) => ({ ...s, [workspaceId]: enabled }));
+    try {
+      await workspaceManagementService.setEntitlement(workspaceId, 'e-invoicing', enabled);
+      toast({ title: enabled ? 'e-Invoicing enabled' : 'e-Invoicing disabled' });
+    } catch (err: any) {
+      setEinvoicing((s) => ({ ...s, [workspaceId]: !enabled }));
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
 
   // Owner/admin of a node can mint a referral link for people to sign up under it.
   const copyReferral = async (workspaceId: string) => {
@@ -107,12 +124,13 @@ const MarketplaceNetworkPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Parent</th>
                   <th className="px-4 py-2 text-left">Catalog access</th>
                   <th className="px-4 py-2 text-right">Commission %</th>
+                  <th className="px-4 py-2 text-center">e-Invoicing</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.filter((r) => !r.is_root).length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
                 )}
                 {rows.filter((r) => !r.is_root).map((r) => {
                   const canEdit = editable(r);
@@ -142,6 +160,13 @@ const MarketplaceNetworkPage: React.FC = () => {
                             className="h-8 w-20 ml-auto text-right" />
                         ) : (
                           <span>{r.commission_pct}%</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {canEdit ? (
+                          <Switch checked={!!einvoicing[r.id]} onCheckedChange={(v) => toggleEinvoicing(r.id, v)} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{einvoicing[r.id] ? 'on' : 'off'}</span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
