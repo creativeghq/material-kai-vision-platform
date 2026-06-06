@@ -13,6 +13,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { financeService, formatMoney, type Invoice, type CreditNote } from '@/modules/finance/services/financeService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
@@ -35,6 +36,7 @@ const DocumentsPage: React.FC = () => {
   const navigate = useNavigate();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { isAccountant } = useCapabilities();
 
   const [type, setType] = useState<DocType>('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -95,10 +97,10 @@ const DocumentsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold capitalize">{NAV.find((n) => n.key === type)?.label}</h2>
               <div className="flex items-center gap-2">
-                {type === 'receipts' && (
+                {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
                 )}
-                {(type === 'invoices' || type === 'receipts') && (
+                {(type === 'invoices' || type === 'receipts') && !isAccountant && (
                   <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
               </div>

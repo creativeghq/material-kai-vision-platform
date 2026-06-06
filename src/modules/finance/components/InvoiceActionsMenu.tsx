@@ -13,6 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 interface Props {
   invoiceId: string;
@@ -26,6 +27,7 @@ interface Props {
 export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fiscalStatus, fiscalMark, status, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAccountant } = useCapabilities(); // read-only accountant: no write actions
   const [mark, setMark] = useState<string | null>(fiscalMark ?? null);
   const [fStatus, setFStatus] = useState<string | null>(fiscalStatus ?? null);
   const [submitting, setSubmitting] = useState(false);
@@ -81,16 +83,16 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> View</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => go()}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>
+        {!isAccountant && <DropdownMenuItem onClick={() => go()}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> Print / PDF</DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">myDATA</DropdownMenuLabel>
-        {canSubmit && <DropdownMenuItem onClick={submitFiscal}><Send className="h-4 w-4 mr-2" /> Submit to myDATA</DropdownMenuItem>}
+        {canSubmit && !isAccountant && <DropdownMenuItem onClick={submitFiscal}><Send className="h-4 w-4 mr-2" /> Submit to myDATA</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyMark}><Hash className="h-4 w-4 mr-2" /> Copy MARK</DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>
+        {!isAccountant && <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

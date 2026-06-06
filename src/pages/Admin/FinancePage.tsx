@@ -50,6 +50,7 @@ import type { FinanceSettings } from '@/modules/finance/services/financeService'
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -61,6 +62,7 @@ const FinancePage: React.FC = () => {
   // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
   // oldest-membership query so Finance follows the workspace switcher (#194).
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { isAccountant } = useCapabilities(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -284,7 +286,7 @@ const FinancePage: React.FC = () => {
               <Card>
                 <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" /> Recent invoices</CardTitle>
-                  <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3 w-3 mr-1" /> New</Button>
+                  {!isAccountant && <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3 w-3 mr-1" /> New</Button>}
                 </CardHeader>
                 <CardContent className="p-0">
                   {recentInvoices.length === 0 ? (
@@ -340,7 +342,7 @@ const FinancePage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Link to={`${financeBase}/documents`}><Button variant="outline"><Receipt className="h-4 w-4 mr-1" /> All documents</Button></Link>
-                <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                {!isAccountant && <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>}
               </div>
             </div>
 
@@ -404,7 +406,7 @@ const FinancePage: React.FC = () => {
                 <h3 className="text-sm font-semibold">Payables — supplier bills</h3>
                 <p className="text-xs text-muted-foreground">Open and overdue bills from suppliers. Suppliers must be marked <code>is_supplier</code> in CRM.</p>
               </div>
-              <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>
+              {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

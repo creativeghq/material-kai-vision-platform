@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
 import { useEnabledModules, ModuleHeaderActions } from '@/modules/_core';
@@ -24,9 +25,12 @@ import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
-  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; enabledSlugs: Set<string> },
+  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; enabledSlugs: Set<string> },
 ): SidebarNavItem[] {
   return items.filter((item) => {
+    // Scoped invited roles see a focused subset only (overrides the gates below).
+    if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
+    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'quotes';
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     // Factory analytics is for verified factories only — not dealers/operators.
     if (item.requireRole === 'factory' && !ctx.isFactory) return false;
@@ -41,11 +45,12 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
+  const { isAccountant, isSalesRep } = useCapabilities();
   const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, enabledSlugs });
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, enabledSlugs });
 
   useEffect(() => {
     setMobileOpen(false);

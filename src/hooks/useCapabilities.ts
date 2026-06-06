@@ -28,6 +28,10 @@ export interface Capabilities {
   isEndUser: boolean;
   /** Verified factory/supplier (factory analytics). */
   isFactory: boolean;
+  /** Invited read-only accountant (#202) — Finance only, no writes. */
+  isAccountant: boolean;
+  /** Invited sales rep (#201) — Sales portal only. */
+  isSalesRep: boolean;
 }
 
 export function useCapabilities(): Capabilities {
@@ -37,6 +41,8 @@ export function useCapabilities(): Capabilities {
   const isWorkspaceManager = !!workspaceRole && ADMIN_ROLES.includes(workspaceRole);
   const isBusinessNode = rank === 'operator' || rank === 'dealer' || rank === 'architect';
   const canSupplyProducts = rank === 'operator' || rank === 'dealer';
+  const isAccountant = workspaceRole === 'accountant';
+  const isSalesRep = workspaceRole === 'sales';
 
   return {
     loading: wsLoading || frLoading,
@@ -45,9 +51,12 @@ export function useCapabilities(): Capabilities {
     isWorkspaceManager,
     isBusinessNode,
     canSupplyProducts,
+    // Accountant is read-only; finance management stays with owner/admin.
     canManageFinance: isWorkspaceManager,
     canManageNetwork: isWorkspaceManager && canSupplyProducts,
-    isEndUser: !isWorkspaceManager && !isPlatformOperator,
+    isEndUser: !isWorkspaceManager && !isPlatformOperator && !isAccountant && !isSalesRep,
     isFactory,
+    isAccountant,
+    isSalesRep,
   };
 }

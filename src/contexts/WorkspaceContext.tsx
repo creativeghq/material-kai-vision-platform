@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLES } from '@/auth/roles';
-import { workspaceManagementService, REFERRAL_STORAGE_KEY } from '@/services/workspaceManagementService';
+import { workspaceManagementService, REFERRAL_STORAGE_KEY, INVITE_STORAGE_KEY } from '@/services/workspaceManagementService';
 import { ACTIVE_WORKSPACE_KEY } from '@/utils/activeWorkspace';
 
 /**
@@ -126,6 +126,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
         await workspaceManagementService.redeemReferral(ref).catch(() => {});
       }
+      // Redeem a pending role-carrying invite (?invite=) — sales rep / accountant.
+      const inv = localStorage.getItem(INVITE_STORAGE_KEY);
+      if (inv) {
+        localStorage.removeItem(INVITE_STORAGE_KEY);
+        await workspaceManagementService.redeemInvite(inv).catch(() => {});
+      }
     } catch { /* localStorage unavailable */ }
 
     const { data, error } = await supabase
@@ -164,8 +170,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Capture a ?ref= referral code into storage so it survives signup/login.
   useEffect(() => {
     try {
-      const code = new URLSearchParams(window.location.search).get('ref');
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('ref');
       if (code) localStorage.setItem(REFERRAL_STORAGE_KEY, code);
+      const invite = params.get('invite');
+      if (invite) localStorage.setItem(INVITE_STORAGE_KEY, invite);
     } catch { /* ignore */ }
   }, []);
 
