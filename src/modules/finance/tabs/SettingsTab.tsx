@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
 import { FiscalConnectorSettings } from '@/modules/finance/components/FiscalConnectorSettings';
+import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -216,6 +217,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
       </Card>
 
       <FiscalConnectorSettings workspaceId={workspaceId} />
+
+      <PaymentRoutingCard workspaceId={workspaceId} />
     </div>
   );
 };

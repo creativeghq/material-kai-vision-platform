@@ -120,6 +120,9 @@ Deno.serve(async (req) => {
         return json({ ok: true, pay_link: payLink, pay_token: token, invoice_id: inv.id });
       }
 
+      // #182 route funds to the workspace's connected Stripe account when configured.
+      const { data: destAcct } = await supabase.rpc('get_workspace_payout_account', { p_workspace_id: inv.workspace_id });
+
       // Create a Stripe Checkout session right now and return its URL too (so admin can paste either).
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
@@ -134,6 +137,7 @@ Deno.serve(async (req) => {
           },
         ],
         payment_intent_data: {
+          ...(destAcct ? { transfer_data: { destination: destAcct as string } } : {}),
           metadata: {
             type: 'invoice_payment',
             invoice_id: inv.id,
@@ -182,6 +186,10 @@ Deno.serve(async (req) => {
       return json({ ok: true, already_paid: true, invoice_id: row.invoice_id }, 200);
     }
 
+    const { data: destAcctPublic } = row.workspace_id
+      ? await supabase.rpc('get_workspace_payout_account', { p_workspace_id: row.workspace_id })
+      : { data: null };
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [
@@ -195,6 +203,7 @@ Deno.serve(async (req) => {
         },
       ],
       payment_intent_data: {
+        ...(destAcctPublic ? { transfer_data: { destination: destAcctPublic as string } } : {}),
         metadata: {
           type: 'invoice_payment',
           invoice_id: row.invoice_id,
