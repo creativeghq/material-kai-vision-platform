@@ -50,6 +50,8 @@ import {
 } from '@/components/core/ui/select';
 import { ScrollArea } from '@/components/core/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { quotesService } from '../services/QuotesService';
 import {
   getAvailableSizes,
@@ -127,6 +129,26 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   customerContactId,
 }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+
+  // Sellable services (item_type='service') for the quick-add picker (#203).
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [addingService, setAddingService] = useState(false);
+  useEffect(() => {
+    if (!open || !activeWorkspaceId) return;
+    servicesService.list(activeWorkspaceId).then(setServices).catch(() => setServices([]));
+  }, [open, activeWorkspaceId]);
+
+  const addServiceToQuote = async (serviceId: string) => {
+    setAddingService(true);
+    try {
+      await quotesService.addItem({ quote_id: quoteId, product_id: serviceId, quantity: 1, added_from: 'manual' });
+      toast({ title: 'Service added' });
+      onProductsAdded();
+    } catch (err: any) {
+      toast({ title: 'Failed to add service', description: err?.message, variant: 'destructive' });
+    } finally { setAddingService(false); }
+  };
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -317,6 +339,21 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
           {/* ── Catalog Search Tab ── */}
           <TabsContent value="search" className="flex-1 flex flex-col gap-4 min-h-0 mt-0">
+            {/* Quick-add a service (#203) */}
+            {services.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Select value="" onValueChange={addServiceToQuote} disabled={addingService}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="+ Add a service…" /></SelectTrigger>
+                  <SelectContent>
+                    {services.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}{s.list_price != null ? ` — ${s.list_price} ${s.currency}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
