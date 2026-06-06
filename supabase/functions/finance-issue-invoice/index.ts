@@ -35,6 +35,25 @@ interface RequestBody {
   fiscal_overrides?: FiscalOverrides;
 }
 
+// Platform cost per myDATA transmission (markup on Novus ~0.5-1 cr). Root transmits free.
+const TRANSMISSION_CREDITS = 2;
+
+/** Sub-tenant credit pre-check: returns an error object when the workspace must pay but
+ *  can't afford a transmission — so we never give away a paid myDATA submission. */
+async function transmissionCreditError(
+  supabase: any, workspaceId: string, userId?: string,
+): Promise<{ code: string; error: string; balance: number } | null> {
+  const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).single();
+  if (ws?.is_root || !userId) return null; // operator root transmits free
+  const { data: cr } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
+  const balance = cr?.balance ?? 0;
+  if (balance < TRANSMISSION_CREDITS) {
+    return { code: 'insufficient_credits', balance,
+      error: `Not enough credits to transmit to myDATA (need ${TRANSMISSION_CREDITS}, have ${balance}). Please top up.` };
+  }
+  return null;
+}
+
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -83,6 +102,9 @@ Deno.serve(async (req) => {
       if (!entitled) {
         return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
       }
+
+      const cnCreditErr = await transmissionCreditError(supabase, cnRow.workspace_id, auth.userId);
+      if (cnCreditErr) return json({ ok: false, ...cnCreditErr }, 402);
 
       const resolved = await resolveWorkspaceConnector(supabase, cnRow.workspace_id, 'legal_invoice');
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
@@ -230,9 +252,12 @@ Deno.serve(async (req) => {
           error: 'This workspace is not entitled to e-Invoicing. The operator must enable it for this workspace.',
         };
       } else {
-        const resolved = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
-        if (!resolved.ok) {
-          fiscalResult = { ok: false, code: resolved.code, error: resolved.error };
+        const creditErr = await transmissionCreditError(supabase, invRow!.workspace_id, auth.userId);
+        const resolved: any = creditErr ? null : await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
+        if (creditErr) {
+          fiscalResult = { ok: false, ...creditErr };
+        } else if (!resolved!.ok) {
+          fiscalResult = { ok: false, code: resolved!.code, error: resolved!.error };
         } else {
           try {
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, body.fiscal_overrides ?? {});
