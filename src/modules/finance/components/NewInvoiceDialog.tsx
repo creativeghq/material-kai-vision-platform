@@ -79,6 +79,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [incTypes, setIncTypes] = useState<{ code: string; description: string }[]>([]);
   const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
   const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
+  const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
+  const [withholdingCode, setWithholdingCode] = useState<string>('');
 
   useEffect(() => {
     if (!open) return;
@@ -96,12 +98,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
         invoicingSetupService.listReference('income_classification_category'),
+        invoicingSetupService.listReference('withholding_tax'),
       ]);
+      setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
+      setWithholdingCode('');
       // Only types the workspace enabled; if none configured, show all.
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
@@ -169,7 +174,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
     const vr = parseFloat(vatRate) || 0;
     const vatAmount = subtotal * (vr / 100);
-    return { subtotal, vatAmount, total: subtotal + vatAmount };
+    const wh = withholdings.find((w) => w.code === withholdingCode);
+    const withheld = wh?.rate ? subtotal * (Number(wh.rate) / 100) : 0;
+    return { subtotal, vatAmount, withheld, total: subtotal + vatAmount - withheld };
   })();
 
   const handleSave = async () => {
@@ -210,6 +217,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           payment_terms_days: parseInt(paymentTermsDays, 10) || 30,
           notes: notes || null,
           document_type: documentType,
+          total_withheld_amount: Number((totals.withheld || 0).toFixed(2)),
           issued_at: issueNow ? new Date().toISOString() : null,
           due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
         })
@@ -417,6 +425,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <tfoot className="text-sm">
                   <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Subtotal</td><td className="px-2 py-1 text-right tabular-nums">{totals.subtotal.toFixed(2)}</td><td /></tr>
                   <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">VAT ({vatRate}%)</td><td className="px-2 py-1 text-right tabular-nums">{totals.vatAmount.toFixed(2)}</td><td /></tr>
+                  {totals.withheld > 0 && (
+                    <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Withholding (φόρος)</td><td className="px-2 py-1 text-right tabular-nums text-amber-600">-{totals.withheld.toFixed(2)}</td><td /></tr>
+                  )}
                   <tr><td colSpan={5} className="px-2 py-1 text-right font-medium">Total</td><td className="px-2 py-1 text-right font-medium tabular-nums">{totals.total.toFixed(2)}</td><td /></tr>
                 </tfoot>
               </table>
@@ -424,6 +435,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <p className="text-[11px] text-muted-foreground">
               "Unit cost" is the cost-of-goods snapshot used for profit calc. Leave empty if you don't track it for this line.
             </p>
+          </div>
+
+          {/* Withholding tax (Φόροι Παραστατικού) — applied on the net, reduces the total */}
+          <div className="space-y-1">
+            <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Φόροι / Withholding tax</Label>
+            <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
+              <SelectTrigger className="max-w-md"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">
