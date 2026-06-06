@@ -29,6 +29,7 @@ export const MarketplaceEarningsTab: React.FC = () => {
   const total = useMemo(() => rows.reduce((s, r) => s + Number(r.commission_amount || 0), 0), [rows]);
   const bySeller = useMemo(() => groupSum(rows, (r) => r.seller), [rows]);
   const byProduct = useMemo(() => groupSum(rows, (r) => r.product), [rows]);
+  const byCategory = useMemo(() => groupSum(rows, (r) => r.category), [rows]);
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
@@ -42,13 +43,14 @@ export const MarketplaceEarningsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card className="dashboard-card border-0"><CardContent className="p-4">
           <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Total earned</div>
           <div className="mt-1 text-xl font-semibold">{cur} {total.toFixed(2)}</div>
           <div className="mt-1 text-xs text-muted-foreground">{rows.length} sale(s)</div>
         </CardContent></Card>
         <BreakdownCard title="By seller" rows={bySeller} cur={cur} />
+        <BreakdownCard title="By category" rows={byCategory} cur={cur} />
         <BreakdownCard title="By product" rows={byProduct} cur={cur} />
       </div>
 

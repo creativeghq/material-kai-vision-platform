@@ -55,6 +55,7 @@ export interface CommissionLedgerRow {
   seller: string;
   seller_rank: string;
   product: string;
+  category: string;
   base_price: number;
   commission_pct: number;
   commission_amount: number;
