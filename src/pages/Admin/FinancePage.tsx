@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   TrendingUp,
   ArrowDownCircle,
@@ -54,6 +54,8 @@ const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Same page is mounted at /admin/finance (operator) and /finance (business owner).
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
   // oldest-membership query so Finance follows the workspace switcher (#194).
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -287,7 +289,7 @@ const FinancePage: React.FC = () => {
                       {recentInvoices.slice(0, 6).map((i) => (
                         <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-3">
                           <div className="min-w-0">
-                            <Link to={`/admin/finance/invoices/${i.id}`} className="text-sm font-mono text-primary hover:underline">
+                            <Link to={`${financeBase}/invoices/${i.id}`} className="text-sm font-mono text-primary hover:underline">
                               {i.internal_number}
                             </Link>
                             <div className="text-xs text-muted-foreground">
@@ -349,7 +351,7 @@ const FinancePage: React.FC = () => {
                       <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No open invoices.</td></tr>
                     )}
                     {ar.map((r) => (
-                      <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/admin/finance/invoices/${r.id}`)}>
+                      <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${r.id}`)}>
                         <td className="px-4 py-2 font-mono text-xs">{r.internal_number}</td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
@@ -497,7 +499,7 @@ const FinancePage: React.FC = () => {
         workspaceId={workspaceId}
         open={newInvoiceOpen}
         onOpenChange={setNewInvoiceOpen}
-        onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`/admin/finance/invoices/${invoiceId}`); }}
+        onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
       />
       <NewSupplierBillDialog
         workspaceId={workspaceId}

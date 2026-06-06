@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import {
   Loader2,
   FileText,
@@ -33,6 +33,7 @@ const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'chec
 
 const InvoiceDetailPage: React.FC = () => {
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { toast } = useToast();
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +171,7 @@ const InvoiceDetailPage: React.FC = () => {
     <div className="container max-w-6xl space-y-6 py-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Link to="/admin/finance">
+          <Link to={financeBase}>
             <Button variant="ghost" size="sm" className="-ml-2">
               <ArrowLeft className="h-4 w-4" />
             </Button>
