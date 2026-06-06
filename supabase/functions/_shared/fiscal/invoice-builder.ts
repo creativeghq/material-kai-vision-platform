@@ -117,7 +117,7 @@ export async function buildInvoiceInputFromDb(
 
   const invoiceType = overrides.invoiceType ?? (counterpart.vatNumber ? '1.1' : '11.1');
   const series = overrides.series ?? (fs?.invoice_number_prefix || 'A');
-  const aa = overrides.aa ?? String(inv.internal_number ?? '');
+  const aa = overrides.aa ?? String(inv.legal_number ?? inv.internal_number ?? '');
   const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
 
   return {
