@@ -44,6 +44,7 @@ import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
+import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -229,6 +230,9 @@ const FinancePage: React.FC = () => {
                 subtext={`${followUps.length} quote(s) need follow-up`}
               />
             </div>
+
+            {/* Marketplace commission earned (downline catalog sales) — renders only when non-zero */}
+            <CommissionSummaryCard />
 
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
