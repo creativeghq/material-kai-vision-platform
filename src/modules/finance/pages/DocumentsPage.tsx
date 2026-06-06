@@ -94,9 +94,14 @@ const DocumentsPage: React.FC = () => {
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold capitalize">{NAV.find((n) => n.key === type)?.label}</h2>
-              {(type === 'invoices' || type === 'receipts') && (
-                <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-              )}
+              <div className="flex items-center gap-2">
+                {type === 'receipts' && (
+                  <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
+                )}
+                {(type === 'invoices' || type === 'receipts') && (
+                  <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+                )}
+              </div>
             </div>
 
             <Card>
