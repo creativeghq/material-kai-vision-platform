@@ -1,0 +1,139 @@
+{  
+    "invoice": [  
+        {  
+            "issuer": {     
+              "vatNumber": "302278212",   
+              "name": "Spiros",  
+              "country": "GR",      
+              "branch": 0,      
+              "address": {    
+                "street": "Parga",  
+                "number": "0",  
+                "postalCode": "48060",  
+                "city": "Parga"  
+              }         
+            },     
+            "counterpart": {    
+              "vatNumber": "026883248",  
+              "name": "Spiros",  
+              "country": "GR",   
+              "branch": 0,     
+              "address": {    
+                "street": "121212",  
+                "number": "0",  
+                "postalCode": "0",  
+                "city": "NONE"  
+              }         
+            },          
+            "invoiceHeader": {   
+              "series": "NOV",     
+              "aa": "775",   
+              "issueDate": "2024-11-15", 
+              "invoiceType": "1.1",       
+              "currency": "EUR",            
+              "dispatchDate": "2024-10-31",  
+              "dispatchTime": "10:00:00",    
+              "vehicleNumber": "AAA-1234",  
+              "movePurpose": 1,             
+              "movePurposeLabel": "Πώληση",   
+              "isDeliveryNote": true,   
+              "otherDeliveryNoteHeader": {  
+                        "loadingAddress": {   
+                          "street": "Γεωργίου Ζωγράφου",  
+                          "number": "53",  
+                          "postalCode": "15772", 
+                          "city": "Ζωγράφου"  
+                        },                   
+                        "deliveryAddress": {  
+                          "street": "Ανεξαρτησίας", 
+                          "number": "154Α",  
+                          "postalCode": "48060", 
+                          "city": "Πάργα"     
+                        },                     
+                        "startShippingBranch": 0, 
+                        "completeShippingBranch": 0  
+                      }                          
+            },                        
+            "paymentMethods": [{         
+                "type": 5,                
+                "amount": 124            
+              }],            
+            "invoiceDetails": [{    
+              "lineNumber": 1,      
+              "lineCode": "655-000023",    
+              "itemDescr": "Αντικατάσταση Λέβητα",    
+              "quantity": 1,              
+              "measurementUnit": 1,  
+              "measurementUnitLabel": "ΤΜΧ",  
+              "lineUnitPrice": 100,           
+              "totalNetPriceBeforeDiscount": 100,   
+              "totalDiscountValue": 0,  
+              "netValue": 100,         
+              "vatCategory": 1,         
+              "vatCategoryPercent": 24,   
+              "vatAmount": 24,                   
+              "lineDescription": "Αντικατάσταση Λέβητα",    
+              "incomeClassification": [{           
+                "classificationType": "E3_561_001",   
+                "classificationCategory": "category1_1", 
+                "amount": 100                   
+              }]                                 
+            }],                                  
+            "providerAdditionalInvoiceDetails": {           
+              "issuer": {                  
+                "name": "Novus Conceptus",  
+                "profession": " Εταιρεία Πληροφορικής",  
+                "taxoffice": "Πρεβέζης",       
+                "addressStreet": "Σπύρου Λειβαδά", 
+                "addressNumber": "43",        
+                "addressPostalCode": "48060", 
+                "addressCity": "Πάργα",      
+                "addressCountry": "Ελλάδα",   
+                "phone": "2684 031 601",        
+                "email": "info@novusconceptus.com",  
+                "webSite": "novusconceptus.com",  
+                "registryNumber": "ΓΕΜΗ: 154255449000",  
+                "emtyLine2": "NBG BANK IBAN: GRXX XXXX XXXX XXXX XXXX XXX"       
+              },                         
+              "counterpart": {       
+                "code": "#0001",  
+                "name": "Υφραυλικός ΑΕ",   
+                "profession": "Υδραυλικές και κλιματιστικές εγκαταστάσεις θέρμανσης και ψύξης", 
+                "taxoffice": "Ζωγράφου",     
+                "addressStreet": "Γεωργίου Ζωγράφου",  
+                "addressNumber": "500",     
+                "addressPostalCode": "11527",   
+                "addressCity": "Ζωγράφου",      
+                "addressCountry": "Ελλάδα",   
+                "phone": "210 123456789",  
+                "email": "test@email.com"  
+              },                                    
+              "additionalDetails": {                  
+                "documentLabel": "Τιμολόγιο Πώλησης - Δελτίο Αποστολής_Διακίνηση Αγαθών",     
+                "documentLanguageCode": "EL",     
+                "documentSizeCode": 0,     
+                "documentComments": "Το προιόν είναι καινουργιο και αμεταχειριστο \n Εξόφληση εντός 10 ημερών",  
+                "paymentMethodInvoiceLabel": "Επι πιστώσει",     
+                "logoId": "44B4B3AF-30E8-4B95-021B-08DC41E24F77",   
+		"dispatchPlaceFrom": "Γεωργίου Ζωγράφου 53, 15772 Ζωγράφου",
+		"dispatchPlaceTo": "Ανεξαρτησίας 153Α, 48060 Πάργα" 
+              }                                     
+            },                                    
+            "invoiceSummary": {                 
+              "totalNetValue": 100,            
+              "totalVatAmount": 24,              
+              "totalWithheldAmount": 0,          
+              "totalFeesAmount": 0,            
+              "totalStampDutyAmount": 0,        
+              "totalOtherTaxesAmount": 0,      
+              "totalDeductionsAmount": 0,     
+              "totalGrossValue": 124,        
+              "incomeClassification": [{       
+                "classificationType": "E3_561_001",
+                "classificationCategory": "category1_1",   
+                "amount": 100   
+              }]      
+            }     
+          }    
+    ]       
+  }  

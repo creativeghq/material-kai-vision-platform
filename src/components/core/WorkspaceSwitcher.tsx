@@ -13,19 +13,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
 
 export const WorkspaceSwitcher: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
-    memberships, activeWorkspace, activeWorkspaceId, workspaceRole, rank,
+    memberships, activeWorkspace, activeWorkspaceId, rank,
     switchWorkspace, refresh,
   } = useWorkspace();
 
   const [createOpen, setCreateOpen] = useState(false);
 
-  const canManage = (workspaceRole === 'owner' || workspaceRole === 'admin') && (rank === 'operator' || rank === 'dealer');
+  const { canManageNetwork: canManage } = useCapabilities();
   // Hide entirely for ordinary single-workspace users with nothing to manage.
   if (memberships.length <= 1 && !canManage) return null;
 
