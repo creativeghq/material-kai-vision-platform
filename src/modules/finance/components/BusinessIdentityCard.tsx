@@ -1,10 +1,15 @@
 /**
  * Business profile for invoicing — the full Novus-style setup (4 tabs):
- *  1. Billing / issuer (bilingual GR-EN) — printed on invoices + transmitted to myDATA.
+ *  1. Billing / issuer — printed on invoices + transmitted to myDATA.
  *  2. Customer contact — shown in customer-facing emails.
  *  3. Personal / confidential — for support contact.
  *  4. My company — type / operating mode / main activity.
  *  + Bank & logo.
+ *
+ * Labels are English-only (translations come later). Fields marked `bilingual`
+ * (name/activity/address/city/country) store BOTH a Greek and an English value for
+ * dual-language invoices — instead of two columns, a top EN/GR switch picks which
+ * language you're entering. Every field carries a placeholder example.
  * Per-workspace (finance_settings); each business fills its own.
  */
 import React, { useEffect, useRef, useState } from 'react';
@@ -19,54 +24,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-type Field = { key: string; label: string; en?: boolean; textarea?: boolean; locked?: boolean };
+type Lang = 'en' | 'gr';
+type Field = { key: string; label: string; bilingual?: boolean; textarea?: boolean; placeholder?: string };
 
 const BILLING: Field[] = [
-  { key: 'business_name', label: 'Επωνυμία / Company name', en: true },
-  { key: 'business_profession', label: 'Δραστηριότητα / Activity', en: true },
-  { key: 'business_vat', label: 'ΑΦΜ / VAT' },
-  { key: 'business_gemi', label: 'Αριθμός ΓΕΜΗ' },
-  { key: 'business_tax_office', label: 'ΔΟΥ / Tax office', en: true },
-  { key: 'business_address', label: 'Οδός / Street', en: true },
-  { key: 'business_street_number', label: 'Αριθμός / Number' },
-  { key: 'business_postal_code', label: 'Τ.Κ. / Postal code' },
-  { key: 'business_city', label: 'Πόλη / City', en: true },
-  { key: 'business_country', label: 'Χώρα / Country', en: true },
-  { key: 'business_country_code', label: 'Country code (e.g. GR)' },
-  { key: 'business_phone', label: 'Τηλέφωνο / Phone' },
-  { key: 'business_fax', label: 'FAX' },
-  { key: 'business_email', label: 'Email' },
-  { key: 'business_other', label: 'Άλλο / Other', en: true },
+  { key: 'business_name', label: 'Company name', bilingual: true, placeholder: 'Acme Tiles S.A.' },
+  { key: 'business_profession', label: 'Activity', bilingual: true, placeholder: 'Wholesale of building materials' },
+  { key: 'business_vat', label: 'VAT number', placeholder: 'EL123456789' },
+  { key: 'business_gemi', label: 'GEMI number', placeholder: '123456789000' },
+  { key: 'business_tax_office', label: 'Tax office', bilingual: true, placeholder: 'FAE Athinon' },
+  { key: 'business_address', label: 'Street', bilingual: true, placeholder: 'Ermou' },
+  { key: 'business_street_number', label: 'Number', placeholder: '15' },
+  { key: 'business_postal_code', label: 'Postal code', placeholder: '10563' },
+  { key: 'business_city', label: 'City', bilingual: true, placeholder: 'Athens' },
+  { key: 'business_country', label: 'Country', bilingual: true, placeholder: 'Greece' },
+  { key: 'business_country_code', label: 'Country code', placeholder: 'GR' },
+  { key: 'business_phone', label: 'Phone', placeholder: '+30 210 1234567' },
+  { key: 'business_fax', label: 'Fax', placeholder: '+30 210 1234568' },
+  { key: 'business_email', label: 'Email', placeholder: 'billing@acme.gr' },
+  { key: 'business_other', label: 'Other', bilingual: true, placeholder: 'e.g. branch / notes' },
 ];
 const CUSTOMER_CONTACT: Field[] = [
-  { key: 'contact_title', label: 'Επωνυμία / Διακριτικός τίτλος', en: true },
-  { key: 'contact_email', label: 'Email επικοινωνίας' },
-  { key: 'contact_phone', label: 'Τηλέφωνο εταιρίας' },
-  { key: 'contact_fax', label: 'ΦΑΞ' },
-  { key: 'contact_website', label: 'Ιστοσελίδα' },
-  { key: 'contact_linkedin', label: 'Linkedin' },
-  { key: 'contact_facebook', label: 'Facebook' },
-  { key: 'contact_hours', label: 'Ωράριο λειτουργίας' },
+  { key: 'contact_title', label: 'Display name / brand', bilingual: true, placeholder: 'Acme Tiles' },
+  { key: 'contact_email', label: 'Contact email', placeholder: 'hello@acme.gr' },
+  { key: 'contact_phone', label: 'Company phone', placeholder: '+30 210 1234567' },
+  { key: 'contact_fax', label: 'Fax', placeholder: '+30 210 1234568' },
+  { key: 'contact_website', label: 'Website', placeholder: 'https://acme.gr' },
+  { key: 'contact_linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/acme' },
+  { key: 'contact_facebook', label: 'Facebook', placeholder: 'https://facebook.com/acme' },
+  { key: 'contact_hours', label: 'Opening hours', placeholder: 'Mon–Fri 9:00–17:00' },
 ];
 const PERSONAL: Field[] = [
-  { key: 'responsible_name', label: 'Ονοματεπώνυμο Υπευθύνου' },
-  { key: 'personal_landline', label: 'Σταθερό Τηλέφωνο' },
-  { key: 'personal_mobile', label: 'Κινητό Τηλέφωνο' },
-  { key: 'notification_email', label: 'Email Ειδοποιήσεων' },
-  { key: 'correspondence_address', label: 'Διεύθυνση αλληλογραφίας' },
-  { key: 'personal_notes', label: 'Οδηγίες & Σχόλια', textarea: true },
+  { key: 'responsible_name', label: 'Responsible person', placeholder: 'Maria Papadopoulou' },
+  { key: 'personal_landline', label: 'Landline', placeholder: '+30 210 1234567' },
+  { key: 'personal_mobile', label: 'Mobile', placeholder: '+30 69x xxx xxxx' },
+  { key: 'notification_email', label: 'Notifications email', placeholder: 'alerts@acme.gr' },
+  { key: 'correspondence_address', label: 'Correspondence address', placeholder: 'Ermou 15, 10563 Athens' },
+  { key: 'personal_notes', label: 'Notes & instructions', textarea: true, placeholder: 'Anything we should know…' },
 ];
 const BANK: Field[] = [
-  { key: 'bank_name', label: 'Bank name' },
-  { key: 'bank_iban', label: 'IBAN' },
-  { key: 'bank_bic', label: 'BIC / SWIFT' },
-  { key: 'bank_beneficiary', label: 'Beneficiary' },
+  { key: 'bank_name', label: 'Bank name', placeholder: 'Piraeus Bank' },
+  { key: 'bank_iban', label: 'IBAN', placeholder: 'GR16 0110 1250 0000 0001 2300 695' },
+  { key: 'bank_bic', label: 'BIC / SWIFT', placeholder: 'PIRBGRAA' },
+  { key: 'bank_beneficiary', label: 'Beneficiary', placeholder: 'Acme Tiles S.A.' },
 ];
 
-const COMPANY_TYPES = ['Ατομική επιχείρηση / Freelancer', 'Μικρή επιχείρηση (2–10 άτομα)', 'Μεσαία επιχείρηση (11–50 άτομα)', 'Μεγάλη επιχείρηση (50+ άτομα)'];
+const COMPANY_TYPES = [
+  'Sole proprietor / Freelancer', 'Small business (2–10 people)',
+  'Medium business (11–50 people)', 'Large business (50+ people)',
+];
 const MAIN_ACTIVITIES = [
-  { group: 'Εμπόριο', items: ['Λιανικό & Χονδρικό εμπόριο', 'Μόνο Λιανικό εμπόριο', 'Μόνο Χονδρικό εμπόριο', 'Κατάστημα εστίασης / cafe'] },
-  { group: 'Υπηρεσίες', items: ['Αρχιτέκτονας/Μηχανικός/Εργολάβος', 'Δικηγόρος/Συμβολαιογράφος', 'Λογιστικές υπηρεσίες', 'Ψυχολόγοι/Θεραπευτές', 'Τεχνικό επάγγελμα (Ηλεκτρολόγος/υδραυλικός/κ.α)', 'Επαγγελματίας Υγείας', 'Τουρισμός/Καταλύματα', 'ΜΚΟ', 'Άλλο'] },
+  { group: 'Commerce', items: ['Retail & Wholesale', 'Retail only', 'Wholesale only', 'Food service / café'] },
+  { group: 'Services', items: ['Architect/Engineer/Contractor', 'Lawyer/Notary', 'Accounting services', 'Psychologists/Therapists', 'Technical trade (Electrician/Plumber/etc.)', 'Healthcare professional', 'Tourism/Accommodation', 'NGO', 'Other'] },
 ];
 
 const ALL_TEXT_FIELDS = [...BILLING, ...CUSTOMER_CONTACT, ...PERSONAL, ...BANK];
@@ -74,6 +83,7 @@ const ALL_TEXT_FIELDS = [...BILLING, ...CUSTOMER_CONTACT, ...PERSONAL, ...BANK];
 export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [data, setData] = useState<Record<string, any>>({});
+  const [lang, setLang] = useState<Lang>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -95,7 +105,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       const patch: Record<string, any> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
       for (const f of ALL_TEXT_FIELDS) {
         patch[f.key] = data[f.key] ?? null;
-        if (f.en) patch[`${f.key}_en`] = data[`${f.key}_en`] ?? null;
+        if (f.bilingual) patch[`${f.key}_en`] = data[`${f.key}_en`] ?? null;
       }
       patch.business_company_type = data.business_company_type ?? null;
       patch.business_seasonal = !!data.business_seasonal;
@@ -135,15 +145,18 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
   const logoUrl = data._logo_url
     ?? (data.business_logo_path ? supabase.storage.from('generation-images').getPublicUrl(data.business_logo_path).data.publicUrl : null);
 
-  if (loading) return <Card className="lg:col-span-2"><CardContent className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
+  if (loading) return <Card><CardContent className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Business profile (invoicing &amp; myDATA)</CardTitle>
-        <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
-          {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
-        </Button>
+        <div className="flex items-center gap-2">
+          <LangToggle lang={lang} onChange={setLang} />
+          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-5">
         <Tabs defaultValue="billing" className="space-y-4">
@@ -155,7 +168,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
 
           <TabsContent value="billing">
             <p className="text-xs text-muted-foreground mb-3">Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory.</p>
-            <Bilingual fields={BILLING} data={data} set={set} />
+            <FieldGrid fields={BILLING} data={data} set={set} lang={lang} />
           </TabsContent>
 
           <TabsContent value="contact">
@@ -163,34 +176,34 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
               <p className="text-xs text-muted-foreground">Shown in the emails your customers receive.</p>
               <Button size="sm" variant="outline" onClick={copyBillingToContact}><Copy className="h-3.5 w-3.5 mr-1" /> Copy from billing</Button>
             </div>
-            <Bilingual fields={CUSTOMER_CONTACT} data={data} set={set} />
+            <FieldGrid fields={CUSTOMER_CONTACT} data={data} set={set} lang={lang} />
           </TabsContent>
 
           <TabsContent value="personal">
             <p className="text-xs text-muted-foreground mb-3">Personal &amp; confidential — used only for support contact, never shown publicly.</p>
-            <Grid fields={PERSONAL} data={data} set={set} />
+            <FieldGrid fields={PERSONAL} data={data} set={set} lang={lang} />
           </TabsContent>
 
           <TabsContent value="company" className="space-y-3">
             <div className="space-y-1">
-              <Label>Τύπος Εταιρίας / Company type</Label>
+              <Label>Company type</Label>
               <Select value={data.business_company_type ?? ''} onValueChange={(v) => set('business_company_type', v)}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>{COMPANY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Η εταιρία λειτουργεί / Operating</Label>
+              <Label>Operating</Label>
               <Select value={data.business_seasonal ? 'seasonal' : 'all_year'} onValueChange={(v) => set('business_seasonal', v === 'seasonal')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all_year">Λειτουργεί όλο το έτος</SelectItem>
-                  <SelectItem value="seasonal">Εποχική λειτουργία</SelectItem>
+                  <SelectItem value="all_year">All year round</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Κύρια δραστηριότητα / Main activity</Label>
+              <Label>Main activity</Label>
               <Select value={data.main_activity ?? ''} onValueChange={(v) => set('main_activity', v)}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
@@ -206,7 +219,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
           </TabsContent>
 
           <TabsContent value="bank" className="space-y-4">
-            <Grid fields={BANK} data={data} set={set} />
+            <FieldGrid fields={BANK} data={data} set={set} lang={lang} />
             <div className="space-y-2">
               <Label>Logo (printed on invoices)</Label>
               <div className="flex items-center gap-4">
@@ -226,32 +239,38 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
   );
 };
 
-const Bilingual: React.FC<{ fields: Field[]; data: Record<string, any>; set: (k: string, v: any) => void }> = ({ fields, data, set }) => (
-  <div className="space-y-2">
-    <div className="hidden md:grid grid-cols-[160px_1fr_1fr] gap-3 text-xs text-muted-foreground">
-      <span /><span>Ελληνικά</span><span>Αγγλικά (English)</span>
-    </div>
-    {fields.map((f) => (
-      <div key={f.key} className="grid grid-cols-1 md:grid-cols-[160px_1fr_1fr] gap-3 md:items-center">
-        <Label className="text-xs">{f.label}</Label>
-        <Input value={data[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} />
-        {f.en
-          ? <Input value={data[`${f.key}_en`] ?? ''} onChange={(e) => set(`${f.key}_en`, e.target.value)} />
-          : <div className="hidden md:block" />}
-      </div>
+const LangToggle: React.FC<{ lang: Lang; onChange: (l: Lang) => void }> = ({ lang, onChange }) => (
+  <div className="flex rounded-full border border-border/60 p-0.5 text-xs">
+    {(['en', 'gr'] as Lang[]).map((l) => (
+      <button
+        key={l}
+        type="button"
+        onClick={() => onChange(l)}
+        className={`rounded-full px-3 py-1 font-medium transition-colors ${lang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+      >
+        {l === 'en' ? 'EN' : 'GR'}
+      </button>
     ))}
   </div>
 );
 
-const Grid: React.FC<{ fields: Field[]; data: Record<string, any>; set: (k: string, v: any) => void }> = ({ fields, data, set }) => (
+/** Single-column field grid. Bilingual fields bind to `${key}_en` (EN) or `${key}` (GR)
+ *  per the top language toggle; others always bind to `${key}`. */
+const FieldGrid: React.FC<{ fields: Field[]; data: Record<string, any>; set: (k: string, v: any) => void; lang: Lang }> = ({ fields, data, set, lang }) => (
   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-    {fields.map((f) => (
-      <div key={f.key} className={`space-y-1 ${f.textarea ? 'md:col-span-2' : ''}`}>
-        <Label>{f.label}</Label>
-        {f.textarea
-          ? <Textarea rows={2} value={data[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} />
-          : <Input value={data[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} />}
-      </div>
-    ))}
+    {fields.map((f) => {
+      const bound = f.bilingual && lang === 'en' ? `${f.key}_en` : f.key;
+      return (
+        <div key={f.key} className={`space-y-1 ${f.textarea ? 'md:col-span-2' : ''}`}>
+          <Label className="text-xs flex items-center gap-1">
+            {f.label}
+            {f.bilingual && <span className="text-[10px] uppercase text-muted-foreground">· {lang}</span>}
+          </Label>
+          {f.textarea
+            ? <Textarea rows={2} value={data[bound] ?? ''} placeholder={f.placeholder} onChange={(e) => set(bound, e.target.value)} />
+            : <Input value={data[bound] ?? ''} placeholder={f.placeholder} onChange={(e) => set(bound, e.target.value)} />}
+        </div>
+      );
+    })}
   </div>
 );
