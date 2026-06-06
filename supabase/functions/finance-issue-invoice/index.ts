@@ -2,6 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
+import { buildInvoiceInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 //
@@ -20,6 +22,12 @@ interface RequestBody {
   quote_id: string;
   issue_now?: boolean;
   push_to_oxygen?: boolean;
+  /** Transmit the invoice to the workspace's `legal_invoice` connector (e.g. Novus → myDATA). */
+  submit_fiscal?: boolean;
+  /** Skip the provider's digital signature step (Novus ?skipSignature=true). */
+  skip_signature?: boolean;
+  /** Per-call myDATA overrides (invoice type, series/aa, income classification). */
+  fiscal_overrides?: FiscalOverrides;
 }
 
 function json(body: any, status = 200): Response {
@@ -103,6 +111,76 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 3b. Optional fiscal submission via the workspace's legal_invoice connector
+    //     (e.g. Novus → myDATA). Connector-driven, per-capability (C3). Graceful
+    //     when no key is configured yet — returns a clear not_configured result.
+    let fiscalResult: any = null;
+    if (body.submit_fiscal) {
+      const { data: invRow } = await supabase
+        .from('invoices')
+        .select('workspace_id, fiscal_status')
+        .eq('id', invoiceId)
+        .single();
+
+      if (invRow?.fiscal_status === 'accepted') {
+        fiscalResult = { ok: true, skipped: true, reason: 'already_accepted' };
+      } else {
+        const resolved = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
+        if (!resolved.ok) {
+          fiscalResult = { ok: false, code: resolved.code, error: resolved.error };
+        } else {
+          try {
+            const input = await buildInvoiceInputFromDb(supabase, invoiceId, body.fiscal_overrides ?? {});
+            const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+              skipSignature: body.skip_signature,
+            });
+
+            await supabase.from('fiscal_submissions').insert({
+              workspace_id: invRow!.workspace_id,
+              invoice_id: invoiceId,
+              connector_slug: resolved.resolved.slug,
+              capability: 'legal_invoice',
+              status: result.status,
+              mark: result.mark ?? null,
+              uid: result.uid ?? null,
+              authentication_code: result.authenticationCode ?? null,
+              qr_url: result.qrUrl ?? null,
+              invoice_url: result.invoiceUrl ?? null,
+              fiscal_invoice_type: input.header.invoiceType,
+              series: input.header.series,
+              aa: input.header.aa,
+              is_offline: result.isOffline,
+              transmission_failure: result.transmissionFailure ?? false,
+              provider_credits: result.providerCredits ?? null,
+              request_payload: input,
+              response_payload: result.raw ?? null,
+              error_code: result.errorCode ?? null,
+              error_message: result.errorMessage ?? null,
+            });
+
+            if (result.status === 'accepted' || result.status === 'offline') {
+              await supabase
+                .from('invoices')
+                .update({
+                  fiscal_status: result.status,
+                  fiscal_mark: result.mark ?? null,
+                  fiscal_uid: result.uid ?? null,
+                  fiscal_qr_url: result.qrUrl ?? null,
+                  fiscal_connector_slug: resolved.resolved.slug,
+                  fiscal_submitted_at: new Date().toISOString(),
+                })
+                .eq('id', invoiceId);
+            } else {
+              await supabase.from('invoices').update({ fiscal_status: result.status }).eq('id', invoiceId);
+            }
+            fiscalResult = { ok: true, ...result };
+          } catch (err: any) {
+            fiscalResult = { ok: false, error: err?.message ?? 'fiscal submission failed' };
+          }
+        }
+      }
+    }
+
     // 4. Read final state for the response
     const { data: finalInvoice } = await supabase
       .from('invoices')
@@ -115,6 +193,7 @@ Deno.serve(async (req) => {
       invoice_id: invoiceId,
       invoice: finalInvoice,
       oxygen: oxygenResult,
+      fiscal: fiscalResult,
     });
   } catch (err: any) {
     console.error('finance-issue-invoice error', err);
