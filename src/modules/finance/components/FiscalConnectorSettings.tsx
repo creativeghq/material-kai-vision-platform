@@ -15,8 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { fiscalConnectorService, type FiscalConnector } from '@/services/fiscalConnectorService';
 
 interface Props {
@@ -74,13 +74,20 @@ export const FiscalConnectorSettings: React.FC<Props> = ({ workspaceId }) => {
         <CardTitle className="text-sm flex items-center gap-2">e-Invoicing (myDATA / AADE)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
-        {/* Operator master keys — standard secrets registry */}
+        {/* The master Novus key is module-level (one for the whole platform); it lives
+            in the module settings, not here. Point operators to it. */}
         {isPlatformOperator && (
-          <SecretsManagerCard
-            scope={{ mode: 'module', moduleSlug: 'sales-finance' }}
-            title="e-Invoicing keys (operator)"
-            description="One master Novus key for the whole platform — every tenant transmits through it with their own issuer VAT. NOVUS_SANDBOX=false switches to production."
-          />
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+            <div className="leading-snug text-muted-foreground">
+              The master Novus key is platform-wide — every tenant transmits through it with their own VAT.
+              Manage it at{' '}
+              <Link to="/admin/modules/sales-finance/settings" className="text-primary hover:underline">
+                Module settings → Sales &amp; Finance → Keys
+              </Link>
+              . The options below are <strong>per-workspace</strong>.
+            </div>
+          </div>
         )}
 
         {/* Per-workspace enablement */}
