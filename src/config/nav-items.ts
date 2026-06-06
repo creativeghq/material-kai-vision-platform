@@ -9,6 +9,7 @@ import {
   FolderKanban,
   Wallet,
   Network,
+  Contact,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -42,6 +43,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText },
   // Business-workspace surfaces — visible to a workspace owner/admin (operator, dealer,
   // architect), hidden from end-users. Part of unifying admin into the front-end (#174).
+  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireRole: 'admin' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireRole: 'admin' },
   { id: 'network', label: 'Network', path: '/network', icon: Network, requireRole: 'admin' },
   {
