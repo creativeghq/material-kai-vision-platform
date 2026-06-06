@@ -449,12 +449,41 @@ export class QuotesService {
       }
     } catch { /* non-fatal — falls back to null (displays as pcs) */ }
 
+    // #176: pre-fill the line from the cascade resolver so catalog lines aren't blank.
+    // For an OWN product the resolved figure IS the sell price; for an operator-catalog
+    // product it's the seller's COST (snapshotted so margin is computable) and seeds the
+    // unit_price as a starting sell the seller marks up.
+    const qtyNow = data.quantity || 1;
+    let unitPrice: number | null = null;
+    let costSnapshot: number | null = null;
+    try {
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('workspace_id')
+        .eq('id', data.quote_id)
+        .single();
+      if (quote?.workspace_id) {
+        const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
+          p_workspace_id: quote.workspace_id,
+          p_product_id: data.product_id,
+        });
+        const p: any = priced;
+        if (p && typeof p === 'object') {
+          const basis = p.cost_basis != null ? Number(p.cost_basis) : null;
+          if (basis != null && !Number.isNaN(basis)) {
+            unitPrice = basis;
+            if (p.mode === 'operator_catalog') costSnapshot = basis;
+          }
+        }
+      }
+    } catch { /* non-fatal — leaves the line unpriced for manual entry */ }
+
     const { data: item, error } = await supabase
       .from('quote_items')
       .insert({
         quote_id: data.quote_id,
         product_id: data.product_id,
-        quantity: data.quantity || 1,
+        quantity: qtyNow,
         notes: data.notes,
         added_from: data.added_from || 'manual',
         selected_size: data.selected_size,
@@ -466,6 +495,9 @@ export class QuotesService {
         installation_requirements: data.installation_requirements || null,
         delivery_date: data.delivery_date || null,
         custom_unit: customUnit,
+        unit_price: unitPrice,
+        line_total: unitPrice != null ? Math.round(unitPrice * qtyNow * 100) / 100 : null,
+        cost_snapshot: costSnapshot,
       } as any)
       .select()
       .single();
