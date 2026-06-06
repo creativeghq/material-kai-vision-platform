@@ -4,6 +4,7 @@ import { Building2, User as UserIcon, X, Search, Plus, Loader2 } from 'lucide-re
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import {
   Tabs,
   TabsContent,
@@ -100,6 +101,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
         .insert({
           user_id: user.id,
           created_by: user.id,
+          workspace_id: getActiveWorkspaceId(user.id) ?? undefined,
           name: displayName,
           first_name: newFirstName.trim() || null,
           last_name: newLastName.trim() || null,
