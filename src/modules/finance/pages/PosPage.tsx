@@ -135,6 +135,8 @@ const PosPage: React.FC = () => {
           branch_code: parseInt(branchCode, 10) || 0,
           status: 'issued',
           document_type: '11.1', // myDATA retail receipt
+          // myDATA payment method: 3=cash, 7=POS/card (was defaulting to 5=on-credit).
+          payment_method_code: method === 'cash' ? 3 : 7,
           currency,
           subtotal_net: totals.net,
           vat_rate: vatRate,

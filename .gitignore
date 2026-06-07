@@ -42,3 +42,7 @@ nul
 
 # Novus reference docs — local only, not deployed
 src/modules/myaade/NovusProvider/
+
+# Build / test / CLI artifacts — generated, never commit
+test-results/
+supabase/.temp/

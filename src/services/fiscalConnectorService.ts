@@ -83,15 +83,6 @@ export const fiscalConnectorService = {
     if (error) throw error;
   },
 
-  async listSubmissions(invoiceId: string): Promise<FiscalSubmission[]> {
-    const { data } = await supabase
-      .from('fiscal_submissions')
-      .select('*')
-      .eq('invoice_id', invoiceId)
-      .order('created_at', { ascending: false });
-    return (data ?? []) as FiscalSubmission[];
-  },
-
   /** Submit an existing invoice to its workspace's legal_invoice connector (Novus → myDATA). */
   async submitInvoice(
     invoiceId: string,

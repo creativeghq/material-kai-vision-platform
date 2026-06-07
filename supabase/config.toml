@@ -104,6 +104,29 @@ verify_jwt = false
 [functions.finance-invoice-pdf]
 verify_jwt = false
 
+# Finance functions do their own auth (authenticate() / x-cron-secret) and must accept the
+# CORS preflight + cron (no-JWT) paths, so the gateway must not pre-reject them.
+[functions.finance-issue-invoice]
+verify_jwt = false
+
+[functions.finance-inbound-sync]
+verify_jwt = false
+
+[functions.finance-send-invoice-email]
+verify_jwt = false
+
+[functions.finance-fiscal-offline-recovery]
+verify_jwt = false
+
+[functions.finance-pay-invoice]
+verify_jwt = false
+
+[functions.finance-send-statement]
+verify_jwt = false
+
+[functions.finance-digest-aggregate]
+verify_jwt = false
+
 [functions.flow-engine]
 verify_jwt = false
 

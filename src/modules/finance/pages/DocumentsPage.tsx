@@ -2,7 +2,8 @@
  * #204 — dedicated Finance documents list with a document-type left nav, mirroring the
  * operator's accounting tool. Invoices / Receipts (11.x) come from `invoices`; Credit
  * notes from `credit_notes`. Each row carries status + an mD (myDATA transmitted) flag +
- * the shared 3-dots action menu. Delivery notes / Expenses are placeholders for later.
+ * the shared 3-dots action menu. Delivery/goods-receipt notes (`delivery_notes`) and the
+ * Expenses inbox (`inbound_documents`) are fully wired surfaces alongside invoices.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
@@ -387,7 +388,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   </Button>
                 )}
-                {!readOnly && d.status === 'issued' && (
+                {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
                   </Button>

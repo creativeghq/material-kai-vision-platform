@@ -807,7 +807,10 @@ const _financeServiceCore = {
     const rate = Number((inv as any)?.vat_rate ?? 24);
     const net = Math.round((input.amount / (1 + rate / 100)) * 100) / 100;
     const vat = Math.round((input.amount - net) * 100) / 100;
-    const vatCat = rate >= 24 ? 1 : rate >= 13 ? 2 : rate >= 6 ? 3 : rate > 0 ? 4 : 7;
+    // myDATA VAT category — EXACT rate→category map (24→1,13→2,6→3,17→4,9→5,4→6,0→7),
+    // matching supabase/functions/_shared/fiscal/invoice-builder.ts. A `>=` ladder here
+    // mislabelled the reduced-island rates 17/9/4.
+    const vatCat = ({ 24: 1, 13: 2, 6: 3, 17: 4, 9: 5, 4: 6, 0: 7 } as Record<number, number>)[Math.round(rate)] ?? 7;
 
     const lines = [{
       description: input.reason || 'Credit',

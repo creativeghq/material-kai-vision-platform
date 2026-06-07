@@ -16,17 +16,30 @@ export interface FiscalOverrides {
   documentLabel?: string;
 }
 
-/** myDATA VAT category from a percentage (1=24, 2=13, 3=6, 4=17/9 reduced-island, 7=0%). */
-function vatCategory(pct: number): number {
-  if (pct >= 24) return 1;
-  if (pct >= 13) return 2;
-  if (pct >= 6) return 3;
-  if (pct > 0) return 4;
-  return 7;
-}
-
 /** Inverse: the VAT percent myDATA expects for each category. 8 = without-VAT/exempt → 0. */
 const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
+
+/**
+ * myDATA VAT category from a percentage. The mapping is EXACT per the AADE table —
+ * 24→1, 13→2, 6→3, and the reduced-island rates 17→4, 9→5, 4→6, 0→7 — and is the inverse
+ * of VAT_PCT_BY_CATEGORY above. (The previous `>=` ladder mislabelled 17/9/4 as 2/3/4 and
+ * could never emit categories 5/6, producing a category↔percent pair myDATA rejects.)
+ */
+const VAT_PCT_TO_CATEGORY: Record<number, number> = { 24: 1, 13: 2, 6: 3, 17: 4, 9: 5, 4: 6, 0: 7 };
+function vatCategory(pct: number): number {
+  const r = Math.round(pct);
+  const exact = VAT_PCT_TO_CATEGORY[r];
+  if (exact !== undefined) return exact;
+  // Non-standard rate — fall back to the nearest standard band so we never emit a
+  // category whose declared percent contradicts the line's actual rate.
+  if (r <= 0) return 7;
+  if (r >= 24) return 1;
+  if (r >= 13) return 2;
+  if (r >= 9) return 5;
+  if (r >= 6) return 3;
+  if (r >= 4) return 6;
+  return 4;
+}
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -285,6 +298,9 @@ export async function buildCreditNoteInputFromDb(
       vatCategory: lineCat,
       vatPercent: linePct,
       vatAmount: round2((net * linePct) / 100),
+      // Carry the exemption reason on 0%/exempt lines — myDATA rejects a cat-7/8 line
+      // without it (mirrors the main-invoice line mapping above).
+      vatExemptionCategory: it.vat_exemption_category ?? undefined,
       incomeClassificationType: it.income_classification_type ?? fs?.default_income_classification_type ?? 'E3_561_001',
       incomeClassificationCategory: it.income_classification_category ?? fs?.default_income_classification_category ?? 'category1_1',
     };

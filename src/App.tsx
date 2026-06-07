@@ -210,9 +210,11 @@ const App = () => (
                   path="/network"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <MarketplaceNetworkPage />
-                      </Layout>
+                      <CapabilityGuard capability="network.manage">
+                        <Layout>
+                          <MarketplaceNetworkPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />
@@ -256,9 +258,11 @@ const App = () => (
                   path="/settings"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <WorkspaceSettingsPage />
-                      </Layout>
+                      <CapabilityGuard capability="network.manage">
+                        <Layout>
+                          <WorkspaceSettingsPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />

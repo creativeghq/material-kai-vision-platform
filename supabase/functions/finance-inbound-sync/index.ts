@@ -71,22 +71,18 @@ Deno.serve(async (req) => {
     const workspaceId = c.workspace_id as string;
     const baseUrl = c.base_url || defaultBase;
 
-    // Credit gate — only on the automated path.
-    if (cronOk) {
-      const meta = metaById.get(workspaceId);
-      if (meta && !meta.is_root && meta.created_by) {
-        const { data: debit, error: debitErr } = await supabase.rpc('debit_user_credits', {
-          p_user_id: meta.created_by, p_amount: INBOUND_SYNC_CREDIT_COST,
-          p_operation_type: 'mydata_inbound_sync',
-          p_description: `Daily myDATA inbound pull (workspace ${workspaceId})`,
-        });
-        const row = Array.isArray(debit) ? debit[0] : debit;
-        if (debitErr || (row && !row.success)) {
-          summary.push({ workspaceId, skipped: 'insufficient_credits' });
-          continue;
-        }
+    // Pre-check credit balance on the automated path WITHOUT debiting yet — we only charge
+    // for a sync that actually reached AADE, so a failed pull never burns the tenant's credits.
+    const meta = metaById.get(workspaceId);
+    const mustBill = cronOk && meta && !meta.is_root && !!meta.created_by;
+    if (mustBill) {
+      const { data: cr } = await supabase.from('user_credits').select('balance').eq('user_id', meta.created_by).maybeSingle();
+      if ((cr?.balance ?? 0) < INBOUND_SYNC_CREDIT_COST) {
+        summary.push({ workspaceId, skipped: 'insufficient_credits' });
+        continue;
       }
     }
+
     const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
     const watermark = fs?.inbound_last_mark || '0';
 
@@ -100,6 +96,20 @@ Deno.serve(async (req) => {
     } catch (err) {
       summary.push({ workspaceId, error: String(err) });
       continue;
+    }
+
+    // The pull succeeded — now charge (automated path only).
+    if (mustBill) {
+      const { data: debit, error: debitErr } = await supabase.rpc('debit_user_credits', {
+        p_user_id: meta.created_by, p_amount: INBOUND_SYNC_CREDIT_COST,
+        p_operation_type: 'mydata_inbound_sync',
+        p_description: `Daily myDATA inbound pull (workspace ${workspaceId})`,
+      });
+      const row = Array.isArray(debit) ? debit[0] : debit;
+      if (debitErr || (row && !row.success)) {
+        summary.push({ workspaceId, skipped: 'insufficient_credits' });
+        continue;
+      }
     }
 
     const blocks = pickAllTagBlocks(xml, 'invoice');

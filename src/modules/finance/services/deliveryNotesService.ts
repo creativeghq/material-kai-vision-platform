@@ -146,9 +146,4 @@ export const deliveryNotesService = {
     if (error) throw error;
     return data as string;
   },
-
-  async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('delivery_notes').delete().eq('id', id);
-    if (error) throw error;
-  },
 };
