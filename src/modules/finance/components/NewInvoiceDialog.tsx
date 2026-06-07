@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService } from '@/services/invoicingSetupService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -85,6 +86,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
   const [withholdingCode, setWithholdingCode] = useState<string>('');
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string>('');
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +115,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
       setWithholdingCode('');
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
+      financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+      setCategoryId('');
       // Only types the workspace enabled; if none configured, show all.
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
@@ -245,6 +250,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           payment_terms_days: parseInt(paymentTermsDays, 10) || 30,
           notes: notes || null,
           document_type: documentType,
+          category_id: categoryId || null,
           total_withheld_amount: Number((totals.withheld || 0).toFixed(2)),
           issued_at: issueNow ? new Date().toISOString() : null,
           due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
@@ -304,6 +310,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 {(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((t) => (
                   <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Category (Κατηγορία) */}
+          <div className="space-y-1">
+            <Label>Category</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+              <SelectContent>
+                {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
+                  : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

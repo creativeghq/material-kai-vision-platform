@@ -18,6 +18,7 @@ import { financeService, formatMoney, type Invoice, type CreditNote, type Paymen
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
@@ -54,7 +55,9 @@ const DocumentsPage: React.FC = () => {
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
   const [cheques, setCheques] = useState<Cheque[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
@@ -64,14 +67,16 @@ const DocumentsPage: React.FC = () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb, pmts, dns, chq] = await Promise.all([
+      const [inv, cn, inb, pmts, dns, chq, cats] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
         financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 200 }).catch(() => []),
         deliveryNotesService.list(activeWorkspaceId).catch(() => []),
         chequesService.list(activeWorkspaceId).catch(() => []),
+        financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
       ]);
+      setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
@@ -148,7 +153,7 @@ const DocumentsPage: React.FC = () => {
                 ) : type === 'expenses' ? (
                   <InboundTable rows={inbound} financeBase={financeBase} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'payments' ? (
-                  <PaymentsTable rows={payments} />
+                  <PaymentsTable rows={payments} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={deliveryNotes} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'cheques' ? (
@@ -159,6 +164,7 @@ const DocumentsPage: React.FC = () => {
                       <tr>
                         <th className="px-4 py-2 text-left">Number</th>
                         <th className="px-4 py-2 text-left">Date</th>
+                        <th className="px-4 py-2 text-left">Category</th>
                         <th className="px-4 py-2 text-right">Total</th>
                         <th className="px-4 py-2 text-right">Due</th>
                         <th className="px-4 py-2 text-center">Status</th>
@@ -168,12 +174,13 @@ const DocumentsPage: React.FC = () => {
                     </thead>
                     <tbody>
                       {rows.length === 0 && (
-                        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No {NAV.find((n) => n.key === type)?.label.toLowerCase()} yet.</td></tr>
+                        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {NAV.find((n) => n.key === type)?.label.toLowerCase()} yet.</td></tr>
                       )}
                       {rows.map((i) => (
                         <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}>
                           <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
                           <td className="px-4 py-2">{i.issued_at ? new Date(i.issued_at).toLocaleDateString() : <span className="text-muted-foreground">Draft</span>}</td>
+                          <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName((i as any).category_id)}</td>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
                           <td className="px-4 py-2 text-center"><Badge variant={statusVariant(i.status)} className="text-[10px]">{i.status}</Badge></td>
@@ -364,13 +371,14 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
   </table>
 );
 
-const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[] }> = ({ rows }) => (
+const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => (
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
         <th className="px-4 py-2 text-left">Date</th>
         <th className="px-4 py-2 text-left">Direction</th>
         <th className="px-4 py-2 text-left">Method</th>
+        <th className="px-4 py-2 text-left">Category</th>
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
@@ -378,7 +386,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[] }> = ({ rows }) =>
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
+        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
       )}
       {rows.map((p: any) => {
         const allocated = (p.allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
@@ -389,6 +397,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[] }> = ({ rows }) =>
               <Badge variant={p.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{p.direction === 'in' ? 'Received' : 'Paid out'}</Badge>
             </td>
             <td className="px-4 py-2 capitalize">{(p.method ?? '—').replace('_', ' ')}</td>
+            <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(p.category_id)}</td>
             <td className="px-4 py-2 text-muted-foreground">{p.reference ?? '—'}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
             <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
