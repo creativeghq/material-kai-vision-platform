@@ -405,6 +405,33 @@ const InvoiceDetailPage: React.FC = () => {
         </Card>
       )}
 
+      {(() => {
+        const inv = invoice as any;
+        const PAY: Record<number, string> = { 1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS', 6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account' };
+        const rows: [string, any][] = [
+          ['Payment method', inv.payment_method_code ? (PAY[Number(inv.payment_method_code)] ?? inv.payment_method_code) : null],
+          ['Payment note', inv.payment_method_info],
+          ['Related document', inv.related_document],
+          ['Digital transaction fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],
+          ['Withholding', Number(inv.total_withheld_amount) > 0 ? formatMoney(inv.total_withheld_amount, inv.currency) : null],
+          ['Prices include VAT', inv.prices_include_vat ? 'Yes' : null],
+          ['VAT payment suspension', inv.vat_payment_suspension ? 'Yes' : null],
+        ].filter((r) => r[1]) as [string, any][];
+        return rows.length > 0 ? (
+          <Card>
+            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Payment &amp; document details</CardTitle></CardHeader>
+            <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
+              {rows.map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="text-right font-medium">{String(value)}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="text-sm">Payments</CardTitle>
