@@ -17,6 +17,8 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const { toast } = useToast();
   const [types, setTypes] = useState<RefRow[]>([]);
   const [incTypes, setIncTypes] = useState<RefRow[]>([]);
+  const [incCats, setIncCats] = useState<RefRow[]>([]);
+  const [withholdings, setWithholdings] = useState<RefRow[]>([]);
   const [settings, setSettings] = useState<Record<string, DocTypeSetting>>({});
   const [series, setSeries] = useState<DocSeries[]>([]);
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
@@ -36,21 +38,23 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const load = async () => {
     setLoading(true);
     try {
-      const [t, ic, s, ser, br] = await Promise.all([
+      const [t, ic, icc, wh, s, ser, br] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.listReference('income_classification_type'),
+        invoicingSetupService.listReference('income_classification_category'),
+        invoicingSetupService.listReference('withholding_tax'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listSeries(workspaceId),
         invoicingSetupService.listBranches(workspaceId),
       ]);
-      setTypes(t); setIncTypes(ic); setSettings(s); setSeries(ser); setBranches(br);
+      setTypes(t); setIncTypes(ic); setIncCats(icc); setWithholdings(wh); setSettings(s); setSeries(ser); setBranches(br);
     } catch (err: any) { toast({ title: 'Failed to load', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
   useEffect(() => { if (workspaceId) void load(); /* eslint-disable-next-line */ }, [workspaceId]);
 
   const toggle = async (code: string, enabled: boolean) => {
-    setSettings((s) => ({ ...s, [code]: { ...(s[code] ?? { code, default_income_classification_type: null, default_income_classification_category: null }), enabled } }));
+    setSettings((s) => ({ ...s, [code]: { ...(s[code] ?? { code, default_income_classification_type: null, default_income_classification_category: null, default_withholding_code: null }), enabled } }));
     try { await invoicingSetupService.setDocType(workspaceId, code, { enabled }); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
@@ -58,6 +62,20 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const setDefaultClass = async (code: string, type: string) => {
     setSettings((s) => ({ ...s, [code]: { ...(s[code] ?? { code, enabled: true }), default_income_classification_type: type } as DocTypeSetting }));
     try { await invoicingSetupService.setDocType(workspaceId, code, { default_income_classification_type: type }); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const setDefaultCat = async (code: string, category: string) => {
+    const v = category === 'none' ? null : category;
+    setSettings((s) => ({ ...s, [code]: { ...(s[code] ?? { code, enabled: true }), default_income_classification_category: v } as DocTypeSetting }));
+    try { await invoicingSetupService.setDocType(workspaceId, code, { default_income_classification_category: v }); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const setDefaultWithholding = async (code: string, wh: string) => {
+    const v = wh === 'none' ? null : wh;
+    setSettings((s) => ({ ...s, [code]: { ...(s[code] ?? { code, enabled: true }), default_withholding_code: v } as DocTypeSetting }));
+    try { await invoicingSetupService.setDocType(workspaceId, code, { default_withholding_code: v }); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
@@ -125,6 +143,26 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         <Select value={st?.default_income_classification_type ?? ''} onValueChange={(v) => setDefaultClass(t.code, v)}>
                           <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="Select…" /></SelectTrigger>
                           <SelectContent>{incTypes.map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-44">Default classification category</span>
+                        <Select value={st?.default_income_classification_category ?? 'none'} onValueChange={(v) => setDefaultCat(t.code, v)}>
+                          <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="Select…" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— None —</SelectItem>
+                            {incCats.map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-44">Default withholding tax</span>
+                        <Select value={st?.default_withholding_code ?? 'none'} onValueChange={(v) => setDefaultWithholding(t.code, v)}>
+                          <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="None" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— None —</SelectItem>
+                            {withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}
+                          </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">

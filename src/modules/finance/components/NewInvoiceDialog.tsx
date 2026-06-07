@@ -161,7 +161,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
   const [units, setUnits] = useState<{ code: string; description: string }[]>([]);
   const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
-  const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
+  const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null; wh: string | null }>>({});
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -233,7 +233,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
       setIncTypes(ic.map((t) => ({ code: t.code, description: t.description })));
       setIncCats(cat.map((t) => ({ code: t.code, description: t.description })));
-      setDocDefaults(Object.fromEntries(Object.values(enabled).map((e) => [e.code, { type: e.default_income_classification_type, category: e.default_income_classification_category }])));
+      setDocDefaults(Object.fromEntries(Object.values(enabled).map((e) => [e.code, { type: e.default_income_classification_type, category: e.default_income_classification_category, wh: e.default_withholding_code }])));
       if (visible.length && !visible.some((t) => t.code === '1.1')) setDocumentType(visible[0].code);
     })();
   }, [open, workspaceId]);
@@ -372,12 +372,23 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return { net, vat, fees, stamp, other, deduct, digital, withheld, total };
   }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee]);
 
+  // Apply the configured default withholding for the active doc type once the doc-type
+  // defaults have loaded (covers the common case where the operator never changes the
+  // doc-type Select). Preserves an explicit choice via `cur ||`. #207
+  useEffect(() => {
+    const def = docDefaults[documentType];
+    if (def?.wh) setWithholdingCode((cur) => cur || def.wh!);
+  }, [documentType, docDefaults]);
+
   const applyDocDefault = (code: string) => {
     const def = docDefaults[code];
     if (def?.type) {
       setGIncType(def.type); setGIncCat(def.category ?? '');
       setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
     }
+    // Pre-fill the configured default withholding for this doc type (only when the
+    // operator hasn't already chosen one). #207 central withholding defaults.
+    if (def?.wh) setWithholdingCode((cur) => cur || def.wh!);
   };
 
   const handleSave = async () => {
