@@ -479,6 +479,8 @@ const _financeServiceCore = {
     notes?: string | null;
     /** Payment currency → workspace base currency, at paid_at. Defaults to 1. */
     fxRateToBase?: number;
+    /** Optional finance category. */
+    categoryId?: string | null;
     /**
      * Allocations may sum to LESS than the payment (remainder = customer credit) but not
      * more. `amount` is the value applied to the target in the TARGET's currency; for a
@@ -508,6 +510,7 @@ const _financeServiceCore = {
         amount_doc: a.amount_doc ?? a.amount,
         fx_rate: a.fx_rate ?? 1,
       })),
+      p_category_id: input.categoryId ?? null,
     });
     if (error) throw error;
     return data as string;

@@ -22,6 +22,7 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
@@ -57,6 +58,7 @@ const DocumentsPage: React.FC = () => {
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
 
   const load = async () => {
     if (!activeWorkspaceId) return;
@@ -130,6 +132,9 @@ const DocumentsPage: React.FC = () => {
                 )}
                 {type === 'cheques' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+                )}
+                {type === 'payments' && !isAccountant && (
+                  <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
                 )}
               </div>
             </div>
@@ -209,6 +214,14 @@ const DocumentsPage: React.FC = () => {
           open={newChequeOpen}
           onOpenChange={setNewChequeOpen}
           onCreated={() => { setNewChequeOpen(false); load(); }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <RecordPaymentDialog
+          workspaceId={activeWorkspaceId}
+          open={recordPaymentOpen}
+          onOpenChange={setRecordPaymentOpen}
+          onSaved={() => { setRecordPaymentOpen(false); load(); }}
         />
       )}
     </div>
