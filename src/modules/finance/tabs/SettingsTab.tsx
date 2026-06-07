@@ -20,6 +20,7 @@ import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
+import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -170,6 +171,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         </TabsContent>
 
         <TabsContent value="documents" className="mt-0 space-y-4">
+          <BranchesCard workspaceId={workspaceId} />
           <DocumentSetupCard workspaceId={workspaceId} />
           <InboundSetupCard workspaceId={workspaceId} />
         </TabsContent>

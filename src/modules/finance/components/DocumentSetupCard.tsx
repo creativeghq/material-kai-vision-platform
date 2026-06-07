@@ -11,7 +11,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { invoicingSetupService, type RefRow, type DocTypeSetting, type DocSeries } from '@/services/invoicingSetupService';
+import { invoicingSetupService, type RefRow, type DocTypeSetting, type DocSeries, type FinanceBranch } from '@/services/invoicingSetupService';
 
 export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -19,24 +19,31 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const [incTypes, setIncTypes] = useState<RefRow[]>([]);
   const [settings, setSettings] = useState<Record<string, DocTypeSetting>>({});
   const [series, setSeries] = useState<DocSeries[]>([]);
+  const [branches, setBranches] = useState<FinanceBranch[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   // Inline add-series form (replaces window.prompt) + per-series next-number edits.
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [newSeries, setNewSeries] = useState('');
   const [newStart, setNewStart] = useState('1');
+  const [newBranchId, setNewBranchId] = useState<string>('');
   const [nextEdits, setNextEdits] = useState<Record<string, string>>({});
+  const branchLabel = (id: string | null) => {
+    const b = branches.find((x) => x.id === id);
+    return b ? `#${b.branch_code} ${b.name}` : 'HQ';
+  };
 
   const load = async () => {
     setLoading(true);
     try {
-      const [t, ic, s, ser] = await Promise.all([
+      const [t, ic, s, ser, br] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.listReference('income_classification_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listSeries(workspaceId),
+        invoicingSetupService.listBranches(workspaceId),
       ]);
-      setTypes(t); setIncTypes(ic); setSettings(s); setSeries(ser);
+      setTypes(t); setIncTypes(ic); setSettings(s); setSeries(ser); setBranches(br);
     } catch (err: any) { toast({ title: 'Failed to load', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
@@ -54,12 +61,12 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); };
+  const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); setNewBranchId(branches.find((b) => b.branch_code === 0)?.id ?? ''); };
   const submitNewSeries = async (code: string) => {
     if (!newSeries.trim()) { toast({ title: 'Enter a series code (e.g. INV-)', variant: 'destructive' }); return; }
     const start = parseInt(newStart, 10) || 1;
     try {
-      await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start);
+      await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start, newBranchId || null);
       setAddingFor(null); await load();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
@@ -135,6 +142,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         {typeSeries.map((s) => (
                           <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
                             <Badge variant="outline" className="font-mono">{s.series}</Badge>
+                            {branches.length > 1 && <Badge variant="secondary" className="text-[10px]">{branchLabel(s.branch_id)}</Badge>}
                             <span className="text-xs text-muted-foreground">Next #</span>
                             <Input
                               className="h-7 w-24 text-xs"
@@ -160,6 +168,17 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                               <span className="text-[10px] text-muted-foreground">Start from #</span>
                               <Input className="h-7 w-24 text-xs" type="number" min="1" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
                             </div>
+                            {branches.length > 1 && (
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-muted-foreground">Establishment</span>
+                                <Select value={newBranchId} onValueChange={setNewBranchId}>
+                                  <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder="HQ" /></SelectTrigger>
+                                  <SelectContent>
+                                    {branches.map((b) => <SelectItem key={b.id} value={b.id}>#{b.branch_code} {b.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                             <Button size="sm" className="h-7 rounded-full" onClick={() => submitNewSeries(t.code)}>Add</Button>
                             <Button size="sm" variant="ghost" className="h-7" onClick={() => setAddingFor(null)}>Cancel</Button>
                           </div>

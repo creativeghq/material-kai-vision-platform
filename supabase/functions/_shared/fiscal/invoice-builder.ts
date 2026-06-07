@@ -67,7 +67,7 @@ export async function buildInvoiceInputFromDb(
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
     country: fs?.business_country_code ?? 'GR',
-    branch: 0,
+    branch: Number(inv.branch_code ?? 0), // myDATA establishment number this invoice was issued under
     name: fs?.business_name ?? '',
     profession: fs?.business_profession ?? undefined,
     taxOffice: fs?.business_tax_office ?? undefined,
@@ -193,7 +193,7 @@ export async function buildCreditNoteInputFromDb(
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
     country: fs?.business_country_code ?? 'GR',
-    branch: 0,
+    branch: Number(inv.branch_code ?? 0), // same establishment as the corrected invoice
     name: fs?.business_name ?? '',
     profession: fs?.business_profession ?? undefined,
     taxOffice: fs?.business_tax_office ?? undefined,

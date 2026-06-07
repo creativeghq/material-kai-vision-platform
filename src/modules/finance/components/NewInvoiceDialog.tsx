@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { invoicingSetupService } from '@/services/invoicingSetupService';
+import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -108,6 +108,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
+  const [branches, setBranches] = useState<FinanceBranch[]>([]);
+  const [branchCode, setBranchCode] = useState<string>('0');
   // Invoice with shipping (combined invoice + delivery note)
   const [hasShipping, setHasShipping] = useState(false);
   const [shipFrom, setShipFrom] = useState('');
@@ -146,6 +148,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setWithholdingCode('');
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+      invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
       setCategoryId('');
       // Only types the workspace enabled; if none configured, show all.
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
@@ -281,6 +284,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           notes: notes || null,
           document_type: documentType,
           category_id: categoryId || null,
+          branch_code: parseInt(branchCode, 10) || 0,
           has_shipping: hasShipping,
           ship_from: hasShipping ? (shipFrom || null) : null,
           transport_date: hasShipping && transportDate ? transportDate : null,
@@ -398,6 +402,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </SelectContent>
                 </Select>
               </div>
+              {branches.length > 1 && (
+                <div className="space-y-1">
+                  <Label>Establishment</Label>
+                  <Select value={branchCode} onValueChange={setBranchCode}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </div>
 
