@@ -15,9 +15,10 @@ import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 
+// jsDelivr npm package (the gh/ path 403s). DejaVu Sans has full Greek + Latin coverage.
 const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts/ttf/DejaVuSans.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts/ttf/DejaVuSans-Bold.ttf',
+  regular: 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans.ttf',
+  bold: 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans-Bold.ttf',
 };
 let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
 async function loadFonts() {
