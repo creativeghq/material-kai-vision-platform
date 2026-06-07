@@ -66,6 +66,8 @@ export const deliveryNotesService = {
     responsible?: string;
     shipFrom?: string;
     shipTo?: string;
+    shipFromStreet?: string; shipFromNumber?: string; shipFromPostal?: string; shipFromCity?: string;
+    shipToStreet?: string; shipToNumber?: string; shipToPostal?: string; shipToCity?: string;
     relatedDocument?: string;
   }): Promise<string> {
     const { data: dn, error } = await supabase
@@ -83,6 +85,14 @@ export const deliveryNotesService = {
         responsible: input.responsible || null,
         ship_from: input.shipFrom || null,
         ship_to: input.shipTo || null,
+        ship_from_street: input.shipFromStreet || null,
+        ship_from_number: input.shipFromNumber || null,
+        ship_from_postal: input.shipFromPostal || null,
+        ship_from_city: input.shipFromCity || null,
+        ship_to_street: input.shipToStreet || null,
+        ship_to_number: input.shipToNumber || null,
+        ship_to_postal: input.shipToPostal || null,
+        ship_to_city: input.shipToCity || null,
         related_document: input.relatedDocument || null,
       } as any)
       .select('id')

@@ -331,13 +331,19 @@ export async function buildDeliveryNoteInputFromDb(
   }));
 
   const movePurpose = dn.move_purpose ? parseInt(String(dn.move_purpose), 10) || 1 : 1;
+  // Per-note structured fields win; fall back to issuer/counterpart address parts, with
+  // the legacy free-text ship_from/ship_to as the street line.
   const loadingAddress = {
-    street: dn.ship_from || issuer.address?.street || '',
-    number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
+    street: dn.ship_from_street || dn.ship_from || issuer.address?.street || '',
+    number: dn.ship_from_number || issuer.address?.number || '',
+    postalCode: dn.ship_from_postal || issuer.address?.postalCode || '',
+    city: dn.ship_from_city || issuer.address?.city || '',
   };
   const deliveryAddress = {
-    street: dn.ship_to || counterpart.address?.street || '',
-    number: counterpart.address?.number ?? '', postalCode: counterpart.address?.postalCode ?? '', city: counterpart.address?.city ?? '',
+    street: dn.ship_to_street || dn.ship_to || counterpart.address?.street || '',
+    number: dn.ship_to_number || counterpart.address?.number || '',
+    postalCode: dn.ship_to_postal || counterpart.address?.postalCode || '',
+    city: dn.ship_to_city || counterpart.address?.city || '',
   };
   const issueDate = String(dn.issued_at ?? dn.created_at ?? new Date().toISOString()).slice(0, 10);
 

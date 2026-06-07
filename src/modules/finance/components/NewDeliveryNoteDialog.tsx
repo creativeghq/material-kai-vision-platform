@@ -32,22 +32,44 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [transportDate, setTransportDate] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [movePurpose, setMovePurpose] = useState('1');
-  const [shipTo, setShipTo] = useState('');
+  // Structured from/to addresses (myDATA 9.3). Loading prefills from your business,
+  // delivery prefills from the selected customer; both editable per note.
+  const emptyAddr = { street: '', number: '', postal: '', city: '' };
+  const [fromAddr, setFromAddr] = useState({ ...emptyAddr });
+  const [toAddr, setToAddr] = useState({ ...emptyAddr });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]);
-    setTransportDate(''); setVehicleNumber(''); setMovePurpose('1'); setShipTo('');
+    setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
+    setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr });
     (async () => {
-      const [{ data: cos }, wh] = await Promise.all([
+      const [{ data: cos }, wh, { data: fs }] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
         deliveryNotesService.listWarehouse(workspaceId),
+        supabase.from('finance_settings').select('business_address, business_street_number, business_postal_code, business_city').eq('workspace_id', workspaceId).maybeSingle(),
       ]);
       setCompanies((cos ?? []) as any);
       setWarehouse(wh);
+      // Loading address defaults to your premises.
+      if (fs) setFromAddr({ street: fs.business_address ?? '', number: fs.business_street_number ?? '', postal: fs.business_postal_code ?? '', city: fs.business_city ?? '' });
     })();
   }, [open, workspaceId]);
+
+  // Prefill the delivery address from the selected customer's CRM record.
+  useEffect(() => {
+    if (!open || !customer) return;
+    (async () => {
+      const { data: c } = await supabase
+        .from('crm_companies').select('street, street_number, postal_code, city')
+        .eq('id', customer).maybeSingle();
+      if (c) setToAddr({ street: (c as any).street ?? '', number: (c as any).street_number ?? '', postal: (c as any).postal_code ?? '', city: (c as any).city ?? '' });
+    })();
+  }, [customer, open]);
+
+  // myDATA 9.3 needs a complete delivery address. Warn before issuing a dispatch note.
+  const toIncomplete = kind === 'dispatch' && (!toAddr.street.trim() || !toAddr.postal.trim() || !toAddr.city.trim());
 
   const addItem = (id: string) => {
     const w = warehouse.find((x) => x.id === id);
@@ -63,7 +85,13 @@ export const NewDeliveryNoteDialog: React.FC<{
     try {
       const id = await deliveryNotesService.create(workspaceId, {
         kind, customerCompanyId: customer || null, notes, lines,
-        transportDate, vehicleNumber, movePurpose, shipTo,
+        transportDate, vehicleNumber, movePurpose,
+        shipFrom: [fromAddr.street, fromAddr.number].filter(Boolean).join(' ') || undefined,
+        shipTo: [toAddr.street, toAddr.number].filter(Boolean).join(' ') || undefined,
+        shipFromStreet: fromAddr.street || undefined, shipFromNumber: fromAddr.number || undefined,
+        shipFromPostal: fromAddr.postal || undefined, shipFromCity: fromAddr.city || undefined,
+        shipToStreet: toAddr.street || undefined, shipToNumber: toAddr.number || undefined,
+        shipToPostal: toAddr.postal || undefined, shipToCity: toAddr.city || undefined,
       });
       if (issue) await deliveryNotesService.issue(id);
       toast({ title: issue ? 'Delivery note issued' : 'Draft saved' });
@@ -122,11 +150,24 @@ export const NewDeliveryNoteDialog: React.FC<{
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Ship to (address)</Label>
-              <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+          </div>
+
+          {/* Structured from/to addresses (myDATA 9.3) */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1 rounded-md border border-border/60 p-3">
+              <Label className="text-xs font-medium">Loading place (from)</Label>
+              <AddressFields value={fromAddr} onChange={setFromAddr} />
+            </div>
+            <div className="space-y-1 rounded-md border border-border/60 p-3">
+              <Label className="text-xs font-medium">Delivery place (to)</Label>
+              <AddressFields value={toAddr} onChange={setToAddr} />
             </div>
           </div>
+          {toIncomplete && (
+            <p className="text-[11px] text-amber-500">
+              Delivery address looks incomplete (street, postal code and city are needed). myDATA may reject this 9.3 note until it’s filled.
+            </p>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -170,3 +211,13 @@ export const NewDeliveryNoteDialog: React.FC<{
     </Dialog>
   );
 };
+
+type Addr = { street: string; number: string; postal: string; city: string };
+const AddressFields: React.FC<{ value: Addr; onChange: (a: Addr) => void }> = ({ value, onChange }) => (
+  <div className="grid grid-cols-2 gap-2">
+    <Input className="h-8 text-xs col-span-2" value={value.street} onChange={(e) => onChange({ ...value, street: e.target.value })} placeholder="Street" />
+    <Input className="h-8 text-xs" value={value.number} onChange={(e) => onChange({ ...value, number: e.target.value })} placeholder="No." />
+    <Input className="h-8 text-xs" value={value.postal} onChange={(e) => onChange({ ...value, postal: e.target.value })} placeholder="Postal code" />
+    <Input className="h-8 text-xs col-span-2" value={value.city} onChange={(e) => onChange({ ...value, city: e.target.value })} placeholder="City" />
+  </div>
+);
