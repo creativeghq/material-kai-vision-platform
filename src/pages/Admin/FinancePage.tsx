@@ -49,8 +49,20 @@ import { MarketplaceEarningsTab } from '@/modules/finance/components/Marketplace
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
+import DocumentsView from '@/modules/finance/pages/DocumentsPage';
+import { FileText, FileMinus, Banknote, Truck, FileSignature } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useCapabilities } from '@/hooks/useCapabilities';
+
+const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
+  { value: 'doc_receipts', type: 'receipts', label: 'Receipts', icon: Receipt },
+  { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit notes', icon: FileMinus },
+  { value: 'doc_payments', type: 'payments', label: 'Payments', icon: Banknote },
+  { value: 'doc_expenses', type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
+  { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery notes', icon: Truck },
+  { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
+];
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -179,6 +191,15 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="ap" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
+
+            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground hidden lg:block">Documents</div>
+            {DOC_TABS.map((d) => (
+              <TabsTrigger key={d.value} value={d.value} className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <d.icon className="h-4 w-4 mr-2" /> {d.label}
+              </TabsTrigger>
+            ))}
+            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground hidden lg:block">Tools</div>
+
             <TabsTrigger value="planning" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
@@ -347,10 +368,7 @@ const FinancePage: React.FC = () => {
                 <h3 className="text-sm font-semibold">Receivables — all open invoices</h3>
                 <p className="text-xs text-muted-foreground">Invoices issued, partially paid, or overdue. To invoice an accepted quote, use the Issue invoice button on the quote page.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Link to={`${financeBase}/documents`}><Button variant="outline"><Receipt className="h-4 w-4 mr-1" /> All documents</Button></Link>
-                {!isAccountant && <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>}
-              </div>
+              {!isAccountant && <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>}
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -464,6 +482,13 @@ const FinancePage: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ─────────── DOCUMENTS (folded in) ─────────── */}
+          {DOC_TABS.map((d) => (
+            <TabsContent key={d.value} value={d.value} className="space-y-4">
+              <DocumentsView embeddedType={d.type} />
+            </TabsContent>
+          ))}
 
           {/* ─────────── PLANNING ─────────── */}
           <TabsContent value="planning" className="space-y-4">

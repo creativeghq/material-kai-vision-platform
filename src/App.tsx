@@ -39,7 +39,6 @@ const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
-const FinanceDocumentsPage = lazy(() => import('./modules/finance/pages/DocumentsPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 
 // Feature pages
@@ -230,16 +229,6 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <CRMPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/finance/documents"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <FinanceDocumentsPage />
                       </Layout>
                     </AuthGuard>
                   }

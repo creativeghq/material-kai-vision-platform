@@ -42,14 +42,15 @@ const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
 const transmitted = (s: any) => s === 'accepted' || s === 'offline';
 
-const DocumentsPage: React.FC = () => {
+const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant } = useCapabilities();
 
-  const [type, setType] = useState<DocType>('invoices');
+  const [internalType, setType] = useState<DocType>('invoices');
+  const type = embeddedType ?? internalType;
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
@@ -111,12 +112,12 @@ const DocumentsPage: React.FC = () => {
   const statusVariant = (s: string) => s === 'overdue' ? 'destructive' : s === 'paid' ? 'default' : 'outline';
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader title="Documents" description="Invoices, receipts and credit notes with myDATA status." badge="Finance" />
+    <div className={embeddedType ? '' : 'min-h-screen'}>
+      {!embeddedType && <GlobalAdminHeader title="Documents" description="Invoices, receipts and credit notes with myDATA status." badge="Finance" />}
 
-      <div className="p-3 sm:p-6">
+      <div className={embeddedType ? '' : 'p-3 sm:p-6'}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          {/* Document-type nav */}
+          {!embeddedType && (
           <div className="flex w-full shrink-0 flex-row flex-wrap gap-1 sm:w-52 sm:flex-col">
             {NAV.map((n) => (
               <button
@@ -133,6 +134,7 @@ const DocumentsPage: React.FC = () => {
               </button>
             ))}
           </div>
+          )}
 
           {/* Content */}
           <div className="min-w-0 flex-1 space-y-3">
