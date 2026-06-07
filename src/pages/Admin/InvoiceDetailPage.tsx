@@ -11,6 +11,7 @@ import {
   CreditCard,
   Copy,
   ShieldCheck,
+  Truck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -31,6 +32,16 @@ import {
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
+
+const MOVE_PURPOSE_LABELS: Record<string, string> = {
+  '1': 'Sale',
+  '2': 'Sale on behalf of third party',
+  '3': 'Sampling',
+  '4': 'Exhibition',
+  '5': 'Return',
+  '6': 'Movement between premises',
+  '7': 'Consignment',
+};
 
 const InvoiceDetailPage: React.FC = () => {
   const { invoiceId } = useParams<{ invoiceId: string }>();
@@ -184,6 +195,9 @@ const InvoiceDetailPage: React.FC = () => {
               <Badge variant={invoice.status === 'overdue' ? 'destructive' : invoice.status === 'paid' ? 'default' : 'outline'}>
                 {invoice.status}
               </Badge>
+              {(invoice as any).has_shipping && (
+                <Badge variant="secondary" className="gap-1"><Truck className="h-3 w-3" /> With shipping</Badge>
+              )}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {invoice.issued_at
@@ -343,6 +357,32 @@ const InvoiceDetailPage: React.FC = () => {
           </table>
         </CardContent>
       </Card>
+
+      {(invoice as any).has_shipping && (
+        <Card>
+          <CardHeader className="border-b border-border/60 px-5 py-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Truck className="h-4 w-4" /> Shipping &amp; transport
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
+            {[
+              ['Loading place', (invoice as any).ship_from],
+              ['Delivery place', (invoice as any).ship_to],
+              ['Transport date', (invoice as any).transport_date],
+              ['Time', (invoice as any).transport_time],
+              ['Vehicle no.', (invoice as any).vehicle_number],
+              ['Responsible', (invoice as any).responsible],
+              ['Purpose', MOVE_PURPOSE_LABELS[(invoice as any).move_purpose as string] ?? (invoice as any).move_purpose],
+            ].map(([label, value]) => (
+              <div key={label as string} className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="text-right font-medium">{value ? String(value) : '—'}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
