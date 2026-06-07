@@ -10,6 +10,7 @@ import {
   Wallet,
   Contact,
   Inbox,
+  Briefcase,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -44,6 +45,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use' },
+  // #201 — Sales portal for invited reps (persona 'sales'). Gated on sales.portal so only
+  // sales reps see it; managers use the full Quotes/Finance surfaces.
+  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view' },

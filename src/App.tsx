@@ -43,6 +43,7 @@ const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
+const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -273,6 +274,18 @@ const App = () => (
                       <CapabilityGuard capability="invoice.issue">
                         <Layout>
                           <PosPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/sales"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="sales.portal">
+                        <Layout>
+                          <SalesPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

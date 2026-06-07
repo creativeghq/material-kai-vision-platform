@@ -37,6 +37,7 @@ export type Capability =
   | 'downstream.view'       // operator: see procurement quotes escalated from children
   | 'marketplace.browse'    // browse the upstream catalog to buy/quote
   | 'quotes.use'            // create + manage quotes
+  | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers (#201)
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use';            // KAI agent / chat
@@ -64,7 +65,7 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // catalog. NO finance/CRM-module/pricing/network/warehouse. Reps see only their OWN quotes
   // (enforced by RLS on created_by); the customer picker is embedded in the Sales surface, so
   // they get marketplace.browse for catalog selection but not crm.view (the full CRM module).
-  sales: ['quotes.use', 'marketplace.browse', 'agent.use'],
+  sales: ['sales.portal', 'quotes.use', 'marketplace.browse', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
 };

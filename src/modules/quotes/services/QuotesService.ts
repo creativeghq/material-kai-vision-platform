@@ -184,6 +184,9 @@ export class QuotesService {
     project_id?: string | null;
     notes?: string;
     custom_request_text?: string;
+    /** Optional customer link (used by the Sales portal #201 — rep builds a quote for a customer). */
+    customer_contact_id?: string | null;
+    customer_company_id?: string | null;
   }): Promise<Quote> {
     // user_id is required by the RLS policy on quotes
     const { data: { user } } = await supabase.auth.getUser();
@@ -200,6 +203,8 @@ export class QuotesService {
         project_id: data?.project_id ?? null,
         notes: data?.notes,
         custom_request_text: data?.custom_request_text,
+        customer_contact_id: data?.customer_contact_id ?? null,
+        customer_company_id: data?.customer_company_id ?? null,
         status: 'draft',
       } as any)
       .select()
