@@ -635,6 +635,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           metadata: pd.metadata || undefined,
           properties: pd.properties || undefined,
           specifications: pd.specifications || undefined,
+          source: 'manual', // preserve the admin modal's existing created_from_type label
         });
 
         // create-manual returns the id only; fetch the full row for local state.

@@ -1,11 +1,15 @@
 /**
  * VirtualStagingModal
  *
- * 3-step flow: Room picker → Style picker → Furniture items (editable) → Accept & Generate
+ * 3-step flow: Room picker → Style picker → step-3 (editable) → Accept & Generate
  *
- * Used from:
- *  - ProgressiveImageGrid (AI-generated images) — "direct" mode
- *  - User message uploaded images — "direct" mode
+ * Serves two tools via the `variant` prop — same room/style pickers, different
+ * step 3 + submit:
+ *  - variant="staging" (default): stage an uploaded room with AI furniture.
+ *    Step 3 = furniture items; submit → virtual-staging pipeline (20 cr).
+ *    Used from ProgressiveImageGrid / uploaded message images / prompt library.
+ *  - variant="design": design a room from scratch. Step 3 = optional details;
+ *    submit → the caller composes a prompt and sends it to the agent (generate_3d).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
-import { Sofa, Bed, UtensilsCrossed, Droplets, Monitor, Wind, Trees, Waves, ChevronLeft, ChevronRight, Check, Sparkles } from 'lucide-react';
+import { Sofa, Bed, UtensilsCrossed, Droplets, Monitor, Wind, Trees, Waves, ChevronLeft, ChevronRight, Check, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -79,6 +83,13 @@ interface VirtualStagingModalProps {
   defaultRoom?: string;
   onGenerate: (params: VirtualStagingParams) => void;
   generating?: boolean;
+  /** "staging" (default) stages an uploaded room; "design" collects inputs for a
+   *  from-scratch generate_3d design (optional step 3, no credit label). */
+  variant?: 'staging' | 'design';
+  /** design variant: seed step 3 with whatever the user already typed. */
+  initialDetails?: string;
+  /** design variant: show a note that the uploaded image is the reference. */
+  hasReferenceImage?: boolean;
 }
 
 export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
@@ -87,7 +98,11 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
   defaultRoom,
   onGenerate,
   generating = false,
+  variant = 'staging',
+  initialDetails,
+  hasReferenceImage = false,
 }) => {
+  const isDesign = variant === 'design';
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom || '');
   const [selectedStyle, setSelectedStyle] = useState<string>('');
@@ -97,7 +112,8 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setSelectedStyle('');
-      setFurnitureItems('');
+      // design seeds step 3 from the user's typed input; staging starts empty
+      setFurnitureItems(isDesign ? (initialDetails?.trim() || '') : '');
       if (defaultRoom) {
         setSelectedRoom(defaultRoom);
         setStep(2);
@@ -106,7 +122,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
         setStep(1);
       }
     }
-  }, [isOpen, defaultRoom]);
+  }, [isOpen, defaultRoom, isDesign, initialDetails]);
 
   const handleRoomNext = () => {
     if (!selectedRoom) return;
@@ -115,7 +131,8 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
 
   const handleStyleNext = (style: string) => {
     setSelectedStyle(style);
-    setFurnitureItems(getFurnitureItems(selectedRoom, style));
+    // staging auto-fills suggested furniture; design keeps the user's own details
+    if (!isDesign) setFurnitureItems(getFurnitureItems(selectedRoom, style));
     setStep(3);
   };
 
@@ -124,7 +141,11 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
     onClose();
   };
 
-  const stepLabel = step === 1 ? 'Select Room Type' : step === 2 ? 'Choose Style' : 'Review & Edit Prompt';
+  const stepLabel = step === 1
+    ? 'Select Room Type'
+    : step === 2
+      ? 'Choose Style'
+      : isDesign ? 'Add Details (optional)' : 'Review & Edit Prompt';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -140,7 +161,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
               </button>
             )}
             <div className="flex-1">
-              <DialogTitle className="text-base font-semibold">Virtual Staging</DialogTitle>
+              <DialogTitle className="text-base font-semibold">{isDesign ? 'New Interior Design' : 'Virtual Staging'}</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">{stepLabel}</p>
             </div>
             {/* Step indicators */}
@@ -217,31 +238,48 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
           {step === 3 && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="px-2 py-1 bg-primary/10 text-primary rounded-full font-medium">{selectedRoom}</span>
+                <span className="px-2 py-1 bg-primary/10 text-primary rounded-full font-medium capitalize">{selectedRoom}</span>
                 <span className="px-2 py-1 bg-primary/10 text-primary rounded-full font-medium">{selectedStyle}</span>
               </div>
+              {isDesign && hasReferenceImage && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                  <ImageIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                  Your uploaded image will be used as the reference room.
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  Furniture &amp; items to include — edit to customise
+                  {isDesign
+                    ? 'Materials, colors, mood, must-haves — optional'
+                    : 'Furniture & items to include — edit to customise'}
                 </label>
                 <textarea
                   value={furnitureItems}
                   onChange={(e) => setFurnitureItems(e.target.value)}
                   rows={4}
                   className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary leading-relaxed"
-                  placeholder="Describe the furniture and decor items to include…"
+                  placeholder={isDesign
+                    ? 'e.g. oak flooring, white walls, warm lighting, a large sectional sofa, indoor plants…'
+                    : 'Describe the furniture and decor items to include…'}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  This is sent as the furniture specification to the AI model. Add or remove items as needed.
+                  {isDesign
+                    ? 'Leave blank to let the AI choose. Anything you add here is built into the design prompt.'
+                    : 'This is sent as the furniture specification to the AI model. Add or remove items as needed.'}
                 </p>
               </div>
               <Button
                 onClick={handleGenerate}
-                disabled={generating || !furnitureItems.trim()}
+                disabled={generating || (!isDesign && !furnitureItems.trim())}
                 className="w-full rounded-full gap-2"
               >
                 {generating ? (
                   <>Generating…</>
+                ) : isDesign ? (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate Design
+                  </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />

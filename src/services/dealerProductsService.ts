@@ -44,6 +44,8 @@ export interface ManualProductPayload {
   category?: string;
   properties?: Record<string, any>;
   specifications?: Record<string, any>;
+  /** Provenance tag → created_from_type. Defaults to 'dealer_manual' server-side. */
+  source?: string;
 }
 
 /** Descriptive facet keys every product can carry (the whitelist's NL keys). */

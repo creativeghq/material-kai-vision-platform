@@ -70,7 +70,6 @@ import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal
 // now live inside the "Prompt Library" tab when the active agent is
 // interior-designer. Templates extracted to interiorPromptTemplates.ts.
 import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
-import { NewDesignModal } from './NewDesignModal';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
@@ -4699,21 +4698,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       )}
 
-      {/* New Design Modal — upfront room/style/details collection for from-scratch
-          3D designs. Composes a complete prompt and auto-sends, so the agent calls
-          generate_3d immediately without a second-turn clarifying question. */}
-      <NewDesignModal
-        isOpen={showNewDesignModal}
-        onClose={() => setShowNewDesignModal(false)}
-        initialDetails={input}
-        hasReferenceImage={attachedImages.length > 0}
-        onGenerate={(composedPrompt) => {
-          setShowNewDesignModal(false);
-          setSelectedGenerationMode(null);
-          setInput(composedPrompt);
-          setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
-        }}
-      />
+      {/* New Design — upfront room/style/details collection for from-scratch 3D
+          designs. Reuses VirtualStagingModal (variant="design"): same room/style
+          pickers, optional step 3. Composes a complete prompt and auto-sends so the
+          agent calls generate_3d immediately without a second-turn question. */}
+      {showNewDesignModal && (
+        <VirtualStagingModal
+          isOpen={showNewDesignModal}
+          onClose={() => setShowNewDesignModal(false)}
+          variant="design"
+          initialDetails={input}
+          hasReferenceImage={attachedImages.length > 0}
+          onGenerate={({ room, style, furnitureItems }) => {
+            setShowNewDesignModal(false);
+            setSelectedGenerationMode(null);
+            const base = `Generate a ${style.toLowerCase()} ${room.toLowerCase()} interior design.`;
+            const extra = furnitureItems.trim();
+            const refNote = attachedImages.length > 0
+              ? ' Use my uploaded image as the reference room to redesign.'
+              : '';
+            const composedPrompt = extra ? `${base} Include: ${extra}.${refNote}` : `${base}${refNote}`;
+            setInput(composedPrompt);
+            setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+          }}
+        />
+      )}
 
       {/* Gemini single-image modal — reuses ProgressiveImageGrid's full modal (Edit Mode, zone select, Products tab, all actions) */}
       {geminiModalImage && (

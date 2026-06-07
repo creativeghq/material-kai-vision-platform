@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2 } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerQuotesTab,
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
+import { validateVatViaVies } from '@/services/viesService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
@@ -69,6 +70,13 @@ interface Company {
   discount_notes?: string | null;
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
+  vat_number?: string | null;
+  country_code?: string | null;
+  tax_office?: string | null;
+  vat_validated?: boolean | null;
+  vat_validated_at?: string | null;
+  vat_validated_name?: string | null;
+  vat_validated_address?: string | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -87,6 +95,7 @@ export const CompanyDetailPage: React.FC = () => {
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [viesBusy, setViesBusy] = useState(false);
   const [editing, setEditing] = useState(isNew); // Start in editing mode for new companies
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
@@ -195,6 +204,48 @@ export const CompanyDetailPage: React.FC = () => {
   const updateField = (field: keyof Company, value: any) => {
     if (!company) return;
     setCompany({ ...company, [field]: value });
+  };
+
+  /**
+   * Validate the company's EU VAT number against VIES (reuses the existing
+   * `vies-validate` edge function via viesService). On success the edge function
+   * persists vat_validated* back onto crm_companies, so we reload to pick up the
+   * authoritative snapshot. Greek ΑΦΜ numbers carry an "EL" prefix in VIES.
+   */
+  const handleVies = async () => {
+    if (!company || !company.vat_number?.trim() || !company.country_code?.trim()) {
+      toast({ title: 'VAT number required', description: 'Enter a country code and VAT number first.', variant: 'destructive' });
+      return;
+    }
+    if (isNew || !id) {
+      toast({ title: 'Save first', description: 'Create the company before validating its VAT number.', variant: 'destructive' });
+      return;
+    }
+    setViesBusy(true);
+    try {
+      const result = await validateVatViaVies({
+        countryCode: company.country_code,
+        vatNumber: company.vat_number,
+        companyId: id,
+      });
+      if (result.skipped_reason === 'non_eu') {
+        toast({ title: 'VIES skipped', description: result.message || 'VIES only validates EU VAT numbers.' });
+      } else if (result.skipped_reason === 'vies_unreachable') {
+        toast({ title: 'VIES unavailable', description: result.message || 'Could not reach the VIES service. Try again later.', variant: 'destructive' });
+      } else if (result.valid === true) {
+        toast({ title: 'VAT verified', description: result.name ? `Registered as ${result.name}` : 'Number is valid.' });
+        await loadCompany();
+      } else if (result.valid === false) {
+        toast({ title: 'VAT not valid', description: 'VIES does not recognise this VAT number for the given country.', variant: 'destructive' });
+        await loadCompany();
+      } else {
+        toast({ title: 'VIES unavailable', description: result.message || 'Could not reach the VIES service. Try again later.', variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Validation failed', description: err instanceof Error ? err.message : 'VIES request failed', variant: 'destructive' });
+    } finally {
+      setViesBusy(false);
+    }
   };
 
   /**
@@ -514,6 +565,87 @@ export const CompanyDetailPage: React.FC = () => {
                     rows={3}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Tax & VAT Card — EU VAT validation via VIES (used before invoicing) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                  Tax &amp; VAT
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Country code */}
+                  <div className="space-y-2">
+                    <Label htmlFor="country_code">Country Code</Label>
+                    <Input
+                      id="country_code"
+                      value={company.country_code || ''}
+                      onChange={(e) => updateField('country_code', e.target.value.toUpperCase().slice(0, 2))}
+                      disabled={!editing}
+                      placeholder="EL, DE, FR…"
+                      maxLength={2}
+                    />
+                  </div>
+
+                  {/* VAT number */}
+                  <div className="space-y-2">
+                    <Label htmlFor="vat_number">VAT Number</Label>
+                    <Input
+                      id="vat_number"
+                      value={company.vat_number || ''}
+                      onChange={(e) => updateField('vat_number', e.target.value)}
+                      disabled={!editing}
+                      placeholder="123456789"
+                    />
+                  </div>
+
+                  {/* Tax office */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tax_office">Tax Office</Label>
+                    <Input
+                      id="tax_office"
+                      value={company.tax_office || ''}
+                      onChange={(e) => updateField('tax_office', e.target.value)}
+                      disabled={!editing}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                {/* Validation status + action */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleVies}
+                    disabled={viesBusy || !company.vat_number?.trim() || !company.country_code?.trim()}
+                  >
+                    {viesBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                    Validate (VIES)
+                  </Button>
+
+                  {company.vat_validated === true && (
+                    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                      VAT verified{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
+                    </Badge>
+                  )}
+                  {company.vat_validated === false && (
+                    <Badge variant="destructive">VAT not recognised by VIES</Badge>
+                  )}
+
+                  {company.vat_validated_name && (
+                    <span className="text-sm text-muted-foreground">
+                      Registered as <span className="text-foreground">{company.vat_validated_name}</span>
+                    </span>
+                  )}
+                </div>
+                {company.vat_validated_address && (
+                  <p className="text-xs text-muted-foreground">{company.vat_validated_address}</p>
+                )}
               </CardContent>
             </Card>
 
