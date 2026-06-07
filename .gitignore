@@ -39,3 +39,6 @@ dist-ssr
 .env*.local
 nul
 .mcp.json
+
+# Novus reference docs — local only, not deployed
+src/modules/myaade/NovusProvider/
