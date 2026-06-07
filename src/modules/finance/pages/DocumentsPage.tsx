@@ -24,6 +24,7 @@ import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog'
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
@@ -62,6 +63,7 @@ const DocumentsPage: React.FC = () => {
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
 
   const load = async () => {
     if (!activeWorkspaceId) return;
@@ -140,6 +142,9 @@ const DocumentsPage: React.FC = () => {
                 )}
                 {type === 'payments' && !isAccountant && (
                   <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+                )}
+                {type === 'credit_notes' && !isAccountant && (
+                  <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
               </div>
             </div>
@@ -229,6 +234,14 @@ const DocumentsPage: React.FC = () => {
           open={recordPaymentOpen}
           onOpenChange={setRecordPaymentOpen}
           onSaved={() => { setRecordPaymentOpen(false); load(); }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <NewCreditNoteDialog
+          workspaceId={activeWorkspaceId}
+          open={newCreditNoteOpen}
+          onOpenChange={setNewCreditNoteOpen}
+          onCreated={() => { setNewCreditNoteOpen(false); load(); }}
         />
       )}
     </div>
