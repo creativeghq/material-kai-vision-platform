@@ -137,13 +137,21 @@ Deno.serve(async (req) => {
     const subject = body.subject?.trim() || `${catalog.title} — new catalog`;
     const publicUrl = `${PUBLIC_APP_URL}/c/${catalog.slug}`;
 
-    // Lookup sender display name + branding (best-effort — don't fail send if missing)
+    // Sender display name (user) + workspace brand identity (finance_settings, #174 Option A).
     const { data: senderProfile } = await supabase
       .from('user_profiles')
-      .select('full_name, email, branding_company_name, branding_contact_line')
+      .select('full_name, email')
       .eq('user_id', catalog.owner_user_id)
       .maybeSingle();
-    const senderName = senderProfile?.full_name || senderProfile?.branding_company_name || senderProfile?.email || 'Material KAI';
+    const { data: ownerMembers } = await supabase
+      .from('workspace_members').select('workspace_id, role').eq('user_id', catalog.owner_user_id).limit(50);
+    const ownerWsId = (ownerMembers?.find((m: any) => m.role === 'owner') ?? ownerMembers?.find((m: any) => m.role === 'admin') ?? ownerMembers?.[0])?.workspace_id;
+    const { data: ownerFs } = ownerWsId
+      ? await supabase.from('finance_settings').select('business_name, branding_contact_line').eq('workspace_id', ownerWsId).maybeSingle()
+      : { data: null as any };
+    const senderCompany = ownerFs?.business_name || '';
+    const senderContact = ownerFs?.branding_contact_line || '';
+    const senderName = senderProfile?.full_name || senderCompany || senderProfile?.email || 'Material KAI';
 
     // Optional ensure_grants — write catalog_email_grants for every recipient
     // so anyone whose category-membership came from a CRM contact (not a
@@ -175,8 +183,8 @@ Deno.serve(async (req) => {
         catalog_url: publicUrl,
         recipient_first_name: firstNameFor(recipient),
         sender_name: senderName,
-        sender_company: senderProfile?.branding_company_name || '',
-        sender_contact: senderProfile?.branding_contact_line || '',
+        sender_company: senderCompany,
+        sender_contact: senderContact,
         message_body: body.message_body?.trim() || '',
       };
 

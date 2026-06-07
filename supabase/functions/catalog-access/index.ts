@@ -43,6 +43,20 @@ interface RequestBody {
   metadata?: Record<string, any>;
 }
 
+// #174 Option A — workspace identity is canonical in finance_settings. Resolve a catalog
+// owner → their primary (owned) workspace → finance_settings branding. Replaces the old
+// per-user user_profiles.branding_* read.
+async function resolveOwnerBranding(supabase: any, ownerUserId: string): Promise<{ logo_url: string | null; company_name: string | null; contact_line: string | null }> {
+  const empty = { logo_url: null, company_name: null, contact_line: null };
+  if (!ownerUserId) return empty;
+  const { data: members } = await supabase.from('workspace_members').select('workspace_id, role').eq('user_id', ownerUserId).limit(50);
+  const wsId = (members?.find((m: any) => m.role === 'owner') ?? members?.find((m: any) => m.role === 'admin') ?? members?.[0])?.workspace_id;
+  if (!wsId) return empty;
+  const { data: fs } = await supabase.from('finance_settings').select('business_name, business_logo_path, branding_contact_line').eq('workspace_id', wsId).maybeSingle();
+  const logo_url = fs?.business_logo_path ? supabase.storage.from('generation-images').getPublicUrl(fs.business_logo_path).data.publicUrl : null;
+  return { logo_url, company_name: fs?.business_name ?? null, contact_line: fs?.branding_contact_line ?? null };
+}
+
 Deno.serve(async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -65,19 +79,15 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!catalog) return jsonResponse({ error: 'Not found' }, 404);
 
-      const { data: branding } = await supabase
-        .from('user_profiles')
-        .select('branding_logo_url, branding_company_name')
-        .eq('user_id', catalog.owner_user_id)
-        .maybeSingle();
+      const branding = await resolveOwnerBranding(supabase, catalog.owner_user_id);
 
       return jsonResponse({
         title: catalog.title,
         subtitle: catalog.subtitle,
         cover_image_url: catalog.cover_data?.cover_image_url || null,
         branding: {
-          logo_url: branding?.branding_logo_url || null,
-          company_name: branding?.branding_company_name || null,
+          logo_url: branding.logo_url,
+          company_name: branding.company_name,
         },
       });
     }
@@ -229,11 +239,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ granted_access: false });
       }
 
-      const { data: branding } = await supabase
-        .from('user_profiles')
-        .select('branding_logo_url, branding_company_name, branding_contact_line')
-        .eq('user_id', catalog.owner_user_id)
-        .maybeSingle();
+      const branding = await resolveOwnerBranding(supabase, catalog.owner_user_id);
 
       return jsonResponse({
         granted_access: true,
@@ -252,9 +258,9 @@ Deno.serve(async (req) => {
             : catalog.pdf_url,
         },
         branding: {
-          logo_url: branding?.branding_logo_url || null,
-          company_name: branding?.branding_company_name || null,
-          contact_line: branding?.branding_contact_line || null,
+          logo_url: branding.logo_url,
+          company_name: branding.company_name,
+          contact_line: branding.contact_line,
         },
       });
     }
