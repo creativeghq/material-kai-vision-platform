@@ -195,22 +195,27 @@ async function validateUserToken(
       };
     }
 
-    // Check roles if specified
+    // Check roles if specified.
+    // #195 — reconcile edge auth with the frontend persona model. Authority comes from
+    // TWO sources that must agree: the GLOBAL role (`user_profiles.role_id → roles`) AND
+    // the WORKSPACE role (`workspace_members.role`). A dealer/architect who OWNS a
+    // workspace can hold global role 'user' yet must be allowed business ops — the
+    // frontend already treats them as owner/admin via WorkspaceContext, so the edge must
+    // too. We grant if EITHER source matches `allowedRoles` (additive — never removes
+    // access). Workspace roles are only owner/admin/member/client/finance/accountant, so
+    // a `super_admin`-only gate is unaffected (no membership row ever holds it).
     if (allowedRoles && allowedRoles.length > 0) {
-      const { data: userProfile } = await adminClient
-        .from('user_profiles')
-        .select('role_id')
-        .eq('user_id', user.id)
-        .single();
-
-      const { data: roles } = await adminClient
-        .from('roles')
-        .select('id, name')
-        .in('name', allowedRoles);
+      const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
+        adminClient.from('user_profiles').select('role_id').eq('user_id', user.id).single(),
+        adminClient.from('roles').select('id, name').in('name', allowedRoles),
+        adminClient.from('workspace_members').select('role').eq('user_id', user.id).in('role', allowedRoles).limit(1),
+      ]);
 
       const allowedRoleIds = roles?.map(r => r.id) || [];
+      const globalOk = !!userProfile && allowedRoleIds.includes(userProfile.role_id);
+      const workspaceOk = !!memberships && memberships.length > 0;
 
-      if (!userProfile || !allowedRoleIds.includes(userProfile.role_id)) {
+      if (!globalOk && !workspaceOk) {
         return {
           success: false,
           level: 'none',
