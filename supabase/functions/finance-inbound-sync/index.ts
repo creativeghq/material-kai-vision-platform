@@ -33,65 +33,69 @@ Deno.serve(async (req) => {
     return json({ error: 'unauthorized' }, 401);
   }
 
-  // Per-tenant myDATA received-docs credentials (distinct from the RgWsPublic2 VAT lookup).
-  const userId = (await resolveSecret(supabase, 'AADE_MYDATA_USER_ID')).value;
-  const subKey = (await resolveSecret(supabase, 'AADE_MYDATA_SUBSCRIPTION_KEY')).value;
-  if (!userId || !subKey) {
-    return json({ ok: true, skipped: 'not_configured', detail: 'AADE_MYDATA_USER_ID / AADE_MYDATA_SUBSCRIPTION_KEY not set' });
-  }
-  const baseUrl = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value
-    || 'https://mydatapi.aade.gr/myDATA';
+  const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
 
-  // v1: pull for the root/operator workspace (per-workspace creds come with multi-tenant).
-  const { data: ws } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
-  if (!ws) return json({ ok: true, skipped: 'no_root_workspace' });
-  const workspaceId = ws.id as string;
+  // Every workspace that configured its own myDATA received-docs credentials.
+  const { data: creds } = await supabase
+    .from('workspace_inbound_credentials')
+    .select('workspace_id, aade_user_id, subscription_key, base_url, enabled')
+    .eq('enabled', true)
+    .not('aade_user_id', 'is', null)
+    .not('subscription_key', 'is', null);
 
-  const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
-  const watermark = fs?.inbound_last_mark || '0';
-
-  let xml: string;
-  try {
-    const res = await fetch(`${baseUrl}/RequestDocs?mark=${encodeURIComponent(watermark)}`, {
-      headers: { 'aade-user-id': userId, 'Ocp-Apim-Subscription-Key': subKey },
-    });
-    xml = await res.text();
-    if (!res.ok) return json({ ok: false, error: `RequestDocs ${res.status}`, body: xml.slice(0, 500) }, 502);
-  } catch (err) {
-    return json({ ok: false, error: String(err) }, 502);
+  if (!creds || creds.length === 0) {
+    return json({ ok: true, skipped: 'no_configured_workspaces' });
   }
 
-  // Parse each invoice block → an inbound_documents row.
-  const blocks = pickAllTagBlocks(xml, 'invoice');
-  let maxMark = watermark;
-  let upserted = 0;
-  for (const b of blocks) {
-    const mark = pickTag(b, 'mark');
-    if (!mark) continue;
-    const issuerBlock = pickTag(b, 'issuer') ?? '';
-    const summary = pickTag(b, 'invoiceSummary') ?? b;
-    const header = pickTag(b, 'invoiceHeader') ?? b;
-    const totalGross = num(pickTag(summary, 'totalGrossValue'));
-    const row = {
-      workspace_id: workspaceId,
-      mark,
-      issuer_vat: pickTag(issuerBlock, 'vatNumber'),
-      issuer_name: pickTag(issuerBlock, 'name'),
-      issue_date: pickTag(header, 'issueDate'),
-      doc_type: pickTag(header, 'invoiceType'),
-      total_net: num(pickTag(summary, 'totalNetValue')),
-      total_vat: num(pickTag(summary, 'totalVatAmount')),
-      total_gross: totalGross,
-      raw: { xml: b.slice(0, 20000) },
-    };
-    const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });
-    if (!error) upserted++;
-    if (Number(mark) > Number(maxMark)) maxMark = mark;
+  const summary: any[] = [];
+  for (const c of creds) {
+    const workspaceId = c.workspace_id as string;
+    const baseUrl = c.base_url || defaultBase;
+    const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
+    const watermark = fs?.inbound_last_mark || '0';
+
+    let xml: string;
+    try {
+      const res = await fetch(`${baseUrl}/RequestDocs?mark=${encodeURIComponent(watermark)}`, {
+        headers: { 'aade-user-id': c.aade_user_id, 'Ocp-Apim-Subscription-Key': c.subscription_key },
+      });
+      xml = await res.text();
+      if (!res.ok) { summary.push({ workspaceId, error: `RequestDocs ${res.status}` }); continue; }
+    } catch (err) {
+      summary.push({ workspaceId, error: String(err) });
+      continue;
+    }
+
+    const blocks = pickAllTagBlocks(xml, 'invoice');
+    let maxMark = watermark;
+    let upserted = 0;
+    for (const b of blocks) {
+      const mark = pickTag(b, 'mark');
+      if (!mark) continue;
+      const issuerBlock = pickTag(b, 'issuer') ?? '';
+      const headerB = pickTag(b, 'invoiceHeader') ?? b;
+      const summaryB = pickTag(b, 'invoiceSummary') ?? b;
+      const row = {
+        workspace_id: workspaceId,
+        mark,
+        issuer_vat: pickTag(issuerBlock, 'vatNumber'),
+        issuer_name: pickTag(issuerBlock, 'name'),
+        issue_date: pickTag(headerB, 'issueDate'),
+        doc_type: pickTag(headerB, 'invoiceType'),
+        total_net: num(pickTag(summaryB, 'totalNetValue')),
+        total_vat: num(pickTag(summaryB, 'totalVatAmount')),
+        total_gross: num(pickTag(summaryB, 'totalGrossValue')),
+        raw: { xml: b.slice(0, 20000) },
+      };
+      const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });
+      if (!error) upserted++;
+      if (Number(mark) > Number(maxMark)) maxMark = mark;
+    }
+    if (maxMark !== watermark) {
+      await supabase.from('finance_settings').update({ inbound_last_mark: maxMark }).eq('workspace_id', workspaceId);
+    }
+    summary.push({ workspaceId, found: blocks.length, upserted, new_watermark: maxMark });
   }
 
-  if (maxMark !== watermark) {
-    await supabase.from('finance_settings').update({ inbound_last_mark: maxMark }).eq('workspace_id', workspaceId);
-  }
-
-  return json({ ok: true, found: blocks.length, upserted, watermark, new_watermark: maxMark });
+  return json({ ok: true, workspaces: summary.length, results: summary });
 });

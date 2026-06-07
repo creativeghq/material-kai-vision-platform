@@ -43,4 +43,26 @@ export const inboundService = {
     const { error } = await supabase.from('inbound_documents').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;
   },
+
+  /** Per-workspace myDATA received-docs credentials (manager-only; not exposed to accountants). */
+  async getCreds(workspaceId: string): Promise<{ aade_user_id: string | null; subscription_key: string | null; base_url: string | null; enabled: boolean } | null> {
+    const { data } = await supabase
+      .from('workspace_inbound_credentials')
+      .select('aade_user_id, subscription_key, base_url, enabled')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    return (data as any) ?? null;
+  },
+
+  async saveCreds(workspaceId: string, input: { aadeUserId: string; subscriptionKey: string; baseUrl?: string; enabled: boolean }): Promise<void> {
+    const { error } = await supabase.from('workspace_inbound_credentials').upsert({
+      workspace_id: workspaceId,
+      aade_user_id: input.aadeUserId || null,
+      subscription_key: input.subscriptionKey || null,
+      base_url: input.baseUrl || null,
+      enabled: input.enabled,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id' });
+    if (error) throw error;
+  },
 };
