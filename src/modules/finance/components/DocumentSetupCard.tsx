@@ -21,6 +21,11 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   const [series, setSeries] = useState<DocSeries[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Inline add-series form (replaces window.prompt) + per-series next-number edits.
+  const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [newSeries, setNewSeries] = useState('');
+  const [newStart, setNewStart] = useState('1');
+  const [nextEdits, setNextEdits] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
@@ -49,12 +54,25 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  const addSeries = async (code: string) => {
-    const prefix = window.prompt(`Series prefix for type ${code} (e.g. ΤΠ-)?`, '');
-    if (prefix === null || !prefix.trim()) return;
-    const startRaw = window.prompt('Start number?', '1');
-    const start = parseInt(startRaw ?? '1', 10) || 1;
-    try { await invoicingSetupService.addSeries(workspaceId, code, prefix.trim(), start); await load(); }
+  const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); };
+  const submitNewSeries = async (code: string) => {
+    if (!newSeries.trim()) { toast({ title: 'Enter a series code (e.g. ΤΠ-)', variant: 'destructive' }); return; }
+    const start = parseInt(newStart, 10) || 1;
+    try {
+      await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start);
+      setAddingFor(null); await load();
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const saveNextNumber = async (s: DocSeries) => {
+    const n = parseInt(nextEdits[s.id] ?? String(s.next_number), 10);
+    if (!Number.isFinite(n) || n < 1) { toast({ title: 'Invalid number', variant: 'destructive' }); return; }
+    try { await invoicingSetupService.updateSeries(s.id, { next_number: n }); toast({ title: 'Next number saved' }); await load(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const toggleSeriesActive = async (s: DocSeries) => {
+    try { await invoicingSetupService.updateSeries(s.id, { is_active: !s.is_active }); await load(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
@@ -102,23 +120,51 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                           <SelectContent>{incTypes.map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Numbering series</span>
-                          <Button size="sm" variant="outline" onClick={() => addSeries(t.code)}><Plus className="h-3.5 w-3.5 mr-1" /> Add series</Button>
+                          <span className="text-xs text-muted-foreground">Numbering series &amp; next number</span>
+                          {addingFor !== t.code && (
+                            <Button size="sm" variant="outline" className="rounded-full" onClick={() => startAdd(t.code)}><Plus className="h-3.5 w-3.5 mr-1" /> Add series</Button>
+                          )}
                         </div>
-                        {typeSeries.length === 0 ? <p className="text-xs text-muted-foreground">No series — uses the default sequential number.</p> : (
-                          <div className="space-y-1">
-                            {typeSeries.map((s) => (
-                              <div key={s.id} className="flex items-center gap-3 text-sm">
-                                <Badge variant="outline" className="font-mono">{s.series}</Badge>
-                                <span className="text-muted-foreground">next #{s.next_number}</span>
-                                {s.is_active && <Badge variant="secondary" className="text-[10px]">active</Badge>}
-                                <Button size="sm" variant="ghost" onClick={() => removeSeries(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                              </div>
-                            ))}
+
+                        {typeSeries.length === 0 && addingFor !== t.code && (
+                          <p className="text-xs text-muted-foreground">No series — uses the default sequential number.</p>
+                        )}
+
+                        {typeSeries.map((s) => (
+                          <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
+                            <Badge variant="outline" className="font-mono">{s.series}</Badge>
+                            <span className="text-xs text-muted-foreground">Next #</span>
+                            <Input
+                              className="h-7 w-24 text-xs"
+                              type="number" min="1"
+                              value={nextEdits[s.id] ?? String(s.next_number)}
+                              onChange={(e) => setNextEdits((m) => ({ ...m, [s.id]: e.target.value }))}
+                            />
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => saveNextNumber(s)}>Save</Button>
+                            <button type="button" onClick={() => toggleSeriesActive(s)}>
+                              <Badge variant={s.is_active ? 'default' : 'secondary'} className="text-[10px] cursor-pointer">{s.is_active ? 'active' : 'inactive'}</Badge>
+                            </button>
+                            <Button size="sm" variant="ghost" className="h-7 px-1" onClick={() => removeSeries(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                          </div>
+                        ))}
+
+                        {addingFor === t.code && (
+                          <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-2">
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-muted-foreground">Series (Σειρά)</span>
+                              <Input className="h-7 w-28 text-xs" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="ΤΠ-" />
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-muted-foreground">Start from #</span>
+                              <Input className="h-7 w-24 text-xs" type="number" min="1" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
+                            </div>
+                            <Button size="sm" className="h-7 rounded-full" onClick={() => submitNewSeries(t.code)}>Add</Button>
+                            <Button size="sm" variant="ghost" className="h-7" onClick={() => setAddingFor(null)}>Cancel</Button>
                           </div>
                         )}
+                        <p className="text-[11px] text-muted-foreground">Set the start number to continue from your previous software (e.g. last invoice was 1450 → start at 1451).</p>
                       </div>
                     </td></tr>
                   )}

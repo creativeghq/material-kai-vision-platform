@@ -75,9 +75,11 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           <div className="text-sm">Enabled</div>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
-        <Button onClick={save} disabled={saving} className="w-full">
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
-        </Button>
+        <div>
+          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -59,9 +59,11 @@ export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <p className="text-xs text-muted-foreground">{ROLE_HINT[role]}</p>
         </div>
 
-        <Button onClick={generate} disabled={busy} className="w-full">
-          {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />} Generate invite link
-        </Button>
+        <div>
+          <Button size="sm" onClick={generate} disabled={busy} className="rounded-full">
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />} Generate invite link
+          </Button>
+        </div>
 
         {link && (
           <div className="space-y-1">
