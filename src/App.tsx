@@ -33,6 +33,7 @@ const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => (
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const RequestsInboxPage = lazy(() => import('./pages/RequestsInboxPage'));
+const WorkspaceSettingsPage = lazy(() => import('./pages/WorkspaceSettingsPage'));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
@@ -248,6 +249,16 @@ const App = () => (
                           <RequestsInboxPage />
                         </Layout>
                       </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <WorkspaceSettingsPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />

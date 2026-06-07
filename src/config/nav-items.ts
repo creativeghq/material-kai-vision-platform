@@ -49,6 +49,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage' },
   { id: 'requests', label: 'Requests', path: '/requests', icon: Inbox, requireCapability: 'network.manage' },
+  { id: 'settings', label: 'Settings', path: '/settings', icon: Settings },
   // Network is reached from the workspace switcher ("Manage network"), not the top nav.
   {
     id: 'factory-analytics',
