@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { financeService, formatMoney, type Invoice, type CreditNote } from '@/modules/finance/services/financeService';
+import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 
@@ -24,8 +25,8 @@ const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?
   { key: 'invoices', label: 'Invoices', icon: FileText, enabled: true },
   { key: 'receipts', label: 'Receipts', icon: Receipt, enabled: true },
   { key: 'credit_notes', label: 'Credit notes', icon: FileMinus, enabled: true },
+  { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
   { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: false },
-  { key: 'expenses', label: 'Expenses', icon: Wallet, enabled: false },
 ];
 
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
@@ -41,6 +42,7 @@ const DocumentsPage: React.FC = () => {
   const [type, setType] = useState<DocType>('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
+  const [inbound, setInbound] = useState<InboundDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
 
@@ -48,12 +50,14 @@ const DocumentsPage: React.FC = () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn] = await Promise.all([
+      const [inv, cn, inb] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
+        inboundService.list(activeWorkspaceId).catch(() => []),
       ]);
       setInvoices(inv);
       setCreditNotes(cn);
+      setInbound(inb);
     } catch (err: any) {
       toast({ title: 'Failed to load documents', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -112,6 +116,8 @@ const DocumentsPage: React.FC = () => {
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
                   <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
+                ) : type === 'expenses' ? (
+                  <InboundTable rows={inbound} financeBase={financeBase} readOnly={isAccountant} onChanged={load} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -194,5 +200,71 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
     </tbody>
   </table>
 );
+
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  const createBill = async (id: string) => {
+    setBusy(id);
+    try { await inboundService.toSupplierBill(id); toast({ title: 'Supplier bill created' }); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+  const dismiss = async (id: string) => {
+    setBusy(id);
+    try { await inboundService.dismiss(id); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div className="p-8 text-center text-sm text-muted-foreground">
+        No received documents yet. Documents other businesses issue to you on myDATA appear here once the
+        inbound poller has your AADE received-docs credentials — then you can turn each into a supplier bill or warehouse intake.
+      </div>
+    );
+  }
+  return (
+    <table className="w-full text-sm">
+      <thead className="border-b border-border/60 text-xs text-muted-foreground">
+        <tr>
+          <th className="px-4 py-2 text-left">Date</th>
+          <th className="px-4 py-2 text-left">Issuer</th>
+          <th className="px-4 py-2 text-left">Type</th>
+          <th className="px-4 py-2 text-right">Total</th>
+          <th className="px-4 py-2 text-center">Status</th>
+          <th className="px-4 py-2 text-right" />
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((d) => (
+          <tr key={d.id} className="border-b border-border/30">
+            <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
+            <td className="px-4 py-2">
+              <div className="font-medium">{d.issuer_name ?? '—'}</div>
+              <div className="text-xs text-muted-foreground font-mono">{d.issuer_vat ?? ''}</div>
+            </td>
+            <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.doc_type ?? '—'}</Badge></td>
+            <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
+            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{d.status}</Badge></td>
+            <td className="px-4 py-2 text-right">
+              {!readOnly && d.status === 'new' && (
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => createBill(d.id)}>
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create bill'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => dismiss(d.id)}>Dismiss</Button>
+                </div>
+              )}
+              {d.status === 'classified' && <span className="text-xs text-emerald-500">Bill created</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
 
 export default DocumentsPage;
