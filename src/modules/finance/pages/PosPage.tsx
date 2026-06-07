@@ -46,6 +46,7 @@ const PosPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'cash' | 'card'>('cash');
+  const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
   const [issuing, setIssuing] = useState(false);
   const [result, setResult] = useState<{ number: string; total: number; currency: string; mark: string | null } | null>(null);
 
@@ -89,10 +90,14 @@ const PosPage: React.FC = () => {
 
   const currency = cart[0]?.currency ?? items[0]?.currency ?? 'EUR';
   const totals = useMemo(() => {
-    const net = round2(cart.reduce((s, l) => s + l.unit_price * l.qty, 0));
-    const vat = round2(net * vatRate / 100);
-    return { net, vat, total: round2(net + vat) };
-  }, [cart, vatRate]);
+    const sum = round2(cart.reduce((s, l) => s + l.unit_price * l.qty, 0));
+    if (vatInclusive) {
+      const net = round2(sum / (1 + vatRate / 100));
+      return { net, vat: round2(sum - net), total: sum };
+    }
+    const vat = round2(sum * vatRate / 100);
+    return { net: sum, vat, total: round2(sum + vat) };
+  }, [cart, vatRate, vatInclusive]);
 
   const add = (it: SellItem) => setCart((c) => {
     const ex = c.find((l) => l.id === it.id);
@@ -126,17 +131,21 @@ const PosPage: React.FC = () => {
         .single();
       if (insErr) throw insErr;
 
-      const itemsPayload = cart.map((l) => ({
-        invoice_id: invoice.id,
-        product_id: l.id,
-        description: l.name,
-        quantity: l.qty,
-        unit_price: l.unit_price,
-        line_total: round2(l.unit_price * l.qty),
-        vat_category: l.vat_category,
-        income_classification_type: l.inc_type,
-        income_classification_category: l.inc_cat,
-      }));
+      // When prices include VAT, store the NET unit price so per-line myDATA VAT is correct.
+      const itemsPayload = cart.map((l) => {
+        const unitNet = vatInclusive ? round2(l.unit_price / (1 + vatRate / 100)) : l.unit_price;
+        return {
+          invoice_id: invoice.id,
+          product_id: l.id,
+          description: l.name,
+          quantity: l.qty,
+          unit_price: unitNet,
+          line_total: round2(unitNet * l.qty),
+          vat_category: l.vat_category,
+          income_classification_type: l.inc_type,
+          income_classification_category: l.inc_cat,
+        };
+      });
       const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itErr) throw itErr;
 
@@ -233,7 +242,11 @@ const PosPage: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="space-y-1 border-t border-border/60 pt-2 text-sm">
+                <label className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground cursor-pointer">
+                  <span>Prices include VAT</span>
+                  <input type="checkbox" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
+                </label>
+                <div className="space-y-1 text-sm">
                   <div className="flex justify-between text-muted-foreground"><span>Net</span><span>{formatMoney(totals.net, currency)}</span></div>
                   <div className="flex justify-between text-muted-foreground"><span>VAT ({vatRate}%)</span><span>{formatMoney(totals.vat, currency)}</span></div>
                   <div className="flex justify-between text-base font-semibold"><span>Total</span><span>{formatMoney(totals.total, currency)}</span></div>
