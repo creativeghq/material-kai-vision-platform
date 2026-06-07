@@ -19,6 +19,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 
 interface SellItem {
   id: string;
@@ -46,6 +47,8 @@ const PosPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'cash' | 'card'>('cash');
+  const [branches, setBranches] = useState<FinanceBranch[]>([]);
+  const [branchCode, setBranchCode] = useState('0');
   const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
   // The receipt also constitutes a movement/delivery document.
   const [movementDoc, setMovementDoc] = useState(false);
@@ -59,14 +62,16 @@ const PosPage: React.FC = () => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [{ data: prices }, { data: fs }] = await Promise.all([
+      const [{ data: prices }, { data: fs }, br] = await Promise.all([
         supabase
           .from('product_prices')
           .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
           .eq('workspace_id', activeWorkspaceId),
         supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', activeWorkspaceId).maybeSingle(),
+        invoicingSetupService.listBranches(activeWorkspaceId).catch(() => [] as FinanceBranch[]),
       ]);
       if (cancelled) return;
+      setBranches(br);
       const sell: SellItem[] = (prices ?? [])
         .filter((r: any) => r.product && r.list_price != null)
         .map((r: any) => ({
@@ -115,7 +120,7 @@ const PosPage: React.FC = () => {
     setIssuing(true);
     try {
       const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
-        p_workspace_id: activeWorkspaceId, p_doc_code: '11.1', p_branch_code: 0,
+        p_workspace_id: activeWorkspaceId, p_doc_code: '11.1', p_branch_code: parseInt(branchCode, 10) || 0,
       });
       if (numErr) throw numErr;
       const num = Array.isArray(numRows) ? numRows[0] : numRows;
@@ -127,6 +132,7 @@ const PosPage: React.FC = () => {
           internal_number: num?.formatted,
           series: num?.series ?? null,
           series_number: num?.number ?? null,
+          branch_code: parseInt(branchCode, 10) || 0,
           status: 'issued',
           document_type: '11.1', // myDATA retail receipt
           currency,
@@ -256,7 +262,16 @@ const PosPage: React.FC = () => {
                   ))}
                 </div>
 
-                <label className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground cursor-pointer">
+                {branches.length > 1 && (
+                  <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs">
+                    <span className="text-muted-foreground">Establishment</span>
+                    <Select value={branchCode} onValueChange={setBranchCode}>
+                      <SelectTrigger className="h-7 w-40 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <label className={`flex items-center justify-between text-xs text-muted-foreground cursor-pointer${branches.length > 1 ? '' : ' border-t border-border/60 pt-2'}`}>
                   <span>Prices include VAT</span>
                   <input type="checkbox" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
                 </label>
