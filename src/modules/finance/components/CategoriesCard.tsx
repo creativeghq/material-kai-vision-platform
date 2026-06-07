@@ -6,7 +6,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Badge } from '@/components/core/ui/badge';
-import { Loader2, Plus, Trash2, Tags } from 'lucide-react';
+import { Loader2, Plus, Trash2, Tags, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -17,6 +17,17 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const [name, setName] = useState('');
   const [kind, setKind] = useState<FinanceCategory['kind']>('both');
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const importDefaults = async () => {
+    setImporting(true);
+    try {
+      const n = await financeCategoriesService.importDefaults(workspaceId);
+      toast({ title: n > 0 ? `Imported ${n} categories` : 'Already up to date', description: n > 0 ? 'Standard income/expense categories added — edit or remove any you don’t need.' : 'All default categories already exist.' });
+      await load();
+    } catch (err: any) { toast({ title: 'Import failed', description: err?.message, variant: 'destructive' }); }
+    finally { setImporting(false); }
+  };
 
   const load = async () => {
     try { setLoading(true); setRows(await financeCategoriesService.list(workspaceId)); }
@@ -42,8 +53,11 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm flex items-center gap-2"><Tags className="h-4 w-4" /> Finance categories</CardTitle>
+        <Button size="sm" variant="outline" className="rounded-full" onClick={importDefaults} disabled={importing}>
+          {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} Import default categories
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">Classify invoices, receipts, expenses and payments. Pick a category on each document or payment.</p>

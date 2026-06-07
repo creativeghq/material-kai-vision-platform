@@ -33,4 +33,53 @@ export const financeCategoriesService = {
     const { error } = await supabase.from('finance_categories').update({ is_active: false }).eq('id', id);
     if (error) throw error;
   },
+
+  /**
+   * Seed a standard income/expense category set for the workspace. Idempotent:
+   * skips any category whose name already exists (case-insensitive), so it can
+   * be run on a partially-populated list to top it up. Returns how many were added.
+   */
+  async importDefaults(workspaceId: string): Promise<number> {
+    const { data: existing } = await supabase
+      .from('finance_categories')
+      .select('name')
+      .eq('workspace_id', workspaceId);
+    const have = new Set((existing ?? []).map((r: any) => String(r.name).trim().toLowerCase()));
+    const toInsert = DEFAULT_CATEGORIES
+      .filter((d) => !have.has(d.name.toLowerCase()))
+      .map((d) => ({ workspace_id: workspaceId, name: d.name, kind: d.kind }));
+    if (toInsert.length === 0) return 0;
+    const { error } = await supabase.from('finance_categories').insert(toInsert as any);
+    if (error) throw error;
+    return toInsert.length;
+  },
 };
+
+/** Standard chart-of-categories seed. Workspaces can edit/remove after importing. */
+export const DEFAULT_CATEGORIES: { name: string; kind: FinanceCategory['kind'] }[] = [
+  // Income
+  { name: 'Product sales', kind: 'income' },
+  { name: 'Service revenue', kind: 'income' },
+  { name: 'Consulting', kind: 'income' },
+  { name: 'Shipping income', kind: 'income' },
+  { name: 'Other income', kind: 'income' },
+  // Expense — cost of goods
+  { name: 'Materials & supplies', kind: 'expense' },
+  { name: 'Inventory purchases', kind: 'expense' },
+  { name: 'Subcontractors', kind: 'expense' },
+  { name: 'Shipping & freight', kind: 'expense' },
+  // Expense — operating
+  { name: 'Rent', kind: 'expense' },
+  { name: 'Utilities', kind: 'expense' },
+  { name: 'Salaries & wages', kind: 'expense' },
+  { name: 'Insurance', kind: 'expense' },
+  { name: 'Marketing & advertising', kind: 'expense' },
+  { name: 'Software & subscriptions', kind: 'expense' },
+  { name: 'Professional fees', kind: 'expense' },
+  { name: 'Bank & payment fees', kind: 'expense' },
+  { name: 'Travel', kind: 'expense' },
+  { name: 'Office supplies', kind: 'expense' },
+  { name: 'Equipment', kind: 'expense' },
+  { name: 'Taxes & duties', kind: 'expense' },
+  { name: 'Other expense', kind: 'expense' },
+];

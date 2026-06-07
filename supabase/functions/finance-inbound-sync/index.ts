@@ -50,10 +50,34 @@ Deno.serve(async (req) => {
     return json({ ok: true, skipped: 'no_configured_workspaces' });
   }
 
+  // Automated (cron) pulls are credit-metered per workspace; the manual "Sync now"
+  // button (finance-manager JWT) is free. Root workspace is never billed.
+  const INBOUND_SYNC_CREDIT_COST = 2;
+  const wsIds = creds.map((c) => c.workspace_id);
+  const { data: wsMeta } = await supabase.from('workspaces').select('id, created_by, is_root').in('id', wsIds);
+  const metaById = new Map((wsMeta ?? []).map((w: any) => [w.id, w]));
+
   const summary: any[] = [];
   for (const c of creds) {
     const workspaceId = c.workspace_id as string;
     const baseUrl = c.base_url || defaultBase;
+
+    // Credit gate — only on the automated path.
+    if (cronOk) {
+      const meta = metaById.get(workspaceId);
+      if (meta && !meta.is_root && meta.created_by) {
+        const { data: debit, error: debitErr } = await supabase.rpc('debit_user_credits', {
+          p_user_id: meta.created_by, p_amount: INBOUND_SYNC_CREDIT_COST,
+          p_operation_type: 'mydata_inbound_sync',
+          p_description: `Daily myDATA inbound pull (workspace ${workspaceId})`,
+        });
+        const row = Array.isArray(debit) ? debit[0] : debit;
+        if (debitErr || (row && !row.success)) {
+          summary.push({ workspaceId, skipped: 'insufficient_credits' });
+          continue;
+        }
+      }
+    }
     const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
     const watermark = fs?.inbound_last_mark || '0';
 
