@@ -47,6 +47,10 @@ const PosPage: React.FC = () => {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'cash' | 'card'>('cash');
   const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
+  // Αποτελεί Δελτίο Διακίνησης — the receipt also constitutes a movement/delivery document.
+  const [movementDoc, setMovementDoc] = useState(false);
+  const [movVehicle, setMovVehicle] = useState('');
+  const [movShipTo, setMovShipTo] = useState('');
   const [issuing, setIssuing] = useState(false);
   const [result, setResult] = useState<{ number: string; total: number; currency: string; mark: string | null } | null>(null);
 
@@ -126,6 +130,10 @@ const PosPage: React.FC = () => {
           vat_amount: totals.vat,
           total: totals.total,
           issued_at: new Date().toISOString(),
+          has_shipping: movementDoc,
+          vehicle_number: movementDoc ? (movVehicle || null) : null,
+          ship_to: movementDoc ? (movShipTo || null) : null,
+          move_purpose: movementDoc ? '1' : null,
         })
         .select()
         .single();
@@ -167,6 +175,7 @@ const PosPage: React.FC = () => {
 
       setResult({ number: number as string, total: totals.total, currency, mark });
       setCart([]);
+      setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
       toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
     } catch (err: any) {
       toast({ title: 'Failed to issue receipt', description: err?.message, variant: 'destructive' });
@@ -246,6 +255,16 @@ const PosPage: React.FC = () => {
                   <span>Prices include VAT</span>
                   <input type="checkbox" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
                 </label>
+                <label className="flex items-center justify-between text-xs text-muted-foreground cursor-pointer">
+                  <span>Constitutes a movement document (Δελτίο Διακίνησης)</span>
+                  <input type="checkbox" checked={movementDoc} onChange={(e) => setMovementDoc(e.target.checked)} />
+                </label>
+                {movementDoc && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input className="h-8 text-xs" value={movVehicle} onChange={(e) => setMovVehicle(e.target.value)} placeholder="Vehicle no." />
+                    <Input className="h-8 text-xs" value={movShipTo} onChange={(e) => setMovShipTo(e.target.value)} placeholder="Ship to" />
+                  </div>
+                )}
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between text-muted-foreground"><span>Net</span><span>{formatMoney(totals.net, currency)}</span></div>
                   <div className="flex justify-between text-muted-foreground"><span>VAT ({vatRate}%)</span><span>{formatMoney(totals.vat, currency)}</span></div>

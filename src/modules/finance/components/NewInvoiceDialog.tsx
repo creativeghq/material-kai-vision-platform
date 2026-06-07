@@ -110,9 +110,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [categoryId, setCategoryId] = useState<string>('');
   // Invoice with shipping (Τιμολόγιο - Δελτίο Αποστολής)
   const [hasShipping, setHasShipping] = useState(false);
+  const [shipFrom, setShipFrom] = useState('');
   const [transportDate, setTransportDate] = useState('');
+  const [transportTime, setTransportTime] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [movePurpose, setMovePurpose] = useState('1');
+  const [responsible, setResponsible] = useState('');
   const [shipTo, setShipTo] = useState('');
 
   useEffect(() => {
@@ -125,7 +128,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setNotes('');
     setLines([emptyLine()]);
     setIssueNow(true);
-    setHasShipping(false); setTransportDate(''); setVehicleNumber(''); setMovePurpose('1'); setShipTo('');
+    setHasShipping(false); setShipFrom(''); setTransportDate(''); setTransportTime(''); setVehicleNumber(''); setMovePurpose('1'); setResponsible(''); setShipTo('');
   }, [open]);
 
   // Load the enabled doc types (+ per-type default classification) and the income catalog.
@@ -279,9 +282,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           document_type: documentType,
           category_id: categoryId || null,
           has_shipping: hasShipping,
+          ship_from: hasShipping ? (shipFrom || null) : null,
           transport_date: hasShipping && transportDate ? transportDate : null,
+          transport_time: hasShipping ? (transportTime || null) : null,
           vehicle_number: hasShipping ? (vehicleNumber || null) : null,
           move_purpose: hasShipping ? movePurpose : null,
+          responsible: hasShipping ? (responsible || null) : null,
           ship_to: hasShipping ? (shipTo || null) : null,
           total_withheld_amount: Number((totals.withheld || 0).toFixed(2)),
           issued_at: issueNow ? new Date().toISOString() : null,
@@ -437,31 +443,52 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
             </div>
             {hasShipping && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-3 md:grid-cols-2">
+                {/* Loading place */}
                 <div className="space-y-1">
-                  <Label className="text-xs">Transport date</Label>
-                  <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
+                  <Label className="text-xs">Loading place (Τόπος φόρτωσης)</Label>
+                  <Input className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Our HQ / address" />
                 </div>
+                {/* Delivery place */}
                 <div className="space-y-1">
-                  <Label className="text-xs">Vehicle no.</Label>
-                  <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+                  <Label className="text-xs">Delivery place (Τόπος αποστολής)</Label>
+                  <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Purpose</Label>
+                {/* Transport */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Transport date</Label>
+                    <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Time</Label>
+                    <Input type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Vehicle no.</Label>
+                    <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Responsible</Label>
+                    <Input className="h-8 text-xs" value={responsible} onChange={(e) => setResponsible(e.target.value)} placeholder="Driver / handler" />
+                  </div>
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs">Purpose (Σκοπός)</Label>
                   <Select value={movePurpose} onValueChange={setMovePurpose}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">1 — Sale</SelectItem>
                       <SelectItem value="2">2 — Sale on behalf of third party</SelectItem>
+                      <SelectItem value="3">3 — Sampling</SelectItem>
+                      <SelectItem value="4">4 — Exhibition</SelectItem>
                       <SelectItem value="5">5 — Return</SelectItem>
                       <SelectItem value="6">6 — Movement between premises</SelectItem>
                       <SelectItem value="7">7 — Consignment</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Ship to (address)</Label>
-                  <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
                 </div>
               </div>
             )}
