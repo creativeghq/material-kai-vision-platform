@@ -15,6 +15,7 @@ import {
   UserPlus,
   Eye,
   Presentation,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -38,6 +39,7 @@ import { OverviewTab } from '../components/tabs/OverviewTab';
 import { RoomsTab } from '../components/tabs/RoomsTab';
 import { MoodboardsTab } from '../components/tabs/MoodboardsTab';
 import { QuotesTab } from '../components/tabs/QuotesTab';
+import { BillingTab } from '../components/tabs/BillingTab';
 import { TasksTab } from '../components/tabs/TasksTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
@@ -187,6 +189,12 @@ export const ProjectDetailPage: React.FC = () => {
                 <Badge variant="outline" className="ml-1 text-xs h-5">{project.accepted_quote_count}</Badge>
               )}
             </TabsTrigger>
+            {isOwner && (
+              <TabsTrigger value="billing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Receipt className="h-3.5 w-3.5" />
+                Billing
+              </TabsTrigger>
+            )}
             <TabsTrigger value="sheets" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileImage className="h-3.5 w-3.5" />
               Sheets
@@ -214,6 +222,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
+          {isOwner && <TabsContent value="billing"><BillingTab projectId={project.id} /></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
           <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>

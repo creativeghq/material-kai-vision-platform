@@ -471,6 +471,34 @@ class ProjectsService {
     return data || [];
   }
 
+  // ---------- BILLING: project → invoice(s) (#177) ----------
+
+  async listProjectInvoices(projectId: string) {
+    const { data, error } = await (supabase as any)
+      .from('invoices')
+      .select('id, internal_number, invoice_kind, progress_pct, total, currency, status, fiscal_status, issued_at, created_at')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Full invoice from an accepted project quote (reuses the standard quote→invoice path). */
+  async createFullInvoiceFromQuote(quoteId: string): Promise<string> {
+    const { data, error } = await (supabase as any).rpc('issue_invoice_from_quote', { p_quote_id: quoteId });
+    if (error) throw error;
+    return data as string;
+  }
+
+  /** Progress / milestone / final invoice for a percentage of an accepted project quote. */
+  async createProgressInvoice(quoteId: string, percent: number, kind: 'progress' | 'milestone' | 'final'): Promise<string> {
+    const { data, error } = await (supabase as any).rpc('create_project_progress_invoice', {
+      p_quote_id: quoteId, p_percent: percent, p_kind: kind,
+    });
+    if (error) throw error;
+    return data as string;
+  }
+
   // ---------- TIMELINE (Phase 3) ----------
 
   async listEvents(projectId: string, opts: { limit?: number; eventTypes?: string[] } = {}): Promise<ProjectEvent[]> {
