@@ -38,20 +38,49 @@ interface RequestBody {
 // Platform cost per myDATA transmission (markup on Novus ~0.5-1 cr). Root transmits free.
 const TRANSMISSION_CREDITS = 2;
 
-/** Sub-tenant credit pre-check: returns an error object when the workspace must pay but
- *  can't afford a transmission — so we never give away a paid myDATA submission. */
-async function transmissionCreditError(
-  supabase: any, workspaceId: string, userId?: string,
-): Promise<{ code: string; error: string; balance: number } | null> {
+type Reservation =
+  | { ok: true; refund: () => Promise<void> }
+  | { ok: false; code: 'insufficient_credits'; error: string; balance: number };
+
+/** Atomically RESERVE (debit up-front) the transmission cost before we hand the document to
+ *  the connector. `debit_user_credits` takes a row lock and returns success=false on
+ *  insufficient balance — the previous flow only pre-checked the balance then debited AFTER a
+ *  successful (paid) submit while swallowing failures, so a debit that lost the race gave away
+ *  a free myDATA transmission. Reserving first closes that race; the returned `refund()` gives
+ *  the credits back if the submit fails or the document is not accepted. Operator root
+ *  transmits free. */
+async function reserveTransmission(
+  supabase: any, workspaceId: string, userId: string | undefined, description: string,
+): Promise<Reservation> {
   const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).single();
-  if (ws?.is_root || !userId) return null; // operator root transmits free
-  const { data: cr } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
-  const balance = cr?.balance ?? 0;
-  if (balance < TRANSMISSION_CREDITS) {
-    return { code: 'insufficient_credits', balance,
-      error: `Not enough credits to transmit to myDATA (need ${TRANSMISSION_CREDITS}, have ${balance}). Please top up.` };
+  if (ws?.is_root || !userId) return { ok: true, refund: async () => {} }; // operator root transmits free
+
+  const { data, error } = await supabase.rpc('debit_user_credits', {
+    p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
+    p_operation_type: 'einvoice_transmission', p_description: description,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row?.success) {
+    const balance = Number(row?.new_balance ?? 0);
+    return {
+      ok: false, code: 'insufficient_credits', balance,
+      error: row?.error_message
+        || `Not enough credits to transmit to myDATA (need ${TRANSMISSION_CREDITS}, have ${balance}). Please top up.`,
+    };
   }
-  return null;
+  return {
+    ok: true,
+    refund: async () => {
+      const { error: rErr } = await supabase.rpc('credit_user_credits', {
+        p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
+        p_operation_type: 'einvoice_transmission_refund',
+        p_description: `Refund — ${description} (transmission not completed)`,
+      });
+      // A failed refund credits the USER's favour, never the platform's — log loudly for
+      // manual reconciliation but do not fail the request over it.
+      if (rErr) console.error('transmission refund FAILED — manual reconciliation needed', { userId, description, rErr });
+    },
+  };
 }
 
 function json(body: any, status = 200): Response {
@@ -132,11 +161,12 @@ Deno.serve(async (req) => {
         return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
       }
 
-      const cnCreditErr = await transmissionCreditError(supabase, cnRow.workspace_id, auth.userId);
-      if (cnCreditErr) return json({ ok: false, ...cnCreditErr }, 402);
-
       const resolved = await resolveWorkspaceConnector(supabase, cnRow.workspace_id, 'legal_invoice');
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
+
+      // Reserve the transmission credits atomically before handing off to the connector.
+      const cnReserve = await reserveTransmission(supabase, cnRow.workspace_id, auth.userId, `myDATA credit note ${body.credit_note_id}`);
+      if (!cnReserve.ok) return json({ ok: false, code: cnReserve.code, balance: cnReserve.balance, error: cnReserve.error }, 402);
 
       try {
         const input = await buildCreditNoteInputFromDb(supabase, body.credit_note_id, body.fiscal_overrides ?? {});
@@ -175,22 +205,13 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq('id', body.credit_note_id);
 
-        if (accepted && auth.userId) {
-          try {
-            const { data: wsRow } = await supabase.from('workspaces').select('is_root').eq('id', cnRow.workspace_id).single();
-            if (!wsRow?.is_root) {
-              await supabase.rpc('debit_user_credits', {
-                p_user_id: auth.userId, p_amount: 2,
-                p_operation_type: 'einvoice_transmission',
-                p_description: `myDATA credit note ${body.credit_note_id}`,
-              });
-            }
-          } catch (e) { console.warn('credit-note credit debit skipped', e); }
-        }
+        // Document didn't transmit → give the reserved credits back.
+        if (!accepted) await cnReserve.refund();
 
         const { data: finalCn } = await supabase.from('credit_notes').select('*').eq('id', body.credit_note_id).single();
         return json({ ok: true, credit_note_id: body.credit_note_id, credit_note: finalCn, fiscal: { ok: true, ...result } });
       } catch (err: any) {
+        await cnReserve.refund();
         return json({ ok: false, error: err?.message ?? 'credit note submission failed' }, 500);
       }
     }
@@ -218,11 +239,12 @@ Deno.serve(async (req) => {
         return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
       }
 
-      const dnCreditErr = await transmissionCreditError(supabase, dnRow.workspace_id, auth.userId);
-      if (dnCreditErr) return json({ ok: false, ...dnCreditErr }, 402);
-
       const resolved = await resolveWorkspaceConnector(supabase, dnRow.workspace_id, 'legal_invoice');
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
+
+      // Reserve the transmission credits atomically before handing off to the connector.
+      const dnReserve = await reserveTransmission(supabase, dnRow.workspace_id, auth.userId, `myDATA delivery note ${body.delivery_note_id}`);
+      if (!dnReserve.ok) return json({ ok: false, code: dnReserve.code, balance: dnReserve.balance, error: dnReserve.error }, 402);
 
       try {
         const input = await buildDeliveryNoteInputFromDb(supabase, body.delivery_note_id, body.fiscal_overrides ?? {});
@@ -259,22 +281,13 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq('id', body.delivery_note_id);
 
-        if (accepted && auth.userId) {
-          try {
-            const { data: wsRow } = await supabase.from('workspaces').select('is_root').eq('id', dnRow.workspace_id).single();
-            if (!wsRow?.is_root) {
-              await supabase.rpc('debit_user_credits', {
-                p_user_id: auth.userId, p_amount: 2,
-                p_operation_type: 'einvoice_transmission',
-                p_description: `myDATA delivery note ${body.delivery_note_id}`,
-              });
-            }
-          } catch (e) { console.warn('delivery-note credit debit skipped', e); }
-        }
+        // Document didn't transmit → give the reserved credits back.
+        if (!accepted) await dnReserve.refund();
 
         const { data: finalDn } = await supabase.from('delivery_notes').select('*').eq('id', body.delivery_note_id).single();
         return json({ ok: true, delivery_note_id: body.delivery_note_id, delivery_note: finalDn, fiscal: { ok: true, ...result } });
       } catch (err: any) {
+        await dnReserve.refund();
         return json({ ok: false, error: err?.message ?? 'delivery note submission failed' }, 500);
       }
     }
@@ -348,12 +361,15 @@ Deno.serve(async (req) => {
           error: 'This workspace is not entitled to e-Invoicing. The operator must enable it for this workspace.',
         };
       } else {
-        const creditErr = await transmissionCreditError(supabase, invRow!.workspace_id, auth.userId);
-        const resolved: any = creditErr ? null : await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
-        if (creditErr) {
-          fiscalResult = { ok: false, ...creditErr };
-        } else if (!resolved!.ok) {
-          fiscalResult = { ok: false, code: resolved!.code, error: resolved!.error };
+        const resolved: any = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
+        // Reserve transmission credits atomically before the connector handoff (see reserveTransmission).
+        const reserve = resolved.ok
+          ? await reserveTransmission(supabase, invRow!.workspace_id, auth.userId, `myDATA transmission for invoice ${invoiceId}`)
+          : null;
+        if (!resolved.ok) {
+          fiscalResult = { ok: false, code: resolved.code, error: resolved.error };
+        } else if (!reserve!.ok) {
+          fiscalResult = { ok: false, code: reserve!.code, balance: reserve!.balance, error: reserve!.error };
         } else {
           try {
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, body.fiscal_overrides ?? {});
@@ -384,7 +400,8 @@ Deno.serve(async (req) => {
               error_message: result.errorMessage ?? null,
             });
 
-            if (result.status === 'accepted' || result.status === 'offline') {
+            const accepted = result.status === 'accepted' || result.status === 'offline';
+            if (accepted) {
               await supabase
                 .from('invoices')
                 .update({
@@ -400,27 +417,14 @@ Deno.serve(async (req) => {
               await supabase.from('invoices').update({ fiscal_status: result.status }).eq('id', invoiceId);
             }
 
-            // #181 meter the transmission against the issuing user's platform credits.
-            // The operator root transmits free; sub-tenants are billed per accepted doc.
-            if ((result.status === 'accepted' || result.status === 'offline') && auth.userId) {
-              try {
-                const { data: wsRow } = await supabase
-                  .from('workspaces').select('is_root').eq('id', invRow!.workspace_id).single();
-                if (!wsRow?.is_root) {
-                  await supabase.rpc('debit_user_credits', {
-                    p_user_id: auth.userId,
-                    p_amount: 2, // platform cost per myDATA transmission (markup on Novus ~0.5-1 cr)
-                    p_operation_type: 'einvoice_transmission',
-                    p_description: `myDATA transmission for invoice ${invoiceId}`,
-                  });
-                }
-              } catch (e) {
-                console.warn('einvoice credit debit skipped', e);
-              }
-            }
+            // #181 the transmission was reserved (debited) up-front. Operator root reserves
+            // free; sub-tenants keep the debit on an accepted/offline doc and get it back if
+            // the document did not transmit.
+            if (!accepted) await reserve!.refund();
 
             fiscalResult = { ok: true, ...result };
           } catch (err: any) {
+            await reserve!.refund();
             fiscalResult = { ok: false, error: err?.message ?? 'fiscal submission failed' };
           }
         }

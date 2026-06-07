@@ -801,8 +801,8 @@ const _financeServiceCore = {
       .eq('id', input.invoiceId)
       .single();
     const rate = Number((inv as any)?.vat_rate ?? 24);
-    const net = Math.round((input.amount / (1 + rate / 100)) * 100) / 100;
-    const vat = Math.round((input.amount - net) * 100) / 100;
+    const net = round2(extractNet(input.amount, rate));
+    const vat = round2(input.amount - net);
     // myDATA VAT category — EXACT rate→category map (24→1,13→2,6→3,17→4,9→5,4→6,0→7),
     // matching supabase/functions/_shared/fiscal/invoice-builder.ts. A `>=` ladder here
     // mislabelled the reduced-island rates 17/9/4.
