@@ -17,7 +17,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
-import { financeService, formatMoney } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, round2, extractNet } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 
@@ -33,8 +33,6 @@ interface SellItem {
   inc_cat: string | null;
 }
 interface CartLine extends SellItem { qty: number; }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const PosPage: React.FC = () => {
   const { toast } = useToast();
@@ -101,7 +99,7 @@ const PosPage: React.FC = () => {
   const totals = useMemo(() => {
     const sum = round2(cart.reduce((s, l) => s + l.unit_price * l.qty, 0));
     if (vatInclusive) {
-      const net = round2(sum / (1 + vatRate / 100));
+      const net = round2(extractNet(sum, vatRate));
       return { net, vat: round2(sum - net), total: sum };
     }
     const vat = round2(sum * vatRate / 100);
@@ -154,7 +152,7 @@ const PosPage: React.FC = () => {
 
       // When prices include VAT, store the NET unit price so per-line myDATA VAT is correct.
       const itemsPayload = cart.map((l) => {
-        const unitNet = vatInclusive ? round2(l.unit_price / (1 + vatRate / 100)) : l.unit_price;
+        const unitNet = vatInclusive ? round2(extractNet(l.unit_price, vatRate)) : l.unit_price;
         return {
           invoice_id: invoice.id,
           product_id: l.id,

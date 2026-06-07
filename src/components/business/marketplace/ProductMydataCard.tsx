@@ -11,14 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
-
-const VAT_CATEGORIES = [
-  { code: '1', label: '1 — 24%' },
-  { code: '2', label: '2 — 13%' },
-  { code: '3', label: '3 — 6%' },
-  { code: '7', label: '7 — 0%' },
-  { code: '8', label: '8 — Without VAT (exempt)' },
-];
+import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 
 export const ProductMydataCard: React.FC<{ productId: string }> = ({ productId }) => {
   const { toast } = useToast();
@@ -71,7 +64,7 @@ export const ProductMydataCard: React.FC<{ productId: string }> = ({ productId }
         <div className="space-y-1">
           <Label className="text-xs">VAT category</Label>
           <Select value={vat} onValueChange={setVat}><SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
-            <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent></Select>
+            <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.longLabel}</SelectItem>)}</SelectContent></Select>
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Income classification type</Label>

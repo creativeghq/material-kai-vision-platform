@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
     const { data: catalog, error: catErr } = await supabase
       .from('presentation_catalogs')
-      .select('id, owner_user_id, title, subtitle, slug, status, pdf_url')
+      .select('id, owner_user_id, workspace_id, title, subtitle, slug, status, pdf_url')
       .eq('id', body.catalog_id)
       .single();
     if (catErr || !catalog) return jsonResponse({ success: false, error: 'Catalog not found' }, 404);
@@ -143,9 +143,14 @@ Deno.serve(async (req) => {
       .select('full_name, email')
       .eq('user_id', catalog.owner_user_id)
       .maybeSingle();
-    const { data: ownerMembers } = await supabase
-      .from('workspace_members').select('workspace_id, role').eq('user_id', catalog.owner_user_id).limit(50);
-    const ownerWsId = (ownerMembers?.find((m: any) => m.role === 'owner') ?? ownerMembers?.find((m: any) => m.role === 'admin') ?? ownerMembers?.[0])?.workspace_id;
+    // Branding from the catalog's OWN workspace (matches the quote path). Fall back to the
+    // owner-membership guess only for legacy rows with a null workspace_id.
+    let ownerWsId: string | null = catalog.workspace_id ?? null;
+    if (!ownerWsId) {
+      const { data: ownerMembers } = await supabase
+        .from('workspace_members').select('workspace_id, role').eq('user_id', catalog.owner_user_id).eq('status', 'active').limit(50);
+      ownerWsId = (ownerMembers?.find((m: any) => m.role === 'owner') ?? ownerMembers?.find((m: any) => m.role === 'admin') ?? ownerMembers?.[0])?.workspace_id ?? null;
+    }
     const { data: ownerFs } = ownerWsId
       ? await supabase.from('finance_settings').select('business_name, branding_contact_line').eq('workspace_id', ownerWsId).maybeSingle()
       : { data: null as any };

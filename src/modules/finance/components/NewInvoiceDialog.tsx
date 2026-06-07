@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
-import { financeService } from '@/modules/finance/services/financeService';
+import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 
 interface Customer { type: 'contact' | 'company'; id: string; label: string; }
@@ -68,21 +68,6 @@ function groupDocTypes(types: { code: string; description: string }[]) {
     .map(([family, items]) => ({ family, label: DOC_FAMILY[family] ?? `Type ${family}.x`, items }));
 }
 
-// myDATA VAT categories (AADE standard) + their percentages.
-const VAT_CATEGORIES: { code: string; label: string; pct: number }[] = [
-  { code: '1', label: '24%', pct: 24 },
-  { code: '2', label: '13%', pct: 13 },
-  { code: '3', label: '6%', pct: 6 },
-  { code: '4', label: '17% (reduced)', pct: 17 },
-  { code: '5', label: '9% (reduced)', pct: 9 },
-  { code: '6', label: '4% (super-reduced)', pct: 4 },
-  { code: '7', label: '0%', pct: 0 },
-  { code: '8', label: 'Without VAT', pct: 0 },
-];
-const vatPctForCat = (code: string | null | undefined, fallback: number): number => {
-  const c = VAT_CATEGORIES.find((v) => v.code === code);
-  return c ? c.pct : fallback;
-};
 
 const MOVE_PURPOSES: [string, string][] = [
   ['1', 'Sale'], ['2', 'Sale on behalf of third party'], ['3', 'Sampling'], ['4', 'Exhibition'],
@@ -354,7 +339,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
     const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
     const gross = Math.max(0, q * p - disc);
-    return pricesIncludeVat ? gross / (1 + pct / 100) : gross;
+    return pricesIncludeVat ? extractNet(gross, pct) : gross;
   };
   const totals = useMemo(() => {
     let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
@@ -400,14 +385,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', { p_workspace_id: workspaceId, p_doc_code: documentType, p_branch_code: parseInt(branchCode, 10) || 0 });
       if (numErr) throw numErr;
       const num = Array.isArray(numRows) ? numRows[0] : numRows;
-      const dueAt = new Date(issueDate); dueAt.setDate(dueAt.getDate() + (parseInt(paymentTermsDays, 10) || 30));
 
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: workspaceId,
         internal_number: num?.formatted, series: num?.series ?? null, series_number: num?.number ?? null,
         customer_contact_id: customer.type === 'contact' ? customer.id : null,
         customer_company_id: customer.type === 'company' ? customer.id : null,
-        status: issueNow ? 'issued' : 'draft',
+        // Always insert as draft. "Issue now" routes through mark_invoice_issued
+        // below so the legal_number (gapless) + issued_at + due_at are assigned
+        // by the same RPC the quote path uses — inline status:'issued' here was
+        // skipping legal_number assignment entirely.
+        status: 'draft',
         currency, subtotal_net: Number(totals.net.toFixed(2)), vat_rate: Number(vatRate),
         vat_amount: Number(totals.vat.toFixed(2)), total: Number(totals.total.toFixed(2)),
         total_withheld_amount: Number(totals.withheld.toFixed(2)),
@@ -430,8 +418,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
         vehicle_number: hasShipping ? (vehicleNumber || null) : null, responsible: hasShipping ? (responsible || null) : null,
         move_purpose: hasShipping ? movePurpose : null,
-        issued_at: issueNow ? new Date(issueDate).toISOString() : null,
-        due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
+        issued_at: null,
+        due_at: null,
       }).select().single();
       if (insErr) throw insErr;
 
@@ -441,7 +429,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
         const net = lineNetOf(l);
         // Store the NET unit price so per-line myDATA VAT stays correct when prices include VAT.
-        const unitNet = pricesIncludeVat ? p / (1 + pct / 100) : p;
+        const unitNet = pricesIncludeVat ? extractNet(p, pct) : p;
         return {
           invoice_id: invoice.id, description: l.description.trim(), sku: l.sku.trim() || null,
           quantity: q, unit_price: Number(unitNet.toFixed(4)), unit: l.unit || null,
@@ -461,6 +449,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       });
       const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itemsErr) throw itemsErr;
+
+      // Issue now → allocate the gapless legal_number + issued_at + due_at via
+      // the same RPC the quote flow uses. (Draft stays unnumbered.)
+      if (issueNow) await financeService.markInvoiceIssued(invoice.id);
 
       // Optional post-create actions chosen on the form.
       if (submitNow && issueNow) {
@@ -732,7 +724,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               </Select>
                             </div>
                           </div>
-                          {(l.vat_category === '7' || l.vat_category === '8' || vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0) === 0) && (
+                          {vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0) === 0 && (
                             <div className="space-y-1">
                               <Label className="text-[10px] text-muted-foreground">VAT exemption category (1–31)</Label>
                               <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="Required for 0% VAT" />

@@ -14,11 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/finance/services/servicesService';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
-
-const VAT_CATEGORIES = [
-  { code: 1, label: '1 — 24%' }, { code: 2, label: '2 — 13%' }, { code: 3, label: '3 — 6%' },
-  { code: 7, label: '7 — 0%' }, { code: 8, label: '8 — Without VAT (exempt)' },
-];
+import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
@@ -121,7 +117,7 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
                 <Label className="text-xs">VAT category</Label>
                 <Select value={form.vatCategory != null ? String(form.vatCategory) : ''} onValueChange={(v) => setForm({ ...form, vatCategory: Number(v) })}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={String(v.code)}>{v.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.longLabel}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
