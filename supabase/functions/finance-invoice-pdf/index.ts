@@ -15,10 +15,10 @@ import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 
-// jsDelivr npm package (the gh/ path 403s). DejaVu Sans has full Greek + Latin coverage.
+// Google Noto Sans (full Greek + Latin), served as real TTF from the official noto-fonts repo.
 const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans.ttf',
-  bold: 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans-Bold.ttf',
+  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Regular.ttf',
+  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Bold.ttf',
 };
 let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
 async function loadFonts() {
