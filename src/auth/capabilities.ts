@@ -20,6 +20,7 @@ export type Persona =
   | 'dealer'     // owner/admin of a supplier node (sells catalog downstream)
   | 'architect'  // owner/admin of an architect node (sells to end users with margin)
   | 'staff'      // team member of a business node (member role)
+  | 'accountant' // invited external accountant — Finance surface only (#202)
   | 'end_user';  // project client / referral-joined member — restricted surface
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
@@ -54,6 +55,10 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   architect: [...ALL_BUSINESS],
   // Team members run day-to-day but don't administer the node (no network/pricing).
   staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
+  // Invited accountant: ONLY the Finance surface (nav + route). Within finance, settings
+  // stay gated on `canManageFinance` and write-ops on `canOperateFinance` (useCapabilities),
+  // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
+  accountant: ['finance.manage'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
 };
@@ -69,6 +74,7 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole }: Pers
   if (isPlatformOperator) return 'operator';
   const role = workspaceRole ?? '';
   if (role === 'client') return 'end_user';
+  if (role === 'accountant') return 'accountant';
   if (role === 'owner' || role === 'admin') {
     if (rank === 'dealer') return 'dealer';
     if (rank === 'architect') return 'architect';

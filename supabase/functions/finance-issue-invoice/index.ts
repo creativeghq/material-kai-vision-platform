@@ -63,6 +63,29 @@ function json(body: any, status = 200): Response {
   });
 }
 
+/**
+ * #202 — is this user a FINANCE MANAGER (not just an allowed-in accountant) for the
+ * workspace that owns this quote? Managers = workspace owner/admin OR a global
+ * admin/super_admin/finance role. Runs under service role (auth.uid() is null), so we
+ * resolve membership + global role by the authenticated user id directly.
+ */
+async function isFinanceManagerForQuote(
+  supabase: ReturnType<typeof createClient>,
+  quoteId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data: q } = await supabase.from('quotes').select('workspace_id').eq('id', quoteId).maybeSingle();
+  if (!q?.workspace_id) return false;
+  const [{ data: mem }, { data: prof }] = await Promise.all([
+    supabase.from('workspace_members').select('role').eq('workspace_id', q.workspace_id).eq('user_id', userId).maybeSingle(),
+    supabase.from('user_profiles').select('roles!user_profiles_role_id_fkey(name)').eq('user_id', userId).maybeSingle(),
+  ]);
+  const wsManager = !!mem && ['owner', 'admin'].includes((mem as any).role);
+  const globalRole = (prof as any)?.roles?.name as string | undefined;
+  const globalManager = !!globalRole && ['admin', 'super_admin', 'finance'].includes(globalRole);
+  return wsManager || globalManager;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -70,7 +93,10 @@ Deno.serve(async (req) => {
   try {
     const auth = await authenticate(req, {
       requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'finance'],
+      // 'accountant' is allowed in so they can SUBMIT/transmit existing documents to myDATA
+      // (#202). The privileged CREATE path (issue a new invoice from a quote) is guarded
+      // separately below to managers only — an accountant can transmit + pay, never create.
+      allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'accountant'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
@@ -254,6 +280,13 @@ Deno.serve(async (req) => {
     if (body.invoice_id) {
       invoiceId = body.invoice_id;
     } else {
+      // CREATE path (issue a new invoice from a quote) — managers only. Block accountants
+      // (and any other non-manager allowed in for the submit path). auth.uid() is null under
+      // service role, so resolve the caller's role for the quote's workspace explicitly.
+      const mgr = await isFinanceManagerForQuote(supabase, body.quote_id!, auth.userId!);
+      if (!mgr) {
+        return json({ error: 'Only a finance manager can issue a new invoice. Accountants may transmit and pay existing documents.' }, 403);
+      }
       const { data: created, error: rpcErr } = await supabase.rpc('issue_invoice_from_quote', {
         p_quote_id: body.quote_id,
       });

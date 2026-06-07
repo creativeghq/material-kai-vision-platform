@@ -16,7 +16,7 @@ import { workspaceManagementService } from '@/services/workspaceManagementServic
 type Role = 'accountant' | 'sales' | 'member';
 
 const ROLE_HINT: Record<Role, string> = {
-  accountant: 'Read-only access to Finance (invoices, payments, reports, myDATA). No edits.',
+  accountant: 'Finance only: view invoices/bills/reports, record payments, submit to myDATA. No settings, pricing, CRM, or new documents.',
   sales: 'Sales portal — create quotes/orders for customers. No finance or settings.',
   member: 'Standard member access to this workspace.',
 };
@@ -51,7 +51,7 @@ export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <Select value={role} onValueChange={(v: Role) => { setRole(v); setLink(null); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="accountant">Accountant (read-only finance)</SelectItem>
+              <SelectItem value="accountant">Accountant (finance ops, no settings)</SelectItem>
               <SelectItem value="sales">Sales rep</SelectItem>
               <SelectItem value="member">Member</SelectItem>
             </SelectContent>

@@ -20,15 +20,21 @@ export interface Capabilities {
   isBusinessNode: boolean;
   /** Can add own products (operator or dealer). */
   canSupplyProducts: boolean;
-  /** Can manage this workspace's finance / e-invoicing. */
+  /** Can manage this workspace's finance / e-invoicing SETTINGS (owner/admin only). */
   canManageFinance: boolean;
+  /**
+   * Can perform day-to-day finance OPERATIONS — record payments + submit documents to
+   * myDATA + generate PDFs — without touching settings/pricing/CRM or creating new
+   * documents. True for workspace managers AND the invited accountant (#202).
+   */
+  canOperateFinance: boolean;
   /** Can manage downline (operator/dealer who owns/admins the node). */
   canManageNetwork: boolean;
   /** A restricted end-user (member without workspace-admin). */
   isEndUser: boolean;
   /** Verified factory/supplier (factory analytics). */
   isFactory: boolean;
-  /** Invited read-only accountant (#202) — Finance only, no writes. */
+  /** Invited accountant (#202) — Finance only: read + record-payment + myDATA submit, no settings. */
   isAccountant: boolean;
   /** Invited sales rep (#201) — Sales portal only. */
   isSalesRep: boolean;
@@ -51,8 +57,9 @@ export function useCapabilities(): Capabilities {
     isWorkspaceManager,
     isBusinessNode,
     canSupplyProducts,
-    // Accountant is read-only; finance management stays with owner/admin.
+    // Settings/pricing stay with owner/admin; the accountant gets operations only.
     canManageFinance: isWorkspaceManager,
+    canOperateFinance: isWorkspaceManager || isAccountant,
     canManageNetwork: isWorkspaceManager && canSupplyProducts,
     isEndUser: !isWorkspaceManager && !isPlatformOperator && !isAccountant && !isSalesRep,
     isFactory,

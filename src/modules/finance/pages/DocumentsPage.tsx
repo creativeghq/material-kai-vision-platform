@@ -47,7 +47,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
   const navigate = useNavigate();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
-  const { isAccountant } = useCapabilities();
+  const { isAccountant, canOperateFinance } = useCapabilities();
 
   const [internalType, setType] = useState<DocType>('invoices');
   const type = embeddedType ?? internalType;
@@ -144,7 +144,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
                 )}
-                {(type === 'invoices' || type === 'expenses') && !isAccountant && (
+                {(type === 'invoices' || type === 'expenses') && canOperateFinance && (
                   <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
                     {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
                   </Button>
@@ -158,7 +158,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 {type === 'cheques' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
-                {type === 'payments' && !isAccountant && (
+                {type === 'payments' && canOperateFinance && (
                   <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
                 )}
                 {type === 'credit_notes' && !isAccountant && (
@@ -174,7 +174,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 ) : type === 'credit_notes' ? (
                   <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={inbound} financeBase={financeBase} readOnly={isAccountant} onChanged={load} />
+                  <InboundTable rows={inbound} financeBase={financeBase} readOnly={!canOperateFinance} onChanged={load} />
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={payments} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
