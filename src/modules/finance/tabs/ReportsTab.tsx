@@ -14,7 +14,7 @@ type ReportKind =
   | 'purchases_per_product' | 'receipts_per_product'
   | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
-  | 'vat_return'
+  | 'vat_return' | 'mydata_reconciliation'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
@@ -39,6 +39,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
   // VAT / tax
   { value: 'vat_return', label: 'VAT analysis (ΦΠΑ)', group: 'vat', period: 'range' },
+  { value: 'mydata_reconciliation', label: 'myDATA reconciliation', group: 'vat', period: 'range' },
   // Outstanding snapshots (no period)
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
@@ -50,7 +51,7 @@ const GROUP_LABELS: Record<ReportGroup, string> = {
   sales: 'Sales',
   purchases: 'Purchases',
   payments: 'Payments (cash movements)',
-  vat: 'VAT / Tax',
+  vat: 'VAT / myDATA',
   outstanding: 'Outstanding (snapshot)',
   tasks: 'Tasks',
 };
@@ -133,6 +134,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportTopSupplierOutstanding(workspaceId); break;
         case 'vat_return':
           data = await financeService.getVatReport(workspaceId, range.from, range.to); break;
+        case 'mydata_reconciliation':
+          data = await financeService.getMyDataReconciliation(workspaceId, range.from, range.to); break;
         case 'open_tasks':
           data = await financeService.reportOpenTasks(workspaceId); break;
       }
@@ -274,6 +277,8 @@ function primarySortKey(report: ReportKind): string {
       return 'outstanding';
     case 'vat_return':
       return 'vat';
+    case 'mydata_reconciliation':
+      return 'issued_at';
     case 'open_tasks':
       return 'scheduled_for';
   }
@@ -357,6 +362,15 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: payable >= 0 ? 'VAT payable' : 'VAT credit', value: formatMoney(Math.abs(payable)) },
       ];
     }
+    case 'mydata_reconciliation': {
+      const count = (b: string) => rows.filter((r) => r.bucket === b).length;
+      const attention = rows.filter((r) => r.bucket !== 'accepted').length;
+      return [
+        { label: 'Accepted', value: String(count('accepted')) },
+        { label: 'Not transmitted', value: String(count('not_transmitted')) },
+        { label: 'Needs attention', value: String(attention) },
+      ];
+    }
     case 'open_tasks':
       return [{ label: 'Open tasks', value: String(rows.length) }];
   }
@@ -411,6 +425,9 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
     if (input) body.push(line('Purchases (supplier bills)', input));
     if (inputCredit) body.push(line('Less: supplier credit notes', inputCredit));
     return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
+  }
+  if (report === 'mydata_reconciliation') {
+    return <MyDataReconTable rows={rows} totals={totals} />;
   }
   if (report === 'open_tasks') {
     return (
@@ -470,6 +487,57 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
   }
   return null;
 }
+
+const BUCKET_META: Record<string, { label: string; cls: string; rank: number }> = {
+  not_transmitted: { label: 'Not transmitted', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 0 },
+  rejected: { label: 'Rejected', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 1 },
+  failed: { label: 'Failed', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 2 },
+  offline_pending: { label: 'Offline — pending MARK', cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30', rank: 3 },
+  accepted: { label: 'Accepted', cls: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30', rank: 9 },
+};
+const DOC_KIND_LABEL: Record<string, string> = { invoice: 'Invoice', credit_note: 'Credit note', delivery_note: 'Delivery note' };
+
+const MyDataReconTable: React.FC<{ rows: any[]; totals: { label: string; value: string }[] }> = ({ rows, totals }) => {
+  const ordered = [...rows].sort((a, b) => {
+    const ra = BUCKET_META[a.bucket]?.rank ?? 5, rb = BUCKET_META[b.bucket]?.rank ?? 5;
+    if (ra !== rb) return ra - rb;
+    return String(b.issued_at ?? '').localeCompare(String(a.issued_at ?? ''));
+  });
+  return (
+    <div>
+      <div className="grid gap-2 border-b border-border/60 bg-muted/20 px-4 py-2 text-xs" style={{ gridTemplateColumns: `repeat(${totals.length}, minmax(0, 1fr))` }}>
+        {totals.map((t) => (<div key={t.label}><span className="text-muted-foreground">{t.label}: </span><span className="font-semibold">{t.value}</span></div>))}
+      </div>
+      <table className="w-full text-sm">
+        <thead className="text-xs text-muted-foreground">
+          <tr className="border-b border-border/60">
+            <th className="px-4 py-2 text-left">Document</th>
+            <th className="px-4 py-2 text-left">Type</th>
+            <th className="px-4 py-2 text-left">Date</th>
+            <th className="px-4 py-2 text-right">Total</th>
+            <th className="px-4 py-2 text-left">MARK</th>
+            <th className="px-4 py-2 text-left">myDATA status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ordered.map((r) => {
+            const meta = BUCKET_META[r.bucket] ?? { label: r.bucket, cls: 'bg-muted text-muted-foreground border-border', rank: 5 };
+            return (
+              <tr key={`${r.doc_kind}-${r.doc_id}`} className="border-b border-border/30">
+                <td className="px-4 py-2 font-mono text-xs">{r.doc_number ?? r.doc_id?.slice(0, 8)}</td>
+                <td className="px-4 py-2">{DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
+                <td className="px-4 py-2">{r.issued_at ? new Date(r.issued_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{r.total != null ? formatMoney(Number(r.total), r.currency ?? undefined) : '—'}</td>
+                <td className="px-4 py-2 font-mono text-[11px] break-all">{r.fiscal_mark ?? '—'}</td>
+                <td className="px-4 py-2"><span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${meta.cls}`}>{meta.label}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 const Table: React.FC<{ headers: string[]; rows: string[][]; totals: { label: string; value: string }[] }> = ({ headers, rows, totals }) => (
   <div>
