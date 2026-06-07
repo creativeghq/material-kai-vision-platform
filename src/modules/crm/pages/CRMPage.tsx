@@ -622,7 +622,7 @@ export const CRMManagement: React.FC = () => {
                         <TableRow key={contact.id}>
                           <TableCell className="font-medium">
                             <button
-                              onClick={() => navigate(`/admin/crm/contacts/${contact.id}`)}
+                              onClick={() => navigate(`/crm/contacts/${contact.id}`)}
                               className="text-primary hover:underline flex items-center gap-1"
                             >
                               {contact.name}
@@ -740,7 +740,7 @@ export const CRMManagement: React.FC = () => {
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">
                             <button
-                              onClick={() => navigate(`/admin/crm/companies/${company.id}`)}
+                              onClick={() => navigate(`/crm/companies/${company.id}`)}
                               className="text-primary hover:underline flex items-center gap-1"
                             >
                               {company.name}

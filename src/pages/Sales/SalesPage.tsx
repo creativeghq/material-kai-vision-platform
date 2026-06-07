@@ -29,6 +29,8 @@ export const SalesPage: React.FC = () => {
   const [orders, setOrders] = useState<QuoteWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Per-order customer label + CRM deep-link, resolved after load.
+  const [customers, setCustomers] = useState<Record<string, { label: string; href: string }>>({});
 
   const loadOrders = useCallback(async () => {
     try {
@@ -36,6 +38,23 @@ export const SalesPage: React.FC = () => {
       // RLS scopes a non-admin rep to their own rows.
       const data = await quotesService.getUserQuotes();
       setOrders(data);
+
+      // Resolve customer names for the distinct contact/company ids in one round trip each.
+      const contactIds = [...new Set(data.map((q) => (q as any).customer_contact_id).filter(Boolean))] as string[];
+      const companyIds = [...new Set(data.map((q) => (q as any).customer_company_id).filter(Boolean))] as string[];
+      const map: Record<string, { label: string; href: string }> = {};
+      const [contacts, companies] = await Promise.all([
+        contactIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+        companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      for (const c of (contacts.data ?? [])) {
+        const label = (c as any).name || [(c as any).first_name, (c as any).last_name].filter(Boolean).join(' ') || 'Contact';
+        map[`contact:${(c as any).id}`] = { label, href: `/crm/contacts/${(c as any).id}` };
+      }
+      for (const co of (companies.data ?? [])) {
+        map[`company:${(co as any).id}`] = { label: (co as any).name, href: `/crm/companies/${(co as any).id}` };
+      }
+      setCustomers(map);
     } catch (err) {
       console.error('Error loading sales orders:', err);
       toast({ title: 'Error', description: 'Failed to load your orders', variant: 'destructive' });
@@ -118,6 +137,7 @@ export const SalesPage: React.FC = () => {
                   <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                     <tr className="text-xs font-semibold text-muted-foreground">
                       <th className="text-left px-6 py-2.5 font-medium">Order</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Customer</th>
                       <th className="text-left px-3 py-2.5 font-medium">Status</th>
                       <th className="text-left px-3 py-2.5 font-medium">Items</th>
                       <th className="text-left px-3 py-2.5 font-medium">Created</th>
@@ -125,13 +145,23 @@ export const SalesPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((q) => (
+                    {orders.map((q) => {
+                      const cid = (q as any).customer_company_id ? `company:${(q as any).customer_company_id}` : (q as any).customer_contact_id ? `contact:${(q as any).customer_contact_id}` : null;
+                      const cust = cid ? customers[cid] : null;
+                      return (
                       <tr
                         key={q.id}
                         className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                         onClick={() => navigate(`/quotes/${q.id}`)}
                       >
                         <td className="px-6 py-2.5 font-medium">{q.name || 'Untitled Order'}</td>
+                        <td className="px-3 py-2.5">
+                          {cust ? (
+                            <button className="text-primary hover:underline" onClick={(e) => { e.stopPropagation(); navigate(cust.href); }}>{cust.label}</button>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5"><QuoteStatusBadge status={q.status} /></td>
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
@@ -146,7 +176,8 @@ export const SalesPage: React.FC = () => {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

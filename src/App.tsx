@@ -41,6 +41,8 @@ const AgentHub = lazy(() => import('./pages/AgentHub'));
 const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage'));
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
+const CrmContactDetailPage = lazy(() => import('./modules/crm/pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
+const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
@@ -238,6 +240,33 @@ const App = () => (
                       <CapabilityGuard capability="crm.view">
                         <Layout>
                           <CRMPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Non-admin CRM customer detail — capability-gated (crm.view) so sales reps
+                    and staff can open a customer + its Account overview. The admin dashboard
+                    keeps its own /admin/crm/* deep-links (AdminGuard). */}
+                <Route
+                  path="/crm/contacts/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="crm.view">
+                        <Layout>
+                          <CrmContactDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/crm/companies/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="crm.view">
+                        <Layout>
+                          <CrmCompanyDetailPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>
