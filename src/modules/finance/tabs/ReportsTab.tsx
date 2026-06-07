@@ -14,12 +14,13 @@ type ReportKind =
   | 'purchases_per_product' | 'receipts_per_product'
   | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
+  | 'vat_return'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 type SortDir = 'desc' | 'asc';
 
-type ReportGroup = 'sales' | 'purchases' | 'payments' | 'outstanding' | 'tasks';
+type ReportGroup = 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'tasks';
 
 const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
   // Sales
@@ -36,6 +37,8 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   // Payments / cash
   { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
   { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
+  // VAT / tax
+  { value: 'vat_return', label: 'VAT analysis (ΦΠΑ)', group: 'vat', period: 'range' },
   // Outstanding snapshots (no period)
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
@@ -47,6 +50,7 @@ const GROUP_LABELS: Record<ReportGroup, string> = {
   sales: 'Sales',
   purchases: 'Purchases',
   payments: 'Payments (cash movements)',
+  vat: 'VAT / Tax',
   outstanding: 'Outstanding (snapshot)',
   tasks: 'Tasks',
 };
@@ -127,6 +131,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportTopCustomerOutstanding(workspaceId); break;
         case 'top_supplier_outstanding':
           data = await financeService.reportTopSupplierOutstanding(workspaceId); break;
+        case 'vat_return':
+          data = await financeService.getVatReport(workspaceId, range.from, range.to); break;
         case 'open_tasks':
           data = await financeService.reportOpenTasks(workspaceId); break;
       }
@@ -161,7 +167,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
             <Select value={report} onValueChange={(v) => setReport(v as ReportKind)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(['sales', 'purchases', 'payments', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
+                {(['sales', 'purchases', 'payments', 'vat', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
                   const inGroup = REPORTS.filter((r) => r.group === g);
                   if (inGroup.length === 0) return null;
                   return (
@@ -266,6 +272,8 @@ function primarySortKey(report: ReportKind): string {
     case 'top_customer_outstanding':
     case 'top_supplier_outstanding':
       return 'outstanding';
+    case 'vat_return':
+      return 'vat';
     case 'open_tasks':
       return 'scheduled_for';
   }
@@ -338,6 +346,17 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: 'Total AP outstanding', value: formatMoney(total) },
       ];
     }
+    case 'vat_return': {
+      const sum = (pred: (r: any) => boolean, key: string) => rows.filter(pred).reduce((s, r) => s + Number(r[key] || 0), 0);
+      const outputVat = sum((r) => r.section === 'output' || r.section === 'output_credit', 'vat');
+      const inputVat = sum((r) => r.section === 'input' || r.section === 'input_credit', 'vat');
+      const payable = Math.round((outputVat - inputVat) * 100) / 100;
+      return [
+        { label: 'Output VAT (sales)', value: formatMoney(outputVat) },
+        { label: 'Input VAT (purchases)', value: formatMoney(inputVat) },
+        { label: payable >= 0 ? 'VAT payable' : 'VAT credit', value: formatMoney(Math.abs(payable)) },
+      ];
+    }
     case 'open_tasks':
       return [{ label: 'Open tasks', value: String(rows.length) }];
   }
@@ -378,6 +397,20 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
         r.product_name, r.sku ?? '—', String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.total_cost || 0)),
       ])} />
     );
+  }
+  if (report === 'vat_return') {
+    const fmtRate = (rate: any) => rate == null ? '—' : `${Number(rate)}%`;
+    const outputs = rows.filter((r: any) => r.section === 'output').sort((a: any, b: any) => Number(b.vat_rate ?? 0) - Number(a.vat_rate ?? 0));
+    const outputCredit = rows.find((r: any) => r.section === 'output_credit');
+    const input = rows.find((r: any) => r.section === 'input');
+    const inputCredit = rows.find((r: any) => r.section === 'input_credit');
+    const line = (label: string, r: any) => [label, formatMoney(Number(r?.net || 0)), formatMoney(Number(r?.vat || 0)), String(r?.doc_count ?? 0)];
+    const body: string[][] = [];
+    for (const o of outputs) body.push([`Sales @ ${fmtRate(o.vat_rate)}`, formatMoney(Number(o.net || 0)), formatMoney(Number(o.vat || 0)), String(o.doc_count ?? 0)]);
+    if (outputCredit) body.push(line('Less: customer credit notes', outputCredit));
+    if (input) body.push(line('Purchases (supplier bills)', input));
+    if (inputCredit) body.push(line('Less: supplier credit notes', inputCredit));
+    return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
   }
   if (report === 'open_tasks') {
     return (

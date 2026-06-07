@@ -1119,6 +1119,7 @@ export interface FinanceSettings {
 }
 
 export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number }
+export interface VatReportRow { section: 'output' | 'output_credit' | 'input' | 'input_credit'; vat_rate: number | null; net: number; vat: number; doc_count: number }
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
 export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
@@ -1340,6 +1341,14 @@ const _financeServiceV2 = {
     });
     if (error) throw error;
     return (data ?? []) as SalesPerDayRow[];
+  },
+  /** #207 — VAT analysis (ΦΠΑ): output by rate + input, each net of credit notes. */
+  async getVatReport(workspaceId: string, from: string, to: string): Promise<VatReportRow[]> {
+    const { data, error } = await supabase.rpc('finance_vat_report', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as VatReportRow[];
   },
   async reportSalesPerCustomer(workspaceId: string, from: string, to: string): Promise<SalesPerCustomerRow[]> {
     const { data, error } = await supabase.rpc('report_sales_per_customer', {
