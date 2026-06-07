@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
+  CustomerAccountOverview,
   CustomerQuotesTab,
   CustomerInvoicesTab,
   CustomerPaymentsTab,
@@ -415,6 +416,10 @@ export const CompanyDetailPage: React.FC = () => {
             <TabsTrigger value="seo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="h-4 w-4 mr-2" />
               SEO
+            </TabsTrigger>
+            <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Wallet className="h-4 w-4 mr-2" />
+              Account
             </TabsTrigger>
             <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ScrollText className="h-4 w-4 mr-2" />
@@ -982,6 +987,11 @@ export const CompanyDetailPage: React.FC = () => {
               website={company.website || null}
               countryCode={(company as any).country_code || null}
             />
+          </TabsContent>
+
+          {/* Account overview Tab */}
+          <TabsContent value="account" className="space-y-4">
+            {company.id && <CustomerAccountOverview companyId={company.id} />}
           </TabsContent>
 
           {/* Quotes Tab */}

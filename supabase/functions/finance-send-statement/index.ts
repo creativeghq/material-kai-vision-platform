@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) statement PDF.
 //
@@ -53,7 +53,9 @@ Deno.serve(async (req) => {
   try {
     const auth = await authenticate(req, {
       requireUser: true,
-      allowedRoles: ['admin', 'super_admin', 'owner', 'finance'],
+      // 'sales' (#201) can email an account overview for their own customers; the
+      // workspace binding below scopes them (and everyone else) to documents they own.
+      allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'sales'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
@@ -76,6 +78,13 @@ Deno.serve(async (req) => {
       .eq('party_id', body.party_id)
       .maybeSingle();
     if (partyErr || !party) return json({ error: `Party not found: ${partyErr?.message ?? body.party_id}` }, 404);
+
+    // Bind to the party's workspace: a finance/sales role in ANY workspace would otherwise be
+    // able to email any tenant's statement by party_id (cross-tenant IDOR). Caller must be an
+    // active member of the workspace that owns this party.
+    if (!(await userCanAccessWorkspace(supabase, auth.userId, party.workspace_id))) {
+      return json({ error: 'Not authorized for this customer' }, 403);
+    }
 
     // 2. Verify statements are enabled for this workspace
     const { data: settings } = await supabase

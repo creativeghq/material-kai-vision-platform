@@ -3,16 +3,19 @@
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, ArrowUpRight } from 'lucide-react';
+import { Loader2, FileText, ArrowUpRight, Mail, TrendingUp, Wallet, CalendarClock, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   financeService,
   formatMoney,
   type Invoice,
   type PaymentWithAllocation,
+  type CustomerTopProductRow,
 } from '@/modules/finance/services/financeService';
 
 type Target = { contactId?: string; companyId?: string };
@@ -55,6 +58,140 @@ export const CustomerFinanceSummary: React.FC<Target> = ({ contactId, companyId 
       <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Invoiced</div><div className="text-lg font-semibold">{formatMoney(summary.invoicedTotal)}</div></CardContent></Card>
       <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Paid</div><div className="text-lg font-semibold">{formatMoney(summary.paidTotal)}</div></CardContent></Card>
       <Card className={`dashboard-card border-0 ${summary.outstandingTotal > 0 ? 'ring-1 ring-destructive/40' : ''}`}><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Outstanding</div><div className={`text-lg font-semibold ${summary.outstandingTotal > 0 ? 'text-destructive' : ''}`}>{formatMoney(summary.outstandingTotal)}</div></CardContent></Card>
+    </div>
+  );
+};
+
+/**
+ * #201 — consolidated customer account overview: KPIs (owed / total sales / revenue / open
+ * orders / last payment) + the customer's top products to push + a one-click "email account
+ * overview" (statement). Reused on the CRM contact/company detail pages so sales reps (and
+ * managers) get the full picture in one place.
+ */
+export const CustomerAccountOverview: React.FC<Target> = ({ contactId, companyId }) => {
+  const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const [loading, setLoading] = useState(true);
+  const [account, setAccount] = useState<{ invoicedTotal: number; paidTotal: number; outstandingTotal: number; quoteCount: number } | null>(null);
+  const [lastPayment, setLastPayment] = useState<{ paid_at: string; amount: number; currency: string } | null>(null);
+  const [openOrders, setOpenOrders] = useState(0);
+  const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
+  const [emailing, setEmailing] = useState(false);
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId]);
+
+  const load = async () => {
+    if (!contactId && !companyId) return;
+    setLoading(true);
+    try {
+      const [acct, payments, topProds] = await Promise.all([
+        financeService.getCustomerAccount({ contactId, companyId }),
+        financeService.listPayments({ counterpartyContactId: contactId, counterpartyCompanyId: companyId, direction: 'in', limit: 1 }),
+        activeWorkspaceId
+          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 })
+          : Promise.resolve([] as CustomerTopProductRow[]),
+      ]);
+      setAccount(acct ? { invoicedTotal: acct.invoicedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal, quoteCount: acct.quoteCount } : null);
+      const p = payments[0];
+      setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
+      setTopProducts(topProds);
+
+      // Open orders = quotes still in flight (submitted / quoted) for this customer.
+      let oq = supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'quoted']);
+      if (contactId) oq = oq.eq('customer_contact_id', contactId);
+      if (companyId) oq = oq.eq('customer_company_id', companyId);
+      const { count } = await oq;
+      setOpenOrders(count ?? 0);
+    } catch (e) {
+      console.error('account overview load failed', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const emailOverview = async () => {
+    const partyId = companyId ?? contactId;
+    if (!partyId) return;
+    try {
+      setEmailing(true);
+      const res = await financeService.sendStatement({ partyType: companyId ? 'company' : 'contact', partyId });
+      if (res.ok) {
+        toast({ title: 'Account overview sent', description: res.email_sent_to ? `Emailed to ${res.email_sent_to}` : 'Statement generated' });
+      } else {
+        toast({ title: 'Could not send', description: res.error ?? 'No email on file for this customer', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Failed to send', description: e?.message, variant: 'destructive' });
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  if (loading) return <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>;
+
+  const kpi = (label: string, value: React.ReactNode, Icon: React.ElementType, danger = false) => (
+    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Icon className="h-3 w-3" /> {label}</div>
+        <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-primary">Account overview</h3>
+        <Button size="sm" variant="outline" onClick={emailOverview} disabled={emailing}>
+          {emailing ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+          Email account info
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        {kpi('Owed', formatMoney(account?.outstandingTotal ?? 0), Wallet, (account?.outstandingTotal ?? 0) > 0)}
+        {kpi('Total sales', formatMoney(account?.invoicedTotal ?? 0), TrendingUp)}
+        {kpi('Revenue (paid)', formatMoney(account?.paidTotal ?? 0), TrendingUp)}
+        {kpi('Open orders', openOrders, ShoppingBag)}
+        {kpi('Last payment', lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—', CalendarClock)}
+      </div>
+
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3">
+          <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {topProducts.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No purchase history yet for this customer.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b border-border/60">
+                  <th className="px-4 py-2 text-left">Product</th>
+                  <th className="px-4 py-2 text-right">Qty bought</th>
+                  <th className="px-4 py-2 text-right">Revenue</th>
+                  <th className="px-4 py-2 text-right">Orders</th>
+                  <th className="px-4 py-2 text-right">Last ordered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topProducts.map((p) => (
+                  <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{p.description || 'Product'}</div>
+                      {p.sku && <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">{Number(p.total_quantity).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -1124,6 +1124,7 @@ export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
 export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
+export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null }
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number }
 export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }
@@ -1437,6 +1438,19 @@ const _financeServiceV2 = {
     const { data, error } = await supabase.rpc('report_sales_per_designer', { p_workspace_id: workspaceId, p_from: from, p_to: to });
     if (error) throw error;
     return (data ?? []) as SalesPerDesignerRow[];
+  },
+  /** #201 — a customer's most-bought catalog products ("items to push"). Membership-gated RPC. */
+  async reportCustomerTopProducts(input: {
+    workspaceId: string; companyId?: string | null; contactId?: string | null; limit?: number;
+  }): Promise<CustomerTopProductRow[]> {
+    const { data, error } = await supabase.rpc('report_customer_top_products', {
+      p_workspace_id: input.workspaceId,
+      p_company_id: input.companyId ?? null,
+      p_contact_id: input.contactId ?? null,
+      p_limit: input.limit ?? 8,
+    });
+    if (error) throw error;
+    return (data ?? []) as CustomerTopProductRow[];
   },
   async reportTopCustomerOutstanding(workspaceId: string): Promise<TopOutstandingRow[]> {
     const { data, error } = await supabase.rpc('report_top_customer_outstanding', { p_workspace_id: workspaceId });

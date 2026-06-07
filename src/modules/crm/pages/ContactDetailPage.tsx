@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
+  CustomerAccountOverview,
   CustomerQuotesTab,
   CustomerInvoicesTab,
   CustomerPaymentsTab,
@@ -482,6 +483,10 @@ export const ContactDetailPage: React.FC = () => {
             <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
+            </TabsTrigger>
+            <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Wallet className="h-4 w-4 mr-2" />
+              Account
             </TabsTrigger>
             <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ScrollText className="h-4 w-4 mr-2" />
@@ -1038,6 +1043,11 @@ export const ContactDetailPage: React.FC = () => {
               (replaced the single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
             <CrmNotesTimeline targetKind="contact" targetId={id ?? null} />
+          </TabsContent>
+
+          {/* Account overview Tab */}
+          <TabsContent value="account" className="space-y-4">
+            {id && <CustomerAccountOverview contactId={id} />}
           </TabsContent>
 
           {/* Quotes Tab */}

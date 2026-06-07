@@ -61,11 +61,12 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // stay gated on `canManageFinance` and write-ops on `canOperateFinance` (useCapabilities),
   // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
   accountant: ['finance.manage'],
-  // Invited sales rep (#201): Sales portal only — build quotes/orders for customers from the
-  // catalog. NO finance/CRM-module/pricing/network/warehouse. Reps see only their OWN quotes
-  // (enforced by RLS on created_by); the customer picker is embedded in the Sales surface, so
-  // they get marketplace.browse for catalog selection but not crm.view (the full CRM module).
-  sales: ['sales.portal', 'quotes.use', 'marketplace.browse', 'agent.use'],
+  // Invited sales rep (#201): Sales portal + CRM (manage their customers) + per-customer
+  // account overview (balance owed, total sales/revenue, open orders, last payment, top items
+  // to push, email account info — all read-only via membership-gated RPCs). NO finance module
+  // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
+  // user_id); customer financials are workspace-scoped reads.
+  sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
 };
