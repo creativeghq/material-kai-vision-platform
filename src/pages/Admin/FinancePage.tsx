@@ -40,6 +40,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
+import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
@@ -88,6 +89,8 @@ const FinancePage: React.FC = () => {
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
+  const [scnOpen, setScnOpen] = useState(false);
+  const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
 
   useEffect(() => {
@@ -431,7 +434,10 @@ const FinancePage: React.FC = () => {
                 <h3 className="text-sm font-semibold">Payables — supplier bills</h3>
                 <p className="text-xs text-muted-foreground">Open and overdue bills from suppliers. Suppliers must be marked <code>is_supplier</code> in CRM.</p>
               </div>
-              {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
+              <div className="flex items-center gap-2">
+                {!isAccountant && <Button variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
+                {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -458,11 +464,12 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due date</th>
                       <th className="px-4 py-2 text-right">Days overdue</th>
+                      {!isAccountant && <th className="px-4 py-2 w-24" />}
                     </tr>
                   </thead>
                   <tbody>
                     {ap.length === 0 && (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No open supplier bills.</td></tr>
+                      <tr><td colSpan={isAccountant ? 7 : 8} className="px-4 py-8 text-center text-muted-foreground">No open supplier bills.</td></tr>
                     )}
                     {ap.map((r) => (
                       <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
@@ -475,6 +482,13 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
+                        {!isAccountant && (
+                          <td className="px-4 py-2 text-right">
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
+                              <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -573,6 +587,13 @@ const FinancePage: React.FC = () => {
         open={newBillOpen}
         onOpenChange={setNewBillOpen}
         onCreated={async () => { setNewBillOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+      />
+      <NewSupplierCreditNoteDialog
+        workspaceId={workspaceId}
+        open={scnOpen}
+        onOpenChange={setScnOpen}
+        supplierBillId={scnBillId}
+        onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
       />
     </div>
   );

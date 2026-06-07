@@ -185,6 +185,24 @@ export interface CreditNote {
   created_at: string;
 }
 
+export interface SupplierCreditNote {
+  id: string;
+  workspace_id: string;
+  supplier_credit_note_number: string;
+  supplier_bill_id: string | null;
+  supplier_company_id: string | null;
+  supplier_contact_id: string | null;
+  currency: string;
+  subtotal_net: number;
+  vat_amount: number;
+  total: number;
+  reason: string | null;
+  external_mark: string | null;
+  status: 'recorded' | 'void';
+  issued_at: string;
+  created_at: string;
+}
+
 export type QuoteActivityKind =
   | 'note'
   | 'call'
@@ -832,6 +850,50 @@ const _financeServiceCore = {
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as CreditNote[];
+  },
+
+  /**
+   * #207 — record a SUPPLIER credit note (πιστωτικό προμηθευτή) against a supplier bill.
+   * The supplier issues + transmits these to myDATA; we only record them to relieve our
+   * payable. `issue_supplier_credit_note` writes the note + a netting allocation, so the
+   * bill's amount_due drops via the shared recompute trigger. `externalMark` captures the
+   * supplier's own myDATA MARK for reconciliation.
+   */
+  async issueSupplierCreditNote(input: {
+    supplierBillId: string;
+    netValue: number;
+    vatAmount: number;
+    reason?: string;
+    externalMark?: string;
+    vatCategory?: number | null;
+    vatPercent?: number | null;
+  }): Promise<string> {
+    const lines = [{
+      description: input.reason || 'Supplier credit',
+      quantity: 1,
+      unit_price: input.netValue,
+      net_value: input.netValue,
+      vat_amount: input.vatAmount,
+      vat_category: input.vatCategory ?? null,
+      vat_percent: input.vatPercent ?? null,
+    }];
+    const { data, error } = await supabase.rpc('issue_supplier_credit_note', {
+      p_supplier_bill_id: input.supplierBillId,
+      p_lines: lines,
+      p_reason: input.reason ?? null,
+      p_external_mark: input.externalMark ?? null,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  async listSupplierCreditNotes(opts: { workspaceId?: string; supplierBillId?: string } = {}): Promise<SupplierCreditNote[]> {
+    let q = supabase.from('supplier_credit_notes').select('*').order('issued_at', { ascending: false });
+    if (opts.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
+    if (opts.supplierBillId) q = q.eq('supplier_bill_id', opts.supplierBillId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as SupplierCreditNote[];
   },
 
   // -------- Quote activities --------
