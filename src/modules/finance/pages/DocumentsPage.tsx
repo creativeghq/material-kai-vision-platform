@@ -27,6 +27,9 @@ import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Input } from '@/components/core/ui/input';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { warehouseService, type WarehouseItem } from '@/services/warehouseService';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -175,7 +178,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 ) : type === 'credit_notes' ? (
                   <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={inbound} financeBase={financeBase} readOnly={!canOperateFinance} onChanged={load} />
+                  <InboundTable rows={inbound} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} />
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={payments} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
@@ -487,9 +490,10 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
   </table>
 );
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void }> = ({ rows, workspaceId, readOnly, onChanged }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
 
   const createBill = async (id: string) => {
     setBusy(id);
@@ -536,20 +540,125 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; rea
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{d.status}</Badge></td>
             <td className="px-4 py-2 text-right">
-              {!readOnly && d.status === 'new' && (
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => createBill(d.id)}>
-                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create bill'}
-                  </Button>
-                  <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => dismiss(d.id)}>Dismiss</Button>
+              {!readOnly && (d.status === 'new' || d.status === 'classified') && (
+                <div className="flex justify-end gap-2 items-center">
+                  {d.status === 'classified' && <span className="text-xs text-emerald-500 mr-1">Bill created</span>}
+                  {d.status === 'new' && (
+                    <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => createBill(d.id)}>
+                      {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create bill'}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => setReceiveDoc(d)}>Receive stock</Button>
+                  {d.status === 'new' && <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => dismiss(d.id)}>Dismiss</Button>}
                 </div>
               )}
-              {d.status === 'classified' && <span className="text-xs text-emerald-500">Bill created</span>}
+              {d.status === 'received' && <span className="text-xs text-emerald-500">Received</span>}
+              {d.status === 'dismissed' && <span className="text-xs text-muted-foreground">Dismissed</span>}
             </td>
           </tr>
         ))}
       </tbody>
+      {receiveDoc && workspaceId && (
+        <ReceiveToWarehouseDialog
+          doc={receiveDoc}
+          workspaceId={workspaceId}
+          onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
+          onDone={() => { setReceiveDoc(null); onChanged(); }}
+        />
+      )}
     </table>
+  );
+};
+
+/**
+ * #206 — map a received doc's lines to warehouse items and receive stock. myDATA line data
+ * is tax-level (often no item name), so the operator picks the target warehouse item per line
+ * and confirms the quantity; we record an 'in' movement per mapping via a finance-manager RPC.
+ */
+const ReceiveToWarehouseDialog: React.FC<{
+  doc: InboundDocument; workspaceId: string; onOpenChange: (v: boolean) => void; onDone: () => void;
+}> = ({ doc, workspaceId, onOpenChange, onDone }) => {
+  const { toast } = useToast();
+  const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  // Per-line mapping state, keyed by line index.
+  const lines = doc.lines ?? [];
+  const [map, setMap] = useState<Record<number, { itemId: string; qty: string }>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    warehouseService.listItems(workspaceId)
+      .then((rows) => { if (!cancelled) setItems(rows); })
+      .catch((e) => toast({ title: 'Failed to load stock items', description: e?.message, variant: 'destructive' }))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workspaceId, toast]);
+
+  const setLine = (i: number, patch: Partial<{ itemId: string; qty: string }>) =>
+    setMap((m) => ({ ...m, [i]: { itemId: m[i]?.itemId ?? '', qty: m[i]?.qty ?? '', ...patch } }));
+
+  const submit = async () => {
+    const mappings = lines
+      .map((ln, i) => ({ item_id: map[i]?.itemId, quantity: parseFloat(map[i]?.qty || String(ln.quantity ?? '')) }))
+      .filter((m) => m.item_id && Number.isFinite(m.quantity) && m.quantity > 0) as { item_id: string; quantity: number }[];
+    if (mappings.length === 0) { toast({ title: 'Map at least one line to a stock item', variant: 'destructive' }); return; }
+    try {
+      setBusy(true);
+      const n = await inboundService.receiveToWarehouse(doc.id, mappings);
+      toast({ title: `Received ${n} line(s) into stock` });
+      onDone();
+    } catch (e: any) {
+      toast({ title: 'Failed to receive', description: e?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Receive into warehouse — {doc.issuer_name ?? doc.issuer_vat ?? doc.mark}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="py-8 text-center"><Loader2 className="h-5 w-5 animate-spin inline" /></div>
+        ) : items.length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            No warehouse items yet. Add stock items in Finance → Warehouse first, then receive against them.
+          </div>
+        ) : lines.length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            This document has no line detail from myDATA. Add stock manually in Finance → Warehouse.
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+            <div className="grid grid-cols-[1fr_2fr_90px] gap-2 text-[11px] uppercase tracking-wide text-muted-foreground px-1">
+              <span>Line</span><span>Warehouse item</span><span className="text-right">Qty</span>
+            </div>
+            {lines.map((ln, i) => (
+              <div key={i} className="grid grid-cols-[1fr_2fr_90px] gap-2 items-center">
+                <div className="text-xs">
+                  <div className="font-medium">#{ln.line_number ?? i + 1}{ln.item_description ? ` · ${ln.item_description}` : ''}</div>
+                  <div className="text-muted-foreground">net {formatMoney(ln.net_value ?? 0, doc.currency)}{ln.quantity != null ? ` · qty ${ln.quantity}` : ''}</div>
+                </div>
+                <Select value={map[i]?.itemId ?? ''} onValueChange={(v) => setLine(i, { itemId: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Skip / pick item…" /></SelectTrigger>
+                  <SelectContent>{items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="h-8 text-xs text-right" type="number" min="0" step="0.01"
+                  value={map[i]?.qty ?? (ln.quantity != null ? String(ln.quantity) : '')}
+                  onChange={(e) => setLine(i, { qty: e.target.value })} placeholder="qty" />
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || loading || items.length === 0 || lines.length === 0}>
+            {busy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Receiving…</> : 'Receive stock'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

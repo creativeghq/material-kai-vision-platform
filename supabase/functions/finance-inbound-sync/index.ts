@@ -121,6 +121,16 @@ Deno.serve(async (req) => {
       const issuerBlock = pickTag(b, 'issuer') ?? '';
       const headerB = pickTag(b, 'invoiceHeader') ?? b;
       const summaryB = pickTag(b, 'invoiceSummary') ?? b;
+      // Per-line detail (for warehouse intake). myDATA carries tax-level line data; an item
+      // description is often absent, so the intake UI lets the operator map each line to a
+      // warehouse item manually. lineNumber/quantity/net/vat are what AADE reliably returns.
+      const lines = pickAllTagBlocks(b, 'invoiceDetails').map((lb) => ({
+        line_number: num(pickTag(lb, 'lineNumber')),
+        quantity: num(pickTag(lb, 'quantity')),
+        net_value: num(pickTag(lb, 'netValue')),
+        vat_amount: num(pickTag(lb, 'vatAmount')),
+        item_description: pickTag(lb, 'itemDescr') ?? pickTag(lb, 'productDescription') ?? null,
+      }));
       const row = {
         workspace_id: workspaceId,
         mark,
@@ -131,6 +141,7 @@ Deno.serve(async (req) => {
         total_net: num(pickTag(summaryB, 'totalNetValue')),
         total_vat: num(pickTag(summaryB, 'totalVatAmount')),
         total_gross: num(pickTag(summaryB, 'totalGrossValue')),
+        lines,
         raw: { xml: b.slice(0, 20000) },
       };
       const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });

@@ -5,6 +5,14 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 
+export interface InboundDocLine {
+  line_number: number | null;
+  quantity: number | null;
+  net_value: number | null;
+  vat_amount: number | null;
+  item_description: string | null;
+}
+
 export interface InboundDocument {
   id: string;
   workspace_id: string;
@@ -17,6 +25,7 @@ export interface InboundDocument {
   total_net: number | null;
   total_vat: number | null;
   total_gross: number | null;
+  lines: InboundDocLine[];
   status: 'new' | 'classified' | 'received' | 'dismissed';
   created_supplier_bill_id: string | null;
   created_at: string;
@@ -44,6 +53,15 @@ export const inboundService = {
     const { data, error } = await supabase.functions.invoke('finance-inbound-sync', { body: {} });
     if (error) throw error;
     return data;
+  },
+
+  /** Receive an inbound doc's lines into the warehouse. mappings: [{item_id, quantity}].
+   *  Records an 'in' stock movement per mapping (server-side, finance-manager-gated) and
+   *  marks the doc 'received'. Returns the number of movements recorded. */
+  async receiveToWarehouse(docId: string, mappings: { item_id: string; quantity: number }[]): Promise<number> {
+    const { data, error } = await supabase.rpc('inbound_doc_receive_to_warehouse', { p_doc_id: docId, p_mappings: mappings });
+    if (error) throw error;
+    return (data as number) ?? 0;
   },
 
   async dismiss(docId: string): Promise<void> {
