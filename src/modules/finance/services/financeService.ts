@@ -311,6 +311,14 @@ const _financeServiceCore = {
     return data?.signedUrl ?? null;
   },
 
+  /** Render (or fetch cached) the credit-note PDF (5.1/5.2). */
+  async generateCreditNotePdf(creditNoteId: string, regenerate = false): Promise<{ pdf_url: string | null }> {
+    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { credit_note_id: creditNoteId, regenerate } });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'PDF generation failed');
+    return { pdf_url: data?.pdf_url ?? null };
+  },
+
   /** #204 "Send SMS" — text the invoice number + total (+ QR) to the customer via messaging-api. */
   async sendInvoiceSms(invoiceId: string): Promise<{ ok: boolean; sent_to?: string; error?: string }> {
     const { data: inv } = await supabase

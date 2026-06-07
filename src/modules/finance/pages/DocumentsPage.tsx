@@ -338,6 +338,12 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
     catch (err: any) { toast({ title: 'myDATA transmission failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
+  const genPdf = async (id: string) => {
+    setBusy(id);
+    try { const url = await deliveryNotesService.generatePdf(id, true); if (url) window.open(url, '_blank'); }
+    catch (err: any) { toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
   return (
     <table className="w-full text-sm">
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -376,6 +382,11 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Send to myDATA'}
                   </Button>
                 )}
+                {d.status !== 'draft' && (
+                  <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => genPdf(d.id)} title="Download PDF">
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  </Button>
+                )}
                 {!readOnly && d.status === 'issued' && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
@@ -390,7 +401,16 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   );
 };
 
-const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = ({ rows, financeBase }) => (
+const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = ({ rows, financeBase }) => {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const genPdf = async (id: string) => {
+    setBusy(id);
+    try { const { pdf_url } = await financeService.generateCreditNotePdf(id, true); if (pdf_url) window.open(pdf_url, '_blank'); }
+    catch (err: any) { toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+  return (
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
@@ -401,11 +421,12 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-center">mD</th>
         <th className="px-4 py-2 text-left">Invoice</th>
+        <th className="px-4 py-2 text-right" />
       </tr>
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No credit notes yet.</td></tr>
+        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No credit notes yet.</td></tr>
       )}
       {rows.map((cn: any) => (
         <tr key={cn.id} className="border-b border-border/30">
@@ -416,11 +437,17 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
           <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
           <td className="px-4 py-2 text-center">{transmitted(cn.fiscal_status) ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
           <td className="px-4 py-2">{cn.invoice_id ? <Link to={`${financeBase}/invoices/${cn.invoice_id}`} className="text-primary hover:underline text-xs">open</Link> : '—'}</td>
+          <td className="px-4 py-2 text-right">
+            <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genPdf(cn.id)} title="Download PDF">
+              {busy === cn.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            </Button>
+          </td>
         </tr>
       ))}
     </tbody>
   </table>
-);
+  );
+};
 
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => (
   <table className="w-full text-sm">

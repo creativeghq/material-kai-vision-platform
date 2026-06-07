@@ -122,6 +122,14 @@ export const deliveryNotesService = {
     if (error) throw error;
   },
 
+  /** Render (or fetch cached) the delivery-note PDF. */
+  async generatePdf(id: string, regenerate = false): Promise<string | null> {
+    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { delivery_note_id: id, regenerate } });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'PDF generation failed');
+    return data?.pdf_url ?? null;
+  },
+
   /** Transmit an issued dispatch note to the workspace's legal connector as a myDATA 9.3 movement document. */
   async submitFiscal(id: string): Promise<any> {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {

@@ -105,33 +105,62 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let invoiceId: string;
+  let kind: 'invoice' | 'credit_note' | 'delivery_note' = 'invoice';
+  let docId = '';
   let regenerate = false;
   try {
     const body = await req.json();
-    invoiceId = body.invoice_id;
     regenerate = !!body.regenerate;
-    if (!invoiceId) return json({ error: 'invoice_id is required' }, 400);
+    if (body.credit_note_id) { kind = 'credit_note'; docId = body.credit_note_id; }
+    else if (body.delivery_note_id) { kind = 'delivery_note'; docId = body.delivery_note_id; }
+    else if (body.invoice_id) { kind = 'invoice'; docId = body.invoice_id; }
+    else return json({ error: 'invoice_id, credit_note_id or delivery_note_id is required' }, 400);
   } catch {
     return json({ error: 'invalid body' }, 400);
   }
 
-  const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
-  if (!inv) return json({ error: 'invoice not found' }, 404);
+  const TABLE = kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : 'invoices';
+  const OUT = kind === 'credit_note' ? 'credit-note-output' : kind === 'delivery_note' ? 'delivery-note-output' : 'invoice-output';
+  const PREFIX = kind === 'credit_note' ? 'cn' : kind === 'delivery_note' ? 'dn' : 'inv';
 
-  // Return the cached PDF unless regeneration is requested.
-  if (!regenerate && inv.pdf_storage_path && inv.pdf_generation_status === 'completed') {
-    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(inv.pdf_storage_path, 60 * 60 * 24 * 7);
-    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: inv.pdf_storage_path, cached: true });
+  const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).single();
+  if (!row) return json({ error: `${kind} not found` }, 404);
+
+  if (!regenerate && row.pdf_storage_path && row.pdf_generation_status === 'completed') {
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(row.pdf_storage_path, 60 * 60 * 24 * 7);
+    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
   }
 
   try {
-    await supabase.from('invoices').update({ pdf_generation_status: 'generating' }).eq('id', invoiceId);
+    await supabase.from(TABLE).update({ pdf_generation_status: 'generating' }).eq('id', docId);
 
-    const [{ data: items }, { data: fs }] = await Promise.all([
-      supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('added_at'),
-      supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle(),
-    ]);
+    // Normalize each document kind into the shape buildPdf expects.
+    let inv: any = row;
+    let items: any[] = [];
+    if (kind === 'invoice') {
+      const { data } = await supabase.from('invoice_items').select('*').eq('invoice_id', docId).order('added_at');
+      items = data ?? [];
+    } else if (kind === 'credit_note') {
+      const [{ data: cnItems }, { data: srcInv }] = await Promise.all([
+        supabase.from('credit_note_items').select('*').eq('credit_note_id', docId).order('created_at'),
+        row.invoice_id ? supabase.from('invoices').select('customer_company_id, customer_contact_id, vat_rate').eq('id', row.invoice_id).maybeSingle() : Promise.resolve({ data: null } as any),
+      ]);
+      items = cnItems ?? [];
+      inv = {
+        ...row, internal_number: row.credit_note_number, vat_rate: srcInv?.vat_rate ?? 24,
+        customer_company_id: srcInv?.customer_company_id ?? null, customer_contact_id: srcInv?.customer_contact_id ?? null,
+        related_document: row.correlated_mark ?? null, notes: row.reason ?? null,
+      };
+    } else {
+      const { data } = await supabase.from('delivery_note_items').select('*').eq('delivery_note_id', docId).order('created_at');
+      items = (data ?? []).map((it: any) => ({ ...it, unit_price: 0, net_value: 0, line_total: 0, vat_category: 8 }));
+      inv = {
+        ...row, internal_number: row.delivery_note_number, document_type: '9.3', total: 0, currency: 'EUR',
+        has_shipping: true, vat_rate: 0,
+      };
+    }
+
+    const { data: fs } = await supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle();
 
     let customer: any = null;
     if (inv.customer_company_id) {
@@ -157,22 +186,20 @@ Deno.serve(async (req) => {
     }
 
     const lang: Lang = inv.doc_language === 'en' ? 'en' : 'el';
-    const pdfBytes = await buildPdf({ inv, items: items ?? [], fs, customer, branch, lang, logo });
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo });
 
-    const path = `invoice-output/${invoiceId}/inv-${invoiceId}.pdf`;
+    const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
     if (upErr) throw upErr;
 
-    await supabase.from('invoices').update({
-      pdf_storage_path: path,
-      pdf_generation_status: 'completed',
-      pdf_generated_at: new Date().toISOString(),
-    }).eq('id', invoiceId);
+    await supabase.from(TABLE).update({
+      pdf_storage_path: path, pdf_generation_status: 'completed', pdf_generated_at: new Date().toISOString(),
+    }).eq('id', docId);
 
     const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7);
     return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: path });
   } catch (err: any) {
-    await supabase.from('invoices').update({ pdf_generation_status: 'failed' }).eq('id', invoiceId);
+    await supabase.from(TABLE).update({ pdf_generation_status: 'failed' }).eq('id', docId);
     return json({ ok: false, error: err?.message ?? 'pdf generation failed' }, 500);
   }
 });
