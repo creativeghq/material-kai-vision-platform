@@ -56,6 +56,14 @@ export const deliveryNotesService = {
     customerContactId?: string | null;
     notes?: string;
     lines: DeliveryLineInput[];
+    transportDate?: string;
+    transportTime?: string;
+    vehicleNumber?: string;
+    movePurpose?: string;
+    responsible?: string;
+    shipFrom?: string;
+    shipTo?: string;
+    relatedDocument?: string;
   }): Promise<string> {
     const { data: dn, error } = await supabase
       .from('delivery_notes')
@@ -64,6 +72,14 @@ export const deliveryNotesService = {
         customer_company_id: input.customerCompanyId ?? null,
         customer_contact_id: input.customerContactId ?? null,
         notes: input.notes || null,
+        transport_date: input.transportDate || null,
+        transport_time: input.transportTime || null,
+        vehicle_number: input.vehicleNumber || null,
+        move_purpose: input.movePurpose || null,
+        responsible: input.responsible || null,
+        ship_from: input.shipFrom || null,
+        ship_to: input.shipTo || null,
+        related_document: input.relatedDocument || null,
       } as any)
       .select('id')
       .single();

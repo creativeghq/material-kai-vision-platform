@@ -27,11 +27,17 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [customer, setCustomer] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DeliveryLineInput[]>([]);
+  // Transport (Στοιχεία Μεταφοράς)
+  const [transportDate, setTransportDate] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [movePurpose, setMovePurpose] = useState('1');
+  const [shipTo, setShipTo] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setCustomer(''); setNotes(''); setLines([]);
+    setTransportDate(''); setVehicleNumber(''); setMovePurpose('1'); setShipTo('');
     (async () => {
       const [{ data: cos }, wh] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
@@ -56,6 +62,7 @@ export const NewDeliveryNoteDialog: React.FC<{
     try {
       const id = await deliveryNotesService.create(workspaceId, {
         customerCompanyId: customer || null, notes, lines,
+        transportDate, vehicleNumber, movePurpose, shipTo,
       });
       if (issue) await deliveryNotesService.issue(id);
       toast({ title: issue ? 'Delivery note issued' : 'Draft saved' });
@@ -77,6 +84,37 @@ export const NewDeliveryNoteDialog: React.FC<{
               <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
               <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
+          </div>
+
+          {/* Transport (Στοιχεία Μεταφοράς) */}
+          <div className="grid grid-cols-2 gap-2 rounded-md border border-border/60 p-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Transport date</Label>
+              <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vehicle no.</Label>
+              <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Purpose</Label>
+              <Select value={movePurpose} onValueChange={setMovePurpose}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 — Sale</SelectItem>
+                  <SelectItem value="2">2 — Sale on behalf of third party</SelectItem>
+                  <SelectItem value="3">3 — Sampling</SelectItem>
+                  <SelectItem value="4">4 — Exhibition</SelectItem>
+                  <SelectItem value="5">5 — Return</SelectItem>
+                  <SelectItem value="6">6 — Movement between premises</SelectItem>
+                  <SelectItem value="7">7 — Consignment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Ship to (address)</Label>
+              <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+            </div>
           </div>
 
           <div className="space-y-2">
