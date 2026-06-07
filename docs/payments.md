@@ -16,18 +16,18 @@ Specific payment processors are **sibling modules** (`payments-stripe` today; fu
 │   • Business identity (name / VAT / address) → finance_settings    │
 │   • Built-in invoice generator (numbering / templates)             │
 │   • Provider routing                                                │
-│       - useInvoiceProvider()  →  single-winner (Oxygen vs built-in) │
+│       - useInvoiceProvider()  →  single-winner (ERP vs built-in)  │
 │       - useActivePaymentProviders()  →  multi-provider array       │
 └─────────────────────────────────────────────────────────────────────┘
        ▲                                  ▲
        │ provides.invoicing               │ provides.payments
        │                                  │
 ┌──────┴──────────┐               ┌───────┴────────────┐
-│  oxygen         │               │  payments-stripe   │
+│ (future ERP)    │               │  payments-stripe   │
 │  ──────         │               │  ──────────────    │
-│  Greek          │               │  Checkout for      │
-│  e-invoicing    │               │  subs + credits    │
-│  (notices only) │               │  + invoice pay-    │
+│  any module     │               │  Checkout for      │
+│  with provides. │               │  subs + credits    │
+│  invoicing=true │               │  + invoice pay-    │
 │                 │               │  link, webhooks    │
 └─────────────────┘               └────────────────────┘
 
@@ -55,7 +55,7 @@ Modules declare what they bring in their `manifest.json`:
 - **`provides.invoicing`** — **single-winner**. Only one ERP wins the active-provider role at a time (alphabetical sort by slug on ties). When an ERP wins:
   - Built-in numbering + template UI on Payments → Invoicing tab **deactivates** with a banner
   - `IssueInvoiceButton` on the quote admin page **hides** for new quotes
-  - The ERP's own push button (e.g. `OxygenPreInvoiceButton`) is the active surface
+  - The ERP module's own push button is the active surface
   - **Payment collection is unaffected** — customers still pay ERP-issued invoices through whichever payment providers are enabled
 
 - **`provides.payments`** — **multi-provider**. Every enabled provider is listed on the Payments → Providers tab. Admins may operate several simultaneously (Stripe + PayPal + bank-transfer) and the checkout UI offers the customer a choice.
@@ -202,7 +202,7 @@ If two ERPs are ever enabled simultaneously, the alphabetical sort by slug wins.
 
 1. Add a numeric `priority` field under `provides.invoicing` and sort by it.
 2. One-ERP-at-a-time rule — disable enabling a second one without explicit confirmation.
-3. Per-workspace operator dropdown in Payments → Invoicing: "Active provider: [Oxygen ▼ / Xero / Built-in]".
+3. Per-workspace operator dropdown in Payments → Invoicing: "Active provider: [ERP ▼ / Built-in]".
 
 (3) is the right answer when you actually have two ERPs. Multi-payment-provider doesn't have this problem (it's already a list).
 
@@ -249,7 +249,7 @@ Applied via `mcp__supabase__apply_migration` per the platform's [SQL workflow ru
 |---|---|
 | **`payments-stripe`** | Sibling. Owns Stripe-specific config + secrets. Declares `provides.payments=true`. |
 | **`sales-finance`** | Shares storage on `finance_settings` (business details + invoice config). Finance's `SettingsTab` and Payments' `BusinessDetailsPanel`/`InvoicingPanel` edit the same rows. STRIPE_SECRET_KEY linked here too for the pay-token flow. |
-| **`oxygen`** | Declares `provides.invoicing=true` in its manifest → wins the active-invoice-provider role when enabled. Has no `provides.payments` (it does NOT process payments — invoices it issues are still paid via whichever payment-provider is enabled here). |
+| **(any ERP module)** | A module that declares `provides.invoicing=true` in its manifest wins the active-invoice-provider role when enabled. (None ships today — the Oxygen ERP connector was removed 2026-06-07; e-Invoicing to AADE/myDATA goes through the Novus connector, not a per-tenant ERP.) |
 | **`quotes`** | The `IssueInvoiceButton` on the quote admin page is a consumer of `useInvoiceProvider()` — hides for new quotes when ERP wins. |
 | **Stripe edge functions** | `stripe-checkout`, `stripe-webhooks`, `stripe-customer-portal`, `finance-pay-invoice` — unchanged behaviour. Read STRIPE_* secrets via env, bootstrapped from `platform_secrets` regardless of module slug. |
 

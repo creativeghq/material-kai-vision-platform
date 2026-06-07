@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { OxygenPreInvoiceButton } from '@/modules/oxygen';
 import { QuoteActivityPanel } from '@/modules/finance/components/QuoteActivityPanel';
 import { IssueInvoiceButton } from '@/modules/finance/components/IssueInvoiceButton';
 import { formatMoney } from '@/modules/finance/services/financeService';
@@ -610,12 +609,6 @@ export const QuoteDetailPage: React.FC = () => {
                 )}
               </Button>
             )}
-
-            {/* Oxygen module: Pre-Invoice (notice) — renders only when status === 'accepted' */}
-            <OxygenPreInvoiceButton
-              quote={quote as unknown as import('@/modules/oxygen').QuoteOxygenView}
-              onSynced={loadQuoteDetails}
-            />
 
             {/* Sales/Finance: Issue invoice (creates internal invoice row from accepted quote) */}
             {quote && <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />}

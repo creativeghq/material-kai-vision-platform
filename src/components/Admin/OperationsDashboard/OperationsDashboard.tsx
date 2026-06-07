@@ -2263,7 +2263,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">Platform Keys</h2>
               <p className="text-muted-foreground text-sm">
-                Centrally manage secrets that aren't tied to a single module — AI providers, payments, push notifications, and cron secrets. Environment variables take priority; the values stored here are only used when the corresponding env var is unset. Module-specific keys (Oxygen, etc.) live in each module's own Settings tab.
+                Centrally manage secrets that aren't tied to a single module — AI providers, payments, push notifications, and cron secrets. Environment variables take priority; the values stored here are only used when the corresponding env var is unset. Module-specific keys live in each module's own Settings tab.
               </p>
             </div>
             <SecretsManagerCard

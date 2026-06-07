@@ -20,21 +20,6 @@ export interface PlatformSecretView {
   modules: string[];
 }
 
-export interface OxygenTaxRow {
-  id: number;
-  name?: string;
-  rate?: number;
-  code?: string;
-  [k: string]: unknown;
-}
-
-export interface OxygenWarehouseRow {
-  id: number;
-  name?: string;
-  code?: string;
-  [k: string]: unknown;
-}
-
 class PlatformSecretsService {
   async list(): Promise<PlatformSecretView[]> {
     const { secrets } = await this.invoke<{ secrets: PlatformSecretView[] }>({ action: 'list' });
@@ -78,27 +63,6 @@ class PlatformSecretsService {
       key,
     });
     return secrets ?? [];
-  }
-
-  // ── Oxygen test/lookup helpers (per-family) ─────────────────────
-  async testOxygen(overrideValue?: string): Promise<{ taxes_count: number; base_url: string }> {
-    return await this.invoke({ action: 'test_oxygen', override_value: overrideValue });
-  }
-
-  async listOxygenTaxes(overrideValue?: string): Promise<OxygenTaxRow[]> {
-    const { taxes } = await this.invoke<{ taxes: OxygenTaxRow[] }>({
-      action: 'list_oxygen_taxes',
-      override_value: overrideValue,
-    });
-    return taxes ?? [];
-  }
-
-  async listOxygenWarehouses(overrideValue?: string): Promise<OxygenWarehouseRow[]> {
-    const { warehouses } = await this.invoke<{ warehouses: OxygenWarehouseRow[] }>({
-      action: 'list_oxygen_warehouses',
-      override_value: overrideValue,
-    });
-    return warehouses ?? [];
   }
 
   private async invoke<T = Record<string, unknown>>(body: Record<string, unknown>): Promise<T> {

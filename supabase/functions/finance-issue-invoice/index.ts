@@ -12,9 +12,8 @@ import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteI
 //      with cost_snapshot copied from quote_items. Idempotent — returns existing invoice
 //      if one exists for the quote.
 //   2. If body.issue_now=true, flip status draft → issued (stamps issued_at + due_at).
-//   3. If body.push_to_oxygen=true AND quote has no oxygen_notice_id yet, invoke the
-//      existing oxygen-create-pre-invoice function. The notice id flows back to both
-//      quotes.oxygen_notice_id and (mirrored at next read) invoices.oxygen_notice_id.
+//   3. If body.submit_fiscal=true, transmit to the workspace's legal_invoice connector
+//      (Novus → myDATA).
 //
 // Auth: admin / super_admin / owner / finance.
 
@@ -28,7 +27,6 @@ interface RequestBody {
   /** Submit a delivery note (myDATA 9.3 movement document) to the legal_invoice connector. */
   delivery_note_id?: string;
   issue_now?: boolean;
-  push_to_oxygen?: boolean;
   /** Transmit the invoice to the workspace's `legal_invoice` connector (e.g. Novus → myDATA). */
   submit_fiscal?: boolean;
   /** Skip the provider's digital signature step (Novus ?skipSignature=true). */
@@ -324,37 +322,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Optional Oxygen push (reuses oxygen-api action=create_pre_invoice)
-    let oxygenResult: any = null;
-    if (body.push_to_oxygen && body.quote_id) {
-      try {
-        const oxygenRes = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/oxygen-api`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: req.headers.get('Authorization') ?? '',
-              apikey: req.headers.get('apikey') ?? '',
-            },
-            body: JSON.stringify({ action: 'create_pre_invoice', quote_id: body.quote_id }),
-          },
-        );
-        oxygenResult = await oxygenRes.json();
-
-        // Mirror oxygen_notice_id back onto the invoice if Oxygen returned one
-        if (oxygenResult?.oxygen_notice_id) {
-          await supabase
-            .from('invoices')
-            .update({ oxygen_notice_id: oxygenResult.oxygen_notice_id })
-            .eq('id', invoiceId)
-            .is('oxygen_notice_id', null);
-        }
-      } catch (err: any) {
-        oxygenResult = { error: err?.message ?? 'oxygen push failed' };
-      }
-    }
-
     // 3b. Optional fiscal submission via the workspace's legal_invoice connector
     //     (e.g. Novus → myDATA). Connector-driven, per-capability (C3). Graceful
     //     when no key is configured yet — returns a clear not_configured result.
@@ -471,7 +438,6 @@ Deno.serve(async (req) => {
       ok: true,
       invoice_id: invoiceId,
       invoice: finalInvoice,
-      oxygen: oxygenResult,
       fiscal: fiscalResult,
     });
   } catch (err: any) {

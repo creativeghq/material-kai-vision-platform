@@ -10,7 +10,7 @@
 > - **Production deployment**: set env vars as you always have. The DB layer never overrides them.
 > - **Self-service config**: leave env unset to let an admin configure a key from `/admin/operations → Keys` or the relevant module Settings tab.
 > - **Sensitive values are masked** in admin GETs (`oxy_••••wxyz`). The full plaintext only leaves the edge function when it makes an outbound call.
-> - Module-specific keys (Oxygen, future Stripe/Twilio/etc. wrappers) live in each module's Settings tab. AI/Stripe/VAPID/cron keys live in `/admin/operations → Keys`.
+> - Module-specific keys (per-module API wrappers) live in each module's Settings tab. AI/Stripe/VAPID/cron keys live in `/admin/operations → Keys`.
 
 ### **Supabase Secrets**
 
@@ -282,19 +282,13 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 |---------|------------|------------|------------|-----------|
 | **Firecrawl** | `FIRECRAWL_API_KEY` | Backend, Edge Functions | https://firecrawl.dev → Dashboard → API Keys | ✅ **Required** |
 
-### **Oxygen Pre-Invoice (Greek e-Invoicing)**
-
-**Primary path: `/admin/modules/oxygen` → Settings tab.** Configuration is stored in the `oxygen_settings` table — no devops involvement needed. Admins paste the API key once, pick the default tax + warehouse from dropdowns populated by live calls to Oxygen, and click "Test connection". The env vars below remain as a one-time fallback only.
+### **myAADE (ΑΑΔΕ — Greek Business Registry)**
 
 | Service | Setting | Where Used | How to Get | Required? |
 |---------|---------|------------|------------|-----------|
-| **Oxygen** | `api_key` (or `OXYGEN_API_KEY` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | https://www.oxygen.gr → Dashboard → API settings → generate key | ✅ Required if `oxygen` module enabled |
 | **myAADE (ΑΑΔΕ)** | `AADE_USERNAME` + `AADE_PASSWORD` (also `AADE_AFM_CALLED_BY` optional) | Edge Function `myaade-rgwspublic2` (and any future `myaade-*` function) | https://www1.gsis.gr/sgsisapps/tokenservices/ → log in with TAXISnet → create "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" pair → authorize for `RgWsPublic2` service | ✅ Required if `myaade` module enabled (Greek business profile auto-fill) |
-| **Oxygen** | `api_base_url` (or `OXYGEN_API_BASE_URL` env fallback) | Edge Functions `oxygen-create-pre-invoice`, `oxygen-admin` | Optional override; defaults to `https://api.oxygen.gr/v1` | Optional |
-| **Oxygen** | `default_tax_id_24` (or `OXYGEN_DEFAULT_TAX_ID_24` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /taxes`) | ✅ Required if `oxygen` module enabled |
-| **Oxygen** | `default_warehouse_id` (or `OXYGEN_DEFAULT_WAREHOUSE_ID` env fallback) | Edge Function `oxygen-create-pre-invoice` | Pick from the dropdown in the Settings tab (auto-populated by `GET /warehouses`) | ✅ Required if `oxygen` module enabled |
 
-See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)** below for the full env-var fallback table.
+> e-Invoicing transmission to AADE/myDATA is handled by the **Novus connector** (`NOVUS_API_KEY`), not a per-tenant ERP. (The Oxygen ERP connector was removed 2026-06-07 — see CLAUDE.md.)
 
 ### **Supabase Edge Functions Secrets**
 
@@ -415,23 +409,6 @@ See **Supabase Edge Functions Secrets → Oxygen Pre-Invoice (Greek e-Invoicing)
 | `VAPID_SUBJECT` | Public | `notification-dispatcher` | VAPID subject email (default: `mailto:admin@materialkai.com`) | `mailto:admin@materialkai.com` |
 
 > **Generate VAPID keys**: Run `npx web-push generate-vapid-keys` to create a new key pair.
-
-#### **Oxygen Pre-Invoice (Greek e-Invoicing)**
-
-Used by the `oxygen` module (`src/modules/oxygen/`) and two Edge Functions: `oxygen-create-pre-invoice` (sync action) + `oxygen-admin` (settings + lookups). The module pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)** — never as final invoices.
-
-> **Primary configuration is the UI at `/admin/modules/oxygen` → Settings tab** (stored in the `oxygen_settings` table). The env vars below are a fallback so existing deployments that already set them keep working — they are read **only** when the corresponding DB column is `NULL`/empty. Once an admin saves a value in the UI, that field's env-var fallback is no longer consulted.
-
-| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
-|------------|------|----------------------|-------------|----------------|
-| `OXYGEN_API_KEY` | **Secret** | `oxygen-create-pre-invoice`, `oxygen-admin` | Fallback for `oxygen_settings.api_key`. Generate from Oxygen dashboard → API settings | `oxy_xxxxxxxxxxxxxxxxxxxx` |
-| `OXYGEN_API_BASE_URL` | Public | `oxygen-create-pre-invoice`, `oxygen-admin` | Fallback for `oxygen_settings.api_base_url`. Defaults to `https://api.oxygen.gr/v1` | `https://api.oxygen.gr/v1` |
-| `OXYGEN_DEFAULT_TAX_ID_24` | **Secret** | `oxygen-create-pre-invoice` | Fallback for `oxygen_settings.default_tax_id_24`. UI picks this from a live dropdown | `1` (numeric) |
-| `OXYGEN_DEFAULT_WAREHOUSE_ID` | **Secret** | `oxygen-create-pre-invoice` | Fallback for `oxygen_settings.default_warehouse_id`. UI picks this from a live dropdown | `1` (numeric) |
-
-> **Endpoints touched at Oxygen**: `POST /notices` (pre-invoice creation), `GET /contacts?vat=…` and `POST /contacts` (customer lookup or create-if-missing), `POST /products` (catalog create-if-missing), `GET /taxes` + `GET /warehouses` (dropdown lookup from the Settings tab). The function never calls `POST /invoices`.
-
-> **Greenfield deployment**: skip the env vars entirely. Deploy `oxygen-create-pre-invoice` + `oxygen-admin`, enable the module on `/admin/modules`, open Settings, paste the API key, click "Refresh dropdowns" → pick the 24% tax + your warehouse → "Test connection" → Save. Done.
 
 #### **myAADE — Greek Business Registry (ΑΑΔΕ)**
 

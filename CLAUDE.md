@@ -1023,8 +1023,7 @@ Single registry for every external-service key the platform uses. `platform_secr
 - Env always wins because env represents an explicit deployer choice; the DB store exists so admins can configure non-env'd keys without a redeploy.
 - **Admin UI**: per-module Settings tabs render `<SecretsManagerCard scope={{mode:'module', moduleSlug}}/>` showing the keys that module declares. `/admin/operations → Keys` renders `scope={{mode:'platform'}}` for keys with `primary_module_slug IS NULL` (AI providers, Stripe, VAPID, cron secret, etc.).
 - A single secret can be declared by multiple modules via `platform_secret_module_links` — same row, edited from any of those tabs, used everywhere.
-- Sensitive values are masked in admin GET responses (`oxy_••••wxyz`). The plaintext only leaves the function when an edge function reads it via service-role for an actual outbound API call.
-- Deprecated 2026-04-22: per-module `oxygen_settings` table — superseded by `platform_secrets` rows with `primary_module_slug='oxygen'`.
+- Sensitive values are masked in admin GET responses (e.g. `sk_••••wxyz`). The plaintext only leaves the function when an edge function reads it via service-role for an actual outbound API call.
 
 ### Phase 2 — generic per-module Settings pages
 
@@ -1042,7 +1041,6 @@ Seeded keys (one row per key, sharing via `platform_secret_module_links`):
 | `TWILIO_ACCOUNT_SID/AUTH_TOKEN` | messaging | — |
 | `ZERNIO_API_KEY/WEBHOOK_SECRET` | social-media | — |
 | `RESEND_API_KEY` | email | — |
-| `OXYGEN_*` (4 keys) | oxygen | — |
 
 Platform-wide (no `primary_module_slug`, shown at `/admin/operations → Keys`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GEMINI_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_API_KEY`, `HF_TOKEN`, `HUGGINGFACE_API_KEY`, `SLIG_ENDPOINT_TOKEN`, `WORLDLABS_API_KEY`, `PINTEREST_APP_ID/SECRET/REDIRECT_URI`, `CRON_SECRET`, `ADMIN_RESTART_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VAPID_*`.
 
@@ -1062,19 +1060,10 @@ Every edge function now honours admin-saved DB values when the env var is unset,
 
 **Result**: an admin can paste a key into the UI, and the edge function picks it up on its next invocation. Env-set deployments behave exactly as before.
 
-## Oxygen Pre-Invoice Module (Greek e-Invoicing — 2026-04-22)
-Self-contained module under `src/modules/oxygen/` + `supabase/functions/oxygen-create-pre-invoice/` + `supabase/functions/oxygen-admin/` + `supabase/functions/_shared/oxygen/`. Pushes accepted quotes to **oxygen.gr** as **notices (pre-invoices)**, never invoices. See `src/modules/oxygen/README.md`.
+## Oxygen ERP connector — REMOVED (2026-06-07)
+The Oxygen pre-invoice/ERP integration was **removed entirely**. It pushed accepted quotes to oxygen.gr as notices using a **single platform-wide `OXYGEN_API_KEY`** — which doesn't make sense in the multi-tenant marketplace (every tenant's pre-invoices would land in the one operator account). Its purpose (mirror invoices into oxygen.gr because the operator used it for accounting) is fully replaced by the **native finance module + the Novus connector → AADE/myDATA** direct transmission, which IS per-tenant correct (one master `NOVUS_API_KEY` + each tenant's own issuer VAT + their own TaxisNet authorization). Oxygen/pelatologio.gr remains only the **competitive benchmark** in the #207 parity audit — never a dependency.
 
-- **Single endpoint hit at Oxygen for sync**: `POST /notices` (plus `/contacts` lookup-or-create and `/products` create-if-missing as side effects). We never call `/invoices`.
-- **Auth**: `Authorization: Bearer <api_key>` via `_shared/oxygen/client.ts`. Key is per-call, not module-load — see Configuration below.
-- **Trigger**: admin clicks "Make Pre-Invoice" on a quote where `status='accepted'`. Hard idempotent — once `quotes.oxygen_notice_id` is set, button permanently disabled and edge function early-returns. Atomic claim guards against double-clicks (`UPDATE … WHERE oxygen_sync_status IN (null,'failed','pending')`).
-- **Customer model**: `quotes.customer_company_id` (B2B → `crm_companies`, type=2) OR `quotes.customer_contact_id` (private/B2C → `crm_contacts`, type=1). XOR check enforces at most one. `quotes.user_id` is the operator/designer, NOT the bill-to.
-- **Customer create-if-missing**: lookup by `vat_number` (companies) or `email` (private), then `POST /contacts` if not found. Result cached on our side as `crm_*.oxygen_contact_id`.
-- **Product create-if-missing**: same pattern, cached as `products.oxygen_product_id`. Price written to Oxygen comes from our `quote_items.unit_price`; we never read price **from** Oxygen.
-- **Single warehouse**: stored in `oxygen_settings.default_warehouse_id`, no per-product column.
-- **Configuration**: uses the platform-wide `platform_secrets` registry (env-first, DB-fallback). Keys: `OXYGEN_API_KEY`, `OXYGEN_API_BASE_URL`, `OXYGEN_DEFAULT_TAX_ID_24`, `OXYGEN_DEFAULT_WAREHOUSE_ID`. Admins manage at `/admin/modules/oxygen → Settings` (renders the generic `<SecretsManagerCard scope={{mode:'module', moduleSlug:'oxygen'}}/>` with a tax/warehouse dropdown footer). When the corresponding env var is set on the function, that value wins at runtime regardless of what the DB row says — the source badge in the UI surfaces this.
-- **DB columns added**: `crm_contacts.{first_name,last_name,contact_type,vat_number,tax_office,profession,is_client,country_code,street,street_number,oxygen_contact_id}`; `crm_companies.{tax_office,profession,country_code,street,street_number,oxygen_contact_id}`; `quotes.{customer_contact_id,customer_company_id,oxygen_notice_id,oxygen_contact_id,oxygen_sync_status,oxygen_last_sync_at,oxygen_sync_error}`; `products.{sku,oxygen_product_id,oxygen_tax_id}`. (The earlier `oxygen_settings` table was dropped 2026-04-22 when the secrets registry landed.)
-- **Mount point**: single `<OxygenPreInvoiceButton />` in `src/modules/quotes/pages/QuoteDetailAdminPage.tsx`. Removable by deleting the module folders + that one import. Module also registers `/admin/modules/oxygen` (Overview + Settings tabs) via the standard `ModuleDefinition` default export.
+Removed: `src/modules/oxygen/`, `supabase/functions/oxygen-api/`, `supabase/functions/_shared/oxygen/`, `docs/api/oxygen-api.md`, the `push_to_oxygen` path in `finance-issue-invoice`, the `test_oxygen`/`list_oxygen_*` actions in `platform-secrets-admin`, the `OXYGEN_*` `platform_secrets` rows + the `oxygen` `modules` row, and every `oxygen_*` column (`quotes`, `invoices`, `products`, `crm_companies`, `crm_contacts` — all had 0 rows of data). If a future tenant independently uses oxygen.gr and wants mirroring, re-introduce it as a **per-workspace** `finance_connections`/`workspace_fiscal_bindings` connector with their **own** key — never a platform-wide key.
 
 ## myAADE Module — Greek Business Registry (ΑΑΔΕ) (2026-05-24)
 

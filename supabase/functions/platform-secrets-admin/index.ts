@@ -14,7 +14,6 @@ import {
   invalidateSecretCache,
   type PlatformSecretRow,
 } from '../_shared/secrets.ts';
-import { oxygenGET, OxygenError } from '../_shared/oxygen/client.ts';
 
 interface RequestBody {
   action:
@@ -23,16 +22,11 @@ interface RequestBody {
     | 'list_platform'     // narrow list to platform-wide (primary_module_slug IS NULL)
     | 'save'              // upsert one key
     | 'save_many'         // upsert N keys at once (used by module settings forms)
-    | 'delete_value'      // null-out a single key's value (env fallback / default still applies)
-    | 'test_oxygen'       // call GET /taxes against Oxygen to verify the OXYGEN_* family
-    | 'list_oxygen_taxes'
-    | 'list_oxygen_warehouses';
+    | 'delete_value';     // null-out a single key's value (env fallback / default still applies)
   module_slug?: string;
   key?: string;
   value?: string | null;
   entries?: Array<{ key: string; value: string | null }>;
-  // override_value supplied when the admin is testing a brand-new key before saving
-  override_value?: string;
 }
 
 interface MaskedSecretView extends Omit<PlatformSecretRow, 'value'> {
@@ -68,9 +62,6 @@ Deno.serve(async (req) => {
       case 'save':                       return await handleSave(supabase, body, auth.userId);
       case 'save_many':                  return await handleSaveMany(supabase, body, auth.userId);
       case 'delete_value':               return await handleDeleteValue(supabase, body, auth.userId);
-      case 'test_oxygen':                return await handleTestOxygen(supabase, body);
-      case 'list_oxygen_taxes':          return await handleListOxygenTaxes(supabase, body);
-      case 'list_oxygen_warehouses':     return await handleListOxygenWarehouses(supabase, body);
       default:
         return json({ error: `Unknown action: ${body.action}` }, 400);
     }
@@ -184,73 +175,6 @@ async function handleDeleteValue(supabase: any, body: RequestBody, userId: strin
   if (error) return json({ error: error.message }, 500);
   invalidateSecretCache(body.key);
   return await handleList(supabase, null);
-}
-
-// ── Per-family test handlers ────────────────────────────────────────
-// Each handler calls a cheap read against the target service to verify the key works.
-// Future modules add their own handler here as their secrets land in platform_secrets.
-
-async function oxygenSettingsForTest(supabase: any, override?: string) {
-  const apiKey = override || (await resolveSecret(supabase, 'OXYGEN_API_KEY')).value || '';
-  const apiBaseUrl = (await resolveSecret(supabase, 'OXYGEN_API_BASE_URL')).value || 'https://api.oxygen.gr/v1';
-  return {
-    apiKey,
-    apiBaseUrl,
-    defaultTaxId24: 0,
-    defaultWarehouseId: 0,
-    source: 'db' as const,
-  };
-}
-
-async function handleTestOxygen(supabase: any, body: RequestBody): Promise<Response> {
-  const settings = await oxygenSettingsForTest(supabase, body.override_value);
-  if (!settings.apiKey) return json({ error: 'OXYGEN_API_KEY not configured' }, 503);
-  try {
-    const result = await oxygenGET(settings, '/taxes');
-    const taxes = Array.isArray(result) ? result : (result?.data ?? []);
-    await supabase.from('platform_secrets').update({
-      last_verified_at: new Date().toISOString(),
-      last_verified_status: 'ok',
-      last_verified_error: null,
-    }).eq('key', 'OXYGEN_API_KEY');
-    return json({ ok: true, taxes_count: taxes.length, base_url: settings.apiBaseUrl });
-  } catch (err) {
-    const message = oxErr(err);
-    await supabase.from('platform_secrets').update({
-      last_verified_at: new Date().toISOString(),
-      last_verified_status: 'failed',
-      last_verified_error: message,
-    }).eq('key', 'OXYGEN_API_KEY');
-    return json({ error: message }, 502);
-  }
-}
-
-async function handleListOxygenTaxes(supabase: any, body: RequestBody): Promise<Response> {
-  const settings = await oxygenSettingsForTest(supabase, body.override_value);
-  if (!settings.apiKey) return json({ error: 'OXYGEN_API_KEY not configured' }, 503);
-  try {
-    const result = await oxygenGET(settings, '/taxes');
-    return json({ ok: true, taxes: Array.isArray(result) ? result : (result?.data ?? []) });
-  } catch (err) {
-    return json({ error: oxErr(err) }, 502);
-  }
-}
-
-async function handleListOxygenWarehouses(supabase: any, body: RequestBody): Promise<Response> {
-  const settings = await oxygenSettingsForTest(supabase, body.override_value);
-  if (!settings.apiKey) return json({ error: 'OXYGEN_API_KEY not configured' }, 503);
-  try {
-    const result = await oxygenGET(settings, '/warehouses');
-    return json({ ok: true, warehouses: Array.isArray(result) ? result : (result?.data ?? []) });
-  } catch (err) {
-    return json({ error: oxErr(err) }, 502);
-  }
-}
-
-function oxErr(err: unknown): string {
-  if (err instanceof OxygenError) return `Oxygen ${err.method} ${err.path} → ${err.status}: ${err.body}`;
-  if (err instanceof Error) return err.message;
-  return String(err);
 }
 
 function json(body: unknown, status = 200) {

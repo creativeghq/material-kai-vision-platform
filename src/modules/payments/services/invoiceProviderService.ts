@@ -2,7 +2,7 @@
  * Invoice Provider Registry
  *
  * The platform supports multiple invoice providers (built-in via the Payments
- * module, plus ERP integrations like Oxygen / Xero / QuickBooks / SAP). Only
+ * module, plus ERP integrations like Xero / QuickBooks / SAP). Only
  * ONE provider is active at any time.
  *
  * Discovery is **manifest-driven**: each ERP module declares

@@ -1,8 +1,8 @@
 // Issue-invoice button for the quote admin page. Renders when the quote is in
 // 'accepted' status AND the built-in Payments provider is active (no ERP
-// module like Oxygen winning the invoice-provider lookup — see
+// an ERP module winning the invoice-provider lookup — see
 // useInvoiceProvider). When an ERP wins, this button hides for new quotes,
-// since the ERP's own button (OxygenPreInvoiceButton, etc.) takes over.
+// since the ERP module's own button takes over.
 //
 // Calls the finance-issue-invoice edge function (which creates the invoice row
 // + items via the issue_invoice_from_quote RPC) and then navigates to the
@@ -61,7 +61,7 @@ export const IssueInvoiceButton: React.FC<Props> = ({ quoteId, quoteStatus }) =>
   }
 
   // Provider gate: when an ERP module wins, hide the issue button for new
-  // quotes. The ERP's own button (OxygenPreInvoiceButton today) is the active
+  // quotes. The ERP module's own button is the active
   // surface for creating an invoice. provider===null = still loading; we
   // render nothing until we know, to avoid flicker.
   if (!provider || provider.isErp) return null;

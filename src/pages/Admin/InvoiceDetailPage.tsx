@@ -53,7 +53,6 @@ const InvoiceDetailPage: React.FC = () => {
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
-  const [oxygenLegalNumber, setOxygenLegalNumber] = useState('');
   const [payLink, setPayLink] = useState<string | null>(null);
   const [payLinkBusy, setPayLinkBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
@@ -85,7 +84,6 @@ const InvoiceDetailPage: React.FC = () => {
       setError(null);
       const inv = await financeService.getInvoice(invoiceId);
       setInvoice(inv);
-      setOxygenLegalNumber(inv.oxygen_legal_number ?? '');
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load invoice');
     } finally {
@@ -101,29 +99,6 @@ const InvoiceDetailPage: React.FC = () => {
       await load();
     } catch (err: any) {
       toast({ title: 'Issue failed', description: err.message, variant: 'destructive' });
-    }
-  };
-
-  const handlePushOxygen = async () => {
-    if (!invoice || !invoice.quote_id) {
-      toast({ title: 'Cannot push', description: 'Invoice has no source quote.', variant: 'destructive' });
-      return;
-    }
-    try {
-      const result = await financeService.issueInvoiceFromQuote(invoice.quote_id, {
-        pushToOxygen: true,
-      });
-      const oxy: any = result.oxygen;
-      if (oxy?.error) {
-        toast({ title: 'Oxygen push failed', description: oxy.error, variant: 'destructive' });
-      } else if (oxy?.oxygen_notice_id) {
-        toast({ title: 'Pushed to Oxygen', description: `Notice ${oxy.oxygen_notice_id}` });
-      } else {
-        toast({ title: 'Pushed to Oxygen' });
-      }
-      await load();
-    } catch (err: any) {
-      toast({ title: 'Push failed', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -154,17 +129,6 @@ const InvoiceDetailPage: React.FC = () => {
       toast({ title: 'Submit failed', description: err?.message, variant: 'destructive' });
     } finally {
       setFiscalBusy(false);
-    }
-  };
-
-  const handleSaveLegalNumber = async () => {
-    if (!invoice) return;
-    try {
-      await financeService.updateInvoice(invoice.id, { oxygen_legal_number: oxygenLegalNumber || null });
-      toast({ title: 'Saved' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -234,11 +198,6 @@ const InvoiceDetailPage: React.FC = () => {
             {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             Download PDF
           </Button>
-          {invoice.quote_id && !invoice.oxygen_notice_id && (
-            <Button onClick={handlePushOxygen} variant="outline">
-              Push to Oxygen
-            </Button>
-          )}
           {(invoice as any).fiscal_status !== 'accepted' && invoice.status !== 'draft' && (
             <Button onClick={handleSubmitFiscal} variant="outline" disabled={fiscalBusy}>
               {fiscalBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
@@ -504,35 +463,6 @@ const InvoiceDetailPage: React.FC = () => {
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm">Oxygen sync</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 p-5 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Notice ID</span>
-            <span className="font-mono text-xs">
-              {invoice.oxygen_notice_id ?? <span className="text-muted-foreground italic">not pushed</span>}
-            </span>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="legal_number">Legal invoice number (from Oxygen UI)</Label>
-            <div className="flex gap-2">
-              <Input
-                id="legal_number"
-                value={oxygenLegalNumber}
-                onChange={(e) => setOxygenLegalNumber(e.target.value)}
-                placeholder="e.g. INV-2026/0042"
-              />
-              <Button onClick={handleSaveLegalNumber} variant="outline" size="sm">Save</Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Oxygen issues the legal invoice and assigns the official number. Paste it here for the audit trail.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       {(() => {
         const f = invoice as any;

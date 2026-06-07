@@ -914,7 +914,7 @@ export const ContactDetailPage: React.FC = () => {
                   <div className="space-y-1">
                     <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
                     <p className="text-xs text-muted-foreground">
-                      Drives B2C vs B2B billing — used by Oxygen pre-invoicing and quote VAT logic.
+                      Drives B2C vs B2B billing — used by quote VAT logic.
                     </p>
                   </div>
                   <Select

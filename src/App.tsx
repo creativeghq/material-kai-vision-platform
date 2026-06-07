@@ -772,7 +772,7 @@ const App = () => (
 
                 {/* Admin: Generic per-module Settings page (renders SecretsManagerCard for the slug).
                     Every module that declares secrets in platform_secrets gets this page automatically.
-                    Modules with bespoke pages (like Oxygen) still override via their own route. */}
+                    Modules with bespoke pages still override via their own route. */}
                 <Route
                   path="/admin/modules/:slug/settings"
                   element={

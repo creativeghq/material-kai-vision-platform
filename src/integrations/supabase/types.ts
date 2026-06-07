@@ -2457,7 +2457,6 @@ export type Database = {
           industry: string | null
           linkedin: string | null
           name: string
-          oxygen_contact_id: string | null
           phone: string | null
           postal_code: string | null
           profession: string | null
@@ -2486,7 +2485,6 @@ export type Database = {
           industry?: string | null
           linkedin?: string | null
           name: string
-          oxygen_contact_id?: string | null
           phone?: string | null
           postal_code?: string | null
           profession?: string | null
@@ -2515,7 +2513,6 @@ export type Database = {
           industry?: string | null
           linkedin?: string | null
           name?: string
-          oxygen_contact_id?: string | null
           phone?: string | null
           postal_code?: string | null
           profession?: string | null
@@ -2637,7 +2634,6 @@ export type Database = {
           linkedin: string | null
           mobile: string | null
           name: string
-          oxygen_contact_id: string | null
           phone: string | null
           position: string | null
           postal_code: string | null
@@ -2680,7 +2676,6 @@ export type Database = {
           linkedin?: string | null
           mobile?: string | null
           name: string
-          oxygen_contact_id?: string | null
           phone?: string | null
           position?: string | null
           postal_code?: string | null
@@ -2723,7 +2718,6 @@ export type Database = {
           linkedin?: string | null
           mobile?: string | null
           name?: string
-          oxygen_contact_id?: string | null
           phone?: string | null
           position?: string | null
           postal_code?: string | null
@@ -8579,8 +8573,6 @@ export type Database = {
           long_description: string | null
           metadata: Json | null
           name: string
-          oxygen_product_id: string | null
-          oxygen_tax_id: number | null
           properties: Json | null
           quality_assessment: string | null
           quality_metrics: Json | null
@@ -8622,8 +8614,6 @@ export type Database = {
           long_description?: string | null
           metadata?: Json | null
           name: string
-          oxygen_product_id?: string | null
-          oxygen_tax_id?: number | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -8665,8 +8655,6 @@ export type Database = {
           long_description?: string | null
           metadata?: Json | null
           name?: string
-          oxygen_product_id?: string | null
-          oxygen_tax_id?: number | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -9458,11 +9446,6 @@ export type Database = {
           last_activity_at: string
           name: string | null
           notes: string | null
-          oxygen_contact_id: string | null
-          oxygen_last_sync_at: string | null
-          oxygen_notice_id: string | null
-          oxygen_sync_error: string | null
-          oxygen_sync_status: string | null
           pdf_generated_at: string | null
           pdf_generation_status: string | null
           pdf_storage_path: string | null
@@ -9491,11 +9474,6 @@ export type Database = {
           last_activity_at?: string
           name?: string | null
           notes?: string | null
-          oxygen_contact_id?: string | null
-          oxygen_last_sync_at?: string | null
-          oxygen_notice_id?: string | null
-          oxygen_sync_error?: string | null
-          oxygen_sync_status?: string | null
           pdf_generated_at?: string | null
           pdf_generation_status?: string | null
           pdf_storage_path?: string | null
@@ -9524,11 +9502,6 @@ export type Database = {
           last_activity_at?: string
           name?: string | null
           notes?: string | null
-          oxygen_contact_id?: string | null
-          oxygen_last_sync_at?: string | null
-          oxygen_notice_id?: string | null
-          oxygen_sync_error?: string | null
-          oxygen_sync_status?: string | null
           pdf_generated_at?: string | null
           pdf_generation_status?: string | null
           pdf_storage_path?: string | null

@@ -45,7 +45,7 @@ export async function resolveWorkspaceConnector(
 ): Promise<ResolveResult> {
   // Every workspace below the operator transmits through the SAME master Novus
   // connector by default — there is no per-workspace connector choice. An explicit
-  // binding can still override (e.g. oxygen), but absence means the platform default.
+  // binding can still override with a future connector, but absence means the platform default.
   const { data: binding } = await supabase
     .from('workspace_fiscal_bindings')
     .select('connector_slug, is_active')

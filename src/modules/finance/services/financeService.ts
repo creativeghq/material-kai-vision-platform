@@ -43,8 +43,6 @@ export interface Invoice {
   due_at: string | null;
   paid_at: string | null;
   payment_terms_days: number | null;
-  oxygen_notice_id: string | null;
-  oxygen_legal_number: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -468,17 +466,16 @@ const _financeServiceCore = {
 
   async issueInvoiceFromQuote(
     quoteId: string,
-    opts: { issueNow?: boolean; pushToOxygen?: boolean } = {},
-  ): Promise<{ invoice_id: string; invoice: Invoice | null; oxygen: unknown | null }> {
+    opts: { issueNow?: boolean } = {},
+  ): Promise<{ invoice_id: string; invoice: Invoice | null }> {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: {
         quote_id: quoteId,
         issue_now: opts.issueNow === true,
-        push_to_oxygen: opts.pushToOxygen === true,
       },
     });
     if (error) throw error;
-    return data as { invoice_id: string; invoice: Invoice | null; oxygen: unknown | null };
+    return data as { invoice_id: string; invoice: Invoice | null };
   },
 
   async markInvoiceIssued(invoiceId: string): Promise<void> {
@@ -491,7 +488,6 @@ const _financeServiceCore = {
       due_at: patch.due_at,
       payment_terms_days: patch.payment_terms_days ?? undefined,
       notes: patch.notes,
-      oxygen_legal_number: patch.oxygen_legal_number,
       status: patch.status,
     };
     // #204 Tools → Change category. Only set when explicitly provided (incl. null to clear),

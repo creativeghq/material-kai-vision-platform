@@ -1,7 +1,7 @@
 /**
  * Invoicing settings — built-in invoice provider configuration.
  *
- * Conditionally deactivated: when an ERP module (Oxygen, future Xero/QB) is
+ * Conditionally deactivated: when an ERP module (e.g. a future Xero/QB) is
  * enabled with `provides_invoicing=true`, this panel shows a banner explaining
  * that the ERP is the active provider and these settings are inactive. The
  * settings rows still exist in the DB so toggling the ERP off re-activates

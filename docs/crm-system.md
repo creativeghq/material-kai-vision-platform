@@ -50,7 +50,6 @@ Organisation records (manufacturers, suppliers, clients). Also where a user's ow
 
 **ΑΑΔΕ (Greek-business) fields** (written by `myaade-rgwspublic2`, see [`src/modules/myaade/README.md`](../src/modules/myaade/README.md)): `commercial_title`, `legal_status`, `kad_primary`, `kad_primary_description`, `kad_secondary jsonb`, `business_start_date`, `aade_data jsonb`, `aade_data_at` (90-day cache).
 
-**Oxygen e-invoicing field**: `oxygen_contact_id` (cached after first push to oxygen.gr).
 
 **Routes:**
 - `/admin/crm` (companies tab)

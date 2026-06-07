@@ -31,7 +31,7 @@ const ModuleSettingsPage: React.FC = () => {
   const mod = registeredModules.find(m => m.manifest.slug === slug);
   const panels = mod?.settingsPanels ?? [];
 
-  // Some modules have a richer dedicated page (e.g. /admin/modules/oxygen,
+  // Some modules have a richer dedicated page (e.g. their own admin route),
   // /admin/modules/myaade) that complements the secrets/settings tabs here.
   // Surface it as a header action so admins landing on the generic settings
   // page don't miss the fuller feature surface. Match convention: any route

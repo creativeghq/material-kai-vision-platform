@@ -14,9 +14,9 @@ interface Props {
   scope: SecretScope;
   title?: string;
   description?: string;
-  /** Optional render-prop slot under each secret row — used by Oxygen to inject tax/warehouse dropdowns under their keys. */
+  /** Optional render-prop slot under each secret row — used by a module to inject extra controls under its keys. */
   renderExtraRow?: (secret: PlatformSecretView, refresh: () => Promise<void>) => React.ReactNode;
-  /** Optional footer slot (e.g. Oxygen's Test connection button). Gets the current secret list + a refresh helper. */
+  /** Optional footer slot (e.g. a Test-connection button). Gets the current secret list + a refresh helper. */
   renderFooter?: (secrets: PlatformSecretView[], refresh: () => Promise<void>) => React.ReactNode;
 }
 

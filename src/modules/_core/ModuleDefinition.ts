@@ -32,7 +32,7 @@ export interface ModuleManifest {
    * (see `useInvoiceProvider`, `useActivePaymentProviders`) reads from this set.
    *
    * `invoicing` — this module handles invoice creation end-to-end (typically
-   *   an ERP integration like Oxygen, Xero, QuickBooks). When true and the
+   *   an ERP integration like Xero, QuickBooks). When true and the
    *   module is enabled, the built-in Payments invoicer defers to it.
    *   **Single-winner**: only one provider wins at a time (alphabetical sort
    *   on ties; see `resolveInvoiceProvider`).
