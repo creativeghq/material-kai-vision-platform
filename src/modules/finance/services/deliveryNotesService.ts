@@ -1,7 +1,7 @@
 /**
  * Delivery notes. A note moves goods to a customer; issuing decrements
- * warehouse stock for lines linked to a warehouse item. myDATA 9.3 transmission is a
- * follow-up — this covers the internal note + stock-out + list.
+ * warehouse stock for lines linked to a warehouse item. Issued dispatch notes can be
+ * transmitted to myDATA as a 9.3 movement document via `submitFiscal()`.
  */
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,6 +16,7 @@ export interface DeliveryNote {
   issued_at: string | null;
   notes: string | null;
   fiscal_mark: string | null;
+  fiscal_status: string | null;
   created_at: string;
 }
 
@@ -107,6 +108,16 @@ export const deliveryNotesService = {
   async issue(id: string): Promise<void> {
     const { error } = await supabase.rpc('issue_delivery_note', { p_id: id });
     if (error) throw error;
+  },
+
+  /** Transmit an issued dispatch note to the workspace's legal connector as a myDATA 9.3 movement document. */
+  async submitFiscal(id: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { delivery_note_id: id, submit_fiscal: true },
+    });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'myDATA transmission failed');
+    return data;
   },
 
   /** Convert an issued delivery note into a draft invoice (prices via the cascade resolver). */

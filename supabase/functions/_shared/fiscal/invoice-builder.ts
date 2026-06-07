@@ -263,3 +263,102 @@ export async function buildCreditNoteInputFromDb(
     documentComments: cn.reason ?? undefined,
   };
 }
+
+const MOVE_PURPOSE_LABELS: Record<number, string> = {
+  1: 'SALES', 2: 'SALES_ON_BEHALF', 3: 'SAMPLING', 4: 'EXHIBITION',
+  5: 'RETURN', 6: 'INTER_BRANCH', 7: 'CONSIGNMENT',
+};
+
+/**
+ * Build a myDATA 9.3 delivery-note (movement document) FiscalInvoiceInput from a
+ * `delivery_notes` row + items. Movement docs carry no value — lines are netValue 0,
+ * VAT category 8 (without VAT), no income classification. Transport details (vehicle,
+ * dispatch date/time, loading/delivery address, move purpose) ride in the header.
+ * Loading address defaults to the issuer's premises, delivery to the counterpart's;
+ * the free-text ship_from/ship_to overrides the street line when set.
+ */
+export async function buildDeliveryNoteInputFromDb(
+  supabase: any,
+  deliveryNoteId: string,
+  overrides: FiscalOverrides = {},
+): Promise<FiscalInvoiceInput> {
+  const { data: dn, error: dnErr } = await supabase.from('delivery_notes').select('*').eq('id', deliveryNoteId).single();
+  if (dnErr || !dn) throw new Error(`delivery note ${deliveryNoteId} not found`);
+
+  const [{ data: items }, { data: fs }] = await Promise.all([
+    supabase.from('delivery_note_items').select('*').eq('delivery_note_id', deliveryNoteId).order('created_at'),
+    supabase.from('finance_settings').select('*').eq('workspace_id', dn.workspace_id).maybeSingle(),
+  ]);
+
+  const issuer: FiscalParty = {
+    vatNumber: fs?.business_vat ?? '',
+    country: fs?.business_country_code ?? 'GR',
+    branch: 0,
+    name: fs?.business_name ?? '',
+    profession: fs?.business_profession ?? undefined,
+    taxOffice: fs?.business_tax_office ?? undefined,
+    address: {
+      street: fs?.business_address ?? '', number: fs?.business_street_number ?? '',
+      postalCode: fs?.business_postal_code ?? '', city: fs?.business_city ?? '',
+      country: fs?.business_country_code ?? 'GR',
+    },
+    phone: fs?.business_phone ?? undefined,
+    email: fs?.business_email ?? undefined,
+  };
+
+  let counterpart: FiscalParty = { vatNumber: '', country: 'GR', branch: 0 };
+  if (dn.customer_company_id) {
+    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', dn.customer_company_id).single();
+    if (c) counterpart = partyFromCrm(c);
+  } else if (dn.customer_contact_id) {
+    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', dn.customer_contact_id).single();
+    if (c) counterpart = partyFromCrm(c);
+  }
+
+  const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => ({
+    lineNumber: i + 1,
+    code: it.sku ?? undefined,
+    description: it.description ?? 'Item',
+    quantity: Number(it.quantity ?? 1),
+    measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+    unitPrice: 0,
+    netValue: 0,
+    vatCategory: 8, // without VAT — movement doc carries no value
+    vatPercent: 0,
+    vatAmount: 0,
+  }));
+
+  const movePurpose = dn.move_purpose ? parseInt(String(dn.move_purpose), 10) || 1 : 1;
+  const loadingAddress = {
+    street: dn.ship_from || issuer.address?.street || '',
+    number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
+  };
+  const deliveryAddress = {
+    street: dn.ship_to || counterpart.address?.street || '',
+    number: counterpart.address?.number ?? '', postalCode: counterpart.address?.postalCode ?? '', city: counterpart.address?.city ?? '',
+  };
+  const issueDate = String(dn.issued_at ?? dn.created_at ?? new Date().toISOString()).slice(0, 10);
+
+  return {
+    issuer,
+    counterpart,
+    header: {
+      series: overrides.series ?? (fs?.invoice_number_prefix || 'A'),
+      aa: overrides.aa ?? String(dn.delivery_note_number ?? ''),
+      issueDate,
+      invoiceType: overrides.invoiceType ?? '9.3',
+      currency: 'EUR',
+      dispatchDate: dn.transport_date ? String(dn.transport_date).slice(0, 10) : issueDate,
+      dispatchTime: dn.transport_time || undefined,
+      vehicleNumber: dn.vehicle_number || undefined,
+      movePurpose,
+      movePurposeLabel: MOVE_PURPOSE_LABELS[movePurpose],
+      loadingAddress,
+      deliveryAddress,
+    },
+    lines,
+    summary: { totalNetValue: 0, totalVatAmount: 0, totalGrossValue: 0 },
+    documentLabel: overrides.documentLabel ?? 'Δελτίο Αποστολής',
+    documentComments: dn.notes ?? undefined,
+  };
+}

@@ -86,6 +86,23 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           ...(input.correlatedInvoices?.length
             ? { correlatedInvoices: input.correlatedInvoices }
             : {}),
+          // 9.3 delivery note: transport / movement block.
+          ...(header.movePurpose != null
+            ? {
+                vatPaymentSuspension: false,
+                dispatchDate: header.dispatchDate ?? header.issueDate,
+                ...(header.dispatchTime ? { dispatchTime: header.dispatchTime } : {}),
+                ...(header.vehicleNumber ? { vehicleNumber: header.vehicleNumber } : {}),
+                otherDeliveryNoteHeader: {
+                  ...(header.loadingAddress ? { loadingAddress: header.loadingAddress } : {}),
+                  ...(header.deliveryAddress ? { deliveryAddress: header.deliveryAddress } : {}),
+                  startShippingBranch: 0,
+                  completeShippingBranch: 0,
+                },
+                movePurpose: header.movePurpose,
+                ...(header.movePurposeLabel ? { movePurposeLabel: header.movePurposeLabel } : {}),
+              }
+            : {}),
         },
         paymentMethods: input.paymentMethods?.length
           ? input.paymentMethods

@@ -332,6 +332,12 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
+  const sendFiscal = async (id: string) => {
+    setBusy(id);
+    try { const r = await deliveryNotesService.submitFiscal(id); toast({ title: r?.fiscal?.mark ? `Sent to myDATA · MARK ${r.fiscal.mark}` : 'Sent to myDATA' }); onChanged(); }
+    catch (err: any) { toast({ title: 'myDATA transmission failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
   return (
     <table className="w-full text-sm">
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -352,18 +358,30 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
             <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</Badge></td>
             <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
-            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{d.status}</Badge></td>
+            <td className="px-4 py-2 text-center">
+              <div className="flex items-center justify-center gap-1">
+                <Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{d.status}</Badge>
+                {d.fiscal_mark && <Badge variant="secondary" className="text-[10px]" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</Badge>}
+              </div>
+            </td>
             <td className="px-4 py-2 text-right">
-              {!readOnly && d.status === 'draft' && (
-                <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => issue(d.id)}>
-                  {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue'}
-                </Button>
-              )}
-              {!readOnly && d.status === 'issued' && (
-                <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
-                  {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
-                </Button>
-              )}
+              <div className="flex items-center justify-end gap-1">
+                {!readOnly && d.status === 'draft' && (
+                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => issue(d.id)}>
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue'}
+                  </Button>
+                )}
+                {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && d.fiscal_status !== 'accepted' && (
+                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => sendFiscal(d.id)}>
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Send to myDATA'}
+                  </Button>
+                )}
+                {!readOnly && d.status === 'issued' && (
+                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
+                  </Button>
+                )}
+              </div>
             </td>
           </tr>
         ))}

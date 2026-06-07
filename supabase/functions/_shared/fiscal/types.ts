@@ -57,8 +57,16 @@ export interface FiscalInvoiceInput {
     series: string;
     aa: string;
     issueDate: string; // YYYY-MM-DD
-    invoiceType: string; // myDATA type code, e.g. '1.1', '2.1', '11.1', '5.1' (credit note)
+    invoiceType: string; // myDATA type code, e.g. '1.1', '2.1', '11.1', '5.1' (credit note), '9.3' (delivery note)
     currency: string; // 'EUR'
+    // ── Movement / delivery-note fields (myDATA 9.3) — present only for transport docs ──
+    dispatchDate?: string;   // YYYY-MM-DD
+    dispatchTime?: string;   // HH:MM:SS
+    vehicleNumber?: string;
+    movePurpose?: number;    // 1=sale, 2=sale-on-behalf, 3=sampling, 4=exhibition, 5=return, 6=inter-premises, 7=consignment
+    movePurposeLabel?: string;
+    loadingAddress?: { street: string; number: string; postalCode: string; city: string };
+    deliveryAddress?: { street: string; number: string; postalCode: string; city: string };
   };
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];
