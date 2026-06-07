@@ -5,6 +5,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
+import type { Capability } from '@/auth/capabilities';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
 import { useEnabledModules, ModuleHeaderActions } from '@/modules/_core';
@@ -25,7 +27,7 @@ import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
-  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; enabledSlugs: Set<string> },
+  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; enabledSlugs: Set<string>; can: (c: Capability) => boolean },
 ): SidebarNavItem[] {
   return items.filter((item) => {
     // Scoped invited roles see a focused subset only (overrides the gates below).
@@ -35,6 +37,8 @@ function filterNavItems(
     // Factory analytics is for verified factories only — not dealers/operators.
     if (item.requireRole === 'factory' && !ctx.isFactory) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
+    // #195 capability gate (the unified persona model — drives end-user restriction).
+    if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
     if (item.moduleSlug && !ctx.enabledSlugs.has(item.moduleSlug)) return false;
     return true;
   });
@@ -46,11 +50,12 @@ export const Sidebar: React.FC = () => {
   const { user, signOut } = useAuth();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
   const { isAccountant, isSalesRep } = useCapabilities();
+  const { can } = usePermissions();
   const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, enabledSlugs });
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, enabledSlugs, can });
 
   useEffect(() => {
     setMobileOpen(false);
