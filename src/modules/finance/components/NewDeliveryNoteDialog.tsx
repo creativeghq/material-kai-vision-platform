@@ -24,6 +24,7 @@ export const NewDeliveryNoteDialog: React.FC<{
   const { toast } = useToast();
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [warehouse, setWarehouse] = useState<WarehousePick[]>([]);
+  const [kind, setKind] = useState<'dispatch' | 'receipt'>('dispatch');
   const [customer, setCustomer] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DeliveryLineInput[]>([]);
@@ -36,7 +37,7 @@ export const NewDeliveryNoteDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setCustomer(''); setNotes(''); setLines([]);
+    setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]);
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1'); setShipTo('');
     (async () => {
       const [{ data: cos }, wh] = await Promise.all([
@@ -61,7 +62,7 @@ export const NewDeliveryNoteDialog: React.FC<{
     setBusy(true);
     try {
       const id = await deliveryNotesService.create(workspaceId, {
-        customerCompanyId: customer || null, notes, lines,
+        kind, customerCompanyId: customer || null, notes, lines,
         transportDate, vehicleNumber, movePurpose, shipTo,
       });
       if (issue) await deliveryNotesService.issue(id);
@@ -76,10 +77,20 @@ export const NewDeliveryNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Truck className="h-4 w-4" /> New delivery note</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Truck className="h-4 w-4" /> New {kind === 'receipt' ? 'goods-receipt note' : 'delivery note'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>Customer (optional)</Label>
+            <Label>Type</Label>
+            <Select value={kind} onValueChange={(v: any) => setKind(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dispatch">Delivery note (dispatch · stock out)</SelectItem>
+                <SelectItem value="receipt">Goods-receipt note (receive · stock in)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>{kind === 'receipt' ? 'Supplier' : 'Customer'} (optional)</Label>
             <Select value={customer} onValueChange={setCustomer}>
               <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
               <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
@@ -152,7 +163,7 @@ export const NewDeliveryNoteDialog: React.FC<{
         <DialogFooter>
           <Button variant="outline" onClick={() => submit(false)} disabled={busy}>Save draft</Button>
           <Button onClick={() => submit(true)} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue (decrement stock)
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue ({kind === 'receipt' ? 'add to stock' : 'decrement stock'})
           </Button>
         </DialogFooter>
       </DialogContent>

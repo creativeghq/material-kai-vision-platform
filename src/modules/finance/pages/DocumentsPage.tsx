@@ -306,6 +306,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
         <tr>
           <th className="px-4 py-2 text-left">Number</th>
+          <th className="px-4 py-2 text-left">Type</th>
           <th className="px-4 py-2 text-left">Date</th>
           <th className="px-4 py-2 text-center">Status</th>
           <th className="px-4 py-2 text-right" />
@@ -313,11 +314,12 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
       </thead>
       <tbody>
         {rows.length === 0 && (
-          <tr><td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">No delivery notes yet.</td></tr>
+          <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">No delivery notes yet.</td></tr>
         )}
         {rows.map((d) => (
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
+            <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</Badge></td>
             <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
             <td className="px-4 py-2 text-center"><Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{d.status}</Badge></td>
             <td className="px-4 py-2 text-right">

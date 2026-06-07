@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface DeliveryNote {
   id: string;
   workspace_id: string;
+  kind: 'dispatch' | 'receipt';
   delivery_note_number: string | null;
   customer_company_id: string | null;
   customer_contact_id: string | null;
@@ -52,6 +53,7 @@ export const deliveryNotesService = {
   },
 
   async create(workspaceId: string, input: {
+    kind?: 'dispatch' | 'receipt';
     customerCompanyId?: string | null;
     customerContactId?: string | null;
     notes?: string;
@@ -69,6 +71,7 @@ export const deliveryNotesService = {
       .from('delivery_notes')
       .insert({
         workspace_id: workspaceId,
+        kind: input.kind ?? 'dispatch',
         customer_company_id: input.customerCompanyId ?? null,
         customer_contact_id: input.customerContactId ?? null,
         notes: input.notes || null,
