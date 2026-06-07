@@ -39,6 +39,15 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     vatCategory: l.vatCategory,
     vatCategoryPercent: l.vatPercent,
     vatAmount: l.vatAmount,
+    // 0% VAT lines must carry the exemption reason or myDATA rejects them.
+    ...(l.vatExemptionCategory ? { vatExemptionCategory: l.vatExemptionCategory } : {}),
+    // Per-line taxes (only emitted when non-zero).
+    ...(l.withheldAmount ? { withheldAmount: l.withheldAmount, ...(l.withheldCategory ? { withheldPercentCategory: l.withheldCategory } : {}) } : {}),
+    ...(l.feesAmount ? { feesAmount: l.feesAmount, ...(l.feesCategory ? { feesPercentCategory: l.feesCategory } : {}) } : {}),
+    ...(l.stampDutyAmount ? { stampDutyAmount: l.stampDutyAmount, ...(l.stampDutyCategory ? { stampDutyPercentCategory: l.stampDutyCategory } : {}) } : {}),
+    ...(l.otherTaxesAmount ? { otherTaxesAmount: l.otherTaxesAmount, ...(l.otherTaxesCategory ? { otherTaxesPercentCategory: l.otherTaxesCategory } : {}) } : {}),
+    ...(l.deductionsAmount ? { deductionsAmount: l.deductionsAmount } : {}),
+    ...(l.lineComments ? { lineComments: l.lineComments } : {}),
     lineDescription: l.description,
     incomeClassification: l.incomeClassificationType
       ? [
@@ -82,6 +91,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           issueDate: header.issueDate,
           invoiceType: header.invoiceType,
           currency: header.currency,
+          ...(header.vatPaymentSuspension != null ? { vatPaymentSuspension: header.vatPaymentSuspension } : {}),
+          ...(header.selfPricing ? { selfPricing: true } : {}),
+          ...(header.exchangeRate ? { exchangeRate: header.exchangeRate } : {}),
           // 5.1 credit note: reference the original invoice MARK(s) being corrected.
           ...(input.correlatedInvoices?.length
             ? { correlatedInvoices: input.correlatedInvoices }
@@ -105,7 +117,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             : {}),
         },
         paymentMethods: input.paymentMethods?.length
-          ? input.paymentMethods
+          ? input.paymentMethods.map((pm: any) => ({ type: pm.type, amount: pm.amount, ...(pm.info ? { paymentMethodInfo: pm.info } : {}) }))
           : [{ type: 5, amount: summary.totalGrossValue }],
         invoiceDetails,
         providerAdditionalInvoiceDetails: {
@@ -138,10 +150,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           totalNetValue: summary.totalNetValue,
           totalVatAmount: summary.totalVatAmount,
           totalWithheldAmount: summary.totalWithheldAmount ?? 0,
-          totalFeesAmount: 0,
-          totalStampDutyAmount: 0,
-          totalOtherTaxesAmount: 0,
-          totalDeductionsAmount: 0,
+          totalFeesAmount: (summary as any).totalFeesAmount ?? 0,
+          totalStampDutyAmount: (summary as any).totalStampDutyAmount ?? 0,
+          totalOtherTaxesAmount: (summary as any).totalOtherTaxesAmount ?? 0,
+          totalDeductionsAmount: (summary as any).totalDeductionsAmount ?? 0,
           totalGrossValue: summary.totalGrossValue,
           incomeClassification: summary.incomeClassificationType
             ? [

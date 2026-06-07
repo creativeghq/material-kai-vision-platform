@@ -34,6 +34,16 @@ export interface ManualProductPayload {
   external_sku?: string;
   metadata?: Record<string, any>;
   images?: ManualImageRef[];
+  // First-class product fields the admin product modal carries. The MIVAA core
+  // doesn't model these; the create-manual endpoint applies them as a post-create
+  // passthrough so the embedding/canonicalization path stays the single chokepoint.
+  long_description?: string;
+  status?: 'draft' | 'published' | 'archived';
+  cost?: number | null;
+  cost_currency?: string;
+  category?: string;
+  properties?: Record<string, any>;
+  specifications?: Record<string, any>;
 }
 
 /** Descriptive facet keys every product can carry (the whitelist's NL keys). */

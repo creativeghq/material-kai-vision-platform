@@ -137,6 +137,17 @@ export async function buildInvoiceInputFromDb(
       vatCategory: lineCat,
       vatPercent: linePct,
       vatAmount: vat,
+      vatExemptionCategory: it.vat_exemption_category ?? undefined,
+      withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
+      withheldCategory: it.withheld_category ?? undefined,
+      feesAmount: Number(it.fees_amount ?? 0) || undefined,
+      feesCategory: it.fees_category ?? undefined,
+      stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
+      stampDutyCategory: it.stamp_duty_category ?? undefined,
+      otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
+      otherTaxesCategory: it.other_taxes_category ?? undefined,
+      deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      lineComments: it.line_comments ?? undefined,
       incomeClassificationType: it.income_classification_type ?? prod?.mydata_income_classification_type ?? incType,
       incomeClassificationCategory: it.income_classification_category ?? prod?.mydata_income_classification_category ?? incCat,
     };
@@ -153,19 +164,34 @@ export async function buildInvoiceInputFromDb(
   const aa = overrides.aa ?? String(inv.series_number ?? inv.legal_number ?? inv.internal_number ?? '');
   const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
 
+  const grossTotal = round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + Number(inv.total_other_taxes_amount ?? 0) - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0));
+
   return {
     issuer,
     counterpart,
-    header: { series, aa, issueDate, invoiceType, currency: inv.currency ?? 'EUR' },
+    header: {
+      series, aa, issueDate, invoiceType, currency: inv.currency ?? 'EUR',
+      vatPaymentSuspension: !!inv.vat_payment_suspension,
+      selfPricing: !!inv.self_pricing,
+      exchangeRate: inv.exchange_rate ?? undefined,
+    },
+    // Payment method captured on the invoice (myDATA requires at least one).
+    paymentMethods: inv.payment_method_code
+      ? [{ type: Number(inv.payment_method_code), amount: grossTotal, ...(inv.payment_method_info ? { info: inv.payment_method_info } : {}) } as any]
+      : undefined,
     lines,
     summary: {
       totalNetValue: totalNet,
       totalVatAmount: totalVat,
-      totalGrossValue: round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + Number(inv.total_other_taxes_amount ?? 0) - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0)),
+      totalGrossValue: grossTotal,
       totalWithheldAmount: Number(inv.total_withheld_amount ?? 0),
+      totalFeesAmount: Number(inv.total_fees_amount ?? 0),
+      totalStampDutyAmount: Number(inv.total_stamp_duty_amount ?? 0),
+      totalOtherTaxesAmount: Number(inv.total_other_taxes_amount ?? 0),
+      totalDeductionsAmount: Number(inv.total_deductions_amount ?? 0),
       incomeClassificationType: incType,
       incomeClassificationCategory: incCat,
-    },
+    } as any,
     documentLabel: overrides.documentLabel,
     documentComments: inv.notes ?? undefined,
   };

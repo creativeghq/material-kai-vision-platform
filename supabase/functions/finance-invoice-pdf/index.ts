@@ -40,6 +40,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatPct: 'ΦΠΑ%', vatAmt: 'Αξία ΦΠΑ', lineTotal: 'Σύνολο',
     vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
     withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό',
+    fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
+    paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
@@ -54,6 +56,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatPct: 'VAT%', vatAmt: 'VAT', lineTotal: 'Total',
     vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
     withheld: 'Withholding', total: 'Amount due',
+    fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
+    paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
     mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
@@ -141,8 +145,17 @@ Deno.serve(async (req) => {
       branch = data;
     }
 
+    // Business logo (generation-images/business-logos/…) — embedded in the header.
+    let logo: Uint8Array | null = null;
+    if (fs?.business_logo_path) {
+      try {
+        const { data: lf } = await supabase.storage.from('generation-images').download(fs.business_logo_path);
+        if (lf) logo = new Uint8Array(await lf.arrayBuffer());
+      } catch { /* logo optional */ }
+    }
+
     const lang: Lang = inv.doc_language === 'en' ? 'en' : 'el';
-    const pdfBytes = await buildPdf({ inv, items: items ?? [], fs, customer, branch, lang });
+    const pdfBytes = await buildPdf({ inv, items: items ?? [], fs, customer, branch, lang, logo });
 
     const path = `invoice-output/${invoiceId}/inv-${invoiceId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -162,8 +175,8 @@ Deno.serve(async (req) => {
   }
 });
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, branch, lang } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang, logo } = d;
   const L = LABELS[lang];
   const currency = inv.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
@@ -195,7 +208,16 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     return lines.length ? lines : [''];
   };
 
-  // ── Header: issuer (left) + document title (right) ──
+  // ── Header: logo + issuer (left) + document title (right) ──
+  if (logo) {
+    try {
+      const img = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
+      const maxW = 120, maxH = 46;
+      const scale = Math.min(maxW / img.width, maxH / img.height);
+      page.drawImage(img, { x: M, y: y - img.height * scale + 6, width: img.width * scale, height: img.height * scale });
+      y -= img.height * scale - 6;
+    } catch { /* logo optional */ }
+  }
   const issuerName = fs?.business_name || '';
   text(issuerName, M, y - 4, 16, bold);
   textR(docTitle(inv.document_type, L), right, y - 2, 18, bold, rgb(0.48, 0.12, 0.36));
@@ -207,6 +229,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
     fs?.business_profession ? `${L.profession}: ${fs.business_profession}` : '',
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
+    fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
+    fs?.business_gemh ? `${L.registry}: ${fs.business_gemh}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean);
   for (const l of issuerLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
@@ -278,7 +302,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     vatByRate[key].net += net; vatByRate[key].vat += vat;
 
     const dLines = wrap(it.description ?? 'Item', font, 8.5, cols.qty - cols.descr - 10);
-    const detail = [it.selected_color, it.selected_size].filter(Boolean).join(' / ');
+    const detail = [[it.selected_color, it.selected_size].filter(Boolean).join(' / '), it.line_comments].filter(Boolean).join(' — ');
     const rowH = Math.max(13, dLines.length * 10 + (detail ? 10 : 0) + 3);
     if (y - rowH < M + 150) { newPage(); drawHead(); }
     let ly = y;
@@ -315,13 +339,32 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
     y -= b ? 16 : 13;
   };
+  const fees = Number(inv.total_fees_amount ?? 0), stamp = Number(inv.total_stamp_duty_amount ?? 0);
+  const otherTax = Number(inv.total_other_taxes_amount ?? 0), deductions = Number(inv.total_deductions_amount ?? 0);
   row(L.subtotalNet, money(totNet));
   row(L.totalVat, money(totVat));
+  if (fees > 0) row(L.fees, money(fees));
+  if (stamp > 0) row(L.stamp, money(stamp));
+  if (otherTax > 0) row(L.otherTaxes, money(otherTax));
+  if (deductions > 0) row(L.deductions, `- ${money(deductions)}`);
   if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
   page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
   y -= 4;
   row(L.total, money(grand), true);
   y = Math.min(y, vy) - 6;
+
+  // ── Payment method + bank details ──
+  const PAY_LABELS: Record<number, string> = { 1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS', 6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account' };
+  const payBits: string[] = [];
+  if (inv.payment_method_code) payBits.push(`${L.paymentMethod}: ${PAY_LABELS[Number(inv.payment_method_code)] ?? inv.payment_method_code}`);
+  if (inv.payment_method_info) payBits.push(String(inv.payment_method_info));
+  const bank = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
+  if (payBits.length || bank) {
+    if (y < M + 110) newPage();
+    for (const pb of payBits) { text(pb, M, y, 8.5, font, MUTED); y -= 11; }
+    if (bank) { text(`${L.bank}: ${bank}`, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 4;
+  }
 
   // ── Movement block (9.3 / invoice-with-shipping) ──
   if (inv.has_shipping) {

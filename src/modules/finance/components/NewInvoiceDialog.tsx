@@ -33,10 +33,18 @@ interface LineItem {
   color: string;
   size: string;
   vat_category: string;            // myDATA VAT category code
+  vat_exemption: string;           // myDATA VAT exemption category (1-31) when 0% VAT
   income_classification_type: string;
   income_classification_category: string;
+  // Per-line Novus taxes (amounts in document currency)
+  fees: string;
+  stamp_duty: string;
+  other_taxes: string;
+  deductions: string;
+  line_comments: string;
   product_id?: string | null;
   expanded?: boolean;
+  advancedOpen?: boolean;
 }
 
 interface Props { workspaceId: string; open: boolean; onOpenChange: (open: boolean) => void; onCreated: (invoiceId: string) => void; }
@@ -82,9 +90,10 @@ const MOVE_PURPOSES: [string, string][] = [
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
   measurement_unit_code: g?.measurement_unit_code ?? '', color: '', size: '',
-  vat_category: g?.vat_category ?? '',
+  vat_category: g?.vat_category ?? '', vat_exemption: '',
   income_classification_type: g?.income_classification_type ?? '',
   income_classification_category: g?.income_classification_category ?? '',
+  fees: '', stamp_duty: '', other_taxes: '', deductions: '', line_comments: '',
 });
 
 // Best-effort extraction of color/size/unit from heterogeneous product metadata.
@@ -124,6 +133,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [branchCode, setBranchCode] = useState('0');
   const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('el');
   const [withholdingCode, setWithholdingCode] = useState('');
+  const [paymentMethodCode, setPaymentMethodCode] = useState('3'); // default "On credit"
+  const [paymentMethodInfo, setPaymentMethodInfo] = useState('');
+  const [vatSuspension, setVatSuspension] = useState(false);
+  const [selfPricing, setSelfPricing] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<{ code: string; description: string }[]>([]);
 
   // Catalogs
   const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
@@ -168,6 +183,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('el'); setWithholdingCode('');
+    setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
     setLines([emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
@@ -178,17 +194,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat, wh, mu, fs] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh, mu, pm, fs] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
         invoicingSetupService.listReference('income_classification_category'),
         invoicingSetupService.listReference('withholding_tax'),
         invoicingSetupService.listReference('measurement_unit'),
+        invoicingSetupService.listReference('payment_method'),
         supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
       ]);
       setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
       setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
+      setPaymentMethods(pm.map((p) => ({ code: p.code, description: p.description })));
       setIssuer(fs.data ?? null);
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
@@ -302,7 +320,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // ── Totals (per-line VAT via category when set, else global rate) ──
   const totals = useMemo(() => {
-    let net = 0, vat = 0;
+    let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
     for (const l of lines) {
       const q = parseFloat(l.quantity) || 0;
       const p = parseFloat(l.unit_price) || 0;
@@ -310,10 +328,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const lineNet = Math.max(0, q * p - disc);
       const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
       net += lineNet; vat += lineNet * (pct / 100);
+      fees += parseFloat(l.fees) || 0; stamp += parseFloat(l.stamp_duty) || 0;
+      other += parseFloat(l.other_taxes) || 0; deduct += parseFloat(l.deductions) || 0;
     }
     const wh = withholdings.find((w) => w.code === withholdingCode);
     const withheld = wh?.rate ? net * (Number(wh.rate) / 100) : 0;
-    return { net, vat, withheld, total: net + vat - withheld };
+    const total = net + vat + fees + stamp + other - withheld - deduct;
+    return { net, vat, fees, stamp, other, deduct, withheld, total };
   }, [lines, vatRate, withholdingCode, withholdings]);
 
   const applyDocDefault = (code: string) => {
@@ -344,6 +365,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         currency, subtotal_net: Number(totals.net.toFixed(2)), vat_rate: Number(vatRate),
         vat_amount: Number(totals.vat.toFixed(2)), total: Number(totals.total.toFixed(2)),
         total_withheld_amount: Number(totals.withheld.toFixed(2)),
+        total_fees_amount: Number(totals.fees.toFixed(2)), total_stamp_duty_amount: Number(totals.stamp.toFixed(2)),
+        total_other_taxes_amount: Number(totals.other.toFixed(2)), total_deductions_amount: Number(totals.deduct.toFixed(2)),
+        payment_method_code: paymentMethodCode ? parseInt(paymentMethodCode, 10) : null,
+        payment_method_info: paymentMethodInfo || null,
+        vat_payment_suspension: vatSuspension, self_pricing: selfPricing,
+        exchange_rate: currency !== 'EUR' && exchangeRate ? parseFloat(exchangeRate) : null,
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
         doc_language: docLanguage,
@@ -369,8 +396,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           unit_cost_snapshot: l.unit_cost.trim() ? parseFloat(l.unit_cost) : null,
           selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
+          vat_exemption_category: l.vat_exemption ? parseInt(l.vat_exemption, 10) : null,
           income_classification_type: l.income_classification_type || null,
           income_classification_category: l.income_classification_category || null,
+          fees_amount: parseFloat(l.fees) || 0, stamp_duty_amount: parseFloat(l.stamp_duty) || 0,
+          other_taxes_amount: parseFloat(l.other_taxes) || 0, deductions_amount: parseFloat(l.deductions) || 0,
+          line_comments: l.line_comments || null,
           product_id: l.product_id || null,
         };
       });
@@ -491,6 +522,35 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
             </section>
 
+            {/* Payment + document flags */}
+            <section className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Payment method (myDATA)</Label>
+                <Select value={paymentMethodCode} onValueChange={setPaymentMethodCode}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Payment method…" /></SelectTrigger>
+                  <SelectContent>{paymentMethods.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.description}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Payment note</Label>
+                <Input className="h-9" value={paymentMethodInfo} onChange={(e) => setPaymentMethodInfo(e.target.value)} placeholder="e.g. IBAN, card ref, “on credit”" />
+              </div>
+              {currency !== 'EUR' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Exchange rate → EUR</Label>
+                  <Input className="h-9" type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
+                </div>
+              )}
+              <label className="flex items-center gap-2 self-end text-xs">
+                <input type="checkbox" className="h-4 w-4 rounded" checked={vatSuspension} onChange={(e) => setVatSuspension(e.target.checked)} />
+                VAT payment suspension
+              </label>
+              <label className="flex items-center gap-2 self-end text-xs">
+                <input type="checkbox" className="h-4 w-4 rounded" checked={selfPricing} onChange={(e) => setSelfPricing(e.target.checked)} />
+                Self-pricing
+              </label>
+            </section>
+
             {/* Global line defaults */}
             <section className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Global line defaults — applied to all rows</Label>
@@ -597,6 +657,29 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                 <SelectContent><SelectItem value="none">—</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
                               </Select>
                             </div>
+                          </div>
+                          {(l.vat_category === '7' || l.vat_category === '8' || vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0) === 0) && (
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">VAT exemption category (1–31)</Label>
+                              <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="Required for 0% VAT" />
+                            </div>
+                          )}
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-[10px] text-muted-foreground">Line comments</Label>
+                            <Input className="h-7 text-xs" value={l.line_comments} onChange={(e) => update(idx, { line_comments: e.target.value })} placeholder="Shown on this line of the invoice" />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => update(idx, { advancedOpen: !l.advancedOpen })}>
+                              {l.advancedOpen ? '− Hide' : '+ Advanced taxes'} (fees · stamp duty · other taxes · deductions)
+                            </button>
+                            {l.advancedOpen && (
+                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Fees ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.fees} onChange={(e) => update(idx, { fees: e.target.value })} placeholder="0.00" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Stamp duty ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.stamp_duty} onChange={(e) => update(idx, { stamp_duty: e.target.value })} placeholder="0.00" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Other taxes ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.other_taxes} onChange={(e) => update(idx, { other_taxes: e.target.value })} placeholder="0.00" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -727,6 +810,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <div className="mt-3 space-y-1 text-xs">
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (net)</span><span className="tabular-nums">{money(totals.net)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{money(totals.vat)}</span></div>
+                {totals.fees > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Fees</span><span className="tabular-nums">{money(totals.fees)}</span></div>}
+                {totals.stamp > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Stamp duty</span><span className="tabular-nums">{money(totals.stamp)}</span></div>}
+                {totals.other > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other taxes</span><span className="tabular-nums">{money(totals.other)}</span></div>}
+                {totals.deduct > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Deductions</span><span className="tabular-nums text-amber-600">- {money(totals.deduct)}</span></div>}
                 {totals.withheld > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Withholding</span><span className="tabular-nums text-amber-600">- {money(totals.withheld)}</span></div>}
                 <div className="flex justify-between border-t border-border/60 pt-1 text-sm font-semibold"><span>Grand total</span><span className="tabular-nums">{money(totals.total)}</span></div>
               </div>

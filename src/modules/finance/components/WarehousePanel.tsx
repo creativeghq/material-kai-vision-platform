@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -7,7 +7,9 @@ import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { warehouseService, type WarehouseItem } from '@/services/warehouseService';
+import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 
 export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -97,51 +99,168 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   );
 };
 
+/**
+ * Stock is product-backed: every warehouse item links to a real catalog `products`
+ * row (which already carries its embeddings). You either pick an existing product or
+ * create a new one through the SAME MIVAA ingest core as XML import / dealer add
+ * (facet canonicalization → Voyage text_embedding_1024 → vector DB) — never a
+ * free-text orphan that bypasses the product pipeline.
+ */
+interface CatalogProduct { id: string; name: string; sku: string | null; unit: string }
+
+const productUnit = (row: any): string =>
+  (row?.metadata?.unit || row?.properties?.unit || 'pcs') as string;
+
 const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; onAdded: () => void }> = ({ open, onOpenChange, workspaceId, onAdded }) => {
   const { toast } = useToast();
-  const [name, setName] = useState('');
-  const [sku, setSku] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CatalogProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<CatalogProduct | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+
   const [unit, setUnit] = useState('pcs');
   const [qty, setQty] = useState('0');
   const [reorder, setReorder] = useState('0');
   const [location, setLocation] = useState('');
   const [busy, setBusy] = useState(false);
+  const searchSeq = useRef(0);
+
+  // Reset when the dialog closes.
+  useEffect(() => {
+    if (!open) {
+      setQuery(''); setResults([]); setSelected(null);
+      setUnit('pcs'); setQty('0'); setReorder('0'); setLocation('');
+    }
+  }, [open]);
+
+  // Debounced catalog search (name or SKU) within the workspace.
+  useEffect(() => {
+    if (!open || selected) return;
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); return; }
+    const seq = ++searchSeq.current;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, external_sku, metadata, properties')
+          .eq('workspace_id', workspaceId)
+          .or(`name.ilike.%${q}%,external_sku.ilike.%${q}%`)
+          .order('name')
+          .limit(10);
+        if (error) throw error;
+        if (seq !== searchSeq.current) return; // stale response
+        setResults((data ?? []).map((r: any) => ({
+          id: r.id, name: r.name, sku: r.external_sku ?? null, unit: productUnit(r),
+        })));
+      } catch (err: any) {
+        toast({ title: 'Search failed', description: err?.message, variant: 'destructive' });
+      } finally {
+        if (seq === searchSeq.current) setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, open, selected, workspaceId, toast]);
+
+  const pick = (p: CatalogProduct) => { setSelected(p); setUnit(p.unit || 'pcs'); };
+
+  // A product was just created via the embedding pipeline — fetch it and select it.
+  const onProductCreated = async (productId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, external_sku, metadata, properties')
+        .eq('id', productId)
+        .single();
+      if (error) throw error;
+      pick({ id: data.id, name: data.name, sku: data.external_sku ?? null, unit: productUnit(data) });
+    } catch (err: any) {
+      toast({ title: 'Created, but failed to load', description: err?.message, variant: 'destructive' });
+    }
+  };
 
   const submit = async () => {
-    if (!name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
+    if (!selected) { toast({ title: 'Pick a product first', variant: 'destructive' }); return; }
     try {
       setBusy(true);
       await warehouseService.createItem({
-        workspaceId, name: name.trim(), sku: sku.trim() || undefined, unit: unit.trim() || 'pcs',
-        qty_on_hand: parseFloat(qty) || 0, reorder_point: parseFloat(reorder) || 0, location: location.trim() || undefined,
+        workspaceId, product_id: selected.id, name: selected.name,
+        sku: selected.sku || undefined, unit: unit.trim() || 'pcs',
+        qty_on_hand: parseFloat(qty) || 0, reorder_point: parseFloat(reorder) || 0,
+        location: location.trim() || undefined,
       });
-      setName(''); setSku(''); setQty('0'); setReorder('0'); setLocation('');
       onAdded();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Add stock item</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>SKU</Label><Input value={sku} onChange={(e) => setSku(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>On hand</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Reorder pt</Label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} /></div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add stock item</DialogTitle></DialogHeader>
+
+          {!selected ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Find a product</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-8" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search catalog by name or SKU…" />
+                </div>
+              </div>
+              <div className="min-h-[3rem] max-h-64 overflow-y-auto rounded-md border border-border/60 divide-y divide-border/40">
+                {searching ? (
+                  <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                ) : results.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    {query.trim().length < 2 ? 'Type at least 2 characters to search.' : 'No matching products.'}
+                  </div>
+                ) : results.map((p) => (
+                  <button key={p.id} type="button" onClick={() => pick(p)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/40">
+                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate text-sm">{p.name}</span>
+                    {p.sku && <span className="font-mono text-[11px] text-muted-foreground">{p.sku}</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-muted-foreground">Not in the catalog yet?</span>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setNewOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> Create new product
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="truncate text-sm font-medium">{selected.name}</div>
+                  {selected.sku && <div className="font-mono text-[11px] text-muted-foreground">{selected.sku}</div>}
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => setSelected(null)} title="Choose a different product"><X className="h-4 w-4" /></Button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1"><Label>On hand</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+                <div className="space-y-1"><Label>Reorder pt</Label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
+                <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
+              </div>
+              <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional — e.g. Aisle 3 / Shelf B" /></div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={submit} disabled={busy || !selected}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add to warehouse'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AddDealerProductDialog open={newOpen} onOpenChange={setNewOpen} onCreated={onProductCreated} />
+    </>
   );
 };

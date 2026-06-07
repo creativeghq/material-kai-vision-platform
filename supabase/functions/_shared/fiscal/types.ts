@@ -48,6 +48,19 @@ export interface FiscalLine {
   /** myDATA income classification, e.g. E3_561_001 / category1_1 */
   incomeClassificationType?: string;
   incomeClassificationCategory?: string;
+  /** myDATA VAT exemption category (1..31) — required when vatCategory is 7 (0%). */
+  vatExemptionCategory?: number;
+  /** Per-line taxes (Novus invoiceDetails). Amounts in document currency. */
+  withheldAmount?: number;
+  withheldCategory?: number;
+  feesAmount?: number;
+  feesCategory?: number;
+  stampDutyAmount?: number;
+  stampDutyCategory?: number;
+  otherTaxesAmount?: number;
+  otherTaxesCategory?: number;
+  deductionsAmount?: number;
+  lineComments?: string;
 }
 
 export interface FiscalInvoiceInput {
@@ -59,6 +72,9 @@ export interface FiscalInvoiceInput {
     issueDate: string; // YYYY-MM-DD
     invoiceType: string; // myDATA type code, e.g. '1.1', '2.1', '11.1', '5.1' (credit note), '9.3' (delivery note)
     currency: string; // 'EUR'
+    vatPaymentSuspension?: boolean;
+    selfPricing?: boolean;
+    exchangeRate?: number;
     // ── Movement / delivery-note fields (myDATA 9.3) — present only for transport docs ──
     dispatchDate?: string;   // YYYY-MM-DD
     dispatchTime?: string;   // HH:MM:SS

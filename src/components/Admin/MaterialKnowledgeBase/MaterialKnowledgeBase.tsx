@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProductFormModal } from '../ProductFormModal';
+import { dealerProductsService } from '@/services/dealerProductsService';
 import { ProductDeleteConfirmation } from '../ProductDeleteConfirmation';
 import { ProductPreviewModal } from '../ProductPreviewModal';
 import { ChunkDetailModal } from '../ChunkDetailModal';
@@ -617,23 +618,37 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
     try {
       if (productFormMode === 'create') {
-        // Create new product
+        // Create through the SAME MIVAA ingest core as XML import / dealer add —
+        // facet canonicalization → Voyage text_embedding_1024 → vector DB. A bare
+        // supabase insert (the previous behaviour) produced an un-embedded product
+        // invisible to vector search; routing through create-manual fixes that.
+        const pd = productData as any;
+        const newId = await dealerProductsService.createManualProduct(workspaceId, {
+          name: pd.name,
+          description: pd.description || undefined,
+          long_description: pd.long_description || undefined,
+          material_category: pd.category || undefined,
+          category: pd.category || undefined,
+          status: pd.status || 'draft',
+          cost: pd.cost ?? null,
+          cost_currency: pd.cost_currency || undefined,
+          metadata: pd.metadata || undefined,
+          properties: pd.properties || undefined,
+          specifications: pd.specifications || undefined,
+        });
+
+        // create-manual returns the id only; fetch the full row for local state.
         const { data, error } = await supabase
           .from('products')
-          .insert({
-            ...productData,
-            workspace_id: workspaceId,
-            created_from_type: 'manual',
-          })
-          .select()
+          .select('*')
+          .eq('id', newId)
           .single();
-
         if (error) throw error;
 
         setProducts([data, ...products]);
         toast({
           title: 'Success',
-          description: 'Product created successfully',
+          description: 'Product created — embeddings are generating in the background.',
         });
       } else {
         // Update existing product
