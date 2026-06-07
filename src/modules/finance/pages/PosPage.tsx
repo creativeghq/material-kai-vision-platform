@@ -53,7 +53,11 @@ const PosPage: React.FC = () => {
   const [movVehicle, setMovVehicle] = useState('');
   const [movShipTo, setMovShipTo] = useState('');
   const [issuing, setIssuing] = useState(false);
-  const [result, setResult] = useState<{ number: string; total: number; currency: string; mark: string | null } | null>(null);
+  const [result, setResult] = useState<{
+    number: string; total: number; currency: string; mark: string | null;
+    net: number; vat: number; method: 'cash' | 'card'; issuedAt: string;
+    lines: { name: string; qty: number; unit_price: number }[];
+  } | null>(null);
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
@@ -184,7 +188,11 @@ const PosPage: React.FC = () => {
         });
       } catch { /* non-fatal */ }
 
-      setResult({ number: num?.formatted as string, total: totals.total, currency, mark });
+      setResult({
+        number: num?.formatted as string, total: totals.total, currency, mark,
+        net: totals.net, vat: totals.vat, method, issuedAt: new Date().toLocaleString(),
+        lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price })),
+      });
       setCart([]);
       setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
       toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
@@ -196,6 +204,39 @@ const PosPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="Point of Sale" description="Quick B2C sale → myDATA retail receipt (11.1)." badge="POS" />
+
+      {/* Thermal-friendly receipt — hidden on screen, the ONLY thing printed (the Print
+          button calls window.print(); the @media print rules below blank everything else). */}
+      <style>{`
+        #pos-receipt { display: none; }
+        @media print {
+          body * { visibility: hidden !important; }
+          #pos-receipt, #pos-receipt * { visibility: visible !important; }
+          #pos-receipt { display: block !important; position: absolute; left: 0; top: 0; width: 80mm; padding: 6mm 4mm; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
+          @page { size: 80mm auto; margin: 0; }
+        }
+      `}</style>
+      {result && (
+        <div id="pos-receipt" aria-hidden="true">
+          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>ΑΠΟΔΕΙΞΗ / RECEIPT</div>
+          <div style={{ textAlign: 'center', marginBottom: 6 }}>No. {result.number}</div>
+          <div>{result.issuedAt}</div>
+          <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
+            {result.lines.map((l, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{l.qty} × {l.name}</span>
+                <span>{formatMoney(l.unit_price * l.qty, result.currency)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Net</span><span>{formatMoney(result.net, result.currency)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT</span><span>{formatMoney(result.vat, result.currency)}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}><span>TOTAL</span><span>{formatMoney(result.total, result.currency)}</span></div>
+          <div style={{ marginTop: 4 }}>Paid: {result.method === 'cash' ? 'Cash' : 'Card'}</div>
+          {result.mark && <div style={{ marginTop: 6, wordBreak: 'break-all' }}>MARK: {result.mark}</div>}
+          <div style={{ textAlign: 'center', marginTop: 8 }}>Thank you!</div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 p-3 sm:p-6 lg:grid-cols-[1fr_360px]">
         {/* Item picker */}
