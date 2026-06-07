@@ -48,6 +48,25 @@ interface Props {
   onCreated: (invoiceId: string) => void;
 }
 
+// Group myDATA document types by family so the dropdown isn't one long flat list.
+const DOC_FAMILY: Record<string, string> = {
+  '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense',
+  '5': 'Credit notes', '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / special',
+  '9': 'Delivery notes', '11': 'Retail receipts', '13': 'Retail / expenses',
+  '14': 'Cross-border', '15': 'Contractor', '16': 'Other', '17': 'Other',
+};
+function groupDocTypes(types: { code: string; description: string }[]) {
+  const groups = new Map<string, { code: string; description: string }[]>();
+  for (const t of types) {
+    const fam = String(t.code).split('.')[0];
+    if (!groups.has(fam)) groups.set(fam, []);
+    groups.get(fam)!.push(t);
+  }
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([family, items]) => ({ family, label: DOC_FAMILY[family] ?? `Type ${family}.x`, items }));
+}
+
 const emptyLine = (): LineItem => ({
   description: '',
   sku: '',
@@ -292,7 +311,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New invoice</DialogTitle>
           <DialogDescription>
@@ -301,66 +320,66 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Document type (myDATA) */}
-          <div className="space-y-1">
-            <Label>Document type (myDATA)</Label>
-            <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
-              <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
-              <SelectContent>
-                {(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((t) => (
-                  <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Header: customer (left) · document type + category (right) */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Customer *</Label>
+              {customer ? (
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+                  <span className="text-sm">{customer.label}</span>
+                  <Button size="sm" variant="ghost" onClick={() => setCustomer(null)}>Change</Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    placeholder="Search contacts or companies…"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                  />
+                  {customerOptions.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
+                      {customerOptions.map((o) => (
+                        <button
+                          key={`${o.type}-${o.id}`}
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                          onClick={() => { setCustomer(o); setCustomerSearch(''); setCustomerOptions([]); }}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Category (Κατηγορία) */}
-          <div className="space-y-1">
-            <Label>Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-              <SelectContent>
-                {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
-                  : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Customer */}
-          <div className="space-y-2">
-            <Label>Customer *</Label>
-            {customer ? (
-              <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                <span className="text-sm">{customer.label}</span>
-                <Button size="sm" variant="ghost" onClick={() => setCustomer(null)}>Change</Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Input
-                  placeholder="Search contacts or companies…"
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                />
-                {customerOptions.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
-                    {customerOptions.map((o) => (
-                      <button
-                        key={`${o.type}-${o.id}`}
-                        type="button"
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                        onClick={() => {
-                          setCustomer(o);
-                          setCustomerSearch('');
-                          setCustomerOptions([]);
-                        }}
-                      >
-                        {o.label}
-                      </button>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Document type (myDATA)</Label>
+                <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
+                  <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
+                  <SelectContent>
+                    {groupDocTypes(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((g) => (
+                      <React.Fragment key={g.family}>
+                        <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
+                        {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
+                      </React.Fragment>
                     ))}
-                  </div>
-                )}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div className="space-y-1">
+                <Label>Category</Label>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
+                      : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
