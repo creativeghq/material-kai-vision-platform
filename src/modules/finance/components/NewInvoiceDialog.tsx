@@ -1,33 +1,25 @@
-// Manual "ad-hoc" invoice creation. Distinct from issuing-from-quote (that flow
-// lives on the QuoteDetailAdminPage as IssueInvoiceButton). Use this for sales
-// that never went through the Quotes pipeline.
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, Tag } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/core/ui/dialog';
+// Manual "ad-hoc" invoice creation (not tied to a quote). Two-panel layout: a structured
+// form on the left, a live invoice preview on the right. Each line can be pulled from a
+// catalog product (price via get_product_price_for_workspace; color/size/unit prefilled
+// from product metadata) and carries full myDATA detail — measurement unit, VAT category,
+// income classification — set per line OR via the GLOBAL defaults bar above the rows.
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, Search, Package, MapPin } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
+import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
-import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 
-interface Customer {
-  type: 'contact' | 'company';
-  id: string;
-  label: string;
-}
+interface Customer { type: 'contact' | 'company'; id: string; label: string; }
 
 interface LineItem {
   description: string;
@@ -35,26 +27,25 @@ interface LineItem {
   quantity: string;
   unit_price: string;
   unit_cost: string;
+  discount: string;                // line-level discount amount (currency)
+  unit: string;                    // free-text unit label (e.g. "pcs", "m²")
+  measurement_unit_code: string;   // myDATA measurement unit code
+  color: string;
+  size: string;
+  vat_category: string;            // myDATA VAT category code
   income_classification_type: string;
   income_classification_category: string;
-  product_id?: string | null;       // set when the line came from a service/product
-  vat_category?: number | null;      // myDATA VAT category for this line (e.g. a service)
+  product_id?: string | null;
   expanded?: boolean;
 }
 
-interface Props {
-  workspaceId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (invoiceId: string) => void;
-}
+interface Props { workspaceId: string; open: boolean; onOpenChange: (open: boolean) => void; onCreated: (invoiceId: string) => void; }
 
-// Group myDATA document types by family so the dropdown isn't one long flat list.
 const DOC_FAMILY: Record<string, string> = {
-  '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense',
-  '5': 'Credit notes', '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / special',
-  '9': 'Delivery notes', '11': 'Retail receipts', '13': 'Retail / expenses',
-  '14': 'Cross-border', '15': 'Contractor', '16': 'Other', '17': 'Other',
+  '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense', '5': 'Credit notes',
+  '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / special', '9': 'Delivery notes',
+  '11': 'Retail receipts', '13': 'Retail / expenses', '14': 'Cross-border', '15': 'Contractor',
+  '16': 'Other', '17': 'Other',
 };
 function groupDocTypes(types: { code: string; description: string }[]) {
   const groups = new Map<string, { code: string; description: string }[]>();
@@ -63,96 +54,145 @@ function groupDocTypes(types: { code: string; description: string }[]) {
     if (!groups.has(fam)) groups.set(fam, []);
     groups.get(fam)!.push(t);
   }
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => Number(a) - Number(b))
+  return Array.from(groups.entries()).sort(([a], [b]) => Number(a) - Number(b))
     .map(([family, items]) => ({ family, label: DOC_FAMILY[family] ?? `Type ${family}.x`, items }));
 }
 
-const emptyLine = (): LineItem => ({
-  description: '',
-  sku: '',
-  quantity: '1',
-  unit_price: '0',
-  unit_cost: '',
-  income_classification_type: '',
-  income_classification_category: '',
+// myDATA VAT categories (AADE standard) + their percentages.
+const VAT_CATEGORIES: { code: string; label: string; pct: number }[] = [
+  { code: '1', label: '24%', pct: 24 },
+  { code: '2', label: '13%', pct: 13 },
+  { code: '3', label: '6%', pct: 6 },
+  { code: '4', label: '17% (reduced)', pct: 17 },
+  { code: '5', label: '9% (reduced)', pct: 9 },
+  { code: '6', label: '4% (super-reduced)', pct: 4 },
+  { code: '7', label: '0%', pct: 0 },
+  { code: '8', label: 'Without VAT', pct: 0 },
+];
+const vatPctForCat = (code: string | null | undefined, fallback: number): number => {
+  const c = VAT_CATEGORIES.find((v) => v.code === code);
+  return c ? c.pct : fallback;
+};
+
+const MOVE_PURPOSES: [string, string][] = [
+  ['1', 'Sale'], ['2', 'Sale on behalf of third party'], ['3', 'Sampling'], ['4', 'Exhibition'],
+  ['5', 'Return'], ['6', 'Movement between premises'], ['7', 'Consignment'],
+];
+
+const emptyLine = (g?: Partial<LineItem>): LineItem => ({
+  description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
+  measurement_unit_code: g?.measurement_unit_code ?? '', color: '', size: '',
+  vat_category: g?.vat_category ?? '',
+  income_classification_type: g?.income_classification_type ?? '',
+  income_classification_category: g?.income_classification_category ?? '',
 });
+
+// Best-effort extraction of color/size/unit from heterogeneous product metadata.
+function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string } {
+  if (!meta || typeof meta !== 'object') return {};
+  const app = meta.appearance ?? {};
+  const dims = Array.isArray(meta.dimensions) ? meta.dimensions : [];
+  const firstVariant = Array.isArray(meta.variants) && meta.variants[0] ? meta.variants[0] : {};
+  const color = app.color ?? app.colour ?? meta.color ?? firstVariant.color ?? '';
+  const size = app.size ?? meta.size ?? firstVariant.format ?? firstVariant.size ?? (dims[0]?.label ?? dims[0]?.value ?? '');
+  return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
+}
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
 
-  // Customer
+  // Parties
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerOptions, setCustomerOptions] = useState<Customer[]>([]);
+  const [customerAddr, setCustomerAddr] = useState<any>(null);
+  const [issuer, setIssuer] = useState<any>(null);
+  // Inline "add client"
+  const [addingClient, setAddingClient] = useState(false);
+  const [newClient, setNewClient] = useState({ name: '', vat: '', email: '' });
 
-  // Invoice header
-  const [currency, setCurrency] = useState<string>('EUR');
-  const [vatRate, setVatRate] = useState<string>('24');
-  const [paymentTermsDays, setPaymentTermsDays] = useState<string>('30');
+  // Header
+  const [documentType, setDocumentType] = useState('1.1');
+  const [currency, setCurrency] = useState('EUR');
+  const [vatRate, setVatRate] = useState('24');
+  const [paymentTermsDays, setPaymentTermsDays] = useState('30');
+  const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [issueNow, setIssueNow] = useState(true);
+  const [categoryId, setCategoryId] = useState('');
+  const [branchCode, setBranchCode] = useState('0');
+  const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('el');
+  const [withholdingCode, setWithholdingCode] = useState('');
 
-  // Line items
-  const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
-
-  // myDATA document type + income-classification catalog (image 7/8)
-  const [documentType, setDocumentType] = useState<string>('1.1');
+  // Catalogs
   const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
   const [incTypes, setIncTypes] = useState<{ code: string; description: string }[]>([]);
   const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
-  const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
+  const [units, setUnits] = useState<{ code: string; description: string }[]>([]);
   const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
-  const [withholdingCode, setWithholdingCode] = useState<string>('');
-  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null }>>({});
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<string>('');
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
-  const [branchCode, setBranchCode] = useState<string>('0');
-  const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('el');
-  // Invoice with shipping (combined invoice + delivery note)
+  const [services, setServices] = useState<ServiceItem[]>([]);
+
+  // Global line defaults
+  const [gUnit, setGUnit] = useState('');
+  const [gVat, setGVat] = useState('');
+  const [gIncType, setGIncType] = useState('');
+  const [gIncCat, setGIncCat] = useState('');
+
+  // Lines
+  const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
+
+  // Product search (per active row)
+  const [prodSearch, setProdSearch] = useState('');
+  const [prodResults, setProdResults] = useState<any[]>([]);
+  const [prodOpenRow, setProdOpenRow] = useState<number | null>(null);
+
+  // Shipping
   const [hasShipping, setHasShipping] = useState(false);
   const [shipFrom, setShipFrom] = useState('');
+  const [shipTo, setShipTo] = useState('');
   const [transportDate, setTransportDate] = useState('');
   const [transportTime, setTransportTime] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [movePurpose, setMovePurpose] = useState('1');
   const [responsible, setResponsible] = useState('');
-  const [shipTo, setShipTo] = useState('');
+  const [movePurpose, setMovePurpose] = useState('1');
 
+  // ── Reset on open ──
   useEffect(() => {
     if (!open) return;
-    setCustomer(null);
-    setCustomerSearch('');
-    setCurrency('EUR');
-    setVatRate('24');
-    setPaymentTermsDays('30');
-    setNotes('');
+    setCustomer(null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
+    setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
+    setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
+    setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
+    setCategoryId(''); setBranchCode('0'); setDocLanguage('el'); setWithholdingCode('');
+    setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
     setLines([emptyLine()]);
-    setIssueNow(true);
-    setHasShipping(false); setShipFrom(''); setTransportDate(''); setTransportTime(''); setVehicleNumber(''); setMovePurpose('1'); setResponsible(''); setShipTo('');
-    setDocLanguage('el');
+    setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
+    setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
   }, [open]);
 
-  // Load the enabled doc types (+ per-type default classification) and the income catalog.
+  // ── Load catalogs + issuer ──
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat, wh] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh, mu, fs] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
         invoicingSetupService.listReference('income_classification_category'),
         invoicingSetupService.listReference('withholding_tax'),
+        invoicingSetupService.listReference('measurement_unit'),
+        supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
       ]);
       setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
-      setWithholdingCode('');
-      servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
+      setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
+      setIssuer(fs.data ?? null);
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+      servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
-      setCategoryId('');
-      // Only types the workspace enabled; if none configured, show all.
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
       setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
@@ -163,171 +203,177 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     })();
   }, [open, workspaceId]);
 
-  // Default each line's classification from the selected doc type's default.
-  const applyDocDefault = (code: string) => {
-    const def = docDefaults[code];
-    if (def?.type) setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
-  };
-
-  // Customer search (contacts + companies)
+  // ── Customer search ──
   useEffect(() => {
     if (!open) return;
     const term = customerSearch.trim();
-    if (term.length < 2) {
-      setCustomerOptions([]);
-      return;
-    }
+    if (term.length < 2) { setCustomerOptions([]); return; }
     const t = setTimeout(async () => {
       const [contacts, companies] = await Promise.all([
-        supabase
-          .from('crm_contacts')
-          .select('id, name, first_name, last_name, email')
-          .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`)
-          .limit(8),
-        supabase
-          .from('crm_companies')
-          .select('id, name, email')
-          .ilike('name', `%${term}%`)
-          .limit(8),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name, email').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(6),
+        supabase.from('crm_companies').select('id, name').ilike('name', `%${term}%`).limit(6),
       ]);
       const opts: Customer[] = [];
-      for (const c of contacts.data ?? []) {
-        const label = c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id;
-        opts.push({ type: 'contact', id: c.id, label: `${label}` });
-      }
-      for (const c of companies.data ?? []) {
-        opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });
-      }
+      for (const c of contacts.data ?? []) opts.push({ type: 'contact', id: c.id, label: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id });
+      for (const c of companies.data ?? []) opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });
       setCustomerOptions(opts);
     }, 200);
     return () => clearTimeout(t);
   }, [customerSearch, open]);
 
-  const updateLine = (idx: number, field: keyof LineItem, value: string) => {
-    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
-  };
+  // Fetch the chosen customer's address (for preview + delivery prefill).
+  useEffect(() => {
+    if (!customer) { setCustomerAddr(null); return; }
+    (async () => {
+      const table = customer.type === 'company' ? 'crm_companies' : 'crm_contacts';
+      const { data } = await supabase.from(table).select('*').eq('id', customer.id).maybeSingle();
+      setCustomerAddr(data ?? null);
+    })();
+  }, [customer]);
 
-  const addLine = () => setLines((prev) => [...prev, emptyLine()]);
+  // ── Product search (debounced) ──
+  useEffect(() => {
+    if (prodOpenRow === null) return;
+    const term = prodSearch.trim();
+    if (term.length < 2) { setProdResults([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from('products').select('id, name, sku, item_type, metadata').ilike('name', `%${term}%`).limit(8);
+      setProdResults(data ?? []);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [prodSearch, prodOpenRow]);
+
+  const update = (idx: number, patch: Partial<LineItem>) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  const addLine = () => setLines((prev) => [...prev, emptyLine({ measurement_unit_code: gUnit, vat_category: gVat, income_classification_type: gIncType, income_classification_category: gIncCat })]);
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
 
-  // #203 — drop a service in as a prefilled line (price + VAT + classification from the service).
-  const addServiceLine = (serviceId: string) => {
-    const s = services.find((x) => x.id === serviceId);
-    if (!s) return;
-    setLines((prev) => {
-      const next = [...prev];
-      const line: LineItem = {
-        description: s.name,
-        sku: '',
-        quantity: '1',
-        unit_price: s.list_price != null ? String(s.list_price) : '0',
-        unit_cost: '',
-        income_classification_type: s.income_classification_type ?? '',
-        income_classification_category: s.income_classification_category ?? '',
-        product_id: s.id,
-        vat_category: s.vat_category,
-      };
-      // Replace a single empty starter row, otherwise append.
-      if (next.length === 1 && !next[0].description.trim()) return [line];
-      return [...next, line];
+  // Apply a global default to every existing row.
+  const applyGlobal = (field: keyof LineItem, value: string) => setLines((prev) => prev.map((l) => ({ ...l, [field]: value })));
+
+  const pickProduct = async (idx: number, p: any) => {
+    const meta = pickFromMeta(p.metadata);
+    let price = '';
+    try {
+      const { data } = await supabase.rpc('get_product_price_for_workspace', { p_workspace_id: workspaceId, p_product_id: p.id });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row?.suggested_sell != null) price = String(row.suggested_sell);
+    } catch { /* price optional */ }
+    update(idx, {
+      product_id: p.id,
+      description: p.name ?? '',
+      sku: p.sku ?? '',
+      unit: meta.unit ?? '',
+      color: meta.color ?? '',
+      size: meta.size ?? '',
+      ...(price ? { unit_price: price } : {}),
+      expanded: true,
     });
+    setProdOpenRow(null); setProdSearch(''); setProdResults([]);
   };
 
-  const totals = (() => {
-    let subtotal = 0;
+  const pickService = (idx: number, s: ServiceItem) => {
+    update(idx, {
+      product_id: s.id,
+      description: s.name,
+      unit_price: s.list_price != null ? String(s.list_price) : '0',
+      vat_category: s.vat_category != null ? String(s.vat_category) : '',
+      income_classification_type: s.income_classification_type ?? gIncType,
+      income_classification_category: s.income_classification_category ?? gIncCat,
+      expanded: true,
+    });
+    setProdOpenRow(null); setProdSearch(''); setProdResults([]);
+  };
+  const matchedServices = (term: string) => term.length < 2 ? [] : services.filter((s) => s.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6);
+
+  // Shipping prefills
+  const fmtAddr = (a: any) => a ? [a.business_address ?? a.street ?? a.address, a.business_street_number ?? a.street_number, a.business_postal_code ?? a.postal_code, a.business_city ?? a.city].filter(Boolean).join(' ') : '';
+  const useHqAddress = () => setShipFrom(fmtAddr(issuer));
+  const useCustomerDelivery = () => setShipTo(fmtAddr(customerAddr));
+
+  const createClient = async () => {
+    if (!newClient.name.trim()) { toast({ title: 'Client name required', variant: 'destructive' }); return; }
+    const { data, error } = await supabase.from('crm_companies').insert({
+      workspace_id: workspaceId, name: newClient.name.trim(), vat_number: newClient.vat || null, email: newClient.email || null,
+    }).select('id, name').single();
+    if (error) { toast({ title: 'Failed to add client', description: error.message, variant: 'destructive' }); return; }
+    setCustomer({ type: 'company', id: data.id, label: `${data.name} (company)` });
+    setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
+  };
+
+  // ── Totals (per-line VAT via category when set, else global rate) ──
+  const totals = useMemo(() => {
+    let net = 0, vat = 0;
     for (const l of lines) {
       const q = parseFloat(l.quantity) || 0;
       const p = parseFloat(l.unit_price) || 0;
-      subtotal += q * p;
+      const disc = parseFloat(l.discount) || 0;
+      const lineNet = Math.max(0, q * p - disc);
+      const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+      net += lineNet; vat += lineNet * (pct / 100);
     }
-    const vr = parseFloat(vatRate) || 0;
-    const vatAmount = subtotal * (vr / 100);
     const wh = withholdings.find((w) => w.code === withholdingCode);
-    const withheld = wh?.rate ? subtotal * (Number(wh.rate) / 100) : 0;
-    return { subtotal, vatAmount, withheld, total: subtotal + vatAmount - withheld };
-  })();
+    const withheld = wh?.rate ? net * (Number(wh.rate) / 100) : 0;
+    return { net, vat, withheld, total: net + vat - withheld };
+  }, [lines, vatRate, withholdingCode, withholdings]);
+
+  const applyDocDefault = (code: string) => {
+    const def = docDefaults[code];
+    if (def?.type) {
+      setGIncType(def.type); setGIncCat(def.category ?? '');
+      setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
+    }
+  };
 
   const handleSave = async () => {
-    if (!customer) {
-      toast({ title: 'Pick a customer', variant: 'destructive' });
-      return;
-    }
-    const cleanLines = lines.filter((l) => l.description.trim() && parseFloat(l.quantity) > 0);
-    if (cleanLines.length === 0) {
-      toast({ title: 'Add at least one line item', variant: 'destructive' });
-      return;
-    }
-
+    if (!customer) { toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
+    const clean = lines.filter((l) => l.description.trim() && parseFloat(l.quantity) > 0);
+    if (clean.length === 0) { toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
     try {
       setBusy(true);
-
-      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
-        p_workspace_id: workspaceId,
-        p_doc_code: documentType,
-        p_branch_code: parseInt(branchCode, 10) || 0,
-      });
+      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', { p_workspace_id: workspaceId, p_doc_code: documentType, p_branch_code: parseInt(branchCode, 10) || 0 });
       if (numErr) throw numErr;
       const num = Array.isArray(numRows) ? numRows[0] : numRows;
+      const dueAt = new Date(issueDate); dueAt.setDate(dueAt.getDate() + (parseInt(paymentTermsDays, 10) || 30));
 
-      const dueAt = new Date();
-      dueAt.setDate(dueAt.getDate() + (parseInt(paymentTermsDays, 10) || 30));
-
-      const { data: invoice, error: insErr } = await supabase
-        .from('invoices')
-        .insert({
-          workspace_id: workspaceId,
-          internal_number: num?.formatted,
-          series: num?.series ?? null,
-          series_number: num?.number ?? null,
-          customer_contact_id: customer.type === 'contact' ? customer.id : null,
-          customer_company_id: customer.type === 'company' ? customer.id : null,
-          status: issueNow ? 'issued' : 'draft',
-          currency,
-          subtotal_net: Number(totals.subtotal.toFixed(2)),
-          vat_rate: Number(vatRate),
-          vat_amount: Number(totals.vatAmount.toFixed(2)),
-          total: Number(totals.total.toFixed(2)),
-          payment_terms_days: parseInt(paymentTermsDays, 10) || 30,
-          notes: notes || null,
-          document_type: documentType,
-          category_id: categoryId || null,
-          branch_code: parseInt(branchCode, 10) || 0,
-          doc_language: docLanguage,
-          has_shipping: hasShipping,
-          ship_from: hasShipping ? (shipFrom || null) : null,
-          transport_date: hasShipping && transportDate ? transportDate : null,
-          transport_time: hasShipping ? (transportTime || null) : null,
-          vehicle_number: hasShipping ? (vehicleNumber || null) : null,
-          move_purpose: hasShipping ? movePurpose : null,
-          responsible: hasShipping ? (responsible || null) : null,
-          ship_to: hasShipping ? (shipTo || null) : null,
-          total_withheld_amount: Number((totals.withheld || 0).toFixed(2)),
-          issued_at: issueNow ? new Date().toISOString() : null,
-          due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
-        })
-        .select()
-        .single();
+      const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
+        workspace_id: workspaceId,
+        internal_number: num?.formatted, series: num?.series ?? null, series_number: num?.number ?? null,
+        customer_contact_id: customer.type === 'contact' ? customer.id : null,
+        customer_company_id: customer.type === 'company' ? customer.id : null,
+        status: issueNow ? 'issued' : 'draft',
+        currency, subtotal_net: Number(totals.net.toFixed(2)), vat_rate: Number(vatRate),
+        vat_amount: Number(totals.vat.toFixed(2)), total: Number(totals.total.toFixed(2)),
+        total_withheld_amount: Number(totals.withheld.toFixed(2)),
+        payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
+        document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
+        doc_language: docLanguage,
+        has_shipping: hasShipping,
+        ship_from: hasShipping ? (shipFrom || null) : null, ship_to: hasShipping ? (shipTo || null) : null,
+        transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
+        vehicle_number: hasShipping ? (vehicleNumber || null) : null, responsible: hasShipping ? (responsible || null) : null,
+        move_purpose: hasShipping ? movePurpose : null,
+        issued_at: issueNow ? new Date(issueDate).toISOString() : null,
+        due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
+      }).select().single();
       if (insErr) throw insErr;
 
-      const itemsPayload = cleanLines.map((l) => {
-        const q = parseFloat(l.quantity);
-        const p = parseFloat(l.unit_price);
-        const c = l.unit_cost.trim() ? parseFloat(l.unit_cost) : null;
+      const itemsPayload = clean.map((l) => {
+        const q = parseFloat(l.quantity); const p = parseFloat(l.unit_price);
+        const disc = parseFloat(l.discount) || 0;
+        const net = Math.max(0, q * p - disc);
         return {
-          invoice_id: invoice.id,
-          description: l.description.trim(),
-          sku: l.sku.trim() || null,
-          quantity: q,
-          unit_price: p,
-          unit_cost_snapshot: c,
-          line_total: Number((q * p).toFixed(2)),
+          invoice_id: invoice.id, description: l.description.trim(), sku: l.sku.trim() || null,
+          quantity: q, unit_price: p, unit: l.unit || null,
+          measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
+          discounted_price: disc || null, net_value: Number(net.toFixed(2)), line_total: Number(net.toFixed(2)),
+          unit_cost_snapshot: l.unit_cost.trim() ? parseFloat(l.unit_cost) : null,
+          selected_color: l.color || null, selected_size: l.size || null,
+          vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
           income_classification_type: l.income_classification_type || null,
           income_classification_category: l.income_classification_category || null,
           product_id: l.product_id || null,
-          vat_category: l.vat_category ?? null,
         };
       });
-
       const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itemsErr) throw itemsErr;
 
@@ -335,61 +381,62 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       onCreated(invoice.id);
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message ?? 'Error', variant: 'destructive' });
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
+
+  const money = (n: number) => `${(n || 0).toFixed(2)} ${currency === 'EUR' ? '€' : currency}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[94vh] overflow-hidden p-0">
+        <DialogHeader className="border-b border-border/60 px-5 py-3">
           <DialogTitle>New invoice</DialogTitle>
-          <DialogDescription>
-            Manual invoice (not tied to a quote). For accepted quotes, use "Issue invoice" from the quote page.
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Header: customer (left) · document type + category (right) */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Customer *</Label>
-              {customer ? (
+        <div className="grid max-h-[calc(94vh-110px)] grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
+          {/* ───────────── FORM (left) ───────────── */}
+          <div className="space-y-5 overflow-y-auto px-5 py-4">
+            {/* Parties + document */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Billed to</Label>
+                {!addingClient && <button type="button" className="text-xs text-primary hover:underline" onClick={() => setAddingClient(true)}>+ Add new client</button>}
+              </div>
+              {addingClient ? (
+                <div className="grid grid-cols-3 gap-2 rounded-md border border-border/60 p-3">
+                  <Input className="h-8 text-xs col-span-3" placeholder="Company name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
+                  <Input className="h-8 text-xs" placeholder="VAT no." value={newClient.vat} onChange={(e) => setNewClient({ ...newClient, vat: e.target.value })} />
+                  <Input className="h-8 text-xs col-span-2" placeholder="Email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
+                  <div className="col-span-3 flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setAddingClient(false)}>Cancel</Button>
+                    <Button size="sm" onClick={createClient}>Add client</Button>
+                  </div>
+                </div>
+              ) : customer ? (
                 <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                   <span className="text-sm">{customer.label}</span>
                   <Button size="sm" variant="ghost" onClick={() => setCustomer(null)}>Change</Button>
                 </div>
               ) : (
                 <div className="relative">
-                  <Input
-                    placeholder="Search contacts or companies…"
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                  />
+                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-8" placeholder="Search contacts or companies…" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   {customerOptions.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
+                    <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
                       {customerOptions.map((o) => (
-                        <button
-                          key={`${o.type}-${o.id}`}
-                          type="button"
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                          onClick={() => { setCustomer(o); setCustomerSearch(''); setCustomerOptions([]); }}
-                        >
-                          {o.label}
-                        </button>
+                        <button key={`${o.type}-${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setCustomer(o); setCustomerSearch(''); setCustomerOptions([]); }}>{o.label}</button>
                       ))}
                     </div>
                   )}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Document type (myDATA)</Label>
+            <section className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs">Document type (myDATA)</Label>
                 <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
-                  <SelectTrigger><SelectValue placeholder="Select document type…" /></SelectTrigger>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
                     {groupDocTypes(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((g) => (
                       <React.Fragment key={g.family}>
@@ -401,260 +448,297 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Category</Label>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
-                      : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
+                <Label className="text-xs">Date issued</Label>
+                <Input type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Payment terms (days)</Label>
+                <Input type="number" min="0" className="h-9" value={paymentTermsDays} onChange={(e) => setPaymentTermsDays(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Default VAT %</Label>
+                <Input type="number" step="0.01" className="h-9" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Category</Label>
+                <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">None</SelectItem>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Document language</Label>
+                <Select value={docLanguage} onValueChange={(v: any) => setDocLanguage(v)}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="el">Greek</SelectItem><SelectItem value="en">English</SelectItem></SelectContent>
                 </Select>
               </div>
               {branches.length > 1 && (
-                <div className="space-y-1">
-                  <Label>Establishment</Label>
+                <div className="space-y-1 col-span-2">
+                  <Label className="text-xs">Establishment</Label>
                   <Select value={branchCode} onValueChange={setBranchCode}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}
-                    </SelectContent>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               )}
-              <div className="space-y-1">
-                <Label>Document language</Label>
-                <Select value={docLanguage} onValueChange={(v: any) => setDocLanguage(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="el">Greek</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
+            </section>
+
+            {/* Global line defaults */}
+            <section className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Global line defaults — applied to all rows</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={gUnit || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGUnit(val); applyGlobal('measurement_unit_code', val); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Measurement unit" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">Unit…</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">Language of the printed invoice PDF sent to the customer.</p>
+                <Select value={gVat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGVat(val); applyGlobal('vat_category', val); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VAT category" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">VAT category…</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={gIncType || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncType(val); applyGlobal('income_classification_type', val); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income type" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">Income type…</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={gIncCat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncCat(val); applyGlobal('income_classification_category', val); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income category" /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">Income category…</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
-            </div>
-          </div>
+            </section>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="space-y-1">
-              <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="GBP">GBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>VAT %</Label>
-              <Input type="number" step="0.01" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Terms (days)</Label>
-              <Input type="number" min="0" value={paymentTermsDays} onChange={(e) => setPaymentTermsDays(e.target.value)} />
-            </div>
-            <div className="flex items-end gap-2">
-              <input
-                id="issue_now"
-                type="checkbox"
-                checked={issueNow}
-                onChange={(e) => setIssueNow(e.target.checked)}
-                className="h-4 w-4 rounded"
-              />
-              <Label htmlFor="issue_now" className="text-sm">Issue now</Label>
-            </div>
-          </div>
-
-          {/* Invoice with shipping (combined invoice + delivery note) */}
-          <div className="rounded-md border border-border/60 p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">Invoice with shipping</div>
-                <p className="text-xs text-muted-foreground">Combined invoice + delivery note — adds transport details.</p>
+            {/* Line items */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / services</Label>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
               </div>
-              <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
-            </div>
-            {hasShipping && (
-              <div className="grid gap-3 md:grid-cols-2">
-                {/* Loading place */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Loading place</Label>
-                  <Input className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Our HQ / address" />
-                </div>
-                {/* Delivery place */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Delivery place</Label>
-                  <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
-                </div>
-                {/* Transport */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Transport date</Label>
-                    <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Time</Label>
-                    <Input type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Vehicle no.</Label>
-                    <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Responsible</Label>
-                    <Input className="h-8 text-xs" value={responsible} onChange={(e) => setResponsible(e.target.value)} placeholder="Driver / handler" />
-                  </div>
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-xs">Purpose</Label>
-                  <Select value={movePurpose} onValueChange={setMovePurpose}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 — Sale</SelectItem>
-                      <SelectItem value="2">2 — Sale on behalf of third party</SelectItem>
-                      <SelectItem value="3">3 — Sampling</SelectItem>
-                      <SelectItem value="4">4 — Exhibition</SelectItem>
-                      <SelectItem value="5">5 — Return</SelectItem>
-                      <SelectItem value="6">6 — Movement between premises</SelectItem>
-                      <SelectItem value="7">7 — Consignment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Line items */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Line items</Label>
-              <div className="flex items-center gap-2">
-                {services.length > 0 && (
-                  <Select value="" onValueChange={addServiceLine}>
-                    <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Add service" /></SelectTrigger>
-                    <SelectContent>
-                      {services.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}{s.list_price != null ? ` — ${s.list_price} ${s.currency}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button size="sm" variant="outline" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-md border border-border/60">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr className="border-b border-border/60">
-                    <th className="px-2 py-2 text-left">Description</th>
-                    <th className="px-2 py-2 text-left w-28">SKU</th>
-                    <th className="px-2 py-2 text-right w-20">Qty</th>
-                    <th className="px-2 py-2 text-right w-28">Unit price</th>
-                    <th className="px-2 py-2 text-right w-28">Unit cost</th>
-                    <th className="px-2 py-2 text-right w-24">Line</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l, idx) => {
-                    const lineTotal = (parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price) || 0);
-                    return (
-                      <React.Fragment key={idx}>
-                      <tr className="border-b border-border/30">
-                        <td className="px-2 py-1">
-                          <Input value={l.description} onChange={(e) => updateLine(idx, 'description', e.target.value)} placeholder="Description" className="h-8" />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input value={l.sku} onChange={(e) => updateLine(idx, 'sku', e.target.value)} className="h-8" />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input type="number" step="0.01" min="0" value={l.quantity} onChange={(e) => updateLine(idx, 'quantity', e.target.value)} className="h-8 text-right" />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input type="number" step="0.01" min="0" value={l.unit_price} onChange={(e) => updateLine(idx, 'unit_price', e.target.value)} className="h-8 text-right" />
-                        </td>
-                        <td className="px-2 py-1">
-                          <Input type="number" step="0.01" min="0" value={l.unit_cost} onChange={(e) => updateLine(idx, 'unit_cost', e.target.value)} placeholder="—" className="h-8 text-right" />
-                        </td>
-                        <td className="px-2 py-1 text-right tabular-nums">{lineTotal.toFixed(2)}</td>
-                        <td className="px-1 py-1">
-                          <div className="flex items-center gap-0.5">
-                            <Button size="sm" variant="ghost" title="Income classification (myDATA)"
-                              className={l.income_classification_type ? 'text-primary' : ''}
-                              onClick={() => setLines((ls) => ls.map((x, i) => i === idx ? { ...x, expanded: !x.expanded } : x))}>
-                              <Tag className="h-3 w-3" />
-                            </Button>
-                            {lines.length > 1 && (
-                              <Button size="sm" variant="ghost" onClick={() => removeLine(idx)}><Trash2 className="h-3 w-3" /></Button>
-                            )}
+              <div className="space-y-2">
+                {lines.map((l, idx) => {
+                  const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
+                  const lineNet = Math.max(0, q * p - disc);
+                  return (
+                    <div key={idx} className="rounded-md border border-border/60">
+                      <div className="flex items-start gap-2 p-2">
+                        <button type="button" className="mt-2 text-muted-foreground" onClick={() => update(idx, { expanded: !l.expanded })}>
+                          {l.expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                        <div className="flex-1 space-y-1">
+                          <div className="relative">
+                            <Input className="h-8 text-sm" placeholder="Description" value={l.description} onChange={(e) => update(idx, { description: e.target.value })} />
                           </div>
-                        </td>
-                      </tr>
+                          <div className="flex items-center gap-1">
+                            <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={() => { setProdOpenRow(idx); setProdSearch(''); setProdResults([]); }}>
+                              <Package className="h-3 w-3" /> {l.product_id ? 'Linked product' : 'Pick from products'}
+                            </button>
+                            {(l.color || l.size) && <span className="text-[11px] text-muted-foreground">· {[l.color, l.size].filter(Boolean).join(' / ')}</span>}
+                          </div>
+                          {prodOpenRow === idx && (
+                            <div className="rounded-md border border-border/60 bg-popover p-2">
+                              <Input autoFocus className="h-8 text-xs" placeholder="Search products & services…" value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} />
+                              <div className="mt-1 max-h-40 overflow-auto">
+                                {matchedServices(prodSearch.trim()).map((s) => (
+                                  <button key={`s-${s.id}`} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onClick={() => pickService(idx, s)}>
+                                    <span>{s.name}</span><span className="text-[10px] text-muted-foreground">service</span>
+                                  </button>
+                                ))}
+                                {prodResults.map((pr) => (
+                                  <button key={pr.id} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onClick={() => pickProduct(idx, pr)}>
+                                    <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">product</span>
+                                  </button>
+                                ))}
+                                {prodSearch.length >= 2 && prodResults.length === 0 && matchedServices(prodSearch.trim()).length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No matches</div>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-16"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
+                        <div className="w-24"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
+                        <div className="w-20 pt-2 text-right text-sm tabular-nums">{lineNet.toFixed(2)}</div>
+                        {lines.length > 1 && <button type="button" className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
+                      </div>
                       {l.expanded && (
-                        <tr className="bg-muted/20">
-                          <td colSpan={7} className="px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-3 text-xs">
-                              <span className="text-muted-foreground">Characterization (myDATA income classification)</span>
-                              <Select value={l.income_classification_type || undefined} onValueChange={(v) => updateLine(idx, 'income_classification_type', v)}>
-                                <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Income type…" /></SelectTrigger>
-                                <SelectContent>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                        <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Measurement unit</Label>
+                            <Select value={l.measurement_unit_code || 'none'} onValueChange={(v) => update(idx, { measurement_unit_code: v === 'none' ? '' : v })}>
+                              <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
+                              <SelectContent><SelectItem value="none">—</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">VAT category</Label>
+                            <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
+                              <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Default" /></SelectTrigger>
+                              <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Unit cost (COGS)</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-[10px] text-muted-foreground">Kind of expense (income classification)</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Select value={l.income_classification_type || 'none'} onValueChange={(v) => update(idx, { income_classification_type: v === 'none' ? '' : v })}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+                                <SelectContent><SelectItem value="none">—</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>)}</SelectContent>
                               </Select>
-                              <Select value={l.income_classification_category || undefined} onValueChange={(v) => updateLine(idx, 'income_classification_category', v)}>
-                                <SelectTrigger className="h-8 w-56"><SelectValue placeholder="Income category…" /></SelectTrigger>
-                                <SelectContent>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                              <Select value={l.income_classification_category || 'none'} onValueChange={(v) => update(idx, { income_classification_category: v === 'none' ? '' : v })}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+                                <SelectContent><SelectItem value="none">—</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
                               </Select>
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       )}
-                      </React.Fragment>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Withholding */}
+            <section className="space-y-1">
+              <Label className="text-xs">Withholding tax</Label>
+              <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}</SelectContent>
+              </Select>
+            </section>
+
+            {/* Shipping */}
+            <section className="rounded-md border border-border/60 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">Invoice with shipping</div>
+                  <p className="text-xs text-muted-foreground">Adds a transport block (combined invoice + delivery note).</p>
+                </div>
+                <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
+              </div>
+              {hasShipping && (
+                <div className="space-y-2">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Loading place</Label>
+                        <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={useHqAddress}><MapPin className="h-3 w-3" /> Use HQ details</button>
+                      </div>
+                      <Input className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Loading address" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Delivery place</Label>
+                        <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-40" disabled={!customerAddr} onClick={useCustomerDelivery}><MapPin className="h-3 w-3" /> Customer delivery address</button>
+                      </div>
+                      <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Date</Label><Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Time</Label><Input type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Vehicle</Label><Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" /></div>
+                    <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Responsible</Label><Input className="h-8 text-xs" value={responsible} onChange={(e) => setResponsible(e.target.value)} /></div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Purpose</Label>
+                    <Select value={movePurpose} onValueChange={setMovePurpose}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{MOVE_PURPOSES.map(([v, lbl]) => <SelectItem key={v} value={v}>{v} — {lbl}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
+            </section>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4 rounded" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} />
+              Issue now (assigns the legal number + date)
+            </label>
+          </div>
+
+          {/* ───────────── PREVIEW (right) ───────────── */}
+          <div className="hidden overflow-y-auto border-l border-border/60 bg-muted/20 px-5 py-4 lg:block">
+            <div className="rounded-lg border border-border/60 bg-background p-5 text-sm shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold">{groupDocTypes(docTypes).find((g) => g.items.some((t) => t.code === documentType))?.items.find((t) => t.code === documentType)?.description || 'Invoice'}</div>
+                  <div className="text-xs text-muted-foreground">{documentType}{branches.length > 1 ? ` · Est. #${branchCode}` : ''}</div>
+                </div>
+                <Badge variant="outline">{issueNow ? 'Issued' : 'Draft'}</Badge>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <div className="text-muted-foreground">Billed by</div>
+                  <div className="font-medium">{issuer?.business_name || '—'}</div>
+                  <div className="text-muted-foreground">{fmtAddr(issuer)}</div>
+                  {issuer?.business_vat && <div className="text-muted-foreground">VAT: {issuer.business_vat}</div>}
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Billed to</div>
+                  <div className="font-medium">{customer?.label?.replace(' (company)', '') || '—'}</div>
+                  <div className="text-muted-foreground">{fmtAddr(customerAddr)}</div>
+                  {customerAddr?.vat_number && <div className="text-muted-foreground">VAT: {customerAddr.vat_number}</div>}
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
+                <div><div className="text-muted-foreground">Date issued</div><div className="font-medium">{issueDate}</div></div>
+                <div><div className="text-muted-foreground">Due</div><div className="font-medium">{(() => { const d = new Date(issueDate); d.setDate(d.getDate() + (parseInt(paymentTermsDays, 10) || 0)); return d.toISOString().slice(0, 10); })()}</div></div>
+              </div>
+
+              <table className="mt-4 w-full text-xs">
+                <thead className="border-y border-border/60 text-muted-foreground">
+                  <tr><th className="py-1.5 text-left">Item</th><th className="py-1.5 text-right">Qty</th><th className="py-1.5 text-right">Unit</th><th className="py-1.5 text-right">Total</th></tr>
+                </thead>
+                <tbody>
+                  {lines.filter((l) => l.description.trim()).map((l, i) => {
+                    const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
+                    return (
+                      <tr key={i} className="border-b border-border/30">
+                        <td className="py-1.5">
+                          <div>{l.description}</div>
+                          {(l.color || l.size) && <div className="text-[10px] text-muted-foreground">{[l.color, l.size].filter(Boolean).join(' / ')}</div>}
+                        </td>
+                        <td className="py-1.5 text-right">{q}{l.unit ? ` ${l.unit}` : ''}</td>
+                        <td className="py-1.5 text-right">{money(p)}</td>
+                        <td className="py-1.5 text-right">{money(Math.max(0, q * p - disc))}</td>
+                      </tr>
                     );
                   })}
+                  {lines.filter((l) => l.description.trim()).length === 0 && <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">No items yet</td></tr>}
                 </tbody>
-                <tfoot className="text-sm">
-                  <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Subtotal</td><td className="px-2 py-1 text-right tabular-nums">{totals.subtotal.toFixed(2)}</td><td /></tr>
-                  <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">VAT ({vatRate}%)</td><td className="px-2 py-1 text-right tabular-nums">{totals.vatAmount.toFixed(2)}</td><td /></tr>
-                  {totals.withheld > 0 && (
-                    <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Withholding</td><td className="px-2 py-1 text-right tabular-nums text-amber-600">-{totals.withheld.toFixed(2)}</td><td /></tr>
-                  )}
-                  <tr><td colSpan={5} className="px-2 py-1 text-right font-medium">Total</td><td className="px-2 py-1 text-right font-medium tabular-nums">{totals.total.toFixed(2)}</td><td /></tr>
-                </tfoot>
               </table>
+
+              <div className="mt-3 space-y-1 text-xs">
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (net)</span><span className="tabular-nums">{money(totals.net)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{money(totals.vat)}</span></div>
+                {totals.withheld > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Withholding</span><span className="tabular-nums text-amber-600">- {money(totals.withheld)}</span></div>}
+                <div className="flex justify-between border-t border-border/60 pt-1 text-sm font-semibold"><span>Grand total</span><span className="tabular-nums">{money(totals.total)}</span></div>
+              </div>
+
+              {notes && <div className="mt-4 rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">{notes}</div>}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              "Unit cost" is the cost-of-goods snapshot used for profit calc. Leave empty if you don't track it for this line.
-            </p>
-          </div>
-
-          {/* Withholding tax — applied on the net, reduces the total */}
-          <div className="space-y-1">
-            <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Withholding tax</Label>
-            <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
-              <SelectTrigger className="max-w-md"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Internal notes (not on PDF)" />
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-border/60 px-5 py-3">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSave} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}
-          </Button>
+          <Button onClick={handleSave} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

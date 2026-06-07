@@ -262,10 +262,15 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
 
   const vatByRate: Record<string, { net: number; vat: number }> = {};
   let totNet = 0, totVat = 0;
+  // myDATA VAT category → percent (used when a line carries an explicit category).
+  const VAT_PCT_BY_CAT: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
+  const UNIT_LABEL: Record<number, string> = { 1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm²', 6: 'm³' };
   for (const it of items) {
     const qty = Number(it.quantity ?? 1);
     const net = Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * qty);
-    const pct = Number(it.vat_percent ?? inv.vat_rate ?? 0);
+    const pct = it.vat_category != null && VAT_PCT_BY_CAT[Number(it.vat_category)] !== undefined
+      ? VAT_PCT_BY_CAT[Number(it.vat_category)]
+      : Number(it.vat_percent ?? inv.vat_rate ?? 0);
     const vat = Number(it.vat_amount ?? (net * pct) / 100);
     totNet += net; totVat += vat;
     const key = String(pct);
@@ -273,12 +278,15 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     vatByRate[key].net += net; vatByRate[key].vat += vat;
 
     const dLines = wrap(it.description ?? 'Item', font, 8.5, cols.qty - cols.descr - 10);
-    const rowH = Math.max(13, dLines.length * 10 + 3);
+    const detail = [it.selected_color, it.selected_size].filter(Boolean).join(' / ');
+    const rowH = Math.max(13, dLines.length * 10 + (detail ? 10 : 0) + 3);
     if (y - rowH < M + 150) { newPage(); drawHead(); }
     let ly = y;
     for (const dl of dLines) { text(dl, cols.descr + 2, ly, 8.5); ly -= 10; }
+    if (detail) { text(detail, cols.descr + 2, ly, 7.5, font, MUTED); ly -= 10; }
+    const unitLabel = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL[Number(it.measurement_unit_code)] : '') ?? '';
     textR(qty, cols.qty + 28, y, 8.5);
-    text(it.unit ?? '', cols.unit, y, 8.5);
+    text(unitLabel, cols.unit, y, 8.5);
     textR(money(it.unit_price ?? 0), cols.price + 52, y, 8.5);
     textR(money(net), cols.net + 42, y, 8.5);
     textR(`${pct}%`, cols.vatp + 22, y, 8.5);
