@@ -16,8 +16,10 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
+import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
+import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'expenses';
 
@@ -27,7 +29,7 @@ const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?
   { key: 'credit_notes', label: 'Credit notes', icon: FileMinus, enabled: true },
   { key: 'payments', label: 'Payments', icon: Banknote, enabled: true },
   { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
-  { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: false },
+  { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: true },
 ];
 
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
@@ -45,23 +47,27 @@ const DocumentsPage: React.FC = () => {
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
+  const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
+  const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
 
   const load = async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb, pmts] = await Promise.all([
+      const [inv, cn, inb, pmts, dns] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
         financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 200 }).catch(() => []),
+        deliveryNotesService.list(activeWorkspaceId).catch(() => []),
       ]);
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
       setPayments(pmts);
+      setDeliveryNotes(dns);
     } catch (err: any) {
       toast({ title: 'Failed to load documents', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -111,6 +117,9 @@ const DocumentsPage: React.FC = () => {
                 {(type === 'invoices' || type === 'receipts') && !isAccountant && (
                   <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
+                {type === 'delivery_notes' && !isAccountant && (
+                  <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+                )}
               </div>
             </div>
 
@@ -124,6 +133,8 @@ const DocumentsPage: React.FC = () => {
                   <InboundTable rows={inbound} financeBase={financeBase} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={payments} />
+                ) : type === 'delivery_notes' ? (
+                  <DeliveryNotesTable rows={deliveryNotes} readOnly={isAccountant} onChanged={load} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -171,7 +182,57 @@ const DocumentsPage: React.FC = () => {
           onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
         />
       )}
+      {activeWorkspaceId && (
+        <NewDeliveryNoteDialog
+          workspaceId={activeWorkspaceId}
+          open={newDeliveryOpen}
+          onOpenChange={setNewDeliveryOpen}
+          onCreated={() => { setNewDeliveryOpen(false); load(); }}
+        />
+      )}
     </div>
+  );
+};
+
+const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+  const { toast } = useToast();
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const issue = async (id: string) => {
+    setBusy(id);
+    try { await deliveryNotesService.issue(id); toast({ title: 'Delivery note issued · stock decremented' }); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+  return (
+    <table className="w-full text-sm">
+      <thead className="border-b border-border/60 text-xs text-muted-foreground">
+        <tr>
+          <th className="px-4 py-2 text-left">Number</th>
+          <th className="px-4 py-2 text-left">Date</th>
+          <th className="px-4 py-2 text-center">Status</th>
+          <th className="px-4 py-2 text-right" />
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 && (
+          <tr><td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">No delivery notes yet.</td></tr>
+        )}
+        {rows.map((d) => (
+          <tr key={d.id} className="border-b border-border/30">
+            <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
+            <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
+            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{d.status}</Badge></td>
+            <td className="px-4 py-2 text-right">
+              {!readOnly && d.status === 'draft' && (
+                <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => issue(d.id)}>
+                  {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue'}
+                </Button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 };
 
