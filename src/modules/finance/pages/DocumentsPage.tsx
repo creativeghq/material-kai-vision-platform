@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -14,17 +14,18 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { financeService, formatMoney, type Invoice, type CreditNote } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 
-type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'delivery_notes' | 'expenses';
+type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'expenses';
 
 const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?: string }>; enabled: boolean }[] = [
   { key: 'invoices', label: 'Invoices', icon: FileText, enabled: true },
   { key: 'receipts', label: 'Receipts', icon: Receipt, enabled: true },
   { key: 'credit_notes', label: 'Credit notes', icon: FileMinus, enabled: true },
+  { key: 'payments', label: 'Payments', icon: Banknote, enabled: true },
   { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
   { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: false },
 ];
@@ -43,6 +44,7 @@ const DocumentsPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
+  const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
 
@@ -50,14 +52,16 @@ const DocumentsPage: React.FC = () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb] = await Promise.all([
+      const [inv, cn, inb, pmts] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
+        financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 200 }).catch(() => []),
       ]);
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
+      setPayments(pmts);
     } catch (err: any) {
       toast({ title: 'Failed to load documents', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -118,6 +122,8 @@ const DocumentsPage: React.FC = () => {
                   <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
                   <InboundTable rows={inbound} financeBase={financeBase} readOnly={isAccountant} onChanged={load} />
+                ) : type === 'payments' ? (
+                  <PaymentsTable rows={payments} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -197,6 +203,41 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
           <td className="px-4 py-2">{cn.invoice_id ? <Link to={`${financeBase}/invoices/${cn.invoice_id}`} className="text-primary hover:underline text-xs">open</Link> : '—'}</td>
         </tr>
       ))}
+    </tbody>
+  </table>
+);
+
+const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[] }> = ({ rows }) => (
+  <table className="w-full text-sm">
+    <thead className="border-b border-border/60 text-xs text-muted-foreground">
+      <tr>
+        <th className="px-4 py-2 text-left">Date</th>
+        <th className="px-4 py-2 text-left">Direction</th>
+        <th className="px-4 py-2 text-left">Method</th>
+        <th className="px-4 py-2 text-left">Reference</th>
+        <th className="px-4 py-2 text-right">Amount</th>
+        <th className="px-4 py-2 text-right">Allocated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.length === 0 && (
+        <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
+      )}
+      {rows.map((p: any) => {
+        const allocated = (p.allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
+        return (
+          <tr key={p.id} className="border-b border-border/30">
+            <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
+            <td className="px-4 py-2">
+              <Badge variant={p.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{p.direction === 'in' ? 'Received' : 'Paid out'}</Badge>
+            </td>
+            <td className="px-4 py-2 capitalize">{(p.method ?? '—').replace('_', ' ')}</td>
+            <td className="px-4 py-2 text-muted-foreground">{p.reference ?? '—'}</td>
+            <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
+            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
+          </tr>
+        );
+      })}
     </tbody>
   </table>
 );
