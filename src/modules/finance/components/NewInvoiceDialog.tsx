@@ -18,6 +18,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
+import { financeService } from '@/modules/finance/services/financeService';
+import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 
 interface Customer { type: 'contact' | 'company'; id: string; label: string; }
 
@@ -139,6 +141,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [selfPricing, setSelfPricing] = useState(false);
   const [exchangeRate, setExchangeRate] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<{ code: string; description: string }[]>([]);
+  // Reference-screen fields
+  const [pricesIncludeVat, setPricesIncludeVat] = useState(false);
+  const [digitalFee, setDigitalFee] = useState('');
+  const [relatedDocument, setRelatedDocument] = useState('');
+  const [printTerms, setPrintTerms] = useState(true);
+  const [includeInMyf, setIncludeInMyf] = useState(true);
+  const [printOnlineCode, setPrintOnlineCode] = useState(true);
+  const [infoBox, setInfoBox] = useState('');
+  const [logoMode, setLogoMode] = useState<'auto' | 'none'>('auto');
+  const [submitNow, setSubmitNow] = useState(false);
+  const [sendEmail, setSendEmail] = useState(false);
+  const [sendSms, setSendSms] = useState(false);
+  const [nextNumber, setNextNumber] = useState<{ series: string | null; number: number | null } | null>(null);
 
   // Catalogs
   const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
@@ -184,6 +199,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('el'); setWithholdingCode('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
+    setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true);
+    setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setSendSms(false); setNextNumber(null);
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
     setLines([emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
@@ -248,6 +265,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setCustomerAddr(data ?? null);
     })();
   }, [customer]);
+
+  // Preview the series + next number for this doc type + establishment (read-only).
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data: br } = await supabase.from('finance_branches').select('id').eq('workspace_id', workspaceId).eq('branch_code', parseInt(branchCode, 10) || 0).maybeSingle();
+      let q = supabase.from('document_series').select('series, next_number, branch_id').eq('workspace_id', workspaceId).eq('doc_code', documentType).eq('is_active', true);
+      const { data: rows } = await q;
+      const list = rows ?? [];
+      const match = list.find((r: any) => r.branch_id === (br as any)?.id) ?? list.find((r: any) => r.branch_id === null);
+      setNextNumber(match ? { series: (match as any).series, number: (match as any).next_number } : null);
+    })();
+  }, [open, workspaceId, documentType, branchCode]);
 
   // ── Product search (debounced) ──
   useEffect(() => {
@@ -319,23 +349,28 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   };
 
   // ── Totals (per-line VAT via category when set, else global rate) ──
+  // Net for one line, honoring the VAT-inclusive toggle (price already contains VAT).
+  const lineNetOf = (l: LineItem) => {
+    const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
+    const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+    const gross = Math.max(0, q * p - disc);
+    return pricesIncludeVat ? gross / (1 + pct / 100) : gross;
+  };
   const totals = useMemo(() => {
     let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
     for (const l of lines) {
-      const q = parseFloat(l.quantity) || 0;
-      const p = parseFloat(l.unit_price) || 0;
-      const disc = parseFloat(l.discount) || 0;
-      const lineNet = Math.max(0, q * p - disc);
+      const lineNet = lineNetOf(l);
       const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
       net += lineNet; vat += lineNet * (pct / 100);
       fees += parseFloat(l.fees) || 0; stamp += parseFloat(l.stamp_duty) || 0;
       other += parseFloat(l.other_taxes) || 0; deduct += parseFloat(l.deductions) || 0;
     }
+    const digital = parseFloat(digitalFee) || 0;
     const wh = withholdings.find((w) => w.code === withholdingCode);
     const withheld = wh?.rate ? net * (Number(wh.rate) / 100) : 0;
-    const total = net + vat + fees + stamp + other - withheld - deduct;
-    return { net, vat, fees, stamp, other, deduct, withheld, total };
-  }, [lines, vatRate, withholdingCode, withholdings]);
+    const total = net + vat + fees + stamp + other + digital - withheld - deduct;
+    return { net, vat, fees, stamp, other, deduct, digital, withheld, total };
+  }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee]);
 
   const applyDocDefault = (code: string) => {
     const def = docDefaults[code];
@@ -371,6 +406,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         payment_method_info: paymentMethodInfo || null,
         vat_payment_suspension: vatSuspension, self_pricing: selfPricing,
         exchange_rate: currency !== 'EUR' && exchangeRate ? parseFloat(exchangeRate) : null,
+        prices_include_vat: pricesIncludeVat,
+        digital_transaction_fee: parseFloat(digitalFee) || 0,
+        related_document: relatedDocument || null,
+        print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode,
+        info_box: infoBox || null, logo_mode: logoMode,
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
         doc_language: docLanguage,
@@ -387,10 +427,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const itemsPayload = clean.map((l) => {
         const q = parseFloat(l.quantity); const p = parseFloat(l.unit_price);
         const disc = parseFloat(l.discount) || 0;
-        const net = Math.max(0, q * p - disc);
+        const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+        const net = lineNetOf(l);
+        // Store the NET unit price so per-line myDATA VAT stays correct when prices include VAT.
+        const unitNet = pricesIncludeVat ? p / (1 + pct / 100) : p;
         return {
           invoice_id: invoice.id, description: l.description.trim(), sku: l.sku.trim() || null,
-          quantity: q, unit_price: p, unit: l.unit || null,
+          quantity: q, unit_price: Number(unitNet.toFixed(4)), unit: l.unit || null,
           measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
           discounted_price: disc || null, net_value: Number(net.toFixed(2)), line_total: Number(net.toFixed(2)),
           unit_cost_snapshot: l.unit_cost.trim() ? parseFloat(l.unit_cost) : null,
@@ -407,6 +450,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       });
       const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itemsErr) throw itemsErr;
+
+      // Optional post-create actions chosen on the form.
+      if (submitNow && issueNow) {
+        try { await fiscalConnectorService.submitInvoice(invoice.id); } catch (e: any) { toast({ title: 'myDATA submission deferred', description: e?.message, variant: 'destructive' }); }
+      }
+      if (sendEmail) { try { await financeService.sendInvoiceEmail(invoice.id); } catch { /* surfaced on detail */ } }
+      if (sendSms) { try { await financeService.sendInvoiceSms(invoice.id); } catch { /* surfaced on detail */ } }
 
       toast({ title: 'Invoice created', description: num?.formatted });
       onCreated(invoice.id);
@@ -477,6 +527,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
+                </p>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs">Related document (optional)</Label>
+                <Input className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="e.g. related invoice no. or myDATA MARK" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Date issued</Label>
@@ -578,12 +635,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / services</Label>
-                <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+                    <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
+                    Prices include VAT
+                  </label>
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
+                </div>
               </div>
               <div className="space-y-2">
                 {lines.map((l, idx) => {
-                  const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
-                  const lineNet = Math.max(0, q * p - disc);
+                  const lineNet = lineNetOf(l);
                   return (
                     <div key={idx} className="rounded-md border border-border/60">
                       <div className="flex items-start gap-2 p-2">
@@ -621,6 +683,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         </div>
                         <div className="w-16"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
                         <div className="w-24"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
+                        <div className="w-20"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="Disc." title="Discount amount" /></div>
                         <div className="w-20 pt-2 text-right text-sm tabular-nums">{lineNet.toFixed(2)}</div>
                         {lines.length > 1 && <button type="button" className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
@@ -689,13 +752,42 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
             </section>
 
-            {/* Withholding */}
-            <section className="space-y-1">
-              <Label className="text-xs">Withholding tax</Label>
-              <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}</SelectContent>
-              </Select>
+            {/* Document taxes */}
+            <section className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Withholding tax</Label>
+                <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Digital transaction fee</Label>
+                <Input className="h-9 text-right" type="number" min="0" step="0.01" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
+              </div>
+            </section>
+
+            {/* Document settings (Ρυθμίσεις Παραστατικού) */}
+            <section className="rounded-md border border-border/60 p-3 space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document settings</Label>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Include in ΜΥΦ report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Send by SMS on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} /></label>
+                <div className="flex items-center justify-between"><span>Logo</span>
+                  <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
+                    <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="auto">Business logo</SelectItem><SelectItem value="none">No logo</SelectItem></SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Info box (printed, ≤250 chars)</Label>
+                <Input className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
+              </div>
             </section>
 
             {/* Shipping */}
@@ -813,6 +905,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 {totals.fees > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Fees</span><span className="tabular-nums">{money(totals.fees)}</span></div>}
                 {totals.stamp > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Stamp duty</span><span className="tabular-nums">{money(totals.stamp)}</span></div>}
                 {totals.other > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other taxes</span><span className="tabular-nums">{money(totals.other)}</span></div>}
+                {totals.digital > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Digital transaction fee</span><span className="tabular-nums">{money(totals.digital)}</span></div>}
                 {totals.deduct > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Deductions</span><span className="tabular-nums text-amber-600">- {money(totals.deduct)}</span></div>}
                 {totals.withheld > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Withholding</span><span className="tabular-nums text-amber-600">- {money(totals.withheld)}</span></div>}
                 <div className="flex justify-between border-t border-border/60 pt-1 text-sm font-semibold"><span>Grand total</span><span className="tabular-nums">{money(totals.total)}</span></div>

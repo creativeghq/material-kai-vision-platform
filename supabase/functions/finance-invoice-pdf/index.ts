@@ -41,6 +41,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
     withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό',
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
+    digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
@@ -57,6 +58,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
     withheld: 'Withholding', total: 'Amount due',
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
+    digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
     mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
@@ -209,7 +211,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   };
 
   // ── Header: logo + issuer (left) + document title (right) ──
-  if (logo) {
+  if (logo && inv.logo_mode !== 'none') {
     try {
       const img = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
       const maxW = 120, maxH = 46;
@@ -242,6 +244,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     inv.series ? [L.series, String(inv.series)] : ['', ''],
     [L.date, inv.issued_at ? new Date(inv.issued_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : ''],
     inv.due_at ? [L.due, String(inv.due_at)] : ['', ''],
+    inv.related_document ? [L.related, String(inv.related_document)] : ['', ''],
   ].filter((r) => r[0]) as [string, string][];
   for (const [k, v] of metaRows) {
     textR(k, right - 90, my, 8.5, font, MUTED);
@@ -343,9 +346,11 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   const otherTax = Number(inv.total_other_taxes_amount ?? 0), deductions = Number(inv.total_deductions_amount ?? 0);
   row(L.subtotalNet, money(totNet));
   row(L.totalVat, money(totVat));
+  const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   if (fees > 0) row(L.fees, money(fees));
   if (stamp > 0) row(L.stamp, money(stamp));
   if (otherTax > 0) row(L.otherTaxes, money(otherTax));
+  if (digitalFee > 0) row(L.digitalFee, money(digitalFee));
   if (deductions > 0) row(L.deductions, `- ${money(deductions)}`);
   if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
   page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
@@ -381,20 +386,25 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     y -= 4;
   }
 
-  // ── Notes ──
-  if (inv.notes) {
+  // ── Notes / terms (gated by print_terms) + info box ──
+  if (inv.print_terms !== false && inv.notes) {
     if (y < M + 90) newPage();
     text(L.notes, M, y, 8, bold, MUTED); y -= 12;
     for (const nl of wrap(inv.notes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 2;
+  }
+  if (inv.info_box) {
+    if (y < M + 80) newPage();
+    for (const nl of wrap(inv.info_box, font, 8, right - M - 130)) { text(nl, M, y, 8, font, MUTED); y -= 10; }
   }
 
-  // ── MARK + QR (bottom of the last page) ──
+  // ── MARK + QR (bottom of the last page; QR gated by print_online_code) ──
   if (inv.fiscal_mark) {
     const qy = Math.max(M + 90, 120);
     text(L.mark, M, qy + 28, 8, bold, MUTED);
     text(String(inv.fiscal_mark), M, qy + 16, 10, bold);
     if (inv.fiscal_uid) { text(`${L.uid}: ${inv.fiscal_uid}`, M, qy + 4, 8, font, MUTED); }
-    if (inv.fiscal_qr_url) {
+    if (inv.fiscal_qr_url && inv.print_online_code !== false) {
       drawQr(page, String(inv.fiscal_qr_url), right - 90, qy - 10, 86);
       textR(L.verify, right, qy - 22, 7, font, MUTED);
     }

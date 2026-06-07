@@ -164,7 +164,10 @@ export async function buildInvoiceInputFromDb(
   const aa = overrides.aa ?? String(inv.series_number ?? inv.legal_number ?? inv.internal_number ?? '');
   const issueDate = String(inv.issued_at ?? inv.created_at ?? new Date().toISOString()).slice(0, 10);
 
-  const grossTotal = round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + Number(inv.total_other_taxes_amount ?? 0) - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0));
+  // Digital transaction fee (Ψηφιακό Τέλος Συναλλαγής) rides in the other-taxes bucket for myDATA.
+  const digitalFee = Number(inv.digital_transaction_fee ?? 0);
+  const otherTaxesTotal = Number(inv.total_other_taxes_amount ?? 0) + digitalFee;
+  const grossTotal = round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + otherTaxesTotal - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0));
 
   return {
     issuer,
@@ -187,7 +190,7 @@ export async function buildInvoiceInputFromDb(
       totalWithheldAmount: Number(inv.total_withheld_amount ?? 0),
       totalFeesAmount: Number(inv.total_fees_amount ?? 0),
       totalStampDutyAmount: Number(inv.total_stamp_duty_amount ?? 0),
-      totalOtherTaxesAmount: Number(inv.total_other_taxes_amount ?? 0),
+      totalOtherTaxesAmount: otherTaxesTotal,
       totalDeductionsAmount: Number(inv.total_deductions_amount ?? 0),
       incomeClassificationType: incType,
       incomeClassificationCategory: incCat,
