@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Mail, Loader2, FileText, Receipt } from 'lucide-react';
+import { Mail, Loader2, FileText, Receipt, Printer, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -10,8 +10,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
 import {
-  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment,
+  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow,
 } from '@/modules/finance/services/financeService';
+
+const LEDGER_KIND_LABEL: Record<string, string> = {
+  invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment',
+  supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
+};
 
 interface Props { workspaceId: string; statementsEnabled: boolean }
 
@@ -159,6 +164,70 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [sending, setSending] = useState(false);
+  // Running ledger (καρτέλα)
+  const [ledgerSide, setLedgerSide] = useState<'customer' | 'supplier'>('customer');
+  const [ledger, setLedger] = useState<PartyLedgerRow[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Default the ledger side to whichever role the party holds.
+  useEffect(() => {
+    if (!party) return;
+    setLedgerSide(party.is_customer ? 'customer' : party.is_supplier ? 'supplier' : 'customer');
+  }, [party]);
+
+  useEffect(() => {
+    if (!party) { setLedger([]); return; }
+    void (async () => {
+      try {
+        setLedgerLoading(true);
+        const rows = await financeService.getPartyLedger({
+          workspaceId: party.workspace_id, side: ledgerSide,
+          companyId: party.party_type === 'company' ? party.party_id : null,
+          contactId: party.party_type === 'contact' ? party.party_id : null,
+          from: '2000-01-01', to: new Date().toISOString().slice(0, 10),
+        });
+        setLedger(rows);
+      } catch (err: any) {
+        toast({ title: 'Failed to load ledger', description: err?.message, variant: 'destructive' });
+        setLedger([]);
+      } finally { setLedgerLoading(false); }
+    })();
+  }, [party, ledgerSide, toast]);
+
+  // Chronological entries with a cumulative running balance (debit − credit).
+  const ledgerWithBalance = useMemo(() => {
+    let bal = 0;
+    return ledger.map((r) => { bal += Number(r.debit || 0) - Number(r.credit || 0); return { ...r, balance: bal }; });
+  }, [ledger]);
+  const ledgerClosing = ledgerWithBalance.length ? ledgerWithBalance[ledgerWithBalance.length - 1].balance : 0;
+
+  const printLedger = () => {
+    if (!party) return;
+    const sideLabel = ledgerSide === 'customer' ? 'Customer' : 'Supplier';
+    const rowsHtml = ledgerWithBalance.map((r) => `
+      <tr>
+        <td>${r.entry_date ? new Date(r.entry_date).toLocaleDateString() : ''}</td>
+        <td>${LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
+        <td>${r.doc_number ?? ''}</td>
+        <td style="text-align:right">${Number(r.debit) ? formatMoney(Number(r.debit), r.currency ?? undefined) : ''}</td>
+        <td style="text-align:right">${Number(r.credit) ? formatMoney(Number(r.credit), r.currency ?? undefined) : ''}</td>
+        <td style="text-align:right">${formatMoney(r.balance)}</td>
+      </tr>`).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Ledger — ${party.display_name}</title>
+      <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}
+      .sub{color:#555;font-size:12px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}
+      th,td{border-bottom:1px solid #ddd;padding:6px 8px}th{text-align:left;background:#f5f5f5}
+      tfoot td{font-weight:bold;border-top:2px solid #333}</style></head>
+      <body><h1>Ledger (Καρτέλα) — ${party.display_name}</h1>
+      <div class="sub">${sideLabel} account · ${party.email ?? ''} · printed ${new Date().toLocaleDateString()}</div>
+      <table><thead><tr><th>Date</th><th>Type</th><th>Document</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th></tr></thead>
+      <tbody>${rowsHtml || '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">No transactions.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right">Closing balance</td><td style="text-align:right">${formatMoney(ledgerClosing)}</td></tr></tfoot>
+      </table></body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { toast({ title: 'Pop-up blocked', description: 'Allow pop-ups to print the ledger.', variant: 'destructive' }); return; }
+    w.document.write(html); w.document.close(); w.focus(); w.print();
+  };
 
   useEffect(() => {
     if (!party) { setInvoices([]); setBills([]); setPayments([]); return; }
@@ -263,6 +332,65 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
                     </ul>
                   )}
                 </Section>
+
+                {/* Running ledger (καρτέλα) — printable */}
+                <Card>
+                  <CardHeader className="border-b border-border/60 px-4 py-2 flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-xs flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger (Καρτέλα)</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {party.is_customer && party.is_supplier && (
+                        <Select value={ledgerSide} onValueChange={(v: any) => setLedgerSide(v)}>
+                          <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="customer">Customer</SelectItem>
+                            <SelectItem value="supplier">Supplier</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={printLedger} disabled={ledgerWithBalance.length === 0}>
+                        <Printer className="h-3.5 w-3.5 mr-1" /> Print
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {ledgerLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    ) : ledgerWithBalance.length === 0 ? (
+                      <div className="p-4 text-xs text-muted-foreground">No transactions for this {ledgerSide} account.</div>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="text-xs text-muted-foreground">
+                          <tr className="border-b border-border/60">
+                            <th className="px-3 py-2 text-left">Date</th>
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Document</th>
+                            <th className="px-3 py-2 text-right">Debit</th>
+                            <th className="px-3 py-2 text-right">Credit</th>
+                            <th className="px-3 py-2 text-right">Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ledgerWithBalance.map((r, idx) => (
+                            <tr key={idx} className="border-b border-border/30">
+                              <td className="px-3 py-1.5">{r.entry_date ? new Date(r.entry_date).toLocaleDateString() : '—'}</td>
+                              <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
+                              <td className="px-3 py-1.5 font-mono text-xs">{r.doc_number ?? '—'}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? formatMoney(Number(r.debit), r.currency ?? undefined) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? formatMoney(Number(r.credit), r.currency ?? undefined) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{formatMoney(r.balance)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-border">
+                            <td colSpan={5} className="px-3 py-2 text-right text-xs font-semibold">Closing balance</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatMoney(ledgerClosing)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    )}
+                  </CardContent>
+                </Card>
               </>
             )}
           </div>

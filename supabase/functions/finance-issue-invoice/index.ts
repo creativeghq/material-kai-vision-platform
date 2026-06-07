@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 
@@ -119,6 +119,9 @@ Deno.serve(async (req) => {
         .from('credit_notes').select('workspace_id, fiscal_status, invoice_id')
         .eq('id', body.credit_note_id).single();
       if (!cnRow) return json({ error: 'credit note not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
+        return json({ error: 'Not authorized for this document' }, 403);
+      }
 
       if (cnRow.fiscal_status === 'accepted') {
         return json({ ok: true, credit_note_id: body.credit_note_id, fiscal: { ok: true, skipped: true, reason: 'already_accepted' } });
@@ -202,6 +205,9 @@ Deno.serve(async (req) => {
         .from('delivery_notes').select('workspace_id, fiscal_status')
         .eq('id', body.delivery_note_id).single();
       if (!dnRow) return json({ error: 'delivery note not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
+        return json({ error: 'Not authorized for this document' }, 403);
+      }
 
       if (dnRow.fiscal_status === 'accepted') {
         return json({ ok: true, delivery_note_id: body.delivery_note_id, fiscal: { ok: true, skipped: true, reason: 'already_accepted' } });
@@ -279,6 +285,13 @@ Deno.serve(async (req) => {
     let invoiceId: string;
     if (body.invoice_id) {
       invoiceId = body.invoice_id;
+      // Bind direct-invoice operations (issue / submit to myDATA) to the caller's workspace.
+      // Without this, any finance user could issue/transmit another tenant's invoice by id.
+      const { data: invWs } = await supabase.from('invoices').select('workspace_id').eq('id', invoiceId).single();
+      if (!invWs) return json({ error: 'invoice not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, invWs.workspace_id))) {
+        return json({ error: 'Not authorized for this document' }, 403);
+      }
     } else {
       // CREATE path (issue a new invoice from a quote) — managers only. Block accountants
       // (and any other non-manager allowed in for the submit path). auth.uid() is null under

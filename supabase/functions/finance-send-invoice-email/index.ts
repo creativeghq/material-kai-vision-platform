@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -25,6 +25,11 @@ Deno.serve(async (req) => {
 
   const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoice_id).single();
   if (!inv) return json({ error: 'invoice not found' }, 404);
+  // Tenancy: bind to the caller's workspace so one tenant can't email another's invoice
+  // (with full PII + myDATA MARK) to an arbitrary address by iterating invoice ids.
+  if (!(await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id))) {
+    return json({ error: 'Not authorized for this document' }, 403);
+  }
 
   // Resolve the recipient.
   let email: string | null = to ?? null;

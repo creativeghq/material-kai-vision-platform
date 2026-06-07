@@ -13,7 +13,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 
 // Google Noto Sans (full Greek + Latin), served as real TTF from the official noto-fonts repo.
 const FONT_URLS = {
@@ -126,6 +126,10 @@ Deno.serve(async (req) => {
 
   const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).single();
   if (!row) return json({ error: `${kind} not found` }, 404);
+  // Tenancy: a finance user may only render documents in a workspace they belong to.
+  if (!(await userCanAccessWorkspace(supabase, auth.userId, row.workspace_id))) {
+    return json({ error: 'Not authorized for this document' }, 403);
+  }
 
   if (!regenerate && row.pdf_storage_path && row.pdf_generation_status === 'completed') {
     const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(row.pdf_storage_path, 60 * 60 * 24 * 7);

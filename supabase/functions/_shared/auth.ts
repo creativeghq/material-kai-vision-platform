@@ -378,3 +378,60 @@ export function isUserAccess(auth: AuthResult): boolean {
 export function getUserId(auth: AuthResult): string | null {
   return auth.userId;
 }
+
+/**
+ * Server-side workspace authorization for edge functions that run under the service role.
+ *
+ * `authenticate({ allowedRoles })` only proves the caller holds a finance-ish role in
+ * SOME workspace — it is an admission gate, NOT authorization for a specific document.
+ * Functions that then read/transmit a row by id under the service-role client (which
+ * bypasses RLS) MUST additionally bind the caller to that row's workspace, or any tenant's
+ * finance user can reach another tenant's documents by iterating ids (cross-tenant IDOR).
+ *
+ * Returns true when `userId` is an ACTIVE member of `workspaceId`, or holds a global
+ * platform-operator role (admin/super_admin). Global operators may act across workspaces;
+ * everyone else is bound to their own. auth.uid() is unavailable under service role, so we
+ * resolve membership + global role by `userId` directly.
+ */
+export async function userCanAccessWorkspace(
+  adminClient: SupabaseClient,
+  userId: string | null,
+  workspaceId: string | null | undefined,
+): Promise<boolean> {
+  if (!userId || !workspaceId) return false;
+  const [{ data: mem }, { data: prof }] = await Promise.all([
+    adminClient
+      .from('workspace_members')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle(),
+    adminClient
+      .from('user_profiles')
+      .select('roles!user_profiles_role_id_fkey(name)')
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ]);
+  if (mem) return true;
+  const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
+  return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
+}
+
+/**
+ * Return the set of workspace ids the user is an ACTIVE member of. Empty array for a
+ * user with no memberships. Used by fan-out handlers (e.g. inbound sync) to constrain a
+ * manual/JWT-triggered run to the caller's own tenants.
+ */
+export async function listUserWorkspaceIds(
+  adminClient: SupabaseClient,
+  userId: string | null,
+): Promise<string[]> {
+  if (!userId) return [];
+  const { data } = await adminClient
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  return (data ?? []).map((r: { workspace_id: string }) => r.workspace_id);
+}

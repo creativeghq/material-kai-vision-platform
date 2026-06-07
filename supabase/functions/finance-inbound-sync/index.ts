@@ -9,7 +9,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 
 const corsHeaders = {
@@ -31,20 +31,29 @@ Deno.serve(async (req) => {
   // Auth: cron secret OR a signed-in finance manager (the "Sync now" button).
   const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
   const cronOk = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret;
+  // On the manual ("Sync now") path, restrict the all-workspace fan-out below to the
+  // caller's own workspaces — without this, one tenant's finance user triggers (and reads
+  // the results of) an inbound myDATA pull for EVERY workspace on the platform.
+  let allowedWorkspaceIds: string[] | null = null;
   if (!cronOk) {
     const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
     if (!auth.success) return json({ error: 'unauthorized' }, 401);
+    allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
+    if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });
   }
 
   const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
 
   // Every workspace that configured its own myDATA received-docs credentials.
-  const { data: creds } = await supabase
+  let credsQuery = supabase
     .from('workspace_inbound_credentials')
     .select('workspace_id, aade_user_id, subscription_key, base_url, enabled')
     .eq('enabled', true)
     .not('aade_user_id', 'is', null)
     .not('subscription_key', 'is', null);
+  // Manual path: only the caller's own workspaces. Cron path: all of them.
+  if (allowedWorkspaceIds) credsQuery = credsQuery.in('workspace_id', allowedWorkspaceIds);
+  const { data: creds } = await credsQuery;
 
   if (!creds || creds.length === 0) {
     return json({ ok: true, skipped: 'no_configured_workspaces' });
