@@ -57,6 +57,7 @@ export const deliveryNotesService = {
     kind?: 'dispatch' | 'receipt';
     customerCompanyId?: string | null;
     customerContactId?: string | null;
+    branchCode?: number;
     notes?: string;
     lines: DeliveryLineInput[];
     transportDate?: string;
@@ -77,6 +78,7 @@ export const deliveryNotesService = {
         kind: input.kind ?? 'dispatch',
         customer_company_id: input.customerCompanyId ?? null,
         customer_contact_id: input.customerContactId ?? null,
+        branch_code: input.branchCode ?? 0,
         notes: input.notes || null,
         transport_date: input.transportDate || null,
         transport_time: input.transportTime || null,

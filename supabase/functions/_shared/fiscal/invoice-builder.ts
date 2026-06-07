@@ -246,8 +246,8 @@ export async function buildCreditNoteInputFromDb(
     issuer,
     counterpart,
     header: {
-      series: overrides.series ?? (fs?.invoice_number_prefix || 'A'),
-      aa: overrides.aa ?? String(cn.credit_note_number ?? ''),
+      series: overrides.series ?? (cn.series || fs?.invoice_number_prefix || 'A'),
+      aa: overrides.aa ?? String(cn.series_number ?? cn.credit_note_number ?? ''),
       issueDate: String(cn.issued_at ?? cn.created_at ?? new Date().toISOString()).slice(0, 10),
       invoiceType: overrides.invoiceType ?? cn.document_type ?? (isCorrelated ? '5.1' : '5.2'),
       currency: cn.currency ?? inv.currency ?? 'EUR',
@@ -295,7 +295,7 @@ export async function buildDeliveryNoteInputFromDb(
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
     country: fs?.business_country_code ?? 'GR',
-    branch: 0,
+    branch: Number(dn.branch_code ?? 0),
     name: fs?.business_name ?? '',
     profession: fs?.business_profession ?? undefined,
     taxOffice: fs?.business_tax_office ?? undefined,
@@ -351,8 +351,8 @@ export async function buildDeliveryNoteInputFromDb(
     issuer,
     counterpart,
     header: {
-      series: overrides.series ?? (fs?.invoice_number_prefix || 'A'),
-      aa: overrides.aa ?? String(dn.delivery_note_number ?? ''),
+      series: overrides.series ?? (dn.series || fs?.invoice_number_prefix || 'A'),
+      aa: overrides.aa ?? String(dn.series_number ?? dn.delivery_note_number ?? ''),
       issueDate,
       invoiceType: overrides.invoiceType ?? '9.3',
       currency: 'EUR',

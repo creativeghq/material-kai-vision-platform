@@ -14,6 +14,7 @@ import { Loader2, Plus, Trash2, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { deliveryNotesService, type WarehousePick, type DeliveryLineInput } from '@/modules/finance/services/deliveryNotesService';
+import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 
 export const NewDeliveryNoteDialog: React.FC<{
   workspaceId: string;
@@ -26,6 +27,8 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [warehouse, setWarehouse] = useState<WarehousePick[]>([]);
   const [kind, setKind] = useState<'dispatch' | 'receipt'>('dispatch');
   const [customer, setCustomer] = useState<string>('');
+  const [branches, setBranches] = useState<FinanceBranch[]>([]);
+  const [branchCode, setBranchCode] = useState<string>('0');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DeliveryLineInput[]>([]);
   // Transport details
@@ -41,17 +44,19 @@ export const NewDeliveryNoteDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]);
+    setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
     setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr });
     (async () => {
-      const [{ data: cos }, wh, { data: fs }] = await Promise.all([
+      const [{ data: cos }, wh, { data: fs }, br] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
         deliveryNotesService.listWarehouse(workspaceId),
         supabase.from('finance_settings').select('business_address, business_street_number, business_postal_code, business_city').eq('workspace_id', workspaceId).maybeSingle(),
+        invoicingSetupService.listBranches(workspaceId).catch(() => [] as FinanceBranch[]),
       ]);
       setCompanies((cos ?? []) as any);
       setWarehouse(wh);
+      setBranches(br);
       // Loading address defaults to your premises.
       if (fs) setFromAddr({ street: fs.business_address ?? '', number: fs.business_street_number ?? '', postal: fs.business_postal_code ?? '', city: fs.business_city ?? '' });
     })();
@@ -84,7 +89,7 @@ export const NewDeliveryNoteDialog: React.FC<{
     setBusy(true);
     try {
       const id = await deliveryNotesService.create(workspaceId, {
-        kind, customerCompanyId: customer || null, notes, lines,
+        kind, customerCompanyId: customer || null, branchCode: parseInt(branchCode, 10) || 0, notes, lines,
         transportDate, vehicleNumber, movePurpose,
         shipFrom: [fromAddr.street, fromAddr.number].filter(Boolean).join(' ') || undefined,
         shipTo: [toAddr.street, toAddr.number].filter(Boolean).join(' ') || undefined,
@@ -117,12 +122,23 @@ export const NewDeliveryNoteDialog: React.FC<{
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>{kind === 'receipt' ? 'Supplier' : 'Customer'} (optional)</Label>
-            <Select value={customer} onValueChange={setCustomer}>
-              <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
-              <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label>{kind === 'receipt' ? 'Supplier' : 'Customer'} (optional)</Label>
+              <Select value={customer} onValueChange={setCustomer}>
+                <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
+                <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {branches.length > 1 && (
+              <div className="space-y-1">
+                <Label>Establishment</Label>
+                <Select value={branchCode} onValueChange={setBranchCode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Transport details */}
