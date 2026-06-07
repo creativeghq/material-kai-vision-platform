@@ -90,6 +90,13 @@ export const deliveryNotesService = {
     if (error) throw error;
   },
 
+  /** Convert an issued delivery note into a draft invoice (prices via the cascade resolver). */
+  async toInvoice(id: string): Promise<string> {
+    const { data, error } = await supabase.rpc('delivery_note_to_invoice', { p_id: id });
+    if (error) throw error;
+    return data as string;
+  },
+
   async remove(id: string): Promise<void> {
     const { error } = await supabase.from('delivery_notes').delete().eq('id', id);
     if (error) throw error;

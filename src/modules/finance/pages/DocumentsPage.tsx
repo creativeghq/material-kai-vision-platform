@@ -196,10 +196,18 @@ const DocumentsPage: React.FC = () => {
 
 const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const [busy, setBusy] = React.useState<string | null>(null);
   const issue = async (id: string) => {
     setBusy(id);
     try { await deliveryNotesService.issue(id); toast({ title: 'Delivery note issued · stock decremented' }); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+  const toInvoice = async (id: string) => {
+    setBusy(id);
+    try { const invId = await deliveryNotesService.toInvoice(id); toast({ title: 'Invoice created' }); navigate(`${financeBase}/invoices/${invId}`); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
@@ -226,6 +234,11 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
               {!readOnly && d.status === 'draft' && (
                 <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => issue(d.id)}>
                   {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue'}
+                </Button>
+              )}
+              {!readOnly && d.status === 'issued' && (
+                <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
+                  {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
                 </Button>
               )}
             </td>
