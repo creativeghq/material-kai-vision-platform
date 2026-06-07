@@ -1,6 +1,7 @@
 import { useWorkspace, type MarketplaceRank } from '@/contexts/WorkspaceContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { ADMIN_ROLES } from '@/auth/roles';
+import { resolvePersona } from '@/auth/capabilities';
 
 /**
  * #195 — the single source of truth for "what can the current user do", derived from
@@ -49,6 +50,9 @@ export function useCapabilities(): Capabilities {
   const canSupplyProducts = rank === 'operator' || rank === 'dealer';
   const isAccountant = workspaceRole === 'accountant';
   const isSalesRep = workspaceRole === 'sales';
+  // Single source of truth for the persona, shared with usePermissions/resolvePersona,
+  // so the end-user determination can't drift between the two hooks (audit #208).
+  const persona = resolvePersona({ isPlatformOperator, rank, workspaceRole });
 
   return {
     loading: wsLoading || frLoading,
@@ -61,7 +65,7 @@ export function useCapabilities(): Capabilities {
     canManageFinance: isWorkspaceManager,
     canOperateFinance: isWorkspaceManager || isAccountant,
     canManageNetwork: isWorkspaceManager && canSupplyProducts,
-    isEndUser: !isWorkspaceManager && !isPlatformOperator && !isAccountant && !isSalesRep,
+    isEndUser: persona === 'end_user',
     isFactory,
     isAccountant,
     isSalesRep,
