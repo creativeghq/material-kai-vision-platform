@@ -204,6 +204,8 @@ const InvoiceDetailPage: React.FC = () => {
                 ? `Issued ${new Date(invoice.issued_at).toLocaleDateString()}`
                 : 'Not issued yet'}
               {invoice.due_at && ` · Due ${invoice.due_at}`}
+              {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
+              {(invoice as any).series && ` · Series ${(invoice as any).series}`}
             </p>
           </div>
         </div>
