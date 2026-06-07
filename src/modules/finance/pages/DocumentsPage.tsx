@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -17,11 +17,14 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
+import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
+import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 
-type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'expenses';
+type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
 
 const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?: string }>; enabled: boolean }[] = [
   { key: 'invoices', label: 'Invoices', icon: FileText, enabled: true },
@@ -30,6 +33,7 @@ const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?
   { key: 'payments', label: 'Payments', icon: Banknote, enabled: true },
   { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
   { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: true },
+  { key: 'cheques', label: 'Cheques', icon: FileSignature, enabled: true },
 ];
 
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
@@ -48,26 +52,30 @@ const DocumentsPage: React.FC = () => {
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
+  const [cheques, setCheques] = useState<Cheque[]>([]);
   const [loading, setLoading] = useState(true);
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
+  const [newChequeOpen, setNewChequeOpen] = useState(false);
 
   const load = async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb, pmts, dns] = await Promise.all([
+      const [inv, cn, inb, pmts, dns, chq] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
         financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 200 }).catch(() => []),
         deliveryNotesService.list(activeWorkspaceId).catch(() => []),
+        chequesService.list(activeWorkspaceId).catch(() => []),
       ]);
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
       setPayments(pmts);
       setDeliveryNotes(dns);
+      setCheques(chq);
     } catch (err: any) {
       toast({ title: 'Failed to load documents', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -120,6 +128,9 @@ const DocumentsPage: React.FC = () => {
                 {type === 'delivery_notes' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
+                {type === 'cheques' && !isAccountant && (
+                  <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+                )}
               </div>
             </div>
 
@@ -135,6 +146,8 @@ const DocumentsPage: React.FC = () => {
                   <PaymentsTable rows={payments} />
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={deliveryNotes} readOnly={isAccountant} onChanged={load} />
+                ) : type === 'cheques' ? (
+                  <ChequesTable rows={cheques} readOnly={isAccountant} onChanged={load} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -190,7 +203,64 @@ const DocumentsPage: React.FC = () => {
           onCreated={() => { setNewDeliveryOpen(false); load(); }}
         />
       )}
+      {activeWorkspaceId && (
+        <NewChequeDialog
+          workspaceId={activeWorkspaceId}
+          open={newChequeOpen}
+          onOpenChange={setNewChequeOpen}
+          onCreated={() => { setNewChequeOpen(false); load(); }}
+        />
+      )}
     </div>
+  );
+};
+
+const CHEQUE_STATUSES: Cheque['status'][] = ['pending', 'cleared', 'bounced', 'cancelled'];
+
+const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+  const { toast } = useToast();
+  const setStatus = async (id: string, status: Cheque['status']) => {
+    try { await chequesService.setStatus(id, status); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+  const overdue = (c: Cheque) => c.status === 'pending' && c.due_date && new Date(c.due_date) < new Date();
+  return (
+    <table className="w-full text-sm">
+      <thead className="border-b border-border/60 text-xs text-muted-foreground">
+        <tr>
+          <th className="px-4 py-2 text-left">Direction</th>
+          <th className="px-4 py-2 text-left">Cheque no.</th>
+          <th className="px-4 py-2 text-left">Bank</th>
+          <th className="px-4 py-2 text-left">Due</th>
+          <th className="px-4 py-2 text-right">Amount</th>
+          <th className="px-4 py-2 text-left">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 && (
+          <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No cheques recorded.</td></tr>
+        )}
+        {rows.map((c) => (
+          <tr key={c.id} className="border-b border-border/30">
+            <td className="px-4 py-2"><Badge variant={c.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{c.direction === 'in' ? 'Received' : 'Issued'}</Badge></td>
+            <td className="px-4 py-2 font-mono text-xs">{c.cheque_number ?? '—'}</td>
+            <td className="px-4 py-2">{c.bank ?? '—'}</td>
+            <td className={`px-4 py-2 ${overdue(c) ? 'text-destructive font-medium' : ''}`}>{c.due_date ?? '—'}</td>
+            <td className="px-4 py-2 text-right font-medium">{formatMoney(c.amount, c.currency)}</td>
+            <td className="px-4 py-2">
+              {readOnly ? (
+                <Badge variant="outline" className="text-[10px]">{c.status}</Badge>
+              ) : (
+                <Select value={c.status} onValueChange={(v: any) => setStatus(c.id, v)}>
+                  <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{CHEQUE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 };
 
