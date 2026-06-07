@@ -16,6 +16,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService } from '@/services/invoicingSetupService';
@@ -107,6 +108,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
+  // Invoice with shipping (Τιμολόγιο - Δελτίο Αποστολής)
+  const [hasShipping, setHasShipping] = useState(false);
+  const [transportDate, setTransportDate] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [movePurpose, setMovePurpose] = useState('1');
+  const [shipTo, setShipTo] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -118,6 +125,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setNotes('');
     setLines([emptyLine()]);
     setIssueNow(true);
+    setHasShipping(false); setTransportDate(''); setVehicleNumber(''); setMovePurpose('1'); setShipTo('');
   }, [open]);
 
   // Load the enabled doc types (+ per-type default classification) and the income catalog.
@@ -270,6 +278,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           notes: notes || null,
           document_type: documentType,
           category_id: categoryId || null,
+          has_shipping: hasShipping,
+          transport_date: hasShipping && transportDate ? transportDate : null,
+          vehicle_number: hasShipping ? (vehicleNumber || null) : null,
+          move_purpose: hasShipping ? movePurpose : null,
+          ship_to: hasShipping ? (shipTo || null) : null,
           total_withheld_amount: Number((totals.withheld || 0).toFixed(2)),
           issued_at: issueNow ? new Date().toISOString() : null,
           due_at: issueNow ? dueAt.toISOString().slice(0, 10) : null,
@@ -412,6 +425,46 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               />
               <Label htmlFor="issue_now" className="text-sm">Issue now</Label>
             </div>
+          </div>
+
+          {/* Invoice with shipping (Τιμολόγιο - Δελτίο Αποστολής) */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Invoice with shipping</div>
+                <p className="text-xs text-muted-foreground">Combined invoice + delivery note — adds transport details (Δελτίο Αποστολής).</p>
+              </div>
+              <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
+            </div>
+            {hasShipping && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Transport date</Label>
+                  <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Vehicle no.</Label>
+                  <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Purpose</Label>
+                  <Select value={movePurpose} onValueChange={setMovePurpose}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 — Sale</SelectItem>
+                      <SelectItem value="2">2 — Sale on behalf of third party</SelectItem>
+                      <SelectItem value="5">5 — Return</SelectItem>
+                      <SelectItem value="6">6 — Movement between premises</SelectItem>
+                      <SelectItem value="7">7 — Consignment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Ship to (address)</Label>
+                  <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Line items */}
