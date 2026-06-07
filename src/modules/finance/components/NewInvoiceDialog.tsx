@@ -20,6 +20,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { validateVatViaVies } from '@/services/viesService';
 
 interface Customer { type: 'contact' | 'company'; id: string; label: string; }
 
@@ -103,6 +104,31 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerOptions, setCustomerOptions] = useState<Customer[]>([]);
   const [customerAddr, setCustomerAddr] = useState<any>(null);
+  const [validatingVat, setValidatingVat] = useState(false);
+
+  // #193 — validate the counterpart's VAT via VIES before invoicing (caches onto crm_companies).
+  const validateCounterpartVat = async () => {
+    if (!customer || customer.type !== 'company' || !customerAddr?.vat_number) return;
+    try {
+      setValidatingVat(true);
+      const res = await validateVatViaVies({
+        countryCode: customerAddr.country_code || 'EL',
+        vatNumber: customerAddr.vat_number,
+        companyId: customer.id,
+      });
+      const { data } = await supabase.from('crm_companies').select('*').eq('id', customer.id).maybeSingle();
+      if (data) setCustomerAddr(data);
+      toast({
+        title: res.valid ? 'VAT validated (VIES)' : res.skipped_reason ? 'Validation skipped' : 'VAT not valid',
+        description: res.message || res.legal_name || undefined,
+        variant: res.valid === false && !res.skipped_reason ? 'destructive' : undefined,
+      });
+    } catch (e: any) {
+      toast({ title: 'Validation failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      setValidatingVat(false);
+    }
+  };
   const [issuer, setIssuer] = useState<any>(null);
   // Inline "add client"
   const [addingClient, setAddingClient] = useState(false);
@@ -499,9 +525,24 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </div>
                 </div>
               ) : customer ? (
-                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                  <span className="text-sm">{customer.label}</span>
-                  <Button size="sm" variant="ghost" onClick={() => setCustomer(null)}>Change</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+                    <span className="text-sm">{customer.label}</span>
+                    <Button size="sm" variant="ghost" onClick={() => setCustomer(null)}>Change</Button>
+                  </div>
+                  {customer.type === 'company' && customerAddr?.vat_number && (
+                    <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-1.5 text-xs">
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">VAT {customerAddr.vat_number}</span>
+                        {customerAddr.vat_validated
+                          ? <Badge variant="outline" className="border-emerald-500/50 text-emerald-500">VIES validated</Badge>
+                          : <Badge variant="outline" className="border-amber-500/50 text-amber-500">Not validated</Badge>}
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={validatingVat} onClick={validateCounterpartVat}>
+                        {validatingVat ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Validate via VIES'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="relative">
