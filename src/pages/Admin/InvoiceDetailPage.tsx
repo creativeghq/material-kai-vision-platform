@@ -435,7 +435,7 @@ const InvoiceDetailPage: React.FC = () => {
                 id="legal_number"
                 value={oxygenLegalNumber}
                 onChange={(e) => setOxygenLegalNumber(e.target.value)}
-                placeholder="e.g. ΤΠ-2026/0042"
+                placeholder="e.g. INV-2026/0042"
               />
               <Button onClick={handleSaveLegalNumber} variant="outline" size="sm">Save</Button>
             </div>

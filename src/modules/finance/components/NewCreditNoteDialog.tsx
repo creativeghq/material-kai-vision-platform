@@ -2,7 +2,7 @@
  * New credit note from the Credit-notes list. You pick the invoice it corrects — the
  * credit note is created against it (myDATA 5.1 when the invoice has a MARK), nets the
  * invoice's balance, and optionally transmits. Mirrors how the operator's tool attaches a
- * Πιστωτικό to a Τιμολόγιο.
+ * credit note to an invoice.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';

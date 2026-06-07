@@ -108,7 +108,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
-  // Invoice with shipping (Τιμολόγιο - Δελτίο Αποστολής)
+  // Invoice with shipping (combined invoice + delivery note)
   const [hasShipping, setHasShipping] = useState(false);
   const [shipFrom, setShipFrom] = useState('');
   const [transportDate, setTransportDate] = useState('');
@@ -433,12 +433,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </div>
           </div>
 
-          {/* Invoice with shipping (Τιμολόγιο - Δελτίο Αποστολής) */}
+          {/* Invoice with shipping (combined invoice + delivery note) */}
           <div className="rounded-md border border-border/60 p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">Invoice with shipping</div>
-                <p className="text-xs text-muted-foreground">Combined invoice + delivery note — adds transport details (Δελτίο Αποστολής).</p>
+                <p className="text-xs text-muted-foreground">Combined invoice + delivery note — adds transport details.</p>
               </div>
               <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
             </div>
@@ -446,12 +446,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <div className="grid gap-3 md:grid-cols-2">
                 {/* Loading place */}
                 <div className="space-y-1">
-                  <Label className="text-xs">Loading place (Τόπος φόρτωσης)</Label>
+                  <Label className="text-xs">Loading place</Label>
                   <Input className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Our HQ / address" />
                 </div>
                 {/* Delivery place */}
                 <div className="space-y-1">
-                  <Label className="text-xs">Delivery place (Τόπος αποστολής)</Label>
+                  <Label className="text-xs">Delivery place</Label>
                   <Input className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
                 </div>
                 {/* Transport */}
@@ -468,7 +468,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Vehicle no.</Label>
-                    <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+                    <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Responsible</Label>
@@ -476,7 +476,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </div>
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <Label className="text-xs">Purpose (Σκοπός)</Label>
+                  <Label className="text-xs">Purpose</Label>
                   <Select value={movePurpose} onValueChange={setMovePurpose}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -598,7 +598,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </p>
           </div>
 
-          {/* Withholding tax (Φόροι Παραστατικού) — applied on the net, reduces the total */}
+          {/* Withholding tax — applied on the net, reduces the total */}
           <div className="space-y-1">
             <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Withholding tax</Label>
             <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>

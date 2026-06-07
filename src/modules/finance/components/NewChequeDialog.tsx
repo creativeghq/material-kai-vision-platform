@@ -1,4 +1,4 @@
-/** Record a cheque (Επιταγή) — received from a customer (in) or issued to a supplier (out). */
+/** Record a cheque — received from a customer (in) or issued to a supplier (out). */
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';

@@ -1,5 +1,5 @@
 /**
- * Create a delivery note (Δελτίο Αποστολής). Pick a customer (optional), add warehouse
+ * Create a delivery note. Pick a customer (optional), add warehouse
  * items as lines, save as draft or issue immediately. Issuing decrements stock for each
  * warehouse-linked line.
  */
@@ -28,7 +28,7 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [customer, setCustomer] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DeliveryLineInput[]>([]);
-  // Transport (Στοιχεία Μεταφοράς)
+  // Transport details
   const [transportDate, setTransportDate] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [movePurpose, setMovePurpose] = useState('1');
@@ -97,7 +97,7 @@ export const NewDeliveryNoteDialog: React.FC<{
             </Select>
           </div>
 
-          {/* Transport (Στοιχεία Μεταφοράς) */}
+          {/* Transport details */}
           <div className="grid grid-cols-2 gap-2 rounded-md border border-border/60 p-3">
             <div className="space-y-1">
               <Label className="text-xs">Transport date</Label>
@@ -105,7 +105,7 @@ export const NewDeliveryNoteDialog: React.FC<{
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Vehicle no.</Label>
-              <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ΝΑΧ-1234" />
+              <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Purpose</Label>

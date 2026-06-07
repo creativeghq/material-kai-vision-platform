@@ -1,4 +1,4 @@
-/** Global finance categories (Κατηγορία) for classifying income/expense docs + payments. */
+/** Global finance categories for classifying income/expense docs + payments. */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface FinanceCategory {

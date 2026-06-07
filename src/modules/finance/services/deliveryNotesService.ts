@@ -1,5 +1,5 @@
 /**
- * Delivery notes (Δελτίο Αποστολής). A note moves goods to a customer; issuing decrements
+ * Delivery notes. A note moves goods to a customer; issuing decrements
  * warehouse stock for lines linked to a warehouse item. myDATA 9.3 transmission is a
  * follow-up — this covers the internal note + stock-out + list.
  */

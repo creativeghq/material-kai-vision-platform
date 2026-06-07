@@ -1,5 +1,5 @@
 /**
- * Standalone "Record payment" (Καταχώρηση είσπραξης / πληρωμής / επιστροφής).
+ * Standalone "Record payment" (receipt / payment / refund).
  *  - Received: money in from a customer — optionally "for an invoice" → marks it paid
  *    (works for late/overdue settlement; the allocation flips the invoice to paid).
  *  - Paid out: money out to a supplier.

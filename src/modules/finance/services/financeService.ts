@@ -552,7 +552,7 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
-  /** Customer open balance: Σ open-invoice amount_due − Σ unallocated inbound payments. */
+  /** Customer open balance: sum of open-invoice amount_due − sum of unallocated inbound payments. */
   async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
     open_invoices_due: number; customer_credit: number; net_balance: number; currency: string;
   }> {

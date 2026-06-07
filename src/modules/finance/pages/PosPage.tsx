@@ -47,7 +47,7 @@ const PosPage: React.FC = () => {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'cash' | 'card'>('cash');
   const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
-  // Αποτελεί Δελτίο Διακίνησης — the receipt also constitutes a movement/delivery document.
+  // The receipt also constitutes a movement/delivery document.
   const [movementDoc, setMovementDoc] = useState(false);
   const [movVehicle, setMovVehicle] = useState('');
   const [movShipTo, setMovShipTo] = useState('');
@@ -256,7 +256,7 @@ const PosPage: React.FC = () => {
                   <input type="checkbox" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
                 </label>
                 <label className="flex items-center justify-between text-xs text-muted-foreground cursor-pointer">
-                  <span>Constitutes a movement document (Δελτίο Διακίνησης)</span>
+                  <span>Constitutes a movement document</span>
                   <input type="checkbox" checked={movementDoc} onChange={(e) => setMovementDoc(e.target.checked)} />
                 </label>
                 {movementDoc && (

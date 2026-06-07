@@ -1,4 +1,4 @@
-/** Cheques (Επιταγές) — post-dated cheques in (from customers) / out (to suppliers). */
+/** Cheques — post-dated cheques in (from customers) / out (to suppliers). */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Cheque {

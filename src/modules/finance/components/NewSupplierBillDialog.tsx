@@ -187,7 +187,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Supplier bill #</Label>
-              <Input value={supplierBillNumber} onChange={(e) => setSupplierBillNumber(e.target.value)} placeholder="e.g. ΤΠ-2026/0042" />
+              <Input value={supplierBillNumber} onChange={(e) => setSupplierBillNumber(e.target.value)} placeholder="e.g. INV-2026/0042" />
             </div>
             <div className="space-y-1">
               <Label>Currency</Label>

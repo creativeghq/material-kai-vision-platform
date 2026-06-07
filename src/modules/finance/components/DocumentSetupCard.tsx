@@ -56,7 +56,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
 
   const startAdd = (code: string) => { setAddingFor(code); setNewSeries(''); setNewStart('1'); };
   const submitNewSeries = async (code: string) => {
-    if (!newSeries.trim()) { toast({ title: 'Enter a series code (e.g. ΤΠ-)', variant: 'destructive' }); return; }
+    if (!newSeries.trim()) { toast({ title: 'Enter a series code (e.g. INV-)', variant: 'destructive' }); return; }
     const start = parseInt(newStart, 10) || 1;
     try {
       await invoicingSetupService.addSeries(workspaceId, code, newSeries.trim(), start);
@@ -153,8 +153,8 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         {addingFor === t.code && (
                           <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-2">
                             <div className="space-y-1">
-                              <span className="text-[10px] text-muted-foreground">Series (Σειρά)</span>
-                              <Input className="h-7 w-28 text-xs" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="ΤΠ-" />
+                              <span className="text-[10px] text-muted-foreground">Series</span>
+                              <Input className="h-7 w-28 text-xs" value={newSeries} onChange={(e) => setNewSeries(e.target.value)} placeholder="INV-" />
                             </div>
                             <div className="space-y-1">
                               <span className="text-[10px] text-muted-foreground">Start from #</span>
