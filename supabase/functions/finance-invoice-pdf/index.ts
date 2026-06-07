@@ -1,0 +1,377 @@
+// deno-lint-ignore-file no-explicit-any
+// Renders a customer-facing legal invoice/receipt PDF (A4) with full myDATA fields:
+// issuer + establishment, customer, line items, VAT breakdown, totals, the MARK and a
+// scannable QR. The field-label language is per-invoice (invoices.doc_language 'el'|'en').
+//
+// NOTE ON GREEK STRINGS: the label dictionary below intentionally contains Greek. This is
+// a legal tax document (παραστατικό) the customer/accountant files — NOT the app UI. The
+// English-only-UI rule applies to the interface, not to this generated document; the user
+// explicitly asked for a per-invoice GR/EN choice. A Unicode font is embedded so Greek
+// glyphs (and Greek customer names/addresses, regardless of language) render correctly.
+import { createClient } from '@supabase/supabase-js';
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import qrcode from 'qrcode-generator';
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
+
+const FONT_URLS = {
+  regular: 'https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts/ttf/DejaVuSans.ttf',
+  bold: 'https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts/ttf/DejaVuSans-Bold.ttf',
+};
+let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
+async function loadFonts() {
+  if (_fontCache) return _fontCache;
+  const [r, b] = await Promise.all([fetch(FONT_URLS.regular), fetch(FONT_URLS.bold)]);
+  if (!r.ok || !b.ok) throw new Error('failed to load PDF fonts');
+  _fontCache = { regular: new Uint8Array(await r.arrayBuffer()), bold: new Uint8Array(await b.arrayBuffer()) };
+  return _fontCache;
+}
+
+type Lang = 'el' | 'en';
+const LABELS: Record<Lang, Record<string, string>> = {
+  el: {
+    invoice: 'ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ', service: 'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ',
+    receipt: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ', creditNote: 'ΠΙΣΤΩΤΙΚΟ ΤΙΜΟΛΟΓΙΟ', deliveryNote: 'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ',
+    issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
+    phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
+    number: 'Αριθμός', series: 'Σειρά', date: 'Ημερομηνία', due: 'Λήξη',
+    descr: 'Περιγραφή', qty: 'Ποσ.', unit: 'Μ.Μ.', unitPrice: 'Τιμή Μον.', net: 'Καθαρή Αξία',
+    vatPct: 'ΦΠΑ%', vatAmt: 'Αξία ΦΠΑ', lineTotal: 'Σύνολο',
+    vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
+    withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό',
+    mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
+    movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
+    vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
+  },
+  en: {
+    invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
+    receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
+    issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
+    phone: 'Tel.', email: 'Email', establishment: 'Establishment',
+    number: 'Number', series: 'Series', date: 'Date', due: 'Due',
+    descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit price', net: 'Net',
+    vatPct: 'VAT%', vatAmt: 'VAT', lineTotal: 'Total',
+    vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
+    withheld: 'Withholding', total: 'Amount due',
+    mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
+    movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
+    vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
+  },
+};
+
+function docTitle(documentType: string | null, L: Record<string, string>): string {
+  switch (documentType) {
+    case '2.1': case '2.2': case '2.3': case '2.4': return L.service;
+    case '11.1': case '11.2': case '11.3': case '11.4': case '11.5': return L.receipt;
+    case '5.1': case '5.2': return L.creditNote;
+    case '9.3': return L.deliveryNote;
+    default: return L.invoice;
+  }
+}
+
+const A4 = { w: 595.28, h: 841.89 };
+const M = 40;
+const INK = rgb(0.12, 0.12, 0.12);
+const MUTED = rgb(0.45, 0.45, 0.45);
+const LINE = rgb(0.82, 0.82, 0.82);
+const HEADBG = rgb(0.95, 0.93, 0.95);
+
+function fmtMoney(n: any, currency: string, lang: Lang): string {
+  const v = Number(n ?? 0);
+  const s = new Intl.NumberFormat(lang === 'el' ? 'el-GR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  const sym = currency === 'EUR' ? '€' : currency;
+  return `${s} ${sym}`;
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+  if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  let invoiceId: string;
+  let regenerate = false;
+  try {
+    const body = await req.json();
+    invoiceId = body.invoice_id;
+    regenerate = !!body.regenerate;
+    if (!invoiceId) return json({ error: 'invoice_id is required' }, 400);
+  } catch {
+    return json({ error: 'invalid body' }, 400);
+  }
+
+  const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
+  if (!inv) return json({ error: 'invoice not found' }, 404);
+
+  // Return the cached PDF unless regeneration is requested.
+  if (!regenerate && inv.pdf_storage_path && inv.pdf_generation_status === 'completed') {
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(inv.pdf_storage_path, 60 * 60 * 24 * 7);
+    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: inv.pdf_storage_path, cached: true });
+  }
+
+  try {
+    await supabase.from('invoices').update({ pdf_generation_status: 'generating' }).eq('id', invoiceId);
+
+    const [{ data: items }, { data: fs }] = await Promise.all([
+      supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('added_at'),
+      supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle(),
+    ]);
+
+    let customer: any = null;
+    if (inv.customer_company_id) {
+      const { data } = await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).maybeSingle();
+      customer = data;
+    } else if (inv.customer_contact_id) {
+      const { data } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).maybeSingle();
+      customer = data;
+    }
+    let branch: any = null;
+    if (Number(inv.branch_code ?? 0) > 0) {
+      const { data } = await supabase.from('finance_branches').select('*').eq('workspace_id', inv.workspace_id).eq('branch_code', inv.branch_code).maybeSingle();
+      branch = data;
+    }
+
+    const lang: Lang = inv.doc_language === 'en' ? 'en' : 'el';
+    const pdfBytes = await buildPdf({ inv, items: items ?? [], fs, customer, branch, lang });
+
+    const path = `invoice-output/${invoiceId}/inv-${invoiceId}.pdf`;
+    const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
+    if (upErr) throw upErr;
+
+    await supabase.from('invoices').update({
+      pdf_storage_path: path,
+      pdf_generation_status: 'completed',
+      pdf_generated_at: new Date().toISOString(),
+    }).eq('id', invoiceId);
+
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7);
+    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: path });
+  } catch (err: any) {
+    await supabase.from('invoices').update({ pdf_generation_status: 'failed' }).eq('id', invoiceId);
+    return json({ ok: false, error: err?.message ?? 'pdf generation failed' }, 500);
+  }
+});
+
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang } = d;
+  const L = LABELS[lang];
+  const currency = inv.currency ?? 'EUR';
+  const money = (n: any) => fmtMoney(n, currency, lang);
+
+  const fonts = await loadFonts();
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font = await pdf.embedFont(fonts.regular, { subset: true });
+  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+
+  let page = pdf.addPage([A4.w, A4.h]);
+  let y = A4.h - M;
+  const right = A4.w - M;
+
+  const text = (s: any, x: number, yy: number, size: number, f: PDFFont = font, color = INK) =>
+    page.drawText(String(s ?? ''), { x, y: yy, size, font: f, color });
+  const textR = (s: any, xRight: number, yy: number, size: number, f: PDFFont = font, color = INK) => {
+    const str = String(s ?? '');
+    page.drawText(str, { x: xRight - f.widthOfTextAtSize(str, size), y: yy, size, font: f, color });
+  };
+  const wrap = (s: string, f: PDFFont, size: number, maxW: number): string[] => {
+    const words = String(s ?? '').split(/\s+/);
+    const lines: string[] = []; let cur = '';
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (f.widthOfTextAtSize(t, size) > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  };
+
+  // ── Header: issuer (left) + document title (right) ──
+  const issuerName = fs?.business_name || '';
+  text(issuerName, M, y - 4, 16, bold);
+  textR(docTitle(inv.document_type, L), right, y - 2, 18, bold, rgb(0.48, 0.12, 0.36));
+  y -= 22;
+  const issuerLines = [
+    [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
+    [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
+    fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
+    fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
+    fs?.business_profession ? `${L.profession}: ${fs.business_profession}` : '',
+    [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
+    branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
+  ].filter(Boolean);
+  for (const l of issuerLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
+
+  // Document meta (right column, under the title)
+  let my = A4.h - M - 26;
+  const metaRows: [string, string][] = [
+    [L.number, String(inv.internal_number ?? inv.legal_number ?? '')],
+    inv.series ? [L.series, String(inv.series)] : ['', ''],
+    [L.date, inv.issued_at ? new Date(inv.issued_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : ''],
+    inv.due_at ? [L.due, String(inv.due_at)] : ['', ''],
+  ].filter((r) => r[0]) as [string, string][];
+  for (const [k, v] of metaRows) {
+    textR(k, right - 90, my, 8.5, font, MUTED);
+    textR(v, right, my, 9, bold);
+    my -= 12;
+  }
+
+  y = Math.min(y, my) - 6;
+  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.7, color: LINE });
+  y -= 16;
+
+  // ── Customer block ──
+  text(L.customer, M, y, 9, bold, MUTED);
+  y -= 13;
+  const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
+  text(custName, M, y, 11, bold);
+  y -= 13;
+  const custLines = customer ? [
+    [customer.street ?? customer.address, customer.street_number].filter(Boolean).join(' '),
+    [customer.postal_code, customer.city].filter(Boolean).join(' '),
+    customer.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
+    customer.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
+  ].filter(Boolean) : [];
+  for (const l of custLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
+  y -= 8;
+
+  // ── Items table ──
+  const cols = { descr: M, qty: 300, unit: 340, price: 390, net: 450, vatp: 500, total: right };
+  const drawHead = () => {
+    page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 16, color: HEADBG });
+    text(L.descr, cols.descr + 2, y, 8, bold);
+    textR(L.qty, cols.qty + 28, y, 8, bold);
+    text(L.unit, cols.unit, y, 8, bold);
+    textR(L.unitPrice, cols.price + 52, y, 8, bold);
+    textR(L.net, cols.net + 42, y, 8, bold);
+    textR(L.vatPct, cols.vatp + 22, y, 8, bold);
+    textR(L.lineTotal, cols.total, y, 8, bold);
+    y -= 18;
+  };
+  const newPage = () => { page = pdf.addPage([A4.w, A4.h]); y = A4.h - M; };
+  drawHead();
+
+  const vatByRate: Record<string, { net: number; vat: number }> = {};
+  let totNet = 0, totVat = 0;
+  for (const it of items) {
+    const qty = Number(it.quantity ?? 1);
+    const net = Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * qty);
+    const pct = Number(it.vat_percent ?? inv.vat_rate ?? 0);
+    const vat = Number(it.vat_amount ?? (net * pct) / 100);
+    totNet += net; totVat += vat;
+    const key = String(pct);
+    vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
+    vatByRate[key].net += net; vatByRate[key].vat += vat;
+
+    const dLines = wrap(it.description ?? 'Item', font, 8.5, cols.qty - cols.descr - 10);
+    const rowH = Math.max(13, dLines.length * 10 + 3);
+    if (y - rowH < M + 150) { newPage(); drawHead(); }
+    let ly = y;
+    for (const dl of dLines) { text(dl, cols.descr + 2, ly, 8.5); ly -= 10; }
+    textR(qty, cols.qty + 28, y, 8.5);
+    text(it.unit ?? '', cols.unit, y, 8.5);
+    textR(money(it.unit_price ?? 0), cols.price + 52, y, 8.5);
+    textR(money(net), cols.net + 42, y, 8.5);
+    textR(`${pct}%`, cols.vatp + 22, y, 8.5);
+    textR(money(net + vat), cols.total, y, 8.5);
+    y -= rowH;
+    page.drawLine({ start: { x: M, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.4, color: LINE });
+  }
+
+  // ── Totals + VAT analysis ──
+  if (y < M + 170) newPage();
+  y -= 14;
+  // VAT analysis (left)
+  let vy = y;
+  text(L.vatAnalysis, M, vy, 8, bold, MUTED); vy -= 12;
+  for (const [pct, agg] of Object.entries(vatByRate)) {
+    text(`${L.net} ${pct}%: ${money(agg.net)}   ${L.vatAmt}: ${money(agg.vat)}`, M, vy, 8, font, MUTED);
+    vy -= 11;
+  }
+
+  // Totals (right box)
+  const withheld = Number(inv.total_withheld_amount ?? 0);
+  const grand = Number(inv.total ?? totNet + totVat - withheld);
+  const boxX = right - 220;
+  const row = (k: string, v: string, b = false) => {
+    textR(k, right - 110, y, b ? 10 : 9, b ? bold : font, b ? INK : MUTED);
+    textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
+    y -= b ? 16 : 13;
+  };
+  row(L.subtotalNet, money(totNet));
+  row(L.totalVat, money(totVat));
+  if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
+  page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
+  y -= 4;
+  row(L.total, money(grand), true);
+  y = Math.min(y, vy) - 6;
+
+  // ── Movement block (9.3 / invoice-with-shipping) ──
+  if (inv.has_shipping) {
+    if (y < M + 120) newPage();
+    page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.5, color: LINE }); y -= 14;
+    text(L.movement, M, y, 9, bold, MUTED); y -= 13;
+    const mv = [
+      inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
+      inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
+      inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
+      inv.move_purpose ? `${L.purpose}: ${inv.move_purpose}` : '',
+    ].filter(Boolean);
+    for (const m of mv) { text(m, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 4;
+  }
+
+  // ── Notes ──
+  if (inv.notes) {
+    if (y < M + 90) newPage();
+    text(L.notes, M, y, 8, bold, MUTED); y -= 12;
+    for (const nl of wrap(inv.notes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
+  }
+
+  // ── MARK + QR (bottom of the last page) ──
+  if (inv.fiscal_mark) {
+    const qy = Math.max(M + 90, 120);
+    text(L.mark, M, qy + 28, 8, bold, MUTED);
+    text(String(inv.fiscal_mark), M, qy + 16, 10, bold);
+    if (inv.fiscal_uid) { text(`${L.uid}: ${inv.fiscal_uid}`, M, qy + 4, 8, font, MUTED); }
+    if (inv.fiscal_qr_url) {
+      drawQr(page, String(inv.fiscal_qr_url), right - 90, qy - 10, 86);
+      textR(L.verify, right, qy - 22, 7, font, MUTED);
+    }
+  }
+
+  // ── Footer page numbers ──
+  const pages = pdf.getPages();
+  pages.forEach((p, i) => {
+    p.drawText(`${L.page} ${i + 1} ${L.of} ${pages.length}`, {
+      x: A4.w / 2 - 30, y: 24, size: 7, font, color: MUTED,
+    });
+  });
+
+  return await pdf.save();
+}
+
+// Draw a QR code (from a URL) as filled squares — no image dependency.
+function drawQr(page: PDFPage, data: string, x: number, y: number, size: number) {
+  const qr = qrcode(0, 'M');
+  qr.addData(data);
+  qr.make();
+  const count = qr.getModuleCount();
+  const cell = size / count;
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) {
+        page.drawRectangle({ x: x + c * cell, y: y + size - (r + 1) * cell, width: cell, height: cell, color: rgb(0, 0, 0) });
+      }
+    }
+  }
+}

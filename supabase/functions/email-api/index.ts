@@ -31,6 +31,8 @@ interface SendEmailRequest {
   replyTo?: string;
   tags?: Record<string, string>;
   emailType?: 'transactional' | 'marketing' | 'notification';
+  /** Resend attachments — base64 content (no data: prefix). */
+  attachments?: Array<{ filename: string; content: string }>;
 }
 
 async function sendViaResend(payload: {
@@ -43,6 +45,7 @@ async function sendViaResend(payload: {
   bcc?: string[];
   reply_to?: string;
   tags?: Array<{ name: string; value: string }>;
+  attachments?: Array<{ filename: string; content: string }>;
 }): Promise<string> {
   const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
   if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');
@@ -238,6 +241,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           bcc: body.bcc,
           reply_to: body.replyTo,
           tags,
+          attachments: body.attachments,
         });
 
         // Update log with Resend message ID

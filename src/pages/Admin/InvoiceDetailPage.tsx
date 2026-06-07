@@ -57,6 +57,21 @@ const InvoiceDetailPage: React.FC = () => {
   const [payLink, setPayLink] = useState<string | null>(null);
   const [payLinkBusy, setPayLinkBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!invoice) return;
+    try {
+      setPdfBusy(true);
+      const { pdf_url } = await financeService.generateInvoicePdf(invoice.id, true);
+      if (pdf_url) window.open(pdf_url, '_blank');
+      else toast({ title: 'PDF generated but no URL returned', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'PDF generation failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -215,6 +230,10 @@ const InvoiceDetailPage: React.FC = () => {
               <CheckCircle2 className="mr-2 h-4 w-4" /> Mark issued
             </Button>
           )}
+          <Button onClick={handleDownloadPdf} variant="outline" disabled={pdfBusy}>
+            {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+            Download PDF
+          </Button>
           {invoice.quote_id && !invoice.oxygen_notice_id && (
             <Button onClick={handlePushOxygen} variant="outline">
               Push to Oxygen

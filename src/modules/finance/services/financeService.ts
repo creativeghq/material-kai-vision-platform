@@ -297,6 +297,20 @@ const _financeServiceCore = {
     return { data, error };
   },
 
+  /** Render (or fetch cached) the customer-facing invoice PDF. Returns a 7-day signed URL. */
+  async generateInvoicePdf(invoiceId: string, regenerate = false): Promise<{ pdf_url: string | null; pdf_storage_path: string | null }> {
+    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { invoice_id: invoiceId, regenerate } });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'PDF generation failed');
+    return { pdf_url: data?.pdf_url ?? null, pdf_storage_path: data?.pdf_storage_path ?? null };
+  },
+
+  /** Re-sign an already-generated invoice PDF without re-rendering. */
+  async refreshInvoicePdfUrl(storagePath: string): Promise<string | null> {
+    const { data } = await supabase.storage.from('pdf-documents').createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+    return data?.signedUrl ?? null;
+  },
+
   /** #204 "Send SMS" — text the invoice number + total (+ QR) to the customer via messaging-api. */
   async sendInvoiceSms(invoiceId: string): Promise<{ ok: boolean; sent_to?: string; error?: string }> {
     const { data: inv } = await supabase

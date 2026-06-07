@@ -110,6 +110,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [categoryId, setCategoryId] = useState<string>('');
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
   const [branchCode, setBranchCode] = useState<string>('0');
+  const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('el');
   // Invoice with shipping (combined invoice + delivery note)
   const [hasShipping, setHasShipping] = useState(false);
   const [shipFrom, setShipFrom] = useState('');
@@ -131,6 +132,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setLines([emptyLine()]);
     setIssueNow(true);
     setHasShipping(false); setShipFrom(''); setTransportDate(''); setTransportTime(''); setVehicleNumber(''); setMovePurpose('1'); setResponsible(''); setShipTo('');
+    setDocLanguage('el');
   }, [open]);
 
   // Load the enabled doc types (+ per-type default classification) and the income catalog.
@@ -290,6 +292,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           document_type: documentType,
           category_id: categoryId || null,
           branch_code: parseInt(branchCode, 10) || 0,
+          doc_language: docLanguage,
           has_shipping: hasShipping,
           ship_from: hasShipping ? (shipFrom || null) : null,
           transport_date: hasShipping && transportDate ? transportDate : null,
@@ -418,6 +421,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </Select>
                 </div>
               )}
+              <div className="space-y-1">
+                <Label>Document language</Label>
+                <Select value={docLanguage} onValueChange={(v: any) => setDocLanguage(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="el">Greek</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">Language of the printed invoice PDF sent to the customer.</p>
+              </div>
             </div>
           </div>
 

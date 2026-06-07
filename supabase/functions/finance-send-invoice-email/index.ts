@@ -1,6 +1,7 @@
 // Email an invoice to its customer (the "Send Email" document action, #204/#6).
 // Sends a summary + the myDATA MARK / QR link via the platform email-api. Auth: finance.
 import { createClient } from '@supabase/supabase-js';
+import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 
@@ -46,6 +47,33 @@ Deno.serve(async (req) => {
   const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${inv.fiscal_mark}</strong></p>` : '';
   const qr = inv.fiscal_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_qr_url}" style="color:#7a1f5c">View / verify the invoice »</a></p>` : '';
 
+  // Generate (or reuse) the invoice PDF and attach it — best-effort, forwarding the
+  // caller's auth to the finance-invoice-pdf function.
+  let attachments: Array<{ filename: string; content: string }> | undefined;
+  try {
+    let pdfPath = inv.pdf_storage_path as string | null;
+    const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/finance-invoice-pdf`, {
+      method: 'POST',
+      headers: {
+        'Authorization': req.headers.get('Authorization') ?? '',
+        'apikey': Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ invoice_id }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (j?.pdf_storage_path) pdfPath = j.pdf_storage_path;
+    if (pdfPath) {
+      const { data: file } = await supabase.storage.from('pdf-documents').download(pdfPath);
+      if (file) {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        attachments = [{ filename: `invoice-${number}.pdf`, content: encodeBase64(buf) }];
+      }
+    }
+  } catch (e) {
+    console.warn('invoice PDF attach skipped', e);
+  }
+
   const subject = `Invoice ${number} from ${sender}`;
   const html = `
     <div style="font-family:system-ui,Arial,sans-serif;max-width:560px;margin:auto;color:#222">
@@ -62,7 +90,7 @@ Deno.serve(async (req) => {
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
-    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id } },
+    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return json({ ok: false, error: dispatchErr?.message ?? 'email send failed' }, 502);

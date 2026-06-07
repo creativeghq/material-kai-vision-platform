@@ -101,6 +101,9 @@ verify_jwt = false
 [functions.field-templates]
 verify_jwt = false
 
+[functions.finance-invoice-pdf]
+verify_jwt = false
+
 [functions.flow-engine]
 verify_jwt = false
 
