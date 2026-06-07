@@ -469,13 +469,17 @@ const _financeServiceCore = {
   },
 
   async updateInvoice(invoiceId: string, patch: Partial<Invoice>): Promise<Invoice> {
-    const allowed: Partial<Invoice> = {
+    const allowed: Record<string, any> = {
       due_at: patch.due_at,
       payment_terms_days: patch.payment_terms_days ?? undefined,
       notes: patch.notes,
       oxygen_legal_number: patch.oxygen_legal_number,
       status: patch.status,
     };
+    // #204 Tools → Change category. Only set when explicitly provided (incl. null to clear),
+    // so a generic patch never accidentally nulls the category. (Financial fields stay
+    // locked by the DB immutability guard regardless.)
+    if ('category_id' in patch) allowed.category_id = (patch as any).category_id;
     const { data, error } = await supabase
       .from('invoices')
       .update(allowed)
