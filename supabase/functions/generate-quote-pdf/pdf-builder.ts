@@ -57,7 +57,8 @@ export async function buildQuotePDF(
   templateConfig: TemplateConfig,
   coverBytes: Uint8Array | null,
   bgBytes: Uint8Array | null,
-  backcoverBytes: Uint8Array | null
+  backcoverBytes: Uint8Array | null,
+  logoBytes: Uint8Array | null = null
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
@@ -70,9 +71,20 @@ export async function buildQuotePDF(
   const coverImage = await embedImage(pdfDoc, coverBytes);
   const bgImage = await embedImage(pdfDoc, bgBytes);
   const backcoverImage = await embedImage(pdfDoc, backcoverBytes);
+  const logoImage = await embedImage(pdfDoc, logoBytes);
 
-  // Page 1: Cover (skipped if no cover template uploaded)
-  if (coverImage) addFullPageImage(pdfDoc, coverImage);
+  // Page 1: Cover (skipped if no cover template uploaded). The seller's logo is
+  // overlaid on the cover for the white-label flow (#177).
+  if (coverImage) {
+    const coverPage = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    coverPage.drawImage(coverImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    if (logoImage) {
+      const maxW = 150, maxH = 80;
+      const scale = Math.min(maxW / logoImage.width, maxH / logoImage.height);
+      const w = logoImage.width * scale, h = logoImage.height * scale;
+      coverPage.drawImage(logoImage, { x: (PAGE_W - w) / 2, y: PAGE_H - h - 60, width: w, height: h });
+    }
+  }
 
   // Page 2: Client Details
   addClientDetailsPage(pdfDoc, quoteData, templateConfig, fontRegular, fontBold);

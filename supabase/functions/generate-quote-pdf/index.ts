@@ -94,11 +94,21 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       quoteData.quote_number = updatedQuote.quote_number;
     }
 
-    // Fetch template images in parallel
-    const [coverBytes, bgBytes, backcoverBytes] = await Promise.all([
+    // The seller workspace's logo (same source as the invoice PDF) for the cover.
+    let logoPath: string | null = null;
+    try {
+      const { data: fs } = await supabase
+        .from('finance_settings').select('business_logo_path')
+        .eq('workspace_id', (quoteData as any).workspace_id).maybeSingle();
+      logoPath = fs?.business_logo_path ?? null;
+    } catch { /* logo optional */ }
+
+    // Fetch template images (+ optional workspace logo) in parallel
+    const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
       fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
       fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
       fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
+      logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
     ]);
 
     // Build the PDF
@@ -107,7 +117,8 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       templateConfig,
       coverBytes,
       bgBytes,
-      backcoverBytes
+      backcoverBytes,
+      logoBytes
     );
 
     // Upload to storage
