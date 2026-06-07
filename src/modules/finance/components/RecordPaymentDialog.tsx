@@ -13,6 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, type Invoice, type PaymentMethod } from '@/modules/finance/services/financeService';
@@ -33,37 +34,63 @@ export const RecordPaymentDialog: React.FC<{
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [invoiceId, setInvoiceId] = useState<string>('');
+  const [issueCreditNote, setIssueCreditNote] = useState(true);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [openInvoices, setOpenInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setKind('received'); setAmount(''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
-    setCategoryId(''); setReference(''); setNotes(''); setInvoiceId('');
+    setCategoryId(''); setReference(''); setNotes(''); setInvoiceId(''); setIssueCreditNote(true);
     (async () => {
       const [cats, invs] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
-        financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue'], limit: 200 }).catch(() => []),
+        // Include paid invoices too — a refund is usually against an already-settled invoice.
+        financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue', 'paid'], limit: 200 }).catch(() => []),
       ]);
       setCategories(cats);
-      setOpenInvoices(invs);
+      setInvoices(invs);
     })();
   }, [open, workspaceId]);
 
-  const selectedInvoice = useMemo(() => openInvoices.find((i) => i.id === invoiceId), [openInvoices, invoiceId]);
+  // Received: only invoices that still owe money. Refund: any issued invoice (usually paid).
+  const pickableInvoices = useMemo(
+    () => (kind === 'refund' ? invoices : invoices.filter((i) => Number(i.amount_due) > 0)),
+    [invoices, kind],
+  );
+  const selectedInvoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
 
   const pickInvoice = (id: string) => {
     setInvoiceId(id);
-    const inv = openInvoices.find((i) => i.id === id);
-    if (inv && !amount) setAmount(String(inv.amount_due));
+    const inv = invoices.find((i) => i.id === id);
+    // Received → prefill the balance due; refund → prefill the invoice total.
+    if (inv && !amount) setAmount(String(kind === 'refund' ? (inv as any).total ?? inv.amount_due : inv.amount_due));
   };
 
   const save = async () => {
     const amt = parseFloat(amount);
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    if (kind === 'refund' && issueCreditNote && !invoiceId) {
+      toast({ title: 'Pick the invoice to credit', description: 'A refund issues a credit note against an invoice. Choose it, or turn off the credit note.', variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
+      // Refund: first issue the credit note (5.1 correlated) so myDATA nets the original invoice.
+      let creditNoteRef: string | null = null;
+      if (kind === 'refund' && issueCreditNote && invoiceId) {
+        const { credit_note_id } = await financeService.createCreditNote({
+          workspaceId,
+          invoiceId,
+          amount: amt,
+          reason: reference || notes || 'Refund / return',
+          correlated: true,
+          submitFiscal: true,
+        });
+        creditNoteRef = credit_note_id;
+      }
+
       const direction = kind === 'received' ? 'in' : 'out';
       const allocations = (kind === 'received' && invoiceId)
         ? [{ target_id: invoiceId, target_type: 'invoice' as const, amount: amt }]
@@ -75,13 +102,16 @@ export const RecordPaymentDialog: React.FC<{
         method,
         paidAt: new Date(paidAt).toISOString(),
         categoryId: categoryId || null,
-        reference: reference || (kind === 'refund' ? 'Refund' : null),
+        reference: reference || (creditNoteRef ? `Refund · CN ${creditNoteRef.slice(0, 8)}` : kind === 'refund' ? 'Refund' : null),
         notes: notes || null,
         counterpartyCompanyId: selectedInvoice?.customer_company_id ?? null,
         counterpartyContactId: selectedInvoice?.customer_contact_id ?? null,
         allocations,
       });
-      toast({ title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded' });
+      toast({
+        title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded',
+        description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
+      });
       onSaved(); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -117,11 +147,35 @@ export const RecordPaymentDialog: React.FC<{
               <Select value={invoiceId} onValueChange={pickInvoice}>
                 <SelectTrigger><SelectValue placeholder="None — unallocated credit" /></SelectTrigger>
                 <SelectContent>
-                  {openInvoices.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices</div>
-                    : openInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>)}
+                  {pickableInvoices.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices</div>
+                    : pickableInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>)}
                 </SelectContent>
               </Select>
               {selectedInvoice && <p className="text-[11px] text-muted-foreground">Settling this invoice will mark it paid when fully covered.</p>}
+            </div>
+          )}
+
+          {kind === 'refund' && (
+            <div className="space-y-2 rounded-md border border-border/60 p-3">
+              <div className="space-y-1">
+                <Label>Invoice to credit</Label>
+                <Select value={invoiceId} onValueChange={pickInvoice}>
+                  <SelectTrigger><SelectValue placeholder="Pick the invoice being refunded…" /></SelectTrigger>
+                  <SelectContent>
+                    {pickableInvoices.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No invoices</div>
+                      : pickableInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — {Number((i as any).total ?? 0).toFixed(2)}{(i as any).fiscal_mark ? ' · MARK' : ''}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex items-center justify-between text-xs cursor-pointer">
+                <span>Issue credit note to myDATA (nets the invoice)</span>
+                <Switch checked={issueCreditNote} onCheckedChange={setIssueCreditNote} />
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                {issueCreditNote
+                  ? 'A 5.1 credit note is transmitted against the invoice, then the cash-out is logged.'
+                  : 'Only the cash-out is recorded — no credit note is issued.'}
+              </p>
             </div>
           )}
 
