@@ -9,6 +9,7 @@ import {
   FolderKanban,
   Wallet,
   Contact,
+  Inbox,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -47,6 +48,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage' },
+  { id: 'requests', label: 'Requests', path: '/requests', icon: Inbox, requireCapability: 'network.manage' },
   // Network is reached from the workspace switcher ("Manage network"), not the top nav.
   {
     id: 'factory-analytics',

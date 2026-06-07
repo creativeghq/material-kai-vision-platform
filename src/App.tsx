@@ -32,6 +32,7 @@ const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
+const RequestsInboxPage = lazy(() => import('./pages/RequestsInboxPage'));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
@@ -233,6 +234,18 @@ const App = () => (
                       <CapabilityGuard capability="crm.view">
                         <Layout>
                           <CRMPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/requests"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="network.manage">
+                        <Layout>
+                          <RequestsInboxPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

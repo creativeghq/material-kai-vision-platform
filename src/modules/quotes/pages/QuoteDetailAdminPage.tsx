@@ -10,6 +10,7 @@ import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
+import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
@@ -667,6 +668,26 @@ export const QuoteDetailPage: React.FC = () => {
               >
                 <FilePlus2 className="h-4 w-4 mr-1" />
                 Generate for end user
+              </Button>
+            )}
+
+            {/* Marketplace: submit a procurement quote up to the parent node to be priced. */}
+            {quote && (quote as any).quote_role !== 'client' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full"
+                onClick={async () => {
+                  try {
+                    await masterRequestsService.submit(quote.id);
+                    toast({ title: 'Submitted to your parent node', description: 'Track it under Requests.' });
+                  } catch (err) {
+                    toast({ title: 'Failed to submit', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                  }
+                }}
+              >
+                <Send className="h-4 w-4 mr-1" />
+                Submit to parent
               </Button>
             )}
           </div>
