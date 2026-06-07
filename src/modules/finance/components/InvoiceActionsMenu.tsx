@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -13,6 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { financeService } from '@/modules/finance/services/financeService';
 import { useCapabilities } from '@/hooks/useCapabilities';
 
 interface Props {
@@ -54,6 +55,16 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     toast({ title: 'Link copied' });
   };
 
+  const useAsTemplate = async () => {
+    try {
+      const newId = await financeService.duplicateInvoice(invoiceId);
+      toast({ title: 'Draft created from template' });
+      navigate(`${financeBase}/invoices/${newId}`);
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const submitFiscal = async () => {
     setSubmitting(true);
     try {
@@ -93,6 +104,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
 
         <DropdownMenuSeparator />
         {!isAccountant && <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={useAsTemplate}><Files className="h-4 w-4 mr-2" /> Use as template</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -291,6 +291,49 @@ const _financeServiceCore = {
     return (data ?? []) as Invoice[];
   },
 
+  /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
+  async duplicateInvoice(invoiceId: string): Promise<string> {
+    const src = await this.getInvoice(invoiceId);
+    const { data: number, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: src.workspace_id });
+    if (numErr) throw numErr;
+    const { data: inv, error: insErr } = await supabase
+      .from('invoices')
+      .insert({
+        workspace_id: src.workspace_id,
+        internal_number: number,
+        status: 'draft',
+        customer_contact_id: src.customer_contact_id,
+        customer_company_id: src.customer_company_id,
+        currency: src.currency,
+        vat_rate: src.vat_rate,
+        document_type: (src as any).document_type ?? null,
+        subtotal_net: src.subtotal_net,
+        vat_amount: src.vat_amount,
+        total: src.total,
+        notes: src.notes,
+      } as any)
+      .select()
+      .single();
+    if (insErr) throw insErr;
+    const items = (src.items ?? []).map((it: any) => ({
+      invoice_id: inv.id,
+      product_id: it.product_id ?? null,
+      description: it.description,
+      sku: it.sku ?? null,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      line_total: it.line_total,
+      vat_category: it.vat_category ?? null,
+      income_classification_type: it.income_classification_type ?? null,
+      income_classification_category: it.income_classification_category ?? null,
+    }));
+    if (items.length) {
+      const { error: itErr } = await supabase.from('invoice_items').insert(items);
+      if (itErr) throw itErr;
+    }
+    return inv.id as string;
+  },
+
   async getInvoice(invoiceId: string): Promise<InvoiceWithItems> {
     const { data: invoice, error: invErr } = await supabase
       .from('invoices')

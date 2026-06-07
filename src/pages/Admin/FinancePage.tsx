@@ -191,15 +191,21 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="followups" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
             </TabsTrigger>
-            <TabsTrigger value="marketplace" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
-            </TabsTrigger>
-            <TabsTrigger value="warehouse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Package className="h-4 w-4 mr-2" /> Warehouse
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <SettingsIcon className="h-4 w-4 mr-2" /> Settings
-            </TabsTrigger>
+            {!isAccountant && (
+              <TabsTrigger value="marketplace" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
+              </TabsTrigger>
+            )}
+            {!isAccountant && (
+              <TabsTrigger value="warehouse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Package className="h-4 w-4 mr-2" /> Warehouse
+              </TabsTrigger>
+            )}
+            {!isAccountant && (
+              <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <SettingsIcon className="h-4 w-4 mr-2" /> Settings
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* ─────────── DASHBOARD ─────────── */}
