@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -65,6 +65,16 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     }
   };
 
+  const sendEmail = async () => {
+    try {
+      const { data, error } = await financeService.sendInvoiceEmail(invoiceId);
+      if (error || data?.ok === false) { toast({ title: 'Email not sent', description: data?.error ?? error?.message, variant: 'destructive' }); return; }
+      toast({ title: 'Email sent', description: `To ${data?.sent_to}` });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const submitFiscal = async () => {
     setSubmitting(true);
     try {
@@ -105,6 +115,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuSeparator />
         {!isAccountant && <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={useAsTemplate}><Files className="h-4 w-4 mr-2" /> Use as template</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

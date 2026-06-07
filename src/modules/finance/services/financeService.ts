@@ -291,6 +291,12 @@ const _financeServiceCore = {
     return (data ?? []) as Invoice[];
   },
 
+  /** #204 "Send email" — email the invoice summary + MARK/QR to the customer. */
+  async sendInvoiceEmail(invoiceId: string, to?: string): Promise<{ data: any; error: any }> {
+    const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', { body: { invoice_id: invoiceId, to } });
+    return { data, error };
+  },
+
   /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
   async duplicateInvoice(invoiceId: string): Promise<string> {
     const src = await this.getInvoice(invoiceId);
