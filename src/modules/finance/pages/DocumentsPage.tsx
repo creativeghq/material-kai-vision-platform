@@ -144,6 +144,11 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
                 )}
+                {(type === 'invoices' || type === 'expenses') && !isAccountant && (
+                  <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
+                    {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
+                  </Button>
+                )}
                 {(type === 'invoices' || type === 'receipts') && !isAccountant && (
                   <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
@@ -158,11 +163,6 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 )}
                 {type === 'credit_notes' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-                )}
-                {type === 'expenses' && !isAccountant && (
-                  <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
-                    {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
-                  </Button>
                 )}
               </div>
             </div>

@@ -178,7 +178,7 @@ jobs:
         id: deploy
         run: |
           set -euo pipefail
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          URL=$(vercel deploy --prebuilt --prod --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "🌐 Deployed: $URL"
 
