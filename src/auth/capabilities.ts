@@ -21,6 +21,7 @@ export type Persona =
   | 'architect'  // owner/admin of an architect node (sells to end users with margin)
   | 'staff'      // team member of a business node (member role)
   | 'accountant' // invited external accountant — Finance surface only (#202)
+  | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
   | 'end_user';  // project client / referral-joined member — restricted surface
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
@@ -59,6 +60,11 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // stay gated on `canManageFinance` and write-ops on `canOperateFinance` (useCapabilities),
   // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
   accountant: ['finance.manage'],
+  // Invited sales rep (#201): Sales portal only — build quotes/orders for customers from the
+  // catalog. NO finance/CRM-module/pricing/network/warehouse. Reps see only their OWN quotes
+  // (enforced by RLS on created_by); the customer picker is embedded in the Sales surface, so
+  // they get marketplace.browse for catalog selection but not crm.view (the full CRM module).
+  sales: ['quotes.use', 'marketplace.browse', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
 };
@@ -75,6 +81,9 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole }: Pers
   const role = workspaceRole ?? '';
   if (role === 'client') return 'end_user';
   if (role === 'accountant') return 'accountant';
+  // Invited sales rep (#201) — Sales portal only. Must come BEFORE the member/staff fallback,
+  // otherwise a 'sales' role falls through to 'staff' and wrongly inherits finance/CRM/invoice.
+  if (role === 'sales') return 'sales';
   if (role === 'owner' || role === 'admin') {
     if (rank === 'dealer') return 'dealer';
     if (rank === 'architect') return 'architect';
