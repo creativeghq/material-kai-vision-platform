@@ -11,6 +11,7 @@ import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
+import { CapabilityGuard } from './components/core/CapabilityGuard';
 import { Layout } from './components/core/Layout';
 import {
   CriticalErrorBoundary,
@@ -217,9 +218,11 @@ const App = () => (
                   path="/finance"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <FinancePage />
-                      </Layout>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <FinancePage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />
@@ -227,9 +230,11 @@ const App = () => (
                   path="/crm"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <CRMPage />
-                      </Layout>
+                      <CapabilityGuard capability="crm.view">
+                        <Layout>
+                          <CRMPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />
@@ -237,9 +242,11 @@ const App = () => (
                   path="/pos"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <PosPage />
-                      </Layout>
+                      <CapabilityGuard capability="invoice.issue">
+                        <Layout>
+                          <PosPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />
@@ -247,9 +254,11 @@ const App = () => (
                   path="/finance/invoices/:invoiceId"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <InvoiceDetailPage />
-                      </Layout>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <InvoiceDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />
@@ -696,9 +705,11 @@ const App = () => (
                   element={
                     <PageErrorBoundary name="Discover">
                       <AuthGuard>
-                        <Layout>
-                          <DiscoverPage />
-                        </Layout>
+                        <CapabilityGuard capability="marketplace.browse">
+                          <Layout>
+                            <DiscoverPage />
+                          </Layout>
+                        </CapabilityGuard>
                       </AuthGuard>
                     </PageErrorBoundary>
                   }
