@@ -169,6 +169,29 @@ export async function buildInvoiceInputFromDb(
   const otherTaxesTotal = Number(inv.total_other_taxes_amount ?? 0) + digitalFee;
   const grossTotal = round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + otherTaxesTotal - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0));
 
+  // Combined invoice + delivery note (Τιμολόγιο – Δελτίο Αποστολής): emit the movement
+  // block so myDATA receives the transport details, same shape as a standalone 9.3.
+  const movement = inv.has_shipping
+    ? (() => {
+        const mp = inv.move_purpose ? parseInt(String(inv.move_purpose), 10) || 1 : 1;
+        return {
+          dispatchDate: inv.transport_date ? String(inv.transport_date).slice(0, 10) : issueDate,
+          dispatchTime: inv.transport_time || undefined,
+          vehicleNumber: inv.vehicle_number || undefined,
+          movePurpose: mp,
+          movePurposeLabel: MOVE_PURPOSE_LABELS[mp],
+          loadingAddress: {
+            street: inv.ship_from || issuer.address?.street || '',
+            number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
+          },
+          deliveryAddress: {
+            street: inv.ship_to || counterpart.address?.street || '',
+            number: counterpart.address?.number ?? '', postalCode: counterpart.address?.postalCode ?? '', city: counterpart.address?.city ?? '',
+          },
+        };
+      })()
+    : null;
+
   return {
     issuer,
     counterpart,
@@ -177,6 +200,7 @@ export async function buildInvoiceInputFromDb(
       vatPaymentSuspension: !!inv.vat_payment_suspension,
       selfPricing: !!inv.self_pricing,
       exchangeRate: inv.exchange_rate ?? undefined,
+      ...(movement ?? {}),
     },
     // Payment method captured on the invoice (myDATA requires at least one).
     paymentMethods: inv.payment_method_code

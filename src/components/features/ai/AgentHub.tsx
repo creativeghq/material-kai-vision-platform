@@ -70,6 +70,7 @@ import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal
 // now live inside the "Prompt Library" tab when the active agent is
 // interior-designer. Templates extracted to interiorPromptTemplates.ts.
 import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
+import { NewDesignModal } from './NewDesignModal';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
@@ -502,6 +503,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   // showPromptLibrary removed — Interior-only legacy duplicate. Prompts now in PromptBuilderModal "Prompt Library" tab.
   const [showInspirationModal, setShowInspirationModal] = useState(false);
+  const [showNewDesignModal, setShowNewDesignModal] = useState(false);
   // showStarterPrompts removed — merged into showPromptBuilder modal
   const [showToolkitPicker, setShowToolkitPicker] = useState(false);
   const [showPromptBuilder, setShowPromptBuilder] = useState(false);
@@ -4213,6 +4215,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {/* Quick action chips — interior designer only */}
               {selectedAgent === 'interior-designer' && (
                 <div className="flex flex-wrap gap-1.5">
+                  {/* New Design — collects room/style/details upfront in a modal
+                      (same pattern as Stage Room / Edit Image) so the agent never
+                      has to ask follow-up questions in a second turn. */}
+                  <button
+                    onClick={() => setShowNewDesignModal(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors bg-primary text-primary-foreground border-primary hover:opacity-90"
+                    title="Design a room from scratch — pick room type, style, and details upfront"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Design a Room
+                  </button>
+
                   {/* Floor Plan → 3D Render */}
                   <button
                     onClick={() => { setSelectedGenerationMode('floor-plan-render'); setInput('Render this floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting.'); }}
@@ -4684,6 +4698,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           onClose={() => setShowInspirationModal(false)}
         />
       )}
+
+      {/* New Design Modal — upfront room/style/details collection for from-scratch
+          3D designs. Composes a complete prompt and auto-sends, so the agent calls
+          generate_3d immediately without a second-turn clarifying question. */}
+      <NewDesignModal
+        isOpen={showNewDesignModal}
+        onClose={() => setShowNewDesignModal(false)}
+        initialDetails={input}
+        hasReferenceImage={attachedImages.length > 0}
+        onGenerate={(composedPrompt) => {
+          setShowNewDesignModal(false);
+          setSelectedGenerationMode(null);
+          setInput(composedPrompt);
+          setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+        }}
+      />
 
       {/* Gemini single-image modal — reuses ProgressiveImageGrid's full modal (Edit Mode, zone select, Products tab, all actions) */}
       {geminiModalImage && (
