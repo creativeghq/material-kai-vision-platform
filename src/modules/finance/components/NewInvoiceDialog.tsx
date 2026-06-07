@@ -259,10 +259,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     try {
       setBusy(true);
 
-      const { data: number, error: numErr } = await supabase.rpc('next_invoice_number', {
+      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
         p_workspace_id: workspaceId,
+        p_doc_code: documentType,
+        p_branch_code: parseInt(branchCode, 10) || 0,
       });
       if (numErr) throw numErr;
+      const num = Array.isArray(numRows) ? numRows[0] : numRows;
 
       const dueAt = new Date();
       dueAt.setDate(dueAt.getDate() + (parseInt(paymentTermsDays, 10) || 30));
@@ -271,7 +274,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         .from('invoices')
         .insert({
           workspace_id: workspaceId,
-          internal_number: number,
+          internal_number: num?.formatted,
+          series: num?.series ?? null,
+          series_number: num?.number ?? null,
           customer_contact_id: customer.type === 'contact' ? customer.id : null,
           customer_company_id: customer.type === 'company' ? customer.id : null,
           status: issueNow ? 'issued' : 'draft',
@@ -323,7 +328,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itemsErr) throw itemsErr;
 
-      toast({ title: 'Invoice created', description: number as string });
+      toast({ title: 'Invoice created', description: num?.formatted });
       onCreated(invoice.id);
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message ?? 'Error', variant: 'destructive' });

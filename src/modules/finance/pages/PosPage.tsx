@@ -114,14 +114,19 @@ const PosPage: React.FC = () => {
     if (!activeWorkspaceId || cart.length === 0) return;
     setIssuing(true);
     try {
-      const { data: number, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: activeWorkspaceId });
+      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
+        p_workspace_id: activeWorkspaceId, p_doc_code: '11.1', p_branch_code: 0,
+      });
       if (numErr) throw numErr;
+      const num = Array.isArray(numRows) ? numRows[0] : numRows;
 
       const { data: invoice, error: insErr } = await supabase
         .from('invoices')
         .insert({
           workspace_id: activeWorkspaceId,
-          internal_number: number,
+          internal_number: num?.formatted,
+          series: num?.series ?? null,
+          series_number: num?.number ?? null,
           status: 'issued',
           document_type: '11.1', // myDATA retail receipt
           currency,
@@ -173,7 +178,7 @@ const PosPage: React.FC = () => {
         });
       } catch { /* non-fatal */ }
 
-      setResult({ number: number as string, total: totals.total, currency, mark });
+      setResult({ number: num?.formatted as string, total: totals.total, currency, mark });
       setCart([]);
       setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
       toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
