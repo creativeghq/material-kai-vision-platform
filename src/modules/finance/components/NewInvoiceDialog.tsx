@@ -4,7 +4,9 @@
 // from product metadata) and carries full myDATA detail — measurement unit, VAT category,
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, Search, Package, MapPin } from 'lucide-react';
+import { ToastAction } from '@/components/core/ui/toast';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -97,6 +99,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   // Parties
@@ -484,7 +487,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
       // Optional post-create actions chosen on the form.
       if (submitNow && issueNow) {
-        try { await fiscalConnectorService.submitInvoice(invoice.id); } catch (e: any) { toast({ title: 'myDATA submission deferred', description: e?.message, variant: 'destructive' }); }
+        try {
+          const sub = await fiscalConnectorService.submitInvoice(invoice.id);
+          // #193 — credit exhaustion at issue: the invoice is issued but the myDATA transmission
+          // was blocked for lack of credits. Surface a top-up CTA; retransmit from the invoice page.
+          const fr = sub?.fiscal;
+          if (fr && fr.ok === false && fr.code === 'insufficient_credits') {
+            toast({
+              title: 'Out of credits — not sent to myDATA',
+              description: `The invoice was issued but couldn't be transmitted (balance ${fr.balance ?? 0}). Top up, then retransmit from the invoice page.`,
+              action: <ToastAction altText="Top up credits" onClick={() => navigate('/billing/credits')}>Top up</ToastAction>,
+              variant: 'destructive',
+            });
+          }
+        } catch (e: any) { toast({ title: 'myDATA submission deferred', description: e?.message, variant: 'destructive' }); }
       }
       if (sendEmail) { try { await financeService.sendInvoiceEmail(invoice.id); } catch { /* surfaced on detail */ } }
       if (sendSms) { try { await financeService.sendInvoiceSms(invoice.id); } catch { /* surfaced on detail */ } }
