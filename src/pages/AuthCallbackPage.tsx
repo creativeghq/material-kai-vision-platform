@@ -93,39 +93,12 @@ export const AuthCallbackPage: React.FC = () => {
             console.error('Error creating user credits:', creditsError);
           }
 
-          // Assign user to default workspace
-          const { data: defaultWorkspace, error: workspaceError } =
-            await supabase
-              .from('workspaces')
-              .select('id')
-              .order('created_at', { ascending: true })
-              .limit(1)
-              .single();
-
-          if (defaultWorkspace && !workspaceError) {
-            const { error: membershipError } = await supabase
-              .from('workspace_members')
-              .insert({
-                workspace_id: defaultWorkspace.id,
-                user_id: user.id,
-                role: 'member',
-                status: 'active',
-                permissions: ['workspace:read', 'workspace:write'],
-              });
-
-            if (membershipError) {
-              console.error(
-                'Error creating workspace membership:',
-                membershipError,
-              );
-            } else {
-              console.log(
-                `✅ User ${user.email} added to workspace ${defaultWorkspace.id}`,
-              );
-            }
-          } else {
-            console.warn('⚠️ No default workspace found for new user');
-          }
+          // Workspace assignment is handled by the DB trigger
+          // `handle_new_user_workspace_assignment`, which creates a personal OWNED
+          // workspace for every new user (#194). The previous app-side block here added
+          // the user to the oldest/root workspace as a plain member — the "single shared
+          // workspace" bug — so it's intentionally removed. Invites (?invite=) are redeemed
+          // separately after auth via workspaceManagementService.redeemInvite.
         }
 
         toast({
