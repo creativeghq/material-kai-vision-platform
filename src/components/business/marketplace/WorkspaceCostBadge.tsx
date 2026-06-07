@@ -34,6 +34,9 @@ export const WorkspaceCostBadge: React.FC<{ productId: string; className?: strin
       <div className="text-[11px] text-muted-foreground">
         base {cur} {price.base_price?.toFixed(2)} + {price.ancestor_commission_pct}% commission
       </div>
+      <div className="text-[10px] text-muted-foreground/80 italic mt-0.5">
+        Indicative — finalised at the base price on the invoice date.
+      </div>
     </div>
   );
 };

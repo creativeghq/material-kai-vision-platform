@@ -364,20 +364,19 @@ const _financeServiceCore = {
   /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
   async duplicateInvoice(invoiceId: string): Promise<string> {
     const src = await this.getInvoice(invoiceId);
-    const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
+    // Derived draft number only — the gapless myDATA series/aa is allocated at issue by
+    // mark_invoice_issued, never when a draft (or template clone) is created.
+    const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', {
       p_workspace_id: src.workspace_id,
-      p_doc_code: (src as any).document_type ?? null,
-      p_branch_code: (src as any).branch_code ?? 0,
     });
     if (numErr) throw numErr;
-    const num = Array.isArray(numRows) ? numRows[0] : numRows;
     const { data: inv, error: insErr } = await supabase
       .from('invoices')
       .insert({
         workspace_id: src.workspace_id,
-        internal_number: num?.formatted,
-        series: num?.series ?? null,
-        series_number: num?.number ?? null,
+        internal_number: draftNumber as string,
+        series: null,
+        series_number: null,
         status: 'draft',
         customer_contact_id: src.customer_contact_id,
         customer_company_id: src.customer_company_id,

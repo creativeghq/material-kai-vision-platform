@@ -382,13 +382,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (clean.length === 0) { toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
     try {
       setBusy(true);
-      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', { p_workspace_id: workspaceId, p_doc_code: documentType, p_branch_code: parseInt(branchCode, 10) || 0 });
+      // Use a DERIVED draft number (no counter advance). The gapless myDATA series/aa is
+      // allocated at issue by mark_invoice_issued — never at draft-create — so a deleted or
+      // failed draft can't gap the legal serial sequence.
+      const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
       if (numErr) throw numErr;
-      const num = Array.isArray(numRows) ? numRows[0] : numRows;
 
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: workspaceId,
-        internal_number: num?.formatted, series: num?.series ?? null, series_number: num?.number ?? null,
+        internal_number: draftNumber as string, series: null, series_number: null,
         customer_contact_id: customer.type === 'contact' ? customer.id : null,
         customer_company_id: customer.type === 'company' ? customer.id : null,
         // Always insert as draft. "Issue now" routes through mark_invoice_issued
@@ -461,7 +463,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       if (sendEmail) { try { await financeService.sendInvoiceEmail(invoice.id); } catch { /* surfaced on detail */ } }
       if (sendSms) { try { await financeService.sendInvoiceSms(invoice.id); } catch { /* surfaced on detail */ } }
 
-      toast({ title: 'Invoice created', description: num?.formatted });
+      toast({ title: 'Invoice created', description: (draftNumber as string) ?? undefined });
       onCreated(invoice.id);
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message ?? 'Error', variant: 'destructive' });
