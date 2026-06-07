@@ -64,6 +64,17 @@ const DocumentsPage: React.FC = () => {
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const syncInbound = async () => {
+    setSyncing(true);
+    try {
+      const res = await inboundService.syncNow();
+      toast({ title: 'myDATA sync ran', description: res?.skipped ? 'No inbound credentials configured yet (Settings → Documents).' : 'Inbox updated.' });
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Sync failed', description: err?.message, variant: 'destructive' });
+    } finally { setSyncing(false); }
+  };
 
   const load = async () => {
     if (!activeWorkspaceId) return;
@@ -145,6 +156,11 @@ const DocumentsPage: React.FC = () => {
                 )}
                 {type === 'credit_notes' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+                )}
+                {type === 'expenses' && !isAccountant && (
+                  <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
+                    {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
+                  </Button>
                 )}
               </div>
             </div>

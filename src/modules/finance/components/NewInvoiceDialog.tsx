@@ -560,7 +560,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Subtotal</td><td className="px-2 py-1 text-right tabular-nums">{totals.subtotal.toFixed(2)}</td><td /></tr>
                   <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">VAT ({vatRate}%)</td><td className="px-2 py-1 text-right tabular-nums">{totals.vatAmount.toFixed(2)}</td><td /></tr>
                   {totals.withheld > 0 && (
-                    <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Withholding (φόρος)</td><td className="px-2 py-1 text-right tabular-nums text-amber-600">-{totals.withheld.toFixed(2)}</td><td /></tr>
+                    <tr><td colSpan={5} className="px-2 py-1 text-right text-muted-foreground">Withholding</td><td className="px-2 py-1 text-right tabular-nums text-amber-600">-{totals.withheld.toFixed(2)}</td><td /></tr>
                   )}
                   <tr><td colSpan={5} className="px-2 py-1 text-right font-medium">Total</td><td className="px-2 py-1 text-right font-medium tabular-nums">{totals.total.toFixed(2)}</td><td /></tr>
                 </tfoot>
@@ -573,7 +573,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
           {/* Withholding tax (Φόροι Παραστατικού) — applied on the net, reduces the total */}
           <div className="space-y-1">
-            <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Φόροι / Withholding tax</Label>
+            <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5" /> Withholding tax</Label>
             <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
               <SelectTrigger className="max-w-md"><SelectValue /></SelectTrigger>
               <SelectContent>

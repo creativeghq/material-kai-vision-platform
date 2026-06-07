@@ -39,6 +39,13 @@ export const inboundService = {
     return data as string;
   },
 
+  /** Manually trigger the myDATA RequestDocs pull (finance-manager). */
+  async syncNow(): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('finance-inbound-sync', { body: {} });
+    if (error) throw error;
+    return data;
+  },
+
   async dismiss(docId: string): Promise<void> {
     const { error } = await supabase.from('inbound_documents').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;

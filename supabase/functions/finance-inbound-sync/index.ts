@@ -9,6 +9,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 
 const corsHeaders = {
@@ -27,10 +28,12 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  // Cron auth.
+  // Auth: cron secret OR a signed-in finance manager (the "Sync now" button).
   const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
-  if (cronSecret && req.headers.get('x-cron-secret') !== cronSecret) {
-    return json({ error: 'unauthorized' }, 401);
+  const cronOk = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret;
+  if (!cronOk) {
+    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+    if (!auth.success) return json({ error: 'unauthorized' }, 401);
   }
 
   const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
