@@ -1,6 +1,6 @@
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { getStripe, getSupabase, noPaymentProviderResponse } from '../../_shared/stripe-clients.ts';
+import { getPlatformBillingStripe, getSupabase, noPaymentProviderResponse, hasDistinctBillingAccount } from '../../_shared/stripe-clients.ts';
 
 /**
  * Stripe Customer Portal Session Creator
@@ -22,8 +22,8 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
       );
     }
 
-    // Resolve clients AFTER auth → bootstrap is guaranteed to have run.
-    const stripe = getStripe();
+    // Subscriptions/credits live on the platform-billing account (#200); manage them there.
+    const stripe = getPlatformBillingStripe();
     const supabase = getSupabase();
     if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
@@ -31,14 +31,15 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
 
     const { returnUrl } = body;
 
-    // Get Stripe customer ID
+    // Use the customer id for the account we're opening the portal on.
+    const customerCol = hasDistinctBillingAccount() ? 'stripe_billing_customer_id' : 'stripe_customer_id';
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('stripe_customer_id')
+      .select(customerCol)
       .eq('user_id', userId)
       .single();
 
-    if (!profile?.stripe_customer_id) {
+    if (!profile?.[customerCol]) {
       return new Response(
         JSON.stringify({ error: 'No Stripe customer found. Please subscribe first.' }),
         { status: 400, headers: corsHeaders }
@@ -47,7 +48,7 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
 
     // Create customer portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
+      customer: profile[customerCol],
       return_url: returnUrl,
     });
 

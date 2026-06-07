@@ -1,7 +1,7 @@
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { getStripe, getSupabase, noPaymentProviderResponse } from '../../_shared/stripe-clients.ts';
+import { getPlatformBillingStripe, getSupabase, noPaymentProviderResponse, hasDistinctBillingAccount } from '../../_shared/stripe-clients.ts';
 
 /**
  * Stripe Checkout Session Creator
@@ -23,10 +23,11 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
       );
     }
 
-    // Resolve clients AFTER auth → bootstrap is guaranteed to have run
-    // (authenticate() triggers it). If Stripe still isn't configured, the
-    // canonical 503 message routes the admin to the right settings page.
-    const stripe = getStripe();
+    // #200 — platform revenue (credits/subscriptions) is collected on the dedicated billing
+    // account when configured (falls back to the default key otherwise). Resolve AFTER auth →
+    // bootstrap has run. If Stripe still isn't configured, the canonical 503 routes the admin
+    // to the right settings page.
+    const stripe = getPlatformBillingStripe();
     const supabase = getSupabase();
     if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
@@ -35,32 +36,30 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
 
     const { type, priceId, credits, price, successUrl, cancelUrl } = body;
 
-    // Get or create Stripe customer
+    // The customer must live on the SAME account we charge. When a distinct billing account is
+    // configured, use a separate customer id (stripe_billing_customer_id) — a customer created
+    // on the default account doesn't exist on the billing account.
+    const distinct = hasDistinctBillingAccount();
+    const customerCol = distinct ? 'stripe_billing_customer_id' : 'stripe_customer_id';
     let customerId: string;
 
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('stripe_customer_id')
+      .select(customerCol)
       .eq('user_id', userId)
       .single();
 
-    if (profile?.stripe_customer_id) {
-      customerId = profile.stripe_customer_id;
+    if (profile?.[customerCol]) {
+      customerId = profile[customerCol];
     } else {
-      // Create new Stripe customer
       const customer = await stripe.customers.create({
         email: user.email,
-        metadata: {
-          supabase_user_id: userId,
-        },
+        metadata: { supabase_user_id: userId },
       });
-
       customerId = customer.id;
-
-      // Save customer ID to user profile
       await supabase
         .from('user_profiles')
-        .update({ stripe_customer_id: customerId })
+        .update({ [customerCol]: customerId })
         .eq('user_id', userId);
     }
 

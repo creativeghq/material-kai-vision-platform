@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { getStripe, getSupabase, stripeWebhookSecret } from '../_shared/stripe-clients.ts';
+import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 
 // Module-level handles re-assigned per-request from the memoised shared
 // factories. The downstream `handle*` functions reference these by name to
@@ -11,6 +11,16 @@ import { getStripe, getSupabase, stripeWebhookSecret } from '../_shared/stripe-c
 // references just stay in scope.
 let stripe!: Stripe;
 let supabase!: SupabaseClient;
+// #200 — true when THIS event was signed by the dedicated platform-billing account (verified
+// with STRIPE_BILLING_WEBHOOK_SECRET). Drives which customer-id column we persist/lookup.
+let eventIsBilling = false;
+
+/** Match a user profile by a Stripe customer id from EITHER account (default or billing). */
+function profileByCustomer(customerId: string, columns: string) {
+  return supabase.from('user_profiles').select(columns)
+    .or(`stripe_customer_id.eq.${customerId},stripe_billing_customer_id.eq.${customerId}`)
+    .limit(1).maybeSingle();
+}
 
 /**
  * Stripe Webhooks Handler
@@ -35,7 +45,6 @@ Deno.serve(async (req) => {
       { status: 503, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  stripe = _stripe;
   supabase = _supabase;
 
   const signature = req.headers.get('stripe-signature');
@@ -49,13 +58,29 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.text();
-    const event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      webhookSecret
-    );
+    // #200 — the same webhook URL receives events from BOTH the default account (tenant
+    // payments) and, when configured, the dedicated platform-billing account. Verify against
+    // the default secret first; on failure try the billing secret. Whichever verifies decides
+    // which Stripe client downstream API calls use (subscriptions.retrieve, etc.) and which
+    // customer-id column we persist.
+    let event: Stripe.Event;
+    eventIsBilling = false;
+    stripe = _stripe;
+    try {
+      event = _stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    } catch (primaryErr) {
+      const billingSecret = platformBillingWebhookSecret();
+      const billingStripe = getPlatformBillingStripe();
+      if (billingSecret && billingSecret !== webhookSecret && billingStripe) {
+        event = billingStripe.webhooks.constructEvent(body, signature, billingSecret);
+        eventIsBilling = true;
+        stripe = billingStripe;
+      } else {
+        throw primaryErr;
+      }
+    }
 
-    console.log(`Received Stripe event: ${event.type}`);
+    console.log(`Received Stripe event: ${event.type}${eventIsBilling ? ' [billing account]' : ''}`);
 
     switch (event.type) {
       // ============================================
@@ -130,9 +155,12 @@ async function handleCustomerCreated(customer: Stripe.Customer) {
     .maybeSingle();
 
   if (profile?.user_id) {
+    // Persist into the column matching the account that emitted the event so default-account
+    // and platform-billing customer ids never overwrite each other.
+    const col = eventIsBilling ? 'stripe_billing_customer_id' : 'stripe_customer_id';
     await supabase
       .from('user_profiles')
-      .update({ stripe_customer_id: customer.id })
+      .update({ [col]: customer.id })
       .eq('user_id', profile.user_id);
   }
 }
@@ -145,12 +173,8 @@ async function handleCustomerUpdated(customer: Stripe.Customer) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
 
-  // Find user by Stripe customer ID
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id, subscription_tier')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  // Find user by Stripe customer ID (either account — default or platform-billing)
+  const { data: profile } = await profileByCustomer(customerId, 'user_id, subscription_tier') as { data: any };
 
   if (!profile) {
     console.error(`No user found for customer: ${customerId}`);
@@ -187,11 +211,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const { data: profile } = await profileByCustomer(customerId, 'user_id') as { data: any };
 
   if (!profile) return;
 
@@ -218,11 +238,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const customerId = paymentIntent.customer as string;
   if (!customerId) return;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const { data: profile } = await profileByCustomer(customerId, 'user_id') as { data: any };
 
   if (!profile) return;
 
@@ -367,11 +383,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   const customerId = paymentIntent.customer as string;
   if (!customerId) return;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const { data: profile } = await profileByCustomer(customerId, 'user_id') as { data: any };
 
   if (!profile) return;
 
@@ -393,11 +405,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // Only process subscription invoices (not one-time credit purchases)
   if (!invoice.subscription) return;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id, subscription_tier')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const { data: profile } = await profileByCustomer(customerId, 'user_id, subscription_tier') as { data: any };
 
   if (!profile) return;
 
@@ -464,11 +472,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
   if (!customerId) return;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const { data: profile } = await profileByCustomer(customerId, 'user_id') as { data: any };
 
   if (!profile) return;
 

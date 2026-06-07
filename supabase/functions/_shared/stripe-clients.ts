@@ -42,11 +42,27 @@ export const stripeWebhookSecret = () => Deno.env.get('STRIPE_WEBHOOK_SECRET') |
 export const supabaseUrlEnv = () => Deno.env.get('SUPABASE_URL') || '';
 export const supabaseServiceKeyEnv = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+// #200 — platform-billing (operator SaaS revenue: subscriptions / credits / API) is collected
+// on a DEDICATED Stripe account, separate from the default key (tenant invoice payments) and
+// from per-tenant Connect (#182). These are optional — everything falls back to the default
+// key until the operator configures a separate billing account, so existing deploys are
+// unaffected.
+export const platformBillingSecretKey = () => Deno.env.get('STRIPE_BILLING_SECRET_KEY') || '';
+export const platformBillingWebhookSecret = () => Deno.env.get('STRIPE_BILLING_WEBHOOK_SECRET') || '';
+
+/** True when a DISTINCT platform-billing Stripe account is configured (key set AND different
+ *  from the default). Drives whether platform charges use a separate customer id + account. */
+export function hasDistinctBillingAccount(): boolean {
+  const b = platformBillingSecretKey();
+  return !!b && b !== stripeSecretKey();
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Memoised client factories
 // ──────────────────────────────────────────────────────────────────────────
 
 let _stripe: Stripe | null = null;
+let _billingStripe: Stripe | null = null;
 let _supabase: SupabaseClient | null = null;
 
 /**
@@ -64,6 +80,23 @@ export function getStripe(): Stripe | null {
     httpClient: Stripe.createFetchHttpClient(),
   });
   return _stripe;
+}
+
+/**
+ * Stripe client for PLATFORM revenue (subscriptions, credits, API) — #200. Prefers the
+ * dedicated STRIPE_BILLING_SECRET_KEY; falls back to the default STRIPE_SECRET_KEY so existing
+ * deploys keep collecting platform revenue on the default account until the operator sets up a
+ * separate billing entity. Null only when neither key resolves.
+ */
+export function getPlatformBillingStripe(): Stripe | null {
+  if (_billingStripe) return _billingStripe;
+  const key = platformBillingSecretKey() || stripeSecretKey();
+  if (!key) return null;
+  _billingStripe = new Stripe(key, {
+    apiVersion: '2023-10-16',
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+  return _billingStripe;
 }
 
 /**
@@ -85,6 +118,7 @@ export function getSupabase(): SupabaseClient | null {
  */
 export function resetStripeClients(): void {
   _stripe = null;
+  _billingStripe = null;
   _supabase = null;
 }
 
