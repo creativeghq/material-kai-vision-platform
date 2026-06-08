@@ -9,7 +9,6 @@ import {
   FolderKanban,
   Wallet,
   Contact,
-  Inbox,
   Briefcase,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -52,9 +51,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage' },
-  { id: 'requests', label: 'Requests', path: '/requests', icon: Inbox, requireCapability: 'network.manage' },
-  // Gate matches the route guard (CapabilityGuard network.manage) so a staff persona
-  // that can't open the page doesn't see a dead nav item.
+  // #177 — "Requests" (master-request procurement inbox) is now a tab inside Quotes
+  // (/quotes?tab=requests), not a top-nav item. The Inbox icon is freed for the upcoming
+  // INBOX feature.
   { id: 'settings', label: 'Settings', path: '/settings', icon: Settings, requireCapability: 'network.manage' },
   // Network is reached from the workspace switcher ("Manage network"), not the top nav.
   {

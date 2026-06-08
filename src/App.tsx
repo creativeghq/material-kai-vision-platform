@@ -32,7 +32,6 @@ const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
-const RequestsInboxPage = lazy(() => import('./pages/RequestsInboxPage'));
 const WorkspaceSettingsPage = lazy(() => import('./pages/WorkspaceSettingsPage'));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
@@ -272,18 +271,9 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/requests"
-                  element={
-                    <AuthGuard>
-                      <CapabilityGuard capability="network.manage">
-                        <Layout>
-                          <RequestsInboxPage />
-                        </Layout>
-                      </CapabilityGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* #177 — the procurement inbox merged into the Quotes page as a tab.
+                    Keep the old path alive as a redirect for bookmarks/notifications. */}
+                <Route path="/requests" element={<Navigate to="/quotes?tab=requests" replace />} />
                 <Route
                   path="/settings"
                   element={

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart,
   Plus,
@@ -10,12 +10,14 @@ import {
   FileText,
   Clock,
   CheckCircle,
+  ArrowDownUp,
 } from 'lucide-react';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   Popover,
   PopoverContent,
@@ -30,10 +32,13 @@ import {
   CommandList,
 } from '@/components/core/ui/command';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { CreateQuoteModal } from '../components/CreateQuoteModal';
+import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
+type QuotesTab = 'quotes' | 'requests';
 
 /**
  * Main Quotes Page - Customer facing
@@ -42,6 +47,19 @@ type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rej
 export const QuotesPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canManageNetwork = can('network.manage');
+
+  // Tab state (?tab=requests deep-links the procurement inbox; #177 merged here from /requests).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const activeTab: QuotesTab = requestedTab === 'requests' && canManageNetwork ? 'requests' : 'quotes';
+  const handleTabChange = (val: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (val === 'requests') params.set('tab', 'requests');
+    else params.delete('tab');
+    setSearchParams(params, { replace: true });
+  };
 
   // State
   const [quotes, setQuotes] = useState<QuoteWithItems[]>([]);
@@ -114,19 +132,6 @@ export const QuotesPage: React.FC = () => {
     navigate(`/quotes/${quoteId}`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Loading quotes...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen">
       <PageHeader
@@ -134,15 +139,41 @@ export const QuotesPage: React.FC = () => {
         title="My Quotes"
         subtitle="Create and manage your material quotes"
         actions={
-          <Button onClick={() => setShowCreateModal(true)} variant="outline" size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            New Quote
-          </Button>
+          activeTab === 'quotes' ? (
+            <Button onClick={() => setShowCreateModal(true)} variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Quote
+            </Button>
+          ) : undefined
         }
       />
 
       {/* Main Content */}
-      <div className="page-container pt-6 pb-6 space-y-6">
+      <div className="page-container pt-6 pb-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          {/* Tabs only appear for network-node personas (#177 — Requests merged in from /requests).
+              End-users / staff / sales just see the quotes list with no tab chrome. */}
+          {canManageNetwork && (
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2 mb-6">
+              <TabsTrigger value="quotes" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <ShoppingCart className="h-4 w-4" /> My Quotes
+              </TabsTrigger>
+              <TabsTrigger value="requests" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <ArrowDownUp className="h-4 w-4" /> Requests
+              </TabsTrigger>
+            </TabsList>
+          )}
+
+          <TabsContent value="quotes" className="space-y-6 mt-0">
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p>Loading quotes...</p>
+                </div>
+              </div>
+            ) : (
+              <>
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
@@ -304,6 +335,16 @@ export const QuotesPage: React.FC = () => {
             )}
           </div>
         </div>
+              </>
+            )}
+          </TabsContent>
+
+          {canManageNetwork && (
+            <TabsContent value="requests" className="mt-0">
+              <RequestsInboxPanel />
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
 
       {/* Create Quote Modal */}

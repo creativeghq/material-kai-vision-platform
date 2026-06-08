@@ -65,6 +65,15 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
   { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];
 
+// Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="hidden lg:flex items-center gap-2 px-3 pt-3 pb-1">
+    <span className="h-px flex-1 bg-border/60" aria-hidden="true" />
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
+    <span className="h-px flex-1 bg-border/60" aria-hidden="true" />
+  </div>
+);
+
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
 const FinancePage: React.FC = () => {
@@ -195,13 +204,13 @@ const FinancePage: React.FC = () => {
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
 
-            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground hidden lg:block">Documents</div>
+            <SectionLabel>Documents</SectionLabel>
             {DOC_TABS.map((d) => (
               <TabsTrigger key={d.value} value={d.value} className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <d.icon className="h-4 w-4 mr-2" /> {d.label}
               </TabsTrigger>
             ))}
-            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground hidden lg:block">Tools</div>
+            <SectionLabel>Tools</SectionLabel>
 
             <TabsTrigger value="planning" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
