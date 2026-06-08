@@ -190,6 +190,9 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
           .from('products')
           .select('id, name, external_sku, metadata, properties')
           .eq('workspace_id', workspaceId)
+          // #207 — warehouse stock is for the workspace's OWN products, never operator-catalog
+          // reference items (supply_mode='reference_only' are cost-basis references, not held stock).
+          .or('supply_mode.is.null,supply_mode.neq.reference_only')
           .or(`name.ilike.%${q}%,external_sku.ilike.%${q}%`)
           .order('name')
           .limit(10);
