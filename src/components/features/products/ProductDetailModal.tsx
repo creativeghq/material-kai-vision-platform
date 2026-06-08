@@ -21,7 +21,7 @@ import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, 
 import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
-import { isAdmin as isAdminRole } from '@/auth/roles';
+import { usePermissions } from '@/hooks/usePermissions';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
@@ -34,7 +34,6 @@ import { ProductPricingCard } from '@/components/business/marketplace/ProductPri
 import { DollarSign } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
   getCategoryDisplayConfig,
@@ -229,11 +228,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onUseIn3DScene,
   vrGenerating,
 }) => {
-  const { user } = useAuth();
+  // #195 — admin diagnostic surfaces (embeddings/relevances, myDATA card, price lookup) gate on
+  // node-admin via the unified capability layer (replaces the per-mount workspace_members fetch).
+  // pricing.manage is granted to exactly the owner/admin personas (operator/dealer/architect),
+  // preserving the old `workspace_members.role IN (owner,admin)` behaviour for the active workspace.
+  const { can } = usePermissions();
+  const isAdmin = can('pricing.manage');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [chunks, setChunks] = useState<any[]>([]);
   const [embeddings, setEmbeddings] = useState<any>({});
   const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
@@ -269,20 +272,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       });
   }, [stackedProductId]);
 
-  // Check if user is admin
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('workspace_members')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-      setIsAdmin(isAdminRole(data?.role));
-    };
-    checkAdmin();
-  }, [user]);
 
   // Load images from image_product_associations when modal opens
   useEffect(() => {
