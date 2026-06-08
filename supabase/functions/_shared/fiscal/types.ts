@@ -87,7 +87,8 @@ export interface FiscalInvoiceInput {
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];
   lines: FiscalLine[];
-  paymentMethods?: { type: number; amount: number }[];
+  // type 7=card, 8=IRIS carry the EFT-POS terminal id + NSP for the Law 5155 signature.
+  paymentMethods?: { type: number; amount: number; info?: string; terminalId?: string; posNspId?: number }[];
   summary: {
     totalNetValue: number;
     totalVatAmount: number;
@@ -101,7 +102,21 @@ export interface FiscalInvoiceInput {
   logoId?: string;
 }
 
-export type FiscalSubmissionStatus = 'accepted' | 'offline' | 'rejected' | 'error';
+export type FiscalSubmissionStatus = 'accepted' | 'offline' | 'rejected' | 'error' | 'awaiting_payment';
+
+/** Law 5155/2023 provider signature returned when skipSignature=false + paymentType 7/8.
+ *  The `token` (HEX/BASE64 per posNspId) + `data` are handed to the bank/NSP terminal API to
+ *  unlock the POS charge; the doc is NOT yet on AADE — CompletionPosInvoices finalizes it. */
+export interface ProviderSignature {
+  invoiceUid: string;
+  token: string;
+  data: string;
+  createdDate?: string;
+  expiryDate?: string;
+  isExpired?: boolean;
+  paymentBalance?: number;
+  issuerVatNumber?: string;
+}
 
 export interface FiscalSubmissionResult {
   status: FiscalSubmissionStatus;
@@ -115,6 +130,18 @@ export interface FiscalSubmissionResult {
   /** 5XX/transient — the caller should resend with transmissionFailure=1 */
   transmissionFailure?: boolean;
   errorCode?: string;
+  errorMessage?: string;
+  raw?: unknown;
+  /** Present when status='awaiting_payment' (skipSignature=false + card/IRIS): the Law-5155
+   *  signature(s) to hand to the POS terminal; complete via completePosInvoice afterwards. */
+  providerSignature?: ProviderSignature[];
+}
+
+/** Result of completing a POS/IRIS card payment (CompletionPosInvoices). */
+export interface PosCompletionResult {
+  ok: boolean;
+  mark?: string;
+  finalPaymentType?: number; // 7=card, 8=IRIS — the bank's final type
   errorMessage?: string;
   raw?: unknown;
 }
@@ -139,4 +166,19 @@ export interface FiscalConnector {
     query: { invoiceMark?: string; aa?: string; issuerVatNumber?: string },
     ctx: FiscalConnectorContext,
   ): Promise<FiscalSubmissionResult>;
+  /** Law 5155 — after the POS terminal charge succeeds, finalize the held card/IRIS invoice
+   *  (CompletionPosInvoices) → transmits to AADE → returns MARK. */
+  completePosInvoice?(
+    input: { signatureToken: string; transactionId: string; paymentAmount: number; paymentType?: number; tipAmount?: number },
+    ctx: FiscalConnectorContext,
+  ): Promise<PosCompletionResult>;
+  /** Law 5155 deferred flow — request a signature for an already-issued (on-credit) invoice. */
+  askSignatureForOldInvoice?(
+    input: { invoiceMark?: string; invoiceUid?: string },
+    ctx: FiscalConnectorContext,
+  ): Promise<ProviderSignature>;
+  completeOldInvoicePosPayment?(
+    input: { signatureToken: string; transactionId: string; paymentAmount: number; paymentType?: number; tipAmount?: number },
+    ctx: FiscalConnectorContext,
+  ): Promise<PosCompletionResult>;
 }

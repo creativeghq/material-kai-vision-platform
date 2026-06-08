@@ -33,6 +33,13 @@ interface RequestBody {
   skip_signature?: boolean;
   /** Per-call myDATA overrides (invoice type, series/aa, income classification). */
   fiscal_overrides?: FiscalOverrides;
+  /** #185 Law 5155 — issue this invoice as a card(7)/IRIS(8) receipt on a registered EFT-POS
+   *  terminal. Forces skipSignature=false; the response carries the provider signature and the
+   *  doc is held (fiscal_status='awaiting_payment') until pos_complete finalizes it. */
+  pos_payment?: { terminal_id: string; pos_nsp_id: number; payment_type?: number };
+  /** #185 Law 5155 — finalize a held POS/IRIS receipt after the terminal charge succeeded.
+   *  Calls Novus CompletionPosInvoices → transmits to AADE → returns MARK. */
+  pos_complete?: { pos_signature_id?: string; invoice_id?: string; transaction_id: string; payment_amount?: number; tip_amount?: number };
 }
 
 // Platform cost per myDATA transmission (markup on Novus ~0.5-1 cr). Root transmits free.
@@ -128,8 +135,8 @@ Deno.serve(async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id) {
-      return json({ error: 'quote_id, invoice_id, credit_note_id or delivery_note_id is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete) {
+      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id or pos_complete is required' }, 400);
     }
 
     const supabase = createClient(
@@ -137,6 +144,82 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+
+    // ── #185 POS/IRIS completion path ─────────────────────────────────────────
+    // The terminal charge succeeded (transaction_id from the bank/NSP); finalize the held
+    // receipt via Novus CompletionPosInvoices → AADE → MARK. Reserves transmission credits here
+    // (the original submit refunded them because the doc was only held, not transmitted).
+    if (body.pos_complete) {
+      const pc = body.pos_complete;
+      if (!pc.transaction_id) return json({ error: 'pos_complete.transaction_id is required' }, 400);
+      if (!pc.pos_signature_id && !pc.invoice_id) return json({ error: 'pos_complete needs pos_signature_id or invoice_id' }, 400);
+
+      let sigQuery = supabase.from('pos_signatures').select('*').eq('status', 'awaiting_payment');
+      sigQuery = pc.pos_signature_id ? sigQuery.eq('id', pc.pos_signature_id) : sigQuery.eq('invoice_id', pc.invoice_id!);
+      const { data: sig } = await sigQuery.order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!sig) return json({ error: 'No awaiting-payment signature found for this receipt' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, (sig as any).workspace_id))) {
+        return json({ error: 'Not authorized for this document' }, 403);
+      }
+      if ((sig as any).expiry_date && new Date((sig as any).expiry_date).getTime() < Date.now()) {
+        await supabase.from('pos_signatures').update({ status: 'expired', is_expired: true, updated_at: new Date().toISOString() }).eq('id', (sig as any).id);
+        return json({ ok: false, code: 'signature_expired', error: 'The POS signature has expired. Re-issue the receipt.' }, 409);
+      }
+
+      const resolved: any = await resolveWorkspaceConnector(supabase, (sig as any).workspace_id, 'legal_invoice');
+      if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
+      if (!resolved.resolved.connector.completePosInvoice) {
+        return json({ ok: false, error: 'Connector does not support POS completion' }, 400);
+      }
+
+      const reserve = await reserveTransmission(supabase, (sig as any).workspace_id, auth.userId, `myDATA POS completion for receipt ${(sig as any).invoice_id ?? (sig as any).id}`);
+      if (!reserve.ok) return json({ ok: false, code: reserve.code, balance: reserve.balance, error: reserve.error }, 402);
+
+      try {
+        const completion = await resolved.resolved.connector.completePosInvoice({
+          signatureToken: (sig as any).signature_token,
+          transactionId: pc.transaction_id,
+          paymentAmount: pc.payment_amount ?? Number((sig as any).payment_amount),
+          paymentType: (sig as any).payment_type ?? undefined,
+          tipAmount: pc.tip_amount ?? Number((sig as any).tip_amount ?? 0),
+        }, resolved.resolved.ctx);
+
+        await supabase.from('fiscal_submissions').insert({
+          workspace_id: (sig as any).workspace_id,
+          invoice_id: (sig as any).invoice_id,
+          connector_slug: resolved.resolved.slug,
+          capability: 'legal_invoice',
+          status: completion.ok ? 'accepted' : 'error',
+          mark: completion.mark ?? null,
+          is_offline: false,
+          response_payload: completion.raw ?? null,
+          error_message: completion.errorMessage ?? null,
+        });
+
+        if (!completion.ok) {
+          await reserve.refund();
+          return json({ ok: false, code: 'pos_completion_failed', error: completion.errorMessage ?? 'POS completion failed' }, 502);
+        }
+
+        await supabase.from('pos_signatures').update({
+          status: 'completed', transaction_id: pc.transaction_id,
+          final_mark: completion.mark ?? null, final_payment_type: completion.finalPaymentType ?? null,
+          completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', (sig as any).id);
+
+        if ((sig as any).invoice_id) {
+          await supabase.from('invoices').update({
+            fiscal_status: 'accepted', fiscal_mark: completion.mark ?? null,
+            fiscal_connector_slug: resolved.resolved.slug, fiscal_submitted_at: new Date().toISOString(),
+          }).eq('id', (sig as any).invoice_id);
+        }
+
+        return json({ ok: true, pos_signature_id: (sig as any).id, invoice_id: (sig as any).invoice_id, fiscal: { ok: true, status: 'accepted', mark: completion.mark, finalPaymentType: completion.finalPaymentType } });
+      } catch (err: any) {
+        await reserve.refund();
+        return json({ ok: false, error: err?.message ?? 'POS completion failed' }, 500);
+      }
+    }
 
     // ── Credit-note submission path (myDATA 5.1) ──────────────────────────────
     // A credit note is already created + the invoice already netted by issue_credit_note;
@@ -372,9 +455,20 @@ Deno.serve(async (req) => {
           fiscalResult = { ok: false, code: reserve!.code, balance: reserve!.balance, error: reserve!.error };
         } else {
           try {
-            const input = await buildInvoiceInputFromDb(supabase, invoiceId, body.fiscal_overrides ?? {});
+            // #185 POS/IRIS receipt — merge the EFT-POS terminal into the overrides and force
+            // signing so Novus returns a provider signature instead of transmitting to AADE.
+            const effOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
+            if (body.pos_payment) {
+              effOverrides.posPayment = {
+                type: body.pos_payment.payment_type ?? 7,
+                terminalId: body.pos_payment.terminal_id,
+                posNspId: body.pos_payment.pos_nsp_id,
+              };
+            }
+            const input = await buildInvoiceInputFromDb(supabase, invoiceId, effOverrides);
             const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
-              skipSignature: body.skip_signature,
+              // POS receipts must be signed (skipSignature=false) to obtain the Law-5155 token.
+              skipSignature: body.pos_payment ? false : body.skip_signature,
             });
 
             await supabase.from('fiscal_submissions').insert({
@@ -400,6 +494,32 @@ Deno.serve(async (req) => {
               error_message: result.errorMessage ?? null,
             });
 
+            // #185 Held card/IRIS receipt: persist the signature for the terminal charge, mark the
+            // invoice awaiting_payment, and refund the reservation — AADE transmission happens at
+            // pos_complete (which reserves its own credits).
+            if (result.status === 'awaiting_payment') {
+              const firstSig = result.providerSignature?.[0];
+              await supabase.from('pos_signatures').insert({
+                workspace_id: invRow!.workspace_id,
+                invoice_id: invoiceId,
+                terminal_id: body.pos_payment?.terminal_id ?? null,
+                pos_nsp_id: body.pos_payment?.pos_nsp_id ?? null,
+                payment_type: body.pos_payment?.payment_type ?? 7,
+                signature_token: firstSig?.token ?? '',
+                signature_data: firstSig?.data ?? null,
+                invoice_uid: firstSig?.invoiceUid ?? result.uid ?? null,
+                payment_amount: input.summary.totalGrossValue,
+                payment_balance: firstSig?.paymentBalance ?? null,
+                expiry_date: firstSig?.expiryDate ?? null,
+                is_expired: firstSig?.isExpired ?? false,
+                created_by: auth.userId ?? null,
+              });
+              await supabase.from('invoices').update({ fiscal_status: 'awaiting_payment' }).eq('id', invoiceId);
+              await reserve!.refund();
+              fiscalResult = { ok: true, ...result };
+              // fall through to read final state + respond below
+            } else {
+
             const accepted = result.status === 'accepted' || result.status === 'offline';
             if (accepted) {
               await supabase
@@ -423,6 +543,7 @@ Deno.serve(async (req) => {
             if (!accepted) await reserve!.refund();
 
             fiscalResult = { ok: true, ...result };
+            } // end non-awaiting_payment branch
           } catch (err: any) {
             await reserve!.refund();
             fiscalResult = { ok: false, error: err?.message ?? 'fiscal submission failed' };

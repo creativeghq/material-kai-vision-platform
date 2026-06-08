@@ -117,7 +117,13 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             : {}),
         },
         paymentMethods: input.paymentMethods?.length
-          ? input.paymentMethods.map((pm: any) => ({ type: pm.type, amount: pm.amount, ...(pm.info ? { paymentMethodInfo: pm.info } : {}) }))
+          ? input.paymentMethods.map((pm: any) => ({
+              type: pm.type, amount: pm.amount,
+              ...(pm.info ? { paymentMethodInfo: pm.info } : {}),
+              // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
+              ...(pm.terminalId ? { terminalId: pm.terminalId } : {}),
+              ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
+            }))
           : [{ type: 5, amount: summary.totalGrossValue }],
         invoiceDetails,
         providerAdditionalInvoiceDetails: {
@@ -222,7 +228,11 @@ export const novusConnector: FiscalConnector = {
   capabilities: ['legal_invoice', 'pre_invoice_notice', 'tax_submission', 'pdf_render'],
 
   async submitInvoice(input, ctx, opts) {
-    const url = `${ctx.baseUrl}/api/v1/Provider/SendInvoices${opts?.skipSignature ? '?skipSignature=true' : ''}`;
+    // Novus defaults skipSignature=true (no provider signature). To get the Law-5155 signature
+    // for a card/IRIS payment on a connected POS, the caller must explicitly request signing
+    // (opts.skipSignature === false). Send the value explicitly either way.
+    const skip = opts?.skipSignature === false ? 'false' : 'true';
+    const url = `${ctx.baseUrl}/api/v1/Provider/SendInvoices?skipSignature=${skip}`;
     const payload = buildNovusPayload(input) as any;
     if (opts?.transmissionFailure) {
       // resend marker for the 5XX recovery path
@@ -245,6 +255,21 @@ export const novusConnector: FiscalConnector = {
       return { status: 'error', isOffline: false, transmissionFailure: res.status >= 500, errorMessage: `Non-JSON response (${res.status})` };
     }
     const entry = body?.response?.[0] ?? body;
+
+    // skipSignature=false + card/IRIS → the doc is HELD (not yet on AADE) and a provider
+    // signature is returned. Surface it so the POS terminal can be charged, then completePosInvoice.
+    const sigBlocks = body?.providerSignature ?? entry?.providerSignature;
+    if (Array.isArray(sigBlocks) && sigBlocks.length) {
+      const providerSignature = sigBlocks.flatMap((b: any) =>
+        (b.signatures ?? [b]).map((s: any) => ({
+          invoiceUid: b.invoiceUid ?? entry?.invoiceUid ?? '',
+          token: s.token, data: s.data,
+          createdDate: s.createdDate, expiryDate: s.expiryDate, isExpired: s.isExpired,
+          paymentBalance: s.paymentBalance, issuerVatNumber: s.issuerVatNumber,
+        })),
+      );
+      return { status: 'awaiting_payment', isOffline: false, uid: entry?.invoiceUid ?? undefined, providerSignature, raw: body };
+    }
     return interpret(entry, res.status);
   },
 
@@ -261,6 +286,69 @@ export const novusConnector: FiscalConnector = {
       return interpret(entry, res.status);
     } catch (e) {
       return { status: 'error', isOffline: false, transmissionFailure: true, errorMessage: String(e) };
+    }
+  },
+
+  // Law 5155 — after the POS terminal charge, finalize the held card/IRIS invoice → AADE → MARK.
+  async completePosInvoice(input, ctx) {
+    try {
+      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionPosInvoices`, {
+        method: 'POST',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          signatureToken: input.signatureToken,
+          transactionId: input.transactionId,
+          paymentAmount: input.paymentAmount,
+          ...(input.paymentType != null ? { paymentType: input.paymentType } : {}),
+          tipAmount: input.tipAmount ?? 0,
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      const entry = body?.response?.[0] ?? body;
+      const mark = entry?.invoiceMark && entry.invoiceMark !== 0 ? String(entry.invoiceMark) : undefined;
+      const ok = res.ok && (entry?.statusCode === 'Success' || !!mark);
+      // If the bank returned a final paymentType use it, else default 7 (card) per the spec.
+      const finalPaymentType = entry?.paymentType ?? input.paymentType ?? 7;
+      return { ok, mark, finalPaymentType, errorMessage: ok ? undefined : (firstError(entry).message ?? `HTTP ${res.status}`), raw: body };
+    } catch (e) {
+      return { ok: false, errorMessage: String(e) };
+    }
+  },
+
+  // Deferred flow — request a signature for an already-issued (on-credit) invoice.
+  async askSignatureForOldInvoice(input, ctx) {
+    const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/AskSignatureForOldInvoice`, {
+      method: 'POST',
+      headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ invoiceMark: input.invoiceMark, invoiceUid: input.invoiceUid }),
+    });
+    const body = await res.json().catch(() => ({}));
+    const s = body?.providerSignature?.[0]?.signatures?.[0] ?? body;
+    return {
+      invoiceUid: input.invoiceUid ?? body?.providerSignature?.[0]?.invoiceUid ?? '',
+      token: s?.token, data: s?.data, createdDate: s?.createdDate, expiryDate: s?.expiryDate,
+      isExpired: s?.isExpired, paymentBalance: s?.paymentBalance, issuerVatNumber: s?.issuerVatNumber,
+    };
+  },
+
+  async completeOldInvoicePosPayment(input, ctx) {
+    try {
+      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionAskSignatureForOldInvoice`, {
+        method: 'POST',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          signatureToken: input.signatureToken,
+          transactionId: input.transactionId,
+          paymentAmount: input.paymentAmount,
+          ...(input.paymentType != null ? { paymentType: input.paymentType } : {}),
+          tipAmount: input.tipAmount ?? 0,
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      const entry = body?.response?.[0] ?? body;
+      return { ok: res.ok, finalPaymentType: entry?.paymentType ?? input.paymentType ?? 7, raw: body };
+    } catch (e) {
+      return { ok: false, errorMessage: String(e) };
     }
   },
 };

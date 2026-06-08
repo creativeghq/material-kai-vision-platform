@@ -20,7 +20,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, extractNet } from '@/modules/finance/services/financeService';
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
-import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 
 interface SellItem {
@@ -54,8 +54,18 @@ const PosPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [method, setMethod] = useState<'cash' | 'card'>('cash');
+  const [method, setMethod] = useState<'cash' | 'card' | 'iris'>('cash');
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
+  // #185 EFT-POS terminals for the Law-5155 card/IRIS signature flow.
+  const [terminals, setTerminals] = useState<PosTerminal[]>([]);
+  const [terminalId, setTerminalId] = useState<string>('');
+  // A held card/IRIS receipt awaiting the physical terminal charge (then CompletionPosInvoices).
+  const [awaiting, setAwaiting] = useState<{
+    posSignatureId: string; invoiceId: string; number: string; total: number; currency: string;
+    net: number; vat: number; method: 'card' | 'iris'; lines: { name: string; qty: number; unit_price: number }[];
+  } | null>(null);
+  const [txnId, setTxnId] = useState('');
+  const [completing, setCompleting] = useState(false);
   const [branchCode, setBranchCode] = useState('0');
   const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
   // The receipt also constitutes a movement/delivery document.
@@ -68,7 +78,7 @@ const PosPage: React.FC = () => {
   const [zReport, setZReport] = useState<PosReport | null>(null);
   const [result, setResult] = useState<{
     number: string; total: number; currency: string; mark: string | null;
-    net: number; vat: number; method: 'cash' | 'card'; issuedAt: string;
+    net: number; vat: number; method: 'cash' | 'card' | 'iris'; issuedAt: string;
     lines: { name: string; qty: number; unit_price: number }[];
   } | null>(null);
 
@@ -130,6 +140,23 @@ const PosPage: React.FC = () => {
     catch { /* non-fatal */ }
   };
   useEffect(() => { void loadSession(); /* eslint-disable-next-line */ }, [activeWorkspaceId, branchCode]);
+
+  // #185 load the registered EFT-POS terminals for this branch (card/IRIS signature flow).
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const t = await posTerminalService.listActive(activeWorkspaceId, parseInt(branchCode, 10) || 0);
+        if (cancelled) return;
+        setTerminals(t);
+        setTerminalId((cur) => (t.some((x) => x.id === cur) ? cur : (t[0]?.id ?? '')));
+      } catch { /* non-fatal — falls back to direct transmit */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, branchCode]);
+
+  const selectedTerminal = useMemo(() => terminals.find((t) => t.id === terminalId) ?? null, [terminals, terminalId]);
 
   const openShift = async () => {
     if (!activeWorkspaceId) return;
@@ -232,34 +259,91 @@ const PosPage: React.FC = () => {
       const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itErr) throw itErr;
 
-      // Transmit the 11.1 to myDATA (best-effort — receipt still valid locally if offline).
+      const snapshot = {
+        number: num?.formatted as string, total: totals.total, currency,
+        net: totals.net, vat: totals.vat,
+        lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price })),
+      };
+
+      // #185 Law 5155 — a card/IRIS receipt on a registered terminal must be SIGNED, the
+      // terminal charged, then finalized to AADE. Hold here with the provider signature.
+      if (method !== 'cash' && selectedTerminal) {
+        const res = await fiscalConnectorService.submitInvoice(invoice.id, {
+          posPayment: { terminal_id: selectedTerminal.terminal_id, pos_nsp_id: selectedTerminal.pos_nsp_id, payment_type: method === 'iris' ? 8 : 7 },
+        });
+        if (res?.fiscal?.status === 'awaiting_payment') {
+          // The pos_signatures row was created server-side; look it up to drive the charge step.
+          const { data: sig } = await supabase
+            .from('pos_signatures').select('id')
+            .eq('invoice_id', invoice.id).eq('status', 'awaiting_payment')
+            .order('created_at', { ascending: false }).limit(1).maybeSingle();
+          setAwaiting({
+            posSignatureId: (sig as any)?.id ?? '', invoiceId: invoice.id,
+            method: method as 'card' | 'iris', ...snapshot,
+          });
+          setCart([]); setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
+          toast({ title: 'Receipt signed — charge the terminal', description: 'Complete the card payment on the EFT-POS device, then confirm.' });
+          return;
+        }
+        // Connector didn't hold (e.g. no signature returned) — fall through to settle directly.
+        await finalizeSale(invoice.id, snapshot, method as 'card' | 'iris', res?.fiscal?.mark ?? null);
+        return;
+      }
+
+      // Cash (or card without a registered terminal): transmit straight to myDATA + settle.
       let mark: string | null = null;
       try {
         const res = await fiscalConnectorService.submitInvoice(invoice.id);
         mark = res?.fiscal?.mark ?? null;
       } catch { /* surfaced on the document page */ }
-
-      // Record the payment (receipt is paid on issue) so it shows settled.
-      try {
-        await financeService.recordPayment({
-          workspaceId: activeWorkspaceId, direction: 'in', amount: totals.total, currency,
-          method: method === 'cash' ? 'cash' : 'card',
-          allocations: [{ target_id: invoice.id, target_type: 'invoice', amount: totals.total }],
-        });
-      } catch { /* non-fatal */ }
-
-      setResult({
-        number: num?.formatted as string, total: totals.total, currency, mark,
-        net: totals.net, vat: totals.vat, method, issuedAt: new Date().toLocaleString(),
-        lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price })),
-      });
-      setCart([]);
-      setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
-      toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
+      await finalizeSale(invoice.id, snapshot, method, mark);
     } catch (err: any) {
       toast({ title: 'Failed to issue receipt', description: err?.message, variant: 'destructive' });
     } finally { setIssuing(false); }
   };
+
+  // Record the payment (receipt is paid on issue) + show the success/receipt state.
+  const finalizeSale = async (
+    invoiceId: string,
+    snapshot: { number: string; total: number; currency: string; net: number; vat: number; lines: { name: string; qty: number; unit_price: number }[] },
+    paidMethod: 'cash' | 'card' | 'iris',
+    mark: string | null,
+  ) => {
+    if (!activeWorkspaceId) return;
+    try {
+      await financeService.recordPayment({
+        workspaceId: activeWorkspaceId, direction: 'in', amount: snapshot.total, currency: snapshot.currency,
+        method: paidMethod === 'cash' ? 'cash' : 'card',
+        allocations: [{ target_id: invoiceId, target_type: 'invoice', amount: snapshot.total }],
+      });
+    } catch { /* non-fatal */ }
+    setResult({ ...snapshot, mark, method: paidMethod, issuedAt: new Date().toLocaleString() });
+    setCart([]);
+    setMovementDoc(false); setMovVehicle(''); setMovShipTo('');
+    toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
+  };
+
+  // #185 — the terminal charge cleared; finalize the held receipt → CompletionPosInvoices → AADE.
+  const chargeAndComplete = async () => {
+    if (!awaiting) return;
+    setCompleting(true);
+    try {
+      const res = await fiscalConnectorService.completePos({
+        pos_signature_id: awaiting.posSignatureId || undefined,
+        invoice_id: awaiting.invoiceId,
+        transaction_id: txnId.trim() || `manual-${Date.now()}`,
+        payment_amount: awaiting.total,
+      });
+      if (!res?.ok) throw new Error(res?.error ?? 'POS completion failed');
+      const mark = res?.fiscal?.mark ?? null;
+      await finalizeSale(awaiting.invoiceId, awaiting, awaiting.method, mark);
+      setAwaiting(null); setTxnId('');
+    } catch (err: any) {
+      toast({ title: 'Could not finalize receipt', description: err?.message, variant: 'destructive' });
+    } finally { setCompleting(false); }
+  };
+
+  const cancelAwaiting = () => { setAwaiting(null); setTxnId(''); };
 
   return (
     <div className="min-h-screen">
@@ -344,7 +428,7 @@ const PosPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Net</span><span>{formatMoney(result.net, result.currency)}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT</span><span>{formatMoney(result.vat, result.currency)}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}><span>TOTAL</span><span>{formatMoney(result.total, result.currency)}</span></div>
-          <div style={{ marginTop: 4 }}>Paid: {result.method === 'cash' ? 'Cash' : 'Card'}</div>
+          <div style={{ marginTop: 4 }}>Paid: {result.method === 'cash' ? 'Cash' : result.method === 'iris' ? 'IRIS' : 'Card'}</div>
           {result.mark && <div style={{ marginTop: 6, wordBreak: 'break-all' }}>MARK: {result.mark}</div>}
           <div style={{ textAlign: 'center', marginTop: 8 }}>Thank you!</div>
         </div>
@@ -382,7 +466,31 @@ const PosPage: React.FC = () => {
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold"><ShoppingCart className="h-4 w-4" /> Cart</div>
 
-            {result ? (
+            {awaiting ? (
+              // #185 held card/IRIS receipt — the terminal charge happens on the physical device;
+              // confirm it (capturing the bank transaction id) to finalize the receipt to AADE.
+              <div className="space-y-3 py-2">
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                  <div className="font-medium">Receipt {awaiting.number} signed</div>
+                  <div className="mt-1 text-2xl font-semibold">{formatMoney(awaiting.total, awaiting.currency)}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Charge {formatMoney(awaiting.total, awaiting.currency)} on the EFT-POS terminal
+                    {selectedTerminal ? <> (<span className="font-mono">{selectedTerminal.label}</span>)</> : null}. When it approves,
+                    confirm below to transmit the {awaiting.method === 'iris' ? 'IRIS' : 'card'} receipt to myDATA.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Terminal transaction ID (optional)</label>
+                  <Input className="h-8 text-xs font-mono" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the terminal receipt" />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={cancelAwaiting} disabled={completing}>Cancel</Button>
+                  <Button className="flex-1" onClick={chargeAndComplete} disabled={completing}>
+                    {completing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Charge cleared — finalize
+                  </Button>
+                </div>
+              </div>
+            ) : result ? (
               <div className="space-y-3 py-4 text-center">
                 <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
                 <div className="text-sm font-medium">Receipt {result.number} issued</div>
@@ -451,9 +559,26 @@ const PosPage: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="iris">IRIS</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* #185 EFT-POS terminal picker — only for card/IRIS, only if terminals are registered. */}
+                {method !== 'cash' && terminals.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Terminal (signed payment)</label>
+                    <Select value={terminalId} onValueChange={setTerminalId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {terminals.map((t) => <SelectItem key={t.id} value={t.id}>{t.label} · {t.terminal_id}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {method !== 'cash' && terminals.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">No EFT-POS terminal registered — this card receipt will transmit without a terminal signature. Add one in Finance → Settings → Documents.</p>
+                )}
 
                 <Button className="w-full" onClick={issue} disabled={issuing}>
                   {issuing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue receipt · {formatMoney(totals.total, currency)}
