@@ -63,7 +63,6 @@ export const CommandPalette: React.FC<Props> = ({
 
   const entries = useMemo<PaletteEntry[]>(() => {
     const out: PaletteEntry[] = [];
-    const isAdmin = role === 'admin' || role === 'owner';
 
     // Form-bearing quick-starts first — picking one opens the collect-then-send
     // modal (same flow as the toolkit cards) instead of injecting an editable
