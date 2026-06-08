@@ -15,6 +15,7 @@ export type {
   MessageType,
   ApprovalStatus,
   MediaType,
+  ConversationStatus,
   // Database models
   MessagingChannel,
   MessagingTemplate,
@@ -22,18 +23,15 @@ export type {
   MessagingAnalytics,
   MessagingCampaignRecipient,
   MessagingOptout,
+  MessagingConversation,
+  MessagingConversationMessage,
   // Message buttons
   MessageButton,
   // Service options
   SendMessageOptions,
   SendBulkOptions,
+  ConnectWhatsAppOptions,
   MessageLogFilters,
-  // Twilio types
-  TwilioConfig,
-  TwilioMessageRequest,
-  TwilioMessageResponse,
-  TwilioStatusCallback,
-  TwilioIncomingMessage,
   // Analytics
   MessagingAnalyticsResponse,
   MessagingCampaignStats,

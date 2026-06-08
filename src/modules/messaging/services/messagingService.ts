@@ -1,10 +1,11 @@
 /**
  * Messaging Service
- * Handles SMS and WhatsApp messaging via Twilio through Supabase Edge Functions
- * @see https://www.twilio.com/docs/messaging/api
+ * Handles WhatsApp messaging via Zernio (Meta Cloud API) through Supabase Edge Functions.
+ * SMS / Twilio removed.
+ * @see https://docs.zernio.com
  *
- * IMPORTANT: Twilio credentials are stored as Supabase Secrets, NOT in environment variables
- * All messaging operations go through the messaging-api Edge Function which has access to secrets
+ * IMPORTANT: the Zernio API key is resolved server-side (env-first / platform_secrets
+ * fallback). All messaging operations go through the messaging-api Edge Function.
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -16,8 +17,11 @@ import type {
   MessagingChannelType,
   SendMessageOptions,
   SendBulkOptions,
+  ConnectWhatsAppOptions,
   MessageLogFilters,
   MessagingAnalyticsResponse,
+  MessagingConversation,
+  MessagingConversationMessage,
 } from './types';
 
 export class MessagingService {
@@ -50,7 +54,7 @@ export class MessagingService {
       if (error.message?.includes('FunctionsRelayError')) {
         throw new Error('Messaging service unavailable. Please check edge function deployment.');
       } else if (error.message?.includes('FunctionsHttpError')) {
-        throw new Error('Messaging service error. Please check Twilio configuration.');
+        throw new Error('Messaging service error. Please check Zernio configuration.');
       }
 
       throw error;
@@ -366,67 +370,116 @@ export class MessagingService {
   }
 
   /**
-   * Get Twilio account balance
+   * Get WhatsApp account health (quality rating + messaging tier) from Zernio.
+   * Replaces the former Twilio account-balance call.
    */
-  async getAccountBalance(): Promise<{ balance: number; currency: string }> {
+  async getAccountInfo(from?: string): Promise<Record<string, any>> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
-        body: {
-          action: 'balance',
-        },
+        body: { action: 'account-info', from },
       });
-
       if (error) throw error;
-      return data;
+      return data || {};
     } catch (error) {
-      console.error('Error getting account balance:', error);
-      throw error;
+      console.error('Error getting account info:', error);
+      return {};
     }
   }
 
   /**
-   * Sync channels from Twilio
-   * Fetches all registered phone numbers from Twilio and syncs them to the database
+   * Connect a WhatsApp number (Meta WABA credentials → Zernio account → channel).
+   */
+  async connectWhatsApp(options: ConnectWhatsAppOptions): Promise<{ channel: MessagingChannel; account: any }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'connect-whatsapp', ...options },
+    });
+    if (error) throw new Error(error.message || 'Failed to connect WhatsApp');
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Sync channels from Zernio — pulls connected WhatsApp accounts into messaging_channels.
    */
   async syncChannels(): Promise<{
     synced: number;
-    channels: Array<{ action: string; channelType: string; senderId: string; displayName: string }>;
+    channels: Array<{ action: string; senderId: string }>;
     message?: string;
     errors?: string[];
   }> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
-        body: {
-          action: 'sync-channels',
-        },
+        body: { action: 'sync-channels' },
       });
-
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error syncing channels from Twilio:', error);
+      console.error('Error syncing channels from Zernio:', error);
       throw error;
     }
   }
 
   /**
-   * Get WhatsApp content templates from Twilio
-   * @see https://www.twilio.com/docs/content/api
+   * Get Meta-approved WhatsApp templates for the default (or given) channel's WABA.
    */
-  async getWhatsAppTemplates(): Promise<any[]> {
+  async getWhatsAppTemplates(from?: string): Promise<any[]> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
-        body: {
-          action: 'whatsapp-templates',
-        },
+        body: { action: 'whatsapp-templates', from },
       });
 
       if (error) throw error;
       return data.templates || [];
     } catch (error) {
-      console.error('Error fetching WhatsApp templates from Twilio:', error);
+      console.error('Error fetching WhatsApp templates from Zernio:', error);
       throw error;
     }
+  }
+
+  // =====================================================
+  // Conversations (inbound replies — fast-follow inbox surface)
+  // =====================================================
+
+  /** List captured reply conversations (newest activity first). */
+  async listConversations(filters?: { status?: string; assignedTo?: string; limit?: number }): Promise<MessagingConversation[]> {
+    let query = supabase
+      .from('messaging_conversations')
+      .select('*')
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .limit(filters?.limit ?? 100);
+    if (filters?.status) query = query.eq('status', filters.status);
+    if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
+    const { data, error } = await query;
+    if (error) throw new Error('Failed to fetch conversations');
+    return data || [];
+  }
+
+  /** Get the messages of a conversation (oldest first). */
+  async getConversationMessages(conversationId: string): Promise<MessagingConversationMessage[]> {
+    const { data, error } = await supabase
+      .from('messaging_conversation_messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error('Failed to fetch conversation messages');
+    return data || [];
+  }
+
+  /** Assign / reassign a conversation to a user. */
+  async assignConversation(conversationId: string, userId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('messaging_conversations')
+      .update({ assigned_to: userId, assigned_at: userId ? new Date().toISOString() : null })
+      .eq('id', conversationId);
+    if (error) throw new Error('Failed to assign conversation');
+  }
+
+  /** Update a conversation's status (open / snoozed / closed) and optionally reset unread. */
+  async updateConversationStatus(conversationId: string, status: string, resetUnread = false): Promise<void> {
+    const update: Record<string, unknown> = { status };
+    if (resetUnread) update.unread_count = 0;
+    const { error } = await supabase.from('messaging_conversations').update(update).eq('id', conversationId);
+    if (error) throw new Error('Failed to update conversation');
   }
 
   // =====================================================
@@ -528,31 +581,6 @@ export class MessagingService {
       rendered = rendered.replace(new RegExp(`{{${key}}}`, 'g'), value);
     }
     return rendered;
-  }
-
-  /**
-   * Calculate SMS segment count
-   * GSM-7: 160 chars per segment (or 153 if multi-part)
-   * Unicode: 70 chars per segment (or 67 if multi-part)
-   */
-  calculateSmsSegments(content: string): { segments: number; encoding: 'gsm7' | 'ucs2' } {
-    // Check if content contains non-GSM characters
-    const gsm7Regex = /^[@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1BÆæßÉ !"#¤%&'()*+,\-.\/0-9:;<=>?¡A-Z ÄÖÑÜ§¿a-zäöñüà\^{}\[~\]|€]*$/;
-    const isGsm7 = gsm7Regex.test(content);
-
-    const maxLength = isGsm7 ? 160 : 70;
-    const multiPartMax = isGsm7 ? 153 : 67;
-
-    const length = content.length;
-
-    if (length <= maxLength) {
-      return { segments: 1, encoding: isGsm7 ? 'gsm7' : 'ucs2' };
-    }
-
-    return {
-      segments: Math.ceil(length / multiPartMax),
-      encoding: isGsm7 ? 'gsm7' : 'ucs2',
-    };
   }
 
   /**

@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign, Phone, MessageCircle } from 'lucide-react';
+import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingAnalyticsResponse, MessagingChannelType } from '../services';
+import { messagingService, MessagingAnalyticsResponse } from '../services';
 
 interface StatCardProps {
   title: string;
@@ -41,15 +41,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, trend
 export const MessagingAnalyticsTab: React.FC = () => {
   const [analytics, setAnalytics] = useState<MessagingAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filterChannel, setFilterChannel] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('7d');
-  const [accountBalance, setAccountBalance] = useState<{ balance: number; currency: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     loadAnalytics();
-    loadAccountBalance();
-  }, [filterChannel, dateRange]);
+  }, [dateRange]);
 
   const getDateRange = () => {
     const end = new Date();
@@ -79,10 +76,7 @@ export const MessagingAnalyticsTab: React.FC = () => {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const data = await messagingService.getAnalytics(
-        filterChannel !== 'all' ? filterChannel as MessagingChannelType : undefined,
-        getDateRange(),
-      );
+      const data = await messagingService.getAnalytics(undefined, getDateRange());
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -93,16 +87,6 @@ export const MessagingAnalyticsTab: React.FC = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadAccountBalance = async () => {
-    try {
-      const balance = await messagingService.getAccountBalance();
-      setAccountBalance(balance);
-    } catch (error) {
-      console.error('Error loading account balance:', error);
-      // Don't show error toast for balance - it's not critical
     }
   };
 
@@ -118,16 +102,6 @@ export const MessagingAnalyticsTab: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={filterChannel} onValueChange={setFilterChannel}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Channels</SelectItem>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
             <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Date range" />
@@ -182,7 +156,7 @@ export const MessagingAnalyticsTab: React.FC = () => {
             />
           </div>
 
-          {/* Cost & Balance */}
+          {/* Cost */}
           <div className="grid gap-4 md:grid-cols-2">
             <StatCard
               title="Total Cost"
@@ -190,64 +164,7 @@ export const MessagingAnalyticsTab: React.FC = () => {
               subtitle={`Average: ${((analytics.totalSent ?? 0) > 0 ? (analytics.totalCost ?? 0) / (analytics.totalSent ?? 1) : 0).toFixed(4)} USD/msg`}
               icon={<DollarSign className="h-5 w-5 text-yellow-500" />}
             />
-            {accountBalance && (
-              <StatCard
-                title="Account Balance"
-                value={`${accountBalance.balance.toFixed(2)} ${accountBalance.currency}`}
-                subtitle="Twilio account balance"
-                icon={<DollarSign className="h-5 w-5 text-green-500" />}
-              />
-            )}
           </div>
-
-          {/* Channel Breakdown */}
-          {filterChannel === 'all' && analytics.dailyData && analytics.dailyData.length > 0 && (
-            <div className="dashboard-card">
-              <h4 className="font-semibold mb-4">Channel Breakdown</h4>
-              <div className="grid gap-4 md:grid-cols-2">
-                {['sms', 'whatsapp'].map((channel) => {
-                  const channelData = analytics.dailyData?.filter(d => d.channel_type === channel) || [];
-                  const totalSent = channelData.reduce((sum, d) => sum + d.total_sent, 0);
-                  const totalDelivered = channelData.reduce((sum, d) => sum + d.total_delivered, 0);
-                  const totalCost = channelData.reduce((sum, d) => sum + parseFloat(d.total_cost as any || 0), 0);
-
-                  const icons: Record<string, React.ReactNode> = {
-                    sms: <Phone className="h-5 w-5" />,
-                    whatsapp: <MessageCircle className="h-5 w-5 text-green-500" />,
-                  };
-
-                  return (
-                    <div key={channel} className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        {icons[channel]}
-                        <span className="font-medium capitalize">{channel}</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Sent</span>
-                          <span>{totalSent.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Delivered</span>
-                          <span>{totalDelivered.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cost</span>
-                          <span>{totalCost.toFixed(2)} USD</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Delivery Rate</span>
-                          <span>
-                            {totalSent > 0 ? ((totalDelivered / totalSent) * 100).toFixed(1) : 0}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Daily Data Table */}
           {analytics.dailyData && analytics.dailyData.length > 0 && (

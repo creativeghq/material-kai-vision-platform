@@ -778,7 +778,7 @@ const OperationsDashboardInner: React.FC = () => {
   // Fetch all-time totals per external service from ai_usage_logs
   useEffect(() => {
     const SERVICE_KEYS = [
-      'twilio-sms', 'twilio-whatsapp',
+      'zernio-whatsapp',
       'apollo-enrich', 'apollo-people-match',
       'hunter-email-finder', 'hunter-domain-search',
       'zerobounce-validate', 'firecrawl-scrape',
@@ -1295,7 +1295,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Resend (email), Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
+                Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
               </p>
             </div>
 
@@ -1324,8 +1324,7 @@ const OperationsDashboardInner: React.FC = () => {
                   <TableBody>
                     {[
                       { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',      raw: 0.0004, billed: null },
-                      { key: 'twilio-sms',            label: 'Twilio SMS',           category: 'Messaging',    unit: 'message',    raw: 0.0079, billed: 0.01185 },
-                      { key: 'twilio-whatsapp',       label: 'Twilio WhatsApp',      category: 'Messaging',    unit: 'message',    raw: 0.005,  billed: 0.0075 },
+                      { key: 'zernio-whatsapp',       label: 'Zernio WhatsApp',      category: 'Messaging',    unit: 'message',    raw: 0.005,  billed: 0.0075 },
                       { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact',    raw: 0.05,   billed: 0.075 },
                       { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',      raw: 0.02,   billed: 0.03 },
                       { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',      raw: 0.01,   billed: 0.015 },
@@ -1442,7 +1441,7 @@ const OperationsDashboardInner: React.FC = () => {
                   Notification Channels
                 </CardTitle>
                 <CardDescription>
-                  All-time sends across Email (Resend), SMS/WhatsApp (Twilio), Web Push, and In-App notifications.
+                  All-time sends across Email (Resend), WhatsApp (Zernio), Web Push, and In-App notifications.
                 </CardDescription>
               </CardHeader>
               <CardContent>

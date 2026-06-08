@@ -135,7 +135,7 @@ async function checkPythonEndpoint(path: string): Promise<ServiceResult> {
 // Only connection errors / timeouts = DOWN.
 
 const EXTERNAL_SERVICES = [
-  { name: 'Twilio',      url: 'https://api.twilio.com',        category: 'messaging', icon: '📱' },
+  { name: 'Zernio',      url: 'https://zernio.com/api/v1',     category: 'messaging', icon: '📱' },
   { name: 'Apollo',      url: 'https://api.apollo.io',         category: 'b2b',       icon: '🏢' },
   { name: 'Hunter.io',   url: 'https://api.hunter.io/v2',      category: 'b2b',       icon: '📧' },
   { name: 'ZeroBounce',  url: 'https://api.zerobounce.net/v2', category: 'b2b',       icon: '✉️' },

@@ -1,21 +1,17 @@
 /**
  * Messaging Campaigns Tab
- * Create and manage SMS and WhatsApp campaigns via Twilio
+ * Create and manage WhatsApp campaigns via Zernio
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Send, Calendar, Users, Play, Pause, Trash2, Phone, MessageCircle } from 'lucide-react';
+import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
-import { MessagingChannelType } from '../services';
 import { format } from 'date-fns';
 
-const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
-  sms: <Phone className="h-4 w-4" />,
-  whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-};
+const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-500',
@@ -144,7 +140,7 @@ export const MessagingCampaignsTab: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold">Messaging Campaigns</h3>
             <p className="text-sm text-muted-foreground">
-              Create and manage SMS and WhatsApp campaigns
+              Create and manage WhatsApp campaigns
             </p>
           </div>
           <Button disabled>
@@ -193,7 +189,7 @@ export const MessagingCampaignsTab: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        {channelIcons[campaign.channel_type]}
+                        {WhatsAppIcon}
                         <span className="capitalize">{campaign.channel_type}</span>
                       </div>
                     </td>

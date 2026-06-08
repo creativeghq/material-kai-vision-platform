@@ -1038,8 +1038,7 @@ Seeded keys (one row per key, sharing via `platform_secret_module_links`):
 | `DATAFORSEO_BASE64` | mention-monitoring | job-research, seo-toolkit, seo-interlinking |
 | `DATAFORSEO_LOGIN/PASSWORD` | mention-monitoring | job-research |
 | `YOUTUBE_DATA_API_KEY` | mention-monitoring | — |
-| `TWILIO_ACCOUNT_SID/AUTH_TOKEN` | messaging | — |
-| `ZERNIO_API_KEY/WEBHOOK_SECRET` | social-media | — |
+| `ZERNIO_API_KEY/WEBHOOK_SECRET` | social-media | messaging (WhatsApp) |
 | `RESEND_API_KEY` | email | — |
 
 Platform-wide (no `primary_module_slug`, shown at `/admin/operations → Keys`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GEMINI_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_API_KEY`, `HF_TOKEN`, `HUGGINGFACE_API_KEY`, `SLIG_ENDPOINT_TOKEN`, `WORLDLABS_API_KEY`, `PINTEREST_APP_ID/SECRET/REDIRECT_URI`, `CRON_SECRET`, `ADMIN_RESTART_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VAPID_*`.
@@ -1149,6 +1148,16 @@ The social-media backbone (`docs/social-media-system.md`) migrated off **Late.de
 - **Secrets**: `ZERNIO_API_KEY` / `ZERNIO_WEBHOOK_SECRET` seeded in `platform_secrets` (module `social-media`). Resolver is **ZERNIO_\* first, legacy LATE_\* fallback**, so existing deploys keep working until the new key is pasted at `/admin/modules/social-media → Settings`. The Late key/service won't authenticate against Zernio — a real Zernio key is required.
 - **API shape changes**: connect is `GET /v1/connect/{platform}?profileId=&redirect_url=` → `{authUrl}` (browser returns to the app with `?connected=&accountId=`; `SocialAccountsTab` finishes via `action:'callback'`). Publish is `POST /v1/posts` with `{content, platforms:[{platform,accountId}], mediaItems, publishNow|scheduledFor}`. Analytics: post → `GET /v1/analytics?postId=` (camelCase, `engagementRate`); best-time → `GET /v1/analytics/best-time?accountId=`; account insights → `GET /v1/accounts/follower-stats?accountIds=`. Webhook payload is `{event, post|account}` (not `{type,data}`) with `X-Zernio-Signature` HMAC-SHA256.
 - **Activate after deploy**: (1) `supabase functions deploy zernio-api zernio-webhook-handler`; (2) paste `ZERNIO_API_KEY` + `ZERNIO_WEBHOOK_SECRET`; (3) in the Zernio dashboard register the OAuth redirect (the app profile page) and the webhook URL (`.../functions/v1/zernio-webhook-handler`).
+
+## Messaging — WhatsApp via Zernio (Twilio + SMS removed, 2026-06-08)
+
+The `messaging` module switched from **Twilio (SMS + WhatsApp)** to **Zernio WhatsApp** (Meta Cloud API). **SMS is gone entirely** — Zernio has no SMS; `messaging-webhook` (Twilio) was deleted; all `TWILIO_*` secrets + the `twilio-sms`/`twilio-whatsapp` pricing rows were removed. Full reference: [docs/api/messaging-api.md](docs/api/messaging-api.md).
+
+- **Model shift**: a channel is now a connected Zernio WhatsApp **account** (a WABA number), not a typed-in phone string. `messaging_channels.zernio_account_id` + `config.{waba_id,phone_number_id,display_phone_number,profile_id}`, `provider='zernio'`. Connect via `messaging-api` action `connect-whatsapp` (Meta access token + WABA ID + phone number ID → `POST /v1/connect/whatsapp/credentials`) or **Sync from Zernio** (`GET /v1/accounts?platform=whatsapp`). Multi-tenant via the same `resolveWorkspaceProfile` (one Zernio profile per workspace) as social.
+- **Sending**: cold/marketing sends **require a Meta-approved template** (24h-window rule); `messaging_templates.whatsapp_template_name` + `whatsapp_language_code` bind to it, `variables[]` is the ordered body-param list. `messaging-processor` loops `messaging_campaign_recipients` per-recipient via `sendWhatsAppMessage` (`POST /v1/inbox/conversations`). **Requires Zernio's Inbox add-on** (the `/v1/inbox/*` endpoints 403 without it). Credits debit as `zernio-whatsapp` (0.005/msg).
+- **Reply capture (assign-on-reply)**: outbound sends create **no** inbox thread. The shared `zernio-webhook-handler` (one Zernio webhook for social `post.*` + WhatsApp `message.*`) handles `message.received` → upserts `messaging_conversations` (unique `(channel_id, contact_phone)`) + `messaging_conversation_messages`, **assigns the thread to the originating campaign owner on the first reply**, applies STOP/START opt-out keywords, and emits the `whatsapp.reply_received` flow event for notify. `message.delivered|read|failed` update `messaging_logs` by `provider_message_id` (=wamid). Both new tables are in `supabase_realtime`.
+- **Fast-follow (NOT shipped 2026-06-08)**: the agent-facing **Inbox UI tab** (conversation list + assignment + reply box via `sendWhatsAppReply`) and a seeded `system-default` flow for `whatsapp.reply_received` (so the notify actually delivers). Service methods already exist (`listConversations`/`getConversationMessages`/`assignConversation`/`updateConversationStatus`).
+- **Flow engine**: the `send_sms` action is now a legacy alias for `send_whatsapp` (both → `messaging-api` `send`, debit `zernio-whatsapp`).
 
 ## Design System Summary
 Full reference: `.claude/design-system.md`

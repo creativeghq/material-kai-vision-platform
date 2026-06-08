@@ -2,7 +2,7 @@
  * External Service Credit Utilities for Supabase Edge Functions
  *
  * Shared credit debit helper for all external (non-AI) per-unit services:
- * Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Wan2.1, Runway, xAI Aurora, etc.
+ * Zernio (WhatsApp), Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Wan2.1, Runway, xAI Aurora, etc.
  *
  * Pricing source: ai_model_pricing table where category='external_service' and billing_type='per_unit'.
  * Admins manage these via the AIModelPricingTab; this module reads the live values via Supabase
@@ -31,8 +31,7 @@ let _pricingFetchPromise: Promise<Record<string, ServicePricing>> | null = null;
  * something rather than free service. Numbers must mirror the DB seed.
  */
 const FALLBACK_PRICING: Record<string, ServicePricing> = {
-  'twilio-sms':           { cost_per_unit: 0.0079, unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER },
-  'twilio-whatsapp':      { cost_per_unit: 0.005,  unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER },
+  'zernio-whatsapp':      { cost_per_unit: 0.005,  unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER },
   'apollo-enrich':        { cost_per_unit: 0.05,   unit: 'enrichment',  markup_multiplier: MARKUP_MULTIPLIER },
   'apollo-people-match':  { cost_per_unit: 0.03,   unit: 'lookup',      markup_multiplier: MARKUP_MULTIPLIER },
   'hunter-email-finder':  { cost_per_unit: 0.01,   unit: 'search',      markup_multiplier: MARKUP_MULTIPLIER },

@@ -1,10 +1,10 @@
 /**
  * Messaging Templates Tab
- * Create and manage SMS and WhatsApp message templates via Twilio
+ * Create and manage WhatsApp message templates (Zernio / Meta Cloud API).
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Phone, MessageCircle, Edit2, Trash2, Copy, Eye } from 'lucide-react';
+import { Plus, FileText, MessageCircle, Edit2, Trash2, Copy, Eye } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -14,13 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingTemplate, MessagingChannelType } from '../services';
+import { messagingService, MessagingTemplate } from '../services';
 import type { MessageType } from '../services/types';
 
-const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
-  sms: <Phone className="h-4 w-4" />,
-  whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-};
+const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
 
 const categoryColors: Record<string, string> = {
   marketing: 'bg-blue-500',
@@ -35,7 +32,6 @@ export const MessagingTemplatesTab: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessagingTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<MessagingTemplate | null>(null);
-  const [filterChannel, setFilterChannel] = useState<string>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -86,7 +82,7 @@ export const MessagingTemplatesTab: React.FC = () => {
         name: `${template.name} (Copy)`,
         slug: `${template.slug}-copy-${Date.now()}`,
         is_approved: false,
-        approval_status: template.channel_type === 'whatsapp' ? 'pending' : 'not_required',
+        approval_status: 'pending',
       });
       toast({
         title: 'Success',
@@ -103,9 +99,7 @@ export const MessagingTemplatesTab: React.FC = () => {
     }
   };
 
-  const filteredTemplates = filterChannel === 'all'
-    ? templates
-    : templates.filter(t => t.channel_type === filterChannel);
+  const filteredTemplates = templates;
 
   if (loading) {
     return (
@@ -125,20 +119,10 @@ export const MessagingTemplatesTab: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold">Message Templates</h3>
             <p className="text-sm text-muted-foreground">
-              Create reusable templates for SMS and WhatsApp
+              Create reusable WhatsApp templates (must map to a Meta-approved template)
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={filterChannel} onValueChange={setFilterChannel}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Filter by channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Channels</SelectItem>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Template
@@ -185,7 +169,7 @@ export const MessagingTemplatesTab: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        {channelIcons[template.channel_type]}
+                        {WhatsAppIcon}
                         <span className="capitalize">{template.channel_type}</span>
                       </div>
                     </td>
@@ -209,18 +193,12 @@ export const MessagingTemplatesTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      {template.channel_type === 'whatsapp' ? (
-                        <Badge
-                          variant={template.is_approved ? 'default' : 'secondary'}
-                          className={template.is_approved ? 'bg-green-500' : ''}
-                        >
-                          {template.approval_status}
-                        </Badge>
-                      ) : (
-                        <Badge variant={template.is_active ? 'default' : 'secondary'}>
-                          {template.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      )}
+                      <Badge
+                        variant={template.is_approved ? 'default' : 'secondary'}
+                        className={template.is_approved ? 'bg-green-500' : ''}
+                      >
+                        {template.approval_status}
+                      </Badge>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2">
@@ -305,7 +283,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
     name: template?.name || '',
     slug: template?.slug || '',
     description: template?.description || '',
-    channel_type: template?.channel_type || 'sms' as MessagingChannelType,
+    channel_type: 'whatsapp' as const,
     content: template?.content || '',
     category: template?.category || 'marketing',
     media_url: template?.media_url || '',
@@ -318,11 +296,6 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
 
   // Extract variables from content
   const variables = (formData.content.match(/{{(\w+)}}/g) || []).map(v => v.replace(/[{}]/g, ''));
-
-  // Calculate SMS segments
-  const smsSegments = formData.channel_type === 'sms'
-    ? messagingService.calculateSmsSegments(formData.content)
-    : null;
 
   const handleContentChange = (content: string) => {
     setFormData({ ...formData, content });
@@ -351,8 +324,8 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
         slug,
         variables,
         buttons: [],
-        is_approved: formData.channel_type !== 'whatsapp',
-        approval_status: formData.channel_type === 'whatsapp' ? 'pending' as const : 'not_required' as const,
+        is_approved: false,
+        approval_status: 'pending' as const,
       };
 
       if (template) {
@@ -411,40 +384,22 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Channel Type</Label>
-              <Select
-                value={formData.channel_type}
-                onValueChange={(value) => setFormData({ ...formData, channel_type: value as MessagingChannelType })}
-                disabled={!!template}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value as MessageType })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="transactional">Transactional</SelectItem>
-                  <SelectItem value="otp">OTP</SelectItem>
-                  <SelectItem value="notification">Notification</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value) => setFormData({ ...formData, category: value as MessageType })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="marketing">Marketing</SelectItem>
+                <SelectItem value="transactional">Transactional</SelectItem>
+                <SelectItem value="otp">OTP</SelectItem>
+                <SelectItem value="notification">Notification</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -459,11 +414,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Message Content</Label>
-              {smsSegments && (
-                <span className="text-xs text-muted-foreground">
-                  {formData.content.length} chars | {smsSegments.segments} segment(s) | {smsSegments.encoding.toUpperCase()}
-                </span>
-              )}
+              <span className="text-xs text-muted-foreground">{formData.content.length} chars</span>
             </div>
             <Textarea
               value={formData.content}
@@ -562,7 +513,7 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({ template, o
 
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            {channelIcons[template.channel_type]}
+            {WhatsAppIcon}
             <span className="font-medium">{template.name}</span>
             <Badge className={categoryColors[template.category]}>{template.category}</Badge>
           </div>

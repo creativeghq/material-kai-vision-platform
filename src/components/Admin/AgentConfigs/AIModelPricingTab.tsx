@@ -57,7 +57,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   voyage: 'bg-purple-100 text-purple-700',
   huggingface: 'bg-yellow-100 text-yellow-700',
   replicate: 'bg-pink-100 text-pink-700',
-  twilio: 'bg-red-100 text-red-700',
+  zernio: 'bg-red-100 text-red-700',
   apollo: 'bg-cyan-100 text-cyan-700',
   hunter: 'bg-yellow-100 text-yellow-700',
   zerobounce: 'bg-blue-100 text-blue-700',

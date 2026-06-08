@@ -98,6 +98,15 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         default_payment_terms_days: settings.default_payment_terms_days,
         default_vat_rate: settings.default_vat_rate,
         default_markup_pct: settings.default_markup_pct,
+        auto_statement_enabled: settings.auto_statement_enabled,
+        auto_statement_frequency: settings.auto_statement_frequency,
+        auto_statement_interval_days: settings.auto_statement_interval_days,
+        auto_statement_day_of_week: settings.auto_statement_day_of_week,
+        auto_statement_day_of_month: settings.auto_statement_day_of_month,
+        auto_statement_hour_utc: settings.auto_statement_hour_utc,
+        auto_statement_only_outstanding: settings.auto_statement_only_outstanding,
+        auto_statement_min_balance: settings.auto_statement_min_balance,
+        auto_statement_side: settings.auto_statement_side,
       });
       setSettings(updated);
       onSettingsChanged(updated);
@@ -224,6 +233,102 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <div className="space-y-1">
             <Label>Default email body</Label>
             <Textarea rows={4} value={settings.statement_email_body ?? ''} onChange={(e) => set('statement_email_body', e.target.value)} placeholder="Optional intro text shown above the PDF link." />
+          </div>
+
+          {/* Automatic per-customer statement schedule (off by default) */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Automatic customer statements</div>
+                <p className="text-xs text-muted-foreground">
+                  Email each customer their own ledger statement (Καρτέλα) on a schedule. Off by default — nothing sends until you turn this on. Customers can be excluded per-party from their CRM record.
+                </p>
+              </div>
+              <Switch
+                checked={settings.auto_statement_enabled}
+                disabled={!settings.statements_enabled}
+                onCheckedChange={(v) => set('auto_statement_enabled', v)}
+              />
+            </div>
+
+            {settings.auto_statement_enabled && (
+              <>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>Frequency</Label>
+                    <Select value={settings.auto_statement_frequency} onValueChange={(v) => set('auto_statement_frequency', v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="every_n_days">Every N days</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly (day of month)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {settings.auto_statement_frequency === 'every_n_days' && (
+                    <div className="space-y-1">
+                      <Label>Interval (days)</Label>
+                      <Input type="number" min="1" value={settings.auto_statement_interval_days ?? 30}
+                        onChange={(e) => set('auto_statement_interval_days', Math.max(1, parseInt(e.target.value, 10) || 30))} />
+                    </div>
+                  )}
+                  {settings.auto_statement_frequency === 'weekly' && (
+                    <div className="space-y-1">
+                      <Label>Day of week</Label>
+                      <Select value={String(settings.auto_statement_day_of_week ?? 1)} onValueChange={(v) => set('auto_statement_day_of_week', parseInt(v, 10))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((d, i) => (
+                            <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {settings.auto_statement_frequency === 'monthly' && (
+                    <div className="space-y-1">
+                      <Label>Day of month (1–28)</Label>
+                      <Input type="number" min="1" max="28" value={settings.auto_statement_day_of_month}
+                        onChange={(e) => set('auto_statement_day_of_month', Math.min(28, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <Label>Hour (UTC, 0–23)</Label>
+                    <Input type="number" min="0" max="23" value={settings.auto_statement_hour_utc}
+                      onChange={(e) => set('auto_statement_hour_utc', Math.min(23, Math.max(0, parseInt(e.target.value, 10) || 0)))} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>Send to</Label>
+                    <Select value={settings.auto_statement_side} onValueChange={(v) => set('auto_statement_side', v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="customer">Customers</SelectItem>
+                        <SelectItem value="supplier">Suppliers</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Minimum balance</Label>
+                    <Input type="number" step="0.01" min="0" value={settings.auto_statement_min_balance}
+                      onChange={(e) => set('auto_statement_min_balance', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch checked={settings.auto_statement_only_outstanding} onCheckedChange={(v) => set('auto_statement_only_outstanding', v)} />
+                      Only customers with an outstanding balance
+                    </label>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Statements cover the current calendar year. Runs hourly; each workspace fires once when its scheduled hour + day match.
+                  {settings.auto_statement_last_run_at && ` Last run: ${new Date(settings.auto_statement_last_run_at).toLocaleString()}.`}
+                </p>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

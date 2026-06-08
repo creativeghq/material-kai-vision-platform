@@ -45,7 +45,6 @@ export const EXT_SERVICE_LABELS: Record<string, string> = {
   'hunter-domain-search': 'Hunter Domain',
   'zerobounce-validate': 'ZeroBounce',
   'firecrawl-scrape': 'Firecrawl',
-  'twilio-sms': 'Twilio SMS',
-  'twilio-whatsapp': 'Twilio WhatsApp',
+  'zernio-whatsapp': 'Zernio WhatsApp',
   'resend-email': 'Resend Email',
 };

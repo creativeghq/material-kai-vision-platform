@@ -1,18 +1,21 @@
 /**
- * Messaging Service Types
- * Type definitions for SMS and WhatsApp messaging via Twilio
- * @see https://www.twilio.com/docs/messaging/api
+ * Messaging Service Types — WhatsApp via Zernio (Meta Cloud API).
+ *
+ * SMS / Twilio removed. A channel is a connected Zernio WhatsApp account (WABA
+ * number); a template references a Meta-approved WhatsApp template.
+ * @see https://docs.zernio.com
  */
 
 // =====================================================
 // Channel Types
 // =====================================================
 
-export type MessagingChannelType = 'sms' | 'whatsapp';
+export type MessagingChannelType = 'whatsapp';
 export type MessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'rejected' | 'expired';
 export type MessageType = 'transactional' | 'marketing' | 'otp' | 'notification';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'not_required';
 export type MediaType = 'image' | 'video' | 'document' | 'audio';
+export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 
 // =====================================================
 // Database Models
@@ -21,12 +24,13 @@ export type MediaType = 'image' | 'video' | 'document' | 'audio';
 export interface MessagingChannel {
   id: string;
   channel_type: MessagingChannelType;
-  provider: string;
-  sender_id: string;
+  provider: string;               // 'zernio'
+  sender_id: string;              // display phone number
+  zernio_account_id?: string;     // Zernio WhatsApp account id
   display_name?: string;
   is_active: boolean;
   is_default: boolean;
-  config: Record<string, any>;
+  config: Record<string, any>;    // { waba_id, phone_number_id, display_phone_number, profile_id, ... }
   daily_quota: number;
   max_send_rate: number;
   created_by?: string;
@@ -44,10 +48,9 @@ export interface MessagingTemplate {
   media_url?: string;
   media_type?: MediaType;
   buttons: MessageButton[];
-  variables: string[];
+  variables: string[];            // ordered variable names → WhatsApp body params
   category: MessageType;
-  // Twilio WhatsApp Content Templates
-  whatsapp_content_sid?: string;
+  // Meta WhatsApp template binding
   whatsapp_template_name?: string;
   whatsapp_template_namespace?: string;
   whatsapp_language_code?: string;
@@ -131,6 +134,43 @@ export interface MessagingOptout {
   created_at: string;
 }
 
+// Inbound-reply capture layer (assign-on-reply). Outbound sends never create these.
+export interface MessagingConversation {
+  id: string;
+  channel_id?: string;
+  zernio_account_id?: string;
+  zernio_conversation_id?: string;
+  contact_phone: string;
+  contact_name?: string;
+  contact_wa_id?: string;
+  status: ConversationStatus;
+  assigned_to?: string;
+  assigned_at?: string;
+  campaign_id?: string;
+  last_message_at?: string;
+  last_message_preview?: string;
+  last_message_direction?: 'incoming' | 'outgoing';
+  unread_count: number;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessagingConversationMessage {
+  id: string;
+  conversation_id: string;
+  zernio_message_id?: string;
+  direction: 'incoming' | 'outgoing';
+  body?: string;
+  attachments: any[];
+  status: 'received' | 'sent' | 'delivered' | 'read' | 'failed';
+  sender_phone?: string;
+  sender_name?: string;
+  sent_at?: string;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
 // =====================================================
 // Message Buttons (for interactive messages)
 // =====================================================
@@ -148,24 +188,12 @@ export interface MessageButton {
 // =====================================================
 
 export interface SendMessageOptions {
-  channel: MessagingChannelType;
   to: string | string[];
-  from?: string;
-  content?: string;
-  templateSlug?: string;
-  variables?: Record<string, string>;
-  mediaUrl?: string;
-  mediaType?: MediaType;
-  buttons?: MessageButton[];
+  from?: string;                  // channel sender_id
+  content?: string;               // freeform (24h window only)
+  templateId?: string;
+  templateVariables?: Record<string, string>;
   messageType?: MessageType;
-  callbackData?: string;
-  tags?: Record<string, string>;
-  scheduledAt?: Date;
-  // WhatsApp-specific (Twilio Content Templates)
-  whatsappContentSid?: string;
-  whatsappTemplateName?: string;
-  whatsappTemplateNamespace?: string;
-  whatsappLanguageCode?: string;
 }
 
 export interface SendBulkOptions extends Omit<SendMessageOptions, 'to'> {
@@ -173,6 +201,14 @@ export interface SendBulkOptions extends Omit<SendMessageOptions, 'to'> {
     to: string;
     variables?: Record<string, string>;
   }>;
+}
+
+export interface ConnectWhatsAppOptions {
+  accessToken: string;
+  wabaId: string;
+  phoneNumberId: string;
+  displayName?: string;
+  workspaceId?: string;
 }
 
 export interface MessageLogFilters {
@@ -184,74 +220,6 @@ export interface MessageLogFilters {
   phoneNumber?: string;
   limit?: number;
   offset?: number;
-}
-
-// =====================================================
-// Twilio API Types
-// @see https://www.twilio.com/docs/messaging/api
-// =====================================================
-
-export interface TwilioConfig {
-  accountSid: string;
-  authToken: string;
-}
-
-export interface TwilioMessageRequest {
-  From: string;
-  To: string;
-  Body?: string;
-  MediaUrl?: string;
-  StatusCallback?: string;
-  // WhatsApp Content Templates
-  ContentSid?: string;
-  ContentVariables?: string;
-}
-
-export interface TwilioMessageResponse {
-  sid: string;
-  account_sid: string;
-  from: string;
-  to: string;
-  body: string;
-  status: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read';
-  num_segments: string;
-  num_media: string;
-  direction: 'inbound' | 'outbound-api' | 'outbound-call' | 'outbound-reply';
-  price?: string;
-  price_unit?: string;
-  error_code?: string;
-  error_message?: string;
-  date_created: string;
-  date_updated: string;
-  date_sent?: string;
-}
-
-export interface TwilioStatusCallback {
-  MessageSid: string;
-  MessageStatus: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read';
-  To: string;
-  From: string;
-  ApiVersion?: string;
-  AccountSid?: string;
-  ErrorCode?: string;
-  ErrorMessage?: string;
-  SmsSid?: string;
-  SmsStatus?: string;
-  ChannelPrefix?: string;
-  Price?: string;
-  PriceUnit?: string;
-}
-
-export interface TwilioIncomingMessage {
-  MessageSid: string;
-  From: string;
-  To: string;
-  Body: string;
-  NumMedia?: string;
-  MediaContentType0?: string;
-  MediaUrl0?: string;
-  ProfileName?: string;
-  WaId?: string;
 }
 
 // =====================================================

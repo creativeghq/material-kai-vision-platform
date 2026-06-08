@@ -1,11 +1,11 @@
 /**
  * Messaging Management
- * Main dashboard for managing SMS and WhatsApp messaging via Twilio API
- * @see https://www.twilio.com/docs/messaging/api
+ * Main dashboard for managing WhatsApp messaging via Zernio (Meta Cloud API).
+ * @see https://docs.zernio.com
  */
 
 import React, { useState, useEffect } from 'react';
-import { Phone, MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Wallet, Bell } from 'lucide-react';
+import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Bell } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -31,8 +31,7 @@ export const MessagingManagement: React.FC = () => {
     deliveryRate: 0,
     readRate: 0,
   });
-  const [accountBalance, setAccountBalance] = useState<{ balance: number; currency: string } | null>(null);
-  const [channelCounts, setChannelCounts] = useState({ sms: 0, whatsapp: 0 });
+  const [channelCounts, setChannelCounts] = useState({ whatsapp: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,21 +65,13 @@ export const MessagingManagement: React.FC = () => {
       });
 
       // Count channels by type
-      const counts = { sms: 0, whatsapp: 0 };
+      const counts = { whatsapp: 0 };
       channels.forEach((ch: any) => {
         if (ch.channel_type in counts) {
           counts[ch.channel_type as keyof typeof counts]++;
         }
       });
       setChannelCounts(counts);
-
-      // Try to get account balance
-      try {
-        const balance = await messagingService.getAccountBalance();
-        setAccountBalance(balance);
-      } catch {
-        // Balance fetch failed - not critical
-      }
     } catch (error) {
       console.error('Error loading messaging data:', error);
     } finally {
@@ -101,22 +92,14 @@ export const MessagingManagement: React.FC = () => {
       {/* Global Admin Header */}
       <GlobalAdminHeader
         title="Messaging Management"
-        description="Manage SMS, WhatsApp, and Push Notifications"
-        badge="Multi-Channel"
+        description="Manage WhatsApp campaigns, replies, and Push Notifications"
+        badge="WhatsApp"
       />
 
       {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end gap-2">
-          {accountBalance && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md">
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Balance: {accountBalance.balance.toFixed(2)} {accountBalance.currency}
-              </span>
-            </div>
-          )}
           <Button onClick={handleTestMessage}>
             <TestTube className="mr-2 h-4 w-4" />
             Send Test Message
@@ -212,17 +195,13 @@ export const MessagingManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Active Channels</p>
-                <p className="text-lg font-bold">{channelCounts.sms + channelCounts.whatsapp}</p>
+                <p className="text-lg font-bold">{channelCounts.whatsapp}</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {channelCounts.sms} SMS
-              </Badge>
               <Badge variant="outline" className="text-xs flex items-center gap-1 text-green-600">
                 <MessageCircle className="h-3 w-3" />
-                {channelCounts.whatsapp} WA
+                {channelCounts.whatsapp} WhatsApp
               </Badge>
             </div>
           </div>

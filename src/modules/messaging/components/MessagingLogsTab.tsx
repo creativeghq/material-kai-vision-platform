@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Phone, MessageCircle, Search, Filter } from 'lucide-react';
+import { RefreshCw, MessageCircle, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -13,10 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
 import { format } from 'date-fns';
 
-const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
-  sms: <Phone className="h-4 w-4" />,
-  whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-};
+const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
 
 const statusColors: Record<MessageStatus, string> = {
   queued: 'bg-gray-500',
@@ -96,7 +93,6 @@ export const MessagingLogsTab: React.FC = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="sms">SMS</SelectItem>
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
             </SelectContent>
           </Select>
@@ -156,7 +152,7 @@ export const MessagingLogsTab: React.FC = () => {
                   <tr key={log.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        {channelIcons[log.channel_type]}
+                        {WhatsAppIcon}
                         <span className="capitalize text-sm">{log.channel_type}</span>
                       </div>
                     </td>

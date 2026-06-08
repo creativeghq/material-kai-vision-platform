@@ -14,13 +14,13 @@ const definition: ModuleDefinition = {
   ],
   navItems: [
     {
-      label: 'Messaging (SMS/WhatsApp)',
+      label: 'Messaging (WhatsApp)',
       path: '/admin/messaging',
       icon: MessageSquare,
       location: 'admin-dashboard',
       adminCategory: 'Communications',
-      adminDescription: 'Send SMS and WhatsApp campaigns with Twilio integration.',
-      adminCount: 'Twilio',
+      adminDescription: 'Send WhatsApp campaigns and capture replies via Zernio.',
+      adminCount: 'Zernio',
     },
   ],
 };

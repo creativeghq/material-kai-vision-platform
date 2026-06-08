@@ -232,18 +232,20 @@ async function executeAction(
   }
 
   switch (actionType) {
-    case 'send_sms': {
+    // 'send_sms' kept as a legacy alias — SMS is gone, both now send WhatsApp via Zernio.
+    case 'send_sms':
+    case 'send_whatsapp': {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
         body: {
           action: 'send',
-          channel: 'sms',
           to: resolved.to,
           content: resolved.message,
-          channelId: resolved.channel_id || undefined,
+          templateId: resolved.template_id || resolved.template_slug || undefined,
+          from: resolved.from || undefined,
         },
       });
-      if (error) throw new Error(`SMS failed: ${error.message}`);
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'twilio-sms', 'flow_send_sms', 1, { to: resolved.to });
+      if (error) throw new Error(`WhatsApp send failed: ${error.message}`);
+      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'zernio-whatsapp', 'flow_send_whatsapp', 1, { to: resolved.to });
       return { output: { sent: true, ...(data || {}) } };
     }
 

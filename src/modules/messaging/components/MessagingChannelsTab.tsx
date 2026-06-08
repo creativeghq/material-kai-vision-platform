@@ -1,116 +1,73 @@
 /**
  * Messaging Channels Tab
- * Configure SMS and WhatsApp sender channels via Twilio
+ * Connect + manage WhatsApp sender numbers via Zernio (Meta Cloud API).
+ * A channel = a connected Zernio WhatsApp account (WABA phone number).
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Phone, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download } from 'lucide-react';
+import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { messagingService, MessagingChannel, MessagingChannelType } from '../services';
-
-const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
-  sms: <Phone className="h-5 w-5" />,
-  whatsapp: <MessageCircle className="h-5 w-5 text-green-500" />,
-};
-
-const channelLabels: Record<MessagingChannelType, string> = {
-  sms: 'SMS',
-  whatsapp: 'WhatsApp',
-};
+import { messagingService, MessagingChannel } from '../services';
 
 export const MessagingChannelsTab: React.FC = () => {
   const [channels, setChannels] = useState<MessagingChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showConnect, setShowConnect] = useState(false);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadChannels();
-  }, []);
+  useEffect(() => { loadChannels(); }, []);
 
   const loadChannels = async () => {
     try {
       setLoading(true);
-      const data = await messagingService.getChannels();
-      setChannels(data);
+      setChannels(await messagingService.getChannels());
     } catch (error) {
       console.error('Error loading channels:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load messaging channels',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to load WhatsApp channels', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteChannel = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this channel?')) return;
-
+    if (!confirm('Remove this WhatsApp channel? (The number stays connected in Zernio.)')) return;
     try {
       await messagingService.deleteChannel(id);
-      toast({
-        title: 'Success',
-        description: 'Channel deleted successfully',
-      });
+      toast({ title: 'Success', description: 'Channel removed' });
       loadChannels();
     } catch (error) {
       console.error('Error deleting channel:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete channel',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to remove channel', variant: 'destructive' });
     }
   };
 
   const handleToggleActive = async (channel: MessagingChannel) => {
     try {
-      await messagingService.updateChannel(channel.id, {
-        is_active: !channel.is_active,
-      });
-      toast({
-        title: 'Success',
-        description: `Channel ${channel.is_active ? 'deactivated' : 'activated'}`,
-      });
+      await messagingService.updateChannel(channel.id, { is_active: !channel.is_active });
+      toast({ title: 'Success', description: `Channel ${channel.is_active ? 'deactivated' : 'activated'}` });
       loadChannels();
     } catch (error) {
       console.error('Error updating channel:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update channel',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to update channel', variant: 'destructive' });
     }
   };
 
   const handleSetDefault = async (channel: MessagingChannel) => {
     try {
-      await messagingService.updateChannel(channel.id, {
-        is_default: true,
-      });
-      toast({
-        title: 'Success',
-        description: 'Default channel updated',
-      });
+      await messagingService.updateChannel(channel.id, { is_default: true });
+      toast({ title: 'Success', description: 'Default channel updated' });
       loadChannels();
     } catch (error) {
       console.error('Error setting default channel:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to set default channel',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to set default channel', variant: 'destructive' });
     }
   };
 
@@ -118,29 +75,16 @@ export const MessagingChannelsTab: React.FC = () => {
     try {
       setSyncing(true);
       const result = await messagingService.syncChannels();
-
-      if (result.synced > 0) {
-        toast({
-          title: 'Sync Complete',
-          description: result.message || `Synced ${result.synced} channel(s) from Twilio`,
-        });
-      } else {
-        toast({
-          title: 'No Channels Found',
-          description: result.message || 'No channels found in Twilio. You can manually add channels using the Add Channel button.',
-        });
-      }
-
-      if (result.errors && result.errors.length > 0) {
-        console.warn('Sync warnings:', result.errors);
-      }
-
+      toast({
+        title: result.synced > 0 ? 'Sync Complete' : 'No Accounts Found',
+        description: result.message || `Synced ${result.synced} WhatsApp account(s) from Zernio`,
+      });
       loadChannels();
     } catch (error: any) {
       console.error('Error syncing channels:', error);
       toast({
         title: 'Sync Failed',
-        description: error.message || 'Failed to sync channels from Twilio. Check your API credentials.',
+        description: error.message || 'Failed to sync from Zernio. Check your ZERNIO_API_KEY.',
         variant: 'destructive',
       });
     } finally {
@@ -151,9 +95,7 @@ export const MessagingChannelsTab: React.FC = () => {
   if (loading) {
     return (
       <div className="dashboard-card">
-        <div className="py-8 text-center text-muted-foreground">
-          Loading channels...
-        </div>
+        <div className="py-8 text-center text-muted-foreground">Loading channels...</div>
       </div>
     );
   }
@@ -164,9 +106,9 @@ export const MessagingChannelsTab: React.FC = () => {
       <div className="dashboard-card">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Messaging Channels</h3>
+            <h3 className="text-lg font-semibold">WhatsApp Channels</h3>
             <p className="text-sm text-muted-foreground">
-              Configure sender IDs for SMS and WhatsApp via Twilio
+              Connect WhatsApp Business numbers via Zernio (Meta Cloud API)
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -176,11 +118,11 @@ export const MessagingChannelsTab: React.FC = () => {
             </Button>
             <Button variant="outline" onClick={handleSyncChannels} disabled={syncing}>
               <Download className={`h-4 w-4 mr-2 ${syncing ? 'animate-pulse' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from Twilio'}
+              {syncing ? 'Syncing...' : 'Sync from Zernio'}
             </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={() => setShowConnect(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Channel
+              Connect WhatsApp
             </Button>
           </div>
         </div>
@@ -190,14 +132,16 @@ export const MessagingChannelsTab: React.FC = () => {
       {channels.length === 0 ? (
         <div className="dashboard-card">
           <div className="py-12 text-center">
-            <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No channels configured</h3>
+            <MessageCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No WhatsApp numbers connected</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add your first messaging channel to get started with Twilio
+              Connect a WhatsApp Business number to start sending. You'll need a Meta WABA
+              (access token, WABA ID, phone number ID) — or "Sync from Zernio" if you connected
+              one in the Zernio dashboard.
             </p>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={() => setShowConnect(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Channel
+              Connect WhatsApp
             </Button>
           </div>
         </div>
@@ -207,7 +151,7 @@ export const MessagingChannelsTab: React.FC = () => {
             <div key={channel.id} className="dashboard-card">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  {channelIcons[channel.channel_type]}
+                  <MessageCircle className="h-5 w-5 text-green-500" />
                   <div>
                     <h4 className="font-semibold">{channel.display_name || channel.sender_id}</h4>
                     <p className="text-sm text-muted-foreground">{channel.sender_id}</p>
@@ -220,17 +164,13 @@ export const MessagingChannelsTab: React.FC = () => {
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Type</span>
-                  <span>{channelLabels[channel.channel_type]}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">Provider</span>
                   <span className="capitalize">{channel.provider}</span>
                 </div>
-                {channel.channel_type === 'whatsapp' && channel.config?.messaging_service_sid && (
+                {channel.config?.waba_id && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Messaging Service</span>
-                    <span className="font-mono text-xs truncate max-w-[150px]">{channel.config.messaging_service_sid}</span>
+                    <span className="text-muted-foreground">WABA</span>
+                    <span className="font-mono text-xs truncate max-w-[150px]">{channel.config.waba_id}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
@@ -251,37 +191,21 @@ export const MessagingChannelsTab: React.FC = () => {
 
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  <Switch
-                    checked={channel.is_active}
-                    onCheckedChange={() => handleToggleActive(channel)}
-                  />
+                  <Switch checked={channel.is_active} onCheckedChange={() => handleToggleActive(channel)} />
                   <span className="text-sm text-muted-foreground">
                     {channel.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   {!channel.is_default && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSetDefault(channel)}
-                      title="Set as default"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => handleSetDefault(channel)} title="Set as default">
                       <Check className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingChannel(channel)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setEditingChannel(channel)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteChannel(channel.id)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteChannel(channel.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -291,104 +215,43 @@ export const MessagingChannelsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
-      {(showCreateModal || editingChannel) && (
-        <ChannelModal
+      {showConnect && (
+        <ConnectWhatsAppModal
+          onClose={() => setShowConnect(false)}
+          onSuccess={() => { setShowConnect(false); loadChannels(); }}
+        />
+      )}
+      {editingChannel && (
+        <EditChannelModal
           channel={editingChannel}
-          onClose={() => {
-            setShowCreateModal(false);
-            setEditingChannel(null);
-          }}
-          onSuccess={() => {
-            setShowCreateModal(false);
-            setEditingChannel(null);
-            loadChannels();
-          }}
+          onClose={() => setEditingChannel(null)}
+          onSuccess={() => { setEditingChannel(null); loadChannels(); }}
         />
       )}
     </div>
   );
 };
 
-// Channel Modal Component
-interface ChannelModalProps {
-  channel: MessagingChannel | null;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    channel_type: channel?.channel_type || 'sms' as MessagingChannelType,
-    sender_id: channel?.sender_id || '',
-    display_name: channel?.display_name || '',
-    daily_quota: channel?.daily_quota || 10000,
-    max_send_rate: channel?.max_send_rate || 100,
-    is_active: channel?.is_active ?? true,
-    is_default: channel?.is_default ?? false,
-    // Twilio-specific config
-    messaging_service_sid: channel?.config?.messaging_service_sid || '',
-  });
+// ── Connect WhatsApp (Meta credentials → Zernio account) ───────────────
+const ConnectWhatsAppModal: React.FC<{ onClose: () => void; onSuccess: () => void }> = ({ onClose, onSuccess }) => {
+  const [form, setForm] = useState({ accessToken: '', wabaId: '', phoneNumberId: '', displayName: '' });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.sender_id) {
-      toast({
-        title: 'Error',
-        description: 'Phone number is required',
-        variant: 'destructive',
-      });
+    if (!form.accessToken || !form.wabaId || !form.phoneNumberId) {
+      toast({ title: 'Error', description: 'Access token, WABA ID and phone number ID are required', variant: 'destructive' });
       return;
     }
-
     try {
       setSaving(true);
-
-      // Build config object based on channel type
-      const config: Record<string, any> = {};
-      if (formData.channel_type === 'whatsapp' && formData.messaging_service_sid) {
-        config.messaging_service_sid = formData.messaging_service_sid;
-      }
-
-      const channelData = {
-        channel_type: formData.channel_type,
-        sender_id: formData.sender_id,
-        display_name: formData.display_name,
-        daily_quota: formData.daily_quota,
-        max_send_rate: formData.max_send_rate,
-        is_active: formData.is_active,
-        is_default: formData.is_default,
-        config,
-      };
-
-      if (channel) {
-        await messagingService.updateChannel(channel.id, channelData);
-        toast({
-          title: 'Success',
-          description: 'Channel updated successfully',
-        });
-      } else {
-        await messagingService.createChannel({
-          ...channelData,
-          provider: 'twilio',
-        });
-        toast({
-          title: 'Success',
-          description: 'Channel created successfully',
-        });
-      }
-
+      await messagingService.connectWhatsApp(form);
+      toast({ title: 'Connected', description: 'WhatsApp number connected via Zernio' });
       onSuccess();
-    } catch (error) {
-      console.error('Error saving channel:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save channel',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+      console.error('Error connecting WhatsApp:', error);
+      toast({ title: 'Connection failed', description: error.message || 'Failed to connect WhatsApp', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -398,114 +261,101 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {channel ? 'Edit Channel' : 'Add Messaging Channel'}
-          </DialogTitle>
+          <DialogTitle>Connect WhatsApp</DialogTitle>
           <DialogDescription>
-            Configure a Twilio messaging channel for SMS or WhatsApp.
+            Paste your Meta WhatsApp Business credentials (Business Suite → System Users →
+            permanent token; WABA ID + Phone Number ID from WhatsApp Manager).
           </DialogDescription>
         </DialogHeader>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Channel Type</Label>
-            <Select
-              value={formData.channel_type}
-              onValueChange={(value) => setFormData({ ...formData, channel_type: value as MessagingChannelType })}
-              disabled={!!channel}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Permanent Access Token</Label>
+            <Input value={form.accessToken} onChange={(e) => setForm({ ...form, accessToken: e.target.value })} placeholder="EAAB..." />
           </div>
-
           <div className="space-y-2">
-            <Label>Phone Number</Label>
-            <Input
-              value={formData.sender_id}
-              onChange={(e) => setFormData({ ...formData, sender_id: e.target.value })}
-              placeholder="+1234567890"
-            />
-            <p className="text-xs text-muted-foreground">
-              Your Twilio phone number in E.164 format
-            </p>
+            <Label>WABA ID</Label>
+            <Input value={form.wabaId} onChange={(e) => setForm({ ...form, wabaId: e.target.value })} placeholder="123456789012345" />
           </div>
-
-          {/* WhatsApp-specific: Messaging Service SID */}
-          {formData.channel_type === 'whatsapp' && (
-            <div className="space-y-2">
-              <Label>Messaging Service SID (Optional)</Label>
-              <Input
-                value={formData.messaging_service_sid}
-                onChange={(e) => setFormData({ ...formData, messaging_service_sid: e.target.value })}
-                placeholder="MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              />
-              <p className="text-xs text-muted-foreground">
-                Twilio Messaging Service SID for WhatsApp (found in Twilio Console)
-              </p>
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label>Display Name (Optional)</Label>
-            <Input
-              value={formData.display_name}
-              onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-              placeholder="Marketing SMS"
-            />
-            <p className="text-xs text-muted-foreground">
-              Friendly name shown in the admin panel
-            </p>
+            <Label>Phone Number ID</Label>
+            <Input value={form.phoneNumberId} onChange={(e) => setForm({ ...form, phoneNumberId: e.target.value })} placeholder="987654321098765" />
           </div>
+          <div className="space-y-2">
+            <Label>Display Name (optional)</Label>
+            <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Support line" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Connecting...' : 'Connect'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
+// ── Edit a connected channel (display name / quota / rate) ──────────────
+const EditChannelModal: React.FC<{ channel: MessagingChannel; onClose: () => void; onSuccess: () => void }> = ({ channel, onClose, onSuccess }) => {
+  const [form, setForm] = useState({
+    display_name: channel.display_name || '',
+    daily_quota: channel.daily_quota || 10000,
+    max_send_rate: channel.max_send_rate || 100,
+    is_active: channel.is_active,
+    is_default: channel.is_default,
+  });
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await messagingService.updateChannel(channel.id, form);
+      toast({ title: 'Success', description: 'Channel updated' });
+      onSuccess();
+    } catch (error) {
+      console.error('Error saving channel:', error);
+      toast({ title: 'Error', description: 'Failed to save channel', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Channel</DialogTitle>
+          <DialogDescription>{channel.sender_id}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Display Name</Label>
+            <Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} placeholder="Support line" />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Daily Quota</Label>
-              <Input
-                type="number"
-                value={formData.daily_quota}
-                onChange={(e) => setFormData({ ...formData, daily_quota: parseInt(e.target.value) || 0 })}
-              />
+              <Input type="number" value={form.daily_quota} onChange={(e) => setForm({ ...form, daily_quota: parseInt(e.target.value) || 0 })} />
             </div>
             <div className="space-y-2">
               <Label>Rate Limit (per min)</Label>
-              <Input
-                type="number"
-                value={formData.max_send_rate}
-                onChange={(e) => setFormData({ ...formData, max_send_rate: parseInt(e.target.value) || 0 })}
-              />
+              <Input type="number" value={form.max_send_rate} onChange={(e) => setForm({ ...form, max_send_rate: parseInt(e.target.value) || 0 })} />
             </div>
           </div>
-
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
+              <Switch checked={form.is_active} onCheckedChange={(c) => setForm({ ...form, is_active: c })} />
               <Label>Active</Label>
             </div>
             <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.is_default}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_default: checked })}
-              />
+              <Switch checked={form.is_default} onCheckedChange={(c) => setForm({ ...form, is_default: c })} />
               <Label>Set as default</Label>
             </div>
           </div>
-
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving...' : channel ? 'Update' : 'Create'}
-            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Update'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

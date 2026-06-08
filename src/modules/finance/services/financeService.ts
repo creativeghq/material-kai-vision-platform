@@ -1113,6 +1113,17 @@ export interface FinanceSettings {
   digest_hour_utc: number;
   digest_recipients: string[];
   digest_last_sent_at: string | null;
+  /** #207 — automatic per-customer statement (Καρτέλα) schedule. Off by default. */
+  auto_statement_enabled: boolean;
+  auto_statement_frequency: 'every_n_days' | 'weekly' | 'monthly';
+  auto_statement_interval_days: number | null;
+  auto_statement_day_of_week: number | null;
+  auto_statement_day_of_month: number;
+  auto_statement_hour_utc: number;
+  auto_statement_only_outstanding: boolean;
+  auto_statement_min_balance: number;
+  auto_statement_side: 'customer' | 'supplier' | 'both';
+  auto_statement_last_run_at: string | null;
   updated_at: string;
 }
 
@@ -1322,6 +1333,9 @@ const _financeServiceV2 = {
       'statement_template_cover_path','statement_template_footer_path',
       'default_payment_terms_days','default_vat_rate','default_markup_pct',
       'digest_enabled','digest_frequency','digest_day_of_week','digest_hour_utc','digest_recipients',
+      'auto_statement_enabled','auto_statement_frequency','auto_statement_interval_days',
+      'auto_statement_day_of_week','auto_statement_day_of_month','auto_statement_hour_utc',
+      'auto_statement_only_outstanding','auto_statement_min_balance','auto_statement_side',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }
@@ -1372,6 +1386,19 @@ const _financeServiceV2 = {
     });
     if (error) throw error;
     return (data ?? []) as PartyLedgerRow[];
+  },
+  /** #207 — carry-forward balance (Προηγούμενα Σύνολα): net debit-credit of all entries before `before`. */
+  async getPartyOpeningBalance(input: {
+    workspaceId: string; side: 'customer' | 'supplier';
+    companyId?: string | null; contactId?: string | null; before: string;
+  }): Promise<number> {
+    const { data, error } = await supabase.rpc('finance_party_opening_balance', {
+      p_workspace_id: input.workspaceId, p_side: input.side,
+      p_company_id: input.companyId ?? null, p_contact_id: input.contactId ?? null,
+      p_before: input.before,
+    });
+    if (error) throw error;
+    return Number(data ?? 0);
   },
   async reportSalesPerCustomer(workspaceId: string, from: string, to: string): Promise<SalesPerCustomerRow[]> {
     const { data, error } = await supabase.rpc('report_sales_per_customer', {
@@ -1469,8 +1496,23 @@ const _financeServiceV2 = {
     partyId: string;
     email?: string;
     dryRun?: boolean;
+    side?: 'customer' | 'supplier';
+    from?: string;
+    to?: string;
+    lang?: 'el' | 'en';
   }): Promise<{ ok: boolean; email_sent_to: string | null; pdf_url: string | null; lines: number; total_outstanding: number; error?: string }> {
-    const { data, error } = await supabase.functions.invoke('finance-send-statement', { body: input });
+    const { data, error } = await supabase.functions.invoke('finance-send-statement', {
+      body: {
+        party_type: input.partyType,
+        party_id: input.partyId,
+        email: input.email,
+        dry_run: input.dryRun,
+        side: input.side,
+        from: input.from,
+        to: input.to,
+        lang: input.lang,
+      },
+    });
     if (error) throw error;
     return data as any;
   },

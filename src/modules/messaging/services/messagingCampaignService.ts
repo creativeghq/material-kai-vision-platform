@@ -1,6 +1,6 @@
 /**
  * Messaging Campaign Service
- * Helper functions for managing SMS and WhatsApp campaigns via Twilio
+ * Helper functions for managing WhatsApp campaigns via Zernio
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -322,7 +322,7 @@ class MessagingCampaignService {
     let query = supabase
       .from('campaigns')
       .select('*')
-      .in('channel_type', ['sms', 'whatsapp'])
+      .eq('channel_type', 'whatsapp')
       .order('created_at', { ascending: false });
 
     if (channelType) {

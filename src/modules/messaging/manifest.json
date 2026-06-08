@@ -1,7 +1,7 @@
 {
   "slug": "messaging",
   "name": "Messaging",
-  "description": "SMS / WhatsApp / Push — channels, templates, campaigns, logs, analytics, opt-outs (Twilio + Web Push).",
+  "description": "WhatsApp / Push — channels, templates, campaigns, logs, analytics, opt-outs, reply capture (Zernio WhatsApp + Web Push).",
   "category": "communications",
   "priceTier": "pro",
   "icon": "MessageSquare",
