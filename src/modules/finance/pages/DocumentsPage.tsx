@@ -14,7 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -51,7 +51,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
   const navigate = useNavigate();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
-  const { isAccountant, canOperateFinance } = useCapabilities();
+  const { isAccountant, canOperateFinance } = usePermissions();
 
   const [internalType, setType] = useState<DocType>('invoices');
   const type = embeddedType ?? internalType;

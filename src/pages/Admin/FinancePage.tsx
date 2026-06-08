@@ -54,7 +54,7 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { FileText, FileMinus, Banknote, Truck, FileSignature } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
@@ -85,7 +85,7 @@ const FinancePage: React.FC = () => {
   // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
   // oldest-membership query so Finance follows the workspace switcher (#194).
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
-  const { isAccountant } = useCapabilities(); // read-only role hides write actions
+  const { isAccountant } = usePermissions(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

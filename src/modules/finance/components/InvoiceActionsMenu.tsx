@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { financeService, formatMoney, type InvoiceWithItems } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Props {
   invoiceId: string;
@@ -39,7 +39,7 @@ interface Props {
 export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fiscalStatus, fiscalMark, status, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAccountant, canOperateFinance } = useCapabilities();
+  const { isAccountant, canOperateFinance } = usePermissions();
   // Accountant (#202): may record payments, submit to myDATA, PDF — but not edit/create
   // documents (new invoice, credit note, template, change description/category).
   const [mark, setMark] = useState<string | null>(fiscalMark ?? null);

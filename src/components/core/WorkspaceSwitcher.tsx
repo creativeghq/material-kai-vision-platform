@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
 
 export const WorkspaceSwitcher: React.FC = () => {
@@ -26,7 +26,7 @@ export const WorkspaceSwitcher: React.FC = () => {
 
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { canManageNetwork: canManage } = useCapabilities();
+  const { canManageNetwork: canManage } = usePermissions();
   // Hide entirely for ordinary single-workspace users with nothing to manage.
   if (memberships.length <= 1 && !canManage) return null;
 

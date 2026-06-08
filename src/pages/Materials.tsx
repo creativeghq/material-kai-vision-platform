@@ -13,7 +13,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Package, Search, Filter, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 import type { Material } from '@/types/materials';
 import {
@@ -38,7 +38,7 @@ export const MaterialsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const { canSupplyProducts } = useCapabilities();
+  const { canSupplyProducts } = usePermissions();
 
   useEffect(() => {
     loadMaterials();

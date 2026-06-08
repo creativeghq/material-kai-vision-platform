@@ -58,7 +58,7 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // Team members run day-to-day but don't administer the node (no network/pricing).
   staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
   // Invited accountant: ONLY the Finance surface (nav + route). Within finance, settings
-  // stay gated on `canManageFinance` and write-ops on `canOperateFinance` (useCapabilities),
+  // stay gated on `isWorkspaceManager` and write-ops on `canOperateFinance` (usePermissions),
   // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
   accountant: ['finance.manage'],
   // Invited sales rep (#201): Sales portal + CRM (manage their customers) + per-customer

@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
-import { useCapabilities } from '@/hooks/useCapabilities';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { Capability } from '@/auth/capabilities';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -49,8 +48,7 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
-  const { isAccountant, isSalesRep } = useCapabilities();
-  const { can } = usePermissions();
+  const { can, isAccountant, isSalesRep } = usePermissions();
   const { enabledSlugs } = useEnabledModules();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);

@@ -19,14 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
 
 export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId }) => {
   const { toast } = useToast();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
-  const { canSupplyProducts } = useCapabilities();
+  const { canSupplyProducts } = usePermissions();
 
   const [eligible, setEligible] = useState(false);
   const [loading, setLoading] = useState(true);
