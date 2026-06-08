@@ -43,6 +43,7 @@ import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierB
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
+import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
@@ -68,9 +69,9 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
 // Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="hidden lg:flex items-center gap-2 px-3 pt-3 pb-1">
-    <span className="h-px flex-1 bg-border/60" aria-hidden="true" />
+    <span className="h-px flex-1 bg-border" aria-hidden="true" />
     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
-    <span className="h-px flex-1 bg-border/60" aria-hidden="true" />
+    <span className="h-px flex-1 bg-border" aria-hidden="true" />
   </div>
 );
 
@@ -215,6 +216,11 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="planning" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
+            {!isAccountant && (
+              <TabsTrigger value="time" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Clock className="h-4 w-4 mr-2" /> Time &amp; billing
+              </TabsTrigger>
+            )}
             <TabsTrigger value="reports" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" /> Reports
             </TabsTrigger>
@@ -516,6 +522,11 @@ const FinancePage: React.FC = () => {
           {/* ─────────── PLANNING ─────────── */}
           <TabsContent value="planning" className="space-y-4">
             <PlanningTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          {/* ─────────── TIME & BILLING ─────────── */}
+          <TabsContent value="time" className="space-y-4">
+            <TimeBillingTab workspaceId={workspaceId} />
           </TabsContent>
 
           {/* ─────────── REPORTS ─────────── */}
