@@ -1,27 +1,39 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { warehouseService, type WarehouseItem } from '@/services/warehouseService';
+import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 
 export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [selectedWh, setSelectedWh] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  const [addWhOpen, setAddWhOpen] = useState(false);
 
-  const load = async () => {
+  const load = async (whId?: string) => {
     setLoading(true);
-    try { setItems(await warehouseService.listItems(workspaceId)); }
-    catch (err: any) { toast({ title: 'Failed to load stock', description: err?.message, variant: 'destructive' }); }
-    finally { setLoading(false); }
+    try {
+      // Ensure at least the default "Main" warehouse exists, then load the list.
+      await warehouseService.ensureDefaultWarehouse(workspaceId);
+      const whs = await warehouseService.listWarehouses(workspaceId);
+      setWarehouses(whs);
+      const active = whId || selectedWh || whs.find((w) => w.is_default)?.id || whs[0]?.id || '';
+      setSelectedWh(active);
+      setItems(active ? await warehouseService.listItems(workspaceId, active) : []);
+    } catch (err: any) {
+      toast({ title: 'Failed to load stock', description: err?.message, variant: 'destructive' });
+    } finally { setLoading(false); }
   };
   useEffect(() => { if (workspaceId) void load(); /* eslint-disable-next-line */ }, [workspaceId]);
 
@@ -34,6 +46,22 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
+  // #207 — move stock of this item's product into another warehouse.
+  const transfer = async (item: WarehouseItem) => {
+    const others = warehouses.filter((w) => w.id !== selectedWh);
+    if (others.length === 0) { toast({ title: 'No other warehouse', description: 'Create a second warehouse first.' }); return; }
+    const target = others.length === 1
+      ? others[0]
+      : others.find((w) => w.name.toLowerCase() === (window.prompt(`Transfer to which warehouse? (${others.map((o) => o.name).join(', ')})`, others[0].name) || '').trim().toLowerCase());
+    if (!target) return;
+    const raw = window.prompt(`Transfer how many "${item.name}" to ${target.name}? (on hand: ${item.qty_on_hand})`, '1');
+    if (raw === null) return;
+    const qty = parseFloat(raw);
+    if (!Number.isFinite(qty) || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
+    try { await warehouseService.transfer(item.id, target.id, qty); toast({ title: `Transferred to ${target.name}` }); await load(); }
+    catch (err: any) { toast({ title: 'Transfer failed', description: err?.message, variant: 'destructive' }); }
+  };
+
   const remove = async (item: WarehouseItem) => {
     if (!confirm(`Delete ${item.name} from the warehouse?`)) return;
     try { await warehouseService.deleteItem(item.id); await load(); }
@@ -42,9 +70,22 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm">Warehouse stock</CardTitle>
-        <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full"><Plus className="h-4 w-4 mr-1" /> Add item</Button>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <CardTitle className="text-sm shrink-0">Warehouse stock</CardTitle>
+          {warehouses.length > 0 && (
+            <Select value={selectedWh} onValueChange={(v) => load(v)}>
+              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" variant="outline" onClick={() => setAddWhOpen(true)} className="rounded-full"><Plus className="h-4 w-4 mr-1" /> Warehouse</Button>
+          <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full" disabled={!selectedWh}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
@@ -83,6 +124,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                       <div className="flex items-center justify-end gap-1">
                         <Button size="sm" variant="ghost" title="Receive stock" onClick={() => move(it, 'in')}><PackagePlus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Issue stock" onClick={() => move(it, 'out')}><PackageMinus className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Transfer to another warehouse" onClick={() => transfer(it)}><ArrowLeftRight className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Delete" onClick={() => remove(it)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </td>
@@ -94,7 +136,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
         )}
       </CardContent>
 
-      <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} onAdded={async () => { setAddOpen(false); await load(); }} />
+      <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} warehouseId={selectedWh} onAdded={async () => { setAddOpen(false); await load(); }} />
+      <AddWarehouseDialog open={addWhOpen} onOpenChange={setAddWhOpen} workspaceId={workspaceId} onAdded={async (id) => { setAddWhOpen(false); await load(id); }} />
     </Card>
   );
 };
@@ -111,7 +154,7 @@ interface CatalogProduct { id: string; name: string; sku: string | null; unit: s
 const productUnit = (row: any): string =>
   (row?.metadata?.unit || row?.properties?.unit || 'pcs') as string;
 
-const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; onAdded: () => void }> = ({ open, onOpenChange, workspaceId, onAdded }) => {
+const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; warehouseId: string; onAdded: () => void }> = ({ open, onOpenChange, workspaceId, warehouseId, onAdded }) => {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CatalogProduct[]>([]);
@@ -186,7 +229,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
     try {
       setBusy(true);
       await warehouseService.createItem({
-        workspaceId, product_id: selected.id, name: selected.name,
+        workspaceId, warehouse_id: warehouseId, product_id: selected.id, name: selected.name,
         sku: selected.sku || undefined, unit: unit.trim() || 'pcs',
         qty_on_hand: parseFloat(qty) || 0, reorder_point: parseFloat(reorder) || 0,
         location: location.trim() || undefined,
@@ -262,5 +305,46 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
 
       <AddDealerProductDialog open={newOpen} onOpenChange={setNewOpen} onCreated={onProductCreated} />
     </>
+  );
+};
+
+// #207 — create an additional warehouse.
+const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; onAdded: (id: string) => void }> = ({ open, onOpenChange, workspaceId, onAdded }) => {
+  const { toast } = useToast();
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [location, setLocation] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { if (!open) { setName(''); setCode(''); setLocation(''); } }, [open]);
+
+  const submit = async () => {
+    if (!name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
+    try {
+      setBusy(true);
+      const wh = await warehouseService.createWarehouse({ workspaceId, name: name.trim(), code: code.trim() || undefined, location: location.trim() || undefined });
+      toast({ title: 'Warehouse created' });
+      onAdded(wh.id);
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Add warehouse</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1"><Label>Name *</Label><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="optional" /></div>
+            <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional" /></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
