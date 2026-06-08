@@ -69,9 +69,9 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
 // Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="hidden lg:flex items-center gap-2 px-3 pt-3 pb-1">
-    <span className="h-px flex-1 bg-foreground/20" aria-hidden="true" />
+    <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
-    <span className="h-px flex-1 bg-foreground/20" aria-hidden="true" />
+    <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
   </div>
 );
 
