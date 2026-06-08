@@ -69,25 +69,38 @@ export const inboundService = {
     if (error) throw error;
   },
 
-  /** Per-workspace myDATA received-docs credentials (manager-only; not exposed to accountants). */
-  async getCreds(workspaceId: string): Promise<{ aade_user_id: string | null; subscription_key: string | null; base_url: string | null; enabled: boolean } | null> {
-    const { data } = await supabase
-      .from('workspace_inbound_credentials')
-      .select('aade_user_id, subscription_key, base_url, enabled')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
-    return (data as any) ?? null;
+  /** Per-workspace myDATA received-docs credential STATUS (manager-only). Never returns the
+   *  secret subscription key to the browser — only whether one is set (`has_key`). */
+  async getCreds(workspaceId: string): Promise<{ aade_user_id: string | null; base_url: string | null; enabled: boolean; has_key: boolean } | null> {
+    const { data, error } = await supabase.rpc('get_inbound_creds_status', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      aade_user_id: row.aade_user_id ?? null,
+      base_url: row.base_url ?? null,
+      enabled: row.enabled ?? true,
+      has_key: !!row.has_key,
+    };
   },
 
-  async saveCreds(workspaceId: string, input: { aadeUserId: string; subscriptionKey: string; baseUrl?: string; enabled: boolean }): Promise<void> {
-    const { error } = await supabase.from('workspace_inbound_credentials').upsert({
+  /** Save inbound credentials. The subscription key is only written when a new value is
+   *  provided — saving with a blank key preserves the existing one (so the masked form never
+   *  wipes a stored secret). */
+  async saveCreds(workspaceId: string, input: { aadeUserId: string; subscriptionKey?: string; baseUrl?: string; enabled: boolean }): Promise<void> {
+    const payload: Record<string, any> = {
       workspace_id: workspaceId,
       aade_user_id: input.aadeUserId || null,
-      subscription_key: input.subscriptionKey || null,
       base_url: input.baseUrl || null,
       enabled: input.enabled,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'workspace_id' });
+    };
+    // Only touch the secret column when the user actually entered a new key — on an
+    // ON CONFLICT update, omitting the column leaves the stored key intact.
+    if (input.subscriptionKey && input.subscriptionKey.trim()) {
+      payload.subscription_key = input.subscriptionKey.trim();
+    }
+    const { error } = await supabase.from('workspace_inbound_credentials').upsert(payload, { onConflict: 'workspace_id' });
     if (error) throw error;
   },
 };

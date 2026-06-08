@@ -18,6 +18,7 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const { toast } = useToast();
   const [userId, setUserId] = useState('');
   const [key, setKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,8 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       const c = await inboundService.getCreds(workspaceId).catch(() => null);
       if (cancelled) return;
       setUserId(c?.aade_user_id ?? '');
-      setKey(c?.subscription_key ?? '');
+      setKey(''); // never prefill the secret — the server only tells us whether one is set
+      setHasKey(!!c?.has_key);
       setBaseUrl(c?.base_url ?? '');
       setEnabled(c?.enabled ?? true);
       setLoading(false);
@@ -41,7 +43,10 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const save = async () => {
     setSaving(true);
     try {
-      await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key, baseUrl, enabled });
+      // Only send the key when the manager typed a new one — blank preserves the stored key.
+      await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, baseUrl, enabled });
+      if (key.trim()) setHasKey(true);
+      setKey('');
       toast({ title: 'Inbound credentials saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -65,7 +70,7 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Subscription key</Label>
-          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Ocp-Apim-Subscription-Key" />
+          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• (configured — leave blank to keep)' : 'Ocp-Apim-Subscription-Key'} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Base URL (optional)</Label>
