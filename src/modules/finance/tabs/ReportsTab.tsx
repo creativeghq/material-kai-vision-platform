@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, formatPct } from '@/modules/finance/services/financeService';
+import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
 
 type ReportKind =
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
@@ -162,6 +163,9 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
+      {/* #207 — accounting export bridges (γέφυρες): download journals for the accountant. */}
+      <AccountingExportCard workspaceId={workspaceId} />
+
       {/* Filter bar */}
       <Card>
         <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
