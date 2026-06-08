@@ -10,6 +10,7 @@ import { useLocation } from 'react-router-dom';
 import { Loader2, Plus, Minus, Trash2, Search, ShoppingCart, Printer, CheckCircle2, Wrench, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -18,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, extractNet } from '@/modules/finance/services/financeService';
+import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 
@@ -33,6 +35,14 @@ interface SellItem {
   inc_cat: string | null;
 }
 interface CartLine extends SellItem { qty: number; }
+
+// Compact label/value row for the X/Z report.
+const Row: React.FC<{ label: string; value: string; muted?: boolean; danger?: boolean }> = ({ label, value, muted, danger }) => (
+  <div className={`flex justify-between ${muted ? 'text-xs text-muted-foreground' : ''}`}>
+    <span>{label}</span>
+    <span className={danger ? 'text-destructive font-medium' : muted ? '' : 'font-medium'}>{value}</span>
+  </div>
+);
 
 const PosPage: React.FC = () => {
   const { toast } = useToast();
@@ -53,6 +63,9 @@ const PosPage: React.FC = () => {
   const [movVehicle, setMovVehicle] = useState('');
   const [movShipTo, setMovShipTo] = useState('');
   const [issuing, setIssuing] = useState(false);
+  // #207 cloud vPOS — the open cashier shift; receipts are blocked until one is open.
+  const [session, setSession] = useState<PosSession | null>(null);
+  const [zReport, setZReport] = useState<PosReport | null>(null);
   const [result, setResult] = useState<{
     number: string; total: number; currency: string; mark: string | null;
     net: number; vat: number; method: 'cash' | 'card'; issuedAt: string;
@@ -110,6 +123,51 @@ const PosPage: React.FC = () => {
     return { net: sum, vat, total: round2(sum + vat) };
   }, [cart, vatRate, vatInclusive]);
 
+  // ── Cloud vPOS shift ──────────────────────────────────────────────────────
+  const loadSession = async () => {
+    if (!activeWorkspaceId) return;
+    try { setSession(await posSessionService.getOpen(activeWorkspaceId, parseInt(branchCode, 10) || 0)); }
+    catch { /* non-fatal */ }
+  };
+  useEffect(() => { void loadSession(); /* eslint-disable-next-line */ }, [activeWorkspaceId, branchCode]);
+
+  const openShift = async () => {
+    if (!activeWorkspaceId) return;
+    const raw = window.prompt('Opening cash float?', '0');
+    if (raw === null) return;
+    try {
+      await posSessionService.open(activeWorkspaceId, parseInt(branchCode, 10) || 0, parseFloat(raw) || 0);
+      await loadSession();
+      toast({ title: 'Shift opened' });
+    } catch (e: any) { toast({ title: 'Could not open shift', description: e?.message, variant: 'destructive' }); }
+  };
+  const cashMove = async (direction: 'in' | 'out') => {
+    if (!session || !activeWorkspaceId) return;
+    const raw = window.prompt(`Cash ${direction === 'in' ? 'in (pay-in)' : 'out (pay-out)'} amount?`, '0');
+    if (raw === null) return;
+    const amt = parseFloat(raw);
+    if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Invalid amount', variant: 'destructive' }); return; }
+    const reason = window.prompt('Reason (optional)?', '') || undefined;
+    try { await posSessionService.recordCash(session.id, activeWorkspaceId, direction, amt, reason); toast({ title: 'Recorded' }); }
+    catch (e: any) { toast({ title: 'Failed', description: e?.message, variant: 'destructive' }); }
+  };
+  const showX = async () => {
+    if (!session) return;
+    try { setZReport(await posSessionService.report(session.id)); }
+    catch (e: any) { toast({ title: 'Failed', description: e?.message, variant: 'destructive' }); }
+  };
+  const closeShift = async () => {
+    if (!session) return;
+    const raw = window.prompt('Counted cash in drawer at close?', '');
+    if (raw === null) return;
+    try {
+      const z = await posSessionService.close(session.id, raw.trim() ? parseFloat(raw) : undefined);
+      setZReport(z);
+      await loadSession();
+      toast({ title: `Z report #${z.z_number} — shift closed` });
+    } catch (e: any) { toast({ title: 'Could not close shift', description: e?.message, variant: 'destructive' }); }
+  };
+
   const add = (it: SellItem) => setCart((c) => {
     const ex = c.find((l) => l.id === it.id);
     return ex ? c.map((l) => l.id === it.id ? { ...l, qty: l.qty + 1 } : l) : [...c, { ...it, qty: 1 }];
@@ -119,6 +177,7 @@ const PosPage: React.FC = () => {
 
   const issue = async () => {
     if (!activeWorkspaceId || cart.length === 0) return;
+    if (!session) { toast({ title: 'Open a shift first', description: 'Start a cashier shift before issuing receipts.', variant: 'destructive' }); return; }
     setIssuing(true);
     try {
       const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
@@ -136,6 +195,7 @@ const PosPage: React.FC = () => {
           series_number: num?.number ?? null,
           branch_code: parseInt(branchCode, 10) || 0,
           status: 'issued',
+          pos_session_id: session.id, // link the receipt to the open shift (Z report)
           document_type: '11.1', // myDATA retail receipt
           // myDATA payment method: 3=cash, 7=POS/card (was defaulting to 5=on-credit).
           payment_method_code: method === 'cash' ? 3 : 7,
@@ -204,6 +264,58 @@ const PosPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="Point of Sale" description="Quick B2C sale → myDATA retail receipt (11.1)." badge="POS" />
+
+      {/* #207 cloud vPOS — cashier shift bar (open/close, cash drawer, X/Z report) */}
+      <div className="px-3 sm:px-6 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-card px-4 py-2 text-sm">
+          {session ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="font-medium">Shift open</span>
+                <span className="text-xs text-muted-foreground">since {new Date(session.opened_at).toLocaleTimeString()} · float {formatMoney(session.opening_float, currency)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="ghost" onClick={() => cashMove('in')}>Cash in</Button>
+                <Button size="sm" variant="ghost" onClick={() => cashMove('out')}>Cash out</Button>
+                <Button size="sm" variant="outline" onClick={showX}>X report</Button>
+                <Button size="sm" variant="outline" className="text-destructive" onClick={closeShift}>Close (Z)</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground">No open shift — receipts are blocked until a shift is opened.</span>
+              <Button size="sm" onClick={openShift}>Open shift</Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* X/Z report modal */}
+      {zReport && (
+        <Dialog open onOpenChange={() => setZReport(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>{zReport.status === 'closed' ? `Z report #${zReport.z_number}` : 'X report (live)'}</DialogTitle></DialogHeader>
+            <div className="space-y-1 text-sm">
+              <Row label="Receipts" value={String(zReport.receipt_count)} />
+              <Row label="Total sales" value={formatMoney(zReport.total_sales, currency)} />
+              {Object.entries(zReport.by_payment || {}).map(([k, v]) => <Row key={k} label={`· ${k}`} value={formatMoney(v as number, currency)} muted />)}
+              <div className="border-t border-border/60 my-1" />
+              {(zReport.by_vat || []).map((r, i) => <Row key={i} label={`VAT ${r.rate}%`} value={`net ${formatMoney(r.net, currency)} · vat ${formatMoney(r.vat, currency)}`} muted />)}
+              <div className="border-t border-border/60 my-1" />
+              <Row label="Opening float" value={formatMoney(zReport.opening_float, currency)} />
+              <Row label="Cash in / out" value={`${formatMoney(zReport.cash_in, currency)} / ${formatMoney(zReport.cash_out, currency)}`} />
+              <Row label="Expected cash" value={formatMoney(zReport.expected_cash, currency)} />
+              {zReport.counted_cash != null && <Row label="Counted cash" value={formatMoney(zReport.counted_cash, currency)} />}
+              {zReport.cash_variance != null && <Row label="Variance" value={formatMoney(zReport.cash_variance, currency)} danger={zReport.cash_variance !== 0} />}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => window.print()}>Print</Button>
+              <Button onClick={() => setZReport(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Thermal-friendly receipt — hidden on screen, the ONLY thing printed (the Print
           button calls window.print(); the @media print rules below blank everything else). */}
