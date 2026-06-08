@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
 import type { ServiceItem } from '@/components/core/Profile/ProfileTab';
 import { FollowButton } from '@/components/features/social/FollowButton';
+import { RequestFactoryAccessButton } from '@/components/features/discover/RequestFactoryAccessButton';
 import { MoodboardComments } from '@/components/features/social/MoodboardComments';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
@@ -367,6 +368,8 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                     <Button className="rounded-full gap-2 px-4" size="sm" onClick={() => openHireModal()}>
                       <Mail className="h-3.5 w-3.5" />Hire Me
                     </Button>
+                    {/* #196 — request access to this factory's catalog (verified-factory profiles only). */}
+                    <RequestFactoryAccessButton factoryUserId={profile.user_id} show={profile.professional_type === 'supplier' && !isOwnProfile} />
                   </div>
                 </div>
 
