@@ -106,6 +106,7 @@ const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/Inv
 const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
+const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
 
@@ -787,6 +788,9 @@ const App = () => (
 
                 {/* Public invoice payment (token-gated, no auth, no layout) */}
                 <Route path="/pay/:token" element={<PageErrorBoundary name="Pay invoice"><PayInvoicePage /></PageErrorBoundary>} />
+
+                {/* Public online storefront (slug-gated, no auth, no layout) */}
+                <Route path="/store/:slug" element={<PageErrorBoundary name="Store"><PublicStorefrontPage /></PageErrorBoundary>} />
 
                 {/* Admin: Modules registry */}
                 <Route

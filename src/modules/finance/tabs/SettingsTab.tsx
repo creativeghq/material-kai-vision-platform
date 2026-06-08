@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -22,6 +22,7 @@ import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard'
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
+import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -33,6 +34,7 @@ const SETTINGS_SECTIONS = [
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
+  { value: 'storefront', label: 'Online store', icon: Store },
   { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
   { value: 'digest', label: 'Finance digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
@@ -192,6 +194,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="team" className="mt-0">
           <TeamInviteCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="storefront" className="mt-0">
+          <StorefrontCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="payments" className="mt-0">

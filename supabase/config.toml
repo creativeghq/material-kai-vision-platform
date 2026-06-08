@@ -64,9 +64,7 @@ verify_jwt = false
 [functions.messaging-api]
 verify_jwt = false
 
-[functions.messaging-webhook]
-verify_jwt = false
-
+# WhatsApp delivery + inbound replies arrive via the shared zernio-webhook-handler.
 [functions.messaging-processor]
 verify_jwt = false
 
@@ -119,6 +117,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.finance-pay-invoice]
+verify_jwt = false
+
+# Public online storefront (anonymous catalog browse + cart checkout → draft order + pay token)
+[functions.finance-storefront]
 verify_jwt = false
 
 [functions.finance-send-statement]
