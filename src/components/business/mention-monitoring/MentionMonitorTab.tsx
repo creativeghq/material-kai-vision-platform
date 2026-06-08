@@ -20,7 +20,7 @@ import {
   TrendingUp, TrendingDown, MessageSquare, Bot, Newspaper, ThumbsDown,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { isAdmin as isAdminRole } from '@/auth/roles';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import {
   TrackedMention, MentionRow, MentionSummary, LlmVisibilitySnapshot,
@@ -54,7 +54,10 @@ const OUTLET_ICON: Record<string, React.ReactNode> = {
 
 export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) => {
   const { toast } = useToast();
-  const [admin, setAdmin] = useState(false);
+  // #195 — admin-only diagnostic actions (force-refresh, classifier correction, promote) are
+  // operator-level platform controls. Resolved from the unified capability layer.
+  const { can } = usePermissions();
+  const admin = can('platform.admin');
   const [tracked, setTracked] = useState<TrackedMention | null>(null);
   const [summary, setSummary] = useState<MentionSummary | null>(null);
   const [feed, setFeed] = useState<MentionRow[]>([]);
@@ -64,24 +67,6 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const [probing, setProbing] = useState(false);
   const [filterSentiment, setFilterSentiment] = useState<string>('');
 
-  useEffect(() => {
-    (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role_id')
-        .eq('user_id', auth.user.id)
-        .maybeSingle();
-      if (!profile?.role_id) return;
-      const { data: role } = await supabase
-        .from('roles')
-        .select('name')
-        .eq('id', profile.role_id)
-        .maybeSingle();
-      setAdmin(isAdminRole(role?.name as string | null));
-    })();
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);

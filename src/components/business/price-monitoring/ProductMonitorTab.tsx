@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { isAdmin as isAdminRole } from '@/auth/roles';
+import { usePermissions } from '@/hooks/usePermissions';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertPreferences } from './PriceAlertPreferences';
@@ -134,7 +134,9 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // #195 — admin overrides (force-refresh, promote/demote, exclusions) are operator controls.
+  const { can } = usePermissions();
+  const isAdmin = can('platform.admin');
   const [summary, setSummary] = useState<string | null>(null);
   const [throttleUntil, setThrottleUntil] = useState<string | null>(null);
   const [lastSearchAt, setLastSearchAt] = useState<string | null>(null);
@@ -290,27 +292,9 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     }
   }, [productId, currentPrice, currency, isDemo, toast]);
 
-  const loadAdminRole = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) return;
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role_id')
-      .eq('user_id', auth.user.id)
-      .maybeSingle();
-    if (!profile?.role_id) return;
-    const { data: role } = await supabase
-      .from('roles')
-      .select('name')
-      .eq('id', profile.role_id)
-      .maybeSingle();
-    setIsAdmin(isAdminRole(role?.name as string | null));
-  }, []);
-
   useEffect(() => {
     loadSources();
-    loadAdminRole();
-  }, [loadSources, loadAdminRole]);
+  }, [loadSources]);
 
   // ─── Perplexity discovery ────────────────────────────────────────────────
   const runDiscovery = useCallback(
