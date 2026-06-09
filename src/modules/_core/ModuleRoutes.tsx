@@ -3,6 +3,7 @@ import { Route } from 'react-router-dom';
 
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from '@/components/core/AdminGuard';
+import { EntitlementGuard } from '@/components/core/EntitlementGuard';
 import { Layout } from '@/components/core/Layout';
 import { PageErrorBoundary } from '@/components/core/ErrorBoundary';
 
@@ -34,6 +35,10 @@ export function buildModuleRoutes(): React.ReactElement[] {
       const Component = route.component;
       const requireAdmin = route.requireAdmin ?? false;
 
+      // Admin routes are operator platform-management surfaces → gated by AdminGuard only.
+      // Tenant-facing module routes additionally require the ACTIVE workspace to OWN the module
+      // (#212/#214) — EntitlementGuard shows an upsell otherwise. (The operator root is entitled
+      // to everything, and free-tier modules are available to all, so neither is affected.)
       const tree = (
         <AuthGuard>
           <ModuleGate slug={mod.manifest.slug}>
@@ -44,9 +49,11 @@ export function buildModuleRoutes(): React.ReactElement[] {
                 </Layout>
               </AdminGuard>
             ) : (
-              <Layout>
-                <Component />
-              </Layout>
+              <EntitlementGuard moduleSlug={mod.manifest.slug} moduleName={mod.manifest.name}>
+                <Layout>
+                  <Component />
+                </Layout>
+              </EntitlementGuard>
             )}
           </ModuleGate>
         </AuthGuard>

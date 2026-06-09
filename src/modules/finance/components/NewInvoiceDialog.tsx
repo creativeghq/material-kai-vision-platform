@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -99,6 +100,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
+  const handleQuotaError = useQuotaErrorHandler();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
@@ -357,7 +359,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const { data, error } = await supabase.from('crm_companies').insert({
       workspace_id: workspaceId, name: newClient.name.trim(), vat_number: newClient.vat || null, email: newClient.email || null,
     }).select('id, name').single();
-    if (error) { toast({ title: 'Failed to add client', description: error.message, variant: 'destructive' }); return; }
+    if (error) { if (!handleQuotaError(error)) toast({ title: 'Failed to add client', description: error.message, variant: 'destructive' }); return; }
     setCustomer({ type: 'company', id: data.id, label: `${data.name} (company)` });
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
   };

@@ -12,6 +12,7 @@ import {
   TabsTrigger,
 } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { projectsService } from '../services/projectsService';
 
@@ -37,6 +38,7 @@ interface ClientPickerProps {
 
 export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, disabled, mode = 'admin' }) => {
   const { toast } = useToast();
+  const handleQuotaError = useQuotaErrorHandler();
   const [search, setSearch] = useState('');
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; email: string | null }>>([]);
   const [contacts, setContacts] = useState<Array<{ id: string; name: string | null; first_name: string | null; last_name: string | null; email: string | null }>>([]);
@@ -125,6 +127,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
       setNewPhone('');
       setAddingNew(false);
     } catch (err) {
+      if (handleQuotaError(err)) return; // plan-limit reached → upsell toast
       toast({
         title: 'Failed to add client',
         description: err instanceof Error ? err.message : undefined,
