@@ -21,9 +21,9 @@ Email sending, domain verification, and analytics using AWS SES.
 - **Access:** Authenticated users
 
 #### [Messaging API](./messaging-api.md)
-Multi-channel messaging (SMS, WhatsApp) using Twilio.
-- **Function:** `messaging-api`
-- **Features:** SMS, WhatsApp messaging, templates, delivery tracking, analytics
+WhatsApp messaging via **Zernio** (Meta Cloud API). SMS + the former Twilio integration were removed 2026-06-08.
+- **Functions:** `messaging-api`, `zernio-webhook-handler` (shared with social)
+- **Features:** WhatsApp templates, per-recipient campaigns, reply capture + assign-on-reply, delivery tracking. Requires Zernio's Inbox add-on for sending.
 - **Access:** Authenticated users
 
 #### [CRM Contacts API](./crm-contacts-api.md)
@@ -273,6 +273,20 @@ Stripe webhook event handling for subscriptions and payments.
 - **Features:** Subscription management, payment processing, user tier updates
 - **Access:** Stripe signature verification
 
+### Finance APIs (Greek e-invoicing, AADE/myDATA)
+
+#### [Finance API](./finance-api.md)
+Multi-tenant Greek invoicing, AADE/myDATA transmission (Novus connector), AR/AP, POS, storefront, statements, digest.
+- **Functions:** `finance-issue-invoice`, `finance-invoice-pdf`, `finance-pay-invoice`, `finance-send-invoice-email`, `finance-send-statement`, `finance-inbound-sync`, `finance-fiscal-offline-recovery`, `finance-digest-aggregate`, `finance-storefront`
+- **Features:** Issue → series/AA allocation → myDATA transmit → MARK/offline-recovery; credit notes (5.1/5.2); delivery notes (9.3); retail receipts (11.1, POS Law 5155); inbound `RequestDocs` sync; Stripe Connect pay links; VAT/reconciliation/ledger reports
+- **Credits:** 2 per myDATA transmission (root workspace free); PDF/pay/email = 0
+- **Access:** JWT `admin/super_admin/owner/finance/accountant`; storefront is public (slug-keyed); crons via `x-cron-secret`. Gated on `sales-finance` module entitlement.
+- **Architecture:** [finance-system.md](../finance-system.md) · [pos-retail-system.md](../pos-retail-system.md) · [online-storefront.md](../online-storefront.md) · [capabilities-and-tenancy.md](../capabilities-and-tenancy.md)
+
+#### Stripe Connect (tenant payouts)
+- **Function:** `stripe-connect` — `onboard` / `status`. Creates the workspace Stripe Express account on `workspace_payment_config`.
+- **Access:** owner/admin JWT
+
 ### Background Processing APIs
 
 #### Background Agent Runner
@@ -301,7 +315,11 @@ Not user-callable. pg_cron invokes these on a schedule. No auth header from fron
 | `campaign-processor` | 1 min | Email campaign dispatcher (Resend, 8/min) |
 | `check-material-alerts` | daily | Run saved searches + email subscribers |
 | `scheduled-import-runner` | 5 min | Run due XML imports |
-| `messaging-processor` | 1 min | SMS/WhatsApp batch sender (Twilio, 10/batch) |
+| `messaging-processor` | 1 min | WhatsApp campaign batch sender (Zernio) |
+| `finance-fiscal-offline-recovery` | hourly | Backfill myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
+| `finance-inbound-sync` (cron mode) | scheduled | Pull AADE `RequestDocs` into `inbound_documents` (2 cr/workspace) |
+| `finance-send-statement` (cron_batch) | scheduled | Auto-send party statements per `finance_settings.auto_statement_*` |
+| `finance-digest-aggregate` | scheduled | AR/AP + P&L + follow-up digest email |
 
 ### Admin / Maintenance
 
