@@ -1,5 +1,4 @@
 import { lazy } from 'react';
-import { Users } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -18,17 +17,10 @@ const definition: ModuleDefinition = {
     { path: '/admin/crm/companies/:id',    component: CompanyDetailPage,  requireAdmin: true },
     { path: '/admin/crm/users/:id',        component: UserDetailPage,     requireAdmin: true },
   ],
-  navItems: [
-    {
-      label: manifest.name,
-      path: '/admin/crm',
-      icon: Users,
-      location: 'admin-dashboard',
-      adminCategory: 'CRM & User Management',
-      adminDescription: 'Manage users, roles, subscriptions, contacts, companies, lists.',
-      adminCount: 'CRM System',
-    },
-  ],
+  // No admin-dashboard tile: CRM is already a top-nav surface (/crm, capability-gated
+  // crm.view) rendering the same CRMPage. Front-nav items aren't duplicated under /admin.
+  // The /admin/crm/* routes above are kept only for internal detail-page deep-links.
+  navItems: [],
 };
 
 export default definition;
