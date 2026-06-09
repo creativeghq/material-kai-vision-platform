@@ -56,7 +56,7 @@ interface PromptTemplate {
   updated_at: string;
 }
 
-export const PromptTemplatesPage: React.FC = () => {
+export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -139,14 +139,16 @@ export const PromptTemplatesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="AI Prompt Templates"
-        description="Customize AI prompts for different industries and extraction stages"
-        badge="AI Templates"
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="AI Prompt Templates"
+          description="Customize AI prompts for different industries and extraction stages"
+          badge="AI Templates"
+        />
+      )}
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         {/* Header Actions */}
         <div className="flex justify-end gap-2">
           <Button

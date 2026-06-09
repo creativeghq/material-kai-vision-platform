@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -14,6 +15,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AIModelPricingTab } from './AIModelPricingTab';
 import { ChatStartersTab } from './ChatStartersTab';
+// Relocated here (2026-06-09) from their own orphaned /admin routes so all AI-dev
+// surfaces live under one page. Old routes redirect into these tabs via ?tab=.
+import { ExtractionPromptsPage } from '@/components/Admin/ExtractionPrompts/ExtractionPromptsPage';
+import { PromptTemplatesPage } from '@/components/Admin/PromptTemplates/PromptTemplatesPage';
+import { AITestingPanel } from '@/components/Admin/AITestingPanel';
+
+const TAB_VALUES = ['prompts', 'extraction', 'templates', 'sandbox', 'starters', 'pricing'] as const;
 
 interface Prompt {
   id: string;
@@ -90,6 +98,19 @@ export const AgentConfigsPage: React.FC = () => {
   const [deletingPrompt, setDeletingPrompt] = useState<Prompt | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+
+  // URL-synced active tab so the legacy /admin/{extraction-prompts,prompt-templates,
+  // material-analysis} routes can deep-link here via ?tab=.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (TAB_VALUES as readonly string[]).includes(searchParams.get('tab') || '')
+    ? (searchParams.get('tab') as string)
+    : 'prompts';
+  const handleTabChange = (val: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (val === 'prompts') params.delete('tab');
+    else params.set('tab', val);
+    setSearchParams(params, { replace: true });
+  };
 
   useEffect(() => {
     loadPrompts();
@@ -290,11 +311,23 @@ export const AgentConfigsPage: React.FC = () => {
         />
 
         {/* Main Tabs */}
-        <Tabs defaultValue="prompts" className="mt-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
             <TabsTrigger value="prompts" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bot className="h-4 w-4" />
               AI Prompts
+            </TabsTrigger>
+            <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <FileText className="h-4 w-4" />
+              Extraction Prompts
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Layers className="h-4 w-4" />
+              Prompt Templates
+            </TabsTrigger>
+            <TabsTrigger value="sandbox" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Cpu className="h-4 w-4" />
+              Sandbox
             </TabsTrigger>
             <TabsTrigger value="starters" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ListChecks className="h-4 w-4" />
@@ -694,6 +727,21 @@ export const AgentConfigsPage: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </TabsContent>
+
+          {/* Extraction Prompts (MIVAA pipeline) — relocated from /admin/extraction-prompts */}
+          <TabsContent value="extraction">
+            <ExtractionPromptsPage embedded />
+          </TabsContent>
+
+          {/* Prompt Templates (MIVAA) — relocated from /admin/prompt-templates */}
+          <TabsContent value="templates">
+            <PromptTemplatesPage embedded />
+          </TabsContent>
+
+          {/* AI sandbox/testing — relocated from /admin/material-analysis */}
+          <TabsContent value="sandbox">
+            <AITestingPanel embedded />
           </TabsContent>
 
           {/* Chat Starters Tab Content */}

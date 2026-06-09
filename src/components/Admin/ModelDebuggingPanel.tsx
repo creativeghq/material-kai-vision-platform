@@ -30,8 +30,12 @@ import {
 } from '@/components/core/ui/accordion';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+// Relocated here (2026-06-09) from its orphaned /admin/3d-suggestions route.
+import { MaterialSuggestionsPanel } from './MaterialSuggestionsPanel';
 
 interface ModelLog {
   id: string;
@@ -59,6 +63,15 @@ interface ModelStatus {
 }
 
 const ModelDebuggingPanel: React.FC = () => {
+  // URL-synced tab so the legacy /admin/3d-suggestions route deep-links via ?tab=suggestions.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'suggestions' ? 'suggestions' : 'debug';
+  const handleTabChange = (val: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (val === 'debug') params.delete('tab');
+    else params.set('tab', val);
+    setSearchParams(params, { replace: true });
+  };
   const { toast } = useToast();
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -361,6 +374,16 @@ const ModelDebuggingPanel: React.FC = () => {
         ]}
       />
       <div className="p-3 sm:p-6 space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="debug" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Activity className="h-4 w-4" /> Model Debugging
+            </TabsTrigger>
+            <TabsTrigger value="suggestions" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Sparkles className="h-4 w-4" /> Material Suggestions
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="debug" className="space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end">
           <Button
@@ -709,6 +732,12 @@ const ModelDebuggingPanel: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="suggestions">
+            <MaterialSuggestionsPanel embedded />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

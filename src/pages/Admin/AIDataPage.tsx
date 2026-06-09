@@ -14,14 +14,15 @@
 
 import React, { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Database, Link2, Copy } from 'lucide-react';
+import { Database, Link2, Copy, Tags } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { MetadataManagement } from '@/components/Admin/MetadataManagement';
 import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
 import { DuplicateDetectionPage } from './DuplicateDetectionPage';
+import { BatchCategorizationPage } from './BatchCategorizationPage';
 
-const TAB_VALUES = ['metadata', 'relevancy', 'duplicates'] as const;
+const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'categorization'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 const AIDataPage: React.FC = () => {
@@ -62,6 +63,9 @@ const AIDataPage: React.FC = () => {
             <TabsTrigger value="duplicates" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Copy className="h-4 w-4" /> Duplicates
             </TabsTrigger>
+            <TabsTrigger value="categorization" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Tags className="h-4 w-4" /> Categorization
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="metadata" className="mt-6">
@@ -72,6 +76,10 @@ const AIDataPage: React.FC = () => {
           </TabsContent>
           <TabsContent value="duplicates" className="mt-6">
             <DuplicateDetectionPage />
+          </TabsContent>
+          {/* Bulk AI categorization — relocated from /admin/batch-categorization */}
+          <TabsContent value="categorization" className="mt-6">
+            <BatchCategorizationPage embedded />
           </TabsContent>
         </Tabs>
       </div>

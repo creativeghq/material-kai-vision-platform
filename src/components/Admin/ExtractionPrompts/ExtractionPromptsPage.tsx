@@ -79,7 +79,7 @@ interface PromptHistory {
   created_at: string;
 }
 
-export const ExtractionPromptsPage: React.FC = () => {
+export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<ExtractionPrompt[]>([]);
@@ -241,14 +241,16 @@ export const ExtractionPromptsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Extraction Prompts Management"
-        description="Manage AI prompts for PDF extraction pipeline"
-        badge="AI Prompts"
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="Extraction Prompts Management"
+          description="Manage AI prompts for PDF extraction pipeline"
+          badge="AI Prompts"
+        />
+      )}
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         {/* Header Actions */}
         <div className="flex justify-end">
           <Button

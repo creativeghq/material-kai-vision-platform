@@ -203,7 +203,7 @@ interface SimilarityTestResult {
   error?: string;
 }
 
-export const AITestingPanel: React.FC = () => {
+export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [testPrompt, setTestPrompt] = useState(
     'Analyze this modern kitchen with marble countertops and stainless steel appliances',
@@ -533,15 +533,17 @@ export const AITestingPanel: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="AI Testing Panel"
-        description="Test the hybrid AI system to generate analytics data and validate scoring"
-        badge="Testing"
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="AI Testing Panel"
+          description="Test the hybrid AI system to generate analytics data and validate scoring"
+          badge="Testing"
+        />
+      )}
 
       {/* Main Content */}
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs defaultValue="legacy" className="w-full">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="legacy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Legacy Tests</TabsTrigger>

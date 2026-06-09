@@ -37,7 +37,7 @@ const STATUS_COLOR: Record<string, string> = {
   skipped:     'bg-amber-100 text-amber-800',
 };
 
-export const BatchCategorizationPage = () => {
+export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -132,22 +132,24 @@ export const BatchCategorizationPage = () => {
   };
 
   return (
-    <div className="p-3 sm:p-8 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate('/admin')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-light flex items-center gap-2">
-            <Tags className="h-6 w-6 text-primary" />
-            Batch AI Categorization
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Bulk assign material_category and zone_intent to products using Claude Haiku
-          </p>
+    <div className={embedded ? 'space-y-6' : 'p-3 sm:p-8 space-y-6 max-w-5xl mx-auto'}>
+      {/* Header — hidden when embedded as a tab (host page supplies the header) */}
+      {!embedded && (
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-light flex items-center gap-2">
+              <Tags className="h-6 w-6 text-primary" />
+              Batch AI Categorization
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Bulk assign material_category and zone_intent to products using Claude Haiku
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

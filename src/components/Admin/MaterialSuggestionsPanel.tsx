@@ -47,7 +47,7 @@ interface SuggestionConfig {
   confidenceThreshold: number;
 }
 
-export const MaterialSuggestionsPanel: React.FC = () => {
+export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [config, setConfig] = useState<SuggestionConfig>({
     roomType: 'living_room',
     style: 'modern',
@@ -188,16 +188,18 @@ export const MaterialSuggestionsPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="3D Material Suggestions"
-        description="AI-powered material suggestions for 3D design and visualization"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: '3D Suggestions' },
-        ]}
-      />
-      <div className="p-3 sm:p-6 space-y-6">
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="3D Material Suggestions"
+          description="AI-powered material suggestions for 3D design and visualization"
+          breadcrumbs={[
+            { label: 'Admin', path: '/admin' },
+            { label: '3D Suggestions' },
+          ]}
+        />
+      )}
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

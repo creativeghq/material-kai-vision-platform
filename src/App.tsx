@@ -35,7 +35,6 @@ const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m 
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
-const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
 const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage'));
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
@@ -68,14 +67,10 @@ const KnowledgeBaseManagement = lazy(() => import('./components/Admin/KnowledgeB
 const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').then(m => ({ default: m.MaterialsDataPage })));
 const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
-const PromptTemplatesPage = lazy(() => import('./components/Admin/PromptTemplates/PromptTemplatesPage').then(m => ({ default: m.PromptTemplatesPage })));
-const ExtractionPromptsPage = lazy(() => import('./components/Admin/ExtractionPrompts/ExtractionPromptsPage').then(m => ({ default: m.ExtractionPromptsPage })));
 const AdminPanel = lazy(() => import('./components/Admin/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const ApiGatewayAdmin = lazy(() => import('./components/Admin/ApiGatewayAdmin').then(m => ({ default: m.ApiGatewayAdmin })));
-const AITestingPanel = lazy(() => import('./components/Admin/AITestingPanel').then(m => ({ default: m.AITestingPanel })));
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
 const SystemPerformance = lazy(() => import('./components/Admin/SystemPerformance').then(m => ({ default: m.SystemPerformance })));
-const MaterialSuggestionsPanel = lazy(() => import('./components/Admin/MaterialSuggestionsPanel').then(m => ({ default: m.MaterialSuggestionsPanel })));
 const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebuggingPanel'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
@@ -95,7 +90,6 @@ const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const AIDataPage = lazy(() => import('./pages/Admin/AIDataPage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
-const BatchCategorizationPage = lazy(() => import('./pages/Admin/BatchCategorizationPage').then(m => ({ default: m.BatchCategorizationPage })));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
@@ -424,42 +418,10 @@ const App = () => (
                 {/* Redirect old routes to new routes */}
                 <Route path="/admin/agent-configs" element={<Navigate to="/admin/ai-configs" replace />} />
                 <Route path="/tasks" element={<Navigate to="/admin/operations" replace />} />
-                <Route
-                  path="/admin/prompt-templates"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <PromptTemplatesPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/extraction-prompts"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <ExtractionPromptsPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/material-analysis"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <AITestingPanel />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Relocated into AI Configurations tabs (2026-06-09) — keep deep-links alive. */}
+                <Route path="/admin/prompt-templates" element={<Navigate to="/admin/ai-configs?tab=templates" replace />} />
+                <Route path="/admin/extraction-prompts" element={<Navigate to="/admin/ai-configs?tab=extraction" replace />} />
+                <Route path="/admin/material-analysis" element={<Navigate to="/admin/ai-configs?tab=sandbox" replace />} />
                 <Route
                   path="/admin/training-models"
                   element={
@@ -538,16 +500,6 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/materials"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <MaterialsPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
-                <Route
                   path="/compare"
                   element={
                     <AuthGuard>
@@ -567,30 +519,9 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/admin/batch-categorization"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <BatchCategorizationPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/3d-suggestions"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <MaterialSuggestionsPanel />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Relocated into AI Data / 3D Model Debugging tabs (2026-06-09). */}
+                <Route path="/admin/batch-categorization" element={<Navigate to="/admin/ai-data?tab=categorization" replace />} />
+                <Route path="/admin/3d-suggestions" element={<Navigate to="/admin/3d-model-debugging?tab=suggestions" replace />} />
                 <Route
                   path="/admin/3d-model-debugging"
                   element={
