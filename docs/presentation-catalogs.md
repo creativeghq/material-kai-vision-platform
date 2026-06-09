@@ -222,6 +222,17 @@ The only public-reachable endpoint for the catalog flow. 5 actions:
 
 No bearer auth required — the function uses the service role internally and validates tokens / slug binding before exposing data.
 
+### `catalog-send-to-customers`
+
+Bulk-sends a published catalog to a CRM-category-resolved recipient list. Auth `admin` (or service role). Two actions:
+
+| Action | Body | Returns |
+|---|---|---|
+| `preview` | `{catalog_id, category_ids[]}` | `{recipients_count, recipients[]}` — resolve the list without sending |
+| `send` | `{catalog_id, category_ids[], subject?, message_body?, ensure_grants?}` | `{send_batch_id, recipients_count, sent_count, failed_count}` |
+
+Recipients come from the `crm_categories_resolve_recipients(category_ids)` RPC. Catalog must be `status='published'` with a non-null `slug`. Sends one `email-api` message per recipient (`templateSlug='catalog_send.recipient'`, `emailType:'marketing'`, `catalog_url={PUBLIC_APP_URL}/c/{slug}`). `ensure_grants:true` upserts a `catalog_email_grants` row per recipient so non-platform CRM contacts pass the [email gate](#catalog-access). Sender branding from `finance_settings.business_name` + `branding_contact_line`. Each send is logged to `catalog_email_sends` (open/download tracked via email webhooks). 0 credits.
+
 ---
 
 ## MIVAA endpoint — PDF page rasterization

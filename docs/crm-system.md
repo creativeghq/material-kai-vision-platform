@@ -10,16 +10,14 @@ The CRM provides workspace admins with a unified view of contacts, companies, an
 
 **Admin Route:** `/admin/crm`
 
-**Edge Functions:**
-- `crm-contacts-api` — Contact CRUD, user linking
-- `crm-companies-api` — Company records, contact associations
-- `crm-users-api` — Platform user management and role control
-- `crm-stripe-api` — Subscription and credit billing (see [billing-credits-system.md](billing-credits-system.md))
+**Edge Function:** `crm-api` — a single router with resource handlers (the former separate `crm-*-api` functions were consolidated):
+- `companies` — Company records, contact associations
+- `contacts` — Contact CRUD, user linking, potential-matches
+- `users` — Platform user management and role control
+- `stripe` — Subscription and credit billing (see [billing-credits-system.md](billing-credits-system.md))
 
-**Individual API Docs:**
-- [crm-contacts-api.md](api/crm-contacts-api.md)
-- [crm-companies-api.md](api/crm-companies-api.md)
-- [crm-users-api.md](api/crm-users-api.md)
+**API Docs:**
+- [api/crm-api.md](api/crm-api.md)
 
 ---
 

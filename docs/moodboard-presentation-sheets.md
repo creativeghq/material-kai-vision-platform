@@ -1,8 +1,8 @@
 # Moodboard Presentation Sheets
 
-Eight client-ready sheet types attached to a moodboard, generated through the KAI agent chat and exported as A3-landscape PDFs. Sheets are persistent and editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing their inputs.
+Nine client-ready sheet types attached to a moodboard, generated through the KAI agent chat and exported as A3-landscape PDFs. Sheets are persistent and editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing their inputs.
 
-Shipped 2026-05-02.
+Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views** (a project-scoped deliverable that bundles sheets across moodboards) landed 2026-06-01 — see [§ Project Client Views](#project-client-views).
 
 ---
 
@@ -31,6 +31,7 @@ Shipped 2026-05-02.
 | `elevation_render_pair` | 2 cr | Yes | `elevation_image_url`, `render_image_url?`, `dimensions[{x1,y1,x2,y2,value,unit}]`, `tile_callouts[{x,y,label}]`. |
 | `ffe_schedule` | 0 cr | No | `quote_id` (preferred — pulls items from `quote_items`) OR explicit `items[{room, name, dimensions, install, delivery, qty, price?}]`. |
 | `full_deck` | 3 cr | No | `included_sheet_ids[]` in display order, `cover{title, description?, client_name?, cover_image_url?, date}`. |
+| `area_breakdown` | 2 cr | No | Single composited one-page room spec (Zubexa-style). `AreaBreakdownData`: `{subtitle, hero_image_url, plan_image_url, elevation_image_url, finishes[], fitting_columns[], palette[], notes[]}`. Builder `buildAreaBreakdown` (`builders.ts`); renders inside `full_deck` and Client Views like any other sheet. **Added 2026-06-01.** ⚠️ Requires `ALTER TYPE moodboard_sheet_type ADD VALUE 'area_breakdown'` in the target DB before use. |
 
 **Passive vs interactive**:
 - **Passive types** (`material_board`, `color_palette`, `concept_board`, `ffe_schedule`, `full_deck`) — the tool gathers the inputs from the agent's tool call, debits credits, inserts the row, and immediately invokes `generate-moodboard-sheet-pdf`. The chat surface receives `sheet_pdf_ready` and renders a `SheetPreviewCard`.
@@ -355,17 +356,36 @@ After pulling the branch on a fresh environment:
    - Via Supabase dashboard SQL editor: paste the contents of each file in order (table first, prompt addendum second). The addendum is idempotent (marker check).
    - Via `supabase db push` if you use the CLI for migrations.
 
-2. **Deploy the new edge function:**
+2. **Deploy the edge functions:**
    ```bash
-   supabase functions deploy generate-moodboard-sheet-pdf
+   supabase functions deploy generate-moodboard-sheet-pdf moodboard-sheet-share
    ```
+   (`generate-moodboard-sheet-pdf` now also renders `area_breakdown` + Client View decks; `moodboard-sheet-share` resolves both single-sheet and Client View tokens.)
 
-3. **Redeploy `agent-chat`** so it picks up the new tool import:
+3. **Redeploy `agent-chat`** so it picks up the new tool import (incl. the `area_breakdown` sheet option):
    ```bash
    supabase functions deploy agent-chat
    ```
 
 4. **Frontend** ships with the next regular build (`npm run build` + your usual deploy pipeline). No env-var changes required — the function uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` which are already set on Supabase.
+
+---
+
+## Project Client Views
+
+**Added 2026-06-01.** A **Client View** is a project-level deliverable one rung above `full_deck`: it bundles selected presentation sheets from **any** of a project's moodboards into one client-ready **PDF + revocable online page** (`/cv/:token`). `full_deck` stays the lightweight single-moodboard PDF sheet; a Client View selects sheets project-wide and adds an interactive HTML surface (3D walkthrough, lighting moods, live FF&E, inline approve/comment). Zero overlap — sheets are content blocks, the moodboard is the working surface, the Client View is the deliverable.
+
+Deliberately mirrors the quote PDF/share pattern and is **folded into the existing sheet functions** (no standalone client-view functions):
+
+- **PDF** — `generate-moodboard-sheet-pdf` with `{ client_view_id }` (instead of `{ sheet_id }`) renders the project-scoped deck via the same `buildFullDeckCover` + `buildSheetForDeck` builders → `pdf-documents/client-view-output/{project_id}/cv-{id}.pdf`. Stores `pdf_storage_path` (re-signs on read; never a stale URL).
+- **HTML/share** — `moodboard-sheet-share` resolves BOTH a single-sheet `share_token` (→ `{sheet}`) and a Client View `public_share_token` (→ `{client_view}`), and accepts a `feedback` body for inline approve/comment. Public route `/cv/:token` ([PublicClientViewPage.tsx](../src/pages/PublicClientViewPage.tsx)) embeds the deck PDF + live Marble 3D walkthrough (`vr_worlds`), CSS lighting moods over the hero render, live FF&E table from a linked quote, and inline approve/comment → `client_view_feedback`.
+
+**Tables** (apply via `mcp__supabase__apply_migration`):
+- `project_client_views` — `sheet_ids uuid[]` (ordered, cross-moodboard), `cover jsonb`, embed toggles (`embed_vr`/`embed_lighting`/`embed_ffe`/`feedback_enabled`), `vr_world_id`/`quote_id`, quote-style PDF columns (`pdf_storage_path`, `pdf_generation_status`, `pdf_generated_at`, `page_count`), and share columns (`public_share_token` unique, `public_share_enabled`, `share_expires_at`, `share_view_count`).
+- `client_view_feedback` — inline approvals/comments (`kind ∈ {comment, approval, change_request}`, `status ∈ {approved, changes_requested}|null`, `body`, `author_name`, `session_id`). Service-role writes via the share fn; owner reads.
+- **Cleanup** mirrors quotes: `_cleanup_client_view_pdf_storage()` AFTER DELETE trigger + `build_storage_reference_set()` extended with `project_client_views.pdf_storage_path` (orphan cron never reaps a live deliverable). `increment_client_view_count(uuid)` bumps the counter.
+
+**Frontend**: [clientViewsService.ts](../src/services/clientViewsService.ts) (list/get/create/update/remove/generatePdf/refreshPdfUrl/share/revokeShare/listFeedback/listVrWorlds) + a **Client View tab** on the project detail page ([ClientViewTab.tsx](../src/modules/projects/components/tabs/ClientViewTab.tsx), owner-only — pick + order sheets, toggle embeds, choose FF&E quote + 3D world, generate PDF, copy/disable share link, read feedback inline).
 
 ---
 

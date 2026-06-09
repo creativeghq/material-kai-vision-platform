@@ -333,6 +333,16 @@ return the cached row instantly instead of re-running the agent.
 **RLS:** all policies require `admin` or `owner` role in the workspace.
 Regular users cannot read this table.
 
+## Public sharing & email (white-label, #177)
+
+Two companion edge functions power the public quote page and email delivery.
+
+### `send-quote-email`
+`{ quote_id, to?, message? }` (JWT — quote owner or admin). Recipient cascade: explicit `to` → `crm_companies.email` → `crm_contacts.email` → owner's `user_profiles.email` (422 if none). **Auto-enables** the public share link (mints `public_share_token` + sets `public_share_enabled=true` if not already), builds inline HTML (no template), dispatches via `email-api` (`emailType:'transactional'`). Returns `{ success, sent_to, view_url }` where `view_url = {PUBLIC_APP_URL}/q/{token}`. 0 credits.
+
+### `quote-public-share`
+Anonymous (anon key), service-role internally. `{ token (≥32 chars), event?:'download', session_id? }` → resolves `quotes.public_share_token` (must have `public_share_enabled=true`) → `{ quote{…items}, seller{name,logo_url,website,phone,email}|null, pdf_url (1h signed), not_found }`. **White-label seller identity** is read from `finance_settings` for the quote's workspace (`null` → frontend falls back to platform branding). Re-signs `pdf_storage_path` to a fresh 1h URL every call. Each lookup writes a `quote_analytics_events` row (`view_context='public'`, `event_type='viewed'`/`'downloaded'`). Powers the public route `/q/:token`. 0 credits.
+
 ## Error Handling
 
 All errors return a standard format:

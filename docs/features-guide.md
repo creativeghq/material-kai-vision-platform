@@ -747,7 +747,7 @@ Complete reference of all platform features and capabilities.
 
 **Status:** ✅ Complete (Production Ready)
 
-**Documentation**: [billing-credits-system.md](billing-credits-system.md) | **API**: [api/crm-stripe-api.md](api/crm-stripe-api.md)
+**Documentation**: [billing-credits-system.md](billing-credits-system.md) | **API**: [api/crm-api.md](api/crm-api.md) (stripe resource)
 
 - ✅ Subscription plans with monthly/annual billing (`subscription_plans` table)
 - ✅ Credit packages for top-up purchases (`credit_packages` table)

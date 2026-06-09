@@ -15,6 +15,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/`. All POST. St
 | `finance-fiscal-offline-recovery` | `x-cron-secret` | 0 |
 | `finance-digest-aggregate` | Flows / `x-cron-secret` / admin `mode:'now'` | email via `email-api` (1) |
 | `finance-storefront` | none (public, slug-keyed) | 0 (transmission billed later at issue) |
+| `parse-supplier-cost-list` | JWT `admin/super_admin/owner` | 0 |
 
 Every document-touching path also runs `userCanAccessWorkspace(supabase, userId, doc.workspace_id)` (post-#208 IDOR guard) and, before any myDATA transmission, `is_workspace_entitled(workspace_id, 'sales-finance')`.
 
@@ -90,6 +91,12 @@ Pulls AADE `RequestDocs` into `inbound_documents`. **Cron** (`x-cron-secret`): a
 ## `finance-storefront`
 
 Public, no auth, `{ action, slug, ... }`. `meta` → store config; `products` → published priced products; `checkout` `{ items, customer:{name,email} }` → server-recomputes prices, `assertEntitled('sales-finance')` (402), inserts a draft `11.1` invoice + items, returns `{ invoice_id, pay_token, pay_url, total, currency }`. Full detail in [online-storefront.md §3](../online-storefront.md#3-finance-storefront-edge-function).
+
+---
+
+## `parse-supplier-cost-list`
+
+`{ kb_doc_id, dry_run? }` → `{ ok, parsed_rows, matched, updated, unmatched, errors, rows[] }`. Parses a `kb_docs` row with `price_doc_type='supplier_cost_list'` (Markdown table) and writes `products.cost`/`cost_currency`/`cost_updated_at`/`cost_source='kb_price_list'` for matching SKUs in the doc's workspace. `dry_run:true` simulates without writing. See [finance-system.md §4](../finance-system.md#supplier-cost-list-import-parse-supplier-cost-list).
 
 ---
 

@@ -1125,152 +1125,27 @@ Resend sends delivery events to `POST /functions/v1/email-webhooks`. Configure t
 
 ---
 
-## 12. Messaging API SMS WhatsApp
+## 12. Messaging API (WhatsApp via Zernio)
 
 **Endpoint**: `POST /functions/v1/messaging-api`
 **Auth**: User JWT or Service Role Key
-**Description**: Action-based provider-agnostic messaging via Twilio. Supports SMS and WhatsApp.
+**Description**: WhatsApp messaging via **Zernio** (Meta Cloud API). **Twilio + SMS were removed 2026-06-08.** Sending requires Zernio's Inbox add-on. A channel is a connected Zernio WhatsApp account (a WABA number), not a typed phone string.
 
-All requests use `POST` with `{ "action": "<action>", ...params }`.
+> 📖 **Authoritative reference**: [messaging-api.md](messaging-api.md) — full action surface, conversation/reply model, webhook shape. This section is a summary.
 
-### Action: send
-Send a message to one or more recipients.
+All requests use `POST` with `{ "action": "<action>", ...params }`. Key actions:
 
-```json
-{
-  "action": "send",
-  "channel": "sms",
-  "to": "+1234567890",
-  "content": "Hello from Material KAI!",
-  "from": "+0987654321",
-  "templateId": "template-uuid",
-  "templateVariables": { "name": "John" },
-  "mediaUrl": "https://example.com/image.jpg",
-  "messageType": "transactional"
-}
-```
+| Action | Purpose |
+|--------|---------|
+| `send` | Send a WhatsApp message (template + ordered params for cold/marketing sends, per Meta's 24h-window rule) |
+| `create-campaign` | Create a WhatsApp campaign (per-recipient send via `messaging-processor` cron) |
+| `connect-whatsapp` | Connect a WABA via Meta access token + WABA ID + phone number ID |
+| `sync-channels` | Pull connected WhatsApp accounts from Zernio (`GET /v1/accounts?platform=whatsapp`) into `messaging_channels` |
+| `account-info` | WhatsApp number health (quality rating + messaging tier) |
+| `templates` / `logs` / `analytics` | Templates, send logs, delivery analytics |
+| conversation/reply ops | List conversations, get messages, assign, reply (`sendWhatsAppReply`) — requires Inbox add-on |
 
-| Field | Type | Values |
-|-------|------|--------|
-| `channel` | string | `"sms"` or `"whatsapp"` |
-| `to` | string or string[] | Phone number(s) in E.164 format |
-| `messageType` | string | `"transactional"`, `"marketing"`, `"otp"`, `"notification"` |
-
-**Response**:
-```json
-{
-  "success": true,
-  "sent": 1,
-  "failed": 0,
-  "results": [{ "success": true, "messageId": "SM...", "status": "queued", "to": "+1234567890" }]
-}
-```
-
----
-
-### Action: send-bulk
-Send to multiple recipients with per-recipient variable substitution.
-
-```json
-{
-  "action": "send-bulk",
-  "channel": "sms",
-  "recipients": [
-    { "to": "+1234567890", "variables": { "name": "John" } },
-    { "to": "+0987654321", "variables": { "name": "Jane" } }
-  ],
-  "content": "Hi {{name}}, your order is ready!",
-  "messageType": "notification"
-}
-```
-
----
-
-### Action: channels
-List configured messaging channels.
-
----
-
-### Action: templates
-List message templates.
-
----
-
-### Action: logs
-Get message send logs.
-
-```json
-{
-  "action": "logs",
-  "limit": 50,
-  "offset": 0,
-  "channel": "sms",
-  "status": "delivered"
-}
-```
-
----
-
-### Action: analytics
-Get messaging analytics for a date range.
-
-```json
-{
-  "action": "analytics",
-  "startDate": "2026-01-01T00:00:00Z",
-  "endDate": "2026-01-31T00:00:00Z"
-}
-```
-
-**Response**:
-```json
-{
-  "total": 500,
-  "byStatus": { "delivered": 480, "failed": 20 },
-  "byChannel": { "sms": 400, "whatsapp": 100 }
-}
-```
-
----
-
-### Action: balance
-Get Twilio account balance.
-
----
-
-### Action: sync-channels
-Sync phone numbers from Twilio account as messaging channels.
-
----
-
-### Action: send-test
-Send a test message.
-
-```json
-{
-  "action": "send-test",
-  "channel": "sms",
-  "testNumber": "+1234567890",
-  "content": "Test message"
-}
-```
-
----
-
-### Action: get-settings
-Get messaging provider settings.
-
----
-
-### Action: update-settings
-Update messaging settings.
-
-```json
-{
-  "action": "update-settings",
-  "settings": { "provider": "twilio" }
-}
-```
+Outbound sends create **no** inbox thread; replies are captured by `zernio-webhook-handler` (`message.received` → `messaging_conversations` + assign-on-reply). Delivery status (`message.delivered|read|failed`) updates `messaging_logs` by `provider_message_id` (=wamid).
 
 ---
 
@@ -2010,7 +1885,7 @@ Content-Type: application/json
 | `email_logs` | Email send history |
 | `email_analytics` | Daily email analytics aggregates |
 | `email_domains` | Verified email domains |
-| `messaging_channels` | Twilio messaging channels |
+| `messaging_channels` | Connected Zernio WhatsApp channels (WABA accounts) |
 | `messaging_templates` | Message templates |
 | `messaging_logs` | Message send history |
 | `vr_worlds` | WorldLabs VR world records |
@@ -2776,13 +2651,13 @@ These endpoints receive events from external services. They perform their own va
 
 ---
 
-### POST /functions/v1/messaging-webhook
+### POST /functions/v1/zernio-webhook-handler
 
-**Source**: Twilio
-**Auth**: None (Twilio callback validation)
-**Description**: Handles SMS/WhatsApp delivery status updates and incoming messages. Responds with TwiML. Auto-processes opt-out/opt-in keywords (STOP, START, HELP).
+**Source**: Zernio (one webhook for social `post.*` + WhatsApp `message.*`)
+**Auth**: HMAC signature (`X-Zernio-Signature`, secret `ZERNIO_WEBHOOK_SECRET`)
+**Description**: WhatsApp delivery + reply capture. `message.received` → upsert `messaging_conversations` + `messaging_conversation_messages`, **assign-on-first-reply** to the campaign owner, STOP/START opt-out handling, emits `whatsapp.reply_received` flow event. `message.delivered|read|failed` update `messaging_logs` by wamid.
 
-Query param `type`: `status` | `delivery` | `incoming`
+> The former Twilio `messaging-webhook` (SMS/WhatsApp + TwiML) was **deleted 2026-06-08**.
 
 ---
 
@@ -2846,7 +2721,7 @@ These functions are callable but intended for internal/admin use. Not part of th
 ### POST /functions/v1/messaging-processor
 
 **Auth**: None (cron-triggered)
-**Description**: Processes scheduled messaging campaigns. Sends SMS/WhatsApp batches via Twilio with opt-out handling and retries.
+**Description**: Processes scheduled WhatsApp campaigns. Sends per-recipient WhatsApp messages via Zernio (`sendWhatsAppMessage`, template + ordered params) with opt-out handling and retries.
 
 **Response:**
 ```json
@@ -2919,8 +2794,8 @@ The following functions are internal automation functions not intended for direc
 | `campaign-processor` | Processes and sends email campaigns |
 | `notification-dispatcher` | Dispatches in-platform notifications |
 | `email-webhooks` | Receives Resend delivery event webhooks (bounce, complaint, delivery, open, click) |
-| `messaging-webhook` | Receives Twilio status callbacks |
-| `messaging-processor` | Processes inbound messages |
+| `zernio-webhook-handler` | Receives Zernio WhatsApp + social webhooks (delivery + reply capture) |
+| `messaging-processor` | WhatsApp campaign batch sender (cron) |
 | `ai-pricing-updater` | AI-assisted product pricing updates |
 | `reset-platform` | Full platform data reset (admin only, destructive) |
 | `kb-generate-embedding` | Generates embeddings for Knowledge Base documents |

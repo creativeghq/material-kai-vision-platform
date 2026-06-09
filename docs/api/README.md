@@ -2,7 +2,7 @@
 
 This directory contains per-function deep docs for Supabase Edge Function APIs.
 
-> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **68 edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
+> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **90+ edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 
 ## Overview
 
@@ -26,23 +26,11 @@ WhatsApp messaging via **Zernio** (Meta Cloud API). SMS + the former Twilio inte
 - **Features:** WhatsApp templates, per-recipient campaigns, reply capture + assign-on-reply, delivery tracking. Requires Zernio's Inbox add-on for sending.
 - **Access:** Authenticated users
 
-#### [CRM Contacts API](./crm-contacts-api.md)
-Contact management for CRM system.
-- **Function:** `crm-contacts-api`
-- **Features:** CRUD operations, user linking, relationship management
-- **Access:** Admin, Factory roles (`manager` role removed 2026-05-23)
-
-#### [CRM Users API](./crm-users-api.md)
-User account and profile management.
-- **Function:** `crm-users-api`
-- **Features:** User listing, profile updates, role management
-- **Access:** Admin only
-
-#### [CRM Companies API](./crm-companies-api.md)
-Company records management.
-- **Function:** `crm-companies-api`
-- **Features:** Company CRUD, contact linking, search
-- **Access:** Authenticated users
+#### [CRM API](./crm-api.md)
+Consolidated CRM — the `crm-api` edge function routes by first path segment to `companies` / `contacts` / `users` / `stripe` handlers. (The former separate `crm-companies-api` / `crm-contacts-api` / `crm-users-api` / `crm-stripe-api` functions were merged into one.)
+- **Function:** `crm-api`
+- **Features:** Company + contact CRUD, user/contact linking, potential-matches, platform user admin, Stripe customer/subscription/credits state
+- **Access:** Admin / Factory (per resource); `manager` role removed 2026-05-23
 
 #### [Quotes API](./quotes-api.md)
 Quote requests and proposal management.
@@ -261,9 +249,9 @@ Social media OAuth, publishing, analytics, and content generation.
 
 ### Payment APIs
 
-#### [CRM Stripe API](./crm-stripe-api.md)
-Subscriptions and credit purchases via Stripe.
-- **Functions:** `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`
+#### CRM Stripe (subscriptions & credits)
+Subscriptions and credit purchases via Stripe. The CRM `stripe` resource is part of the consolidated [crm-api](./crm-api.md) router.
+- **Functions:** `crm-api` (stripe resource), `stripe-checkout`, `stripe-customer-portal`
 - **Features:** Subscription checkout, credit packages, customer portal, balance queries
 - **Access:** Authenticated users
 

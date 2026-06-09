@@ -269,12 +269,14 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 
 ---
 
-### **Messaging Service API Keys (SMS/WhatsApp)**
+### **Messaging Service API Keys (WhatsApp via Zernio)**
+
+> Twilio (SMS + WhatsApp) was removed 2026-06-08. Messaging now runs on **Zernio** (WhatsApp via Meta Cloud API), sharing keys with the social-media module. SMS is no longer supported. See [api/messaging-api.md](api/messaging-api.md).
 
 | Service | Secret Name | Where Used | How to Get | Required? |
 |---------|------------|------------|------------|-----------|
-| **Twilio** | `TWILIO_ACCOUNT_SID` | Supabase Edge Functions | https://console.twilio.com/ → Account SID | ✅ **Required** for messaging |
-| **Twilio** | `TWILIO_AUTH_TOKEN` | Supabase Edge Functions | https://console.twilio.com/ → Auth Token | ✅ **Required** for messaging |
+| **Zernio** | `ZERNIO_API_KEY` | Supabase Edge Functions (`messaging-api`, `zernio-api`) | https://zernio.com → API settings | ✅ **Required** for WhatsApp (needs Inbox add-on for sending) |
+| **Zernio** | `ZERNIO_WEBHOOK_SECRET` | `zernio-webhook-handler` | Zernio dashboard → Webhooks | ✅ **Required** for delivery + reply capture |
 
 ### **Price Monitoring API Keys**
 
@@ -328,8 +330,9 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 |------------|------|----------------------|-------------|----------------|
 | `RESEND_API_KEY` | **Secret** | `email-api` | Resend API key for email sending | `re_xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `RESEND_WEBHOOK_SECRET` | **Secret** | `email-webhooks` | Resend webhook signing secret (Svix, prefix `whsec_`) | `whsec_xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_ACCOUNT_SID` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_AUTH_TOKEN` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `ZERNIO_API_KEY` | **Secret** | `messaging-api`, `zernio-api`, `messaging-processor` | Zernio API key (WhatsApp + social). Inbox add-on required for sending. | `zer_xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `ZERNIO_WEBHOOK_SECRET` | **Secret** | `zernio-webhook-handler` | Zernio webhook HMAC secret (`X-Zernio-Signature`) | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `NOVUS_API_KEY` | **Secret** | `finance-issue-invoice` + finance crons | Novus myDATA provider key (one platform-wide; per-tenant issuer VAT from `finance_settings`). `NOVUS_SANDBOX=true` for dev. | — |
 
 > **Migration note (2026-03-11):** Email provider migrated from Amazon SES to Resend. The following secrets have been removed: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET_NAME`. Delete these from Supabase Edge Function secrets if they still exist.
 
@@ -1304,12 +1307,12 @@ This section covers all third-party services used by the platform, their pricing
 
 ---
 
-### 📱 Twilio (SMS/WhatsApp)
+### 📱 Zernio (WhatsApp)
 
-**Role**: SMS and WhatsApp messaging for platform notifications.
+**Role**: WhatsApp messaging (Meta Cloud API wrapper) for platform notifications + campaigns. Replaced Twilio 2026-06-08; SMS no longer supported. Sending requires Zernio's Inbox add-on.
 
-**Dashboard**: https://console.twilio.com
-**Pricing**: Pay-per-message
+**Dashboard**: https://zernio.com · **Docs**: https://docs.zernio.com
+**Pricing**: Zernio subscription + per-message (WhatsApp conversation pricing)
 
 | Channel | Price |
 |---------|-------|
@@ -1348,7 +1351,8 @@ Credits are refunded on generation failure.
 | **HuggingFace** | $5–$20 | Auto-paused endpoints |
 | **Firecrawl** | $16–$83 | Depends on scraping volume |
 | **DataForSEO** | $10–$50 | Depends on SEO pipeline usage |
-| **Twilio** | $5–$30 | Depends on messaging volume |
+| **Zernio** | Subscription + per-message | WhatsApp messaging + social publishing |
+| **Novus** | Per-transmission | Greek AADE/myDATA e-invoicing provider |
 | **WorldLabs** | Variable | Per-credit, on-demand |
 | **Total (est.)** | **~$160–$600/month** | Scales with usage |
 

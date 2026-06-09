@@ -255,6 +255,41 @@
 
 ---
 
+### 💶 Business, Finance & Tenancy ✨ NEW (2026-06)
+
+The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#194). **Tenant = workspace.**
+
+**[finance-system.md](finance-system.md)** — Greek e-invoicing core
+- AADE/myDATA via the **Novus** connector (master-key model, per-tenant issuer VAT)
+- Issue → series/AA allocation → transmit → MARK / offline-recovery state machine
+- Inbound `RequestDocs` sync, customer + supplier credit notes
+- Reports: VAT analysis (ΦΠΑ), myDATA reconciliation, ledgers (καρτέλα), accounting export bridges (γέφυρες CSV)
+- 9 `finance-*` edge functions; replaced the removed Oxygen connector
+
+**[pos-retail-system.md](pos-retail-system.md)** — POS / retail
+- myDATA `11.1` retail receipts; cloud vPOS shifts + cash drawer + X/Z reports
+- Law 5155 card/IRIS two-phase signature flow + EFT-POS terminal registry; thermal receipt
+
+**[online-storefront.md](online-storefront.md)** — public `/store/:slug`
+- Anonymous catalog → cart → Stripe Connect checkout → draft `11.1` receipt
+- Platform revenue model (#200): separate billing Stripe account, destination charges
+
+**[warehouse-and-billing.md](warehouse-and-billing.md)** — inventory & billing
+- Multi-warehouse stock, transfers, intake from inbound myDATA
+- Time-tracking → draft invoice; project → invoice (full / progress / milestone / final)
+
+**[sales-and-marketplace.md](sales-and-marketplace.md)** — B2B surfaces
+- Sales rep portal (#201); supplier→factory catalog access (#196); procurement routing inbox (#177)
+
+**[capabilities-and-tenancy.md](capabilities-and-tenancy.md)** — authorization backbone
+- 7 personas × 15 capabilities matrix + `usePermissions()` + `CapabilityGuard`
+- Module entitlements (#212): `is_workspace_entitled`, `EntitlementGuard`, plan/grant pathways
+- Workspace tenancy: signup→own-workspace, hierarchy, `assert_workspace_member` guard RPCs
+
+**[api/finance-api.md](api/finance-api.md)** — `finance-*` edge function reference
+
+---
+
 ## 🎓 Learning Paths
 
 ### For New Developers

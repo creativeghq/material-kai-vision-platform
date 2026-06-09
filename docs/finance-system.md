@@ -47,6 +47,7 @@ All live under `supabase/functions/`. Full request/response detail in [api/finan
 | `finance-fiscal-offline-recovery` | `x-cron-secret` | Backfill MARK on `fiscal_status='offline'` documents via `RequestTransmittedDocs` |
 | `finance-digest-aggregate` | Flows / `x-cron-secret` / admin `mode:'now'` | Email AR/AP + P&L + follow-up digest; dispatch quote follow-up reminders |
 | `finance-storefront` | none (public, slug-keyed) | Anonymous mini-store meta/products/checkout → draft retail receipt + pay link |
+| `parse-supplier-cost-list` | `admin/super_admin/owner` JWT | Apply a supplier price list (KB doc) → `products.cost` (procurement cost maintenance) |
 
 ### `finance-issue-invoice` — the central document engine
 
@@ -142,6 +143,10 @@ Pulls AADE's `RequestDocs` REST feed — documents **other** Greek businesses su
 - **Pull**: `GET {baseUrl}/RequestDocs?mark={watermark}` with `aade-user-id` + `Ocp-Apim-Subscription-Key` headers. Watermark = `finance_settings.inbound_last_mark` (advances to max MARK seen).
 - **Lands in** `inbound_documents` (PK `(workspace_id, mark)`, upsert ignore-duplicates). `status`: `new` → `classified` → `received` (lines mapped to stock) / `dismissed`. `lines` jsonb holds per-line `{line_number, quantity, net_value, vat_amount, item_description}`.
 - **Downstream**: `inbound_doc_to_supplier_bill(p_doc_id)` creates a `supplier_bills` row; `inbound_doc_receive_to_warehouse(p_doc_id, p_mappings)` records stock-in (see [warehouse doc](warehouse-and-billing.md)).
+
+### Supplier cost-list import (`parse-supplier-cost-list`)
+
+Procurement-cost maintenance without editing product rows. An admin pastes a supplier's price list into a `kb_docs` row tagged `price_doc_type='supplier_cost_list'` (a Markdown table), then POSTs `{ kb_doc_id, dry_run? }`. The function parses SKU/cost/currency columns (case-insensitive header detection; strips `€$£`, handles comma separators), looks up `products` by `sku` (fallback `external_sku`) within the doc's `workspace_id`, and updates `products.cost` / `cost_currency` / `cost_updated_at` / `cost_source='kb_price_list'`. `dry_run:true` reports matched/unmatched without writing. Auth `admin/super_admin/owner`; 0 credits; manually invoked (no cron). Unmatched SKUs are reported, not errored.
 
 ---
 

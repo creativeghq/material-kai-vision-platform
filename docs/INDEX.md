@@ -470,11 +470,34 @@ Complete documentation for Material Kai Vision Platform.
 - Quote acceptance workflow
 - Admin management interface
 
+**[finance-system.md](finance-system.md)** - Greek e-invoicing & AR/AP ✨ NEW (2026-06)
+- Multi-tenant AADE/myDATA transmission via the Novus connector
+- Invoices, credit notes (5.1/5.2), delivery notes (9.3), retail receipts (11.1)
+- Inbound `RequestDocs` sync, supplier bills + credit notes
+- Reports: VAT (ΦΠΑ), myDATA reconciliation, ledgers (καρτέλα), accounting export (γέφυρες)
+- Replaced the removed Oxygen connector
+
+**[pos-retail-system.md](pos-retail-system.md)** - POS / retail ✨ NEW (2026-06)
+- vPOS shifts + cash drawer + X/Z reports; Law 5155 card/IRIS signature flow; EFT-POS registry; thermal receipt
+
+**[online-storefront.md](online-storefront.md)** - Public `/store/:slug` ✨ NEW (2026-06)
+- Anonymous catalog → cart → Stripe Connect checkout → draft receipt; platform revenue model (#200)
+
+**[warehouse-and-billing.md](warehouse-and-billing.md)** - Inventory & billing ✨ NEW (2026-06)
+- Multi-warehouse stock + transfers + inbound intake; time-tracking → invoice; project → invoice (full/progress/milestone)
+
+**[sales-and-marketplace.md](sales-and-marketplace.md)** - B2B surfaces ✨ NEW (2026-06)
+- Sales rep portal (#201); supplier→factory catalog access (#196); procurement routing inbox (#177)
+
+**[capabilities-and-tenancy.md](capabilities-and-tenancy.md)** - Authorization backbone ✨ NEW (2026-06)
+- 7 personas × 15 capabilities matrix; `usePermissions`/`CapabilityGuard`
+- Module entitlements (#212); workspace tenancy, hierarchy & guard RPCs
+
 ---
 
 ### 🔌 API Reference
 
-**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 68 Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / SEO / KB / CRM / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns.
+**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 90+ Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / SEO / KB / CRM / finance / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns.
 
 **[api/README.md](api/README.md)** — Per-edge-function deep docs index (25 dedicated function pages).
 

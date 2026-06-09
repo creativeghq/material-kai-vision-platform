@@ -2,7 +2,7 @@
 
 Single source of truth for every API surface in the platform. Two layers:
 
-1. **Supabase Edge Functions** (Deno/TypeScript) — 68 functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
+1. **Supabase Edge Functions** (Deno/TypeScript) — 90+ functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
 2. **MIVAA Python API** (FastAPI) — 140+ endpoints, base URL `https://v1api.materialshub.gr`
 
 For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
@@ -15,7 +15,7 @@ For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoin
 |-------|--------|-------------|
 | **JWT** | `Authorization: Bearer <supabase_access_token>` | Frontend (normal user sessions) |
 | **Service-role** | `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` | Cron jobs, server-to-server, admin-only functions |
-| **Webhook signature** | Provider-specific (Svix `svix-signature`, Stripe `stripe-signature`, Twilio `x-twilio-signature`, AWS SNS, Zernio) | Inbound webhooks — no bearer token |
+| **Webhook signature** | Provider-specific (Svix `svix-signature`, Stripe `stripe-signature`, AWS SNS, Zernio `X-Zernio-Signature`) | Inbound webhooks — no bearer token |
 | **API key** | `Authorization: Bearer <MIVAA_API_KEY>` | Server-to-server calls into MIVAA Python backend |
 | **Public** | — | Health checks, OAuth callbacks, debug stubs |
 
@@ -66,6 +66,8 @@ All POST, all JWT-authenticated.
 | `seo-write` | Full article generation from plan via Claude Opus |
 | `seo-analyze` | 15+ SEO quality checks; auto-fix issues via Gemini |
 | `seo-pipeline` | Orchestrator: research → plan → write → analyze in one call |
+| `seo-api` | Consolidated SEO toolkit router (research/plan/write/analyze/pipeline + toolkit audit/research handlers) |
+| `crawl-user-website` | Sitemap-driven crawler (JWT owner / `x-cron-secret`). Firecrawl-scrapes a user's own site into `user_website_pages` with Voyage 1024D embeddings for SEO interlinking. `mode:'preview'` samples 5 URLs; `mode:'full'` crawls up to `min(max_pages,1000)`. |
 
 Reference: the KAI agent exposes `seo_*` sub-agent tools that call these.
 
@@ -74,6 +76,7 @@ Reference: the KAI agent exposes `seo_*` sub-agent tools that call these.
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `kb-generate-embedding` | POST | JWT or service-role | Generate Voyage AI 1024D embedding for a `kb_docs` row (triggered on insert/content change). Idempotent via content hash. |
+| `canonicalize-attributes` | POST | internal (agents) | Thin proxy → MIVAA `/api/admin/facets/canonicalize`. Called by `material-tagger` / `product-enrichment` agents to canonicalize raw product attributes (3-layer facet pipeline: normalize → Voyage cosine cluster → `facet_canonical_values`). Local-fast-path then external MIVAA URL. |
 
 ### 1.5 Search & Re-rank
 
@@ -96,7 +99,10 @@ All service-role-authenticated (pg_cron invokes them). No user-facing API.
 | `check-material-alerts` | daily | Runs saved-search queries, emails matching results to subscribers |
 | `price-monitoring-cron` | every 4 hr | Executes due price checks against competitor URLs |
 | `scheduled-import-runner` | every 5 min | Runs due XML imports |
-| `messaging-processor` | every 1 min | Batches outbound SMS/WhatsApp (10/batch, Twilio) |
+| `messaging-processor` | every 1 min | Batches outbound WhatsApp campaign sends (Zernio) |
+| `finance-fiscal-offline-recovery` | hourly | Backfills myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
+| `finance-inbound-sync` (cron mode) | scheduled | Pulls AADE `RequestDocs` into `inbound_documents` |
+| `finance-digest-aggregate` | scheduled | AR/AP + P&L + follow-up digest email |
 
 ### 1.7 CRM
 
@@ -104,10 +110,7 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 
 | Function | Methods | Purpose | Deep docs |
 |----------|---------|---------|-----------|
-| `crm-companies-api` | GET/POST/PATCH/DELETE | Companies CRUD + contact linking + search | [crm-companies-api](api/crm-companies-api.md) |
-| `crm-contacts-api` | GET/POST/PATCH/DELETE | Contacts CRUD + user linking + custom fields | [crm-contacts-api](api/crm-contacts-api.md) |
-| `crm-users-api` | GET/POST/PATCH | User account + workspace + role management (admin only) | [crm-users-api](api/crm-users-api.md) |
-| `crm-stripe-api` | GET | Stripe invoice / subscription history for CRM contacts | [crm-stripe-api](api/crm-stripe-api.md) |
+| `crm-api` | GET/POST/PATCH/DELETE | **Consolidated CRM router** — `companies` / `contacts` / `users` / `stripe` by first path segment (the former separate `crm-*-api` functions were merged) | [crm-api](api/crm-api.md) |
 
 ### 1.8 Stripe / billing
 
@@ -117,17 +120,36 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 | `stripe-customer-portal` | POST | JWT | Create customer portal session (subscription / payment method mgmt) |
 | `stripe-webhooks` | POST | signature | Handle Stripe events — sub created/updated/cancelled, invoice paid, payment failed. See [stripe-webhooks-api](api/stripe-webhooks-api.md) |
 
-### 1.9 Messaging (email / SMS / WhatsApp)
+### 1.9 Messaging (email / WhatsApp)
+
+WhatsApp moved from Twilio (SMS+WA) to **Zernio** (WhatsApp via Meta Cloud API) on 2026-06-08; SMS removed.
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
 | `email-api` | POST | JWT | Send transactional email via AWS SES. Templates, analytics, domain verification. | [email-api](api/email-api.md) |
-| `messaging-api` | POST | JWT | Send SMS / WhatsApp via Twilio. Actions: `send`, `create-campaign`, Twilio Content API for WA templates. | [messaging-api](api/messaging-api.md) |
-| `messaging-processor` | POST | service-role | Batch dispatcher (cron-invoked, see §1.6) | — |
-| `messaging-webhook` | POST | signature (Twilio) | Delivery status callbacks (delivered/failed/read receipts) | — |
+| `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `create-campaign`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. | [messaging-api](api/messaging-api.md) |
+| `messaging-processor` | POST | service-role | WhatsApp campaign batch dispatcher (cron-invoked, see §1.6) | — |
+| `zernio-webhook-handler` | POST | signature (Zernio) | One webhook for social `post.*` + WhatsApp `message.*` (delivery + reply capture) | [zernio-social-api](api/zernio-social-api.md) |
 | `email-webhook` | POST | signature (Resend) | Campaign email events (delivered/bounced/opened/clicked) | — |
 | `email-webhooks` | POST | signature (Svix/Resend) | Transactional email events | — |
 | `ses-webhook` | POST | signature (SNS) | Amazon SES bounce/complaint notifications | — |
+
+### 1.9b Finance (Greek e-invoicing, AADE/myDATA)
+
+Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitlement. 2 credits per myDATA transmission (root free). Full reference: [finance-api](api/finance-api.md) · architecture [finance-system](finance-system.md), [pos-retail-system](pos-retail-system.md), [online-storefront](online-storefront.md).
+
+| Function | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `finance-issue-invoice` | POST | JWT (finance roles) | Create-from-quote, issue (series/AA), transmit to AADE via Novus, POS card/IRIS, credit/delivery notes |
+| `finance-invoice-pdf` | POST | JWT | Render A4 PDF (invoice / credit note / delivery note) |
+| `finance-pay-invoice` | POST | JWT or public `pay_token` | Pay link / Stripe Checkout session (Connect-routed) |
+| `finance-send-invoice-email` | POST | JWT | Email invoice PDF via `email-api` |
+| `finance-send-statement` | POST | JWT / `x-cron-secret` | Party ledger (καρτέλα) PDF + email; cron auto-statements |
+| `finance-inbound-sync` | POST | JWT / `x-cron-secret` | Pull AADE `RequestDocs` into `inbound_documents` |
+| `finance-fiscal-offline-recovery` | POST | `x-cron-secret` | Backfill MARK on offline documents |
+| `finance-digest-aggregate` | POST | Flows / `x-cron-secret` / admin | AR/AP + P&L + follow-up digest |
+| `finance-storefront` | POST | public (slug) | Mini-store meta/products/checkout |
+| `stripe-connect` | POST | owner/admin JWT | Workspace Stripe Express onboarding/status |
 
 ### 1.10 Quotes
 
@@ -246,7 +268,7 @@ Full endpoint-by-endpoint reference: [api-endpoints.md](api-endpoints.md) (1940 
 | Agents (Python) | `/api/agents/*` | Backend agent execution — edge `background-agent-runner` delegates here via `DelegateToMivaaError` for >25s tasks |
 | Internal | `/api/internal/*` | Admin observability. Incl. `GET /api/internal/document-extraction-status/{document_id}` (Document Health panel) and `POST /api/internal/run-catalog-knowledge/{document_id}?force=true` (re-run Layer 1/2) |
 | Data Import | `/api/import/*` | XML import with AI field mapping, web scraping, field templates |
-| Messaging | `/api/messaging/*` | SMS/WhatsApp (backend Twilio bridge) |
+| Finance | `/api/v1/...` (edge) | Greek e-invoicing / AADE myDATA via Novus, AR/AP, POS, storefront — see §1.9b + [finance-api](api/finance-api.md) |
 | Modules | `/api/v1/modules/*` | Module-system control + per-module routers — see §2.1 below |
 
 ### 2.1 Module system
