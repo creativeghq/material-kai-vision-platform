@@ -68,7 +68,7 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
 
 // Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="hidden lg:flex items-center gap-2 px-3 pt-3 pb-1">
+  <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
     <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
     <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
@@ -278,6 +278,30 @@ const FinancePage: React.FC = () => {
                 subtext={`${followUps.length} quote(s) need follow-up`}
               />
             </div>
+
+            {/* Point of Sale — quick B2C sale → myDATA retail receipt (11.1). The page lives at
+                /pos (outside the Finance tabs), so surface it here as the discoverable entry. */}
+            {!isAccountant && (
+              <Link to="/pos" className="block">
+                <Card className="dashboard-card border-0 transition-colors hover:bg-muted/40">
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        Point of Sale
+                        <Badge variant="outline" className="text-[10px]">vPOS</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Cashier shifts, cash drawer &amp; X/Z reports. Ring up a walk-in sale and issue a myDATA retail receipt.
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" className="shrink-0">Open POS</Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
 
             {/* Marketplace commission earned (downline catalog sales) — renders only when non-zero */}
             <CommissionSummaryCard />
