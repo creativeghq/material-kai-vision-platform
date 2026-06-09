@@ -12,6 +12,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
 import { CapabilityGuard } from './components/core/CapabilityGuard';
+import { EntitlementGuard } from './components/core/EntitlementGuard';
 import { Layout } from './components/core/Layout';
 import {
   CriticalErrorBoundary,
@@ -32,7 +33,6 @@ const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
-const WorkspaceSettingsPage = lazy(() => import('./pages/WorkspaceSettingsPage'));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
@@ -226,9 +226,11 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <CapabilityGuard capability="finance.manage">
-                        <Layout>
-                          <FinancePage />
-                        </Layout>
+                        <EntitlementGuard moduleSlug="sales-finance" moduleName="Finance">
+                          <Layout>
+                            <FinancePage />
+                          </Layout>
+                        </EntitlementGuard>
                       </CapabilityGuard>
                     </AuthGuard>
                   }
@@ -275,18 +277,10 @@ const App = () => (
                 {/* #177 — the procurement inbox merged into the Quotes page as a tab.
                     Keep the old path alive as a redirect for bookmarks/notifications. */}
                 <Route path="/requests" element={<Navigate to="/quotes?tab=requests" replace />} />
-                <Route
-                  path="/settings"
-                  element={
-                    <AuthGuard>
-                      <CapabilityGuard capability="network.manage">
-                        <Layout>
-                          <WorkspaceSettingsPage />
-                        </Layout>
-                      </CapabilityGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Workspace Settings retired — its content merged into Finance → Settings
+                    (branding → Business identity, members → Team) and User Profile (credits).
+                    Redirect old bookmarks/notifications to Finance. */}
+                <Route path="/settings" element={<Navigate to="/finance" replace />} />
                 <Route
                   path="/pos"
                   element={

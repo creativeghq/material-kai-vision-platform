@@ -8,7 +8,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import type { Capability } from '@/auth/capabilities';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
-import { useEnabledModules, ModuleHeaderActions } from '@/modules/_core';
+import { ModuleHeaderActions } from '@/modules/_core';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { Button } from '@/components/core/ui/button';
 import {
   Sheet,
@@ -26,7 +27,7 @@ import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
-  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; enabledSlugs: Set<string>; can: (c: Capability) => boolean },
+  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; isModuleAvailable: (slug: string) => boolean; can: (c: Capability) => boolean },
 ): SidebarNavItem[] {
   return items.filter((item) => {
     // Scoped invited roles see a focused subset only (overrides the gates below).
@@ -38,7 +39,10 @@ function filterNavItems(
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     // #195 capability gate (the unified persona model — drives end-user restriction).
     if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
-    if (item.moduleSlug && !ctx.enabledSlugs.has(item.moduleSlug)) return false;
+    // #212 entitlement gate — hide a paid module unless the active workspace owns it.
+    // isModuleAvailable already folds in platform-enabled (the access RPC only returns enabled
+    // modules) + free baseline tiers + per-workspace entitlement, and fails OPEN while loading.
+    if (item.moduleSlug && !ctx.isModuleAvailable(item.moduleSlug)) return false;
     return true;
   });
 }
@@ -49,11 +53,11 @@ export const Sidebar: React.FC = () => {
   const { user, signOut } = useAuth();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
   const { can, isAccountant, isSalesRep } = usePermissions();
-  const { enabledSlugs } = useEnabledModules();
+  const { isModuleAvailable } = useEntitlements();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, enabledSlugs, can });
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can });
 
   useEffect(() => {
     setMobileOpen(false);
