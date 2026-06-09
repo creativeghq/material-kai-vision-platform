@@ -10,6 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 
 const corsHeaders = {
@@ -70,6 +71,14 @@ Deno.serve(async (req) => {
   for (const c of creds) {
     const workspaceId = c.workspace_id as string;
     const baseUrl = c.base_url || defaultBase;
+
+    // #212 — myDATA inbound is a Finance-module feature; skip workspaces that don't own it.
+    // (Root passes via is_workspace_entitled; the configured-but-unentitled case is skipped,
+    //  not errored, so one unentitled tenant can't fail the whole cron batch.)
+    if (!(await isWorkspaceEntitled(supabase, workspaceId, 'sales-finance'))) {
+      summary.push({ workspaceId, skipped: 'not_entitled' });
+      continue;
+    }
 
     // Pre-check credit balance on the automated path WITHOUT debiting yet — we only charge
     // for a sync that actually reached AADE, so a failed pull never burns the tenant's credits.

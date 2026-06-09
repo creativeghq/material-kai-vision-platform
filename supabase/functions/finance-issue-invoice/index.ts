@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
       }
 
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
-        p_workspace_id: cnRow.workspace_id, p_module_slug: 'e-invoicing',
+        p_workspace_id: cnRow.workspace_id, p_module_slug: 'sales-finance',
       });
       if (!entitled) {
         return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
       }
 
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
-        p_workspace_id: dnRow.workspace_id, p_module_slug: 'e-invoicing',
+        p_workspace_id: dnRow.workspace_id, p_module_slug: 'sales-finance',
       });
       if (!entitled) {
         return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
@@ -429,10 +429,10 @@ Deno.serve(async (req) => {
         .eq('id', invoiceId)
         .single();
 
-      // Monetization gate (#181): the workspace must be entitled to e-invoicing.
+      // Monetization gate (#181/#212): the workspace must own the Finance (sales-finance) module.
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
         p_workspace_id: invRow!.workspace_id,
-        p_module_slug: 'e-invoicing',
+        p_module_slug: 'sales-finance',
       });
 
       if (invRow?.fiscal_status === 'accepted') {

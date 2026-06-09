@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
 
 // #207 — Public online storefront (Oxygen "Open Link" / mini-store parity).
 //
@@ -94,6 +95,11 @@ Deno.serve(async (req) => {
       const clean = items.filter((i) => i?.product_id && Number(i.qty) > 0);
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
+
+      // #212 — checkout creates a fiscal retail receipt, so the selling workspace must own the
+      // Finance module. (Browse actions above stay open so a store can showcase products.)
+      const ent = await assertEntitled(supabase, ws.id, 'sales-finance');
+      if (!ent.ok) return ent.response;
 
       // Recompute every line from the DB — the client cart never sets a price.
       const ids = [...new Set(clean.map((i) => i.product_id))];
