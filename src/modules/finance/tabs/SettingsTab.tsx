@@ -23,6 +23,7 @@ import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
+import { MembersCard } from '@/modules/finance/components/MembersCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -164,20 +165,20 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   }
 
   return (
-    <Tabs defaultValue="general" orientation="vertical" className="flex flex-col gap-4 sm:flex-row sm:items-start">
-      <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+    <Tabs defaultValue="general" className="space-y-4">
+      <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
         {SETTINGS_SECTIONS.map((s) => (
           <TabsTrigger
             key={s.value}
             value={s.value}
-            className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
             <s.icon className="h-4 w-4" /> {s.label}
           </TabsTrigger>
         ))}
       </TabsList>
 
-      <div className="w-full min-w-0 flex-1 space-y-4">
+      <div className="w-full min-w-0 space-y-4">
         <TabsContent value="identity" className="mt-0">
           <BusinessIdentityCard workspaceId={workspaceId} />
         </TabsContent>
@@ -201,7 +202,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <ServicesCard workspaceId={workspaceId} />
         </TabsContent>
 
-        <TabsContent value="team" className="mt-0">
+        <TabsContent value="team" className="mt-0 space-y-4">
+          <MembersCard workspaceId={workspaceId} />
           <TeamInviteCard workspaceId={workspaceId} />
         </TabsContent>
 

@@ -68,7 +68,7 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
 
 // Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="hidden lg:flex items-center gap-2 px-3 pt-3 pb-1">
+  <div className="flex w-full items-center gap-2 px-1 pt-1 pb-0.5">
     <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
     <span className="h-px flex-1 bg-foreground/30" aria-hidden="true" />
@@ -193,61 +193,61 @@ const FinancePage: React.FC = () => {
           </Card>
         )}
 
-        <Tabs defaultValue="dashboard" orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
-            <TabsTrigger value="dashboard" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+        <Tabs defaultValue="dashboard" className="space-y-4">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="dashboard" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <PieChart className="h-4 w-4 mr-2" /> Dashboard
             </TabsTrigger>
-            <TabsTrigger value="ar" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="ar" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowDownCircle className="h-4 w-4 mr-2" /> Receivables ({ar.length})
             </TabsTrigger>
-            <TabsTrigger value="ap" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="ap" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
 
             <SectionLabel>Documents</SectionLabel>
             {DOC_TABS.map((d) => (
-              <TabsTrigger key={d.value} value={d.value} className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger key={d.value} value={d.value} className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <d.icon className="h-4 w-4 mr-2" /> {d.label}
               </TabsTrigger>
             ))}
             <SectionLabel>Tools</SectionLabel>
 
-            <TabsTrigger value="planning" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="planning" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
             {!isAccountant && (
-              <TabsTrigger value="time" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="time" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Clock className="h-4 w-4 mr-2" /> Time &amp; billing
               </TabsTrigger>
             )}
-            <TabsTrigger value="reports" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="reports" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" /> Reports
             </TabsTrigger>
-            <TabsTrigger value="parties" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="parties" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
             </TabsTrigger>
-            <TabsTrigger value="followups" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="followups" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
             </TabsTrigger>
             {!isAccountant && (
-              <TabsTrigger value="marketplace" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="marketplace" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
               </TabsTrigger>
             )}
             {!isAccountant && (
-              <TabsTrigger value="warehouse" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="warehouse" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Package className="h-4 w-4 mr-2" /> Warehouse
               </TabsTrigger>
             )}
             {!isAccountant && (
-              <TabsTrigger value="settings" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="settings" className="flex items-center data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <SettingsIcon className="h-4 w-4 mr-2" /> Settings
               </TabsTrigger>
             )}
           </TabsList>
 
-          <div className="min-w-0 flex-1 space-y-4">
+          <div className="min-w-0 space-y-4">
           {/* ─────────── DASHBOARD ─────────── */}
           <TabsContent value="dashboard" className="space-y-6">
             {/* KPI strip */}
