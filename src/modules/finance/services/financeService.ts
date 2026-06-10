@@ -788,12 +788,32 @@ const _financeServiceCore = {
   async createCreditNote(input: {
     workspaceId?: string;
     invoiceId: string;
-    amount: number;          // gross (net + VAT)
+    amount: number;          // gross (net + VAT) — used only when `lines` is omitted
     currency?: string;
     reason: string;
     correlated?: boolean;    // 5.1 (correlated, default) vs 5.2
     submitFiscal?: boolean;
+    /** Explicit per-line credit (preferred — credits specific invoice lines/quantities).
+     *  When omitted, a single synthetic line is derived from `amount` at the invoice VAT rate. */
+    lines?: Array<{
+      source_invoice_item_id?: string | null; product_id?: string | null; description: string;
+      sku?: string | null; unit?: string | null; quantity: number; unit_price: number;
+      net_value: number; vat_amount: number; vat_category?: number | null; vat_percent?: number | null;
+      income_classification_type?: string | null; income_classification_category?: string | null;
+    }>;
   }): Promise<{ credit_note_id: string }> {
+    if (input.lines && input.lines.length > 0) {
+      const { data: cnId, error } = await supabase.rpc('issue_credit_note', {
+        p_invoice_id: input.invoiceId,
+        p_lines: input.lines,
+        p_reason: input.reason,
+        p_correlated: input.correlated ?? true,
+      });
+      if (error) throw error;
+      if (input.submitFiscal) { try { await this.submitCreditNoteFiscal(cnId as string); } catch { /* surfaced via list */ } }
+      return { credit_note_id: cnId as string };
+    }
+
     const { data: inv } = await supabase
       .from('invoices')
       .select('vat_rate')
