@@ -8,8 +8,8 @@ Single source of truth for every API surface in the platform. Two layers:
 For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
 
 **Machine-readable specs / Swagger:**
-- **Edge Functions** → [`docs/api/openapi-edge.json`](api/openapi-edge.json) (hand-maintained OpenAPI 3.0.3, all 88 functions) · browse via [`docs/api/edge-swagger.html`](api/edge-swagger.html). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs`.
-- **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
+- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 88). Repo: [`docs/api/openapi-edge.json`](api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
+- **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `https://v1api.materialshub.gr/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
 
 ---
 

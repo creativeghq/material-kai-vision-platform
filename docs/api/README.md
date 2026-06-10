@@ -4,7 +4,13 @@ This directory contains per-function deep docs for Supabase Edge Function APIs.
 
 > **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **90+ edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 >
-> **🧪 Machine-readable / Swagger.** The MIVAA Python API has its FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (`/docs`). The Edge Functions (Deno) are **not** in that spec — they have their own hand-maintained OpenAPI at [**openapi-edge.json**](./openapi-edge.json), browsable via [**edge-swagger.html**](./edge-swagger.html). Regenerate after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json) then run `node scripts/build-openapi-edge.mjs`. Covers all **88 edge functions**.
+> **🧪 Machine-readable / Swagger.** The MIVAA Python API has its FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (Swagger UI `/docs`). The Edge Functions (Deno) are **not** in that spec — they have their own hand-maintained OpenAPI at [**openapi-edge.json**](./openapi-edge.json), browsable via [**edge-swagger.html**](./edge-swagger.html). Covers all **88 edge functions**.
+>
+> **Live URLs** (served from the frontend's `public/api/` after the next build+deploy; `/api/*` is excluded from the SPA rewrite in `vercel.json`):
+> - Swagger UI → `https://app.materialshub.gr/api/edge-swagger.html`
+> - Spec JSON → `https://app.materialshub.gr/api/openapi-edge.json`
+>
+> Regenerate after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (emits to both `docs/api/` and `public/api/`).
 
 ## Overview
 

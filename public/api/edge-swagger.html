@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Material KAI — Edge Functions API (Swagger)</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #fafafa; }
+    .topbar-note {
+      font: 13px/1.5 system-ui, sans-serif; color: #555;
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #eee;
+    }
+    .topbar-note b { color: #7a2e52; }
+  </style>
+</head>
+<body>
+  <div class="topbar-note">
+    <b>Supabase Edge Functions</b> — the Deno/TypeScript surface. The MIVAA Python API has its own
+    generated spec at <code>https://v1api.materialshub.gr/openapi.json</code> (<code>/docs</code>).
+    Spec source: <code>scripts/edge-endpoints.json</code> → <code>scripts/build-openapi-edge.mjs</code>.
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: './openapi-edge.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      docExpansion: 'none',
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+      defaultModelsExpandDepth: 0,
+    });
+  </script>
+</body>
+</html>

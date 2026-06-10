@@ -22,7 +22,10 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const SRC = join(__dirname, 'edge-endpoints.json');
-const OUT = join(ROOT, 'docs', 'api', 'openapi-edge.json');
+// Emit to BOTH the repo doc (GitHub-viewable) and the served static asset
+// (public/api → dist/api → https://<frontend>/api/openapi-edge.json). One source,
+// two identical outputs, so they can't drift.
+const OUTS = [join(ROOT, 'docs', 'api', 'openapi-edge.json'), join(ROOT, 'public', 'api', 'openapi-edge.json')];
 
 const fns = JSON.parse(readFileSync(SRC, 'utf8'));
 
@@ -248,6 +251,11 @@ const spec = {
   },
 };
 
-writeFileSync(OUT, JSON.stringify(spec, null, 2) + '\n');
-console.log(`Wrote ${OUT}`);
+import { mkdirSync } from 'node:fs';
+const json = JSON.stringify(spec, null, 2) + '\n';
+for (const out of OUTS) {
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, json);
+  console.log(`Wrote ${out}`);
+}
 console.log(`  functions: ${fns.length}  paths: ${Object.keys(paths).length}  tags: ${tags.length}`);
