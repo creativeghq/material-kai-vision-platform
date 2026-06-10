@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock, Megaphone } from 'lucide-react';
+import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock, Megaphone, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -434,6 +434,35 @@ export const SubscriptionTab: React.FC = () => {
               )}
             </>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl mt-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />API Documentation</CardTitle>
+          <CardDescription>Interactive reference for both API surfaces. Use your API key above to authorize requests.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2">
+          {[
+            { label: 'Edge Functions — Swagger UI', href: '/api/edge-swagger.html', sub: 'Supabase edge functions (interactive)' },
+            { label: 'Edge Functions — OpenAPI JSON', href: '/api/openapi-edge.json', sub: 'openapi-edge.json (machine-readable)' },
+            { label: 'Core API — Swagger UI', href: 'https://v1api.materialshub.gr/docs', sub: 'MIVAA backend (RAG, search, AI)' },
+            { label: 'Core API — OpenAPI JSON', href: 'https://v1api.materialshub.gr/openapi.json', sub: 'openapi.json (machine-readable)' },
+          ].map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30 hover:bg-muted/60 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium truncate">{l.label}</span>
+                <span className="block text-xs text-muted-foreground truncate">{l.sub}</span>
+              </span>
+            </a>
+          ))}
         </CardContent>
       </Card>
         </TabsContent>

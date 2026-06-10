@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut } from 'lucide-react';
+import { User, Menu, LogOut, BookOpen, ExternalLink } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
@@ -93,6 +94,33 @@ export const Sidebar: React.FC = () => {
           <User className="mr-3 h-4 w-4" />
           <span className="text-sm">My Profile</span>
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-light">API Documentation</DropdownMenuLabel>
+            <DropdownMenuItem asChild className="py-3">
+              <a href="/api/edge-swagger.html" target="_blank" rel="noopener noreferrer">
+                <BookOpen className="mr-3 h-4 w-4" />
+                <span className="text-sm flex-1">Edge API — Swagger</span>
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="py-3">
+              <a href="/api/openapi-edge.json" target="_blank" rel="noopener noreferrer">
+                <BookOpen className="mr-3 h-4 w-4" />
+                <span className="text-sm flex-1">Edge API — OpenAPI JSON</span>
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="py-3">
+              <a href="https://v1api.materialshub.gr/docs" target="_blank" rel="noopener noreferrer">
+                <BookOpen className="mr-3 h-4 w-4" />
+                <span className="text-sm flex-1">Core API — Swagger</span>
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              </a>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut()}
