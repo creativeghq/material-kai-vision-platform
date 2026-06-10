@@ -7,13 +7,15 @@ export interface FinanceCategory {
   kind: 'income' | 'expense' | 'both';
   color: string | null;
   is_active: boolean;
+  /** #207 — default sell margin % for products in this category; auto-prices received goods. */
+  margin_pct: number | null;
 }
 
 export const financeCategoriesService = {
   async list(workspaceId: string): Promise<FinanceCategory[]> {
     const { data, error } = await supabase
       .from('finance_categories')
-      .select('id, name, kind, color, is_active')
+      .select('id, name, kind, color, is_active, margin_pct')
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)
       .order('name', { ascending: true });
@@ -25,6 +27,12 @@ export const financeCategoriesService = {
     const { error } = await supabase.from('finance_categories').insert({
       workspace_id: workspaceId, name: input.name, kind: input.kind,
     } as any);
+    if (error) throw error;
+  },
+
+  /** Set the default sell margin % for a category (used to auto-price received goods). */
+  async setMargin(id: string, marginPct: number | null): Promise<void> {
+    const { error } = await supabase.from('finance_categories').update({ margin_pct: marginPct } as any).eq('id', id);
     if (error) throw error;
   },
 

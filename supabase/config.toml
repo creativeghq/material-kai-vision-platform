@@ -110,9 +110,6 @@ verify_jwt = false
 [functions.finance-inbound-sync]
 verify_jwt = false
 
-[functions.finance-extract-products]
-verify_jwt = false
-
 [functions.finance-send-invoice-email]
 verify_jwt = false
 

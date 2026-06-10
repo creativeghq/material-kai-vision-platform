@@ -47,6 +47,11 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
     try { await financeCategoriesService.remove(id); await load(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
+  const saveMargin = async (id: string, raw: string) => {
+    const n = raw.trim() === '' ? null : Number(raw);
+    try { await financeCategoriesService.setMargin(id, n != null && Number.isFinite(n) ? n : null); }
+    catch (err: any) { toast({ title: 'Failed to save margin', description: err?.message, variant: 'destructive' }); }
+  };
 
   const kindBadge = (k: FinanceCategory['kind']) =>
     k === 'income' ? 'default' : k === 'expense' ? 'destructive' : 'outline';
@@ -73,6 +78,12 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <span>{c.name}</span>
                 <div className="flex items-center gap-3">
                   <Badge variant={kindBadge(c.kind)} className="text-[10px]">{c.kind}</Badge>
+                  <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
+                    <input type="number" step="0.5" min="0" defaultValue={c.margin_pct ?? ''} placeholder="margin"
+                      className="h-7 w-14 rounded border border-border/60 bg-background px-1 text-right text-xs"
+                      onBlur={(e) => saveMargin(c.id, e.target.value)} />
+                    <span className="text-[10px] text-muted-foreground">%</span>
+                  </div>
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>

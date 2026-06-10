@@ -13,6 +13,7 @@ import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { extractProductsFromLines } from '../_shared/finance/extract-products.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -161,7 +162,60 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     if (maxMark !== watermark) {
       await supabase.from('finance_settings').update({ inbound_last_mark: maxMark }).eq('workspace_id', workspaceId);
     }
-    summary.push({ workspaceId, found: blocks.length, upserted, new_watermark: maxMark });
+
+    // ── Background AI product extraction → pending-products queue (credit-gated) ──
+    // For each not-yet-extracted inbound doc with line detail, run the cheapest model to
+    // turn raw supplier lines into clean products and queue them for the operator's ✓/✗.
+    // Entitlement was already checked above; each doc costs EXTRACT_CREDIT_COST credits.
+    let extracted = 0;
+    try {
+      const EXTRACT_CREDIT_COST = 1;
+      const r2 = (n: number) => Math.round(n * 100) / 100;
+      const { data: docs } = await supabase
+        .from('inbound_documents')
+        .select('id, currency, lines')
+        .eq('workspace_id', workspaceId)
+        .neq('status', 'dismissed')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      for (const d of (docs ?? []) as any[]) {
+        const all = Array.isArray(d.lines) ? d.lines : [];
+        const usable = all.filter((l: any) => String(l?.item_description ?? '').trim());
+        if (usable.length === 0) continue;
+        const { count } = await supabase.from('warehouse_pending_items')
+          .select('id', { count: 'exact', head: true }).eq('inbound_document_id', d.id);
+        if ((count ?? 0) > 0) continue; // already extracted
+
+        const { data: debit } = await supabase.rpc('debit_user_credits', {
+          p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
+          p_operation_type: 'expense_product_extraction',
+          p_description: `AI product extraction (inbound doc ${d.id})`,
+        });
+        const drow = Array.isArray(debit) ? debit[0] : debit;
+        if (!drow?.success) break; // out of credits — stop extracting for this workspace
+
+        const suggestions = await extractProductsFromLines(
+          usable.map((l: any, i: number) => ({ index: i, description: String(l.item_description), quantity: l.quantity ?? null })),
+        );
+        const byIdx = new Map(suggestions.map((s) => [s.index, s]));
+        const pendingRows = usable.map((l: any, i: number) => {
+          const s = byIdx.get(i);
+          const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
+          const unitCost = l.net_value != null ? r2(Number(l.net_value) / qty) : null;
+          const name = s ? [s.name, s.size, s.attributes].filter((x) => x && String(x).trim()).join(' ').trim() : String(l.item_description);
+          return {
+            workspace_id: workspaceId, inbound_document_id: d.id, line_index: i,
+            raw_description: String(l.item_description), name: name || 'Item',
+            sku: s?.sku ?? null, unit: s?.unit ?? null, size: s?.size ?? null, attributes: s?.attributes ?? null,
+            quantity: qty, unit_cost: unitCost, currency: d.currency ?? 'EUR',
+          };
+        });
+        await supabase.from('warehouse_pending_items').upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
+        extracted += pendingRows.length;
+      }
+    } catch (e) { console.error('[inbound-sync] product extraction failed', String(e)); }
+
+    summary.push({ workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark });
   }
 
   return json({ ok: true, workspaces: summary.length, results: summary });

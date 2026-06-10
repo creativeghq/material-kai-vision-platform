@@ -117,4 +117,30 @@ export const warehouseService = {
     const { error } = await supabase.from('warehouse_items').delete().eq('id', id);
     if (error) throw error;
   },
+
+  // ── Pending products (AI-extracted from inbound expenses → ✓ add / ✗ dismiss) ──
+  async listPending(workspaceId: string): Promise<PendingProduct[]> {
+    const { data, error } = await supabase.from('warehouse_pending_items')
+      .select('*').eq('workspace_id', workspaceId).eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as PendingProduct[];
+  },
+  async approvePending(id: string, overrides: Record<string, unknown>): Promise<string> {
+    const { data, error } = await supabase.rpc('approve_pending_warehouse_item', { p_id: id, p_overrides: overrides });
+    if (error) throw error;
+    return data as string;
+  },
+  async dismissPending(id: string): Promise<void> {
+    const { error } = await supabase.rpc('dismiss_pending_warehouse_item', { p_id: id });
+    if (error) throw error;
+  },
 };
+
+export interface PendingProduct {
+  id: string; workspace_id: string; inbound_document_id: string | null; raw_description: string | null;
+  name: string; sku: string | null; unit: string | null; size: string | null; attributes: string | null;
+  quantity: number; unit_cost: number | null; currency: string;
+  suggested_sales_price: number | null; sales_price: number | null; category_id: string | null;
+  matched_product_id: string | null; add_to_catalog: boolean; target_warehouse_id: string | null;
+}
