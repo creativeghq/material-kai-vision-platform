@@ -55,9 +55,11 @@ export type TriggerType =
   | 'stripe_payment_succeeded'
   | 'stripe_payment_failed'
   | 'project_invitation_sent'
-  | 'project_invitation_resent';
+  | 'project_invitation_resent'
+  | 'inventory_low_stock';
 
 export interface ManualTriggerConfig {}
+export interface InventoryLowStockTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -211,6 +213,7 @@ export type TriggerConfigMap = {
   stripe_payment_failed: StripePaymentFailedTriggerConfig;
   project_invitation_sent: ProjectInvitationSentTriggerConfig;
   project_invitation_resent: ProjectInvitationResentTriggerConfig;
+  inventory_low_stock: InventoryLowStockTriggerConfig;
 };
 
 // =====================================================

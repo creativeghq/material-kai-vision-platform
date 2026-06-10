@@ -56,6 +56,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   stripe_payment_failed: XCircle,
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
+  inventory_low_stock: Package,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

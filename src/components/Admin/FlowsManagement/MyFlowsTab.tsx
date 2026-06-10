@@ -113,6 +113,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   stripe_payment_failed: XCircle,
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
+  inventory_low_stock: Package,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -162,6 +163,7 @@ const triggerLabels: Record<TriggerType, string> = {
   stripe_payment_failed: 'Payment Failed',
   project_invitation_sent: 'Project Invite Sent',
   project_invitation_resent: 'Project Invite Resent',
+  inventory_low_stock: 'Low Stock',
 };
 
 const statusColors: Record<FlowStatus, string> = {

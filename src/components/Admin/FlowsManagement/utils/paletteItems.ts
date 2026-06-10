@@ -156,6 +156,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'project_invitation_resent', group: 'Projects',
     label: 'Project Invite Resent', description: 'A project collaboration invite is resent', icon: 'Send', color: 'emerald',
     defaultData: { label: 'Project Invite Resent', category: 'trigger', triggerType: 'project_invitation_resent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'inventory_low_stock', group: 'Finance',
+    label: 'Low Stock', description: 'A warehouse item drops to/below its reorder point', icon: 'Package', color: 'amber',
+    defaultData: { label: 'Low Stock', category: 'trigger', triggerType: 'inventory_low_stock', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC
