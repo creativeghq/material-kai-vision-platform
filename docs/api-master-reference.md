@@ -2,10 +2,14 @@
 
 Single source of truth for every API surface in the platform. Two layers:
 
-1. **Supabase Edge Functions** (Deno/TypeScript) — 90+ functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
+1. **Supabase Edge Functions** (Deno/TypeScript) — 88 functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
 2. **MIVAA Python API** (FastAPI) — 140+ endpoints, base URL `https://v1api.materialshub.gr`
 
 For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
+
+**Machine-readable specs / Swagger:**
+- **Edge Functions** → [`docs/api/openapi-edge.json`](api/openapi-edge.json) (hand-maintained OpenAPI 3.0.3, all 88 functions) · browse via [`docs/api/edge-swagger.html`](api/edge-swagger.html). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs`.
+- **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
 
 ---
 
@@ -31,9 +35,246 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (68)
+## 1. Supabase Edge Functions (88)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
+
+> Machine-readable: [`docs/api/openapi-edge.json`](api/openapi-edge.json) (browse via [`edge-swagger.html`](api/edge-swagger.html)). The table below is the complete index (auth column: JWT = user session, `kai_*` = partner key, secret = admin `apikey`, cron = `x-cron-secret`, sig = webhook signature, token = share/query token, public = none). The §1.x subsections that follow add call-pattern detail for the high-traffic groups.
+
+### 1.0 Complete edge-function index
+<!-- AUTO-DERIVED from scripts/edge-endpoints.json — keep in sync when adding functions. -->
+**AI Agents**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `agent-chat` | JWT / kai_* | Multi-agent LangGraph chat with tool execution and SSE streaming |
+
+**AI Generation**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `generate-interior-gemini` | JWT | Multi-mode interior design image generation (Gemini, FLUX, Grok) |
+| `generate-interior-video-v2` | JWT | Multi-model interior design video generation with async polling fallback |
+| `generate-pbr-maps` | JWT | Generate PBR texture maps (albedo, normal, roughness, metalness) from a product image |
+| `generate-region-edit` | JWT | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
+| `generate-virtual-staging` | JWT | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
+| `generate-vr-world` | JWT | Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble |
+
+**Social**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `generate-social-content` | JWT | Generate platform-optimised social media captions and hashtags via Claude |
+| `generate-social-image` | JWT | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
+| `generate-social-video` | JWT | Generate a short-form social video via Kling or Veo-2 |
+| `zernio-api` | JWT | Social media publishing, OAuth account management, and analytics via Zernio. |
+| `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
+
+**Search**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `ai-rerank` | JWT | Re-rank search results using Claude LLM |
+
+**MIVAA Gateway**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `mivaa-gateway` | JWT / secret | Authenticated proxy to MIVAA Python backend with per-action credit billing |
+
+**Knowledge Base**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `kb-generate-embedding` | JWT / secret | Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row |
+
+**Finance**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `finance-digest-aggregate` | JWT | Send finance digest emails and dispatch quote follow-up bell notifications |
+| `finance-fiscal-offline-recovery` | cron | Re-query connector for pending MARK on offline-accepted fiscal documents |
+| `finance-inbound-sync` | JWT / cron | Pull inbound documents from myDATA (RequestDocs) for configured workspaces |
+| `finance-invoice-pdf` | JWT | Render a legal invoice, credit note, or delivery note as a PDF |
+| `finance-issue-invoice` | JWT | Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note |
+| `finance-pay-invoice` | JWT / token / public | Create a Stripe Checkout session or pay-link for an invoice |
+| `finance-send-invoice-email` | JWT | Email an invoice to its customer with optional PDF attachment |
+| `finance-send-statement` | JWT / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
+| `finance-storefront` | public | Public online storefront: browse products and submit cart checkout |
+| `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
+
+**Payments**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `stripe-api` | JWT | Stripe Checkout and Customer Portal session creator |
+| `stripe-connect` | JWT | Stripe Connect onboarding and status for per-workspace payouts |
+| `stripe-webhooks` | sig | Stripe webhook receiver for subscription, payment, and invoice events |
+
+**Quotes**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `generate-quote-pdf` | JWT | Generate or return cached PDF for a quote |
+| `quote-public-share` | token / public | Public token-based quote share lookup (anonymous-friendly) |
+| `quotes-api` | JWT | REST API for quote requests and proposals (customer-facing) |
+| `send-quote-email` | JWT | Email a quote to a recipient with a public share link |
+
+**CRM**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `crm-api` | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
+
+**Business Profile**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `myaade-rgwspublic2` | JWT | Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service. |
+| `role-upgrade-requests` | JWT | Dealer/factory role promotion workflow — submit, approve, and reject requests. |
+| `vies-validate` | JWT | Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write. |
+
+**Catalogs**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `catalog-access` | public | Public email-gate for shared catalog pages (/c/:slug) |
+| `catalog-extract-from-pdfs` | JWT | Claude Sonnet vision pass over source PDFs to find materials matching a query |
+| `catalog-image-search` | JWT | Find candidate images for a catalog material via platform DB then web fallback |
+| `catalog-render-pdf-page` | cron | Proxy to MIVAA rasterize-pdf-page; returns signed URL to a PNG crop of a PDF page |
+| `catalog-send-to-customers` | JWT | Admin sends a published catalog to CRM-category recipients via email |
+| `catalog-translate-pdf` | JWT | Whole-PDF vision pass to populate a catalog's body_data from a source PDF |
+| `generate-catalog-pdf` | JWT | Render a presentation catalog to a PDF and store it in pdf-documents |
+
+**Moodboard & Sheets**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `generate-moodboard-sheet-pdf` | JWT | Render a moodboard presentation sheet or project client-view to PDF |
+| `moodboard-sheet-share` | public | Public token resolver for shared presentation sheets and project client views |
+
+**PDF Processing**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `pdf-batch-process` | JWT | Queue, status-check, and cancel batch PDF extraction jobs |
+
+**Data Import**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `field-templates` | JWT | CRUD API for reusable XML field-mapping templates scoped to a workspace. |
+| `scheduled-import-runner` | cron | Cron runner that fetches due scheduled XML imports and re-invokes xml-import-orchestrator. |
+| `suggest-fields` | JWT | Scrape a product page URL with Firecrawl then use Claude to suggest importable field mappings. |
+| `xml-import-orchestrator` | JWT | Parse and import supplier XML feeds; supports field detection, preview, and full import modes. |
+
+**Scraping**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `crawl-user-website` | JWT / cron | Sitemap-driven indexer for SEO inter-linking; preview or full crawl mode |
+| `firecrawl-webhook` | token | Receives async Firecrawl crawl callbacks and persists pages; triggers product creation on completion. |
+| `parse-sitemap` | JWT | Fetch and parse a sitemap XML, returning a list of page URLs |
+| `scrape-preview` | JWT | Single-URL Firecrawl preview that returns extracted materials and markdown |
+| `scrape-session-manager` | JWT | Start, pause, resume, or stop a web-scraping session |
+| `scrape-single-page` | JWT | Scrape one page within a scraping session using Firecrawl v2 |
+
+**Email**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `email-api` | JWT / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
+| `email-webhooks` | sig | Receives Resend delivery event webhooks and updates email_logs. |
+| `ses-webhook` | sig | Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries. |
+
+**Messaging**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `messaging-api` | JWT / secret | WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics. |
+| `messaging-processor` | cron | Cron-invoked processor that advances scheduled WhatsApp campaigns per-recipient. |
+
+**Pinterest**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `pinterest-api` | JWT | Pinterest pin import and OAuth board browsing for moodboard population. |
+
+**Notifications**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `notification-dispatcher` | JWT / secret | Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry. |
+
+**Recommendations**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `recommendations-api` | JWT / secret | Collaborative filtering interaction tracking, recommendations, and analytics. |
+
+**SEO**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `seo-api` | JWT / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
+
+**Flows**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `flow-engine` | JWT | Execute, test, or event-trigger workflow automations by walking the xyflow graph. |
+| `flow-scheduler-cron` | cron | Per-minute cron that fires scheduled flows whose cron expression matches current UTC time. |
+| `flow-webhook` | token | Receives external HTTP requests and routes them to the matching webhook-triggered flow. |
+
+**Alerts**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `check-material-alerts` | JWT | Daily cron (08:00 UTC) that matches new products against active saved searches and sends bell notifications. |
+
+**Monitoring Crons**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `job-research-cron` | cron | Hourly cron (at :45) that refreshes due internal job-research tracked jobs via MIVAA. |
+| `job-research-digest-cron` | cron | Hourly cron (at :05) that dispatches consolidated daily job-research digest emails per user. |
+| `llm-mention-probe-cron` | cron | Daily cron (03:00 UTC) that runs LLM visibility probes for tracked mention subjects. |
+| `mention-monitoring-cron` | cron | Hourly cron that refreshes due internal mention-monitoring subjects via MIVAA. |
+| `price-monitoring-cron` | cron | Hourly cron that refreshes due internal price-monitoring tracked queries via MIVAA. |
+
+**Background Agents**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `background-agent-runner` | JWT / secret | Execute a registered background agent by agent_id |
+
+**Crons**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `agent-scheduler-cron` | cron | Every-minute cron: dispatch background agents whose cron schedule is due |
+| `ai-pricing-updater` | cron | Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables |
+| `auto-recovery-cron` | cron | Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs |
+| `campaign-processor` | secret | Every-minute cron: start scheduled campaigns and drip-send emails to recipients |
+| `job-cleanup-cron` | cron | Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs |
+| `storage-orphan-cleanup-cron` | cron | Nightly cron (04:00 UTC): delete storage objects with no live DB reference |
+
+**Admin**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `batch-update-sessions` | JWT | Batch-update field_mappings on multiple scraping_sessions |
+| `health-check` | JWT | Check liveness and key validity of all AI providers and external services |
+| `platform-secrets-admin` | JWT | CRUD for the platform_secrets key store (admin/super_admin only) |
+| `reset-platform` | JWT / secret | Destructively clear all user-generated data while preserving system config |
+| `seed-sheet-references` | secret | One-shot admin tool: generate and upload reference preview images for all sheet types |
+| `trigger-factory-enrichment` | JWT | Propagate factory fields within a scope and queue a factory-enrichment agent if needed |
+
+**Internal**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
 
 ### 1.1 AI Agents & Chat
 

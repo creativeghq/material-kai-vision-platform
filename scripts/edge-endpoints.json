@@ -1,0 +1,5403 @@
+[
+  {
+    "name": "agent-chat",
+    "tag": "AI Agents",
+    "summary": "Multi-agent LangGraph chat with tool execution and SSE streaming",
+    "description": "Stateful LLM chat endpoint supporting three agents (kai, interior-designer, demo). Uses LangGraph StateGraph for multi-step tool execution. Supports multimodal input (data-URL images), long-term memory, toolkit-based tool selection, and optional partner API key access. Returns SSE stream of JSON chunks; content-type text/event-stream.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": "docs/api/agent-chat-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Conversation history array",
+          "default": []
+        },
+        "agentId": {
+          "type": "string",
+          "enum": [
+            "kai",
+            "interior-designer",
+            "demo"
+          ],
+          "description": "Agent to invoke; legacy aliases search/insights/seo resolve to kai",
+          "default": "kai"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "User-attached images as data URLs (data:image/jpeg;base64,...) or HTTP URLs",
+          "default": []
+        },
+        "conversation_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "Supabase conversation ID; used to post background task results back"
+        },
+        "pinned_material_images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Catalog product image URLs pinned for Gemini multi-reference generation",
+          "default": []
+        },
+        "generation_mode": {
+          "type": "string",
+          "nullable": true,
+          "description": "Optional generation mode hint passed through to generation tools"
+        },
+        "selected_toolkits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "description": "Active toolkit cluster IDs; null means Core tools only plus load_toolkit meta-tool"
+        },
+        "user_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "Only honored when the caller authenticates with service-role/admin key (server-to-server act-on-behalf). Ignored for user-JWT and partner-key calls."
+        }
+      },
+      "required": [
+        "messages"
+      ]
+    },
+    "response": {
+      "streaming": true,
+      "content_type": "text/event-stream",
+      "chunk_types": [
+        "tool_call",
+        "tool_result",
+        "tool_error",
+        "assistant_thinking",
+        "iteration",
+        "tool_call_ids",
+        "text",
+        "search_spec",
+        "inspiration_analysis",
+        "sheet_canvas_open",
+        "sheet_pdf_ready",
+        "sheet_created",
+        "job_search_created",
+        "job_search_updated",
+        "job_searches_list",
+        "job_listings_feed",
+        "job_digest_preview",
+        "mention_summary",
+        "llm_visibility_result",
+        "mention_feed",
+        "mention_tracking_started"
+      ],
+      "non_streaming_fields": {
+        "text": {
+          "type": "string"
+        },
+        "materialResults": {
+          "type": "object",
+          "properties": {
+            "products": {
+              "type": "array"
+            }
+          }
+        },
+        "toolResults": {
+          "type": "array"
+        },
+        "generationJob": {
+          "type": "object",
+          "nullable": true
+        },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "inputTokens": {
+              "type": "integer"
+            },
+            "outputTokens": {
+              "type": "integer"
+            },
+            "totalTokens": {
+              "type": "integer"
+            },
+            "modelName": {
+              "type": "string"
+            },
+            "turnCount": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "agent-scheduler-cron",
+    "tag": "Crons",
+    "summary": "Every-minute cron: dispatch background agents whose cron schedule is due",
+    "description": "Runs every minute via pg_cron. Evaluates all enabled background_agents with trigger_type='cron', parses their cron expression, and dispatches due agents to background-agent-runner. Includes concurrency guard to skip agents with an in-flight run.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, checked, triggered, results: [{ agent_id, name, triggered, run_id?, error? }] }"
+  },
+  {
+    "name": "ai-pricing-updater",
+    "tag": "Crons",
+    "summary": "Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables",
+    "description": "Reads ai_model_pricing rows with auto_update_enabled=true, compares current prices against a hardcoded per-provider reference (Anthropic, OpenAI, Voyage, Google, Firecrawl), updates changed rows, and writes an audit row to ai_pricing_update_logs. Accepts optional POST body to force-update or filter by provider.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "force_update",
+        "type": "boolean",
+        "required": false,
+        "desc": "Ignore auto_update_enabled flag; check all rows"
+      },
+      {
+        "name": "provider",
+        "type": "string",
+        "required": false,
+        "desc": "Limit update to one provider (anthropic, openai, voyage, google, firecrawl)"
+      }
+    ],
+    "response": "{ success, message, stats: { models_checked, models_updated, models_skipped, models_failed, results }, timestamp }"
+  },
+  {
+    "name": "ai-rerank",
+    "tag": "Search",
+    "summary": "Re-rank search results using Claude LLM",
+    "description": "Takes a query and a list of search results, uses Claude to semantically re-rank them by relevance. Optionally returns per-result explanations. Supports model selection between opus and haiku tiers.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/api/ai-rerank-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "query": {
+          "type": "string",
+          "description": "The search query string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Array of SearchResult objects to re-rank"
+        },
+        "maxResults": {
+          "type": "integer",
+          "description": "Maximum number of results to return after re-ranking"
+        },
+        "includeExplanations": {
+          "type": "boolean",
+          "description": "Whether to include per-result relevance explanations"
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "claude-opus-4-7",
+            "claude-haiku-4-5"
+          ],
+          "description": "Claude model to use for re-ranking"
+        }
+      },
+      "required": [
+        "query",
+        "results"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "rerankedResults": {
+          "type": "array"
+        },
+        "explanations": {
+          "type": "array",
+          "description": "Present when includeExplanations=true"
+        },
+        "processingTimeMs": {
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "number"
+        },
+        "usage": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "name": "auto-recovery-cron",
+    "tag": "Crons",
+    "summary": "Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs",
+    "description": "Scans background_jobs, scraping_sessions, and agent_runs for heartbeat-stale entries. Atomically claims each and re-dispatches to MIVAA or background-agent-runner. Terminally-failed exhausted PDF jobs are marked failed and HuggingFace endpoints are scaled to zero as a cost watchdog.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, totalStuck, exhausted_failed, recovered, failed, results }"
+  },
+  {
+    "name": "background-agent-runner",
+    "tag": "Background Agents",
+    "summary": "Execute a registered background agent by agent_id",
+    "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "run_agent",
+        "summary": "Run or resume a background agent",
+        "params": [
+          {
+            "name": "agent_id",
+            "type": "string",
+            "required": true,
+            "desc": "ID from background_agents table"
+          },
+          {
+            "name": "run_id",
+            "type": "string",
+            "required": false,
+            "desc": "Resume or update an existing pending run"
+          },
+          {
+            "name": "input_data",
+            "type": "object",
+            "required": false,
+            "desc": "Override or augment agent config input"
+          },
+          {
+            "name": "triggered_by",
+            "type": "string",
+            "required": false,
+            "desc": "cron | event | manual | chain | api"
+          }
+        ],
+        "response": "{ success, run_id, status, duration_ms, output? }"
+      },
+      {
+        "name": "get_catalog",
+        "summary": "Return registered agent type catalog (GET ?catalog=1)",
+        "params": [],
+        "response": "{ catalog: Record<string, AgentTypeDefinition> }"
+      }
+    ],
+    "request": [
+      {
+        "name": "agent_id",
+        "type": "string",
+        "required": true,
+        "desc": "ID from background_agents table"
+      },
+      {
+        "name": "run_id",
+        "type": "string",
+        "required": false,
+        "desc": "Resume an existing pending run"
+      },
+      {
+        "name": "input_data",
+        "type": "object",
+        "required": false,
+        "desc": "Override or augment config input"
+      },
+      {
+        "name": "triggered_by",
+        "type": "string",
+        "required": false,
+        "desc": "cron | event | manual | chain | api"
+      }
+    ],
+    "response": "{ success, run_id, status, duration_ms, output? }"
+  },
+  {
+    "name": "batch-update-sessions",
+    "tag": "Admin",
+    "summary": "Batch-update field_mappings on multiple scraping_sessions",
+    "description": "Authenticated (any valid JWT). Accepts a list of scraping session IDs and a fieldMappings object, then applies the same mapping to all matching scraping_sessions rows in a single UPDATE.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "sessionIds",
+        "type": "string[]",
+        "required": true,
+        "desc": "Array of scraping_sessions UUIDs to update"
+      },
+      {
+        "name": "fieldMappings",
+        "type": "object",
+        "required": true,
+        "desc": "Field mapping config to write to field_mappings column"
+      }
+    ],
+    "response": "{ success, updated, sessionIds: string[] }"
+  },
+  {
+    "name": "campaign-processor",
+    "tag": "Crons",
+    "summary": "Every-minute cron: start scheduled campaigns and drip-send emails to recipients",
+    "description": "Transitions campaigns from status='scheduled' to 'sending' when their scheduled_at has elapsed. Then processes up to 8 pending recipients per campaign per tick by calling the email-api edge function. Marks campaigns complete (sent or partial_failure) when all recipients are exhausted.",
+    "security": [
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, processed, scheduledCampaigns, sendingCampaigns }"
+  },
+  {
+    "name": "canonicalize-attributes",
+    "tag": "Internal",
+    "summary": "Proxy product attribute canonicalization to MIVAA facet service",
+    "description": "Internal-only thin proxy called by background agents (material-tagger, product-enrichment) to canonicalize raw product attributes through MIVAA's POST /api/admin/facets/canonicalize. Keeps MIVAA credentials in one place so background agents do not need to carry them. No auth enforced at the edge layer — network-level restriction applies.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "description": "Optional — enables diff-before-canonicalize in MIVAA"
+        },
+        "raw_attributes": {
+          "type": "object",
+          "description": "Record of raw attribute key→value pairs to canonicalize"
+        },
+        "source": {
+          "type": "string",
+          "description": "Caller identifier e.g. 'agent_material_tagger'"
+        }
+      },
+      "required": [
+        "raw_attributes",
+        "source"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "attributes": {
+          "type": "object",
+          "description": "Canonicalized attribute map"
+        },
+        "attributes_raw": {
+          "type": "object",
+          "description": "Record<string, string[]> of every raw value seen"
+        },
+        "resolutions_count": {
+          "type": "integer"
+        },
+        "actions_by_type": {
+          "type": "object",
+          "description": "Counts by resolution action type"
+        }
+      }
+    }
+  },
+  {
+    "name": "catalog-access",
+    "tag": "Catalogs",
+    "summary": "Public email-gate for shared catalog pages (/c/:slug)",
+    "description": "Handles access requests, token verification, public metadata, and view/download tracking for published catalogs. No authentication header required; uses service role internally.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "public_meta",
+        "summary": "Return title, subtitle, cover image and owner branding for the gate landing page",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          }
+        ],
+        "response": "{title, subtitle, cover_image_url, branding:{logo_url,company_name}}"
+      },
+      {
+        "name": "request",
+        "summary": "Verify email eligibility and mint a 30-day cookie token if matched",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "required": true,
+            "desc": "Visitor email address"
+          }
+        ],
+        "response": "{granted_access, token, expires_at, match_kind, access_log_id}"
+      },
+      {
+        "name": "verify",
+        "summary": "Validate an existing cookie token and return the full catalog payload",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          },
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "30-day cookie token from request action"
+          }
+        ],
+        "response": "{granted_access, email, catalog:{id,slug,title,subtitle,description,cover_data,body_data,back_cover_data,pdf_url}, branding}"
+      },
+      {
+        "name": "track_view",
+        "summary": "Record a page_view event for analytics; increments view counter",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          },
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Valid cookie token"
+          },
+          {
+            "name": "metadata",
+            "type": "object",
+            "required": false,
+            "desc": "Optional extra event metadata"
+          }
+        ],
+        "response": "{tracked, event_type}"
+      },
+      {
+        "name": "track_download",
+        "summary": "Record a pdf_download event for analytics",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          },
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Valid cookie token"
+          },
+          {
+            "name": "metadata",
+            "type": "object",
+            "required": false,
+            "desc": "Optional extra event metadata"
+          }
+        ],
+        "response": "{tracked, event_type}"
+      }
+    ]
+  },
+  {
+    "name": "catalog-extract-from-pdfs",
+    "tag": "Catalogs",
+    "summary": "Claude Sonnet vision pass over source PDFs to find materials matching a query",
+    "description": "Sends one or more admin-uploaded source PDFs to Claude Sonnet 4.6 with tool-use to extract candidate materials matching a free-form query. Returns candidates with name, description, price, specs, bbox, and a rasterized image URL.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "catalog_id",
+        "type": "string",
+        "required": true,
+        "desc": "Target catalog ID (for cost logging)"
+      },
+      {
+        "name": "source_pdf_ids",
+        "type": "string[]",
+        "required": true,
+        "desc": "IDs of catalog_source_pdfs rows to search"
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "required": true,
+        "desc": "Free-form search query describing desired materials"
+      },
+      {
+        "name": "max_results",
+        "type": "number",
+        "required": false,
+        "desc": "Max candidates to return (default 12, max 40)"
+      },
+      {
+        "name": "caller_user_id",
+        "type": "string",
+        "required": false,
+        "desc": "User ID for ai_usage_logs cost attribution"
+      }
+    ],
+    "response": "{success, candidates:[{source_pdf_id,page_no,name,description,image_url,bbox,price,currency,specs}], partial_errors?}"
+  },
+  {
+    "name": "catalog-image-search",
+    "tag": "Catalogs",
+    "summary": "Find candidate images for a catalog material via platform DB then web fallback",
+    "description": "Searches the platform product DB (via MIVAA multi-vector search) first, then falls back to DataForSEO Google Images SERP. Returns up to N image candidates tagged with source ('db' or 'web') for admin approval.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "query",
+        "type": "string",
+        "required": true,
+        "desc": "Material name / search query"
+      },
+      {
+        "name": "max_candidates",
+        "type": "number",
+        "required": false,
+        "desc": "Max results (default 6, max 12)"
+      },
+      {
+        "name": "search_db_first",
+        "type": "boolean",
+        "required": false,
+        "desc": "Whether to query platform DB before web (default true)"
+      },
+      {
+        "name": "caller_user_id",
+        "type": "string",
+        "required": false,
+        "desc": "User ID for logging"
+      }
+    ],
+    "response": "{success, candidates:[{source,thumb_url,full_url,title,source_metadata}], db_hits, web_hits}"
+  },
+  {
+    "name": "catalog-render-pdf-page",
+    "tag": "Catalogs",
+    "summary": "Proxy to MIVAA rasterize-pdf-page; returns signed URL to a PNG crop of a PDF page",
+    "description": "Thin edge proxy that forwards a rasterization request to MIVAA's internal endpoint using the cron secret. Accepts an optional normalized [0..1] bbox to crop a region of the page. Called internally by catalog-extract-from-pdfs and catalog-translate-pdf.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "source_pdf_id",
+        "type": "string",
+        "required": true,
+        "desc": "catalog_source_pdfs row ID"
+      },
+      {
+        "name": "page_no",
+        "type": "number",
+        "required": true,
+        "desc": "1-based page number to rasterize"
+      },
+      {
+        "name": "bbox",
+        "type": "object",
+        "required": false,
+        "desc": "Normalized [0..1] crop region {x1,y1,x2,y2}"
+      },
+      {
+        "name": "dpi",
+        "type": "number",
+        "required": false,
+        "desc": "Output DPI (default 150)"
+      },
+      {
+        "name": "target_path",
+        "type": "string",
+        "required": false,
+        "desc": "Override storage path for the output PNG"
+      },
+      {
+        "name": "signed_url_ttl_seconds",
+        "type": "number",
+        "required": false,
+        "desc": "Signed URL TTL in seconds"
+      }
+    ],
+    "response": "{success, image_url, storage_path, width, height}"
+  },
+  {
+    "name": "catalog-send-to-customers",
+    "tag": "Catalogs",
+    "summary": "Admin sends a published catalog to CRM-category recipients via email",
+    "description": "Resolves recipients from CRM categories, optionally writes catalog_email_grants for each, then dispatches emails via email-api using the catalog_send.recipient template. Preview mode returns recipient list without sending.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "preview",
+        "summary": "Resolve recipient list from CRM categories without sending any emails",
+        "params": [
+          {
+            "name": "catalog_id",
+            "type": "string",
+            "required": true,
+            "desc": "Published catalog ID"
+          },
+          {
+            "name": "category_ids",
+            "type": "string[]",
+            "required": true,
+            "desc": "CRM category IDs to resolve recipients from"
+          }
+        ],
+        "response": "{success, recipients_count, recipients:[{email,member_kind,user_id,crm_contact_id,crm_company_id,display_name,category_ids,category_slugs}]}"
+      },
+      {
+        "name": "send",
+        "summary": "Dispatch catalog emails to all resolved recipients and log each send",
+        "params": [
+          {
+            "name": "catalog_id",
+            "type": "string",
+            "required": true,
+            "desc": "Published catalog ID"
+          },
+          {
+            "name": "category_ids",
+            "type": "string[]",
+            "required": true,
+            "desc": "CRM category IDs to resolve recipients from"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": false,
+            "desc": "Override email subject line"
+          },
+          {
+            "name": "message_body",
+            "type": "string",
+            "required": false,
+            "desc": "Optional personal message included in template"
+          },
+          {
+            "name": "ensure_grants",
+            "type": "boolean",
+            "required": false,
+            "desc": "Write catalog_email_grants for every recipient before sending"
+          }
+        ],
+        "response": "{success, send_batch_id, recipients_count, sent_count, failed_count}"
+      }
+    ]
+  },
+  {
+    "name": "catalog-translate-pdf",
+    "tag": "Catalogs",
+    "summary": "Whole-PDF vision pass to populate a catalog's body_data from a source PDF",
+    "description": "Sends an entire source PDF to Claude Sonnet 4.6 via tool-use to produce sections and materials, then merges the result into the target catalog's body_data. Supports layout-preserving (page-per-section) and restructured (category-grouped) modes.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "source_pdf_id",
+        "type": "string",
+        "required": true,
+        "desc": "catalog_source_pdfs row ID to translate"
+      },
+      {
+        "name": "target_catalog_id",
+        "type": "string",
+        "required": true,
+        "desc": "presentation_catalogs row to write body_data into"
+      },
+      {
+        "name": "preserve_original_layout",
+        "type": "boolean",
+        "required": false,
+        "desc": "One section per PDF page when true; category-grouped when false (default)"
+      },
+      {
+        "name": "caller_user_id",
+        "type": "string",
+        "required": false,
+        "desc": "User ID for ai_usage_logs cost attribution"
+      }
+    ],
+    "response": "{success, sections_count, materials_count}"
+  },
+  {
+    "name": "check-material-alerts",
+    "tag": "Alerts",
+    "summary": "Daily cron (08:00 UTC) that matches new products against active saved searches and sends bell notifications.",
+    "description": "Can also be triggered manually via POST (no secret required — uses service-role JWT from pg_cron Authorization header). For each active saved_search not yet due to re-alert, queries products created since last_recommendation_sent_at whose name or description matches the saved query, inserts deduped material_alerts rows, and writes user_notifications.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{processed: number, new_alerts: number, timestamp: string}"
+  },
+  {
+    "name": "crawl-user-website",
+    "tag": "Scraping",
+    "summary": "Sitemap-driven indexer for SEO inter-linking; preview or full crawl mode",
+    "description": "Discovers the sitemap via robots.txt or well-known paths, then either samples 5 URLs (mode=preview) or fully crawls up to max_pages URLs (mode=full), scraping each with Firecrawl and embedding the content via Voyage for SEO inter-linking. Accepts JWT or cron secret.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "website_id",
+        "type": "string",
+        "required": true,
+        "desc": "user_websites row ID to crawl"
+      },
+      {
+        "name": "mode",
+        "type": "string",
+        "required": false,
+        "desc": "preview (5-URL sample, no full index) or full (default)"
+      }
+    ],
+    "response": "{success, mode, data:{sitemap_url?,pages_discovered,pages_indexed?,capped_at?,sample?,ok,error?}}"
+  },
+  {
+    "name": "crm-api",
+    "tag": "CRM",
+    "summary": "REST CRM resource router for companies, contacts, users, and Stripe.",
+    "description": "Path-routed REST API dispatching to four resource handlers: /companies (GET/POST/PATCH/DELETE for company CRUD, requires admin or factory role), /contacts (contact CRUD), /users (user profile CRUD), /stripe (Stripe customer/subscription operations). Each handler performs its own auth and RLS enforcement.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST",
+      "PATCH",
+      "DELETE"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "email-api",
+    "tag": "Email",
+    "summary": "Action-discriminated email sending, domain management, logs, and analytics via Resend.",
+    "description": "Accepts a JSON body with an `action` field (or path suffix) to select the operation. Requires `RESEND_API_KEY`; returns 503 with `provider_not_configured` when absent. Supports optional React Email templates resolved by slug from `email_templates`.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET"
+    ],
+    "actions": [
+      {
+        "name": "send",
+        "summary": "Send a transactional/marketing email via Resend, with optional template.",
+        "params": [
+          {
+            "name": "to",
+            "type": "string | string[]",
+            "required": true,
+            "desc": "Recipient address(es)"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true,
+            "desc": "Email subject (may be overridden by template)"
+          },
+          {
+            "name": "html",
+            "type": "string",
+            "required": false,
+            "desc": "HTML body (required if no templateSlug and no text)"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": false,
+            "desc": "Plain-text body"
+          },
+          {
+            "name": "templateSlug",
+            "type": "string",
+            "required": false,
+            "desc": "Slug of an active email_templates row"
+          },
+          {
+            "name": "variables",
+            "type": "object",
+            "required": false,
+            "desc": "Template variable substitutions"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "Sender address (defaults to email_settings.default_from_email)"
+          },
+          {
+            "name": "fromName",
+            "type": "string",
+            "required": false,
+            "desc": "Sender display name"
+          },
+          {
+            "name": "cc",
+            "type": "string[]",
+            "required": false,
+            "desc": "CC addresses"
+          },
+          {
+            "name": "bcc",
+            "type": "string[]",
+            "required": false,
+            "desc": "BCC addresses"
+          },
+          {
+            "name": "replyTo",
+            "type": "string",
+            "required": false,
+            "desc": "Reply-To address"
+          },
+          {
+            "name": "emailType",
+            "type": "'transactional'|'marketing'|'notification'",
+            "required": false,
+            "desc": "Email category tag"
+          },
+          {
+            "name": "attachments",
+            "type": "Array<{filename:string,content:string}>",
+            "required": false,
+            "desc": "Base64-encoded attachments (no data: prefix)"
+          }
+        ],
+        "response": "{success:true, messageId:string, logId:string}"
+      },
+      {
+        "name": "domains",
+        "summary": "List configured sending domains.",
+        "params": [],
+        "response": "{success:true, domains: Domain[]}"
+      },
+      {
+        "name": "add-domain",
+        "summary": "Register a new sending domain (admin only).",
+        "params": [
+          {
+            "name": "domain",
+            "type": "string",
+            "required": true,
+            "desc": "Domain name to add"
+          }
+        ],
+        "response": "{success:true, domain: Domain, message:string}"
+      },
+      {
+        "name": "mark-domain-verified",
+        "summary": "Mark a domain as verified after DNS confirmation (admin only).",
+        "params": [
+          {
+            "name": "domain",
+            "type": "string",
+            "required": true,
+            "desc": "Domain name to verify"
+          }
+        ],
+        "response": "{success:true}"
+      },
+      {
+        "name": "logs",
+        "summary": "Retrieve email send logs with optional status/type filters.",
+        "params": [
+          {
+            "name": "status",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by send status"
+          },
+          {
+            "name": "emailType",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by email type"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Max rows (1–1000, default 50)"
+          }
+        ],
+        "response": "{success:true, logs: EmailLog[]}"
+      },
+      {
+        "name": "analytics",
+        "summary": "Return aggregated email delivery/engagement stats for a date range.",
+        "params": [
+          {
+            "name": "dateRange",
+            "type": "{start:string,end:string}",
+            "required": false,
+            "desc": "ISO date range (POST body) or fromDate/toDate query params (GET)"
+          }
+        ],
+        "response": "{success:true, totalSent, totalDelivered, totalBounced, deliveryRate, bounceRate, openRate, clickRate, dailyData}"
+      },
+      {
+        "name": "sync-domains",
+        "summary": "Pull domain list from Resend and upsert into email_domains (admin only).",
+        "params": [],
+        "response": "{success:true, added:number, updated:number, total:number}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: send, domains, add-domain, mark-domain-verified, logs, analytics, sync-domains"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "email-webhooks",
+    "tag": "Email",
+    "summary": "Receives Resend delivery event webhooks and updates email_logs.",
+    "description": "Accepts POST from Resend (Svix-signed). Verifies HMAC-SHA256 signature using `RESEND_WEBHOOK_SECRET` and rejects requests with missing or invalid Svix headers. Maps Resend event types (sent, delivered, bounced, complained, opened, clicked) to internal `email_events` rows and updates `email_logs` status accordingly.",
+    "security": [
+      "svixSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "type",
+        "type": "string",
+        "required": true,
+        "desc": "Resend event type, e.g. email.delivered"
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "desc": "ISO timestamp of the event"
+      },
+      {
+        "name": "data",
+        "type": "object",
+        "required": true,
+        "desc": "Event data including email_id, from, to, subject; bounce/click details when applicable"
+      }
+    ],
+    "response": "{success:true, event_type:string}"
+  },
+  {
+    "name": "field-templates",
+    "tag": "Data Import",
+    "summary": "CRUD API for reusable XML field-mapping templates scoped to a workspace.",
+    "description": "Requires Supabase JWT. Supports GET (list global + workspace templates), POST (create), POST /:id/use (increment usage_count via RPC), and DELETE /:id.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST",
+      "DELETE"
+    ],
+    "actions": [
+      {
+        "name": "list",
+        "summary": "GET /field-templates?workspace_id=<id> — return workspace + global templates ordered by usage.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (query param)",
+            "required": true,
+            "desc": "Filter templates by workspace or global."
+          }
+        ],
+        "response": "[{id, workspace_id, name, description, fields, usage_count, is_global, ...}]"
+      },
+      {
+        "name": "create",
+        "summary": "POST /field-templates — create a new field mapping template for a workspace.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Owning workspace UUID."
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Template display name."
+          },
+          {
+            "name": "fields",
+            "type": "object",
+            "required": true,
+            "desc": "Field mapping definition (xml_tag -> target)."
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "desc": "Optional description."
+          }
+        ],
+        "response": "{id, workspace_id, name, description, fields, created_by, ...}"
+      },
+      {
+        "name": "use",
+        "summary": "POST /field-templates/:id/use — increment usage_count for analytics.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string (path)",
+            "required": true,
+            "desc": "Template UUID."
+          }
+        ],
+        "response": "{success: boolean}"
+      },
+      {
+        "name": "delete",
+        "summary": "DELETE /field-templates/:id — remove a template.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string (path)",
+            "required": true,
+            "desc": "Template UUID."
+          }
+        ],
+        "response": "{success: boolean}"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "finance-digest-aggregate",
+    "tag": "Finance",
+    "summary": "Send finance digest emails and dispatch quote follow-up bell notifications",
+    "description": "Cron mode (invoked by the Finance digest flow): sends scheduled digest emails with AR/AP aging, cash-flow forecast, P&L, and top-party tables to configured recipients, and dispatches bell notifications for idle or due-scheduled quotes. Now mode (admin JWT): sends an on-demand digest for a specific workspace.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "mode",
+        "type": "string ('cron'|'now')",
+        "required": true,
+        "desc": "'cron' for scheduled invocation from flow-engine; 'now' for admin-triggered send."
+      },
+      {
+        "name": "job",
+        "type": "string ('digest'|'followups')",
+        "required": false,
+        "desc": "Narrow cron run to one job; omit to run both."
+      },
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "now mode: target workspace; inferred from caller's membership if omitted."
+      },
+      {
+        "name": "recipients_override",
+        "type": "string[]",
+        "required": false,
+        "desc": "now mode: override recipient list (skips last_sent stamp)."
+      }
+    ],
+    "response": "{ok, digest?: {processed, dispatched, results}, followups?: {dispatched, skipped, queue_size}, recipients_attempted?, recipients_delivered?, errors?}"
+  },
+  {
+    "name": "finance-fiscal-offline-recovery",
+    "tag": "Finance",
+    "summary": "Re-query connector for pending MARK on offline-accepted fiscal documents",
+    "description": "Cron function that finds invoices and credit notes with fiscal_status='offline' (accepted by the connector while AADE was down) and calls fetchTransmitted on the connector to stamp the final MARK. Safe to run continuously; no-ops when nothing is pending.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{ok, invoices_checked, invoices_recovered, credit_notes_checked, credit_notes_recovered}"
+  },
+  {
+    "name": "finance-inbound-sync",
+    "tag": "Finance",
+    "summary": "Pull inbound documents from myDATA (RequestDocs) for configured workspaces",
+    "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{ok, workspaces, results: [{workspaceId, found, upserted, new_watermark} | {workspaceId, skipped|error}]}"
+  },
+  {
+    "name": "finance-invoice-pdf",
+    "tag": "Finance",
+    "summary": "Render a legal invoice, credit note, or delivery note as a PDF",
+    "description": "Generates an A4 PDF for an invoice, credit note, or delivery note using pdf-lib with embedded Noto Sans for Greek/Latin rendering. Caches the PDF in pdf-documents storage and returns a 7-day signed URL. Supports GR/EN language selection per-document.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "invoice_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Invoice to render. Provide one of: invoice_id, credit_note_id, delivery_note_id."
+      },
+      {
+        "name": "credit_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Credit note to render."
+      },
+      {
+        "name": "delivery_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Delivery note to render."
+      },
+      {
+        "name": "regenerate",
+        "type": "boolean",
+        "required": false,
+        "desc": "Force re-render even if a cached PDF exists."
+      }
+    ],
+    "response": "{ok, pdf_url, pdf_storage_path, cached?}"
+  },
+  {
+    "name": "finance-issue-invoice",
+    "tag": "Finance",
+    "summary": "Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note",
+    "description": "Creates a draft invoice from a quote (idempotent), optionally issues it, and optionally transmits it to the workspace's legal_invoice connector (Novus → myDATA). Also handles credit-note submission (myDATA 5.1), delivery-note submission (9.3), and POS/IRIS receipt hold + completion (Law 5155). Costs 2 credits per myDATA transmission; root workspace transmits free.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "quote_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Create/find invoice from this quote. Provide this OR invoice_id."
+      },
+      {
+        "name": "invoice_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Operate on an existing invoice directly."
+      },
+      {
+        "name": "credit_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Submit a credit note (myDATA 5.1) to the fiscal connector."
+      },
+      {
+        "name": "delivery_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Submit a delivery note (myDATA 9.3) to the fiscal connector."
+      },
+      {
+        "name": "issue_now",
+        "type": "boolean",
+        "required": false,
+        "desc": "Flip invoice from draft → issued status."
+      },
+      {
+        "name": "submit_fiscal",
+        "type": "boolean",
+        "required": false,
+        "desc": "Transmit to the workspace's legal_invoice connector."
+      },
+      {
+        "name": "skip_signature",
+        "type": "boolean",
+        "required": false,
+        "desc": "Skip provider digital-signature step (Novus ?skipSignature=true)."
+      },
+      {
+        "name": "fiscal_overrides",
+        "type": "object (FiscalOverrides)",
+        "required": false,
+        "desc": "Per-call myDATA overrides: invoice type, series/aa, income classification."
+      },
+      {
+        "name": "pos_payment",
+        "type": "object {terminal_id, pos_nsp_id, payment_type?}",
+        "required": false,
+        "desc": "Issue as card/IRIS receipt on a registered EFT-POS terminal (Law 5155)."
+      },
+      {
+        "name": "pos_complete",
+        "type": "object {pos_signature_id?, invoice_id?, transaction_id, payment_amount?, tip_amount?}",
+        "required": false,
+        "desc": "Finalize a held POS/IRIS receipt after terminal charge succeeded."
+      }
+    ],
+    "response": "{ok, invoice_id, invoice, fiscal: {ok, status, mark, uid, qrUrl, ...} | null}"
+  },
+  {
+    "name": "finance-pay-invoice",
+    "tag": "Finance",
+    "summary": "Create a Stripe Checkout session or pay-link for an invoice",
+    "description": "Two modes: authenticated admin/finance mints a pay_token and/or creates a Stripe Checkout session for an invoice; public/unauthenticated path resolves a pay_token and creates a Checkout session for the buyer. Routes funds to the workspace's connected Stripe account when configured.",
+    "security": [
+      "supabaseJwt",
+      "queryToken",
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "invoice_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Admin mode: invoice to pay. Requires JWT with finance role."
+      },
+      {
+        "name": "link_only",
+        "type": "boolean",
+        "required": false,
+        "desc": "Admin mode: mint/refresh pay_token + return public link without creating a Checkout session."
+      },
+      {
+        "name": "pay_token",
+        "type": "string",
+        "required": false,
+        "desc": "Public mode: token from the pay link (e.g. from /pay/:token URL)."
+      },
+      {
+        "name": "success_url",
+        "type": "string",
+        "required": false,
+        "desc": "Redirect URL on payment success."
+      },
+      {
+        "name": "cancel_url",
+        "type": "string",
+        "required": false,
+        "desc": "Redirect URL on payment cancellation."
+      }
+    ],
+    "response": "{ok, checkout_url, session_id, invoice_id, pay_link?, pay_token?, amount?, currency?, customer_display?}"
+  },
+  {
+    "name": "finance-send-invoice-email",
+    "tag": "Finance",
+    "summary": "Email an invoice to its customer with optional PDF attachment",
+    "description": "Resolves the recipient from the invoice's CRM company/contact, generates or reuses the invoice PDF, and dispatches via the email-api edge function. The 'to' field overrides automatic recipient resolution.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "invoice_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Invoice to email."
+      },
+      {
+        "name": "to",
+        "type": "string (email)",
+        "required": false,
+        "desc": "Override recipient email; defaults to CRM customer email on file."
+      }
+    ],
+    "response": "{ok, sent_to}"
+  },
+  {
+    "name": "finance-send-statement",
+    "tag": "Finance",
+    "summary": "Render and email a party account-statement PDF (ledger / Καρτέλα)",
+    "description": "Single mode: renders a chronological debit/credit ledger PDF for a CRM company or contact and emails it. Cron-batch mode: iterates all workspaces with auto_statement_enabled and sends each eligible party their statement according to the configured schedule. Customer-side statements include pay-by-card links for open invoices.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "mode",
+        "type": "string ('cron_batch')",
+        "required": false,
+        "desc": "Pass 'cron_batch' with x-cron-secret header to run the automated batch."
+      },
+      {
+        "name": "party_type",
+        "type": "string ('company'|'contact')",
+        "required": false,
+        "desc": "Single mode: party type. Required unless mode='cron_batch'."
+      },
+      {
+        "name": "party_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Single mode: CRM company or contact ID."
+      },
+      {
+        "name": "side",
+        "type": "string ('customer'|'supplier')",
+        "required": false,
+        "desc": "Ledger direction; inferred from party flags if omitted."
+      },
+      {
+        "name": "from",
+        "type": "string (date YYYY-MM-DD)",
+        "required": false,
+        "desc": "Period start; defaults to current year start."
+      },
+      {
+        "name": "to",
+        "type": "string (date YYYY-MM-DD)",
+        "required": false,
+        "desc": "Period end; defaults to current year end."
+      },
+      {
+        "name": "lang",
+        "type": "string ('el'|'en')",
+        "required": false,
+        "desc": "PDF/email language; inferred from workspace country if omitted."
+      },
+      {
+        "name": "email",
+        "type": "string (email)",
+        "required": false,
+        "desc": "Override recipient email."
+      },
+      {
+        "name": "dry_run",
+        "type": "boolean",
+        "required": false,
+        "desc": "Generate PDF but do not send email."
+      }
+    ],
+    "response": "{ok, email_sent_to, pdf_url, rows, closing_balance, lines, total_outstanding, note?}"
+  },
+  {
+    "name": "finance-storefront",
+    "tag": "Finance",
+    "summary": "Public online storefront: browse products and submit cart checkout",
+    "description": "Anonymous action-discriminated endpoint for the workspace's public mini-store (Oxygen 'Open Link' parity). 'meta' returns storefront config, 'products' returns published products with prices, 'checkout' validates the cart server-side, creates a draft retail receipt (myDATA 11.1), and returns a Stripe pay link. Requires the sales-finance module for checkout.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "meta",
+        "summary": "Return storefront config and workspace branding for a given slug",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace public slug."
+          }
+        ],
+        "response": "{ok, enabled, workspace_name?, headline?, subheadline?, accent?}"
+      },
+      {
+        "name": "products",
+        "summary": "List storefront-published products with gross prices",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace public slug."
+          }
+        ],
+        "response": "{ok, products: [{product_id, name, description, unit, item_type, price, currency, image_url}]}"
+      },
+      {
+        "name": "checkout",
+        "summary": "Submit cart, create draft retail receipt, return Stripe pay link",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace public slug."
+          },
+          {
+            "name": "items",
+            "type": "array [{product_id, qty}]",
+            "required": true,
+            "desc": "Cart line items; prices are always recomputed server-side."
+          },
+          {
+            "name": "customer",
+            "type": "object {name, email}",
+            "required": true,
+            "desc": "Buyer name and email (required)."
+          }
+        ],
+        "response": "{ok, invoice_id, pay_token, pay_url, total, currency}"
+      }
+    ]
+  },
+  {
+    "name": "firecrawl-webhook",
+    "tag": "Scraping",
+    "summary": "Receives async Firecrawl crawl callbacks and persists pages; triggers product creation on completion.",
+    "description": "Identified by session_id and crawl_id query parameters. On crawl.page events stores scraped pages in scraping_pages. On crawl.completed marks the session done and POSTs to MIVAA /api/scraping/process-session to create products, then triggers factory enrichment.",
+    "security": [
+      "queryToken"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "session_id",
+        "type": "string (query param)",
+        "required": true,
+        "desc": "UUID of the scraping_sessions row."
+      },
+      {
+        "name": "crawl_id",
+        "type": "string (query param)",
+        "required": false,
+        "desc": "Firecrawl crawl job ID."
+      },
+      {
+        "name": "webhook_secret",
+        "type": "string (query param)",
+        "required": false,
+        "desc": "Optional secret matching FIRECRAWL_WEBHOOK_SECRET env var."
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "required": true,
+        "desc": "Firecrawl event type: 'crawl.page' | 'crawl.completed' | 'crawl.failed'."
+      },
+      {
+        "name": "data",
+        "type": "array",
+        "required": false,
+        "desc": "Array of scraped page objects with url, markdown, and metadata."
+      }
+    ],
+    "response": "{ok: boolean, pages_received: number}"
+  },
+  {
+    "name": "flow-engine",
+    "tag": "Flows",
+    "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",
+    "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "flows-notification-system.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "execute-flow",
+        "summary": "Run a flow with provided trigger data; writes execution record to flow_runs.",
+        "params": [
+          {
+            "name": "flow_id",
+            "type": "string",
+            "required": true,
+            "desc": "UUID of the flow to execute."
+          },
+          {
+            "name": "trigger_data",
+            "type": "object",
+            "required": false,
+            "desc": "Arbitrary payload passed as trigger context into the graph."
+          }
+        ],
+        "response": "{success: boolean, data: {id: string, status: string, results: object}}"
+      },
+      {
+        "name": "test-flow",
+        "summary": "Dry-run a flow: resolves templates and evaluates conditions but does not fire actions.",
+        "params": [
+          {
+            "name": "flow_id",
+            "type": "string",
+            "required": true,
+            "desc": "UUID of the flow to test."
+          },
+          {
+            "name": "trigger_data",
+            "type": "object",
+            "required": false,
+            "desc": "Test trigger payload."
+          }
+        ],
+        "response": "{success: boolean, data: {id: string, status: string, results: object}}"
+      },
+      {
+        "name": "trigger-event",
+        "summary": "Auto-dispatch flows whose trigger_type matches the event type; used by DB triggers and internal services.",
+        "params": [
+          {
+            "name": "event_type",
+            "type": "string",
+            "required": true,
+            "desc": "TriggerType enum value (e.g. 'new_product', 'price_alert')."
+          },
+          {
+            "name": "event_data",
+            "type": "object",
+            "required": true,
+            "desc": "Event payload merged into trigger context."
+          }
+        ],
+        "response": "{success: boolean, triggered: number, results: array}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: execute-flow | test-flow | trigger-event"
+      }
+    ],
+    "response": "{success: boolean, data: object}"
+  },
+  {
+    "name": "flow-scheduler-cron",
+    "tag": "Flows",
+    "summary": "Per-minute cron that fires scheduled flows whose cron expression matches current UTC time.",
+    "description": "Validates x-cron-secret, fetches active flows with trigger_type='scheduled', evaluates their cron expression against the current time (with timezone support), and invokes flow-engine execute-flow for each due flow. Prevents double-firing with a 55-second last_run_at guard.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, checked: number, triggered: number, results: array}"
+  },
+  {
+    "name": "flow-webhook",
+    "tag": "Flows",
+    "summary": "Receives external HTTP requests and routes them to the matching webhook-triggered flow.",
+    "description": "Requires flow_id as a query parameter. Validates that the flow has trigger_type='webhook' and is active. Optionally verifies an X-Webhook-Secret header against the secret stored in the flow's trigger_config before delegating to flow-engine execute-flow.",
+    "security": [
+      "queryToken"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "flow_id",
+        "type": "string (query param)",
+        "required": true,
+        "desc": "UUID of the webhook-triggered flow to execute."
+      }
+    ],
+    "response": "{success: boolean, data: {flow_id: string, run_id: string, status: string}}"
+  },
+  {
+    "name": "generate-catalog-pdf",
+    "tag": "Catalogs",
+    "summary": "Render a presentation catalog to a PDF and store it in pdf-documents",
+    "description": "Builds a multi-page A3 PDF from the catalog's cover/body/back-cover data and selected template, uploads it to pdf-documents/catalog-output/{id}/, and updates presentation_catalogs with the storage path and a fresh signed URL.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "catalog_id",
+        "type": "string",
+        "required": true,
+        "desc": "presentation_catalogs row ID to render"
+      }
+    ],
+    "response": "{success, pdf_url, pdf_storage_path, page_count}"
+  },
+  {
+    "name": "generate-interior-gemini",
+    "tag": "AI Generation",
+    "summary": "Multi-mode interior design image generation (Gemini, FLUX, Grok)",
+    "description": "Generates interior design images across seven modes: text-to-image, image-edit, redesign, copy-style, floor-plan-render, floor-plan-text, and materials-selection-board. Routes to Gemini (flash 6cr / pro 15cr), FLUX Depth Pro (redesign/copy-style 20cr), or Grok Aurora (15cr) based on mode and model_tier. Accepts service-role key for server-to-server calls from agent-chat; otherwise requires user JWT.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/api/generate-interior-gemini-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "text-to-image",
+            "image-edit",
+            "redesign",
+            "copy-style",
+            "floor-plan-render",
+            "floor-plan-text",
+            "materials-selection-board"
+          ],
+          "description": "Generation mode; defaults to text-to-image"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Descriptive prompt for the generation"
+        },
+        "room_type": {
+          "type": "string",
+          "description": "Room type e.g. 'kitchen', 'bathroom'"
+        },
+        "style": {
+          "type": "string",
+          "description": "Design style e.g. 'minimalist', 'scandinavian'"
+        },
+        "sqm": {
+          "type": "number",
+          "description": "Room area in square metres"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "description": "Output image aspect ratio e.g. '16:9', '1:1'"
+        },
+        "model_tier": {
+          "type": "string",
+          "enum": [
+            "fast",
+            "pro",
+            "grok"
+          ],
+          "description": "Model quality tier: fast=Gemini flash (6cr), pro=Gemini pro (15cr), grok=Grok Aurora (15cr)"
+        },
+        "material_images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 14 catalog product image URLs for multi-reference Gemini generation"
+        },
+        "reference_image_url": {
+          "type": "string",
+          "description": "Source image URL for image-edit and floor-plan-render modes"
+        },
+        "edit_instruction": {
+          "type": "string",
+          "description": "Instruction describing what to change in image-edit mode"
+        },
+        "style_reference_url": {
+          "type": "string",
+          "description": "Second uploaded image: style/mood reference for copy-style and redesign modes"
+        },
+        "board_mode": {
+          "type": "string",
+          "enum": [
+            "presentation-board",
+            "selection-board",
+            "photorealistic-render"
+          ],
+          "description": "Sub-mode for materials-selection-board"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "board_mode": {
+          "type": "string",
+          "nullable": true
+        },
+        "model": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-interior-video-v2",
+    "tag": "AI Generation",
+    "summary": "Multi-model interior design video generation with async polling fallback",
+    "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), wan2.1-i2v-720p (12cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/api/generate-interior-video-v2-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "source_image_url": {
+          "type": "string",
+          "description": "Required. Public URL of the source interior image"
+        },
+        "video_type": {
+          "type": "string",
+          "enum": [
+            "walkthrough",
+            "product_spotlight",
+            "before_after",
+            "floorplan_flythrough",
+            "social_reel"
+          ],
+          "description": "Video type; drives auto model selection. Default: walkthrough",
+          "default": "walkthrough"
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "veo-2",
+            "kling-v3.0",
+            "wan2.1-i2v-720p",
+            "runway-gen4-turbo"
+          ],
+          "description": "Explicit model override; if omitted, auto-selected from video_type"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Optional generation prompt; model defaults apply if omitted"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ],
+          "default": "16:9"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "description": "Requested duration. veo-2 capped at 8s.",
+          "default": 8
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "before_image_url": {
+          "type": "string",
+          "description": "Before image for before_after video type (Replicate models)"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        },
+        "conversation_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_image_url"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "video_url": {
+          "type": "string",
+          "description": "Present when generation completed synchronously"
+        },
+        "model_used": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        },
+        "video_type": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "processing"
+          ]
+        },
+        "async_job": {
+          "type": "boolean",
+          "description": "True when generation is still in progress"
+        },
+        "prediction_id": {
+          "type": "string",
+          "description": "Replicate prediction ID for client-side polling"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-moodboard-sheet-pdf",
+    "tag": "Moodboard & Sheets",
+    "summary": "Render a moodboard presentation sheet or project client-view to PDF",
+    "description": "Accepts either a sheet_id (renders one of the 9 sheet types: material_board, color_palette, concept_board, lighting_plan, annotated_render, elevation_render_pair, ffe_schedule, area_breakdown, full_deck) or a client_view_id (renders a cross-moodboard project deck). Uploads to pdf-documents and returns a 7-day signed URL.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "sheet_id",
+        "type": "string",
+        "required": false,
+        "desc": "moodboard_presentation_sheets row ID; required when client_view_id is absent"
+      },
+      {
+        "name": "client_view_id",
+        "type": "string",
+        "required": false,
+        "desc": "project_client_views row ID; required when sheet_id is absent"
+      },
+      {
+        "name": "regenerate",
+        "type": "boolean",
+        "required": false,
+        "desc": "Force re-render even if a completed PDF already exists (client view path only)"
+      }
+    ],
+    "response": "{success, pdf_url, pdf_storage_path, page_count}"
+  },
+  {
+    "name": "generate-pbr-maps",
+    "tag": "AI Generation",
+    "summary": "Generate PBR texture maps (albedo, normal, roughness, metalness) from a product image",
+    "description": "Multi-strategy PBR generation: tries MIVAA SVBRDF extraction first, falls back to Replicate controlnet-normal for normal map, uses source as albedo as last resort. Updates product metadata JSONB with the resulting map URLs. Costs 8 credits. Accepts service-role key for agent-chat internal calls.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "description": "Required. Product ID to associate maps with"
+        },
+        "source_image_url": {
+          "type": "string",
+          "description": "Required. Public URL of the product image"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        },
+        "generate_tileable": {
+          "type": "boolean",
+          "description": "Whether to also generate a seamlessly tileable version"
+        }
+      },
+      "required": [
+        "product_id",
+        "source_image_url"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "pbr_maps": {
+          "type": "object",
+          "properties": {
+            "albedo_url": {
+              "type": "string"
+            },
+            "normal_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "roughness_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "metalness_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "tileable_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "partial",
+                "failed"
+              ]
+            }
+          }
+        },
+        "credits_used": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-quote-pdf",
+    "tag": "Quotes",
+    "summary": "Generate or return cached PDF for a quote",
+    "description": "Builds an A4 branded PDF for a quote using pdf-lib, uploads to pdf-documents storage, and returns a 7-day signed URL. Returns the cached PDF on subsequent calls unless regenerate is requested. Emits a flow event on successful generation.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "quote_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Quote to render as PDF."
+      },
+      {
+        "name": "regenerate",
+        "type": "boolean",
+        "required": false,
+        "desc": "Force re-render even if a cached completed PDF exists."
+      }
+    ],
+    "response": "{success, pdf_url, pdf_storage_path}"
+  },
+  {
+    "name": "generate-region-edit",
+    "tag": "AI Generation",
+    "summary": "Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora",
+    "description": "Accepts a room image URL, a binary PNG mask data URL (white=regenerate, black=keep), and a prompt. Calls Grok Aurora's /v1/images/edits endpoint with an explicit binary mask. Costs 20 credits. Accepts service-role key for agent-chat internal calls.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/api/generate-region-edit-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "image_url": {
+          "type": "string",
+          "description": "Required. Public URL of the room image to edit"
+        },
+        "mask_data_url": {
+          "type": "string",
+          "description": "Required. PNG data URL of the binary mask (white=regenerate, black=keep)"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Required. Description of what to generate in the masked area"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "image_url",
+        "mask_data_url",
+        "prompt"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-social-content",
+    "tag": "Social",
+    "summary": "Generate platform-optimised social media captions and hashtags via Claude",
+    "description": "Uses Claude Haiku to generate 3 caption variants and hashtags tailored to the target platform's character limits and tone conventions. Costs 2 credits (non-refundable). Platforms: instagram, facebook, linkedin, tiktok, pinterest, youtube, twitter, threads.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "topic": {
+          "type": "string",
+          "description": "Required. Content topic or product/scene description"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "instagram",
+            "facebook",
+            "linkedin",
+            "tiktok",
+            "pinterest",
+            "youtube",
+            "twitter",
+            "threads"
+          ],
+          "description": "Required. Target social platform"
+        },
+        "tone": {
+          "type": "string",
+          "description": "Writing tone; defaults to 'professional'"
+        },
+        "product_info": {
+          "type": "string",
+          "description": "Optional product details to incorporate"
+        },
+        "include_hashtags": {
+          "type": "boolean",
+          "default": true
+        },
+        "hashtag_count": {
+          "type": "integer",
+          "default": 10
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "post_id": {
+          "type": "string",
+          "description": "Optional social_posts row ID to associate with"
+        }
+      },
+      "required": [
+        "topic",
+        "platform"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "post_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "captions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variant": {
+                "type": "string"
+              },
+              "caption": {
+                "type": "string"
+              },
+              "char_count": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "hashtags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "best_time_hint": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        },
+        "credits_remaining": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-social-image",
+    "tag": "Social",
+    "summary": "Generate a social media image via Aurora, Gemini, or FLUX based on content type",
+    "description": "Routes to the best image model: lifestyle/people → xAI Aurora (10cr), product/interior → Gemini Imagen (5cr), artistic/textured → FLUX 2 Pro via Replicate (6cr). Model can be overridden explicitly or set to 'auto'. Credits are debited upfront and non-refundable.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "prompt": {
+          "type": "string",
+          "description": "Required. Image generation prompt"
+        },
+        "image_type": {
+          "type": "string",
+          "enum": [
+            "lifestyle",
+            "product",
+            "interior",
+            "artistic"
+          ],
+          "description": "Content type; used for auto model selection. Default: lifestyle",
+          "default": "lifestyle"
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "aurora",
+            "gemini",
+            "flux",
+            "auto"
+          ],
+          "description": "Model override; 'auto' selects based on image_type",
+          "default": "auto"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "4:5",
+            "9:16",
+            "16:9"
+          ],
+          "default": "1:1"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "post_id": {
+          "type": "string",
+          "description": "Optional social_posts row ID to associate with"
+        }
+      },
+      "required": [
+        "prompt"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "model_used": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        },
+        "credits_remaining": {
+          "type": "integer"
+        },
+        "aspect_ratio": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-social-video",
+    "tag": "Social",
+    "summary": "Generate a short-form social video via Kling or Veo-2",
+    "description": "Generates social media videos: kling-3.0 (20cr), kling-1.6-pro (15cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "source_image_url": {
+          "type": "string",
+          "description": "Required. Source image for the video"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Optional generation prompt; model default applies if omitted"
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "kling-3.0",
+            "kling-1.6-pro",
+            "veo-2"
+          ],
+          "default": "kling-3.0"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ],
+          "default": "9:16"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "default": 10
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "post_id": {
+          "type": "string",
+          "description": "Optional social_posts row ID to associate with"
+        }
+      },
+      "required": [
+        "source_image_url"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "video_url": {
+          "type": "string",
+          "description": "Present when generation completed synchronously"
+        },
+        "prediction_id": {
+          "type": "string"
+        },
+        "model_used": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "processing"
+          ]
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Present when delegated to generate-interior-video-v2 (veo-2)"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-virtual-staging",
+    "tag": "AI Generation",
+    "summary": "AI virtual staging of an empty room via Replicate proplabs/virtual-staging",
+    "description": "Takes an empty room image, room type, and optional furniture style/items. Calls proplabs/virtual-staging on Replicate with Prefer: wait polling (~56s, 20 credits). Emits virtual_staging_completed flow event on success. Accepts service-role key for agent-chat internal calls.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/api/generate-virtual-staging-api.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "source_image_url": {
+          "type": "string",
+          "description": "Required. Public URL of the empty room image"
+        },
+        "room": {
+          "type": "string",
+          "description": "Required. Room type e.g. 'living room', 'bedroom'"
+        },
+        "furniture_style": {
+          "type": "string",
+          "description": "Optional furniture style; defaults to 'Default (AI decides)'"
+        },
+        "furniture_items": {
+          "type": "string",
+          "description": "Optional comma-separated list of specific furniture items"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        },
+        "conversation_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_image_url",
+        "room"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "credits_used": {
+          "type": "integer"
+        },
+        "room": {
+          "type": "string"
+        },
+        "furniture_style": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "generate-vr-world",
+    "tag": "AI Generation",
+    "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
+    "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Models: marble-1.0-draft (28cr, ~3min) and marble-1.1 (190cr, ~7min). Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "source_image_url": {
+          "type": "string",
+          "description": "Required. Public URL of the interior image"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Required. Scene description prompt"
+        },
+        "room_type": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "enum": [
+            "marble-1.0-draft",
+            "marble-1.1"
+          ],
+          "description": "WorldLabs model; defaults to marble-1.0-draft"
+        },
+        "is_pano": {
+          "type": "boolean",
+          "description": "Set true for panoramic (360°) source images"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Required when called with service-role key (server-to-server)"
+        }
+      },
+      "required": [
+        "source_image_url",
+        "prompt"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "world_id": {
+              "type": "string"
+            },
+            "splat_url_100k": {
+              "type": "string"
+            },
+            "splat_url_500k": {
+              "type": "string"
+            },
+            "splat_url_full": {
+              "type": "string"
+            },
+            "collider_glb_url": {
+              "type": "string"
+            },
+            "panorama_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "thumbnail_url": {
+              "type": "string",
+              "nullable": true
+            },
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "health-check",
+    "tag": "Admin",
+    "summary": "Check liveness and key validity of all AI providers and external services",
+    "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, WorldLabs, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces module is enabled).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ claude, openai, huggingface, voyage_ai, embeddings, ai_services, external: [{ name, category, status, latency_ms, http_status? }], timestamp }"
+  },
+  {
+    "name": "job-cleanup-cron",
+    "tag": "Crons",
+    "summary": "Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs",
+    "description": "Deletes completed/failed background_jobs (>5d), scraping_sessions (>5d), data_import_jobs (>5d), flow_runs/steps (>30d), agent_checkpoints (>30d), system_logs (>30d), ai_call_logs (>30d), search_query_tracking (>90d), and unsaved generation_3d rows (>15d) plus their storage files.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, message, stats: { backgroundJobs, scrapingSessions, ... , totalCleaned }, timestamp }"
+  },
+  {
+    "name": "job-research-cron",
+    "tag": "Monitoring Crons",
+    "summary": "Hourly cron (at :45) that refreshes due internal job-research tracked jobs via MIVAA.",
+    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/job-research/cron-refresh with limit=50. Respects volatility-aware cadence (6h/24h/48h/72h/168h). External API consumers are excluded.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/job-research-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
+  },
+  {
+    "name": "job-research-digest-cron",
+    "tag": "Monitoring Crons",
+    "summary": "Hourly cron (at :05) that dispatches consolidated daily job-research digest emails per user.",
+    "description": "Validates x-cron-secret, computes current UTC hour, and POSTs to MIVAA /api/v1/job-research/cron-digest?current_hour_utc=H. Users whose digest_hour_utc matches receive one consolidated email covering all their tracked job searches.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/job-research-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, hour_utc: number, backend_response: object, timestamp: string}"
+  },
+  {
+    "name": "kb-generate-embedding",
+    "tag": "Knowledge Base",
+    "summary": "Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row",
+    "description": "Triggered on kb_docs changes (via pg_net) or called directly by the admin UI. Builds text from title + content_markdown, calls MIVAA /api/embeddings/clip-text (voyage-4, 1024D), and writes the vector plus embedding metadata back to kb_docs.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "doc_id",
+        "type": "string",
+        "required": true,
+        "desc": "UUID of the kb_docs row to embed"
+      }
+    ],
+    "response": "{ success, doc_id, dimensions, model, generation_time_ms }"
+  },
+  {
+    "name": "llm-mention-probe-cron",
+    "tag": "Monitoring Crons",
+    "summary": "Daily cron (03:00 UTC) that runs LLM visibility probes for tracked mention subjects.",
+    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-probe-llm with limit=25 and min_age_days=7. Runs a 4-template x 4-model probe matrix per subject (~$0.008/subject/week).",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/mention-monitoring-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
+  },
+  {
+    "name": "mention-monitoring-cron",
+    "tag": "Monitoring Crons",
+    "summary": "Hourly cron that refreshes due internal mention-monitoring subjects via MIVAA.",
+    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-refresh with limit=50. Scheduled at :30 every hour by pg_cron mention-monitoring-refresh-hourly.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/mention-monitoring-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
+  },
+  {
+    "name": "messaging-api",
+    "tag": "Messaging",
+    "summary": "WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics.",
+    "description": "Action-discriminated API for WhatsApp via Zernio (Meta Cloud API). Requires `ZERNIO_API_KEY`; returns 503 with `provider_not_configured` when absent. Channels are `messaging_channels` rows linked to Zernio WhatsApp accounts. Cold/marketing sends require a Meta-approved template; freeform content is only valid inside the 24h customer-care window.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": "api/messaging-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "send",
+        "summary": "Send a WhatsApp message to one or more recipients.",
+        "params": [
+          {
+            "name": "to",
+            "type": "string | string[]",
+            "required": true,
+            "desc": "Recipient phone number(s) in E.164 or local format"
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "required": false,
+            "desc": "Freeform message body (24h window only)"
+          },
+          {
+            "name": "templateId",
+            "type": "string",
+            "required": false,
+            "desc": "messaging_templates.id for an approved template"
+          },
+          {
+            "name": "templateVariables",
+            "type": "object",
+            "required": false,
+            "desc": "Variable substitutions for the template"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "Channel sender_id; defaults to default active WhatsApp channel"
+          },
+          {
+            "name": "messageType",
+            "type": "string",
+            "required": false,
+            "desc": "transactional | marketing | otp | notification"
+          }
+        ],
+        "response": "{success:boolean, sent:number, failed:number, results:[], messageId?:string}"
+      },
+      {
+        "name": "send-bulk",
+        "summary": "Send a WhatsApp template message to a list of recipients with per-recipient variables.",
+        "params": [
+          {
+            "name": "recipients",
+            "type": "Array<{to:string,variables?:object}>",
+            "required": true,
+            "desc": "List of recipients with optional per-recipient template variables"
+          },
+          {
+            "name": "templateId",
+            "type": "string",
+            "required": false,
+            "desc": "messaging_templates.id"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "Channel sender_id"
+          }
+        ],
+        "response": "{success:true, sent:number, failed:number, results:[]}"
+      },
+      {
+        "name": "connect-whatsapp",
+        "summary": "Connect a WhatsApp number via Meta credentials to a Zernio account.",
+        "params": [
+          {
+            "name": "accessToken",
+            "type": "string",
+            "required": true,
+            "desc": "Meta Business Suite access token"
+          },
+          {
+            "name": "wabaId",
+            "type": "string",
+            "required": true,
+            "desc": "WhatsApp Business Account ID"
+          },
+          {
+            "name": "phoneNumberId",
+            "type": "string",
+            "required": true,
+            "desc": "Meta phone number ID"
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "required": false,
+            "desc": "Display name for the channel"
+          },
+          {
+            "name": "workspaceId",
+            "type": "string",
+            "required": false,
+            "desc": "Workspace to attach the account to (defaults to JWT workspace)"
+          }
+        ],
+        "response": "{success:true, channel:{}, account:{}}"
+      },
+      {
+        "name": "sync-channels",
+        "summary": "Pull connected WhatsApp accounts from Zernio and upsert into messaging_channels.",
+        "params": [],
+        "response": "{success:true, synced:number, channels:[], message:string}"
+      },
+      {
+        "name": "whatsapp-templates",
+        "summary": "List Meta-approved WhatsApp templates for a channel's WABA.",
+        "params": [
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "Channel sender_id to resolve the Zernio account"
+          }
+        ],
+        "response": "{templates:[]}"
+      },
+      {
+        "name": "channels",
+        "summary": "List all WhatsApp channels from messaging_channels.",
+        "params": [],
+        "response": "{channels:[]}"
+      },
+      {
+        "name": "templates",
+        "summary": "List WhatsApp messaging templates from messaging_templates.",
+        "params": [],
+        "response": "{templates:[]}"
+      },
+      {
+        "name": "logs",
+        "summary": "Paginated list of WhatsApp send logs.",
+        "params": [
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Page size (default 50)"
+          },
+          {
+            "name": "offset",
+            "type": "number",
+            "required": false,
+            "desc": "Pagination offset"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by delivery status"
+          }
+        ],
+        "response": "{logs:[], total:number}"
+      },
+      {
+        "name": "analytics",
+        "summary": "Aggregate WhatsApp send/delivery/read stats for a date range.",
+        "params": [
+          {
+            "name": "startDate",
+            "type": "string",
+            "required": false,
+            "desc": "ISO start date (default 30 days ago)"
+          },
+          {
+            "name": "endDate",
+            "type": "string",
+            "required": false,
+            "desc": "ISO end date (default now)"
+          }
+        ],
+        "response": "{total, totalSent, totalDelivered, totalRead, totalFailed, deliveryRate, readRate, failureRate, byStatus}"
+      },
+      {
+        "name": "account-info",
+        "summary": "Return WhatsApp number quality rating and messaging tier from Zernio.",
+        "params": [
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "Channel sender_id"
+          }
+        ],
+        "response": "{}"
+      },
+      {
+        "name": "get-settings",
+        "summary": "Retrieve messaging_settings row.",
+        "params": [],
+        "response": "{settings:{}}"
+      },
+      {
+        "name": "update-settings",
+        "summary": "Upsert messaging_settings.",
+        "params": [
+          {
+            "name": "settings",
+            "type": "object",
+            "required": true,
+            "desc": "Settings fields to upsert"
+          }
+        ],
+        "response": "{settings:{}}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: send, send-bulk, connect-whatsapp, sync-channels, whatsapp-templates, channels, templates, logs, analytics, account-info, get-settings, update-settings"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "messaging-processor",
+    "tag": "Messaging",
+    "summary": "Cron-invoked processor that advances scheduled WhatsApp campaigns per-recipient.",
+    "description": "Called every minute by pg_cron via `x-cron-secret` header. Starts campaigns whose `scheduled_at` has elapsed, then dispatches pending recipients in batches of 10 using Zernio's inbox conversation-create path with approved templates. Retries up to 3 times per recipient. Marks campaigns completed when no pending recipients remain.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success:true, message:string, stats:{campaignsProcessed, messagesSent, messagesFailed, campaignsCompleted, campaignsStarted}, durationMs:number}"
+  },
+  {
+    "name": "mivaa-gateway",
+    "tag": "MIVAA Gateway",
+    "summary": "Authenticated proxy to MIVAA Python backend with per-action credit billing",
+    "description": "Action-discriminated reverse proxy to the MIVAA FastAPI backend. Authenticates the caller, checks admin access where required, debits credits per action, then forwards the payload to the corresponding MIVAA endpoint. Also handles multipart/form-data uploads (forwarded to rag_upload) and GET /job-status/{jobId} path requests.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": "docs/api/mivaa-gateway-api.md",
+    "methods": [
+      "POST",
+      "GET"
+    ],
+    "actions": [
+      {
+        "action": "health_check",
+        "description": "Consolidated health check for all MIVAA services",
+        "admin_only": false
+      },
+      {
+        "action": "kb_create_document",
+        "description": "Create KB document with embeddings",
+        "admin_only": false
+      },
+      {
+        "action": "kb_get_document",
+        "description": "Get KB document by ID",
+        "admin_only": false
+      },
+      {
+        "action": "kb_update_document",
+        "description": "Update KB document (smart embedding regeneration)",
+        "admin_only": false
+      },
+      {
+        "action": "kb_delete_document",
+        "description": "Delete KB document",
+        "admin_only": false
+      },
+      {
+        "action": "kb_create_from_pdf",
+        "description": "Create KB document from PDF",
+        "admin_only": false
+      },
+      {
+        "action": "kb_search",
+        "description": "Semantic/full-text/hybrid KB search",
+        "admin_only": false
+      },
+      {
+        "action": "kb_create_category",
+        "description": "Create KB category",
+        "admin_only": false
+      },
+      {
+        "action": "kb_list_categories",
+        "description": "List KB categories",
+        "admin_only": false
+      },
+      {
+        "action": "kb_create_attachment",
+        "description": "Attach document to product",
+        "admin_only": false
+      },
+      {
+        "action": "kb_get_doc_attachments",
+        "description": "Get document attachments",
+        "admin_only": false
+      },
+      {
+        "action": "kb_get_product_docs",
+        "description": "Get product documents",
+        "admin_only": false
+      },
+      {
+        "action": "rag_upload",
+        "description": "Consolidated RAG upload (file + URL)",
+        "admin_only": false
+      },
+      {
+        "action": "rag_search",
+        "description": "Consolidated RAG search (6 strategies)",
+        "admin_only": false
+      },
+      {
+        "action": "rag_query",
+        "description": "RAG query with auto-detecting modality",
+        "admin_only": false
+      },
+      {
+        "action": "rag_chat",
+        "description": "RAG chat completions",
+        "admin_only": false
+      },
+      {
+        "action": "rag_get_job",
+        "description": "Get RAG job status",
+        "admin_only": false
+      },
+      {
+        "action": "rag_list_jobs",
+        "description": "List all RAG jobs",
+        "admin_only": false
+      },
+      {
+        "action": "rag_resume_job",
+        "description": "Resume job from checkpoint",
+        "admin_only": false
+      },
+      {
+        "action": "rag_get_chunks",
+        "description": "Get document chunks with filters",
+        "admin_only": false
+      },
+      {
+        "action": "rag_get_images",
+        "description": "Get document images with filters",
+        "admin_only": false
+      },
+      {
+        "action": "rag_get_products",
+        "description": "Get products with filters",
+        "admin_only": false
+      },
+      {
+        "action": "rag_list_documents",
+        "description": "List RAG documents",
+        "admin_only": false
+      },
+      {
+        "action": "rag_delete_document",
+        "description": "Delete RAG document",
+        "admin_only": false
+      },
+      {
+        "action": "admin_list_jobs",
+        "description": "List all jobs (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_job_statistics",
+        "description": "Job statistics (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_get_job",
+        "description": "Get job details (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_system_health",
+        "description": "System health check (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_system_metrics",
+        "description": "System metrics (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_cleanup_data",
+        "description": "Cleanup old data (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_prompts_list",
+        "description": "List LLM prompts (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "admin_prompts_update",
+        "description": "Update LLM prompt (admin)",
+        "admin_only": true
+      },
+      {
+        "action": "process_scraping_session",
+        "description": "Process scraping session to products",
+        "admin_only": true
+      },
+      {
+        "action": "products_create_from_chunks",
+        "description": "Create products from chunks",
+        "admin_only": true
+      },
+      {
+        "action": "entities_list",
+        "description": "List document entities",
+        "admin_only": false
+      },
+      {
+        "action": "entities_by_product",
+        "description": "Get entities by product ID",
+        "admin_only": false
+      }
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "One of ~80 named MIVAA_ENDPOINTS keys that selects which backend route to call"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Arbitrary body forwarded verbatim to the selected MIVAA endpoint"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "description": "Proxied response from the MIVAA backend; shape depends on the selected action"
+    }
+  },
+  {
+    "name": "moodboard-sheet-share",
+    "tag": "Moodboard & Sheets",
+    "summary": "Public token resolver for shared presentation sheets and project client views",
+    "description": "Resolves a share token against either moodboard_presentation_sheets (single-sheet share) or project_client_views (client view with VR/lighting/FF&E embeds). Also accepts a feedback body to write client comments/approvals to client_view_feedback.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "resolve",
+        "summary": "Resolve a share token and return sheet or client_view payload with signed PDF URL",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Share token (min 32 chars) from share_token or public_share_token column"
+          }
+        ],
+        "response": "{sheet?:{id,sheet_type,title,status,page_count}, pdf_url, expired} OR {client_view:{id,title,project_name,cover,sheets,pdf_url,embed_vr,embed_lighting,embed_ffe,feedback_enabled,vr_world,ffe,lighting_image_url}, not_found}"
+      },
+      {
+        "name": "feedback",
+        "summary": "Write a client comment, approval, or change_request on a client view",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Client view public_share_token"
+          },
+          {
+            "name": "feedback",
+            "type": "object",
+            "required": true,
+            "desc": "{kind, status?, body, sheet_id?, author_name?}"
+          },
+          {
+            "name": "session_id",
+            "type": "string",
+            "required": false,
+            "desc": "Anonymous session ID for grouping comments"
+          }
+        ],
+        "response": "{success}"
+      }
+    ]
+  },
+  {
+    "name": "myaade-rgwspublic2",
+    "tag": "Business Profile",
+    "summary": "Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service.",
+    "description": "Calls the ΑΑΔΕ RgWsPublic2 SOAP 1.2 endpoint with WS-Security UsernameToken (`AADE_USERNAME`/`AADE_PASSWORD` from env or platform_secrets). Returns basic company record and KAD activity codes. Uses a 90-day cache on `crm_companies.aade_data` to minimize TAXISnet quota consumption. Note: every live SOAP call writes an audit entry to the looked-up ΑΦΜ's TAXISnet inbox.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "afm",
+        "type": "string",
+        "required": true,
+        "desc": "Greek ΑΦΜ — exactly 9 digits (non-digit characters stripped)"
+      },
+      {
+        "name": "company_id",
+        "type": "string",
+        "required": false,
+        "desc": "crm_companies.id — enables cache check and result write-back for authorized callers"
+      }
+    ],
+    "response": "{ok:true, valid_afm:boolean, basic_rec:{afm,doy,onomasia,commer_title,legal_status_descr,postal_address,postal_address_no,postal_zip_code,postal_area_description,regist_date,stop_date,deactivation_flag,...}, activities:[{code,description,kind,kind_description}], source:'aade'|'cache', checked_at, secret_sources}"
+  },
+  {
+    "name": "notification-dispatcher",
+    "tag": "Notifications",
+    "summary": "Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry.",
+    "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-vapid-key`: returns the public VAPID key for service-worker subscription registration.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "send-push",
+        "summary": "Send a Web Push notification to one or more browser subscriptions.",
+        "params": [
+          {
+            "name": "subscriptions",
+            "type": "Array<{endpoint:string,p256dh_key:string,auth_key:string}>",
+            "required": true,
+            "desc": "Web Push subscription objects"
+          },
+          {
+            "name": "notification",
+            "type": "{title:string,body:string,data?,icon?,badge?}",
+            "required": true,
+            "desc": "Notification payload"
+          }
+        ],
+        "response": "{success:number, failed:number, results:[]}"
+      },
+      {
+        "name": "send-webhook",
+        "summary": "Deliver a JSON payload to webhook endpoints with retry and optional HMAC signing.",
+        "params": [
+          {
+            "name": "webhooks",
+            "type": "Array<{id,url,secret?,headers,retry_config}>",
+            "required": true,
+            "desc": "Webhook endpoint definitions from webhook_endpoints table"
+          },
+          {
+            "name": "payload",
+            "type": "object",
+            "required": true,
+            "desc": "JSON payload to POST to each webhook"
+          }
+        ],
+        "response": "{success:number, failed:number, results:[]}"
+      },
+      {
+        "name": "get-vapid-key",
+        "summary": "Return the VAPID public key for service-worker push subscription registration.",
+        "params": [],
+        "response": "{configured:boolean, publicKey?:string}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: send-push, send-webhook, get-vapid-key"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "parse-sitemap",
+    "tag": "Scraping",
+    "summary": "Fetch and parse a sitemap XML, returning a list of page URLs",
+    "description": "Downloads a sitemap (standard or sitemap-index) from the provided URL, extracts all <loc> entries, decodes HTML entities, and returns the URL list capped at maxPages. Supports both standard urlset and sitemap-index formats.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "sitemapUrl",
+        "type": "string",
+        "required": true,
+        "desc": "Absolute URL of the sitemap XML to parse"
+      },
+      {
+        "name": "maxPages",
+        "type": "number",
+        "required": false,
+        "desc": "Maximum URLs to return (default 100)"
+      }
+    ],
+    "response": "{success, urls, count}"
+  },
+  {
+    "name": "parse-supplier-cost-list",
+    "tag": "Finance",
+    "summary": "Parse a KB doc supplier cost list and apply costs to matching products",
+    "description": "Reads a kb_docs row with price_doc_type='supplier_cost_list', parses its Markdown table for SKU/cost rows, bulk-matches against products by sku or external_sku within the workspace, and updates products.cost. Supports dry_run mode to preview matches without writing.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "kb_doc_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "KB doc with price_doc_type='supplier_cost_list'."
+      },
+      {
+        "name": "dry_run",
+        "type": "boolean",
+        "required": false,
+        "desc": "Preview matches without writing costs to products."
+      }
+    ],
+    "response": "{ok, kb_doc_id, dry_run, parsed_rows, matched, updated, unmatched, errors, rows: [{sku, cost, currency, matched, updated, product_id, reason}]}"
+  },
+  {
+    "name": "pdf-batch-process",
+    "tag": "PDF Processing",
+    "summary": "Queue, status-check, and cancel batch PDF extraction jobs",
+    "description": "Creates a batch job that fans out to the pdf-extract function for up to 100 documents concurrently; supports GET for status polling and DELETE for cancellation.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET",
+      "DELETE"
+    ],
+    "actions": [
+      {
+        "name": "create (POST)",
+        "summary": "Create a new batch job and begin async processing",
+        "params": [
+          {
+            "name": "documents",
+            "type": "array",
+            "required": true,
+            "desc": "Array of {documentId, extractionType: markdown|tables|images|all, priority?: low|normal|high}; max 100"
+          },
+          {
+            "name": "workspaceId",
+            "type": "string",
+            "required": false,
+            "desc": "Workspace scope; validated against JWT if provided"
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "desc": "{includeImages, includeMetadata, chunkSize 100-10000, overlapSize, outputFormat, maxConcurrent 1-10, notifyOnComplete, webhookUrl}"
+          }
+        ],
+        "response": "{success, data:{batchId, status, totalDocuments, processedDocuments, failedDocuments, estimatedCompletionTime, results:[]}}"
+      },
+      {
+        "name": "status (GET)",
+        "summary": "Poll batch job status and per-document results",
+        "params": [
+          {
+            "name": "batchId",
+            "type": "string",
+            "required": true,
+            "desc": "Query param: batch job ID returned on create"
+          }
+        ],
+        "response": "{success, data:{batchId, status, totalDocuments, processedDocuments, failedDocuments, results:[{documentId,status,extractionId,error,processingTime}]}}"
+      },
+      {
+        "name": "cancel (DELETE)",
+        "summary": "Cancel a queued or processing batch job",
+        "params": [
+          {
+            "name": "batchId",
+            "type": "string",
+            "required": true,
+            "desc": "Query param: batch job ID to cancel"
+          }
+        ],
+        "response": "{success, message}"
+      }
+    ]
+  },
+  {
+    "name": "pinterest-api",
+    "tag": "Pinterest",
+    "summary": "Pinterest pin import and OAuth board browsing for moodboard population.",
+    "description": "Action-discriminated API with two handler groups: import (extract_pin via oEmbed, import_pin, import_pins_bulk — no OAuth required) and OAuth (get_auth_url, callback, get_boards, get_board_pins, disconnect — requires PINTEREST_APP_ID/APP_SECRET). Imported pins are stored in `generation-images` storage and optionally matched against the catalog via MIVAA visual search.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "extract_pin",
+        "summary": "Extract pin metadata (title, image URL, author) via Pinterest oEmbed.",
+        "params": [
+          {
+            "name": "pin_url",
+            "type": "string",
+            "required": true,
+            "desc": "Full Pinterest pin URL"
+          }
+        ],
+        "response": "{success:true, pin:{title,image_url,author,source_url}}"
+      },
+      {
+        "name": "import_pin",
+        "summary": "Import a single Pinterest pin image into a moodboard.",
+        "params": [
+          {
+            "name": "pin_url",
+            "type": "string",
+            "required": true,
+            "desc": "Pinterest pin URL"
+          },
+          {
+            "name": "moodboard_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target moodboard ID"
+          },
+          {
+            "name": "find_matching_products",
+            "type": "boolean",
+            "required": false,
+            "desc": "Run MIVAA visual search to suggest matching products"
+          }
+        ],
+        "response": "{success:true, item:{}, matching_products:[]}"
+      },
+      {
+        "name": "import_pins_bulk",
+        "summary": "Import multiple Pinterest pin URLs into a moodboard in one request.",
+        "params": [
+          {
+            "name": "pin_urls",
+            "type": "string[]",
+            "required": true,
+            "desc": "List of Pinterest pin URLs"
+          },
+          {
+            "name": "moodboard_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target moodboard ID"
+          },
+          {
+            "name": "find_matching_products",
+            "type": "boolean",
+            "required": false,
+            "desc": "Run visual search for each imported pin"
+          }
+        ],
+        "response": "{success:true, imported:number, failed:number, results:[]}"
+      },
+      {
+        "name": "get_auth_url",
+        "summary": "Generate a Pinterest OAuth authorization URL.",
+        "params": [
+          {
+            "name": "redirect_uri",
+            "type": "string",
+            "required": false,
+            "desc": "OAuth redirect URI (defaults to PINTEREST_REDIRECT_URI env)"
+          }
+        ],
+        "response": "{success:true, auth_url:string, state:string}"
+      },
+      {
+        "name": "callback",
+        "summary": "Exchange Pinterest OAuth code for tokens and persist in social_accounts.",
+        "params": [
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "desc": "Authorization code from Pinterest callback"
+          },
+          {
+            "name": "state",
+            "type": "string",
+            "required": true,
+            "desc": "CSRF state from get_auth_url"
+          },
+          {
+            "name": "redirect_uri",
+            "type": "string",
+            "required": false,
+            "desc": "Must match the URI used in get_auth_url"
+          }
+        ],
+        "response": "{success:true, account:{}}"
+      },
+      {
+        "name": "get_boards",
+        "summary": "List Pinterest boards for the authenticated user's connected account.",
+        "params": [
+          {
+            "name": "account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id with platform='pinterest'"
+          }
+        ],
+        "response": "{success:true, boards:[]}"
+      },
+      {
+        "name": "get_board_pins",
+        "summary": "List pins from a specific Pinterest board.",
+        "params": [
+          {
+            "name": "account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id"
+          },
+          {
+            "name": "board_id",
+            "type": "string",
+            "required": true,
+            "desc": "Pinterest board ID"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "desc": "Pagination bookmark"
+          }
+        ],
+        "response": "{success:true, pins:[], next_cursor:string|null}"
+      },
+      {
+        "name": "disconnect",
+        "summary": "Revoke the Pinterest OAuth token and deactivate the social_accounts row.",
+        "params": [
+          {
+            "name": "account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id to disconnect"
+          }
+        ],
+        "response": "{success:true}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: extract_pin, import_pin, import_pins_bulk, get_auth_url, callback, get_boards, get_board_pins, disconnect"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "platform-secrets-admin",
+    "tag": "Admin",
+    "summary": "CRUD for the platform_secrets key store (admin/super_admin only)",
+    "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "list",
+        "summary": "List all platform_secrets with masked values and effective source",
+        "params": [],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      },
+      {
+        "name": "list_platform",
+        "summary": "List only platform-wide secrets (primary_module_slug IS NULL)",
+        "params": [],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      },
+      {
+        "name": "list_for_module",
+        "summary": "List secrets whose primary_module_slug or linked module matches",
+        "params": [
+          {
+            "name": "module_slug",
+            "type": "string",
+            "required": true,
+            "desc": "Module slug to filter by"
+          }
+        ],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      },
+      {
+        "name": "save",
+        "summary": "Upsert a single secret value (empty/null clears the DB value)",
+        "params": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "desc": "Secret key name"
+          },
+          {
+            "name": "value",
+            "type": "string|null",
+            "required": false,
+            "desc": "New value; null or '' clears it"
+          }
+        ],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      },
+      {
+        "name": "save_many",
+        "summary": "Upsert multiple secrets at once (used by module settings forms)",
+        "params": [
+          {
+            "name": "entries",
+            "type": "Array<{ key: string, value: string|null }>",
+            "required": true,
+            "desc": "Key-value pairs to upsert"
+          },
+          {
+            "name": "module_slug",
+            "type": "string",
+            "required": false,
+            "desc": "If set, response is scoped to this module"
+          }
+        ],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      },
+      {
+        "name": "delete_value",
+        "summary": "Null out a secret's DB value (env fallback / default still applies)",
+        "params": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "desc": "Secret key to clear"
+          }
+        ],
+        "response": "{ ok, secrets: MaskedSecretView[] }"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "list | list_platform | list_for_module | save | save_many | delete_value"
+      },
+      {
+        "name": "module_slug",
+        "type": "string",
+        "required": false,
+        "desc": "Required for list_for_module; optional for save_many"
+      },
+      {
+        "name": "key",
+        "type": "string",
+        "required": false,
+        "desc": "Required for save and delete_value"
+      },
+      {
+        "name": "value",
+        "type": "string|null",
+        "required": false,
+        "desc": "New value for save"
+      },
+      {
+        "name": "entries",
+        "type": "array",
+        "required": false,
+        "desc": "Required for save_many: [{ key, value }]"
+      }
+    ],
+    "response": "{ ok, secrets: MaskedSecretView[] }"
+  },
+  {
+    "name": "price-monitoring-cron",
+    "tag": "Monitoring Crons",
+    "summary": "Hourly cron that refreshes due internal price-monitoring tracked queries via MIVAA.",
+    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/price-monitoring/tracked-queries/cron-refresh with limit=50. External API consumers (api_key_id IS NOT NULL) are intentionally excluded.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, refreshed?: number, errors?: number}"
+  },
+  {
+    "name": "quote-public-share",
+    "tag": "Quotes",
+    "summary": "Public token-based quote share lookup (anonymous-friendly)",
+    "description": "Resolves a public_share_token to a quote (with items, seller identity, and a 1-hour signed PDF URL) without requiring authentication. Logs view or download analytics events. Returns not_found when the token is invalid or sharing is disabled.",
+    "security": [
+      "queryToken",
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "token",
+        "type": "string (min 32 chars)",
+        "required": true,
+        "desc": "Public share token from the /q/:token link."
+      },
+      {
+        "name": "event",
+        "type": "string ('download')",
+        "required": false,
+        "desc": "Pass 'download' to log a download event instead of a view."
+      },
+      {
+        "name": "session_id",
+        "type": "string",
+        "required": false,
+        "desc": "Optional analytics session ID; auto-generated if absent."
+      }
+    ],
+    "response": "{quote: {id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, grand_total, extras_total, expires_at, created_at, client_name, items}, seller, pdf_url, not_found}"
+  },
+  {
+    "name": "quotes-api",
+    "tag": "Quotes",
+    "summary": "REST API for quote requests and proposals (customer-facing)",
+    "description": "Path-routed REST handler for quote requests and seller proposals. Supports creating quote requests from a quote, listing/getting quote requests, updating status, listing/getting proposals, and accepting/rejecting proposals. All operations scoped to the authenticated user.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET",
+      "PATCH"
+    ],
+    "actions": [
+      {
+        "name": "POST /quote-requests",
+        "summary": "Create a quote request from a quote",
+        "params": [
+          {
+            "name": "quote_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Quote to request."
+          },
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Seller workspace."
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "required": false,
+            "desc": "Optional message to seller."
+          }
+        ],
+        "response": "{data: quote_request}"
+      },
+      {
+        "name": "GET /quote-requests",
+        "summary": "List the authenticated user's quote requests",
+        "params": [],
+        "response": "{data: quote_request[]}"
+      },
+      {
+        "name": "GET /quote-requests/:id",
+        "summary": "Get a specific quote request owned by the user",
+        "params": [],
+        "response": "{data: quote_request}"
+      },
+      {
+        "name": "PATCH /quote-requests/:id",
+        "summary": "Update the status of a quote request",
+        "params": [
+          {
+            "name": "status",
+            "type": "string ('pending'|'updated'|'approved'|'rejected')",
+            "required": true,
+            "desc": "New status."
+          }
+        ],
+        "response": "{data: quote_request}"
+      },
+      {
+        "name": "GET /proposals",
+        "summary": "List proposals for the user's quote requests",
+        "params": [],
+        "response": "{data: proposal[]}"
+      },
+      {
+        "name": "GET /proposals/:id",
+        "summary": "Get a specific proposal (ownership-verified)",
+        "params": [],
+        "response": "{data: proposal}"
+      },
+      {
+        "name": "PATCH /proposals/:id",
+        "summary": "Accept or reject a proposal",
+        "params": [
+          {
+            "name": "status",
+            "type": "string ('accepted'|'rejected')",
+            "required": true,
+            "desc": "Decision."
+          }
+        ],
+        "response": "{data: proposal}"
+      }
+    ]
+  },
+  {
+    "name": "recommendations-api",
+    "tag": "Recommendations",
+    "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
+    "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET",
+      "DELETE"
+    ],
+    "actions": [
+      {
+        "name": "track-interaction",
+        "summary": "Record a user interaction event (view, click, save, purchase, rate, add_to_quote, share).",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace context"
+          },
+          {
+            "name": "material_id",
+            "type": "string",
+            "required": true,
+            "desc": "Material/product being interacted with"
+          },
+          {
+            "name": "interaction_type",
+            "type": "string",
+            "required": true,
+            "desc": "One of: view, click, save, purchase, rate, add_to_quote, share"
+          },
+          {
+            "name": "interaction_value",
+            "type": "number",
+            "required": false,
+            "desc": "Numeric weight (default 1.0)"
+          },
+          {
+            "name": "session_id",
+            "type": "string",
+            "required": false,
+            "desc": "Session identifier for grouping"
+          },
+          {
+            "name": "metadata",
+            "type": "object",
+            "required": false,
+            "desc": "Additional context metadata"
+          }
+        ],
+        "response": "{data:{}, message:'Interaction tracked successfully'}"
+      },
+      {
+        "name": "for-user",
+        "summary": "Retrieve cached collaborative-filtering recommendations for the current user.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace scope (query param)"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Max results (default 20, query param)"
+          },
+          {
+            "name": "algorithm",
+            "type": "string",
+            "required": false,
+            "desc": "Algorithm key (default user_user, query param)"
+          }
+        ],
+        "response": "{data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}"
+      },
+      {
+        "name": "similar-materials",
+        "summary": "Compute item-item similarity for a material from co-interaction data.",
+        "params": [
+          {
+            "name": "material_id",
+            "type": "string",
+            "required": true,
+            "desc": "Path segment: /similar-materials/{material_id}"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace scope (query param)"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Max results (default 10, query param)"
+          }
+        ],
+        "response": "{data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}"
+      },
+      {
+        "name": "analytics",
+        "summary": "Interaction and recommendation cache analytics for a workspace.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Path segment: /analytics/{workspace_id}"
+          },
+          {
+            "name": "days",
+            "type": "number",
+            "required": false,
+            "desc": "Lookback window in days (default 30, query param)"
+          }
+        ],
+        "response": "{data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}"
+      },
+      {
+        "name": "cache-invalidate",
+        "summary": "Delete the current user's recommendation_scores rows, optionally scoped.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": false,
+            "desc": "Scope deletion to a workspace (query param)"
+          },
+          {
+            "name": "material_id",
+            "type": "string",
+            "required": false,
+            "desc": "Scope deletion to a specific material (query param)"
+          }
+        ],
+        "response": "{message:'Cache invalidated successfully'}"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "reset-platform",
+    "tag": "Admin",
+    "summary": "Destructively clear all user-generated data while preserving system config",
+    "description": "Admin-only (admin role or service-role secret). Truncates ~80 tables of user/AI-generated data, clears pdf-tiles and generation-images storage buckets, wipes all VECS embedding collections, trims prompt_history to 5 rows per prompt, and clears the MIVAA server /tmp folder. Preserves KB, CRM, users, credits, prompts, flows, price-monitoring, and admin config tables.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "confirm",
+        "type": "boolean",
+        "required": true,
+        "desc": "Must be true; acts as an explicit confirmation gate"
+      }
+    ],
+    "response": "{ success, summary, results: { tables, storage, vecs, prompt_history, server_tmp } }"
+  },
+  {
+    "name": "role-upgrade-requests",
+    "tag": "Business Profile",
+    "summary": "Dealer/factory role promotion workflow — submit, approve, and reject requests.",
+    "description": "Three actions gated by the `action` field. `submit` (any authenticated business user): validates entity_type='business', re-validates VAT via VIES, inserts `role_upgrade_requests`, fans out bell notifications and emails to all admins. `approve` and `reject` (admin only): flip request status, promote or leave user role, and email the applicant. Emits Flows events for each transition.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "submit",
+        "summary": "Submit a dealer or factory role upgrade request (business users only).",
+        "params": [
+          {
+            "name": "requested_role",
+            "type": "'dealer'|'factory'",
+            "required": true,
+            "desc": "Target role being applied for"
+          },
+          {
+            "name": "justification",
+            "type": "string",
+            "required": false,
+            "desc": "Optional freeform justification text"
+          }
+        ],
+        "response": "{success:true, request_id:string}"
+      },
+      {
+        "name": "approve",
+        "summary": "Approve a pending role upgrade request and promote the user (admin only).",
+        "params": [
+          {
+            "name": "request_id",
+            "type": "string",
+            "required": true,
+            "desc": "role_upgrade_requests.id"
+          },
+          {
+            "name": "admin_note",
+            "type": "string",
+            "required": false,
+            "desc": "Optional admin note sent to the applicant"
+          }
+        ],
+        "response": "{success:true, status:'approved'}"
+      },
+      {
+        "name": "reject",
+        "summary": "Reject a pending role upgrade request (admin only).",
+        "params": [
+          {
+            "name": "request_id",
+            "type": "string",
+            "required": true,
+            "desc": "role_upgrade_requests.id"
+          },
+          {
+            "name": "admin_note",
+            "type": "string",
+            "required": false,
+            "desc": "Optional rejection reason sent to the applicant"
+          }
+        ],
+        "response": "{success:true, status:'rejected'}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: submit, approve, reject"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "scheduled-import-runner",
+    "tag": "Data Import",
+    "summary": "Cron runner that fetches due scheduled XML imports and re-invokes xml-import-orchestrator.",
+    "description": "Validates x-cron-secret, queries data_import_jobs where is_scheduled=true and next_run_at is past, fetches fresh XML from source_url for each, delegates to xml-import-orchestrator, and updates last_run_at and next_run_at.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{success: boolean, jobs_processed: number, results: array}"
+  },
+  {
+    "name": "scrape-preview",
+    "tag": "Scraping",
+    "summary": "Single-URL Firecrawl preview that returns extracted materials and markdown",
+    "description": "Scrapes one URL via Firecrawl v2 with structured JSON extraction, returning candidate materials and raw markdown. Used by the admin scraping UI to validate a URL before starting a full session. Debits 1 Firecrawl credit.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "url",
+        "type": "string",
+        "required": true,
+        "desc": "Product page URL to preview-scrape"
+      },
+      {
+        "name": "workspaceId",
+        "type": "string",
+        "required": true,
+        "desc": "Workspace ID for context"
+      },
+      {
+        "name": "options",
+        "type": "object",
+        "required": false,
+        "desc": "{prompt, systemPrompt, schema, fieldMappings, timeout}"
+      }
+    ],
+    "response": "{success, url, materials:[{name,description,category,price,images,properties,supplier}], markdown, service, timestamp}"
+  },
+  {
+    "name": "scrape-session-manager",
+    "tag": "Scraping",
+    "summary": "Start, pause, resume, or stop a web-scraping session",
+    "description": "Controls lifecycle of a scraping_sessions row. On start/resume, attempts to launch a Firecrawl full-site crawl job (async webhook delivery); falls back to page-by-page processing via scrape-single-page when Firecrawl is unavailable. Verifies caller owns the session.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "sessionId",
+        "type": "string",
+        "required": true,
+        "desc": "scraping_sessions row ID to manage"
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: start | pause | resume | stop"
+      }
+    ],
+    "response": "{success, action, sessionId}"
+  },
+  {
+    "name": "scrape-single-page",
+    "tag": "Scraping",
+    "summary": "Scrape one page within a scraping session using Firecrawl v2",
+    "description": "Called by scrape-session-manager (page-by-page fallback path) or directly. Updates scraping_pages status, extracts materials via Firecrawl v2 structured extraction, and persists them to scraped_materials_temp. Debits 1 Firecrawl credit.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "pageUrl",
+        "type": "string",
+        "required": true,
+        "desc": "URL to scrape"
+      },
+      {
+        "name": "sessionId",
+        "type": "string",
+        "required": true,
+        "desc": "Parent scraping_sessions row ID"
+      },
+      {
+        "name": "pageId",
+        "type": "string",
+        "required": true,
+        "desc": "scraping_pages row ID to update with results"
+      },
+      {
+        "name": "options",
+        "type": "object",
+        "required": false,
+        "desc": "{prompt, systemPrompt, schema, timeout, useStructuredExtraction}"
+      }
+    ],
+    "response": "{success, pageId, materialsFound, processingTimeMs, error}"
+  },
+  {
+    "name": "seed-sheet-references",
+    "tag": "Admin",
+    "summary": "One-shot admin tool: generate and upload reference preview images for all sheet types",
+    "description": "Generates up to 8 Gemini images (one per moodboard sheet type) using architectural-style prompts and uploads them to the public moodboard-sheet-references bucket as <sheet_type>.png. Authenticated via x-admin-secret header (service-role key). Skips types that already exist unless overwrite=true.",
+    "security": [
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "types",
+        "type": "string[]",
+        "required": false,
+        "desc": "Sheet types to generate; default: all 8 (material_board, color_palette, concept_board, lighting_plan, annotated_render, elevation_render_pair, ffe_schedule, full_deck)"
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "required": false,
+        "desc": "flash (default, faster) or pro"
+      },
+      {
+        "name": "overwrite",
+        "type": "boolean",
+        "required": false,
+        "desc": "Replace existing images; default false"
+      }
+    ],
+    "response": "{ success, uploaded: [{ type, path, public_url }], skipped: [{ type, reason }], failed: [{ type, error }], total_duration_ms }"
+  },
+  {
+    "name": "send-quote-email",
+    "tag": "Quotes",
+    "summary": "Email a quote to a recipient with a public share link",
+    "description": "Sends a quote summary email to the customer (or an explicit address). Ensures a public share token exists (mints one if needed), composes inline HTML with a view-quote link and optional free-text message, and dispatches via email-api. Authorized for the quote owner or an admin.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "quote_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Quote to email."
+      },
+      {
+        "name": "to",
+        "type": "string (email)",
+        "required": false,
+        "desc": "Override recipient; defaults to CRM customer email then quote owner."
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": false,
+        "desc": "Optional free-text note included above the quote summary in the email."
+      }
+    ],
+    "response": "{success, sent_to, view_url}"
+  },
+  {
+    "name": "seo-api",
+    "tag": "SEO",
+    "summary": "Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.",
+    "description": "Single POST endpoint routing on body.action to one of seven handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "research",
+        "summary": "Keyword research using DataForSEO (18 credits). Runs 6 parallel API calls and enriches with SERP signals.",
+        "params": [
+          {
+            "name": "topic",
+            "type": "string",
+            "required": true,
+            "desc": "Topic or subject area for research context."
+          },
+          {
+            "name": "target_keyword",
+            "type": "string",
+            "required": true,
+            "desc": "Primary keyword to research."
+          },
+          {
+            "name": "location_code",
+            "type": "number",
+            "required": false,
+            "desc": "DataForSEO numeric location code, default 2840 (US)."
+          },
+          {
+            "name": "language_code",
+            "type": "string",
+            "required": false,
+            "desc": "Language code, default 'en'."
+          }
+        ],
+        "response": "{success: boolean, data: {research_id: string, research: KeywordResearchResult, credits_used: 18}}"
+      },
+      {
+        "name": "plan",
+        "summary": "Generate article plan from keyword research data using Gemini (2 credits).",
+        "params": [
+          {
+            "name": "topic",
+            "type": "string",
+            "required": true,
+            "desc": "Topic for the article."
+          },
+          {
+            "name": "target_keyword",
+            "type": "string",
+            "required": true,
+            "desc": "Primary keyword to target."
+          },
+          {
+            "name": "keyword_research",
+            "type": "object",
+            "required": true,
+            "desc": "KeywordResearchResult from the research action."
+          },
+          {
+            "name": "content_brief",
+            "type": "object",
+            "required": false,
+            "desc": "Optional ContentBrief with audience, brand voice, business objective."
+          }
+        ],
+        "response": "{success: boolean, data: {plan: ArticlePlan, credits_used: 2}}"
+      },
+      {
+        "name": "write",
+        "summary": "Generate full SEO article from an article plan using Claude Opus (20 credits).",
+        "params": [
+          {
+            "name": "article_plan",
+            "type": "object",
+            "required": true,
+            "desc": "ArticlePlan from the plan action."
+          },
+          {
+            "name": "content_brief",
+            "type": "object",
+            "required": false,
+            "desc": "Optional ContentBrief for brand voice and audience tuning."
+          },
+          {
+            "name": "keyword_research_summary",
+            "type": "object",
+            "required": false,
+            "desc": "Optional partial KeywordResearchResult for SERP-aware writing."
+          }
+        ],
+        "response": "{success: boolean, data: {content_markdown: string, word_count: number, title: string, credits_used: 20}}"
+      },
+      {
+        "name": "analyze",
+        "summary": "Analyze article content for SEO quality; optionally auto-fix with Gemini (2 + up to 15 credits).",
+        "params": [
+          {
+            "name": "content_markdown",
+            "type": "string",
+            "required": true,
+            "desc": "Article markdown to analyze."
+          },
+          {
+            "name": "article_plan",
+            "type": "object",
+            "required": true,
+            "desc": "ArticlePlan the article was written against."
+          },
+          {
+            "name": "apply_fixes",
+            "type": "boolean",
+            "required": false,
+            "desc": "Whether to apply AI fixes (up to 3 iterations, 5 cr each)."
+          },
+          {
+            "name": "content_brief",
+            "type": "object",
+            "required": false,
+            "desc": "Optional ContentBrief for brand voice checks."
+          }
+        ],
+        "response": "{success: boolean, data: {analysis: ContentAnalysisResult, fixed_content?: string, credits_used: number}}"
+      },
+      {
+        "name": "pipeline",
+        "summary": "Full async research→plan→write→analyze pipeline; creates seo_articles row and polls progress.",
+        "params": [
+          {
+            "name": "topic",
+            "type": "string",
+            "required": true,
+            "desc": "Article topic."
+          },
+          {
+            "name": "target_keyword",
+            "type": "string",
+            "required": true,
+            "desc": "Primary target keyword."
+          },
+          {
+            "name": "location_code",
+            "type": "number",
+            "required": false,
+            "desc": "DataForSEO location code."
+          },
+          {
+            "name": "language_code",
+            "type": "string",
+            "required": false,
+            "desc": "Language code."
+          },
+          {
+            "name": "content_brief",
+            "type": "object",
+            "required": false,
+            "desc": "Optional ContentBrief."
+          }
+        ],
+        "response": "{success: boolean, data: {article_id: string, status: ArticleStatus, stage: PipelineStage}}"
+      },
+      {
+        "name": "toolkit_audit",
+        "summary": "Run composite domain audit for SEO dashboard; accepts JWT (manual) or x-cron-secret (batch).",
+        "params": [
+          {
+            "name": "tracked_domain_id",
+            "type": "string",
+            "required": false,
+            "desc": "UUID of the seo_tracked_domains row to audit. Required for user-driven mode; omitted for cron batch."
+          },
+          {
+            "name": "source",
+            "type": "string",
+            "required": false,
+            "desc": "'manual' | 'cron' | 'first_run'"
+          }
+        ],
+        "response": "{success: boolean, audit_id?: string, domain?: string, audited?: number, errors?: number}"
+      },
+      {
+        "name": "toolkit_research",
+        "summary": "User-driven SERP opportunity research; persists result into seo_research_runs.",
+        "params": [
+          {
+            "name": "kind",
+            "type": "string",
+            "required": true,
+            "desc": "Research kind identifier forwarded to /opportunities-stateless."
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true,
+            "desc": "Subject string (keyword or domain)."
+          },
+          {
+            "name": "params",
+            "type": "object",
+            "required": true,
+            "desc": "Parameters forwarded verbatim to /opportunities-stateless."
+          },
+          {
+            "name": "label",
+            "type": "string",
+            "required": false,
+            "desc": "Optional display label for the run."
+          }
+        ],
+        "response": "{ok: boolean, run_id: string, opportunities: object}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research"
+      }
+    ],
+    "response": "{success: boolean, data: object}"
+  },
+  {
+    "name": "ses-webhook",
+    "tag": "Email",
+    "summary": "Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries.",
+    "description": "Accepts POST from Amazon SNS; auto-confirms subscription on `SubscriptionConfirmation` messages. For `Notification` messages, parses SES bounce/complaint/delivery payloads and updates `email_logs` and `campaign_recipients` accordingly. No HMAC signature verification is performed — relies on SNS IP filtering.",
+    "security": [
+      "snsSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "Type",
+        "type": "string",
+        "required": true,
+        "desc": "SNS message type: SubscriptionConfirmation or Notification"
+      },
+      {
+        "name": "Message",
+        "type": "string",
+        "required": true,
+        "desc": "JSON-encoded SES notification payload (Bounce, Complaint, or Delivery)"
+      },
+      {
+        "name": "TopicArn",
+        "type": "string",
+        "required": true,
+        "desc": "SNS topic ARN"
+      },
+      {
+        "name": "SubscribeURL",
+        "type": "string",
+        "required": false,
+        "desc": "Confirmation URL (only on SubscriptionConfirmation)"
+      }
+    ],
+    "response": "{message:string}"
+  },
+  {
+    "name": "storage-orphan-cleanup-cron",
+    "tag": "Crons",
+    "summary": "Nightly cron (04:00 UTC): delete storage objects with no live DB reference",
+    "description": "Scans pdf-documents (72h grace), pdf-tiles (48h grace), and generation-images (14d grace) via the find_orphan_storage_objects RPC. Each 100-path delete batch is pre-verified by verify_storage_orphans to close the snapshot-to-delete race window. Results logged to storage_cleanup_log.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "dry_run",
+        "type": "boolean",
+        "required": false,
+        "desc": "Report orphans without deleting"
+      },
+      {
+        "name": "bucket",
+        "type": "string",
+        "required": false,
+        "desc": "Limit scan to a single bucket name"
+      },
+      {
+        "name": "source",
+        "type": "string",
+        "required": false,
+        "desc": "Label written to storage_cleanup_log.source"
+      }
+    ],
+    "response": "{ success, stats: { buckets, total_deleted, total_bytes_freed, total_skipped_raced, duration_ms, dry_run } }"
+  },
+  {
+    "name": "stripe-api",
+    "tag": "Payments",
+    "summary": "Stripe Checkout and Customer Portal session creator",
+    "description": "Action-discriminated endpoint for platform billing. 'checkout' creates a Stripe Checkout session for credit purchases or subscriptions; 'customer_portal' creates a billing portal session for subscription management. Uses the dedicated platform-billing Stripe account when configured.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "checkout",
+        "summary": "Create a Stripe Checkout session for credit purchase or subscription",
+        "params": [
+          {
+            "name": "type",
+            "type": "string ('credit_purchase'|'subscription')",
+            "required": true,
+            "desc": "Checkout type."
+          },
+          {
+            "name": "price",
+            "type": "number",
+            "required": false,
+            "desc": "EUR amount for credit_purchase; server derives credit quantity (1 EUR = 100 credits)."
+          },
+          {
+            "name": "priceId",
+            "type": "string",
+            "required": false,
+            "desc": "Stripe price ID for subscription type."
+          },
+          {
+            "name": "successUrl",
+            "type": "string",
+            "required": true,
+            "desc": "Redirect URL on payment success."
+          },
+          {
+            "name": "cancelUrl",
+            "type": "string",
+            "required": true,
+            "desc": "Redirect URL on cancellation."
+          }
+        ],
+        "response": "{url}"
+      },
+      {
+        "name": "customer_portal",
+        "summary": "Create a Stripe Customer Portal session for subscription management",
+        "params": [
+          {
+            "name": "returnUrl",
+            "type": "string",
+            "required": true,
+            "desc": "URL to return to after portal session."
+          }
+        ],
+        "response": "{url}"
+      }
+    ]
+  },
+  {
+    "name": "stripe-connect",
+    "tag": "Payments",
+    "summary": "Stripe Connect onboarding and status for per-workspace payouts",
+    "description": "Manages Stripe Express accounts for per-workspace destination charges. 'onboard' gets or creates an Express account and returns an onboarding link; 'status' refreshes charges_enabled and details_submitted flags. Caller must be workspace owner or admin.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "onboard",
+        "summary": "Get or create a Stripe Express account and return an onboarding link",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Workspace to onboard."
+          },
+          {
+            "name": "return_url",
+            "type": "string",
+            "required": false,
+            "desc": "URL to redirect after onboarding; defaults to /admin/finance."
+          }
+        ],
+        "response": "{url, account_id}"
+      },
+      {
+        "name": "status",
+        "summary": "Refresh and return Stripe Connect account flags for a workspace",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Workspace to check."
+          }
+        ],
+        "response": "{configured, charges_enabled, details_submitted?}"
+      }
+    ]
+  },
+  {
+    "name": "stripe-webhooks",
+    "tag": "Payments",
+    "summary": "Stripe webhook receiver for subscription, payment, and invoice events",
+    "description": "Verifies the Stripe-Signature header (supports both default and dedicated platform-billing accounts), then routes events: customer.created/updated, subscription created/updated/deleted, payment_intent.succeeded (credit grants + invoice payments), payment_intent.payment_failed, invoice.paid (monthly credit grants), invoice.payment_failed.",
+    "security": [
+      "stripeSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{received: true}"
+  },
+  {
+    "name": "suggest-fields",
+    "tag": "Data Import",
+    "summary": "Scrape a product page URL with Firecrawl then use Claude to suggest importable field mappings.",
+    "description": "Requires Supabase JWT. If sampleHtml is omitted the page is scraped via Firecrawl v2/scrape. The first 3000 chars of markdown are passed to Claude with a DB-editable field_suggester prompt; returns a JSON array of suggested field definitions.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "url",
+        "type": "string",
+        "required": true,
+        "desc": "Product page URL to analyze."
+      },
+      {
+        "name": "sampleHtml",
+        "type": "string",
+        "required": false,
+        "desc": "Pre-fetched page markdown/HTML; skips Firecrawl scrape if provided."
+      }
+    ],
+    "response": "{success: boolean, fields: [{name, type, selector, sample_value, ...}], url: string}"
+  },
+  {
+    "name": "trigger-factory-enrichment",
+    "tag": "Admin",
+    "summary": "Propagate factory fields within a scope and queue a factory-enrichment agent if needed",
+    "description": "Called by PDF, XML, and scraping import pipelines after products are inserted. Runs propagateFactoryFieldsInScope to share the best factory object across all products in the same document/session scope, then queues a background agent_run (agent_type='factory-enrichment') when average completeness score is below 0.9.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true,
+        "desc": "Workspace to operate within"
+      },
+      {
+        "name": "product_ids",
+        "type": "string[]",
+        "required": false,
+        "desc": "Specific product IDs to check; falls back to scope query"
+      },
+      {
+        "name": "scope_column",
+        "type": "string",
+        "required": false,
+        "desc": "source_document_id or scrape_session_id"
+      },
+      {
+        "name": "scope_value",
+        "type": "string",
+        "required": false,
+        "desc": "Value for scope_column"
+      },
+      {
+        "name": "force_enrichment",
+        "type": "boolean",
+        "required": false,
+        "desc": "Skip completeness score check; always queue"
+      }
+    ],
+    "response": "{ propagated, queued_job_id: string|null, reason?: string }"
+  },
+  {
+    "name": "vies-validate",
+    "tag": "Business Profile",
+    "summary": "Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.",
+    "description": "Accepts a JWT-authenticated POST with `country_code` and `vat_number`. Non-EU codes are skipped with `skipped_reason='non_eu'`; VIES outages return 503 with `skipped_reason='vies_unreachable'`. If `company_id` is supplied and the caller owns the company (or is admin), the validated result is cached on `crm_companies` VIES columns.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "country_code",
+        "type": "string",
+        "required": true,
+        "desc": "ISO 3166-1 alpha-2 EU country code (e.g. EL, DE, FR); EL is used for Greece"
+      },
+      {
+        "name": "vat_number",
+        "type": "string",
+        "required": true,
+        "desc": "VAT number (with or without country prefix; prefix wins if present)"
+      },
+      {
+        "name": "company_id",
+        "type": "string",
+        "required": false,
+        "desc": "crm_companies.id — if provided and authorized, caches the result on the company row"
+      }
+    ],
+    "response": "{valid:boolean|null, name, legal_name, trade_name, address, address_parsed:{street,street_number,postal_code,city}, country_code, vat_number, checked_at, source:'vies', skipped_reason?}"
+  },
+  {
+    "name": "xml-import-orchestrator",
+    "tag": "Data Import",
+    "summary": "Parse and import supplier XML feeds; supports field detection, preview, and full import modes.",
+    "description": "Requires Supabase JWT. Accepts base64-encoded XML and routes behavior via preview_only and generate_preview flags: analyze mode returns detected fields with coverage stats (dictionary-first, AI-residual), preview mode applies mappings to a sample product, import mode creates a data_import_job and batch-inserts products for MIVAA processing.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "api/xml-import-orchestrator-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "analyze (preview_only=true)",
+        "summary": "Detect XML fields, compute coverage stats, and suggest field mappings without creating a job.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target workspace UUID."
+          },
+          {
+            "name": "xml_content",
+            "type": "string",
+            "required": true,
+            "desc": "Base64-encoded XML feed content."
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "required": false,
+            "desc": "Material category applied to all products (e.g. 'lighting')."
+          },
+          {
+            "name": "preview_only",
+            "type": "boolean",
+            "required": true,
+            "desc": "Must be true to enter analyze mode."
+          }
+        ],
+        "response": "{success: boolean, detected_fields: DetectedField[], product_count: number}"
+      },
+      {
+        "name": "preview (generate_preview=true)",
+        "summary": "Apply field mappings and manual_values to the first product node and return a preview.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target workspace UUID."
+          },
+          {
+            "name": "xml_content",
+            "type": "string",
+            "required": true,
+            "desc": "Base64-encoded XML feed content."
+          },
+          {
+            "name": "field_mappings",
+            "type": "object",
+            "required": false,
+            "desc": "Map of xml_tag -> target field name."
+          },
+          {
+            "name": "manual_values",
+            "type": "object",
+            "required": false,
+            "desc": "Per-target fallback values applied when mapped tag is empty."
+          },
+          {
+            "name": "generate_preview",
+            "type": "boolean",
+            "required": true,
+            "desc": "Must be true to enter preview mode."
+          }
+        ],
+        "response": "{success: boolean, preview_product: ProductData}"
+      },
+      {
+        "name": "import (default)",
+        "summary": "Create a data_import_job, batch-insert product nodes, and kick off MIVAA processing.",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target workspace UUID."
+          },
+          {
+            "name": "xml_content",
+            "type": "string",
+            "required": true,
+            "desc": "Base64-encoded XML feed content (max 25 MB decoded)."
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "required": true,
+            "desc": "Material category for all imported products."
+          },
+          {
+            "name": "source_name",
+            "type": "string",
+            "required": false,
+            "desc": "Human-readable feed label."
+          },
+          {
+            "name": "field_mappings",
+            "type": "object",
+            "required": false,
+            "desc": "Map of xml_tag -> target field name."
+          },
+          {
+            "name": "manual_values",
+            "type": "object",
+            "required": false,
+            "desc": "Per-target job-level fallback values."
+          },
+          {
+            "name": "mapping_template_id",
+            "type": "string",
+            "required": false,
+            "desc": "UUID of a saved field_templates row to apply."
+          },
+          {
+            "name": "parent_job_id",
+            "type": "string",
+            "required": false,
+            "desc": "UUID of the scheduled import job that spawned this run."
+          }
+        ],
+        "response": "{success: boolean, job_id: string, product_count: number, status: string}"
+      }
+    ],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true,
+        "desc": "Target workspace UUID."
+      },
+      {
+        "name": "xml_content",
+        "type": "string",
+        "required": true,
+        "desc": "Base64-encoded XML."
+      },
+      {
+        "name": "preview_only",
+        "type": "boolean",
+        "required": false,
+        "desc": "Set true to run field analysis only."
+      },
+      {
+        "name": "generate_preview",
+        "type": "boolean",
+        "required": false,
+        "desc": "Set true to preview mappings on one sample product."
+      }
+    ],
+    "response": "{success: boolean, job_id?: string, detected_fields?: array, preview_product?: object}"
+  },
+  {
+    "name": "zernio-api",
+    "tag": "Social",
+    "summary": "Social media publishing, OAuth account management, and analytics via Zernio.",
+    "description": "Action-discriminated API routing POST requests to three handlers: analytics (get_best_time, get_post_analytics, get_account_insights), OAuth (connect, callback, disconnect; GET returns account list), and publish (publish_now, schedule). All actions require supabase JWT auth.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET"
+    ],
+    "actions": [
+      {
+        "name": "connect",
+        "summary": "Obtain a Zernio OAuth authUrl for a social platform.",
+        "params": [
+          {
+            "name": "platform",
+            "type": "string",
+            "required": true,
+            "desc": "Social platform slug (instagram, facebook, linkedin, tiktok, pinterest, youtube, twitter, threads)"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace to attach the account"
+          },
+          {
+            "name": "redirect_url",
+            "type": "string",
+            "required": false,
+            "desc": "Post-OAuth redirect URL"
+          }
+        ],
+        "response": "{success:true, authUrl:string}"
+      },
+      {
+        "name": "callback",
+        "summary": "Persist a Zernio-connected account after OAuth completes.",
+        "params": [
+          {
+            "name": "zernio_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Zernio account ID returned after OAuth"
+          },
+          {
+            "name": "platform",
+            "type": "string",
+            "required": true,
+            "desc": "Social platform slug"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target workspace"
+          }
+        ],
+        "response": "{success:true, account:{}}"
+      },
+      {
+        "name": "disconnect",
+        "summary": "Mark a social account inactive and revoke the Zernio connection.",
+        "params": [
+          {
+            "name": "social_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id to disconnect"
+          }
+        ],
+        "response": "{success:true}"
+      },
+      {
+        "name": "publish_now",
+        "summary": "Publish a social post immediately via Zernio.",
+        "params": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_posts.id"
+          },
+          {
+            "name": "social_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id to publish from"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": false,
+            "desc": "Workspace scope for the post and account"
+          }
+        ],
+        "response": "{success:true, zernio_post_id:string, status:string}"
+      },
+      {
+        "name": "schedule",
+        "summary": "Schedule a social post for future publication via Zernio.",
+        "params": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_posts.id"
+          },
+          {
+            "name": "social_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id"
+          },
+          {
+            "name": "scheduled_at",
+            "type": "string",
+            "required": true,
+            "desc": "ISO datetime to publish"
+          },
+          {
+            "name": "workspace_id",
+            "type": "string",
+            "required": false,
+            "desc": "Workspace scope"
+          }
+        ],
+        "response": "{success:true, zernio_post_id:string, status:'scheduled'}"
+      },
+      {
+        "name": "get_post_analytics",
+        "summary": "Retrieve engagement analytics for a published post.",
+        "params": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_posts.id (Zernio postId resolved internally)"
+          }
+        ],
+        "response": "{analytics:{likes, comments, shares, engagementRate, ...}}"
+      },
+      {
+        "name": "get_best_time",
+        "summary": "Get the best posting time recommendation for an account.",
+        "params": [
+          {
+            "name": "account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id"
+          }
+        ],
+        "response": "{bestTime:{dayOfWeek, hour, timezone}}"
+      },
+      {
+        "name": "get_account_insights",
+        "summary": "Return follower stats and account-level insights for a social account.",
+        "params": [
+          {
+            "name": "account_id",
+            "type": "string",
+            "required": true,
+            "desc": "social_accounts.id"
+          }
+        ],
+        "response": "{insights:{followers, followersGrowth, ...}}"
+      }
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "One of: connect, callback, disconnect, publish_now, schedule, get_post_analytics, get_best_time, get_account_insights"
+      }
+    ],
+    "response": "{}"
+  },
+  {
+    "name": "zernio-webhook-handler",
+    "tag": "Social",
+    "summary": "Receives Zernio webhooks for social post events and WhatsApp messaging events.",
+    "description": "Single Zernio webhook endpoint for both social (post.scheduled/published/partial/failed/cancelled, account.disconnected) and WhatsApp messaging (message.received, message.delivered/read/failed). Verifies HMAC-SHA256 via X-Zernio-Signature header using `ZERNIO_WEBHOOK_SECRET` (legacy `LATE_WEBHOOK_SECRET` fallback). On message.received: upserts messaging_conversations, assigns thread to campaign owner on first reply, handles STOP/START opt-out keywords, emits whatsapp.reply_received flow event.",
+    "security": [
+      "zernioSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": false,
+        "desc": "Zernio event ID"
+      },
+      {
+        "name": "event",
+        "type": "string",
+        "required": true,
+        "desc": "Event name: post.scheduled|published|partial|failed|cancelled, account.disconnected, message.received|delivered|read|failed"
+      },
+      {
+        "name": "post",
+        "type": "object",
+        "required": false,
+        "desc": "Post object (present for post.* events); includes id, publishedAt, platforms[]"
+      },
+      {
+        "name": "account",
+        "type": "object",
+        "required": false,
+        "desc": "Account object (present for account.* and WhatsApp message.* events)"
+      },
+      {
+        "name": "message",
+        "type": "object",
+        "required": false,
+        "desc": "Message object (present for message.* events); includes text, sender, direction, platformMessageId"
+      },
+      {
+        "name": "timestamp",
+        "type": "string",
+        "required": false,
+        "desc": "ISO event timestamp"
+      }
+    ],
+    "response": "{received:true, event:string}"
+  }
+]
