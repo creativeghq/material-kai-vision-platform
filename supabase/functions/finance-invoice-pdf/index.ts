@@ -14,6 +14,7 @@ import fontkit from '@pdf-lib/fontkit';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Google Noto Sans (full Greek + Latin), served as real TTF from the official noto-fonts repo.
 const FONT_URLS = {
@@ -95,7 +96,7 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -207,7 +208,7 @@ Deno.serve(async (req) => {
     await supabase.from(TABLE).update({ pdf_generation_status: 'failed' }).eq('id', docId);
     return json({ ok: false, error: err?.message ?? 'pdf generation failed' }, 500);
   }
-});
+}));
 
 async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null }): Promise<Uint8Array> {
   const { inv, items, fs, customer, branch, lang, logo } = d;

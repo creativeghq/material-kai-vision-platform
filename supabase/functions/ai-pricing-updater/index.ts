@@ -15,6 +15,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Known pricing sources for major providers (per 1M tokens)
 // These are fallback values - the function will attempt to fetch from APIs first
@@ -90,7 +91,7 @@ interface UpdateStats {
   results: UpdateResult[];
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
   await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -283,4 +284,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));

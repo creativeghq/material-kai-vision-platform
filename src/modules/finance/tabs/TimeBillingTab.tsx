@@ -3,7 +3,7 @@
  * entries into a draft invoice (one line per entry). Oxygen tasks_management + time-reports parity.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, Clock, Search, FilePlus2, CheckCircle2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Clock, Search, FilePlus2, CheckCircle2, BarChart3, Users, Contact } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
-import { timeTrackingService, type TimeEntry } from '@/modules/finance/services/timeTrackingService';
+import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -39,6 +39,23 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [billing, setBilling] = useState(false);
+
+  // Time reports (Oxygen m=403 — per user / per contact)
+  const thisYear = new Date().getFullYear();
+  const [repFrom, setRepFrom] = useState(`${thisYear}-01-01`);
+  const [repTo, setRepTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [report, setReport] = useState<{ byUser: TimeReportUserRow[]; byContact: TimeReportContactRow[] } | null>(null);
+  const [repLoading, setRepLoading] = useState(false);
+  const [repView, setRepView] = useState<'user' | 'contact'>('user');
+
+  const loadReport = async () => {
+    try {
+      setRepLoading(true);
+      setReport(await timeTrackingService.report(workspaceId, repFrom, repTo));
+    } catch (err: any) { toast({ title: 'Failed to load report', description: err?.message, variant: 'destructive' }); }
+    finally { setRepLoading(false); }
+  };
+  useEffect(() => { void loadReport(); /* eslint-disable-next-line */ }, [workspaceId, repFrom, repTo]);
 
   const load = async () => {
     try {
@@ -94,13 +111,14 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       });
       setDesc(''); setHours('1');
       await load();
+      void loadReport();
       toast({ title: 'Time logged' });
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
   };
 
   const removeEntry = async (e: TimeEntry) => {
-    try { await timeTrackingService.remove(e.id); await load(); }
+    try { await timeTrackingService.remove(e.id); await load(); void loadReport(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
@@ -126,6 +144,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       const invoiceId = await timeTrackingService.billToInvoice(workspaceId, cust, selectedRows.map((e) => e.id), vatRate);
       setSelected(new Set());
       await load();
+      void loadReport();
       toast({ title: 'Draft invoice created', description: `Invoice ${invoiceId.slice(0, 8)} — finalize & issue it in Invoices.` });
     } catch (err: any) { toast({ title: 'Could not bill', description: err?.message, variant: 'destructive' }); }
     finally { setBilling(false); }
@@ -217,6 +236,85 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 </label>
               ))}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Time reports — per user / per contact (Oxygen m=403) */}
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
+          <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Time reports</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-md border border-border/60 p-0.5">
+              <button type="button" onClick={() => setRepView('user')} className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${repView === 'user' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}><Users className="h-3.5 w-3.5" /> By user</button>
+              <button type="button" onClick={() => setRepView('contact')} className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${repView === 'contact' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}><Contact className="h-3.5 w-3.5" /> By contact</button>
+            </div>
+            <input type="date" value={repFrom} max={repTo} onChange={(e) => setRepFrom(e.target.value)} className="h-8 rounded-md border border-border/60 bg-background px-2 text-xs" />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input type="date" value={repTo} min={repFrom} onChange={(e) => setRepTo(e.target.value)} className="h-8 rounded-md border border-border/60 bg-background px-2 text-xs" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {repLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : repView === 'user' ? (
+            (report?.byUser.length ?? 0) === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No time logged in this period.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr className="border-b border-border/60">
+                    <th className="px-4 py-2 text-left">User</th>
+                    <th className="px-4 py-2 text-right">Entries</th>
+                    <th className="px-4 py-2 text-right">Hours</th>
+                    <th className="px-4 py-2 text-right">Billable h</th>
+                    <th className="px-4 py-2 text-right">Value</th>
+                    <th className="px-4 py-2 text-right">Billed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report!.byUser.map((r) => (
+                    <tr key={r.user_id ?? 'none'} className="border-b border-border/30">
+                      <td className="px-4 py-2">{r.name}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{r.entries}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">{r.hours}h</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.billable_hours}h</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatMoney(r.value)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(r.billed_value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          ) : (
+            (report?.byContact.length ?? 0) === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No time logged in this period.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr className="border-b border-border/60">
+                    <th className="px-4 py-2 text-left">Contact</th>
+                    <th className="px-4 py-2 text-right">Entries</th>
+                    <th className="px-4 py-2 text-right">Hours</th>
+                    <th className="px-4 py-2 text-right">Value</th>
+                    <th className="px-4 py-2 text-right">Billed</th>
+                    <th className="px-4 py-2 text-right">Unbilled</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report!.byContact.map((r) => (
+                    <tr key={r.key} className="border-b border-border/30">
+                      <td className="px-4 py-2">{r.name}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{r.entries}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">{r.hours}h</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatMoney(r.value)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(r.billed_value)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-amber-500">{formatMoney(r.unbilled_value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </CardContent>
       </Card>

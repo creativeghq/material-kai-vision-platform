@@ -9,6 +9,7 @@ import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // =====================================================
 // TYPES
@@ -212,7 +213,7 @@ async function sendWebhooks(
 // =====================================================
 // MAIN HANDLER
 // =====================================================
-serve(async (req) => {
+serve(withApiLogging('notification-dispatcher', async (req) => {
   await bootstrapForFunction();
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -282,5 +283,5 @@ serve(async (req) => {
       }
     );
   }
-});
+}));
 

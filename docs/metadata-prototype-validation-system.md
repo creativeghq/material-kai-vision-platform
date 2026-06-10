@@ -24,7 +24,7 @@ The Metadata Prototype Validation System is a semantic validation system that st
 
 ## 🎯 Overview
 
-The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using CLIP text embeddings. This ensures that the vision model's free-text metadata extractions (Claude Opus 4.7 vision_analysis via Anthropic tool use, sole vision pass post-2026-05-01 — schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`; pre-2026-05-01 was Qwen3-VL with Claude fallback, retired because the Qwen HF endpoint had been 404-ing for months) are standardized to consistent, validated property values. Note: with Anthropic tool use the schema is hard-enforced at the model boundary, so this validator now mainly catches lexical drift on enum-like fields rather than malformed JSON.
+The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using text embeddings. This ensures that the vision model's free-text metadata extractions (Claude Opus 4.7 vision_analysis via Anthropic tool use, sole vision pass post-2026-05-01 — schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`; pre-2026-05-01 was Qwen3-VL with Claude fallback, retired because the Qwen HF endpoint had been 404-ing for months) are standardized to consistent, validated property values. Note: with Anthropic tool use the schema is hard-enforced at the model boundary, so this validator now mainly catches lexical drift on enum-like fields rather than malformed JSON.
 
 ---
 
@@ -126,13 +126,13 @@ Track all extracted values for each property using a `metadata_value_frequency` 
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 
-The API endpoint `GET /api/admin/metadata-prototypes/suggestions` queries unvalidated values with frequency >= a threshold, calculates CLIP embedding similarity against existing prototypes for each suggestion, and returns enriched suggestions ordered by frequency.
+The API endpoint `GET /api/admin/metadata-prototypes/suggestions` queries unvalidated values with frequency >= a threshold, calculates embedding similarity against existing prototypes for each suggestion, and returns enriched suggestions ordered by frequency.
 
 #### Phase 3: Admin Actions
 
-**Action 1: Add as New Prototype** — `POST /api/admin/metadata-prototypes/add` updates the `prototype_descriptions` JSONB on the `material_properties` row, regenerates the CLIP embedding for the property, marks the value as validated in the frequency table, and queues a re-validation job for all affected products.
+**Action 1: Add as New Prototype** — `POST /api/admin/metadata-prototypes/add` updates the `prototype_descriptions` JSONB on the `material_properties` row, regenerates the prototype embedding for the property, marks the value as validated in the frequency table, and queues a re-validation job for all affected products.
 
-**Action 2: Merge with Existing** — `POST /api/admin/metadata-prototypes/merge` adds the extracted value as a variation of an existing prototype, regenerates the embedding, updates all products that had the extracted value to use the target prototype, and marks the value as validated.
+**Action 2: Merge with Existing** — `POST /api/admin/metadata-prototypes/merge` adds the extracted value as a variation of an existing prototype, regenerates the prototype embedding, updates all products that had the extracted value to use the target prototype, and marks the value as validated.
 
 **Action 3: Ignore** — `POST /api/admin/metadata-prototypes/ignore` marks the suggestion as rejected so it won't appear in the dashboard again.
 
@@ -290,7 +290,7 @@ Query: `{"finish": "shiny", "slip_resistance": "R-11"}`
 │   "standard": ["2 hours", "2-3 hours", "normal"]            │
 │   "extended": ["3-4 hours", "4+ hours", "complex"]          │
 │                                                              │
-│ System generates 512D CLIP embeddings                       │
+│ System generates 512D prototype embeddings (validator-local) │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                           ↓
@@ -476,7 +476,7 @@ The new scoring formula weights: 30% text similarity, 30% visual similarity, 20%
 
 **NEW Columns** (ADDED):
 - `prototype_descriptions` — JSONB mapping value names to arrays of 3-5 prototype descriptions. For example, the "finish" property maps "glossy" to descriptions like "High gloss reflective surface, Polished shiny appearance, Mirror-like finish".
-- `text_embedding_512` — VECTOR(512) containing the averaged CLIP embedding for all prototypes of that property
+- `text_embedding_512` — VECTOR(512) containing the averaged prototype embedding for all prototypes of that property. (Note: this is a validator-specific column for property-level prototype embeddings — distinct from the VECS image/text embedding collections which use 768D SLIG and 1024D Voyage.)
 - `prototype_updated_at` — TIMESTAMP of last update
 
 A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embedding_512` for fast similarity search.
@@ -491,7 +491,7 @@ A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embe
 
 **2. Prototype Validator Processes Each Field**: The `MetadataPrototypeValidator.validate_property(property_key, extracted_value)` method is called for each field. It returns the best-matching prototype value, a `validated` boolean, a `confidence` score, and the similarity scores against all prototypes.
 
-**3. Validation Algorithm**: A CLIP embedding is generated for the extracted value. The property's prototypes are retrieved from the database. Cosine similarity is computed between the extracted embedding and each prototype embedding. The best match is selected; if its similarity exceeds 0.80, the prototype value is returned as validated, otherwise the original value is kept.
+**3. Validation Algorithm**: A prototype embedding is generated for the extracted value. The property's prototypes are retrieved from the database. Cosine similarity is computed between the extracted embedding and each prototype embedding. The best match is selected; if its similarity exceeds 0.80, the prototype value is returned as validated, otherwise the original value is kept.
 
 **4. Store Validated Metadata**: The product metadata is saved with both validated values and a `_validation_metadata` dictionary tracking which properties were validated and at what confidence.
 
@@ -503,7 +503,7 @@ A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embe
 
 **1. Exact Metadata Filtering (EXISTING - UNCHANGED)**: Search products by exact metadata values using `POST /api/search/products` with a `filters` object (e.g., `{"metadata.finish": "glossy", "metadata.slip_resistance": "R11"}`).
 
-**2. Semantic Metadata Search (NEW - ADDED)**: Search using natural language via `POST /api/search/products/semantic` with `use_metadata_prototypes: true`. The system generates CLIP embeddings for query terms (e.g., "shiny" → matches "glossy" prototype at 0.89), then boosts products whose validated metadata matches the inferred prototypes.
+**2. Semantic Metadata Search (NEW - ADDED)**: Search using natural language via `POST /api/search/products/semantic` with `use_metadata_prototypes: true`. The system generates prototype embeddings for query terms (e.g., "shiny" → matches "glossy" prototype at 0.89), then boosts products whose validated metadata matches the inferred prototypes.
 
 **3. Metadata Similarity Scoring (NEW - ADDED)**: The combined score formula now includes a 20% weight for `metadata_prototype_match` alongside text similarity (40%), visual similarity (30%), and confidence score (10%).
 
@@ -532,7 +532,7 @@ A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embe
 
 ### Database Schema
 
-Three new columns are added to `material_properties`: `prototype_descriptions` (JSONB, default `{}`), `text_embedding_512` (VECTOR(512)), and `prototype_updated_at` (TIMESTAMP). A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embedding_512`.
+Three new columns are added to `material_properties`: `prototype_descriptions` (JSONB, default `{}`), `text_embedding_512` (VECTOR(512) — validator-specific prototype embeddings, not the VECS image/text embedding collections), and `prototype_updated_at` (TIMESTAMP). A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embedding_512`.
 
 ### Property Population
 
@@ -548,7 +548,7 @@ For each property/value combination, embeddings are generated for all descriptio
 
 ### Validation Service
 
-The `MetadataPrototypeValidator` class provides three main methods: `validate_property(property_key, extracted_value)` for single-field validation, `validate_metadata(metadata)` for batch validation, and `get_property_prototypes(property_key)` for inspection. The validator generates CLIP embeddings for extracted values, compares them against all prototype embeddings for the property, returns the best match with confidence, uses a 0.80 confidence threshold, and falls back to the original value if confidence is below threshold.
+The `MetadataPrototypeValidator` class provides three main methods: `validate_property(property_key, extracted_value)` for single-field validation, `validate_metadata(metadata)` for batch validation, and `get_property_prototypes(property_key)` for inspection. The validator generates embeddings for extracted values, compares them against all prototype embeddings for the property, returns the best match with confidence, uses a 0.80 confidence threshold, and falls back to the original value if confidence is below threshold.
 
 ### Pipeline Integration
 

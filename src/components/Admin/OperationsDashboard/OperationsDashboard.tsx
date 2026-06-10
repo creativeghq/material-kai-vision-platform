@@ -66,6 +66,11 @@ import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
 import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { StorageAuditPanel } from '../StorageAuditPanel';
+// Relocated here (2026-06-09) from the orphaned /admin/performance route.
+import { SystemPerformance } from '../SystemPerformance';
+// Relocated here (2026-06-09) from the misnamed /admin/training-models grab-bag.
+import { FactoryRegistrationsTab } from '../FactoryRegistrationsTab';
+import { FactoryAccessRequestsTab } from '../FactoryAccessRequestsTab';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
@@ -91,9 +96,9 @@ import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
 const VALID_OPERATIONS_TABS = new Set([
-  'system-health', 'data-processing', 'ai-performance', 'agent-chat',
+  'system-health', 'data-processing', 'ai-performance', 'performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
-  'seo-toolkit', 'keys',
+  'seo-toolkit', 'factory-onboarding', 'keys',
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
@@ -846,6 +851,10 @@ const OperationsDashboardInner: React.FC = () => {
               <Bot className="h-4 w-4 mr-2" />
               AI Performance
             </TabsTrigger>
+            <TabsTrigger value="performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Gauge className="h-4 w-4 mr-2" />
+              Performance
+            </TabsTrigger>
             <TabsTrigger value="agent-chat" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
@@ -861,6 +870,10 @@ const OperationsDashboardInner: React.FC = () => {
             <TabsTrigger value="platform-overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Platform Overview
+            </TabsTrigger>
+            <TabsTrigger value="factory-onboarding" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Users className="h-4 w-4 mr-2" />
+              Factory Onboarding
             </TabsTrigger>
             <TabsTrigger value="catalogs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BookOpen className="h-4 w-4 mr-2" />
@@ -881,6 +894,24 @@ const OperationsDashboardInner: React.FC = () => {
             <SystemHealthMonitor />
             {/* Storage audit — orphan objects per bucket + run cleanup, across all buckets (PDFs, images, sheets, quotes, etc.) */}
             <StorageAuditPanel />
+          </TabsContent>
+
+          {/* Performance Tab — relocated from /admin/performance (job processing + per-document timelines). */}
+          <TabsContent value="performance" className="space-y-4">
+            <SystemPerformance embedded />
+          </TabsContent>
+
+          {/* Factory Onboarding — manufacturer registration approvals + access requests.
+              Salvaged from the retired /admin/training-models panel (2026-06-09). */}
+          <TabsContent value="factory-onboarding" className="space-y-4">
+            <Tabs defaultValue="registrations" className="space-y-4">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                <TabsTrigger value="registrations" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Registrations</TabsTrigger>
+                <TabsTrigger value="access" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Access Requests</TabsTrigger>
+              </TabsList>
+              <TabsContent value="registrations"><FactoryRegistrationsTab /></TabsContent>
+              <TabsContent value="access"><FactoryAccessRequestsTab /></TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* Agent Chat Analytics Tab */}

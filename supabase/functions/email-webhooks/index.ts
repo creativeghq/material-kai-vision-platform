@@ -8,6 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,7 +87,7 @@ async function verifyResendSignature(
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('email-webhooks', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -220,4 +221,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

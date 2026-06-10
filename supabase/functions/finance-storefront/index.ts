@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // #207 — Public online storefront (Oxygen "Open Link" / mini-store parity).
 //
@@ -36,7 +37,7 @@ function imageFromMetadata(meta: any): string | null {
   return null;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-storefront', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -178,4 +179,4 @@ Deno.serve(async (req) => {
     console.error('finance-storefront error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));

@@ -18,6 +18,7 @@
 // No process.env polyfill needed — API key passed directly to ChatAnthropic constructor.
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -2079,7 +2080,7 @@ async function logAgentUsage(
 /**
  * Main handler
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('agent-chat', async (req) => {
   // Handle CORS preflight - must return 200/204 with proper headers
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -2568,5 +2569,5 @@ Deno.serve(async (req) => {
       },
     );
   }
-});
+}));
 

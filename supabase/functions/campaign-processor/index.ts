@@ -7,10 +7,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
-serve(async (req) => {
+serve(withApiLogging('campaign-processor', async (req) => {
   await bootstrapForFunction();
   try {
     // Verify this is a cron request
@@ -171,11 +172,11 @@ serve(async (req) => {
     console.error('Campaign processor error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
+      {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       }
     );
   }
-});
+}));
 

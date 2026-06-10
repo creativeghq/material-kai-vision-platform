@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -11,7 +12,7 @@ function json(body: unknown, status = 200): Response {
 
 const money = (v: number, c: string) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: c || 'EUR' }).format(v);
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -101,4 +102,4 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: dispatchErr?.message ?? 'email send failed' }, 502);
   }
   return json({ ok: true, sent_to: email });
-});
+}));

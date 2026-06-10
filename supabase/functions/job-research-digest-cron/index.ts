@@ -1,4 +1,5 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 /**
  * Job Research Digest Cron — consolidated daily email per user.
  *
@@ -17,7 +18,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
  * :05 of the next hour) ensures the digest sees the freshest results.
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('job-research-digest-cron', async (req) => {
   await bootstrapForFunction();
   console.log('📬 Job research digest cron started');
 
@@ -76,4 +77,4 @@ Deno.serve(async (req) => {
       timestamp: new Date().toISOString(),
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-});
+}));

@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 //
@@ -120,7 +121,7 @@ async function isFinanceManagerForQuote(
   return wsManager || globalManager;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -569,4 +570,4 @@ Deno.serve(async (req) => {
     console.error('finance-issue-invoice error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));

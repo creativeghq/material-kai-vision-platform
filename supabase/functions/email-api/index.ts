@@ -8,7 +8,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { captureException } from '../_shared/sentry.ts';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
@@ -476,12 +475,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
     }
   } catch (error) {
     console.error('Error:', error);
-
-    await captureException(error instanceof Error ? error : new Error(String(error)), {
-      tags: { function: 'email-api' },
-      extra: { error_message: error instanceof Error ? error.message : String(error) },
-    });
-
+    // Top-level capture is handled by withApiLogging (returns 5xx → Sentry).
     const errMsg = error instanceof Error ? error.message : String(error);
     const statusCode = errMsg.includes('Unauthorized') ? 401 : errMsg.includes('not allowed') ? 405 : 500;
     return new Response(

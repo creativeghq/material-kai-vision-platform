@@ -37,6 +37,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface BucketStat {
   bucket: string;
@@ -210,7 +211,7 @@ async function cleanBucket(
   return stat;
 }
 
-serve(async (req) => {
+serve(withApiLogging('storage-orphan-cleanup-cron', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -310,4 +311,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

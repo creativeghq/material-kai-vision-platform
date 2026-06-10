@@ -6,6 +6,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) running ledger
 // statement (Καρτέλα) PDF.
@@ -521,7 +522,7 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
   return { ok: true, mode: 'cron_batch', processed_workspaces: summary.length, summary };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-send-statement', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -580,4 +581,4 @@ Deno.serve(async (req) => {
     console.error('finance-send-statement error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));

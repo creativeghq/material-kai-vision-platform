@@ -24,6 +24,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -182,7 +183,7 @@ async function sendEmail(
   }
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -453,4 +454,4 @@ Deno.serve(async (req: Request) => {
     console.error('[role-upgrade-requests] error:', err);
     return jsonResponse({ error: 'internal_error', detail }, 500);
   }
-});
+}));

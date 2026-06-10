@@ -18,6 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { zernioKey, sendWhatsAppMessage } from '../_shared/zernio.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
@@ -35,7 +36,7 @@ function orderedTemplateParams(template: any, variables: Record<string, any>): s
   return names.map((name) => String(variables?.[name] ?? ''));
 }
 
-serve(async (req) => {
+serve(withApiLogging('messaging-processor', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -209,4 +210,4 @@ serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));

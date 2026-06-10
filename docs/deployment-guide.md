@@ -202,11 +202,9 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 **Chandra OCR v2** (model `chandra-ocr-2.Q8_0.gguf`) is a state-of-the-art OCR model deployed as a serverless HuggingFace Inference Endpoint. It returns structured bbox-JSON: each output entry is `{"text", "x", "y", "w", "h"}` with pixel coordinates on the source image. The strict response parser in `chandra_endpoint_manager.py` raises `ChandraResponseError` on unparseable output rather than writing empty/garbage text downstream.
 
 #### **How It Works:**
-1. **Chandra v2 Primary**: GPU-accelerated, structured bbox-JSON OCR (runs first)
-2. **EasyOCR Fallback**: Local, CPU-only fallback if Chandra is unreachable or returns unparseable output
-3. **Tesseract Last Resort**: Only used when both Chandra and EasyOCR fail
-4. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
-5. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused (T4 GPU at $0.50/hr while running)
+1. **Chandra v2 (sole OCR engine)**: GPU-accelerated, structured bbox-JSON OCR with retry-with-jitter (3 attempts at temperatures 0.0/0.4/0.8). EasyOCR and Tesseract were removed 2026-05-01. Failure sets `OCRResult.method='chandra_failed'` — consumers must check `method`, not emptiness.
+2. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
+3. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused (T4 GPU at $0.50/hr while running)
 
 #### **Required Secrets:**
 
@@ -217,7 +215,7 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 | `CHANDRA_ENDPOINT_NAME` | Public | `chandra-ocr-2` | Endpoint name for pause/resume operations |
 | `CHANDRA_NAMESPACE` | Public | `basiliskan` | HuggingFace namespace/username |
 | `CHANDRA_ENABLED` | Public | `true` | Enable/disable Chandra OCR fallback |
-| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | `0.7` | EasyOCR confidence threshold (0.0-1.0) |
+| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | `0.7` | Deprecated (was EasyOCR confidence threshold — EasyOCR removed 2026-05-01). Retained for config compat; has no effect. |
 | `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | `60` | Seconds before auto-pause (prevents billing) |
 | `CHANDRA_MAX_RESUME_RETRIES` | Public | `3` | Max retry attempts for resuming endpoint |
 | `CHANDRA_RESUME_TIMEOUT` | Public | `300` | Timeout for resume operation (seconds) |
@@ -265,7 +263,7 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 - ✅ Force-pause after batch processing
 - ✅ Endpoint status monitoring
 - ✅ Cost tracking per document
-- ✅ Fallback to EasyOCR if endpoint fails
+- ✅ Retry-with-jitter (3 attempts at temperatures 0.0/0.4/0.8) on endpoint failure
 
 ---
 
@@ -886,10 +884,9 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
      - OPENAI_API_KEY
      - ANTHROPIC_API_KEY
      - VOYAGE_API_KEY (for text embeddings)
-     - QWEN_ENDPOINT_URL (for vision models)
-     - QWEN_ENDPOINT_TOKEN (for vision models)
-     - SLIG_ENDPOINT_URL (for visual embeddings)
-     - SLIG_ENDPOINT_TOKEN (for visual embeddings)
+     - SLIG_ENDPOINT_URL (for visual embeddings — SigLIP2)
+     - SLIG_ENDPOINT_TOKEN (for visual embeddings — SigLIP2)
+     - CHANDRA_ENDPOINT_URL (for OCR — sole OCR engine; QWEN_ENDPOINT_* retired 2026-05-01)
      - FIRECRAWL_API_KEY (for price monitoring)
 
 2. **Environment Variable Mismatch**:
@@ -1316,7 +1313,6 @@ This section covers all third-party services used by the platform, their pricing
 
 | Channel | Price |
 |---------|-------|
-| SMS (outbound, US) | ~$0.0079/message |
 | WhatsApp (template) | ~$0.005/message |
 
 ---
@@ -1330,8 +1326,8 @@ This section covers all third-party services used by the platform, their pricing
 
 | World Quality | Credits | Time |
 |--------------|---------|------|
-| Mini | 50 credits | ~30–45 seconds |
-| Plus | 200 credits | ~5 minutes |
+| `marble-1.0-draft` | 18 credits | ~30–45 seconds |
+| `marble-1.1` | 190 credits | ~5 minutes |
 
 Credits are refunded on generation failure.
 

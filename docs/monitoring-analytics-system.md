@@ -31,8 +31,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - ✅ Auto-refresh with Supabase real-time subscriptions
 
 **Data Sources**:
-- `background_jobs` table - Main job tracking
-- `job_checkpoints` table - Stage-by-stage progress
+- `background_jobs` table - Main job tracking (including `stage_history` JSONB for stage-by-stage progress; `job_checkpoints` was dropped 2026-04-25)
 
 **Metrics Tracked**: For `pdf_processing`, the system tracks pending, processing, completed, failed, retrying, and total job counts, plus success rate and average processing time. At the platform level it tracks total documents, total products created, total chunks created, and total images extracted.
 
@@ -183,23 +182,19 @@ Stage 4 logs products consolidated, sources merged, and AI calls made.
 
 ---
 
-## 🎯 Checkpoint System
+## 🎯 Stage History & Checkpoint System
 
-### 9 Processing Checkpoints
+### Stage-level audit via background_jobs JSONB (post 2026-04-25)
 
-All stages save comprehensive metrics to checkpoints for recovery:
+> The `job_checkpoints` table was **dropped** in the 2026-04-25 single-table migration. All stage data now lives as JSONB on `background_jobs`:
 
-1. **INITIALIZED** - Job created
-2. **PDF_EXTRACTED** - Stage 1 complete (focused extraction)
-3. **CHUNKS_CREATED** - Stage 2 complete (chunking)
-4. **TEXT_EMBEDDINGS_GENERATED** - Stage 3 complete (text embeddings)
-5. **IMAGES_EXTRACTED** - Stage 5 complete (image extraction)
-6. **IMAGE_EMBEDDINGS_GENERATED** - Stage 7 complete (CLIP embeddings)
-7. **PRODUCTS_DETECTED** - Stage 0 complete (product discovery)
-8. **PRODUCTS_CREATED** - Stage 9 complete (product creation)
-9. **COMPLETED** - All stages complete
+- **`stage_history`** — append-only array of stage events. Each entry carries `stage`, `status`, `started_at`, `completed_at`, `attempt`, `data`, `metadata`, `source`. Capped at 100 entries.
+- **`last_checkpoint`** — the resume snapshot (last successfully completed stage data). Used by auto-recovery to know where to restart.
+- **`recovery_history`** — append-only log of auto-recovery attempts.
 
-Each checkpoint saves a `stage` identifier, `checkpoint_data` (e.g., `document_id`, `images_extracted`, `material_images`), and `metadata` (e.g., `processing_time_ms`, `ai_model`, `success_rate`).
+Stage names written to `stage_history` include: `initialized`, `pdf_extracted`, `chunks_created`, `text_embeddings_generated`, `images_extracted`, `image_embeddings_generated`, `products_detected`, `products_created`, `completed`.
+
+Each stage event carries a `data` payload (e.g., `document_id`, `images_extracted`, `material_images`) and a `metadata` payload (e.g., `processing_time_ms`, `ai_model`, `success_rate`).
 
 ---
 
@@ -383,13 +378,9 @@ Six critical indexes to optimize job monitoring queries:
    - Query: `WHERE status = 'completed' AND completed_at < cutoff_time`
    - Partial index for completed jobs only
 
-5. **Checkpoint Queries** (`idx_job_checkpoints_job_created`)
-   - Query: `WHERE job_id = ? ORDER BY created_at DESC`
-   - Composite index on (job_id, created_at DESC)
+5. **stage_history / last_checkpoint** — these are JSONB columns on `background_jobs` (the `job_checkpoints` table was dropped 2026-04-25); no separate index needed — queries access them via the row's primary key.
 
-6. **Progress Tracking** (`idx_job_progress_document_updated`)
-   - Query: `WHERE document_id = ? ORDER BY updated_at DESC`
-   - Composite index on (document_id, updated_at DESC)
+6. **Progress Tracking** — progress percent is a column on `background_jobs` itself; the `job_progress` table was dropped 2026-04-25.
 
 **Impact**:
 - Before: Queries scanning 1000s of rows → 500-900ms (timeout)

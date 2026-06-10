@@ -151,7 +151,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Aspect Embeddings**
 
-The four aspect collections are now Voyage `voyage-3` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 4.7's structured output):
+The four aspect collections are now Voyage `voyage-4` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 4.7's structured output):
 
 | Collection | Aspect text source | Producer key (v2) |
 |---|---|---|
@@ -160,7 +160,7 @@ The four aspect collections are now Voyage `voyage-3` (1024D) text embeddings of
 | `image_style_embeddings` (1024D) | `VisionAnalysis.style + surface_pattern + applications` | `style_aspect_1024` |
 | `image_material_embeddings` (1024D) | `VisionAnalysis.material_type + category + subcategory` | `material_aspect_1024` |
 
-Pre-v2 these collections held 768D SLIG-blend vectors (computed as `0.7-0.9 × base_image + 0.1-0.3 × fixed_global_text_for_aspect`). The pre-v2 vectors carried near-zero independent signal because the text portion was the same fixed string for every image regardless of content — they were ~80% identical to `image_slig_embeddings` and to each other. Producer keys during the rollout window: `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` (legacy, retained behind feature flag `EMBED_ASPECTS_FROM_VISION_ANALYSIS`).
+Pre-v2 these collections held 768D SLIG-blend vectors (computed as `0.7-0.9 × base_image + 0.1-0.3 × fixed_global_text_for_aspect`). The pre-v2 vectors carried near-zero independent signal because the text portion was the same fixed string for every image regardless of content — they were ~80% identical to `image_slig_embeddings` and to each other. Producer keys `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` were legacy keys from this pre-v2 path — **removed** in the v2 rollout cleanup. The producer no longer emits them; consumers no longer accept them.
 
 Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `vision_analysis` JSON) → `image_understanding_embeddings`.
 
@@ -183,7 +183,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 
 **Replaced**: pytesseract + EasyOCR (both removed entirely 2026-05). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed). Even when "working" it produced bbox-less text that silently degraded layout-merge to UNCLASSIFIED orphans.
 
-**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%. (Widened from 0.0/0.1/0.2 in 2026-05-03 — the narrow spread kept the model stuck through all three retries on graphic-heavy pages.)
 
 **Failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 

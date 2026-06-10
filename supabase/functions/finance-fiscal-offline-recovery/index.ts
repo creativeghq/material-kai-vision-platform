@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,7 @@ const corsHeaders = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -69,4 +70,4 @@ Deno.serve(async (req) => {
   await recover('credit_notes', cns ?? [], (r) => String(r.credit_note_number ?? ''));
 
   return json({ ok: true, ...results });
-});
+}));

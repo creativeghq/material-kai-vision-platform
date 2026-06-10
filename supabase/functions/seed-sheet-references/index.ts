@@ -20,6 +20,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -118,7 +119,7 @@ interface SeedResult {
   total_duration_ms: number;
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('seed-sheet-references', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') {
@@ -208,7 +209,7 @@ Deno.serve(async (req: Request) => {
   result.success = result.failed.length === 0;
 
   return jsonResponse(result);
-});
+}));
 
 /**
  * Direct Gemini generateContent call. We don't import the shared

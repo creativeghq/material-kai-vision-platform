@@ -10,6 +10,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -324,7 +325,7 @@ async function crawlOneWebsite(
   return { ok: true, pages_indexed: indexed, pages_discovered: urls.length };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
@@ -380,4 +381,4 @@ Deno.serve(async (req) => {
     }
     return jsonResponse({ success: false, error: e?.message || 'Crawl failed' }, 500);
   }
-});
+}));

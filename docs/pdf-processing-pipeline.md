@@ -166,10 +166,11 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 7: SLIG Embeddings (75-85%) - URL-BASED PROCESSING        │
-│ Models: SigLIP2 via SLIG cloud endpoint (768D, 5 types)       │
+│ STAGE 7: SLIG + Voyage Embeddings (75-85%) - URL-BASED          │
+│ Models: SigLIP2/SLIG (768D, 1 visual) + Voyage voyage-4        │
+│         (1024D, 4 aspect: color/texture/style/material)        │
 │ Process: Use Supabase URLs directly (NO download!)            │
-│ Output: 5 SLIG 768D embeddings per material image              │
+│ Output: 1×768D visual + 4×1024D aspect + 1×1024D understanding │
 │                                                                 │
 │ 🚀 ZERO-DOWNLOAD ARCHITECTURE:                                │
 │   1. Pass Supabase URL to SLIG cloud endpoint                 │
@@ -404,7 +405,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Pytesseract + EasyOCR removed entirely (2026-05)** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed) and even when "working" produced bbox-less text that silently degraded layout-merge.
 
-**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8. Chandra freelances ("The image is...") ~50% at temp=0; the wider temperature spread breaks the sticky-prose state and lifts success rate to >90%. (The original narrow 0.0/0.1/0.2 spread was widened 2026-05-03 after a ~55% cumulative failure rate was observed at the original narrow range.)
 
 **Failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 
@@ -731,7 +732,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Models**:
 - SLIG SigLIP2 (768D, raw image): produces ONE visual vector per image
-- Voyage `voyage-3` (1024D, text): produces FOUR per-aspect vectors per image, embedding deterministic strings derived from VisionAnalysis fields
+- Voyage `voyage-4` (1024D, text): produces FOUR per-aspect vectors per image, embedding deterministic strings derived from VisionAnalysis fields
 
 Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text prompts blended at 10-30% into the base visual vector). Legacy SigLIP ViT-SO400M (1152D) was retired in 2026-04 — its collections were 100% orphans.
 
@@ -845,15 +846,12 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 ### Stage 8 (alternate): Entity Linking (92-97%)
 
 **Process**:
-1. Link products to images (relevance scores)
-2. Link chunks to images (relevance scores)
+1. Link products to images (page-proximity based)
+2. Link chunks to images via `entity_linking_service.link_images_to_chunks` (page proximity — NOT cosine similarity)
 3. Link chunks to products (relevance scores)
 4. Create relationship records
 
-**Relevance Algorithm**:
-- Page overlap (40%): Same page = 0.4, adjacent = 0.2
-- Visual similarity (40%): From AI detection
-- Detection score (20%): Confidence from discovery
+> **Note (2026-04)**: `chunk_image_relationships` are populated by `entity_linking_service.link_images_to_chunks` using **page_proximity**. The former `create_chunk_image_relationships()` method in RelevancyService was deleted — it computed cosine similarity between 1024D text and 768D visual vectors, which was mathematically invalid.
 
 **Output**: A JSON result with `product_image_relationships`, `chunk_image_relationships`, `chunk_product_relationships`, and `total_relationships` counts.
 
@@ -894,7 +892,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
-- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All 5 SLIG embeddings (768D) + Claude Opus 4.7 vision_analysis (tool use) + understanding embedding (1024D Voyage from VisionAnalysis JSON) complete
+- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): 1× SLIG visual (768D) + 4× Voyage aspect embeddings (1024D: color/texture/style/material) + Claude Opus 4.7 vision_analysis (tool use) + understanding embedding (1024D Voyage from VisionAnalysis JSON) complete
 - Recovery uses Supabase URLs for all subsequent processing (no local files needed)
 
 ---
@@ -908,7 +906,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 - Images extracted: 249
 - Material images: 150
 - Non-material images: 99 (deleted from Supabase)
-- SLIG embeddings generated: 750 (5 types × 150 material images, all 768D)
+- SLIG embeddings generated: 150 (1 visual × 150 material images, 768D) + 600 aspect embeddings (4 × 150 images, 1024D Voyage)
 - Processing time: 2-3 minutes (vs 30+ minutes before)
 - Memory usage: <3GB peak (vs 7.7GB OOM before)
 - Disk usage: 0 images (vs 249 cumulative before)
@@ -919,7 +917,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 - Material recognition: 90%+
 - Metadata extraction: 88%+
 - Search relevance: 85%+
-- SLIG embedding quality: 95%+
+- Visual embedding quality (SLIG SigLIP2): 95%+
 
 **URL-Based Architecture Impact**:
 - **Before**: 7.7GB memory → OOM crash at 249 images
@@ -1030,7 +1028,7 @@ Comprehensive error tracking and performance monitoring using `sentry_sdk.start_
 | **Heartbeat Monitoring** | ✅ COMPLETE | Updates every stage, 10-minute stuck threshold |
 | **Sentry Tracking** | ✅ COMPLETE | Transactions, breadcrumbs, exception capture |
 | **Error Handling** | ✅ COMPLETE | Comprehensive try-catch with Sentry integration |
-| **Progress Tracking** | ✅ COMPLETE | Real-time progress updates via `job_progress` table |
+| **Progress Tracking** | ✅ COMPLETE | Real-time progress updates via `background_jobs` table (`stage_history` JSONB; `job_progress` table was dropped 2026-04-25) |
 | **Checkpoint Recovery** | ✅ COMPLETE | Resume from last successful stage |
 | **Auto-Recovery** | ✅ COMPLETE | Automatic retry of stuck/failed jobs |
 
@@ -1204,7 +1202,7 @@ Region counts by type: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA counts per do
 - 💰 Track processing costs
 - 🐛 Detect when YOLO is struggling
 
-Metrics would be stored in the `job_progress` table with a `stage: 'yolo_detection'` key.
+Metrics would be stored on the `background_jobs` row (as `stage_history` events) with a `stage: 'yolo_detection'` key. (The legacy `job_progress` table was dropped in 2026-04-25 — all stage data lives in `background_jobs.stage_history` JSONB.)
 
 ---
 

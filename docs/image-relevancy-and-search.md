@@ -184,21 +184,23 @@ The multi-vector search uses advanced async programming to achieve maximum perfo
 **Architecture:**
 
 Query → Generate Embeddings → Search 6 Collections in Parallel
-                               ├─ Visual (SigLIP 768D)
+                               ├─ Visual (SigLIP2 768D)
                                ├─ Understanding (Voyage AI 1024D)
-                               ├─ Color (SigLIP 768D)
-                               ├─ Texture (SigLIP 768D)
-                               ├─ Style (SigLIP 768D)
-                               └─ Material (SigLIP 768D)
+                               ├─ Color (Voyage AI 1024D, post-2026-05-04)
+                               ├─ Texture (Voyage AI 1024D, post-2026-05-04)
+                               ├─ Style (Voyage AI 1024D, post-2026-05-04)
+                               └─ Material (Voyage AI 1024D, post-2026-05-04)
                                ↓
                           Combine Scores → Apply Filters → Return Results
+
+> **Note**: Pre-2026-05-04 Color/Texture/Style/Material were 768D SLIG-blend vectors. Post-v2 they are 1024D Voyage AI embeddings of deterministic per-image VisionAnalysis field serializations.
 
 **Key Technologies:**
 - **asyncio.gather()** - Executes all searches simultaneously
 - **asyncio.to_thread()** - Runs blocking VECS queries in thread pool
 - **VECS (pgvector)** - Vector similarity search on PostgreSQL
-- **SigLIP2** - State-of-the-art vision-language model (768D visual embeddings)
-- **Voyage AI** - Text embedding model for understanding embeddings (1024D)
+- **SigLIP2** - Vision-language model (768D visual embeddings only, via SLIG cloud endpoint)
+- **Voyage AI** - Text embedding model for understanding embeddings (1024D) and all four aspect embeddings (color/texture/style/material, 1024D, post-2026-05-04)
 
 **Performance Benefits:**
 - 3-4x faster than sequential execution

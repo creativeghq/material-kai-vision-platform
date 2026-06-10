@@ -261,7 +261,7 @@ Two complementary helpers cover every edge function that calls an external API:
 
 ### 1. [`_shared/api-provider-errors.ts`](../supabase/functions/_shared/api-provider-errors.ts) — generic
 
-Used by `email-api`, `messaging-api`, `messaging-processor`, `mivaa-gateway`, `generate-pbr-maps`, and any other edge function that calls a third-party API (Resend, Twilio, Replicate, OpenAI, Anthropic, MIVAA, etc.) when the required secret is unset.
+Used by `email-api`, `messaging-api`, `messaging-processor`, `mivaa-gateway`, `generate-pbr-maps`, and any other edge function that calls a third-party API (Resend, Zernio, Replicate, OpenAI, Anthropic, MIVAA, etc.) when the required secret is unset.
 
 ```typescript
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';

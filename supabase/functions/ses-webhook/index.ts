@@ -7,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface SNSMessage {
   Type: string;
@@ -51,7 +52,7 @@ interface SESDelivery {
   smtpResponse: string;
 }
 
-serve(async (req) => {
+serve(withApiLogging('ses-webhook', async (req) => {
   await bootstrapForFunction();
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -217,5 +218,5 @@ serve(async (req) => {
       status: 500,
     });
   }
-});
+}));
 

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 
 // Module-level handles re-assigned per-request from the memoised shared
@@ -26,7 +27,7 @@ function profileByCustomer(customerId: string, columns: string) {
  * Stripe Webhooks Handler
  * Handles Stripe webhook events for subscription and payment processing
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
   await bootstrapForFunction();
 
   // Verify configuration AFTER bootstrap. Both secrets MUST be set; rejecting
@@ -137,7 +138,7 @@ Deno.serve(async (req) => {
       { status: 400 }
     );
   }
-});
+}));
 
 // ============================================
 // Handler Functions

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance — digest aggregator.
 //
@@ -388,7 +389,7 @@ async function dispatchFollowUps(supabase: any): Promise<{ dispatched: number; s
 // ───────────────────────────────────────────────────────────
 // HTTP entry
 // ───────────────────────────────────────────────────────────
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -484,4 +485,4 @@ Deno.serve(async (req) => {
     console.error('finance-digest-aggregate error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));

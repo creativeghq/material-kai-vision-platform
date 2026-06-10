@@ -11,6 +11,7 @@
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
@@ -33,7 +34,7 @@ interface RenderResponse {
   error?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('catalog-render-pdf-page', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
     console.error('[catalog-render-pdf-page] error:', err);
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Render failed' }, 500);
   }
-});
+}));
 
 function jsonResponse(body: RenderResponse, status = 200): Response {
   return new Response(JSON.stringify(body), {

@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -87,7 +88,7 @@ const TRANSLATE_TOOL = {
   },
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
@@ -227,7 +228,7 @@ Deno.serve(async (req) => {
     console.error('[catalog-translate-pdf] error:', err);
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Translation failed' }, 500);
   }
-});
+}));
 
 function isValidBbox(b: any): b is { x1: number; y1: number; x2: number; y2: number } {
   if (!b || typeof b !== 'object') return false;

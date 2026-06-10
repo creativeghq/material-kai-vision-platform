@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -46,7 +47,7 @@ interface SearchResponse {
   error?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('catalog-image-search', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
     console.error('[catalog-image-search] error:', err);
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Image search failed' }, 500);
   }
-});
+}));
 
 async function searchPlatformDb(supabase: any, query: string, limit: number): Promise<ImageCandidate[]> {
   try {

@@ -314,10 +314,9 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 **Processing**:
 - **Chunk-Image Relationships**:
-  - Method: Cosine similarity between chunk text embeddings (1024D) and image SLIG embeddings (768D)
-  - Threshold: 0.5 (default)
-  - Links semantically related chunks and images
-  - Example: A chunk describing "oak wood texture" links to images of oak textures
+  - Method: Page-proximity matching via `entity_linking_service.link_images_to_chunks()` (NOT cosine similarity — 1024D text and 768D visual vectors are different spaces and cannot be compared directly)
+  - Links chunks and images that appear on the same or adjacent pages
+  - Example: A chunk on page 5 links to images extracted from page 5
 
 - **Product-Image Relationships**:
   - Method: Page range matching

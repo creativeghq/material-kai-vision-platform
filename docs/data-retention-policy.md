@@ -12,11 +12,9 @@ Cleanup is performed by two mechanisms:
 
 | Table | Retention | Trigger | Reason |
 |---|---|---|---|
-| `background_jobs` | 5 days | completed or failed | Short-lived job records; no value after completion |
+| `background_jobs` | 5 days | completed or failed | Short-lived job records; no value after completion. Note: `stage_history`, `recovery_history`, and `last_checkpoint` JSONB columns on this table supersede the dropped `job_checkpoints` and `job_progress` tables (both dropped 2026-04-25). |
 | `scraping_sessions` | 5 days | completed or failed | Temporary session state; content is already in products |
 | `data_import_jobs` | 5 days | completed/failed + non-scheduled | One-off import runs; scheduled jobs are kept |
-| `job_checkpoints` | 7 days | age | Resume checkpoints lose value once the job finishes |
-| `job_progress` | 7 days | not updated | Progress rows are only useful while the job runs; orphaned after parent job is deleted |
 | `vr_worlds` (failed only) | 7 days | status = failed | Failed renders have no asset URLs; safe to discard |
 | `generation_3d` (unsaved) | 15 days | not saved to moodboard | Unsaved renders are temp workspace; storage files also deleted |
 | `data_import_history` | 30 days | age | Import audit trail useful short-term; not needed long-term |

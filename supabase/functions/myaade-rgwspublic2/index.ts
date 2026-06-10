@@ -29,6 +29,7 @@ import {
   summarizeAadeError,
   xmlEscape,
 } from '../_shared/aade/soap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -126,7 +127,7 @@ function buildRgWsPublic2Body(afmCalledBy: string, afmCalledFor: string): string
   </srv:rgWsPublic2AfmMethod>`;
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
@@ -297,4 +298,4 @@ Deno.serve(async (req: Request) => {
     console.error('[myaade-rgwspublic2] error:', err);
     return jsonResponse({ error: 'internal_error', detail }, 500);
   }
-});
+}));

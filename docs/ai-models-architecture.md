@@ -77,7 +77,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 │ Visual (SLIG SigLIP2 768D) — pixel-similarity:                          │
 │   image_slig_embeddings (key: visual_768)                               │
 │                                                                          │
-│ Aspect (Voyage voyage-3 1024D):                                          │
+│ Aspect (Voyage voyage-4 1024D):                                          │
 │   image_color_embeddings    (key: color_aspect_1024)                    │
 │   image_texture_embeddings  (key: texture_aspect_1024)                  │
 │   image_style_embeddings    (key: style_aspect_1024)                    │
@@ -86,7 +86,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 │   string derived from VisionAnalysis fields (colors[], textures[]+      │
 │   finish, style+surface_pattern+applications, material_type+category).  │
 │                                                                          │
-│ Understanding (Voyage voyage-3 1024D):                                  │
+│ Understanding (Voyage voyage-4 1024D):                                  │
 │   image_understanding_embeddings (key: understanding_1024)              │
 │   ↑ Voyage embedding of the full serialized VisionAnalysis text.        │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -113,7 +113,8 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 │             text_embedding_schema_version)                              │
 │ - document_images (has_*_slig flags + understanding_embedding_model +   │
 │                    understanding_schema_version + ocr_*)                │
-│ - 6× VECS image collections (5× 768D SLIG + 1× 1024D understanding)     │
+│ - 6× VECS image collections (1× 768D SLIG visual + 4× 1024D Voyage aspect │
+│   color/texture/style/material + 1× 1024D Voyage understanding)        │
 │ - document_chunks (text_embedding_1024 — Voyage)                        │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
@@ -238,7 +239,7 @@ HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_emb
 
 **Pytesseract + EasyOCR were removed entirely in 2026-05** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed), and even when "working" it produced bbox-less text that silently degraded layout-merge.
 
-**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%.
+**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%. (Widened from 0.0/0.1/0.2 in 2026-05-03 — the narrow spread kept the model in sticky-prose state through all three retries on graphic-heavy pages.)
 
 **Used for**:
 - Stage 1.5 page-level OCR (with `cache_status` persistence: `success` / `yolo_only` / `empty_page` / `ocr_failed` / `page_failed`)

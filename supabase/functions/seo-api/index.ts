@@ -4,6 +4,7 @@
 //                | 'toolkit_audit' | 'toolkit_research', ...params }
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleAnalyze } from './handlers/analyze.ts';
 import { handlePlan } from './handlers/plan.ts';
 import { handleResearch } from './handlers/research.ts';
@@ -22,7 +23,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   toolkit_research: handleToolkitResearch,
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('seo-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), {
@@ -53,4 +54,4 @@ Deno.serve(async (req) => {
   }
 
   return handler(req, body);
-});
+}));

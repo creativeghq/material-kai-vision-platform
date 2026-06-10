@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by 20+ AI models across 8 providers.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, Chandra v2 OCR, plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -97,7 +97,8 @@ The platform's core differentiator is not a single AI model — it is the orches
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
-| Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. (Pre-2026-05-01: routed through Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months → retired.) | Anthropic API |
+| Anthropic | Claude Sonnet 4.6 | Semantic chunking (PRIMARY chunker; was Qwen pre-2026-05-01, but Qwen had been silently 404-ing for months — migration made architecture honest) | Anthropic API |
+| Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
 | HuggingFace | Chandra v2 | OCR (sole engine post-2026-05-01) — retry-with-jitter (3 attempts at temps 0.0/0.1/0.2). Per-attempt metrics in `chandra_ocr_metrics`. Failure marker: `OCRResult.method='chandra_failed'`. (Pytesseract + EasyOCR removed entirely.) | Cloud endpoint |
 | HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
@@ -296,10 +297,10 @@ Any interior design image — AI-generated or user-uploaded — can be turned in
 
 **Model tiers:**
 
-| Model | Credits | USD Cost | Generation Time | Best For |
-|-------|---------|---------|----------------|---------|
-| marble-0.1-mini | 50 credits | $0.50 | ~30–45 seconds | Quick previews, client check-ins |
-| marble-0.1-plus | 200 credits | $2.00 | ~5 minutes | High-fidelity final walkthroughs |
+| Model | Credits | Generation Time | Best For |
+|-------|---------|----------------|---------|
+| marble-1.0-draft | 18 credits | ~30–45 seconds | Quick previews, client check-ins |
+| marble-1.1 | 190 credits | ~5 minutes | High-fidelity final walkthroughs |
 
 Credits are refunded automatically on generation failure.
 
@@ -531,6 +532,20 @@ Full platform operations suite at `/admin`:
 
 ---
 
+### Feature 16 — Finance & Business Suite
+
+A multi-tenant finance and business operations stack layered on the core AI catalog. See full docs in the finance cluster:
+
+- **Greek e-invoicing (AADE/myDATA)** — per-tenant direct transmission via Novus connector (`docs/finance-system.md`). Each tenant uses their own issuer VAT and TaxisNet authorization. Replaced the platform-wide Oxygen ERP connector (removed 2026-06-07).
+- **POS** — Two-panel cash register (`docs/pos-retail-system.md`)
+- **Online Storefront** (`docs/online-storefront.md`)
+- **Warehouse & Billing** (`docs/warehouse-and-billing.md`)
+- **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
+- **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
+- **myAADE Module** — Auto-fill business profile from Greek ΑΦΜ via ΑΑΔΕ SOAP API. Cached 90 days per company. Admin UI at `/admin/modules/myaade`.
+
+---
+
 ## User Segments, Roles & Access Control
 
 ### Four Functional Groups
@@ -612,8 +627,8 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |
 | Claude Opus 4.7 vision_analysis per image (post-2026-05-01 — sole vision pass; Qwen retired) | ~$0.02–0.05 | 2–5 credits | Variable |
-| VR World — mini | $0.50 WorldLabs | 50 credits ($0.50) | Pass-through + platform overhead |
-| VR World — plus | $2.00 WorldLabs | 200 credits ($2.00) | Pass-through + platform overhead |
+| VR World — draft (marble-1.0-draft) | WorldLabs | 18 credits | Pass-through + platform overhead |
+| VR World — quality (marble-1.1) | WorldLabs | 190 credits | Pass-through + platform overhead |
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
 | Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |
 | Gemini interior (pro/4K) | ~$0.06 | 15 credits | 2.5x markup |
@@ -631,7 +646,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- HuggingFace Endpoints: Pay-per-use for SigLIP2 + Chandra v2 OCR inference. (Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.)
+- HuggingFace Endpoints: Pay-per-use for SigLIP2 (768D visual embeddings) + Chandra v2 OCR. Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
 ---
@@ -680,7 +695,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | 20+ across 8 providers |
+| AI models integrated | Anthropic (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, Chandra v2, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 
@@ -753,7 +768,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Quotes system (buyer + supplier workflow, upsells, project timeline)
 - Price monitoring (multi-source, alerts, trends)
 - Knowledge Base & RAG
-- Flow builder & automation engine (cron, webhook, event triggers; SMS/email/HTTP actions)
+- Flow builder & automation engine (cron, webhook, event triggers; WhatsApp/email/HTTP actions — send_sms is a legacy alias for send_whatsapp; SMS removed 2026-06-08)
 - Background agent framework (6 types: product enrichment, material tagging, social analytics, factory enrichment + auto-recovery)
 - Factory Analytics dashboard (own data + market trends + platform-wide for admins)
 - Full admin dashboard (analytics, monitoring, prompt management, CRM, campaigns, background agents, flows)
@@ -788,8 +803,8 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 **API:** v1api.materialshub.gr/docs
 **Repository:** github.com/creativeghq/material-kai-vision-platform
 **Status:** Production — 5,000+ active users, 99.5%+ uptime
-**Version:** 3.5.0 — March 2026
+**Version:** 3.7.0 — June 2026
 
 ---
 
-*This document is confidential and intended for investors, strategic partners, and due diligence purposes only. All metrics are as of March 2026.*
+*This document is confidential and intended for investors, strategic partners, and due diligence purposes only. All metrics are as of June 2026.*

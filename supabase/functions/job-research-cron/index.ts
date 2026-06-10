@@ -1,4 +1,5 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 /**
  * Job Research Cron — internal-flow refresher.
  *
@@ -15,7 +16,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
  * Scheduling: pg_cron `job-research-refresh-hourly` at :45 every hour.
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('job-research-cron', async (req) => {
   await bootstrapForFunction();
   console.log('💼 Job research cron started');
 
@@ -71,4 +72,4 @@ Deno.serve(async (req) => {
       timestamp: new Date().toISOString(),
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-});
+}));

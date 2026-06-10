@@ -9,6 +9,7 @@ import { serve } from 'http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface ScheduledJob {
   id: string;
@@ -22,7 +23,7 @@ interface ScheduledJob {
   mapping_template_id: string | null;
 }
 
-serve(async (req) => {
+serve(withApiLogging('scheduled-import-runner', async (req) => {
   await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -159,7 +160,7 @@ serve(async (req) => {
       }
     );
   }
-});
+}));
 
 /**
  * Calculate next run time based on cron schedule

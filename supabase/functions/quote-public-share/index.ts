@@ -17,6 +17,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -27,7 +28,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405);
 
@@ -170,7 +171,7 @@ Deno.serve(async (req: Request) => {
     pdf_url,
     not_found: false,
   });
-});
+}));
 
 function jsonResponse(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), {

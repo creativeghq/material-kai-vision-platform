@@ -183,7 +183,7 @@ The AI extracts images and analyzes them for visual metafields:
    - Pattern recognition
    - Material appearance
 4. **Perform OCR** on images to extract text
-5. **Generate CLIP embeddings** (512D) for visual search
+5. **Generate SLIG embeddings** (768D halfvec) for visual search — the legacy 512D CLIP columns were dropped 2026-04
 
 ### How AI Identifies Visual Metafields
 

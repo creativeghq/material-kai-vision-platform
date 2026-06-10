@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -247,7 +248,7 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   await supabase.from('messaging_conversation_messages').update({ status }).eq('zernio_message_id', wamid);
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -364,4 +365,4 @@ Deno.serve(async (req) => {
   }
 
   return jsonResponse({ received: true, event });
-});
+}));

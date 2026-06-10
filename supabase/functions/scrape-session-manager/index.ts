@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { captureException, captureMessage } from '../_shared/sentry.ts';
+import { captureException } from '../_shared/sentry.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -135,20 +135,7 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
 
   } catch (error) {
     console.error('Error in session manager:', error);
-
-    // 🚨 SENTRY ALERT: Send error to Sentry
-    await captureException(error, {
-      tags: {
-        function: 'scrape-session-manager',
-        error_type: 'session_manager_error',
-      },
-      extra: {
-        error_message: error.message,
-        timestamp: new Date().toISOString(),
-      },
-      fingerprint: ['scrape-session-manager', 'error'],
-    });
-
+    // Top-level capture is handled by withApiLogging (returns 5xx → Sentry).
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Unknown error occurred',

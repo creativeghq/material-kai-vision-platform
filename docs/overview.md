@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 20+ AI models across 8 providers.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, and Chandra v2 OCR.
 
 ---
 
@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **20+ AI models** across 8 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs, Replicate, Google Gemini, xAI)
+- **AI stack**: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings, Chandra v2 OCR — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
 - **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
@@ -39,6 +39,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 🤖 **Background Agents**: Scheduled autonomous agents with chain triggers + auto-recovery
 - 💳 **Billing & Credits**: Stripe subscriptions + credit packages
 - 📊 **CRM System**: Contacts, companies, user management
+- 🏦 **Finance & Business Suite**: Greek e-invoicing (AADE/myDATA via Novus), POS cash register, online storefront, warehouse & billing, sales portal, and multi-tenant capabilities — see `docs/finance-system.md` and related docs (`pos-retail-system.md`, `online-storefront.md`, `warehouse-and-billing.md`, `sales-and-marketplace.md`, `capabilities-and-tenancy.md`)
 
 ---
 
@@ -108,54 +109,43 @@ Real-time updates → Frontend displays results
 
 ## AI Models & Intelligence
 
-### 8 AI Models Across 4 Providers
+### Production AI Stack
 
 #### 1. Anthropic Claude Models
 
-**Claude Opus 4.7** (Premium Tier):
-- **Use Cases**: Deep product analysis, complex metadata extraction, quality validation
+**Claude Opus 4.7** (Vision + Deep Analysis):
+- **Use Cases**: Material image analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`), deep product analysis, quality validation, KAI agent
 - **Context**: 200,000 tokens
-- **Performance**: Highest accuracy for complex reasoning
-- **Pipeline Stages**: Product Discovery (Stage 2), Deferred AI Analysis (Stage 11)
+- **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre-2026-05-01 the stack said "Qwen for vision, Claude for validation" — but the Qwen HF endpoint had been 404-ing for months and silently falling through to Claude. The migration made the architecture honest. `qwen_endpoint_manager.py` and `QWEN_*` env vars deleted 2026-05-01.
+- **Pipeline Stages**: Image Analysis (Stages 6, 8, 9), product discovery
 
-**Claude Haiku 4.5** (Mid Tier):
-- **Use Cases**: Fast content classification, product boundary detection
-- **Context**: 200,000 tokens
+**Claude Sonnet 4.6** (Chunking):
+- **Use Cases**: Semantic text chunking (PRIMARY chunker, replaced Qwen 2026-05-01)
+- **Pipeline Stages**: Stage 6 semantic chunking
+
+**Claude Haiku 4.5** (Classification):
+- **Use Cases**: Fast content classification, product boundary detection, price-monitoring identity classifier, demo agent
 - **Performance**: 3x faster than Opus, 90% accuracy
-- **Pipeline Stages**: Product Discovery (Stage 1), Content Classification
+- **Pipeline Stages**: Product Discovery (Stage 4), Content Classification
 
-#### 2. OpenAI Models
-
-**GPT-4o**:
-- **Use Cases**: Product discovery, conversational AI, complex reasoning
-- **Context**: 128,000 tokens
-- **Performance**: High accuracy, multimodal capabilities
-- **Pipeline Stages**: Product Discovery (alternative to Claude)
-
-**text-embedding-3-small** (retired 2026-04):
-- **Use Cases**: Text chunk embeddings (historical)
-- **Dimensions**: 1536
-- **Status**: Retired in 2026-04. Primary and only text embedder is now Voyage AI voyage-4 (1024D, stored as halfvec in VECS). OpenAI text-embedding-3-small is only retained for the legacy CI changelog workflow.
-
-#### 3. Anthropic Claude Opus 4.7 — VISION (post-2026-05-01 — replaced Qwen)
-
-- **Schema enforcement**: Anthropic tool use with `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`)
-- **Modality**: Vision + Text
-- **Use Cases**: Material image analysis, product classification (material vs non-material), segmentation, OCR-aware quality scoring
-- **Why tool use**: hard schema adherence — eliminates fragile JSON regex recovery, protects Voyage's understanding-embedding space from drift
-- **Cost**: $15/$75 per 1M tokens
-- **Pipeline Stages**: Image Analysis (Stage 6, 8)
-- **Note**: Pre-2026-05-01 the architecture said "Qwen for vision, Claude for validation" — but the configured Qwen endpoint had been 404-ing in 0.7s for months and silently falling through to Claude. The migration made the architecture honest. The HF Qwen endpoint env vars (`QWEN_*`) and `qwen_endpoint_manager.py` were deleted on 2026-05-01.
-
-#### 3a. HuggingFace Endpoint — Chandra v2 (sole OCR engine, post-2026-05-01)
+#### 2. HuggingFace Endpoint — Chandra v2 (sole OCR engine)
 
 - **Use Cases**: Stage 1.5 page-level OCR + Phase 3 per-image OCR for text-bearing images
-- **Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.1 / 0.2; >95% success rate
+- **Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8; >90% cumulative success rate
 - **Failure marker**: `OCRResult.method='chandra_failed'`
 - **Per-attempt metrics**: `chandra_ocr_metrics` table
 - **Replaced**: pytesseract + EasyOCR (both removed entirely 2026-05-01)
 
-#### 4. SLIG (SigLIP2 via HuggingFace Cloud) — updated 2026-04
+#### 3. OpenAI Models (optional, not vision)
+
+**GPT-4o / GPT-5**:
+- **Use Cases**: Alternative product discovery, conversational AI (optional, not vision)
+- **Pipeline Stages**: Product Discovery (alternative to Claude)
+
+**text-embedding-3-small** (retired 2026-04):
+- **Status**: Retired. Primary and only text embedder is now Voyage AI voyage-4 (1024D, stored as halfvec in VECS).
+
+#### 4. SLIG (SigLIP2 via HuggingFace Cloud) — current visual embedder
 
 - **Model**: SigLIP2 via SLIG cloud endpoint (replaced CLIP ViT-B/32 and SigLIP-SO400M in 2026-04)
 - **Dimensions**: 768 (halfvec in VECS)
@@ -175,11 +165,11 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 
 1. **Text Embeddings** (1024D) - Voyage AI voyage-4 (primary)
 2. **Visual Embeddings** (768D) - SigLIP2 via HuggingFace Endpoint
-3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search)
-4. **Color Embeddings** (768D) - SigLIP2 color-guided
-5. **Texture Embeddings** (768D) - SigLIP2 texture-guided
-6. **Style Embeddings** (768D) - SigLIP2 style-guided
-7. **Material Embeddings** (768D) - SigLIP2 material-guided
+3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search). Provenance (`embedding_model`, `schema_version`) persisted per row.
+4. **Color Embeddings** (1024D) - Voyage AI from `VisionAnalysis.colors[]` (v2, post-2026-05-04; legacy was 768D SigLIP2)
+5. **Texture Embeddings** (1024D) - Voyage AI from `VisionAnalysis.textures[] + finish` (v2)
+6. **Style Embeddings** (1024D) - Voyage AI from `VisionAnalysis.style + surface_pattern + applications` (v2)
+7. **Material Embeddings** (1024D) - Voyage AI from `VisionAnalysis.material_type + category + subcategory` (v2)
 
 **Dynamic Weight Profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected per query.
 
@@ -262,14 +252,10 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - Create metafield_values records
 - Link to chunks, products, images
 
-**Stage 13: Deferred AI Analysis (Async Background Job)**
+**Stage 13: Quality Enhancement (Async)**
 - Claude Opus 4.7: Validate low-scoring images
-- Generate specialized embeddings:
-  - Color embeddings (256D)
-  - Texture embeddings (256D)
-  - Application embeddings (512D)
-  - Multimodal embeddings (2048D)
 - Enhanced metadata extraction
+- Note: Legacy 256D/512D/2048D specialized embedding columns were dropped in 2026-04. All embeddings now in VECS collections (SLIG 768D visual + Voyage 1024D understanding/aspect).
 
 **Stage 14: Cleanup & Completion**
 - Delete temporary files from disk
@@ -310,7 +296,7 @@ On job restart, the system resumes from the last completed checkpoint, avoiding 
 
 ### Multi-Vector Search System
 
-The platform uses **6 embedding types** for comprehensive search:
+The platform uses **7 embedding types** for comprehensive search:
 
 **Semantic Search** (Text):
 - Query: "sustainable wood materials"
@@ -353,7 +339,7 @@ The platform uses **6 embedding types** for comprehensive search:
 **document_chunks**: Semantic text chunks with 1024D Voyage embeddings (updated 2026-04)
 **document_images**: Image metadata + boolean presence flags (`has_slig_embedding`, `has_understanding_embedding`, `has_color_slig`, `has_texture_slig`, `has_style_slig`, `has_material_slig`) + provenance columns for the four aspect collections (`<aspect>_aspect_embedding_model`, `<aspect>_aspect_schema_version`). All image vectors live in VECS collections.
 **products**: Product records from PDFs
-**background_jobs**: Async job tracking with checkpoint recovery
+**background_jobs**: Async job tracking — `stage_history` + `recovery_history` JSONB arrays (single-table design post-2026-04-25; `job_progress` and `job_checkpoints` tables dropped)
 **material_metadata_fields**: Dynamic metafield definitions
 **metafield_values**: Metafield data for chunks/products/images
 
@@ -529,8 +515,8 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ---
 
-**Last Updated**: March 2026
-**Version**: 3.5.0
+**Last Updated**: June 2026
+**Version**: 3.7.0
 **Status**: Production
 **Users**: 5,000+
 **Uptime**: 99.5%+

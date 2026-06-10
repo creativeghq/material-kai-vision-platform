@@ -5,13 +5,14 @@
 //   - OAuth-side actions:   get_auth_url, callback, get_boards, get_board_pins, disconnect
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { handlePinterestImport } from './handlers/import.ts';
 import { handlePinterestOauth } from './handlers/oauth.ts';
 
 const IMPORT_ACTIONS = new Set(['extract_pin', 'import_pin', 'import_pins_bulk']);
 const OAUTH_ACTIONS = new Set(['get_auth_url', 'callback', 'get_boards', 'get_board_pins', 'disconnect']);
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('pinterest-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), {
@@ -41,4 +42,4 @@ Deno.serve(async (req) => {
     status: 400,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+}));

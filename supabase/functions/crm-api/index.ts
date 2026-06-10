@@ -13,6 +13,7 @@ import { handleCompanies } from './handlers/companies-api-handler.ts';
 import { handleContacts } from './handlers/contacts-api-handler.ts';
 import { handleUsers } from './handlers/users-api-handler.ts';
 import { handleCrmStripe } from './handlers/stripe-api-handler.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
   companies: handleCompanies,
@@ -21,7 +22,7 @@ const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
   stripe: handleCrmStripe,
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('crm-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const url = new URL(req.url);
@@ -41,4 +42,4 @@ Deno.serve(async (req) => {
   }
 
   return handler(req);
-});
+}));

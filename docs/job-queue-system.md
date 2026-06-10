@@ -52,12 +52,11 @@ The Material Kai Vision Platform uses a **unified job queue system** across all 
                  │
 ┌────────────────▼────────────────────────────────────────────────┐
 │  Supabase PostgreSQL                                            │
-│  - background_jobs (unified job tracking)                       │
+│  - background_jobs (unified job tracking — stage_history, recovery_history, last_checkpoint JSONB) │
 │  - scraping_sessions (web scraping jobs)                        │
 │  - scraping_pages (page-level tracking)                         │
 │  - data_import_jobs (XML import jobs)                           │
 │  - webhook_calls (API call tracking)                            │
-│  - job_checkpoints (PDF recovery data)                          │
 │  - ai_analysis_queue (AI analysis jobs)                 │
 └─────────────────────────────────────────────────────────┘
 
@@ -85,33 +84,25 @@ Main job tracking table. Key columns: `id`, `workspace_id`, `document_id`, `job_
 
 ---
 
-### job_progress
+### stage_history (JSONB on background_jobs)
 
-Real-time progress tracking for each stage. Key columns: `id`, `job_id`, `stage`, `progress_percent`, `current_step`, `details` JSONB, `created_at`. A unique constraint exists on `(job_id, stage)`.
+> **Note (2026-04-25):** The `job_progress` and `job_checkpoints` tables were **dropped**. All stage and recovery audit data now lives as JSONB arrays directly on the `background_jobs` row.
 
-**Stages**:
-- `initialized`: Job created
-- `pdf_extracted`: PDF text extracted
-- `chunks_created`: Text chunks created
-- `text_embeddings_generated`: Text embeddings generated
-- `images_extracted`: Images extracted from PDF
-- `image_embeddings_generated`: Image embeddings generated
-- `products_detected`: Products identified
-- `products_created`: Product records created
-- `completed`: All processing complete
+**`background_jobs.stage_history` jsonb** — append-only audit log; one entry per stage transition (`{stage, status, started_at, completed_at, attempt, data, metadata, source}`). Capped at 100 entries by `append_stage_history(uuid, jsonb)`.
 
----
+**`background_jobs.recovery_history` jsonb** — append-only log written by auto-recovery-cron whenever it claims a stuck job (`{attempted_at, from_stage, reason, attempt_number, succeeded, exhausted}`).
 
-### job_checkpoints
+**`background_jobs.last_checkpoint` jsonb** — snapshot used by auto-recovery to know which stage to resume from. Updated alongside every `append_stage_history` call.
 
-Checkpoint data for recovery. Key columns: `id`, `job_id`, `stage`, `checkpoint_data` JSONB, `metadata` JSONB, `created_at`. A unique constraint exists on `(job_id, stage)`.
+**SQL helpers (atomic, race-safe)**:
+- `append_stage_history(p_job_id, p_event)` — atomic `||` UPDATE
+- `append_recovery_history(p_job_id, p_event)` — atomic `||` UPDATE
+- `update_checkpoint_and_append_history(job_id, checkpoint, event)` — single-UPDATE atomic combined write
+- `detect_stuck_pdf_jobs(stuck_threshold_seconds, max_attempts)`
+- `mark_pdf_job_for_recovery(job_id, max_attempts)`
+- `fail_exhausted_pdf_jobs(max_attempts, stuck_threshold_seconds)`
 
-**Checkpoint Data** stored per stage:
-- `chunk_ids`: IDs of created chunks
-- `image_ids`: IDs of extracted images
-- `embedding_ids`: IDs of generated embeddings
-- `product_ids`: IDs of created products
-- `metadata`: Stage-specific metadata
+**Consolidated read**: `GET /api/rag/documents/job/{id}/full-status` returns `{core, stage_history, recovery_history, products, memory}` in a single round trip.
 
 ---
 
@@ -135,11 +126,11 @@ The frontend uploads a PDF, the backend creates a job record in `background_jobs
 
 ### 2. Job Processing
 
-The job monitor detects the pending job and starts processing. It updates the status to `processing`, then executes the 14-stage pipeline (Stage 0: Product Discovery at 0-15%, through Stage 13: Quality Enhancement at 97-100%). At each stage, the system creates a checkpoint, updates `job_progress`, and updates `background_jobs.progress_percent`.
+The job monitor detects the pending job and starts processing. It updates the status to `processing`, then executes the 14-stage pipeline (Stage 0: Product Discovery at 0-15%, through Stage 13: Quality Enhancement at 97-100%). At each stage, the system appends a `stage_history` entry via `append_stage_history()` and updates `background_jobs.progress_percent`.
 
-### 3. Checkpoint Creation
+### 3. Checkpoint / Stage History Creation
 
-After each successful stage, the checkpoint recovery service stores the stage's output data (e.g., chunk IDs, total chunks, average chunk size) in the `job_checkpoints` table. This allows the job to resume from that point if it fails.
+After each successful stage, the checkpoint recovery service calls `update_checkpoint_and_append_history()` to atomically update `last_checkpoint` (the resume snapshot) and append a stage event to `stage_history`. Both live as JSONB on the `background_jobs` row — the `job_checkpoints` table was dropped in the 2026-04-25 single-table migration.
 
 ### 4. Stuck Job Detection
 
@@ -223,7 +214,7 @@ The `JobMonitorService` is configured with `check_interval_seconds=60` (check ev
 
 - **Max Concurrent Jobs**: 100+
 - **Max Queue Size**: 10,000+
-- **Checkpoint Retention**: 24 hours
+- **stage_history Retention**: capped at 100 entries per job (JSONB on background_jobs); job rows retained 5 days after completion per data-retention policy
 - **Job History Retention**: 30 days
 
 ---
@@ -235,18 +226,18 @@ The `JobMonitorService` is configured with `check_interval_seconds=60` (check ev
 **Symptoms**: Job processing >30 minutes without progress
 
 **Solution**:
-1. Check job_progress table for last update
-2. Verify checkpoint exists
-3. Manual restart: `POST /api/v1/admin/jobs/{job_id}/restart`
+1. Check `background_jobs.stage_history` JSONB for the last stage entry
+2. Check `background_jobs.last_checkpoint` for the resume snapshot
+3. Manual restart: `POST /api/v1/admin/jobs/{job_id}/restart` (or `POST /api/rag/documents/job/{id}/resume`)
 
 ### Checkpoint Invalid
 
 **Symptoms**: Job fails to restart from checkpoint
 
 **Solution**:
-1. Verify checkpoint_data in job_checkpoints table
-2. Check if referenced chunks/images exist
-3. Cleanup invalid checkpoints
+1. Inspect `last_checkpoint` JSONB on the `background_jobs` row
+2. Check if referenced chunks/images still exist in the DB
+3. Use `cleanup_invalid_stage_history(job_id, invalid_stages[])` RPC if stage entries are corrupt
 4. Restart job from beginning
 
 ### High Memory Usage
@@ -256,8 +247,7 @@ The `JobMonitorService` is configured with `check_interval_seconds=60` (check ev
 **Solution**:
 1. Reduce check_interval_seconds
 2. Reduce stuck_job_timeout_minutes
-3. Cleanup old checkpoints
-4. Restart job monitor service
+3. Restart job monitor service
 
 ---
 

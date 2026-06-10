@@ -1,12 +1,14 @@
 # Image Embedding Generation
 
-Image embedding generation system with batching, retry logic, and checkpoint recovery for reliable CLIP embedding coverage.
+Image embedding generation system with batching, retry logic, and checkpoint recovery for reliable embedding coverage.
+
+> **Architecture note (2026-04)**: CLIP models (512D collections) were retired. The current system uses **SigLIP2 via SLIG cloud endpoint** (768D visual) + **Voyage AI `voyage-4`** (1024D aspect + understanding embeddings). The "CLIP" label in some of the method names below (`save_images_and_generate_clips`, `clip_embeddings_generated`) is a legacy alias retained for backwards compatibility; they now write SigLIP2/Voyage vectors to VECS.
 
 ---
 
 ## Overview
 
-The image embedding system generates visual embeddings for all processed images using CLIP models. The system includes batch processing, automatic retry with exponential backoff, and checkpoint recovery to ensure complete embedding coverage.
+The image embedding system generates visual embeddings for all processed images using SigLIP2 (768D visual) and Voyage AI (1024D aspect + understanding). The system includes batch processing, automatic retry with exponential backoff, and checkpoint recovery to ensure complete embedding coverage.
 
 ## Features
 
@@ -145,7 +147,7 @@ Images that fail after all retries are:
 
 ### Log Output
 
-The log shows progress per batch: saving each image to DB with its UUID, generating CLIP embeddings per image, and batch completion messages. The final summary reports total images saved, total CLIP embeddings generated, and a list of failed images with their page numbers and error reasons (e.g., "Network timeout after 3 retries", "Invalid image format").
+The log shows progress per batch: saving each image to DB with its UUID, generating SLIG/Voyage embeddings per image (the method is still named `generate_clips` for backwards compat), and batch completion messages. The final summary reports total images saved, total embeddings generated, and a list of failed images with their page numbers and error reasons (e.g., "Network timeout after 3 retries", "Invalid image format").
 
 ## Integration
 
@@ -182,13 +184,13 @@ The **OpenAI fallback is disabled** for the understanding path so Voyage and Ope
 
 1. **Query** → Embedded via Voyage AI `voyage-4` with `input_type="query"` → 1024D vector
 2. **VECS Search** → Similarity search against `image_understanding_embeddings`
-3. **Score Fusion** → Combined with 6 other embedding scores (text + 5× SLIG specialized) using weighted fusion (see `docs/search-strategies.md` for weight configurations)
+3. **Score Fusion** → Combined with 6 other embedding scores (text + visual SLIG 768D + 4× Voyage aspect 1024D) using weighted fusion (see `docs/search-strategies.md` for weight configurations)
 
 ### Pipeline Integration (updated 2026-05)
 
 - **Phase 1 image pipeline (inline)**: Generates the understanding embedding directly after Claude vision_analysis, in the same pass that writes SLIG embeddings to VECS. The former asynchronous "Phase 2 background processor" (`background_image_processor.py`) was deleted in 2026-04 — it was silently broken and produced no output.
 - **Backfill endpoint**: `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Claude Opus 4.7 + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
-- **CLIP Job Service**: Generates understanding embedding for images with existing vision_analysis
+- **Clip Job Service** (legacy name): Generates understanding embedding for images with existing vision_analysis; despite the "CLIP" name, it now uses Voyage AI
 - **Regeneration Endpoint**: Includes understanding in embedding regeneration
 
 ### Hardening (2026-05-01)

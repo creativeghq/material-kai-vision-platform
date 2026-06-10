@@ -9,6 +9,7 @@ import {
   Utils,
   ValidationSchemas,
 } from '../_shared/config.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface BatchProcessRequest {
   documents: Array<{
@@ -66,7 +67,7 @@ interface BatchJob {
   completedAt?: string;
 }
 
-serve(async (req) => {
+serve(withApiLogging('pdf-batch-process', async (req) => {
   await bootstrapForFunction();
   const startTime = Date.now();
 
@@ -101,7 +102,7 @@ serve(async (req) => {
       startTime,
     );
   }
-});
+}));
 
 async function handleBatchCreate(req: Request, supabase: any, startTime: number): Promise<Response> {
   try {

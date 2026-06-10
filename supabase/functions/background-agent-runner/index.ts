@@ -27,12 +27,13 @@ import { createLogHelper, createHeartbeatHelper } from '../_shared/agents/base-a
 import { getRunnerGated, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
 import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
 import type { BackgroundAgentRecord, AgentRunRecord, AgentRunContext } from '../_shared/agents/types.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const { createClient } = await import('@supabase/supabase-js');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -414,7 +415,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
 
 // ── Chat callback ─────────────────────────────────────────────────────────────
 

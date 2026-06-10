@@ -49,7 +49,6 @@ const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
 const MoodBoardPage = lazy(() => import('./components/business/moodboard/MoodBoardPage').then(m => ({ default: m.MoodBoardPage })));
 const MoodBoardDetailPage = lazy(() => import('./components/business/moodboard/MoodBoardDetailPage').then(m => ({ default: m.MoodBoardDetailPage })));
-const SVBRDFExtractionPage = lazy(() => import('./components/experimental/svbrdf/SVBRDFExtractionPage').then(m => ({ default: m.SVBRDFExtractionPage })));
 
 // AR Preview (standalone page for QR handoff)
 const ARPage = lazy(() => import('./components/features/ar/ARPage').then(m => ({ default: m.default })).catch(() => ({ default: () => null })));
@@ -67,10 +66,8 @@ const KnowledgeBaseManagement = lazy(() => import('./components/Admin/KnowledgeB
 const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').then(m => ({ default: m.MaterialsDataPage })));
 const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
-const AdminPanel = lazy(() => import('./components/Admin/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const ApiGatewayAdmin = lazy(() => import('./components/Admin/ApiGatewayAdmin').then(m => ({ default: m.ApiGatewayAdmin })));
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
-const SystemPerformance = lazy(() => import('./components/Admin/SystemPerformance').then(m => ({ default: m.SystemPerformance })));
 const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebuggingPanel'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
@@ -422,30 +419,10 @@ const App = () => (
                 <Route path="/admin/prompt-templates" element={<Navigate to="/admin/ai-configs?tab=templates" replace />} />
                 <Route path="/admin/extraction-prompts" element={<Navigate to="/admin/ai-configs?tab=extraction" replace />} />
                 <Route path="/admin/material-analysis" element={<Navigate to="/admin/ai-configs?tab=sandbox" replace />} />
-                <Route
-                  path="/admin/training-models"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <AdminPanel />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/performance"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <SystemPerformance />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Retired (2026-06-09): misnamed "training" panel. Factory approvals moved to Operations. */}
+                <Route path="/admin/training-models" element={<Navigate to="/admin/operations?tab=factory-onboarding" replace />} />
+                {/* Folded into Operations → Performance tab (2026-06-09). */}
+                <Route path="/admin/performance" element={<Navigate to="/admin/operations?tab=performance" replace />} />
                 <Route
                   path="/admin/logs"
                   element={
@@ -466,18 +443,6 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <ApiGatewayAdmin />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-<Route
-                  path="/admin/svbrdf"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <SVBRDFExtractionPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

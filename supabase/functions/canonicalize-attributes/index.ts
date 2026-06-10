@@ -28,6 +28,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
 const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
@@ -73,7 +74,7 @@ async function callMivaa(body: CanonicalizeRequest): Promise<Response> {
   );
 }
 
-serve(async (req) => {
+serve(withApiLogging('canonicalize-attributes', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -109,4 +110,4 @@ serve(async (req) => {
   }
 
   return await callMivaa(body);
-});
+}));

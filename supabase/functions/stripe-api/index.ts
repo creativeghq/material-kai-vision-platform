@@ -8,10 +8,11 @@
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleCheckout } from './handlers/checkout.ts';
 import { handleCustomerPortal } from './handlers/customer-portal.ts';
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('stripe-api', async (req) => {
   // Populate Deno.env from platform_secrets BEFORE dispatching — handlers
   // create their Stripe client per-request from env, env-first DB-fallback.
   await bootstrapForFunction();
@@ -48,4 +49,4 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
   }
-});
+}));

@@ -121,16 +121,11 @@ Frontend (Vercel)
 - Chunk/image references
 
 **background_jobs**
-- Async job tracking
-- Status monitoring
-- Progress tracking
-- Error handling
-
-**job_progress**
-- Real-time progress updates
-- Stage tracking
-- Checkpoint data
-- Performance metrics
+- Async job tracking (single-table design post-2026-04-25)
+- `stage_history jsonb` — append-only audit log per stage transition (capped at 100 entries)
+- `recovery_history jsonb` — append-only auto-recovery audit log
+- `last_checkpoint jsonb` — resume snapshot used by auto-recovery cron
+- Note: `job_progress` and `job_checkpoints` tables were dropped 2026-04-25; all stage and recovery data now lives as JSONB arrays on the job row.
 
 ---
 
@@ -255,7 +250,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 **HuggingFace Endpoints**:
 - **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material)
-- **Chandra v2** — OCR (sole OCR engine; pytesseract + EasyOCR removed 2026-05-01); retry-with-jitter (3 attempts at temps 0.0/0.1/0.2)
+- **Chandra v2** — OCR (sole OCR engine; pytesseract + EasyOCR removed 2026-05-01); retry-with-jitter (3 attempts at temps 0.0/0.4/0.8 — wider spread breaks sticky-prose state; >90% cumulative success)
 
 **OpenAI** (optional, not vision):
 - GPT-4o / GPT-5 — alternative product discovery / agents
@@ -433,6 +428,21 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 ---
 
+## 🏦 Finance & Business Suite
+
+The platform includes a multi-tenant finance and business operations stack layered on top of the core AI catalog. Key modules:
+
+- **Greek e-invoicing** — AADE/myDATA direct transmission via Novus connector (per-tenant issuer VAT + TaxisNet authorization). See `docs/finance-system.md`.
+- **POS** — Oxygen-style two-panel cash register (`docs/pos-retail-system.md`)
+- **Online Storefront** (`docs/online-storefront.md`)
+- **Warehouse & Billing** (`docs/warehouse-and-billing.md`)
+- **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
+- **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
+
+Note: The Oxygen ERP connector (platform-wide `OXYGEN_API_KEY`) was removed 2026-06-07 — replaced by the per-tenant Novus/AADE direct transmission path.
+
+---
+
 ## 📈 Production Metrics
 
 - **Uptime**: 99.5%+
@@ -444,6 +454,6 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 ---
 
-**Last Updated**: November 3, 2025
-**Version**: 1.0.0
+**Last Updated**: June 2026
+**Version**: 3.7.0
 **Status**: Production

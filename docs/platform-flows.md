@@ -248,7 +248,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Edge Function:** `generate-vr-world`
 **Frontend Component:** `WorldViewer.tsx`
 **Service:** `vrWorldService.ts`
-**External API:** WorldLabs Marble (`marble-0.1-mini`, `marble-0.1-plus`)
+**External API:** WorldLabs Marble (`marble-1.0-draft` fast preview, `marble-1.1` quality)
 **Documentation:** [vr-world-generation.md](vr-world-generation.md)
 
 ---
@@ -288,7 +288,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 5. Engine walks the graph:
    - Trigger node: extracts input data
    - Condition nodes: evaluate if_else / switch / filter
-   - Action nodes: send SMS, send email, HTTP call, create notification
+   - Action nodes: send WhatsApp (send_sms is a legacy alias → routes to Zernio WhatsApp), send email, HTTP call, create notification
    ↓
 6. Execution result written to `flow_runs`
 

@@ -15,12 +15,11 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - **Sentry hygiene:** 4xx codes 401/403/404 are no longer captured to Sentry. Auth-token-expiry noise filtered out of frontend Sentry init too. See `.claude/plans/modular-architecture.md` for the full module system design.
 
 **Previous Updates (v2.6.0 - January 2026):**
-- **MULTI-CHANNEL MESSAGING:** 10+ endpoints for SMS, WhatsApp via Twilio (NEW)
+- **MULTI-CHANNEL MESSAGING:** WhatsApp via Zernio (Meta Cloud API). Twilio + SMS removed 2026-06-08.
   - `POST /functions/v1/messaging-api` - Unified messaging API (action-based routing)
-  - Send single/bulk messages across SMS, WhatsApp
+  - WhatsApp sends require Zernio Inbox add-on + Meta-approved template (24h-window rule)
+  - Channels are connected Zernio WABA accounts, not typed phone strings
   - Template management with variable substitution
-  - Twilio Content API for WhatsApp templates
-  - WhatsApp pre-approved template support
   - Delivery analytics and cost tracking
   - Opt-out compliance management
 
@@ -61,7 +60,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
 
 **Total API Endpoints:** 140+ endpoints across 19 categories
-- **MULTI-CHANNEL MESSAGING:** SMS, WhatsApp messaging via Twilio ✨ NEW
+- **MULTI-CHANNEL MESSAGING:** WhatsApp via Zernio (Meta Cloud API). Twilio + SMS removed 2026-06-08. ✨
 - **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
 - **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
@@ -93,7 +92,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 15. [Data Import Routes](#15-data-import-routes) - XML import, web scraping, batch processing
 16. [Job Health Routes](#16-job-health-routes) - Job monitoring and health checks
 17. [Suggestions Routes](#17-suggestions-routes) - Search suggestions and auto-complete
-19. [Messaging Routes](#19-messaging-routes-sms-whatsapp--new-v260) - SMS, WhatsApp via Twilio ✨ NEW v2.6.0
+19. [Messaging Routes](#19-messaging-routes-whatsapp--new-v260) - WhatsApp via Zernio ✨ NEW v2.6.0 (Twilio + SMS removed 2026-06-08)
 
 ---
 
@@ -104,7 +103,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **Purpose:** Unified health check for all MIVAA services
 **Replaces:** 10+ individual health check endpoints (`/api/pdf/health`, `/api/rag/health`, `/api/search/health`, etc.)
 
-The response includes `status`, `timestamp`, per-service health details with response times (database, storage, AI models including Claude/GPT/QWEN, and RAG), and a `version` field.
+The response includes `status`, `timestamp`, per-service health details with response times (database, storage, AI models including Claude/GPT, and RAG), and a `version` field.
 
 **Benefits:**
 - ✅ Single request instead of 10+ requests
@@ -1196,7 +1195,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 
 **Features:**
 - Uses same **multi-vector search** as main search endpoint
-- Combines 6 specialized CLIP embeddings (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
+- Combines 7 VECS-based embeddings (text 20%, visual/SLIG 20%, understanding 20%, color/texture/style/material 12.5% each — Voyage AI 1024D)
 - Searches across products, entities, chunks, and images
 - Supports category filtering and entity type filtering
 - Returns comprehensive results with all metadata and embeddings
@@ -1222,7 +1221,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 - SELECT FROM products (with multi-vector search)
 - SELECT FROM document_entities (with embedding search)
 - SELECT FROM document_chunks (with category filtering)
-- SELECT FROM document_images (with CLIP embeddings)
+- SELECT FROM document_images (with VECS image embeddings)
 
 **Frontend Integration:**
 - KnowledgeBaseSearch.tsx
@@ -1239,7 +1238,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 - SELECT FROM products with vector similarity (pgvector)
 - PostgreSQL full-text search (for hybrid strategy)
 - JSONB property filtering (for material strategy)
-- CLIP embedding generation (for image strategy)
+- VECS embedding lookup (for image strategy — SLIG SigLIP2 768D)
 
 **Frontend Integration:** SearchPage.tsx, KnowledgeBase.tsx, ProductDiscovery.tsx
 
@@ -1760,172 +1759,41 @@ All endpoints return JSON with fields: `success` (boolean), `data` (object), `er
 
 ---
 
-## 19. Messaging Routes (SMS, WhatsApp) ✨ NEW v2.6.0
+## 19. Messaging Routes (WhatsApp) ✨ NEW v2.6.0
 
 **Base Path:** Supabase Edge Function `/functions/v1/messaging-api`
-**Purpose:** Multi-channel messaging via Twilio (SMS, WhatsApp)
-**Provider:** Twilio - Single API for all channels
+**Purpose:** WhatsApp messaging via Zernio (Meta Cloud API). SMS and Twilio removed 2026-06-08.
+**Provider:** Zernio (`https://zernio.com/api/v1`)
 **Philosophy:** Unified messaging API with templates, campaigns, analytics, and compliance
 
-### Environment Variables (Supabase Secrets)
-
-Required secrets: `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
-
-### 19.1 POST /functions/v1/messaging-api (action: send)
-
-**Purpose:** Send a single message via SMS or WhatsApp
-**Used In:** Test messages, transactional notifications, OTP delivery
-
-**Request fields:** `action: "send"`, `channel` (`sms` | `whatsapp`), `to` (phone number), `content`, `from` (optional), `messageType` (`transactional` | `marketing` | `otp` | `notification`), `variables` (for template rendering), `templateSlug` (optional), `mediaUrl` (optional), `tags` (optional), `whatsappContentSid` (optional, for WhatsApp pre-approved templates)
-
-**Response:** `success`, `messageId`, `logId`
-
-**Twilio API Endpoints Used:**
-- SMS: `POST /2010-04-01/Accounts/{AccountSid}/Messages.json`
-- WhatsApp: `POST /2010-04-01/Accounts/{AccountSid}/Messages.json` (with `whatsapp:` prefix)
-
----
-
-### 19.2 POST /functions/v1/messaging-api (action: send-bulk)
-
-**Purpose:** Send messages to multiple recipients in bulk
-**Used In:** Marketing campaigns, mass notifications
-
-**Request fields:** `action: "send-bulk"`, `channel`, `recipients` (array of {to, variables}), `content`, `templateSlug` (optional), `messageType`, `from` (optional)
-
-**Response:** `success`, `bulkId`, `total`, `sent`, `failed`, `optedOut`, `results` array (to, status, messageId or error)
-
----
-
-### 19.3 POST /functions/v1/messaging-api (action: channels)
-
-**Purpose:** List all configured messaging channels
-**Used In:** Channel management UI, channel selection dropdowns
-
-**Request fields:** `action: "channels"`, `channelType` (optional filter: `sms` | `whatsapp`)
-
-**Response:** `success`, `channels` array (id, channel_type, provider, sender_id, display_name, is_active, is_default, daily_quota, max_send_rate, config)
-
-**Database Table:** `messaging_channels`
-
----
-
-### 19.4 POST /functions/v1/messaging-api (action: templates)
-
-**Purpose:** List all messaging templates
-**Used In:** Template management UI, campaign creation
-
-**Request fields:** `action: "templates"`, `channelType` (optional filter)
-
-**Response:** `success`, `templates` array (id, name, slug, channel_type, content, variables, category, whatsapp_template_name, is_approved, is_active)
-
-**Database Table:** `messaging_templates`
-
----
-
-### 19.5 POST /functions/v1/messaging-api (action: logs)
-
-**Purpose:** Get message delivery logs with filtering
-**Used In:** Message logs tab, delivery tracking, debugging
-
-**Request fields:** `action: "logs"`, `channelType` (optional), `status` (optional: queued | sent | delivered | read | failed | rejected), `messageType` (optional), `limit`
-
-**Response:** `success`, `logs` array (id, channel_type, provider_message_id, from_number, to_number, content, status, sent_at, delivered_at, cost, currency)
-
-**Database Table:** `messaging_logs`
-
----
-
-### 19.6 POST /functions/v1/messaging-api (action: analytics)
-
-**Purpose:** Get aggregated messaging analytics
-**Used In:** Analytics dashboard, reporting
-
-**Request fields:** `action: "analytics"`, `channelType` (optional), `dateRange` (start, end)
-
-**Response:** `success`, `totalSent`, `totalDelivered`, `totalRead` (WhatsApp only), `totalFailed`, `totalCost`, `deliveryRate`, `readRate`, `failureRate`, `dailyData` array
-
-**Database Table:** `messaging_analytics`
-
----
-
-### 19.7 POST /functions/v1/messaging-api (action: balance)
-
-**Purpose:** Get Twilio account balance
-**Used In:** Header balance display, billing monitoring
-
-**Request fields:** `action: "balance"`
-
-**Response:** `success`, `balance`, `currency`
-
-**Twilio API Endpoint:** `GET /2010-04-01/Accounts/{AccountSid}/Balance.json`
-
----
-
-### 19.8 POST /functions/v1/messaging-api (action: sync-senders)
-
-**Purpose:** Sync senders/numbers from Twilio account to local database
-**Used In:** Channel sync button, initial setup
-
-**Request fields:** `action: "sync-senders"`, `autoImport` (boolean — set to true to automatically import to database)
-
-**Response:** `success`, `senders` (sms and whatsapp arrays with sender_id, display_name, status), `total`, `imported`
-
-**Twilio API Endpoints Used:**
-- Phone Numbers: `GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json`
-- WhatsApp Senders: Configured via Twilio Console
-
----
-
-### 19.9 POST /functions/v1/messaging-api (action: whatsapp-templates)
-
-**Purpose:** Fetch WhatsApp templates from Twilio Content API
-**Used In:** WhatsApp template selection, template sync
-
-**Request fields:** `action: "whatsapp-templates"`
-
-**Response:** `success`, `templates` array (sid, friendly_name, language, types with body)
-
-**Twilio API Endpoint:** `GET /v1/Content` (Twilio Content API)
-
----
-
-### 19.10 POST /functions/v1/messaging-api (action: send-test)
-
-**Purpose:** Send a test message for a campaign
-**Used In:** Campaign testing, preview verification
-
-**Request fields:** `action: "send-test"`, `campaignId`, `testNumber`
-
-**Response:** `success`, `messageId`
-
----
-
-### Twilio API Reference (Internal)
-
-**Base URL:** `https://api.twilio.com`
-**Authentication:** HTTP Basic Auth (Account SID + Auth Token)
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/2010-04-01/Accounts/{AccountSid}/Messages.json` | POST | Send SMS/WhatsApp messages |
-| `/2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json` | GET | List phone numbers |
-| `/2010-04-01/Accounts/{AccountSid}/Balance.json` | GET | Get account balance |
-| `/v1/Content` | GET | List WhatsApp content templates (Content API) |
-
-**Documentation:** https://www.twilio.com/docs/messaging/api
-
----
+> **Provider change 2026-06-08:** Twilio (SMS + WhatsApp) replaced by Zernio WhatsApp. SMS support removed entirely. Channels are now connected Zernio WABA accounts (not typed phone strings). Cold/marketing sends require a Meta-approved template (24h-window rule). Requires Zernio Inbox add-on for `/v1/inbox/*` endpoints.
+
+**Required secrets:** `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET` (configured at `/admin/modules/social-media → Settings` or as Supabase Edge Function secrets)
+
+For the full endpoint inventory, action parameters, database tables, and webhook payload shapes see **[docs/api/messaging-api.md](./api/messaging-api.md)**.
+
+### Key Actions (POST /functions/v1/messaging-api)
+
+| Action | Purpose |
+|--------|---------|
+| `send` | Send a single WhatsApp message (requires approved template outside 24h window) |
+| `send-bulk` | Send to multiple recipients (campaign processor) |
+| `channels` | List configured Zernio WABA channels |
+| `templates` | List messaging templates (with `whatsapp_template_name` + `whatsapp_language_code`) |
+| `logs` | Delivery logs with filtering |
+| `analytics` | Aggregated messaging analytics |
+| `connect-whatsapp` | Connect a Zernio WhatsApp account (Meta access token + WABA ID + phone number ID) |
+| `sync-from-zernio` | Sync connected WhatsApp accounts from `GET /v1/accounts?platform=whatsapp` |
+| `send-test` | Send a test message for a campaign |
 
 ### Database Tables
 
-The messaging system uses the following tables:
-
-- **`messaging_channels`** — Stores SMS and WhatsApp sender configurations (channel_type, provider, sender_id, display_name, is_active, is_default, config JSONB, daily_quota, max_send_rate)
-- **`messaging_templates`** — Message templates with variables (name, slug, channel_type, content, variables array, category, whatsapp_content_sid, is_approved, is_active)
-- **`messaging_logs`** — Per-message delivery records (channel_type, provider_message_id, from/to numbers, content, status, timestamps, cost, currency)
-- **`messaging_analytics`** — Daily aggregated analytics per channel (date, channel_type, total_sent, total_delivered, total_read, total_failed, total_cost)
-- **`messaging_optouts`** — Compliance opt-out records (phone_number, channel_type, source, opted_out_at)
+- **`messaging_channels`** — Connected Zernio WABA accounts (`zernio_account_id`, `provider='zernio'`, `config.{waba_id, phone_number_id, display_phone_number, profile_id}`)
+- **`messaging_templates`** — Templates with `whatsapp_template_name` + `whatsapp_language_code` + `variables[]` (ordered body params)
+- **`messaging_logs`** — Per-message delivery records; `provider_message_id` = wamid; updated by `zernio-webhook-handler` on `message.delivered|read|failed`
+- **`messaging_campaigns`** / **`messaging_campaign_recipients`** — Campaign rows and per-recipient send state
+- **`messaging_conversations`** / **`messaging_conversation_messages`** — Inbound reply threads (unique on `channel_id + contact_phone`); assigned to campaign owner on first reply
+- **`messaging_optouts`** — STOP/START keyword compliance records
 
 ---
 
@@ -1933,13 +1801,12 @@ The messaging system uses the following tables:
 
 **Total Endpoints:** 140+
 **Latest Version:** v2.6.0
-**Last Updated:** January 2026
+**Last Updated:** January 2026 (messaging updated 2026-06-08)
 
 **New in v2.6.0:**
-- ✨ Multi-channel Messaging (SMS, WhatsApp) via Twilio
+- ✨ WhatsApp messaging via Zernio (Meta Cloud API) — Twilio + SMS removed 2026-06-08
 - ✨ Unified messaging templates with variable substitution
 - ✨ Bulk messaging with recipient-specific variables
-- ✨ WhatsApp template support via Twilio Content API
 - ✨ Delivery analytics and cost tracking
 - ✨ Opt-out compliance management
 
@@ -1948,10 +1815,10 @@ The messaging system uses the following tables:
 
 **Key Features:**
 - ✅ Consolidated endpoints (no duplicates)
-- ✅ Comprehensive AI integration (Claude, GPT, QWEN)
+- ✅ Comprehensive AI integration (Claude, GPT)
 - ✅ Complete Knowledge Base system
 - ✅ Advanced duplicate detection
 - ✅ Data import with AI field mapping
 - ✅ Spatial analysis with Claude Vision
-- ✅ Multi-channel messaging via Twilio
+- ✅ WhatsApp messaging via Zernio
 - ✅ Full FastAPI documentation at `/docs` and `/redoc`

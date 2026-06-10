@@ -90,7 +90,7 @@ All methods update the `background_jobs` table in real-time with the current job
 
 ---
 
-### 3. CLIP Embeddings Generation
+### 3. Embedding Generation (SLIG + Voyage)
 
 **Applies to**: PDF, Web Scraping, XML Import
 **Service**: `ImageProcessingService`
@@ -101,7 +101,7 @@ All methods update the `background_jobs` table in real-time with the current job
 | **Max Retries** | 3 | Retry failed embeddings |
 
 **Why 20?**
-- CLIP model processes ~20 images in 10-15 seconds
+- SLIG/Voyage batch processes ~20 images in 10-15 seconds
 - Larger batches cause memory spikes
 
 ---
@@ -207,7 +207,7 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 |-----------|---------|---------|
 | **Claude Vision Request** | 120s | Vision analysis via Anthropic tool use |
 | **Chandra v2 OCR Request** | 60s per attempt × 3 retries | Page + per-image OCR |
-| **SLIG Embedding Request** | 30s | 5× specialized 768D vectors |
+| **SLIG Embedding Request** | 30s | 1× visual 768D vector (SigLIP2) |
 
 ---
 
@@ -266,7 +266,12 @@ Shared limits across all methods (post-2026-05-01): 2 concurrent Claude vision r
 
 **Used by**: PDF, Web Scraping, XML Import
 
-Uses SigLIP2 via the SLIG cloud endpoint (HuggingFace Inference Endpoint, 768D) and generates five specialized 768D embedding types written directly to VECS: `image_slig_embeddings` (visual), `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, and `image_material_embeddings`. Plus an understanding embedding (1024D Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`) → `image_understanding_embeddings`. Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026-05-01: vision pass migrated from Qwen to Claude Opus 4.7 tool use (Qwen had been silently 404-ing for months).
+Generates 6 embedding types written directly to VECS:
+- `image_slig_embeddings` (visual, **768D** SigLIP2 via SLIG cloud endpoint)
+- `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, `image_material_embeddings` (aspect embeddings, **1024D** Voyage AI from deterministic per-image `VisionAnalysis` field serializations — post-2026-05-04; pre-v2 these were 768D SLIG-blend vectors)
+- `image_understanding_embeddings` (**1024D** Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`)
+
+Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026-05-01: vision pass migrated from Qwen to Claude Opus 4.7 tool use (Qwen had been silently 404-ing for months).
 
 ---
 
@@ -295,7 +300,7 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 | Method | Batch Size | Memory Impact |
 |--------|-----------|---------------|
 | **PDF Image Classification** | 15 images | ~500MB per batch |
-| **CLIP Embeddings** | 20 images | ~300MB per batch |
+| **SLIG+Voyage Embeddings** | 20 images | ~300MB per batch |
 | **XML Product Import** | 10 products | ~200MB per batch |
 
 ---

@@ -72,7 +72,7 @@ Complete reference of all platform features and capabilities.
 - Precision: 95%+
 
 **6. Image Search** ✅
-- Visual similarity using CLIP embeddings
+- Visual similarity using SigLIP2 (SLIG) embeddings (768D halfvec)
 - Accepts image URL or base64
 - Find visually similar products
 - Response time: <150ms
@@ -545,8 +545,8 @@ Complete reference of all platform features and capabilities.
 - ✅ Persists across chat sessions
 
 **Models**:
-- `marble-0.1-mini`: 50 credits, ~30-45 seconds
-- `marble-0.1-plus`: 200 credits, ~5 minutes
+- `marble-1.0-draft`: 18 credits, ~30-45 seconds (fast preview)
+- `marble-1.1`: 190 credits, ~5 minutes (quality)
 
 **Output Assets**:
 - SPZ files (3 quality levels — Gaussian Splats)
@@ -605,7 +605,7 @@ Complete reference of all platform features and capabilities.
 - ✅ 3 node types: trigger, condition, action
 - ✅ Trigger types: manual, cron schedule, webhook, platform event
 - ✅ Condition types: if_else, switch, filter, delay
-- ✅ Action types: send_sms, send_email, http_request, create_notification, send_quote
+- ✅ Action types: send_whatsapp (send_sms is a legacy alias → send_whatsapp), send_email, http_request, create_notification, send_quote, send_price_alert
 - ✅ `{{template}}` variable resolution from execution context
 - ✅ Dry-run / test mode (no actions fire)
 - ✅ Scheduled execution via `flow-scheduler-cron` (pg_cron, every minute)
@@ -894,6 +894,27 @@ Complete reference of all platform features and capabilities.
 
 ---
 
-**Last Updated**: April 2026
-**Version**: 3.6.0
+---
+
+### 32. Finance & Business Suite
+
+**Purpose**: Multi-tenant finance and business operations layer for the architecture/materials industry
+
+**Status:** ✅ Production
+
+**Documentation**: See `docs/finance-system.md` and related cluster
+
+**Components:**
+- ✅ **Greek e-invoicing** — AADE/myDATA direct transmission via Novus connector (per-tenant issuer VAT + TaxisNet authorization). Replaced the removed Oxygen ERP connector (2026-06-07).
+- ✅ **POS** — Two-panel cash register (`docs/pos-retail-system.md`)
+- ✅ **Online Storefront** (`docs/online-storefront.md`)
+- ✅ **Warehouse & Billing** (`docs/warehouse-and-billing.md`)
+- ✅ **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
+- ✅ **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
+- ✅ **myAADE Module** — Greek business registry (ΑΑΔΕ) auto-fill from ΑΦΜ via SOAP/WS-Security
+
+---
+
+**Last Updated**: June 2026
+**Version**: 3.7.0
 **Status**: Production

@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // ── Cron expression parser (minute, hour, day-of-month, month, day-of-week) ──
 
@@ -76,7 +77,7 @@ function fieldMatches(field: string, value: number, min: number, max: number): b
 
 // ── Main handler ──
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('flow-scheduler-cron', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -197,4 +198,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

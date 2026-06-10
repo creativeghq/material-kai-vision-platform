@@ -1,4 +1,5 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 /**
  * Mention Monitoring Cron Job — internal-flow refresher.
  *
@@ -15,7 +16,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
  * Scheduling: pg_cron `mention-monitoring-refresh-hourly` at :30 every hour.
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('mention-monitoring-cron', async (req) => {
   await bootstrapForFunction();
   console.log('🔔 Mention monitoring cron job started');
 
@@ -72,4 +73,4 @@ Deno.serve(async (req) => {
       timestamp: new Date().toISOString(),
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-});
+}));

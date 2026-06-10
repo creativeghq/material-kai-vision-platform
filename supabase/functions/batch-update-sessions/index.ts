@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface BatchUpdateRequest {
   sessionIds: string[];
@@ -14,7 +15,7 @@ interface BatchUpdateRequest {
  * - Secret key (apikey header): Full admin access
  * - User JWT (Authorization header): User-specific operations
  */
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('batch-update-sessions', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -83,5 +84,5 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));
 

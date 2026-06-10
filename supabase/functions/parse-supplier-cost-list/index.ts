@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance PR-A — Supplier Cost List parser
 //
@@ -134,7 +135,7 @@ function json(body: any, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('parse-supplier-cost-list', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -294,7 +295,7 @@ Deno.serve(async (req) => {
     console.error('parse-supplier-cost-list error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));
 
 // Quote a SKU string for safe use inside a Postgrest `.or()` `in.(...)` list.
 // PostgREST's `in.(a,b,c)` syntax expects raw tokens; commas / parens inside a value

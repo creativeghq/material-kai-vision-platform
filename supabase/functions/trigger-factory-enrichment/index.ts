@@ -28,6 +28,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import {
   propagateFactoryFieldsInScope,
   factoryCompletenessScore,
@@ -39,7 +40,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type ScopeColumn = 'source_document_id' | 'scrape_session_id';
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('trigger-factory-enrichment', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -190,4 +191,4 @@ Deno.serve(async (req: Request) => {
     JSON.stringify({ propagated, queued_job_id: runRow.id }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   );
-});
+}));

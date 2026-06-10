@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
 //
@@ -42,7 +43,7 @@ function json(body: any, status = 200): Response {
 // PUBLIC_APP_URL is not a Stripe secret — keep it lazy locally.
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -237,4 +238,4 @@ Deno.serve(async (req) => {
     console.error('finance-pay-invoice error', err);
     return json({ error: err?.message ?? 'Internal error' }, 500);
   }
-});
+}));

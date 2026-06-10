@@ -1,4 +1,5 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 /**
  * Price Monitoring Cron Job — internal-flow refresher.
@@ -12,7 +13,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
  * touched — they pay per call and control their own refresh cadence.
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('price-monitoring-cron', async (req) => {
   await bootstrapForFunction();
   console.log('🔄 Price monitoring cron job started');
 
@@ -67,4 +68,4 @@ Deno.serve(async (req) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-});
+}));

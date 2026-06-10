@@ -14,6 +14,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface StuckJob {
   id: string;
@@ -26,7 +27,7 @@ interface StuckJob {
   metadata?: any;
 }
 
-serve(async (req) => {
+serve(withApiLogging('auto-recovery-cron', async (req) => {
   await bootstrapForFunction();
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -122,7 +123,7 @@ serve(async (req) => {
       }
     );
   }
-});
+}));
 
 async function detectAllStuckJobs(supabase: any): Promise<StuckJob[]> {
   const [pdfJobs, scrapingJobs, xmlJobs, agentRunJobs] = await Promise.all([

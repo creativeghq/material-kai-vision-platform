@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { captureException, captureMessage } from '../_shared/sentry.ts';
+import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
@@ -783,21 +783,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     console.error('Error stack:', error?.stack);
 
     const errorMessage = error?.message || String(error);
-    const errorObj = error instanceof Error ? error : new Error(errorMessage);
-
-    // 🚨 SENTRY ALERT: Send XML import error to Sentry
-    await captureException(errorObj, {
-      tags: {
-        function: 'xml-import-orchestrator',
-        error_type: 'xml_import_failed',
-      },
-      extra: {
-        error_message: errorMessage,
-        error_stack: error?.stack,
-        timestamp: new Date().toISOString(),
-      },
-      fingerprint: ['xml-import-orchestrator', 'error'],
-    });
+    // Top-level capture is handled by withApiLogging (returns 5xx → Sentry).
 
     return new Response(
       JSON.stringify({

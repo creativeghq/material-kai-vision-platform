@@ -12,6 +12,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,7 @@ function json(body: unknown, status = 200): Response {
 
 const num = (s: string | null) => (s != null && s !== '' ? Number(s) : null);
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -164,4 +165,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true, workspaces: summary.length, results: summary });
-});
+}));

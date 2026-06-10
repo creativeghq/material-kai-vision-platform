@@ -7,6 +7,13 @@
 - **Database**: Supabase PostgreSQL 15 + pgvector 0.8.0
 - **Design System**: `.claude/design-system.md` — full reference for all UI patterns, colors, components
 
+## Edge Function Observability (2026-06-09 — unified wrapper)
+Every edge function is wrapped with `withApiLogging('<fn-name>', handler)` from [_shared/api-logger.ts](supabase/functions/_shared/api-logger.ts) — the single chokepoint for both request logging (`api_usage_logs`) AND Sentry error capture. All 88 functions are wrapped (was 29; the other 59 + the 3 that had bespoke Sentry calls were unified 2026-06-09).
+- **Do NOT call `captureException` yourself for top-level request failures** — the wrapper reports them: a thrown handler → `captureException(realError)`; a handler that returns 5xx → `captureMessage` (error level); 4xx are intentionally NOT reported (client errors, not bugs). All tagged with `function` + `method` + `status`.
+- **Deep / background captures** (errors swallowed mid-pipeline that never reach the wrapper — e.g. detached async work like `scrape-session-manager`'s background scrape or `xml-import-orchestrator`'s retry loop) still call `captureException` directly from [_shared/sentry.ts](supabase/functions/_shared/sentry.ts) — they carry context the wrapper can't see, over the same transport.
+- **New functions**: wrap the `Deno.serve(...)` / `serve(...)` handler with `withApiLogging` — that's all; logging + Sentry come for free. Sentry DSN is env `SENTRY_DSN` (hardcoded fallback in sentry.ts).
+- **Sentry is kept signal-only (noise filtering, 2026-06-09)**: 4xx are never reported; a 5xx whose message reads like a client error (validation / auth / method / not-found — `isLikelyClientError`) is suppressed too, since several functions mislabel client errors as 500 (scrape-*, email-api). The HTTP response is never altered — only the report is gated. Duplicate `(function+status+message)` events are throttled per worker (60s). For correct status codes on validation/auth failures in new code, `throw new HttpError(400, 'msg')` (from api-logger.ts) — the wrapper returns that status AND skips Sentry. The `CLIENT_ERROR_RE` filter is tunable as real noise-vs-bug data comes in.
+
 ## Storage Buckets (post-consolidation 2026-05-23)
 The platform uses **6 buckets** (down from 17). Routing is path-based; feature identity lives in the top-level folder, not the bucket name.
 

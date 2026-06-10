@@ -291,8 +291,8 @@ Max file size: 100MB.
 
 | Action | Method | Description | Billable |
 |--------|--------|-------------|----------|
-| `embeddings_clip_image` | POST | Generate CLIP image embedding | Yes |
-| `embeddings_clip_text` | POST | Generate CLIP text embedding | Yes |
+| `embeddings_clip_image` | POST | Generate image embedding (SLIG SigLIP2 768D / Voyage 1024D) | Yes |
+| `embeddings_clip_text` | POST | Generate text embedding (Voyage voyage-4 1024D) | Yes |
 | `embeddings_health` | GET | Embeddings service health | No |
 
 #### AI Services
@@ -378,7 +378,7 @@ Include path params directly in `payload`:
 | RAG search (text) | 0.5 |
 | RAG search (visual) | 1 |
 | Image analysis | 1 |
-| CLIP embedding | 0.25 |
+| Embedding generation (SLIG/Voyage) | 0.25 |
 | Document upload/process | 2 |
 
 ### Response Format
@@ -1250,7 +1250,7 @@ Invalidate recommendation cache for the current user.
   "prompt": "Modern living room with marble floors and warm lighting",
   "room_type": "living_room",
   "style": "modern",
-  "model": "marble-0.1-mini"
+  "model": "marble-1.0-draft"
 }
 ```
 
@@ -1260,14 +1260,14 @@ Invalidate recommendation cache for the current user.
 | `prompt` | `string` | Yes | Text description of the desired world |
 | `room_type` | `string` | No | Room type hint (e.g. `"living_room"`) |
 | `style` | `string` | No | Style hint (e.g. `"modern"`) |
-| `model` | `string` | No | `"marble-0.1-mini"` or `"marble-0.1-plus"` |
+| `model` | `string` | No | `"marble-1.0-draft"` (fast preview) or `"marble-1.1"` (quality) |
 
 ### Credit Costs
 
 | Model | Credits | Estimated Time |
 |-------|---------|---------------|
-| `marble-0.1-mini` | 75 | 30-45 seconds |
-| `marble-0.1-plus` | 300 | ~5 minutes |
+| `marble-1.0-draft` | 18 | ~30-45 seconds |
+| `marble-1.1` | 190 | ~5 minutes |
 
 ### Response `200`
 
@@ -2812,12 +2812,12 @@ The platform uses a credit system for AI operations. Credits are debited per ope
 |---------------|-----------------|
 | KAI agent message (Opus) | 0.5-5 credits depending on length |
 | KAI agent message (Haiku) | 0.1-1 credit |
-| VR World generation (mini) | 75 credits |
-| VR World generation (plus) | 300 credits |
+| VR World generation (marble-1.0-draft) | 18 credits |
+| VR World generation (marble-1.1) | 190 credits |
 | RAG text search | 0.5 credits |
 | RAG visual search | 1 credit |
 | Image analysis | 1 credit |
-| CLIP embedding generation | 0.25 credits |
+| Embedding generation (SLIG / Voyage) | 0.25 credits |
 | Document upload and processing | 2 credits |
 | SEO pipeline | 40-50 credits (full pipeline) |
 

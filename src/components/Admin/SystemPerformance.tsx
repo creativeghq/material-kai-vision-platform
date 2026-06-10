@@ -108,7 +108,7 @@ interface DocumentAnalysisMetrics {
   };
 }
 
-export const SystemPerformance: React.FC = () => {
+export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     total_processing_jobs: 0,
@@ -429,15 +429,17 @@ export const SystemPerformance: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="System Performance"
-        description="Technical performance metrics, processing times, and system health"
-        badge="Performance"
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="System Performance"
+          description="Technical performance metrics, processing times, and system health"
+          badge="Performance"
+        />
+      )}
 
       {/* Main Content */}
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button

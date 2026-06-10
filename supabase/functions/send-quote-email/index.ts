@@ -17,6 +17,7 @@
  * Sender (from:) is resolved by email-api from email_settings.
  */
 import { createClient } from '@supabase/supabase-js';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ interface Body {
   message?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('send-quote-email', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ success: false, error: 'Method not allowed' }, 405);
 
@@ -158,7 +159,7 @@ Deno.serve(async (req) => {
   }
 
   return json({ success: true, sent_to: recipient, view_url: viewUrl });
-});
+}));
 
 function buildHtml(p: {
   title: string;

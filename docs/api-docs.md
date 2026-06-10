@@ -82,7 +82,7 @@ The multi-vector search has been **significantly enhanced** to be the single com
 **Endpoint:** `POST /api/rag/search?strategy=multi_vector`
 
 **Features:**
-- 6 specialized CLIP embeddings with intelligent weighting
+- 7 VECS-based embeddings with intelligent weighting (SLIG SigLIP2 768D + Voyage AI 1024D × 6)
 - JSONB metadata filtering
 - Query understanding (enabled by default)
 - Best accuracy and performance for general queries

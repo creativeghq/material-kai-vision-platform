@@ -33,6 +33,16 @@ export interface NewTimeEntry {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Oxygen m=403 parity — aggregated time reports.
+export interface TimeReportUserRow {
+  user_id: string | null; name: string; entries: number;
+  hours: number; billable_hours: number; value: number; billed_value: number;
+}
+export interface TimeReportContactRow {
+  key: string; name: string; entries: number;
+  hours: number; value: number; billed_value: number; unbilled_value: number;
+}
+
 export const timeTrackingService = {
   async list(workspaceId: string, opts?: { onlyUnbilled?: boolean; customerId?: string; from?: string; to?: string }): Promise<TimeEntry[]> {
     let q = supabase.from('time_entries').select('*').eq('workspace_id', workspaceId).order('work_date', { ascending: false });
@@ -134,5 +144,52 @@ export const timeTrackingService = {
     if (stampErr) throw stampErr;
 
     return (invoice as any).id as string;
+  },
+
+  /**
+   * Time reports for a date range, aggregated per user and per contact
+   * (Oxygen taskstime_users / taskstime_contacts, m=403). Computed client-side
+   * from `time_entries`; volumes per workspace are small enough to not need an RPC.
+   */
+  async report(workspaceId: string, from: string, to: string): Promise<{ byUser: TimeReportUserRow[]; byContact: TimeReportContactRow[] }> {
+    const entries = await this.list(workspaceId, { from, to });
+
+    // resolve user + party display names
+    const userIds = [...new Set(entries.map((e) => e.user_id).filter(Boolean) as string[])];
+    const compIds = [...new Set(entries.map((e) => e.customer_company_id).filter(Boolean) as string[])];
+    const contIds = [...new Set(entries.map((e) => e.customer_contact_id).filter(Boolean) as string[])];
+    const userName: Record<string, string> = {};
+    const partyName: Record<string, string> = {};
+    await Promise.all([
+      userIds.length ? supabase.from('user_profiles').select('id, full_name, email').in('id', userIds)
+        .then(({ data }) => { for (const u of data ?? []) userName[(u as any).id] = (u as any).full_name || (u as any).email || (u as any).id; }) : Promise.resolve(),
+      compIds.length ? supabase.from('crm_companies').select('id, name').in('id', compIds)
+        .then(({ data }) => { for (const c of data ?? []) partyName[`c:${(c as any).id}`] = (c as any).name ?? ''; }) : Promise.resolve(),
+      contIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contIds)
+        .then(({ data }) => { for (const c of data ?? []) partyName[`p:${(c as any).id}`] = (c as any).name || [(c as any).first_name, (c as any).last_name].filter(Boolean).join(' '); }) : Promise.resolve(),
+    ]);
+
+    const byUserMap = new Map<string, TimeReportUserRow>();
+    const byContactMap = new Map<string, TimeReportContactRow>();
+    for (const e of entries) {
+      const hours = round2(e.minutes / 60);
+      const value = round2(hours * Number(e.hourly_rate));
+      const isBilled = !!e.billed_invoice_id;
+
+      const uk = e.user_id ?? '∅';
+      const u = byUserMap.get(uk) ?? { user_id: e.user_id, name: e.user_id ? (userName[e.user_id] || e.user_id.slice(0, 8)) : 'Unassigned', entries: 0, hours: 0, billable_hours: 0, value: 0, billed_value: 0 };
+      u.entries += 1; u.hours = round2(u.hours + hours); if (e.is_billable) u.billable_hours = round2(u.billable_hours + hours);
+      u.value = round2(u.value + value); if (isBilled) u.billed_value = round2(u.billed_value + value);
+      byUserMap.set(uk, u);
+
+      const pk = e.customer_company_id ? `c:${e.customer_company_id}` : e.customer_contact_id ? `p:${e.customer_contact_id}` : '∅';
+      const c = byContactMap.get(pk) ?? { key: pk, name: pk === '∅' ? 'No customer' : (partyName[pk] || '—'), entries: 0, hours: 0, value: 0, billed_value: 0, unbilled_value: 0 };
+      c.entries += 1; c.hours = round2(c.hours + hours); c.value = round2(c.value + value);
+      if (isBilled) c.billed_value = round2(c.billed_value + value); else if (e.is_billable) c.unbilled_value = round2(c.unbilled_value + value);
+      byContactMap.set(pk, c);
+    }
+    const byUser = [...byUserMap.values()].sort((a, b) => b.hours - a.hours);
+    const byContact = [...byContactMap.values()].sort((a, b) => b.value - a.value);
+    return { byUser, byContact };
   },
 };

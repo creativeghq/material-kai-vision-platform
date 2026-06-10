@@ -24,11 +24,12 @@ const MIVAA_API_KEY             = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const { createClient } = await import('@supabase/supabase-js');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withApiLogging('firecrawl-webhook', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -257,4 +258,4 @@ Deno.serve(async (req: Request) => {
   return new Response(JSON.stringify({ ok: true, pages_received: pages.length }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+}));

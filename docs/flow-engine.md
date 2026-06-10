@@ -78,7 +78,8 @@ Perform side effects. Templated values like `{{trigger.data.user_email}}` are re
 
 | Action Type | What it does | Cost |
 |---|---|---|
-| `send_sms` | Sends SMS via `messaging-api` | Twilio per-message |
+| `send_sms` | **Legacy alias for `send_whatsapp`** — both route to `messaging-api` debiting `zernio-whatsapp` (~0.005/msg). SMS (Twilio) removed 2026-06-08. Old saved flows using `send_sms` continue to work via this alias. | ~0.005/msg |
+| `send_whatsapp` | Sends WhatsApp message via `messaging-api` (Zernio). Requires a Meta-approved template outside the 24h session window. | ~0.005/msg |
 | `send_email` | Sends email via `email-api` | SES per-message |
 | `http_request` | Makes outbound HTTP call (GET/POST/PUT/DELETE) | None |
 | `create_notification` | Inserts record into `notifications` table | None |
@@ -177,7 +178,7 @@ The payload is passed as `trigger.data` in the execution context.
 
 ## Credit Usage
 
-Individual actions may consume credits (e.g., `send_sms` via Twilio, `http_request` to paid APIs). Credit deduction is handled by the individual invoked functions, not the flow engine itself.
+Individual actions may consume credits (e.g., `send_sms`/`send_whatsapp` via Zernio (~0.005/msg), `http_request` to paid APIs). Credit deduction is handled by the individual invoked functions, not the flow engine itself.
 
 ---
 

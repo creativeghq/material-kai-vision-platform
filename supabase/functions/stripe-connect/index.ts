@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 
 // #182 Stripe Connect onboarding for per-workspace payouts (destination charges).
@@ -19,7 +20,7 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('stripe-connect', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -89,4 +90,4 @@ Deno.serve(async (req) => {
     type: 'account_onboarding',
   });
   return json({ url: link.url, account_id: accountId });
-});
+}));

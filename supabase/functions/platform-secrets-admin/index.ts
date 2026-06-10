@@ -14,6 +14,7 @@ import {
   invalidateSecretCache,
   type PlatformSecretRow,
 } from '../_shared/secrets.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 interface RequestBody {
   action:
@@ -39,7 +40,7 @@ interface MaskedSecretView extends Omit<PlatformSecretRow, 'value'> {
   modules: string[]; // module_slug list, including primary + linked
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('platform-secrets-admin', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
     console.error('[platform-secrets-admin] Unhandled error:', err);
     return json({ error: err instanceof Error ? err.message : 'Unknown error' }, 500);
   }
-});
+}));
 
 async function handleList(supabase: any, scope: string | null): Promise<Response> {
   // scope: null => everything, 'platform' => primary_module_slug IS NULL, else => secrets linked to that module

@@ -1,4 +1,5 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 /**
  * LLM Mention Probe Cron Job — weekly visibility tracker.
  *
@@ -10,7 +11,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
  * Cost: roughly $0.008/subject/week.
  */
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('llm-mention-probe-cron', async (req) => {
   await bootstrapForFunction();
   console.log('🤖 LLM mention probe cron job started');
 
@@ -63,4 +64,4 @@ Deno.serve(async (req) => {
       timestamp: new Date().toISOString(),
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-});
+}));

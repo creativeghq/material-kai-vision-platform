@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -61,7 +62,7 @@ async function resolveOwnerBranding(supabase: any, workspaceId: string | null, o
   return { logo_url, company_name: fs?.business_name ?? null, contact_line: fs?.branding_contact_line ?? null };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('catalog-access', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -274,7 +275,7 @@ Deno.serve(async (req) => {
     console.error('[catalog-access] error:', err);
     return jsonResponse({ error: err instanceof Error ? err.message : 'Access failed' }, 500);
   }
-});
+}));
 
 interface MatchResult {
   granted: boolean;

@@ -10,6 +10,7 @@
 // zernio-webhook-handler stays separate (Zernio's outbound webhook URL).
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleZernioAnalytics } from './handlers/analytics.ts';
 import { handleZernioOauth } from './handlers/oauth.ts';
 import { handleZernioPublish } from './handlers/publish.ts';
@@ -18,7 +19,7 @@ const ANALYTICS_ACTIONS = new Set(['get_best_time', 'get_post_analytics', 'get_a
 const OAUTH_ACTIONS = new Set(['connect', 'callback', 'disconnect']);
 const PUBLISH_ACTIONS = new Set(['schedule', 'publish_now']);
 
-Deno.serve(async (req) => {
+Deno.serve(withApiLogging('zernio-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   // GET → oauth account listing path
@@ -53,4 +54,4 @@ Deno.serve(async (req) => {
     status: 400,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+}));
