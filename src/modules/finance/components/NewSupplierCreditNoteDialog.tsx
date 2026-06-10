@@ -1,9 +1,9 @@
 /**
- * #207 — record a SUPPLIER credit note (πιστωτικό προμηθευτή) against a supplier bill.
- * The supplier issues + transmits the credit note to myDATA; on our side we only RECORD
- * it so our payable (AP) is reduced. Capture the supplier's myDATA MARK in `external_mark`
- * for reconciliation. Net + VAT are entered separately (myDATA needs the split); they
- * default to the selected bill's amounts and can be trimmed for a partial credit.
+ * #207 — record a SUPPLIER credit note (πιστωτικό προμηθευτή) at Oxygen pistotikap parity:
+ * full line items (product/description/qty/unit price/VAT), keyed either to a recorded
+ * supplier bill (nets its payable) OR standalone to a supplier directly, with issue date,
+ * category, mark-as-paid and the supplier's myDATA MARK for reconciliation. The supplier
+ * issues + transmits to myDATA; on our side we RECORD it so AP is reduced.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -11,65 +11,116 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { financeService, formatMoney, type SupplierBill } from '@/modules/finance/services/financeService';
+import { supabase } from '@/integrations/supabase/client';
+import { financeService, formatMoney, round2, VAT_CATEGORIES, type SupplierBill } from '@/modules/finance/services/financeService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+
+type Supplier = { type: 'company' | 'contact'; id: string; label: string };
+interface Line { id: string; description: string; qty: string; unitPrice: string; vatCode: string; }
+
+const newLine = (): Line => ({ id: Math.random().toString(36).slice(2), description: '', qty: '1', unitPrice: '', vatCode: '1' });
+const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
 
 export const NewSupplierCreditNoteDialog: React.FC<{
   workspaceId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-  /** Preselect a bill (from the AP row action); when omitted a picker is shown. */
+  /** Preselect a bill (from the AP row action); when omitted the operator picks a bill or a supplier. */
   supplierBillId?: string;
 }> = ({ workspaceId, open, onOpenChange, onCreated, supplierBillId }) => {
   const { toast } = useToast();
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [billId, setBillId] = useState('');
-  const [net, setNet] = useState('');
-  const [vat, setVat] = useState('');
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string>('');
+
+  // standalone supplier picker
+  const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [supSearch, setSupSearch] = useState('');
+  const [supOptions, setSupOptions] = useState<Supplier[]>([]);
+
+  const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [lines, setLines] = useState<Line[]>([newLine()]);
   const [reason, setReason] = useState('');
   const [externalMark, setExternalMark] = useState('');
+  const [markPaid, setMarkPaid] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setReason(''); setExternalMark('');
+    setReason(''); setExternalMark(''); setMarkPaid(false); setLines([newLine()]); setSupplier(null); setSupSearch(''); setCategoryId('');
+    setIssueDate(new Date().toISOString().slice(0, 10));
     financeService.listSupplierBills({ workspaceId, status: ['received', 'partially_paid', 'paid', 'overdue', 'disputed'] })
-      .then((rows) => {
-        setBills(rows);
-        const initial = supplierBillId ?? '';
-        setBillId(initial);
-        const b = rows.find((r) => r.id === initial);
-        setNet(b ? String(b.subtotal_net) : '');
-        setVat(b ? String(b.vat_amount) : '');
-      })
+      .then((rows) => { setBills(rows); setBillId(supplierBillId ?? ''); })
       .catch(() => setBills([]));
+    financeCategoriesService.list(workspaceId).then((c) => setCategories(c.filter((x) => x.kind === 'expense' || x.kind === 'both'))).catch(() => setCategories([]));
   }, [open, workspaceId, supplierBillId]);
 
+  // supplier search (standalone mode — only when no bill linked)
+  useEffect(() => {
+    const term = supSearch.trim();
+    if (term.length < 2 || billId) { setSupOptions([]); return; }
+    const t = setTimeout(async () => {
+      const [companies, contacts] = await Promise.all([
+        supabase.from('crm_companies').select('id, name').ilike('name', `%${term}%`).limit(6),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`).limit(6),
+      ]);
+      const opts: Supplier[] = [];
+      for (const c of companies.data ?? []) opts.push({ type: 'company', id: (c as any).id, label: `${(c as any).name} (company)` });
+      for (const c of contacts.data ?? []) opts.push({ type: 'contact', id: (c as any).id, label: (c as any).name || [(c as any).first_name, (c as any).last_name].filter(Boolean).join(' ') || (c as any).id });
+      setSupOptions(opts);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [supSearch, billId]);
+
   const bill = useMemo(() => bills.find((b) => b.id === billId), [bills, billId]);
+  const currency = bill?.currency ?? 'EUR';
 
-  const pick = (id: string) => {
-    setBillId(id);
-    const b = bills.find((x) => x.id === id);
-    if (b) { setNet(String(b.subtotal_net)); setVat(String(b.vat_amount)); }
-  };
+  const computed = useMemo(() => {
+    let net = 0, vat = 0;
+    const payloadLines = lines
+      .filter((l) => l.description.trim() && parseFloat(l.unitPrice) > 0)
+      .map((l) => {
+        const qty = parseFloat(l.qty) || 0;
+        const lineNet = round2(qty * (parseFloat(l.unitPrice) || 0));
+        const pct = pctOf(l.vatCode);
+        const lineVat = round2(lineNet * pct / 100);
+        net = round2(net + lineNet); vat = round2(vat + lineVat);
+        return {
+          description: l.description.trim(), quantity: qty, unit_price: parseFloat(l.unitPrice) || 0,
+          net_value: lineNet, vat_amount: lineVat, vat_category: parseInt(l.vatCode, 10), vat_percent: pct,
+        };
+      });
+    return { payloadLines, net, vat, total: round2(net + vat) };
+  }, [lines]);
 
-  const netNum = parseFloat(net) || 0;
-  const vatNum = parseFloat(vat) || 0;
-  const total = Math.round((netNum + vatNum) * 100) / 100;
+  const setLine = (id: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => l.id === id ? { ...l, ...patch } : l));
+  const addLine = () => setLines((ls) => [...ls, newLine()]);
+  const removeLine = (id: string) => setLines((ls) => ls.length > 1 ? ls.filter((l) => l.id !== id) : ls);
 
   const save = async () => {
-    if (!billId) { toast({ title: 'Pick a supplier bill', variant: 'destructive' }); return; }
-    if (total <= 0) { toast({ title: 'Enter a credit amount', variant: 'destructive' }); return; }
+    if (!billId && !supplier) { toast({ title: 'Pick a supplier bill or a supplier', variant: 'destructive' }); return; }
+    if (computed.payloadLines.length === 0) { toast({ title: 'Add at least one line', description: 'Each line needs a description and a price.', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       await financeService.issueSupplierCreditNote({
-        supplierBillId: billId, netValue: netNum, vatAmount: vatNum,
-        reason: reason.trim() || undefined, externalMark: externalMark.trim() || undefined,
+        workspaceId,
+        supplierBillId: billId || null,
+        supplier: billId ? null : supplier,
+        currency,
+        issuedAt: new Date(issueDate).toISOString(),
+        categoryId: categoryId || null,
+        markPaid,
+        reason: reason.trim() || undefined,
+        externalMark: externalMark.trim() || undefined,
+        lines: computed.payloadLines,
       });
-      toast({ title: 'Supplier credit note recorded', description: 'Payable reduced.' });
+      toast({ title: 'Supplier credit note recorded', description: billId ? 'Payable reduced.' : 'Standalone note recorded.' });
       onCreated(); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -78,47 +129,119 @@ export const NewSupplierCreditNoteDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Record supplier credit note</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Supplier credit note (πιστωτικό προμηθευτή)</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Against supplier bill *</Label>
-            <Select value={billId} onValueChange={pick} disabled={!!supplierBillId}>
-              <SelectTrigger><SelectValue placeholder="Pick the bill to credit…" /></SelectTrigger>
-              <SelectContent>
-                {bills.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No open supplier bills</div>
-                  : bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.supplier_bill_number ?? b.id.slice(0, 8)} — {formatMoney(b.total, b.currency)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              The supplier issues this credit note to myDATA; we record it here to reduce what we owe. Paste their MARK below for reconciliation.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          {/* Bill link OR standalone supplier */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <Label>Net</Label>
-              <Input type="number" step="0.01" min="0" value={net} onChange={(e) => setNet(e.target.value)} />
+              <Label>Against supplier bill</Label>
+              <Select value={billId || '__none'} onValueChange={(v) => { setBillId(v === '__none' ? '' : v); if (v !== '__none') setSupplier(null); }} disabled={!!supplierBillId}>
+                <SelectTrigger><SelectValue placeholder="Optional — link a recorded bill" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">— Standalone (no bill) —</SelectItem>
+                  {bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.supplier_bill_number ?? b.id.slice(0, 8)} — {formatMoney(b.total, b.currency)}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label>VAT</Label>
-              <Input type="number" step="0.01" min="0" value={vat} onChange={(e) => setVat(e.target.value)} />
+              <Label>{billId ? 'Supplier' : 'Supplier *'}</Label>
+              {billId ? (
+                <Input disabled value={(bill as any)?.supplier_name ?? 'From the linked bill'} />
+              ) : supplier ? (
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-2 py-1.5 text-sm">
+                  <span className="truncate">{supplier.label}</span>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setSupplier(null)}>Change</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pl-7" placeholder="Search supplier…" value={supSearch} onChange={(e) => setSupSearch(e.target.value)} />
+                  {supOptions.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                      {supOptions.map((o) => (
+                        <button key={`${o.type}-${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setSupplier(o); setSupSearch(''); setSupOptions([]); }}>{o.label}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-          <div className="text-right text-sm text-muted-foreground">Total: {formatMoney(total, bill?.currency)}</div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="space-y-1">
+              <Label>Issue date</Label>
+              <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Select value={categoryId || '__none'} onValueChange={(v) => setCategoryId(v === '__none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">— None —</SelectItem>
+                  {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Supplier MARK</Label>
+              <Input value={externalMark} onChange={(e) => setExternalMark(e.target.value)} placeholder="myDATA MARK (optional)" />
+            </div>
+          </div>
+
+          {/* Line items */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label>Lines</Label>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> Add line</Button>
+            </div>
+            <div className="rounded-md border border-border/60">
+              <div className="grid grid-cols-[1fr_60px_84px_88px_84px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                <span>Description</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
+              </div>
+              {lines.map((l) => {
+                const qty = parseFloat(l.qty) || 0; const up = parseFloat(l.unitPrice) || 0;
+                const lineNet = round2(qty * up); const lineTotal = round2(lineNet * (1 + pctOf(l.vatCode) / 100));
+                return (
+                  <div key={l.id} className="grid grid-cols-[1fr_60px_84px_88px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                    <Input className="h-8 text-sm" value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} placeholder="Item / reason" />
+                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.qty} onChange={(e) => setLine(l.id, { qty: e.target.value })} />
+                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unitPrice} onChange={(e) => setLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
+                    <Select value={l.vatCode} onValueChange={(v) => setLine(l.id, { vatCode: v })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <span className="text-right text-sm tabular-nums">{formatMoney(lineTotal, currency)}</span>
+                    <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(l.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-4 text-sm">
+            <span className="text-muted-foreground">Net {formatMoney(computed.net, currency)}</span>
+            <span className="text-muted-foreground">VAT {formatMoney(computed.vat, currency)}</span>
+            <span className="font-semibold">Total {formatMoney(computed.total, currency)}</span>
+          </div>
 
           <div className="space-y-1">
-            <Label>Supplier MARK (optional)</Label>
-            <Input value={externalMark} onChange={(e) => setExternalMark(e.target.value)} placeholder="myDATA MARK from the supplier's credit note" />
+            <Label>Reason / notes</Label>
+            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Returned goods / pricing correction" />
           </div>
-          <div className="space-y-1">
-            <Label>Reason</Label>
-            <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Returned goods / pricing correction" />
-          </div>
+
+          <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">Mark as paid</div>
+              <p className="text-xs text-muted-foreground">The credit was settled in cash/offset rather than reducing an open bill.</p>
+            </div>
+            <Switch checked={markPaid} onCheckedChange={setMarkPaid} />
+          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Record credit note</Button>
+          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Record · {formatMoney(computed.total, currency)}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

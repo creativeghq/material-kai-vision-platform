@@ -711,7 +711,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 **Used In:** Model-specific analytics
 **Flow:** Fetch job → Filter by model → Return model-specific data
 
-**Request:** `GET /api/rag/job/{job_id}/ai-tracking/model/QWEN`
+**Request:** `GET /api/rag/job/{job_id}/ai-tracking/model/claude-opus-4-7`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** AIUsagePanel.tsx (model filter)
@@ -733,15 +733,15 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 
 ### 1.20 GET /jobs/{job_id}/checkpoints
 
-**Purpose:** Get all checkpoints for a job
+**Purpose:** Get checkpoint/stage history for a job
 **Used In:** Job recovery, debugging
-**Flow:** Fetch job → Get checkpoint history → Return checkpoint data
+**Flow:** Fetch job → Return stage_history from background_jobs JSONB column
 
 **Request:** `GET /api/rag/jobs/{job_id}/checkpoints`
 
 **Response:** `checkpoints` array (stage, progress, data, completed_at) and `count`
 
-**Database Operations:** SELECT FROM background_jobs
+**Database Operations:** SELECT stage_history FROM background_jobs (JSONB — `job_progress` and `job_checkpoints` tables were dropped; history is now JSONB on the job row)
 **Frontend Integration:** JobMonitor.tsx (checkpoint viewer)
 
 ---
@@ -1348,7 +1348,7 @@ See Section 2 (RAG System) for current endpoints:
 
 **Batch Embeddings** — `POST /api/embeddings/batch` — body: `texts` (string array) — response: `embeddings` (array of float arrays)
 
-**CLIP Embeddings** — `POST /api/embeddings/clip-generate` — multipart: `image` file, `embedding_type` — response: `embedding`, `type`, `dimension`
+**SLIG/Voyage Embeddings** — `POST /api/embeddings/clip-generate` — multipart: `image` file, `embedding_type` — response: `embedding`, `type`, `dimension` (768D for SLIG SigLIP2 visual; 1024D for Voyage aspect/understanding embeddings)
 
 ---
 
@@ -1748,7 +1748,7 @@ All endpoints return JSON with fields: `success` (boolean), `data` (object), `er
 
 ---
 
-**Total Endpoints**: 119 (115 + 4 Data Import)
+**Total Endpoints**: 140+ (see MIVAA API header count)
 **Last Updated**: November 10, 2025
 
 **See Also:**

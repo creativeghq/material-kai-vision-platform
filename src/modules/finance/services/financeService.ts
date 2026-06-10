@@ -858,28 +858,35 @@ const _financeServiceCore = {
    * supplier's own myDATA MARK for reconciliation.
    */
   async issueSupplierCreditNote(input: {
-    supplierBillId: string;
-    netValue: number;
-    vatAmount: number;
+    workspaceId: string;
+    /** Link to a recorded supplier bill (nets its payable) OR omit for a standalone note. */
+    supplierBillId?: string | null;
+    /** Required when no bill is linked — the supplier the note is from. */
+    supplier?: { type: 'company' | 'contact'; id: string } | null;
+    currency?: string | null;
+    issuedAt?: string | null;
+    categoryId?: string | null;
+    markPaid?: boolean;
     reason?: string;
     externalMark?: string;
-    vatCategory?: number | null;
-    vatPercent?: number | null;
+    lines: Array<{
+      product_id?: string | null; description: string; quantity: number; unit_price: number;
+      net_value: number; vat_amount: number; vat_category?: number | null; vat_percent?: number | null;
+      unit?: string | null; sku?: string | null;
+    }>;
   }): Promise<string> {
-    const lines = [{
-      description: input.reason || 'Supplier credit',
-      quantity: 1,
-      unit_price: input.netValue,
-      net_value: input.netValue,
-      vat_amount: input.vatAmount,
-      vat_category: input.vatCategory ?? null,
-      vat_percent: input.vatPercent ?? null,
-    }];
     const { data, error } = await supabase.rpc('issue_supplier_credit_note', {
-      p_supplier_bill_id: input.supplierBillId,
-      p_lines: lines,
+      p_supplier_bill_id: input.supplierBillId ?? null,
+      p_lines: input.lines,
       p_reason: input.reason ?? null,
       p_external_mark: input.externalMark ?? null,
+      p_workspace_id: input.workspaceId,
+      p_supplier_company_id: input.supplier?.type === 'company' ? input.supplier.id : null,
+      p_supplier_contact_id: input.supplier?.type === 'contact' ? input.supplier.id : null,
+      p_currency: input.currency ?? 'EUR',
+      p_issued_at: input.issuedAt ?? null,
+      p_category_id: input.categoryId ?? null,
+      p_mark_paid: input.markPaid ?? false,
     });
     if (error) throw error;
     return data as string;

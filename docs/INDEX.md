@@ -326,7 +326,7 @@ Complete documentation for Material Kai Vision Platform.
 - Real-time progress tracking
 - Priority-based job processing
 - Health monitoring & observability
-- Database tables (background_jobs, job_progress, job_checkpoints)
+- Single-table design: `background_jobs` with JSONB `stage_history` / `recovery_history` / `last_checkpoint` (the legacy `job_progress` + `job_checkpoints` tables were dropped 2026-04-25)
 - Processing flow & lifecycle
 - Key services (AsyncQueueService, CheckpointRecoveryService, JobMonitorService)
 - Configuration & tuning

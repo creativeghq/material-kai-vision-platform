@@ -37,7 +37,7 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 9. [Stripe Checkout](#9-stripe-checkout)
 10. [Stripe Customer Portal](#10-stripe-customer-portal)
 11. [Email API](#11-email-api)
-12. [Messaging API SMS WhatsApp](#12-messaging-api-sms-whatsapp)
+12. [Messaging API (WhatsApp via Zernio)](#12-messaging-api-whatsapp-via-zernio)
 13. [Recommendations API](#13-recommendations-api)
 14. [Generate VR World](#14-generate-vr-world)
 15. [Generate Quote PDF](#15-generate-quote-pdf)
@@ -1889,9 +1889,8 @@ Content-Type: application/json
 | `messaging_templates` | Message templates |
 | `messaging_logs` | Message send history |
 | `vr_worlds` | WorldLabs VR world records |
-| `price_monitoring_products` | Price monitoring configuration |
-| `price_history` | Historical competitor price records |
-| `competitor_sources` | Competitor URLs for price monitoring |
+| `tracked_queries` | Price monitoring subject table (consolidated 2026-05-01 — replaces dropped `price_monitoring_products` + `competitor_sources`). Rows keyed by `api_key_id` (external API) or `product_id` (internal product flow). |
+| `tracked_query_price_history` | Historical price rows per tracked subject (replaces dropped `price_history`) |
 | `product_prices` | **Admin-only (RLS).** Confirmed KB-sourced prices cached per product. `(workspace_id, product_id)` unique. Includes `source_kb_doc_ids`, `price_lookup_call_id` audit link. **(2026-04)** |
 | `subscription_plans` | Available subscription plans |
 | `roles` | User role definitions |

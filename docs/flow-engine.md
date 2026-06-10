@@ -29,7 +29,7 @@ Triggered by: cron schedule | incoming webhook | manual | event emission
 flow-engine edge function walks the graph:
   - Resolves {{template}} variables from execution context
   - Evaluates condition nodes (branches to true/false/case_N)
-  - Executes action nodes (SMS, email, HTTP, notification, etc.)
+  - Executes action nodes (WhatsApp, email, HTTP, notification, etc.)
     ↓
 Execution log written to flow_runs table
 ```
@@ -96,14 +96,14 @@ Action configs support `{{path.to.value}}` syntax. The context is built from exe
 {{node_id.output.field}}        — output of a previous node
 ```
 
-**Example:** An SMS action with `to: "{{trigger.data.customer_phone}}"` resolves the phone number from whatever data triggered the flow.
+**Example:** A `send_whatsapp` (or its `send_sms` alias) action with `to: "{{trigger.data.customer_phone}}"` resolves the phone number from whatever data triggered the flow.
 
 ---
 
 ## Execution Modes
 
 ### `execute-flow`
-Runs the flow for real. All actions fire (SMS sent, emails sent, etc.).
+Runs the flow for real. All actions fire (WhatsApp messages sent, emails sent, etc.).
 
 ```json
 POST /functions/v1/flow-engine
