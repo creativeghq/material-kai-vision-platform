@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -15,7 +15,7 @@ type ReportKind =
   | 'purchases_per_product' | 'receipts_per_product'
   | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
-  | 'vat_return' | 'mydata_reconciliation'
+  | 'vat_return' | 'mydata_reconciliation' | 'myf'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
@@ -41,6 +41,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   // VAT / tax
   { value: 'vat_return', label: 'VAT analysis (ΦΠΑ)', group: 'vat', period: 'range' },
   { value: 'mydata_reconciliation', label: 'myDATA reconciliation', group: 'vat', period: 'range' },
+  { value: 'myf', label: 'ΜΥΦ (per counterparty)', group: 'vat', period: 'range' },
   // Outstanding snapshots (no period)
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
@@ -137,6 +138,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.getVatReport(workspaceId, range.from, range.to); break;
         case 'mydata_reconciliation':
           data = await financeService.getMyDataReconciliation(workspaceId, range.from, range.to); break;
+        case 'myf':
+          data = await financeService.reportMyf(workspaceId, range.from, range.to); break;
         case 'open_tasks':
           data = await financeService.reportOpenTasks(workspaceId); break;
       }
@@ -239,6 +242,13 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
       {/* Result */}
       <Card>
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
+          <span className="text-sm font-medium">{REPORTS.find((r) => r.value === report)?.label}</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={sorted.length === 0}
+            onClick={() => downloadReportCsv(report, sorted)}>
+            <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+          </Button>
+        </div>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -257,6 +267,24 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
     </div>
   );
 };
+
+// Generic CSV export of the raw report rows (keys = columns). Works for every report.
+function downloadReportCsv(report: ReportKind, rows: any[]): void {
+  if (rows.length === 0) return;
+  const colSet = new Set<string>();
+  for (const r of rows) for (const k of Object.keys(r)) colSet.add(k);
+  const cols: string[] = Array.from(colSet);
+  const esc = (v: any) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${report}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
 
 function primarySortKey(report: ReportKind): string {
   switch (report) {
@@ -281,6 +309,8 @@ function primarySortKey(report: ReportKind): string {
       return 'outstanding';
     case 'vat_return':
       return 'vat';
+    case 'myf':
+      return 'gross';
     case 'mydata_reconciliation':
       return 'issued_at';
     case 'open_tasks':
@@ -375,6 +405,14 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: 'Needs attention', value: String(attention) },
       ];
     }
+    case 'myf': {
+      const sum = (dir: string, key: string) => rows.filter((r) => r.direction === dir).reduce((s, r) => s + Number(r[key] || 0), 0);
+      return [
+        { label: 'Sales net', value: formatMoney(sum('sales', 'net')) },
+        { label: 'Purchases net', value: formatMoney(sum('purchases', 'net')) },
+        { label: 'Counterparties', value: String(rows.length) },
+      ];
+    }
     case 'open_tasks':
       return [{ label: 'Open tasks', value: String(rows.length) }];
   }
@@ -432,6 +470,14 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
   }
   if (report === 'mydata_reconciliation') {
     return <MyDataReconTable rows={rows} totals={totals} />;
+  }
+  if (report === 'myf') {
+    return (
+      <Table headers={['Flow', 'Counterparty', 'VAT no.', 'Docs', 'Net', 'VAT', 'Gross']} totals={totals} rows={rows.map((r: any) => [
+        r.direction === 'sales' ? 'Sales' : 'Purchases', r.counterparty_name, r.vat_number ?? '—',
+        String(r.doc_count ?? 0), formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), formatMoney(Number(r.gross || 0)),
+      ])} />
+    );
   }
   if (report === 'open_tasks') {
     return (

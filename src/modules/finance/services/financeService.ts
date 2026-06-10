@@ -1162,6 +1162,7 @@ export interface PartyLedgerRow { entry_date: string | null; doc_kind: string; d
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
+export interface MyfRow { direction: 'sales' | 'purchases'; counterparty_name: string; vat_number: string | null; doc_count: number; net: number; vat: number; gross: number }
 export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null }
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
@@ -1428,6 +1429,11 @@ const _financeServiceV2 = {
     });
     if (error) throw error;
     return Number(data ?? 0);
+  },
+  async reportMyf(workspaceId: string, from: string, to: string): Promise<MyfRow[]> {
+    const { data, error } = await supabase.rpc('report_myf', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as MyfRow[];
   },
   async reportSalesPerCustomer(workspaceId: string, from: string, to: string): Promise<SalesPerCustomerRow[]> {
     const { data, error } = await supabase.rpc('report_sales_per_customer', {
