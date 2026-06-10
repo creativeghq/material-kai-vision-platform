@@ -193,6 +193,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         linkedin, twitter, facebook, description,
         is_supplier, is_customer, commercial_title, legal_status,
         tax_office, profession, street, street_number, vat_number, country_code,
+        discount_percent, discount_notes, credit_limit,
       } = body;
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (name !== undefined) updates.name = name;
@@ -221,6 +222,9 @@ export async function handleCompanies(req: Request): Promise<Response> {
       if (street_number !== undefined) updates.street_number = street_number;
       if (vat_number !== undefined) updates.vat_number = vat_number;
       if (country_code !== undefined) updates.country_code = country_code;
+      if (discount_percent !== undefined) updates.discount_percent = discount_percent;
+      if (discount_notes !== undefined) updates.discount_notes = discount_notes;
+      if (credit_limit !== undefined) updates.credit_limit = credit_limit;
 
       const { data, error } = await supabase
         .from('crm_companies')

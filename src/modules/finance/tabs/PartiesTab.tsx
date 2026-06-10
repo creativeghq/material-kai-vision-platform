@@ -114,7 +114,12 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled }) 
                 {filtered.map((r) => (
                   <tr key={`${r.party_type}-${r.party_id}`} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setSelected(r)}>
                     <td className="px-4 py-2">
-                      <div className="font-medium">{r.display_name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{r.display_name}</span>
+                        {r.over_credit_limit && (
+                          <Badge variant="destructive" className="text-[10px]" title={`Outstanding ${formatMoney(Number(r.receivable_outstanding || 0))} exceeds credit limit ${formatMoney(Number(r.credit_limit || 0))}`}>Over limit</Badge>
+                        )}
+                      </div>
                       {r.email && <div className="text-[10px] text-muted-foreground">{r.email}</div>}
                     </td>
                     <td className="px-4 py-2">

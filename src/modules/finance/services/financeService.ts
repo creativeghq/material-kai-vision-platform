@@ -1121,6 +1121,8 @@ export interface PartyRow {
   payable_paid_total: number;
   payable_outstanding: number;
   net_position: number;
+  credit_limit: number | null;
+  over_credit_limit: boolean;
 }
 
 export interface FinanceSettings {

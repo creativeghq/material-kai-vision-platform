@@ -148,7 +148,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         linkedin, twitter, facebook, address, city, state, postal_code, country,
         status, lead_source, contact_type, vat_number, country_code, tax_office,
         first_name, last_name, profession, is_client, is_supplier,
-        discount_pct, discount_notes,
+        discount_pct, discount_percent, discount_notes, credit_limit,
       } = body;
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (name !== undefined) updates.name = name;
@@ -177,8 +177,12 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (profession !== undefined) updates.profession = profession;
       if (is_client !== undefined) updates.is_client = is_client;
       if (is_supplier !== undefined) updates.is_supplier = is_supplier;
-      if (discount_pct !== undefined) updates.discount_pct = discount_pct;
+      // Column is discount_percent; accept both the canonical name and the legacy
+      // discount_pct alias (older callers) — the prior code wrote a non-existent column.
+      if (discount_percent !== undefined) updates.discount_percent = discount_percent;
+      else if (discount_pct !== undefined) updates.discount_percent = discount_pct;
       if (discount_notes !== undefined) updates.discount_notes = discount_notes;
+      if (credit_limit !== undefined) updates.credit_limit = credit_limit;
 
       const { data, error } = await supabase
         .from('crm_contacts')

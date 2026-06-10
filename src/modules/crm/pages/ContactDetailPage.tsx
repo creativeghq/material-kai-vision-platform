@@ -74,6 +74,7 @@ interface Contact {
   tags?: string[];
   discount_percent?: number | null;
   discount_notes?: string | null;
+  credit_limit?: number | null;
   is_supplier?: boolean | null;
   is_client?: boolean | null;
   contact_type?: string | null;
@@ -128,6 +129,7 @@ export const ContactDetailPage: React.FC = () => {
     tags: [],
     discount_percent: null,
     discount_notes: '',
+    credit_limit: null,
     is_supplier: false,
     is_client: false,
     contact_type: null,
@@ -845,6 +847,25 @@ export const ContactDetailPage: React.FC = () => {
                     />
                     <p className="text-xs text-muted-foreground">
                       Applied automatically by the AI price lookup when this contact is the quote customer. Leave empty for no customer discount.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="credit_limit">Credit limit</Label>
+                    <Input
+                      id="credit_limit"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={contact.credit_limit ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updateField('credit_limit', v === '' ? null : Number(v));
+                      }}
+                      disabled={!editing}
+                      placeholder="e.g. 5000"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Max outstanding receivable. Finance flags this customer when their open balance exceeds it. Leave empty for no limit.
                     </p>
                   </div>
                 </div>
