@@ -55,6 +55,18 @@ export const inboundService = {
     return data;
   },
 
+  /** AI (Haiku) — extract clean product attributes from raw expense-line descriptions.
+   *  Credit-metered + auto-logged server-side. Returns one suggestion per input line. */
+  async extractProducts(workspaceId: string, lines: { description: string; quantity?: number }[]): Promise<{
+    suggestions: { index: number; name: string; sku: string | null; unit: string | null; size: string | null; attributes: string | null }[];
+    credits_used?: number; balance?: number;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-extract-products', { body: { workspace_id: workspaceId, lines } });
+    if (error) throw error;
+    if ((data as any)?.error) throw new Error((data as any).error === 'insufficient_credits' ? 'Insufficient credits for AI extraction.' : (data as any).error);
+    return data as any;
+  },
+
   /** Receive an inbound doc's lines into the warehouse. mappings: [{item_id, quantity}].
    *  Records an 'in' stock movement per mapping (server-side, finance-manager-gated) and
    *  marks the doc 'received'. Returns the number of movements recorded. */

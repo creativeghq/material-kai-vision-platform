@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -577,7 +577,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
  * existing item by name; unmatched lines default to "create". One 'in' movement per line.
  */
 type LineMode = 'skip' | string /* existing item id */ | '__create';
-interface LineRow { mode: LineMode; name: string; sku: string; qty: string; }
+interface LineRow { mode: LineMode; name: string; sku: string; unit: string; qty: string; }
 
 const ReceiveToWarehouseDialog: React.FC<{
   doc: InboundDocument; workspaceId: string; onOpenChange: (v: boolean) => void; onDone: () => void;
@@ -589,8 +589,33 @@ const ReceiveToWarehouseDialog: React.FC<{
   const [addToCatalog, setAddToCatalog] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const lines = doc.lines ?? [];
   const [rows, setRows] = useState<Record<number, LineRow>>({});
+
+  // AI (Haiku) — clean up the raw supplier lines into proper product name/sku/unit/size.
+  // Credit-metered + logged server-side. Only overwrites "create" rows (keeps your matches).
+  const analyzeWithAi = async () => {
+    const payload = lines.map((ln) => ({ description: ln.item_description ?? '', quantity: ln.quantity ?? undefined }));
+    if (payload.every((p) => !p.description.trim())) { toast({ title: 'No line text to analyze', variant: 'destructive' }); return; }
+    try {
+      setAiBusy(true);
+      const { suggestions, credits_used } = await inboundService.extractProducts(workspaceId, payload);
+      setRows((m) => {
+        const next = { ...m };
+        for (const s of suggestions) {
+          const cur = next[s.index];
+          if (!cur || (cur.mode !== '__create' && cur.mode !== 'skip')) continue; // keep matches to existing items
+          const name = [s.name, s.size, s.attributes].filter((x) => x && String(x).trim()).join(' ').trim();
+          next[s.index] = { ...cur, mode: '__create', name: name || cur.name, sku: s.sku || cur.sku, unit: s.unit || cur.unit };
+        }
+        return next;
+      });
+      toast({ title: 'Lines analyzed', description: credits_used ? `${credits_used} credit used.` : undefined });
+    } catch (e: any) {
+      toast({ title: 'AI analysis failed', description: e?.message, variant: 'destructive' });
+    } finally { setAiBusy(false); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -612,7 +637,7 @@ const ReceiveToWarehouseDialog: React.FC<{
           init[i] = {
             mode: match ? match.id : (desc ? '__create' : 'skip'),
             name: desc || `Item ${ln.line_number ?? i + 1}`,
-            sku: '',
+            sku: '', unit: '',
             qty: ln.quantity != null ? String(ln.quantity) : '',
           };
         });
@@ -642,7 +667,7 @@ const ReceiveToWarehouseDialog: React.FC<{
           const productId = addToCatalog ? await warehouseService.createProduct({ workspaceId, name: r.name.trim() || 'Item', sku: r.sku.trim() || null }) : null;
           const itemId = await warehouseService.createItem({
             workspaceId, warehouse_id: targetWh, name: r.name.trim() || 'Item',
-            sku: r.sku.trim() || undefined, product_id: productId, qty_on_hand: 0,
+            sku: r.sku.trim() || undefined, unit: r.unit.trim() || undefined, product_id: productId, qty_on_hand: 0,
           });
           mappings.push({ item_id: itemId, quantity: qty });
           created += 1;
@@ -680,14 +705,19 @@ const ReceiveToWarehouseDialog: React.FC<{
                   <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={addToCatalog} onChange={(e) => setAddToCatalog(e.target.checked)} />
-                <span>Also add new items to the sellable catalog</span>
-              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={addToCatalog} onChange={(e) => setAddToCatalog(e.target.checked)} />
+                  <span>Also add new items to the sellable catalog</span>
+                </label>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={analyzeWithAi} disabled={aiBusy || busy}>
+                  {aiBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Analyze with AI (1 credit)
+                </Button>
+              </div>
             </div>
             <div className="space-y-2 max-h-[52vh] overflow-y-auto">
               {lines.map((ln, i) => {
-                const r = rows[i] ?? { mode: 'skip', name: '', sku: '', qty: '' };
+                const r = rows[i] ?? { mode: 'skip', name: '', sku: '', unit: '', qty: '' };
                 return (
                   <div key={i} className="rounded-md border border-border/50 p-2">
                     <div className="grid grid-cols-[1fr_2fr_84px] items-center gap-2">
@@ -707,9 +737,10 @@ const ReceiveToWarehouseDialog: React.FC<{
                         value={r.qty} onChange={(e) => setRow(i, { qty: e.target.value })} placeholder="qty" disabled={r.mode === 'skip'} />
                     </div>
                     {r.mode === '__create' && (
-                      <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
+                      <div className="mt-2 grid grid-cols-[2fr_1fr_72px] gap-2">
                         <Input className="h-8 text-xs" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="New product name" />
                         <Input className="h-8 text-xs" value={r.sku} onChange={(e) => setRow(i, { sku: e.target.value })} placeholder="SKU (optional)" />
+                        <Input className="h-8 text-xs" value={r.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" />
                       </div>
                     )}
                   </div>
