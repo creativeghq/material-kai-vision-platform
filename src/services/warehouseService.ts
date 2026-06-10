@@ -76,8 +76,8 @@ export const warehouseService = {
   async createItem(input: {
     workspaceId: string; name: string; warehouse_id: string; sku?: string; unit?: string;
     qty_on_hand?: number; reorder_point?: number; location?: string; product_id?: string | null;
-  }): Promise<void> {
-    const { error } = await supabase.from('warehouse_items').insert({
+  }): Promise<string> {
+    const { data, error } = await supabase.from('warehouse_items').insert({
       workspace_id: input.workspaceId,
       warehouse_id: input.warehouse_id,
       name: input.name,
@@ -87,8 +87,22 @@ export const warehouseService = {
       reorder_point: input.reorder_point ?? 0,
       location: input.location ?? null,
       product_id: input.product_id ?? null,
-    });
+    }).select('id').single();
     if (error) throw error;
+    return (data as any).id as string;
+  },
+
+  /** Minimal catalog product (name + sku) — used when building stock from a supplier
+   *  expense line so the received good is also sellable. Returns the new product id. */
+  async createProduct(input: { workspaceId: string; name: string; sku?: string | null; itemType?: 'good' | 'service' }): Promise<string> {
+    const { data, error } = await supabase.from('products').insert({
+      workspace_id: input.workspaceId,
+      name: input.name,
+      sku: input.sku ?? null,
+      item_type: input.itemType ?? 'good',
+    }).select('id').single();
+    if (error) throw error;
+    return (data as any).id as string;
   },
 
   async recordMovement(itemId: string, direction: 'in' | 'out' | 'adjust', quantity: number, reason?: string): Promise<number> {

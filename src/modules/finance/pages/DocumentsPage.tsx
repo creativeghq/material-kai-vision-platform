@@ -29,7 +29,7 @@ import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
-import { warehouseService, type WarehouseItem } from '@/services/warehouseService';
+import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -571,42 +571,87 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
 };
 
 /**
- * #206 — map a received doc's lines to warehouse items and receive stock. myDATA line data
- * is tax-level (often no item name), so the operator picks the target warehouse item per line
- * and confirms the quantity; we record an 'in' movement per mapping via a finance-manager RPC.
+ * #206/#207 — receive a myDATA inbound doc's lines into the warehouse. Each line can be
+ * MATCHED to an existing stock item, or used to CREATE a brand-new stock item (and,
+ * optionally, a catalog product) right from the supplier line. Lines auto-match to an
+ * existing item by name; unmatched lines default to "create". One 'in' movement per line.
  */
+type LineMode = 'skip' | string /* existing item id */ | '__create';
+interface LineRow { mode: LineMode; name: string; sku: string; qty: string; }
+
 const ReceiveToWarehouseDialog: React.FC<{
   doc: InboundDocument; workspaceId: string; onOpenChange: (v: boolean) => void; onDone: () => void;
 }> = ({ doc, workspaceId, onOpenChange, onDone }) => {
   const { toast } = useToast();
   const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [targetWh, setTargetWh] = useState('');
+  const [addToCatalog, setAddToCatalog] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  // Per-line mapping state, keyed by line index.
   const lines = doc.lines ?? [];
-  const [map, setMap] = useState<Record<number, { itemId: string; qty: string }>>({});
+  const [rows, setRows] = useState<Record<number, LineRow>>({});
 
   useEffect(() => {
     let cancelled = false;
-    warehouseService.listItems(workspaceId)
-      .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch((e) => toast({ title: 'Failed to load stock items', description: e?.message, variant: 'destructive' }))
-      .finally(() => { if (!cancelled) setLoading(false); });
+    (async () => {
+      try {
+        const [its, whs] = await Promise.all([
+          warehouseService.listItems(workspaceId),
+          warehouseService.listWarehouses(workspaceId).catch(() => [] as Warehouse[]),
+        ]);
+        if (cancelled) return;
+        setItems(its);
+        setWarehouses(whs);
+        setTargetWh(whs.find((w) => w.is_default)?.id ?? whs[0]?.id ?? '');
+        // Auto-match each line to an existing item by name; else default to create.
+        const init: Record<number, LineRow> = {};
+        lines.forEach((ln, i) => {
+          const desc = (ln.item_description ?? '').trim();
+          const match = desc ? its.find((it) => it.name && (it.name.toLowerCase().includes(desc.toLowerCase()) || desc.toLowerCase().includes(it.name.toLowerCase()))) : undefined;
+          init[i] = {
+            mode: match ? match.id : (desc ? '__create' : 'skip'),
+            name: desc || `Item ${ln.line_number ?? i + 1}`,
+            sku: '',
+            qty: ln.quantity != null ? String(ln.quantity) : '',
+          };
+        });
+        setRows(init);
+      } catch (e: any) {
+        toast({ title: 'Failed to load', description: e?.message, variant: 'destructive' });
+      } finally { if (!cancelled) setLoading(false); }
+    })();
     return () => { cancelled = true; };
-  }, [workspaceId, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]);
 
-  const setLine = (i: number, patch: Partial<{ itemId: string; qty: string }>) =>
-    setMap((m) => ({ ...m, [i]: { itemId: m[i]?.itemId ?? '', qty: m[i]?.qty ?? '', ...patch } }));
+  const setRow = (i: number, patch: Partial<LineRow>) => setRows((m) => ({ ...m, [i]: { ...m[i], ...patch } }));
 
   const submit = async () => {
-    const mappings = lines
-      .map((ln, i) => ({ item_id: map[i]?.itemId, quantity: parseFloat(map[i]?.qty || String(ln.quantity ?? '')) }))
-      .filter((m) => m.item_id && Number.isFinite(m.quantity) && m.quantity > 0) as { item_id: string; quantity: number }[];
-    if (mappings.length === 0) { toast({ title: 'Map at least one line to a stock item', variant: 'destructive' }); return; }
+    const active = lines.map((_, i) => ({ i, r: rows[i] })).filter(({ r }) => r && r.mode !== 'skip' && (parseFloat(r.qty) || 0) > 0);
+    if (active.length === 0) { toast({ title: 'Nothing to receive', description: 'Match or create at least one line.', variant: 'destructive' }); return; }
+    const needsCreate = active.some(({ r }) => r.mode === '__create');
+    if (needsCreate && !targetWh) { toast({ title: 'Pick a target warehouse', description: 'New stock items need a warehouse.', variant: 'destructive' }); return; }
     try {
       setBusy(true);
+      const mappings: { item_id: string; quantity: number }[] = [];
+      let created = 0;
+      for (const { r } of active) {
+        const qty = parseFloat(r.qty) || 0;
+        if (r.mode === '__create') {
+          const productId = addToCatalog ? await warehouseService.createProduct({ workspaceId, name: r.name.trim() || 'Item', sku: r.sku.trim() || null }) : null;
+          const itemId = await warehouseService.createItem({
+            workspaceId, warehouse_id: targetWh, name: r.name.trim() || 'Item',
+            sku: r.sku.trim() || undefined, product_id: productId, qty_on_hand: 0,
+          });
+          mappings.push({ item_id: itemId, quantity: qty });
+          created += 1;
+        } else {
+          mappings.push({ item_id: r.mode, quantity: qty });
+        }
+      }
       const n = await inboundService.receiveToWarehouse(doc.id, mappings);
-      toast({ title: `Received ${n} line(s) into stock` });
+      toast({ title: `Received ${n} line(s)`, description: created > 0 ? `${created} new stock item(s) created.` : undefined });
       onDone();
     } catch (e: any) {
       toast({ title: 'Failed to receive', description: e?.message, variant: 'destructive' });
@@ -621,39 +666,61 @@ const ReceiveToWarehouseDialog: React.FC<{
         </DialogHeader>
         {loading ? (
           <div className="py-8 text-center"><Loader2 className="h-5 w-5 animate-spin inline" /></div>
-        ) : items.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            No warehouse items yet. Add stock items in Finance → Warehouse first, then receive against them.
-          </div>
         ) : lines.length === 0 ? (
           <div className="py-6 text-center text-sm text-muted-foreground">
             This document has no line detail from myDATA. Add stock manually in Finance → Warehouse.
           </div>
         ) : (
-          <div className="space-y-2 max-h-[55vh] overflow-y-auto">
-            <div className="grid grid-cols-[1fr_2fr_90px] gap-2 text-[11px] uppercase tracking-wide text-muted-foreground px-1">
-              <span>Line</span><span>Warehouse item</span><span className="text-right">Qty</span>
-            </div>
-            {lines.map((ln, i) => (
-              <div key={i} className="grid grid-cols-[1fr_2fr_90px] gap-2 items-center">
-                <div className="text-xs">
-                  <div className="font-medium">#{ln.line_number ?? i + 1}{ln.item_description ? ` · ${ln.item_description}` : ''}</div>
-                  <div className="text-muted-foreground">net {formatMoney(ln.net_value ?? 0, doc.currency)}{ln.quantity != null ? ` · qty ${ln.quantity}` : ''}</div>
-                </div>
-                <Select value={map[i]?.itemId ?? ''} onValueChange={(v) => setLine(i, { itemId: v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Skip / pick item…" /></SelectTrigger>
-                  <SelectContent>{items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>)}</SelectContent>
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">New items → warehouse:</span>
+                <Select value={targetWh} onValueChange={setTargetWh}>
+                  <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder="Default warehouse" /></SelectTrigger>
+                  <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input className="h-8 text-xs text-right" type="number" min="0" step="0.01"
-                  value={map[i]?.qty ?? (ln.quantity != null ? String(ln.quantity) : '')}
-                  onChange={(e) => setLine(i, { qty: e.target.value })} placeholder="qty" />
               </div>
-            ))}
-          </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={addToCatalog} onChange={(e) => setAddToCatalog(e.target.checked)} />
+                <span>Also add new items to the sellable catalog</span>
+              </label>
+            </div>
+            <div className="space-y-2 max-h-[52vh] overflow-y-auto">
+              {lines.map((ln, i) => {
+                const r = rows[i] ?? { mode: 'skip', name: '', sku: '', qty: '' };
+                return (
+                  <div key={i} className="rounded-md border border-border/50 p-2">
+                    <div className="grid grid-cols-[1fr_2fr_84px] items-center gap-2">
+                      <div className="text-xs">
+                        <div className="font-medium">#{ln.line_number ?? i + 1}{ln.item_description ? ` · ${ln.item_description}` : ''}</div>
+                        <div className="text-muted-foreground">net {formatMoney(ln.net_value ?? 0, doc.currency)}{ln.quantity != null ? ` · qty ${ln.quantity}` : ''}</div>
+                      </div>
+                      <Select value={r.mode} onValueChange={(v) => setRow(i, { mode: v })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="skip">— Skip —</SelectItem>
+                          <SelectItem value="__create">➕ Create new stock item</SelectItem>
+                          {items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Input className="h-8 text-xs text-right" type="number" min="0" step="0.01"
+                        value={r.qty} onChange={(e) => setRow(i, { qty: e.target.value })} placeholder="qty" disabled={r.mode === 'skip'} />
+                    </div>
+                    {r.mode === '__create' && (
+                      <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
+                        <Input className="h-8 text-xs" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="New product name" />
+                        <Input className="h-8 text-xs" value={r.sku} onChange={(e) => setRow(i, { sku: e.target.value })} placeholder="SKU (optional)" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || loading || items.length === 0 || lines.length === 0}>
+          <Button onClick={submit} disabled={busy || loading || lines.length === 0}>
             {busy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Receiving…</> : 'Receive stock'}
           </Button>
         </DialogFooter>

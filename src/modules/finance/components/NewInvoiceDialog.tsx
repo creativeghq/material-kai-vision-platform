@@ -169,6 +169,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [submitNow, setSubmitNow] = useState(false);
   const [sendEmail, setSendEmail] = useState(false);
   const [sendSms, setSendSms] = useState(false);
+  const [moveStock, setMoveStock] = useState(true);
   const [nextNumber, setNextNumber] = useState<{ series: string | null; number: number | null } | null>(null);
 
   // Catalogs
@@ -215,7 +216,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('el'); setWithholdingCode('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
-    setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true);
+    setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setSendSms(false); setNextNumber(null);
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
     setLines([emptyLine()]);
@@ -441,7 +442,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         prices_include_vat: pricesIncludeVat,
         digital_transaction_fee: parseFloat(digitalFee) || 0,
         related_document: relatedDocument || null,
-        print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode,
+        print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode, move_stock: moveStock,
         info_box: infoBox || null, logo_mode: logoMode,
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
@@ -838,6 +839,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Include in ΜΥΦ report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><input type="checkbox" className="h-4 w-4 rounded" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Send by SMS on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} /></label>
