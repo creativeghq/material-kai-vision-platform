@@ -18,11 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { Search, Eye, Loader2, Trash2, FileText, Code, Globe, Package } from 'lucide-react';
+import { Search, Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   getManufacturer,
   getMaterialCategory,
@@ -37,6 +38,9 @@ interface Product {
   source_document_id: string;
   source_type?: 'pdf_processing' | 'xml_import' | 'web_scraping' | null;
   source_job_id?: string | null;
+  // Halfvec comes back as a string via select('*'); null = never embedded
+  // (invisible to product-level vector search until backfilled).
+  text_embedding_1024?: string | null;
 }
 
 interface ProductsTabProps {
@@ -53,6 +57,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [reembeddingId, setReembeddingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const ITEMS_PER_PAGE = 20;
@@ -138,6 +143,44 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
     }
   };
 
+  const handleReembed = async (productId: string) => {
+    setReembeddingId(productId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      const res = await fetch(`${MIVAA_API_URL}/api/admin/text-embeddings/backfill`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ product_ids: [productId], include_chunks: false }),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail?.detail?.error || detail?.detail || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      const embedded = result?.products?.embedded ?? 0;
+      toast({
+        title: embedded > 0 ? 'Embedding generated' : 'Embedding failed',
+        description: embedded > 0
+          ? 'Product is now visible to vector search.'
+          : 'The embedding provider did not return a vector — check MIVAA logs and retry.',
+        variant: embedded > 0 ? 'default' : 'destructive',
+      });
+      await loadProducts(currentPage);
+    } catch (error) {
+      console.error('Re-embed failed:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Re-embed request failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setReembeddingId(null);
+    }
+  };
+
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
@@ -218,6 +261,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   <TableHead>Source</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Manufacturer</TableHead>
+                  <TableHead>Embedding</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -252,7 +296,28 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                         {category}
                       </Badge>
                     </TableCell>
-                    <TableCell>{manufacturer}</TableCell>
+                    <TableCell>
+                      {product.text_embedding_1024 ? (
+                        <Badge className="bg-green-100 text-green-700">Embedded</Badge>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Badge variant="destructive">Missing</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Generate text embedding now"
+                            disabled={reembeddingId === product.id}
+                            onClick={() => handleReembed(product.id)}
+                          >
+                            {reembeddingId === product.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {new Date(product.created_at).toLocaleDateString()}
                     </TableCell>
