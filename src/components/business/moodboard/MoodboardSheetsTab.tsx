@@ -213,7 +213,12 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
               New Tool
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
+          <DropdownMenuContent
+            align="end"
+            side="bottom"
+            avoidCollisions={false}
+            className="w-72 max-h-[60vh] overflow-y-auto"
+          >
             {SHEET_GROUPS.map((group, gi) => (
               <React.Fragment key={group.label}>
                 {gi > 0 && <DropdownMenuSeparator />}

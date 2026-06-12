@@ -245,6 +245,53 @@ export function SheetTypeIllustration({ sheetType, className }: Props) {
           </>
         );
 
+      case 'area_breakdown':
+        return (
+          <>
+            {/* Hero render — top-left ~50% */}
+            <rect x={20} y={20} width={120} height={80} fill={accent3} stroke={ink} strokeWidth={0.6} />
+            <path d="M20,100 L140,100 L140,82 L20,90 Z" fill={accent2} opacity={0.5} />
+            <rect x={45} y={55} width={40} height={40} fill={accent4} opacity={0.7} />
+            <circle cx={115} cy={80} r={12} fill={accent1} opacity={0.8} />
+            {/* Top-right: plan (upper) + elevation (lower) */}
+            <rect x={150} y={20} width={80} height={38} fill={paper} stroke={ink} strokeWidth={0.6} />
+            <line x1={185} y1={20} x2={185} y2={58} stroke={ink} strokeWidth={0.5} />
+            <line x1={150} y1={42} x2={230} y2={42} stroke={ink} strokeWidth={0.5} />
+            <line x1={154} y1={54} x2={226} y2={54} stroke={red} strokeWidth={0.5} />
+            <text x={182} y={53} fontSize={4} fill={ink}>2400</text>
+            <rect x={150} y={62} width={80} height={38} fill={paper} stroke={ink} strokeWidth={0.6} />
+            <rect x={156} y={68} width={20} height={26} fill={accent3} stroke={ink} strokeWidth={0.3} />
+            <rect x={180} y={68} width={20} height={26} fill={accent1} stroke={ink} strokeWidth={0.3} />
+            <rect x={204} y={68} width={20} height={26} fill={accent3} stroke={ink} strokeWidth={0.3} />
+            {/* Finishes column — swatches with labels */}
+            {[accent1, accent2, accent4, accent3, accent2].map((c, i) => (
+              <g key={'f' + i}>
+                <rect x={20} y={112 + i * 12} width={12} height={9} fill={c} stroke={ink} strokeWidth={0.3} />
+                <rect x={36} y={115 + i * 12} width={34} height={2} fill={ink} opacity={0.45} />
+              </g>
+            ))}
+            {/* Two fitting columns */}
+            {[0, 1].map((col) => (
+              <g key={'fit' + col}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <g key={i}>
+                    <circle cx={88 + col * 50} cy={117 + i * 12} r={2.5} fill={paper} stroke={ink} strokeWidth={0.4} />
+                    <rect x={94 + col * 50} y={116 + i * 12} width={34} height={2} fill={ink} opacity={0.4} />
+                  </g>
+                ))}
+              </g>
+            ))}
+            {/* Notes column */}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <rect key={'n' + i} x={188} y={116 + i * 12} width={42} height={2} fill={ink} opacity={0.35} />
+            ))}
+            {/* Bottom palette strip */}
+            {[accent1, accent4, accent2, accent3, accent2, accent1].map((c, i) => (
+              <rect key={'p' + i} x={20 + i * 36} y={166} width={32} height={9} fill={c} stroke={ink} strokeWidth={0.3} />
+            ))}
+          </>
+        );
+
       case 'full_deck':
         return (
           <>

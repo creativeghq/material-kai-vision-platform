@@ -40,6 +40,7 @@ const SHEET_TYPES = [
   'annotated_render',
   'elevation_render_pair',
   'ffe_schedule',
+  'area_breakdown',
   'full_deck',
 ] as const;
 
@@ -98,6 +99,12 @@ const PROMPTS: Record<SheetType, string> = {
   // working drawing, NOT a photo of paper on a desk.
   ffe_schedule:
     'A single A3 landscape architectural schedule sheet on white paper, viewed straight-on (NOT photographed at an angle). Centered table: clean tabular layout in thin black hairline rules with small-caps column headers (room, item, dim., supplier, lead, qty, unit, total). About 9 rows of restrained text content like "living — boucle armchair sandmark — 920×880×740 — italy — 8 wk — 2 — 2,400 — 4,800". Tiny lowercase text, generous row height, hairline horizontal separators between rows. Bottom-right has totals in slightly bolder text. A discrete small drawing-number block in the bottom-right corner ("S-001" in a thin rectangle). Generous white margins on all sides. NO logo, NO studio branding, NO "FF&E SCHEDULE" title overlay, NO project header, NO date. Pure architectural-portfolio aesthetic — looks like a single sheet from a permit-set schedule page.',
+
+  // Single composited "design breakdown" board — hero render top-left, plan +
+  // elevation stacked top-right, a finishes column, fitting/accessory columns,
+  // notes, and a color-palette strip along the bottom (Zubexa-style spec board).
+  area_breakdown:
+    'A single A3 landscape architectural "design breakdown" board on white paper, one composited page summarizing one room. LAYOUT: top-left ~50% is a large soft photoreal 3D render of a finished residential bathroom (travertine porcelain tile, brass tapware, walnut vanity, soft daylight). Top-right is split into two stacked smaller panels: an upper 2D dimensioned floor plan in thin black line work with a few small red dimension numbers ("2400", "1800"), and a lower 2D elevation drawing of the same wall. BELOW, a horizontal band of columns: (1) a "material & finishes" column — a vertical list of 5 small swatch rectangles (stone, tile, wood, paint, metal) each with a tiny lowercase spec label connected by a thin hairline; (2) two narrow "fittings" columns listing small line-drawn fixtures with tiny labels (wall-hung wc, basin mixer, towel rail, shower set); (3) a short notes column with 3-4 tiny lowercase bullet lines. ALONG THE BOTTOM EDGE: a single thin horizontal strip of 6 small color blocks with tiny code labels. Generous white margins, lots of negative space, thin black hairlines throughout, muted designer palette. Bottom-right has a small drawing-number block ("A-001"). NO logo, NO studio branding, NO "AREA BREAKDOWN" title overlay, NO project header, NO date. Pure architectural-portfolio aesthetic — a single spec board from a working set.',
 
   // A multi-panel index/title sheet — small thumbnails of the other 4-5
   // sheet types laid out on a single A3 page like a sheet index.
