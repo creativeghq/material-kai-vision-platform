@@ -31,6 +31,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   color_palette: 'Color palette extracted from your moodboard',
   concept_board: 'Inspiration collage with curated images',
   lighting_plan: 'Top-down floor plan with fixture symbols',
+  plumbing_plan: 'Top-down plan with plumbing fixtures (WC, basin, bath, drains)',
   annotated_render: 'Render with AI-detected callouts',
   elevation_render_pair: 'Uploaded elevation with dimensions + render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
@@ -40,7 +41,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
   { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
-  { label: 'Plans', types: ['lighting_plan', 'annotated_render', 'elevation_render_pair'] },
+  { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'annotated_render', 'elevation_render_pair'] },
   { label: 'Schedules', types: ['ffe_schedule'] },
   { label: 'Decks', types: ['full_deck'] },
 ];

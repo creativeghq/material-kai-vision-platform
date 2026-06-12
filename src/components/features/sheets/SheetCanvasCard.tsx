@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Card } from '@/components/core/ui/card';
 import { CalloutCanvas, type CalloutAnnotation } from './CalloutCanvas';
 import { DimensionCanvas, type Dimension, type TileCallout } from './DimensionCanvas';
-import { FixtureSymbolCanvas, type FixtureSymbol, type LegendEntry } from './FixtureSymbolCanvas';
+import { FixtureSymbolCanvas, PLUMBING_FIXTURE_DEFS, type FixtureSymbol, type LegendEntry } from './FixtureSymbolCanvas';
+import { Droplets } from 'lucide-react';
 import { DeckBuilderCanvas } from './DeckBuilderCanvas';
 import { SheetPreviewCard } from './SheetPreviewCard';
 import type { SheetType } from '@/services/moodboardSheetsService';
@@ -71,6 +72,18 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           backdrop={initialData.backdrop || { kind: 'rect', width_mm: 4000, height_mm: 3000 }}
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
+          onPdfReady={setPdfUrl}
+        />
+      )}
+
+      {sheetType === 'plumbing_plan' && (
+        <FixtureSymbolCanvas
+          sheetId={sheetId}
+          backdrop={initialData.backdrop || { kind: 'rect', width_mm: 4000, height_mm: 3000 }}
+          initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
+          initialLegend={(initialData.legend || []) as LegendEntry[]}
+          fixtureDefs={PLUMBING_FIXTURE_DEFS}
+          paletteIcon={Droplets}
           onPdfReady={setPdfUrl}
         />
       )}

@@ -55,6 +55,7 @@ import {
   buildFfeSchedule,
   buildFullDeckCover,
   buildLightingPlan,
+  buildPlumbingPlan,
   buildMaterialBoard,
   buildSheetForDeck,
   sheetLabel,
@@ -177,6 +178,13 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         break;
       case 'lighting_plan':
         await buildLightingPlan(pdfDoc, fonts, td, {
+          backdrop: sheet.data.backdrop,
+          symbols: sheet.data.symbols || [],
+          legend: sheet.data.legend || [],
+        });
+        break;
+      case 'plumbing_plan':
+        await buildPlumbingPlan(pdfDoc, fonts, td, {
           backdrop: sheet.data.backdrop,
           symbols: sheet.data.symbols || [],
           legend: sheet.data.legend || [],
@@ -486,6 +494,14 @@ function validatePdfContent(sheet_type: string, data: Record<string, any> | unde
       }
       if (!Array.isArray(d.symbols) || d.symbols.length === 0) {
         return 'No fixture symbols placed — drop at least one symbol on the canvas before rendering.';
+      }
+      return null;
+    case 'plumbing_plan':
+      if (!d.backdrop || !['upload', 'rect'].includes(d.backdrop.kind)) {
+        return 'Missing backdrop — plumbing_plan needs an uploaded floor plan or room dimensions.';
+      }
+      if (!Array.isArray(d.symbols) || d.symbols.length === 0) {
+        return 'No plumbing symbols placed — drop at least one symbol on the canvas before rendering.';
       }
       return null;
     case 'annotated_render':

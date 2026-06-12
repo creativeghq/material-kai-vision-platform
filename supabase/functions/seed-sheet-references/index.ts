@@ -37,6 +37,7 @@ const SHEET_TYPES = [
   'color_palette',
   'concept_board',
   'lighting_plan',
+  'plumbing_plan',
   'annotated_render',
   'elevation_render_pair',
   'ffe_schedule',
@@ -83,6 +84,11 @@ const PROMPTS: Record<SheetType, string> = {
   // (Already on style — keeping the same prompt with hard rules emphasized.)
   lighting_plan:
     'A single A3 landscape architectural lighting plan on white paper. Top-down floor plan of a residential bathroom and bedroom drawn in crisp thin black lines: walls, doors with swing arcs, windows, fixtures (wall-hung toilet, vanity, shower, bed, wardrobe) all rendered as 2D black line work. Lighting symbols placed thoughtfully through the rooms: small ⊕ circles (recessed downlights) in ceiling positions, ● (pendants) above key spots, ◐ (wall lights) on walls, ▬ (LED strip) along select edges. A discrete legend column on the right lists each symbol next to its tiny lowercase label ("recessed", "pendant", "wall", "led strip"). Small dimension callouts in red on a few walls ("3200", "2400", "1800") with thin extension lines. Bottom-right shows a small drawing-number block ("L-001"). Generous white margins. NO logo, NO studio branding, NO "LIGHTING PLAN" header, NO date strip. Single working drawing.',
+
+  // Top-down architectural plumbing plan — same style as lighting_plan but with
+  // sanitary-ware symbols (WC, basin, bath, shower, floor drain) + supply/waste.
+  plumbing_plan:
+    'A single A3 landscape architectural plumbing plan on white paper. Top-down floor plan of a residential bathroom and ensuite drawn in crisp thin black lines: walls, doors with swing arcs, windows, and sanitary fixtures rendered as 2D black line work — wall-hung WC, vanity basin, bathtub, walk-in shower tray. Plumbing symbols placed at each fixture: ◎ (basin), a rounded rectangle (bath), a square with a diagonal cross (shower drain), ⊞ (floor drain), small filled dots (water supply points), and a circle marked "H" (water heater / boiler). Thin dashed lines trace cold/hot supply runs and a heavier line traces the waste/soil run to a stack. A discrete legend column on the right lists each symbol next to its tiny lowercase label (basin, bath, shower, floor drain, supply, waste, water heater). Small dimension callouts in red on a few walls ("2400", "1800") with thin extension lines. Bottom-right shows a small drawing-number block ("P-001"). Generous white margins. NO logo, NO studio branding, NO "PLUMBING PLAN" header, NO date strip. Single working drawing.',
 
   // Soft hand-illustrated axonometric of a kitchen with thin callout leaders.
   // (Already on style — locking down the references and removing the studio

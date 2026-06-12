@@ -149,6 +149,55 @@ export function SheetTypeIllustration({ sheetType, className }: Props) {
           </>
         );
 
+      case 'plumbing_plan':
+        return (
+          <>
+            {/* Floor plan rectangle (top-down) — a wet room */}
+            <rect x={20} y={30} width={210} height={130} fill={paper} stroke={ink} strokeWidth={1.5} />
+            <line x1={130} y1={30} x2={130} y2={95} stroke={ink} strokeWidth={1} />
+            {/* WC — bowl over cistern */}
+            <g transform="translate(45,55)">
+              <rect x={-9} y={-2} width={18} height={9} fill={paper} stroke={ink} strokeWidth={0.8} />
+              <circle cx={0} cy={11} r={6} fill={paper} stroke={ink} strokeWidth={0.8} />
+            </g>
+            {/* Basin — circle + drain */}
+            <g transform="translate(45,120)">
+              <circle r={9} fill={paper} stroke={ink} strokeWidth={0.9} />
+              <circle r={2} fill={ink} />
+            </g>
+            {/* Bath — long rounded rectangle */}
+            <g transform="translate(180,55)">
+              <rect x={-22} y={-12} width={44} height={24} rx={4} fill={paper} stroke={ink} strokeWidth={0.9} />
+              <circle cx={16} cy={0} r={2} fill={ink} />
+            </g>
+            {/* Shower tray — square + drain cross */}
+            <g transform="translate(180,125)">
+              <rect x={-13} y={-13} width={26} height={26} fill={paper} stroke={ink} strokeWidth={0.9} />
+              <line x1={-7} y1={-7} x2={7} y2={7} stroke={ink} strokeWidth={0.7} />
+              <line x1={-7} y1={7} x2={7} y2={-7} stroke={ink} strokeWidth={0.7} />
+            </g>
+            {/* Supply points (filled dots) + a water heater (H) */}
+            <circle cx={120} cy={45} r={2.5} fill={ink} />
+            <circle cx={120} cy={145} r={2.5} fill={ink} />
+            <g transform="translate(110,95)">
+              <circle r={7} fill={paper} stroke={ink} strokeWidth={1} />
+              <text x={-3.5} y={2.5} fontSize={7} fontWeight="bold" fill={ink}>H</text>
+            </g>
+            {/* Legend on the right */}
+            <text x={245} y={45} fontSize={6} fill={ink} fontWeight="bold">LEGEND</text>
+            {[
+              ['◎', 'Basin'],
+              ['▭', 'Bath'],
+              ['▣', 'Shower'],
+              ['H', 'Heater'],
+            ].map(([sym, label], i) => (
+              <text key={i} x={245} y={60 + i * 12} fontSize={5} fill={ink}>
+                {sym}  {label}
+              </text>
+            ))}
+          </>
+        );
+
       case 'annotated_render':
         return (
           <>

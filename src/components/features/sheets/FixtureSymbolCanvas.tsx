@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Save, Lightbulb, Square } from 'lucide-react';
+import { Trash2, Save, Lightbulb, Droplets } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
@@ -7,18 +7,24 @@ import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
- * Lighting Plan canvas.
+ * Symbol-plan canvas — drives BOTH lighting_plan and plumbing_plan.
  *
  * Backdrop is either an uploaded floor plan image OR a plain rectangle drawn
- * from user-typed room dimensions. The user picks a fixture type from the
+ * from user-typed room dimensions. The user picks a symbol type from the
  * palette, then clicks anywhere on the backdrop to place it. All symbols are
  * stored as normalized [0..1] coords so the PDF builder can re-place them on
- * any canvas size.
+ * any canvas size. The symbol palette is injected via `fixtureDefs` so the
+ * same widget renders lighting fixtures or plumbing fixtures — the glyph set
+ * mirrors the PDF builder's drawFixtureSymbol / drawPlumbingSymbol.
  */
 
-type FixtureType = 'recessed' | 'pendant' | 'wall' | 'spot' | 'led_strip' | 'floor' | 'table';
+export interface FixtureDef {
+  type: string;
+  label: string;
+  glyph: string;
+}
 
-const FIXTURE_DEFS: { type: FixtureType; label: string; glyph: string }[] = [
+export const LIGHTING_FIXTURE_DEFS: FixtureDef[] = [
   { type: 'recessed', label: 'Recessed', glyph: '⊕' },
   { type: 'pendant',  label: 'Pendant',  glyph: '●' },
   { type: 'wall',     label: 'Wall',     glyph: '◐' },
@@ -28,8 +34,20 @@ const FIXTURE_DEFS: { type: FixtureType; label: string; glyph: string }[] = [
   { type: 'table',    label: 'Table',    glyph: '○' },
 ];
 
+export const PLUMBING_FIXTURE_DEFS: FixtureDef[] = [
+  { type: 'wc',           label: 'WC',          glyph: '🚽' },
+  { type: 'basin',        label: 'Basin',       glyph: '◎' },
+  { type: 'bath',         label: 'Bath',        glyph: '▭' },
+  { type: 'shower',       label: 'Shower',      glyph: '▣' },
+  { type: 'floor_drain',  label: 'Floor Drain', glyph: '⊞' },
+  { type: 'water_supply', label: 'Supply',      glyph: '●' },
+  { type: 'waste',        label: 'Waste',       glyph: 'W' },
+  { type: 'water_heater', label: 'Water Heater', glyph: 'H' },
+  { type: 'mixer',        label: 'Tap / Mixer', glyph: '◉' },
+];
+
 export interface FixtureSymbol {
-  type: FixtureType;
+  type: string;
   x: number;
   y: number;
   label?: string;
@@ -45,6 +63,10 @@ interface FixtureSymbolCanvasProps {
   backdrop: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   initialSymbols?: FixtureSymbol[];
   initialLegend?: LegendEntry[];
+  /** Symbol palette. Defaults to lighting fixtures; pass PLUMBING_FIXTURE_DEFS for plumbing_plan. */
+  fixtureDefs?: FixtureDef[];
+  /** Palette header icon. Defaults to a lightbulb. */
+  paletteIcon?: React.ComponentType<{ className?: string }>;
   onPdfReady?: (pdfUrl: string) => void;
 }
 
@@ -53,11 +75,14 @@ export function FixtureSymbolCanvas({
   backdrop,
   initialSymbols = [],
   initialLegend = [],
+  fixtureDefs = LIGHTING_FIXTURE_DEFS,
+  paletteIcon: PaletteIcon = Lightbulb,
   onPdfReady,
 }: FixtureSymbolCanvasProps) {
+  const FIXTURE_DEFS = fixtureDefs;
   const [symbols, setSymbols] = useState<FixtureSymbol[]>(initialSymbols);
   const [legend, setLegend] = useState<LegendEntry[]>(initialLegend);
-  const [activeType, setActiveType] = useState<FixtureType>('recessed');
+  const [activeType, setActiveType] = useState<string>(fixtureDefs[0]?.type ?? 'recessed');
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +149,7 @@ export function FixtureSymbolCanvas({
     <div className="space-y-3">
       {/* Fixture palette */}
       <div className="flex items-center gap-1 flex-wrap text-xs">
-        <Lightbulb className="h-3.5 w-3.5 mr-1" />
+        <PaletteIcon className="h-3.5 w-3.5 mr-1" />
         {FIXTURE_DEFS.map((def) => (
           <button
             key={def.type}
@@ -156,6 +181,7 @@ export function FixtureSymbolCanvas({
                 <SymbolDot
                   key={idx}
                   symbol={s}
+                  defs={FIXTURE_DEFS}
                   onPointerDown={handleSymbolPointerDown(idx)}
                 />
               ))}
@@ -191,6 +217,7 @@ export function FixtureSymbolCanvas({
                 <SymbolDot
                   key={idx}
                   symbol={s}
+                  defs={FIXTURE_DEFS}
                   onPointerDown={handleSymbolPointerDown(idx)}
                 />
               ))}
@@ -273,8 +300,8 @@ export function FixtureSymbolCanvas({
   );
 }
 
-function SymbolDot({ symbol, onPointerDown }: { symbol: FixtureSymbol; onPointerDown: (e: React.PointerEvent) => void }) {
-  const def = FIXTURE_DEFS.find((d) => d.type === symbol.type);
+function SymbolDot({ symbol, defs, onPointerDown }: { symbol: FixtureSymbol; defs: FixtureDef[]; onPointerDown: (e: React.PointerEvent) => void }) {
+  const def = defs.find((d) => d.type === symbol.type);
   return (
     <div
       // 36×36 hit target on mobile, 28×28 on desktop. Visible glyph stays compact.

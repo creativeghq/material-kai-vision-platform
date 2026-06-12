@@ -41,6 +41,7 @@ const SHEET_LABELS: Record<string, string> = {
   color_palette: 'COLOR PALETTE',
   concept_board: 'CONCEPT BOARD',
   lighting_plan: 'LIGHTING PLAN',
+  plumbing_plan: 'PLUMBING PLAN',
   annotated_render: 'ANNOTATED RENDER',
   elevation_render_pair: 'ELEVATION + RENDER',
   ffe_schedule: 'FF&E SCHEDULE',
@@ -288,19 +289,45 @@ export async function buildConceptBoard(
 
 // ============================================================
 // 4. LIGHTING PLAN — backdrop + fixture symbols + legend.
+//    PLUMBING PLAN reuses the exact same layout via buildSymbolPlan;
+//    only the symbol glyphs (drawSymbol) and subtitle differ.
 // ============================================================
+type SymbolPlanPayload = {
+  backdrop?: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
+  symbols: FixtureSymbolData[];
+  legend: { symbol_type: string; label: string }[];
+};
+
+type SymbolDrawer = (page: PDFPage, fonts: SheetFonts, type: string, cx: number, cy: number, label?: string) => void;
+
 export async function buildLightingPlan(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
   td: TitleBlockData,
-  payload: {
-    backdrop?: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
-    symbols: FixtureSymbolData[];
-    legend: { symbol_type: string; label: string }[];
-  },
+  payload: SymbolPlanPayload,
+): Promise<void> {
+  return buildSymbolPlan(pdfDoc, fonts, td, payload, 'Fixture layout', drawFixtureSymbol);
+}
+
+export async function buildPlumbingPlan(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  payload: SymbolPlanPayload,
+): Promise<void> {
+  return buildSymbolPlan(pdfDoc, fonts, td, payload, 'Plumbing layout', drawPlumbingSymbol);
+}
+
+async function buildSymbolPlan(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  payload: SymbolPlanPayload,
+  subtitle: string,
+  drawSymbol: SymbolDrawer,
 ): Promise<void> {
   const page = newSheetPage(pdfDoc);
-  const cy = drawSheetHeader(page, fonts, td.sheet_title, 'Fixture layout');
+  const cy = drawSheetHeader(page, fonts, td.sheet_title, subtitle);
 
   // Plan area on left ~70%, legend on right.
   const planW = CONTENT_W * 0.7;
@@ -351,7 +378,7 @@ export async function buildLightingPlan(
   for (const s of payload.symbols || []) {
     const px = bdX + Math.max(0, Math.min(1, s.x)) * bdW;
     const py = bdY + (1 - Math.max(0, Math.min(1, s.y))) * bdH;
-    drawFixtureSymbol(page, fonts, s.type, px, py, s.label);
+    drawSymbol(page, fonts, s.type, px, py, s.label);
   }
 
   // Legend on right
@@ -362,7 +389,7 @@ export async function buildLightingPlan(
   });
   let ly = legendY - 24;
   for (const item of (payload.legend || []).slice(0, 12)) {
-    drawFixtureSymbol(page, fonts, item.symbol_type, legendX + 10, ly + 5);
+    drawSymbol(page, fonts, item.symbol_type, legendX + 10, ly + 5);
     page.drawText(truncate(item.label, 28), {
       x: legendX + 32, y: ly,
       size: 9, font: fonts.regular, color: COLOR_DARK,
@@ -405,6 +432,69 @@ function drawFixtureSymbol(
     case 'floor': // ⬡
     case 'table':
       page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1.5, color: COLOR_WHITE });
+      break;
+    default:
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1 });
+  }
+  if (label) {
+    page.drawText(label, {
+      x: cx + r + 3, y: cy - 3,
+      size: 7, font: fonts.regular, color: COLOR_GRAY,
+    });
+  }
+}
+
+// Plumbing fixture glyphs — 2D architectural symbols drawn from pdf-lib
+// primitives. Types must stay in sync with PLUMBING_FIXTURE_DEFS in
+// FixtureSymbolCanvas.tsx so the canvas preview and the PDF agree.
+function drawPlumbingSymbol(
+  page: PDFPage,
+  fonts: SheetFonts,
+  type: string,
+  cx: number,
+  cy: number,
+  label?: string,
+): void {
+  const r = 7;
+  const code = (txt: string) =>
+    page.drawText(txt, { x: cx - txt.length * 1.45, y: cy - 2.5, size: 5, font: fonts.bold, color: COLOR_DARK });
+  switch (type) {
+    case 'wc': // toilet — bowl over cistern
+      page.drawRectangle({ x: cx - r * 0.7, y: cy - r, width: r * 1.4, height: r * 0.9, borderColor: COLOR_DARK, borderWidth: 0.9, color: COLOR_WHITE });
+      page.drawCircle({ x: cx, y: cy + r * 0.35, size: r * 0.6, borderColor: COLOR_DARK, borderWidth: 0.9, color: COLOR_WHITE });
+      break;
+    case 'basin': // washbasin — circle + drain
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      page.drawCircle({ x: cx, y: cy, size: 1.4, color: COLOR_DARK });
+      break;
+    case 'bath': // bathtub — rounded rectangle + tap end
+      page.drawRectangle({ x: cx - r * 1.4, y: cy - r * 0.8, width: r * 2.8, height: r * 1.6, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      page.drawCircle({ x: cx + r, y: cy, size: 1.4, color: COLOR_DARK });
+      break;
+    case 'shower': // shower tray — square + drain cross
+      page.drawSquare({ x: cx - r, y: cy - r, size: r * 2, rotate: undefined as any, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      page.drawLine({ start: { x: cx - r * 0.5, y: cy - r * 0.5 }, end: { x: cx + r * 0.5, y: cy + r * 0.5 }, color: COLOR_DARK, thickness: 0.7 });
+      page.drawLine({ start: { x: cx - r * 0.5, y: cy + r * 0.5 }, end: { x: cx + r * 0.5, y: cy - r * 0.5 }, color: COLOR_DARK, thickness: 0.7 });
+      break;
+    case 'floor_drain': // FD — small square + cross
+      page.drawSquare({ x: cx - r * 0.6, y: cy - r * 0.6, size: r * 1.2, rotate: undefined as any, borderColor: COLOR_DARK, borderWidth: 0.9, color: COLOR_WHITE });
+      page.drawLine({ start: { x: cx - r * 0.6, y: cy }, end: { x: cx + r * 0.6, y: cy }, color: COLOR_DARK, thickness: 0.6 });
+      page.drawLine({ start: { x: cx, y: cy - r * 0.6 }, end: { x: cx, y: cy + r * 0.6 }, color: COLOR_DARK, thickness: 0.6 });
+      break;
+    case 'water_supply': // supply point — filled dot
+      page.drawCircle({ x: cx, y: cy, size: r * 0.55, color: COLOR_DARK });
+      break;
+    case 'waste': // waste / soil pipe — circle + W
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      code('W');
+      break;
+    case 'water_heater': // boiler / water heater — circle + WH
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1.3, color: COLOR_WHITE });
+      code('WH');
+      break;
+    case 'mixer': // tap / mixer — small triangle-ish marker
+      page.drawCircle({ x: cx, y: cy, size: r * 0.7, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      page.drawCircle({ x: cx, y: cy, size: 1.2, color: COLOR_DARK });
       break;
     default:
       page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1 });
@@ -1050,6 +1140,13 @@ export async function buildSheetForDeck(
       break;
     case 'lighting_plan':
       await buildLightingPlan(pdfDoc, fonts, td, {
+        backdrop: sheet.data.backdrop,
+        symbols: sheet.data.symbols || [],
+        legend: sheet.data.legend || [],
+      });
+      break;
+    case 'plumbing_plan':
+      await buildPlumbingPlan(pdfDoc, fonts, td, {
         backdrop: sheet.data.backdrop,
         symbols: sheet.data.symbols || [],
         legend: sheet.data.legend || [],

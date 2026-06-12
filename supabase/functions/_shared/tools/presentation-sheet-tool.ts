@@ -31,6 +31,7 @@ type SheetType =
   | 'color_palette'
   | 'concept_board'
   | 'lighting_plan'
+  | 'plumbing_plan'
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
@@ -47,6 +48,7 @@ const SHEET_CREDITS: Record<SheetType, number> = {
   concept_board: 1,          // moodboard-image fetch + collage layout
   ffe_schedule: 1,           // quote_items fetch + table render
   lighting_plan: 3,          // canvas + diagram render
+  plumbing_plan: 3,          // canvas + diagram render (mirror of lighting_plan)
   annotated_render: 4,       // Claude Vision auto-detection + canvas + render
   elevation_render_pair: 3,  // dimensioned-image render + canvas
   area_breakdown: 2,         // composited board: hero + plan + elevation + finishes
@@ -63,6 +65,7 @@ const PASSIVE_TYPES: SheetType[] = [
 
 const INTERACTIVE_TYPES: SheetType[] = [
   'lighting_plan',
+  'plumbing_plan',
   'annotated_render',
   'elevation_render_pair',
   'full_deck',
@@ -118,6 +121,19 @@ function validateInitialData(sheet_type: SheetType, data: Record<string, any> | 
       }
       if (d.backdrop.kind === 'rect' && (!d.backdrop.width_mm || !d.backdrop.height_mm)) {
         return 'lighting_plan rect backdrop must include width_mm and height_mm.';
+      }
+      return null;
+
+    case 'plumbing_plan':
+      // Interactive — the user places plumbing symbols in the canvas. We only require a backdrop here.
+      if (!d.backdrop || !['upload', 'rect'].includes(d.backdrop.kind)) {
+        return 'plumbing_plan needs a backdrop. Ask the user to upload a floor plan image (kind=upload) or provide room dimensions in mm (kind=rect).';
+      }
+      if (d.backdrop.kind === 'upload' && !d.backdrop.image_url) {
+        return 'plumbing_plan upload backdrop must include an image_url.';
+      }
+      if (d.backdrop.kind === 'rect' && (!d.backdrop.width_mm || !d.backdrop.height_mm)) {
+        return 'plumbing_plan rect backdrop must include width_mm and height_mm.';
       }
       return null;
 
@@ -563,6 +579,7 @@ export const createPresentationSheetTool = (
             credits_charged: creditCost,
             message: `Sheet created. Use the canvas widget to ${
               sheet_type === 'lighting_plan' ? 'place fixture symbols'
+              : sheet_type === 'plumbing_plan' ? 'place plumbing symbols'
               : sheet_type === 'annotated_render' ? 'review and edit AI-suggested callouts'
               : 'add dimensions and tile callouts'
             }, then click Render PDF.`,
@@ -633,13 +650,14 @@ export const createPresentationSheetTool = (
         'Create a presentation sheet attached to a moodboard. Eight sheet types: ' +
         'material_board (selected materials, 0 credits), color_palette (extracted colors, 0), ' +
         'concept_board (inspiration collage, 0), lighting_plan (fixture layout, 3 credits), ' +
+        'plumbing_plan (top-down plumbing fixture layout — WC/basin/bath/shower/floor drain/supply/waste/water heater — 3 credits), ' +
         'annotated_render (render with AI-detected callouts, 3 credits), ' +
         'elevation_render_pair (uploaded elevation + render with user dimensions, 2), ' +
         'ffe_schedule (FF&E table from quote, 0), ' +
         'area_breakdown (single composited board: hero render + dimensioned plan + elevation + ' +
         'finishes + fitting columns + palette, 2 credits), full_deck (multi-page deck, 3). ' +
         'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown, full_deck) ' +
-        'generate the PDF immediately. Interactive types (lighting_plan, annotated_render, ' +
+        'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, annotated_render, ' +
         'elevation_render_pair) open a canvas widget for user input first. ALWAYS pass a sensible ' +
         'initial_data payload — see the schema for each sheet_type.',
       schema: z.object({
@@ -649,6 +667,7 @@ export const createPresentationSheetTool = (
           'color_palette',
           'concept_board',
           'lighting_plan',
+          'plumbing_plan',
           'annotated_render',
           'elevation_render_pair',
           'ffe_schedule',
@@ -677,13 +696,18 @@ export const createPresentationSheetTool = (
             image_url: z.string().optional(),
             width_mm: z.number().optional(),
             height_mm: z.number().optional(),
-          }).optional().describe('lighting_plan: floor plan backdrop'),
+          }).optional().describe('lighting_plan / plumbing_plan: floor plan backdrop'),
           symbols: z.array(z.object({
-            type: z.enum(['recessed', 'pendant', 'wall', 'spot', 'led_strip', 'floor', 'table']),
+            type: z.enum([
+              // lighting_plan
+              'recessed', 'pendant', 'wall', 'spot', 'led_strip', 'floor', 'table',
+              // plumbing_plan
+              'wc', 'basin', 'bath', 'shower', 'floor_drain', 'water_supply', 'waste', 'water_heater', 'mixer',
+            ]),
             x: z.number().describe('Normalized 0..1 in backdrop'),
             y: z.number().describe('Normalized 0..1 in backdrop'),
             label: z.string().optional(),
-          })).optional().describe('lighting_plan: fixture symbols'),
+          })).optional().describe('lighting_plan / plumbing_plan: fixture symbols'),
           legend: z.array(z.object({
             symbol_type: z.string(),
             label: z.string(),

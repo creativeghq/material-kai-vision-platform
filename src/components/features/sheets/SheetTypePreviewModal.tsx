@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
-import { Sparkles, FileImage, Layers, Lightbulb, Ruler, ListTree, FileText, Album, LayoutGrid } from 'lucide-react';
+import { Sparkles, FileImage, Layers, Lightbulb, Droplets, Ruler, ListTree, FileText, Album, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   SHEET_TYPE_LABELS,
@@ -67,6 +67,13 @@ const SHEET_TYPE_META: Record<SheetType, SheetTypeMeta> = {
     produces: 'A 1-page A3 PDF with the floor plan, all symbols at their normalized positions, and a labeled legend.',
     inputs: ['A floor plan image OR room dimensions in millimeters', 'Drop fixture symbols on the canvas (interactive)'],
     bestFor: 'Coordinating with the electrician/lighting designer on circuit layouts.',
+  },
+  plumbing_plan: {
+    icon: Droplets,
+    what: 'A top-down room view with plumbing fixture symbols (WC, basin, bath, shower, floor drain, water supply, waste/soil stack, water heater, tap) placed where you want them, plus a legend on the right.',
+    produces: 'A 1-page A3 PDF with the floor plan, all plumbing symbols at their normalized positions, and a labeled legend.',
+    inputs: ['A floor plan image OR room dimensions in millimeters', 'Drop plumbing symbols on the canvas (interactive)'],
+    bestFor: 'Coordinating with the plumber on fixture positions, supply/waste runs, and the wet-room layout.',
   },
   annotated_render: {
     icon: Sparkles,

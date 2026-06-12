@@ -5,6 +5,7 @@ export type SheetType =
   | 'color_palette'
   | 'concept_board'
   | 'lighting_plan'
+  | 'plumbing_plan'
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
@@ -53,6 +54,7 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   color_palette: 'Color Palette',
   concept_board: 'Concept Board',
   lighting_plan: 'Lighting Plan',
+  plumbing_plan: 'Plumbing Plan',
   annotated_render: 'Annotated Render Sheet',
   elevation_render_pair: 'Elevation + Render Pair',
   ffe_schedule: 'FF&E Schedule',
@@ -67,6 +69,7 @@ export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
   concept_board: 1,
   ffe_schedule: 1,
   lighting_plan: 3,
+  plumbing_plan: 3,
   annotated_render: 4,
   elevation_render_pair: 3,
   area_breakdown: 2,

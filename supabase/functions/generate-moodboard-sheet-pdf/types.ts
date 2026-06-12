@@ -3,6 +3,7 @@ export type SheetType =
   | 'color_palette'
   | 'concept_board'
   | 'lighting_plan'
+  | 'plumbing_plan'
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
