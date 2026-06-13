@@ -3128,8 +3128,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           '⚙️',
                   }));
 
-                  // Get completed checkpoints
-                  const completedCheckpoints = jobCheckpoints.map(cp => cp.stage);
+                  // Get completed checkpoints. A stage counts as completed only
+                  // when its LATEST stage_history entry is not still `in_progress`
+                  // — otherwise a running stage (e.g. the Surya structural pass,
+                  // which emits an in_progress event before completed) renders as
+                  // done and the "current stage" indicator jumps ahead to the
+                  // next stage. Marker checkpoints are written with status
+                  // 'completed' (checkpoint_recovery_service), so they are
+                  // unaffected; entries with no status default to completed.
+                  const latestStatusByStage: Record<string, string> = {};
+                  jobCheckpoints.forEach(cp => {
+                    if (cp.stage) {
+                      latestStatusByStage[cp.stage as string] = (cp.status as string) || 'completed';
+                    }
+                  });
+                  const completedCheckpoints = Object.entries(latestStatusByStage)
+                    .filter(([, status]) => status !== 'in_progress')
+                    .map(([stage]) => stage);
 
                   // Determine current stage by finding the NEXT pipeline stage that hasn't been checkpointed yet
                   const getCurrentStage = () => {
