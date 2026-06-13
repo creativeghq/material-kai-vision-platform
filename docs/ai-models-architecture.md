@@ -1,7 +1,9 @@
 # AI Models Architecture - Complete Overview
 
-**Last Updated**: 2026-05-03
+**Last Updated**: 2026-06-13
 **Status**: Production
+
+> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **YOLO DocParser + Chandra OCR + `merge_layout` were deleted** and replaced by a single **Surya-2** vision-language model (`datalab-to/surya-ocr-2`) that returns layout regions + OCR text + figure boxes in one call, run **before discovery** (structure-first). The two warmed HF endpoints are now **SLIG + Surya**. Anywhere below that names YOLO or Chandra, read "Surya-2 structural pass". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the Surya section in `CLAUDE.md`.
 
 ## Executive Summary
 

@@ -1,5 +1,17 @@
 # PDF Processing Pipeline - Complete Technical Guide
 
+> **⚠️ ARCHITECTURE UPDATED 2026-06-13 — Surya-2 structural backbone (structure-first).**
+> The layout/OCR front-end below describes the **retired** YOLO + Chandra + `merge_layout`
+> design. It has been replaced by a single **Surya-2** vision-language model that returns
+> layout regions + OCR text + figure boxes in one call, run as **Stage 1 BEFORE discovery**.
+> Discovery, chunking, and image crops all read its `document_layout_analysis` cache
+> (`processing_version='surya-2'`). YOLO/Chandra and their managers were deleted.
+> See the **"PDF Pipeline — Surya-2 structural backbone"** section in `CLAUDE.md` and
+> [ai-models-complete-list.md](./ai-models-complete-list.md) for the current model map.
+> Wherever this doc says "YOLO detects regions" or "Chandra OCRs the page", read
+> "Surya does both in one structural pass". The remaining stages (vision analysis,
+> embeddings, chunking, products) are unchanged.
+
 14-stage intelligent pipeline for transforming material catalogs into searchable knowledge.
 
 > **📚 Related Documentation:**
