@@ -2664,7 +2664,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     statusText = 'Initializing pipeline — connecting to AI services...';
                   } else if (currentStage.includes('warmup')) {
                     const warmupData = jobCheckpoints.find(cp => cp.stage === 'warmup_started')?.checkpoint_data;
-                    const endpoints = warmupData?.endpoints_to_warmup?.join(', ') || 'SLIG, Surya';
+                    const endpoints = warmupData?.endpoints_to_warmup?.join(', ') || 'SLIG, PaddleOCR';
                     statusText = `Warming up AI endpoints: ${endpoints}`;
                   } else if (currentStage.includes('image') || currentStage.includes('Image')) {
                     statusText = imagesTotal > 0
@@ -3130,7 +3130,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                   // Get completed checkpoints. A stage counts as completed only
                   // when its LATEST stage_history entry is not still `in_progress`
-                  // — otherwise a running stage (e.g. the Surya structural pass,
+                  // — otherwise a running stage (e.g. the PaddleOCR structural pass,
                   // which emits an in_progress event before completed) renders as
                   // done and the "current stage" indicator jumps ahead to the
                   // next stage. Marker checkpoints are written with status
@@ -3338,7 +3338,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               {completedCheckpoints.includes('warmup_complete') && (
                                 <>
                                   <Badge variant="outline" className="text-[9px] bg-purple-500/10 border-purple-500/20 text-purple-400">SigLIP Vision</Badge>
-                                  <Badge variant="outline" className="text-[9px] bg-blue-500/15 border-blue-500/30 text-blue-400">Surya-2 (Layout + OCR)</Badge>
+                                  <Badge variant="outline" className="text-[9px] bg-blue-500/15 border-blue-500/30 text-blue-400">PaddleOCR-VL (Layout + OCR)</Badge>
                                 </>
                               )}
                               {completedCheckpoints.includes('products_detected') && (
@@ -4173,7 +4173,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   // HuggingFace Endpoints (per GPU hour). 'qwen-vision' removed
                   // 2026-05-01 — vision discovery is on Claude Opus 4.7 (token-priced).
                   'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings' },
-                  'surya': { gpuHourly: 0.80, type: 'gpu', description: 'Surya-2 Structural Pass (layout + OCR + figure boxes)' },
+                  'paddleocr': { gpuHourly: 0.80, type: 'gpu', description: 'PaddleOCR-VL Structural Pass (layout + OCR + figure boxes)' },
                   // Free/bundled models
                   'clip': { perImage: 0.0, type: 'free', description: 'OpenAI CLIP (open-source)' },
                 };
@@ -4227,11 +4227,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     };
                   }
 
-                  // Surya - Structural Pass (one call per page: layout + OCR + figure boxes; ~2s/page)
+                  // PaddleOCR - Structural Pass (one call per page: layout + OCR + figure boxes; ~2s/page)
                   if (totalPages > 0) {
                     const gpuSeconds = totalPages * 2.0;
-                    costs['surya'] = {
-                      model: 'Surya-2',
+                    costs['paddleocr'] = {
+                      model: 'PaddleOCR-VL',
                       generations: totalPages,
                       inputTokens: 0,
                       outputTokens: 0,
@@ -4338,11 +4338,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
                                 key === 'slig' ? 'bg-gradient-to-br from-purple-500 to-pink-500' :
-                                key === 'surya' ? 'bg-gradient-to-br from-blue-500 to-cyan-500' :
+                                key === 'paddleocr' ? 'bg-gradient-to-br from-blue-500 to-cyan-500' :
                                 key === 'claude' ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
                                 'bg-gradient-to-br from-green-500 to-teal-500'
                               }`}>
-                                {key === 'slig' ? '🖼️' : key === 'surya' ? '📐' : key === 'claude' ? '🧠' : '📝'}
+                                {key === 'slig' ? '🖼️' : key === 'paddleocr' ? '📐' : key === 'claude' ? '🧠' : '📝'}
                               </div>
                               <div>
                                 <div className="font-semibold text-sm text-foreground">{data.model}</div>
@@ -4383,7 +4383,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     {/* Cost breakdown note */}
                     <div className="mt-3 p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
                       <p className="text-[10px] text-blue-400">
-                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: SLIG ($0.45/hr), Surya ($0.80/hr).
+                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: SLIG ($0.45/hr), PaddleOCR ($0.80/hr).
                         Token costs: Claude Opus ($15/$75 per 1M), Claude Sonnet ($3/$15 per 1M), Voyage embeddings ($0.06 per 1M). Actual costs may vary.
                       </p>
                     </div>

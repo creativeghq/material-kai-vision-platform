@@ -19,10 +19,10 @@ import {
 export const GLOBAL_PIPELINE_FLOW = [
   { id: 'initialized', name: 'Initialized', icon: Clock, checkpoint: 'initialized' },
   { id: 'warmup', name: 'AI Warmup', icon: Flame, checkpoint: 'warmup_complete' },
-  // Stage 1 (structure-first): the Surya structural pass runs BEFORE discovery —
+  // Stage 1 (structure-first): the PaddleOCR structural pass runs BEFORE discovery —
   // one call per physical page → layout regions + OCR text + figure boxes →
   // document_layout_analysis cache. Discovery then reads that cache.
-  { id: 'layout_precompute', name: 'Surya Structural Pass', icon: Cpu, checkpoint: 'stage_1_5_layout_precompute' },
+  { id: 'layout_precompute', name: 'PaddleOCR Layout+OCR', icon: Cpu, checkpoint: 'stage_1_5_layout_precompute' },
   { id: 'discovery', name: 'Discovery', icon: Search, checkpoint: 'products_detected' },
   { id: 'extraction', name: 'PDF Extract', icon: FileText, checkpoint: 'pdf_extracted' },
   { id: 'chunking', name: 'Chunking', icon: FileText, checkpoint: 'chunks_created' },
@@ -79,7 +79,7 @@ export const PRODUCT_STAGES = [
     id: 'extraction',
     name: 'Page Extraction',
     icon: FileText,
-    description: 'Map catalog pages to PDF pages (layout read from Surya cache)',
+    description: 'Map catalog pages to PDF pages (layout read from PaddleOCR cache)',
   },
   {
     id: 'chunking',

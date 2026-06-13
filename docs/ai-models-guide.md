@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-06-13
 
-> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **Surya-2** structural pass (`datalab-to/surya-ocr-2`) — **YOLO + Chandra + `merge_layout` were deleted**. It runs before discovery (structure-first); warmed HF endpoints are **SLIG + Surya**. Read "Surya-2" wherever YOLO/Chandra appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
+> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **PaddleOCR-VL** structural pass (`PaddlePaddle/PaddleOCR-VL`) — **YOLO + Chandra + `merge_layout` were deleted**. It runs before discovery (structure-first); warmed HF endpoints are **SLIG + PaddleOCR**. Read "PaddleOCR-VL" wherever YOLO/Chandra appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
