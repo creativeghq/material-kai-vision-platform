@@ -89,7 +89,11 @@ const AIDataPage = lazy(() => import('./pages/Admin/AIDataPage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
-const PublicToolsPage = lazy(() => import('./pages/Tools/PublicToolsPage'));
+const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
+const PriceScanPage = lazy(() => import('./pages/Tools/PriceScanPage'));
+const MentionScanPage = lazy(() => import('./pages/Tools/MentionScanPage'));
+const HeatPumpToolPage = lazy(() => import('./pages/Tools/HeatPumpToolPage'));
+const HeatingCostPage = lazy(() => import('./pages/Tools/HeatingCostPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
 const PublicClientViewPage = lazy(() => import('./pages/PublicClientViewPage'));
 // Project Workspace passwordless invite flow (public landing + auth-required accept)
@@ -99,6 +103,7 @@ const PublicCatalogPage = lazy(() => import('./components/business/catalogs/Publ
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
 const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
+const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
@@ -153,7 +158,11 @@ const App = () => (
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
-                <Route path="/tools" element={<PageErrorBoundary name="Public Tools"><PublicToolsPage /></PageErrorBoundary>} />
+                <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
+                <Route path="/tools/price-scan" element={<PageErrorBoundary name="Price Scan"><PriceScanPage /></PageErrorBoundary>} />
+                <Route path="/tools/mention-scan" element={<PageErrorBoundary name="Mention Scan"><MentionScanPage /></PageErrorBoundary>} />
+                <Route path="/tools/heat-pump" element={<PageErrorBoundary name="Heat Pump Sizer"><HeatPumpToolPage /></PageErrorBoundary>} />
+                <Route path="/tools/heating-cost" element={<PageErrorBoundary name="Heating Cost Comparison"><HeatingCostPage /></PageErrorBoundary>} />
                 {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
                     expects a Supabase session (established by the magic-link callback) — if it isn't there,
                     its internal redirect bounces back to the invite landing. */}
@@ -690,6 +699,20 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <ModulesPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+
+                {/* Admin: Plans & Pricing — module→plan grid + per-plan quotas (#214) */}
+                <Route
+                  path="/admin/plans"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <PlansPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

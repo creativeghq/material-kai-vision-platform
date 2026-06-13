@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Package, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
+import { Home, Package, ArrowRight, AlertCircle, KeyRound, Layers } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -84,12 +84,20 @@ const ModulesPage: React.FC = () => {
         title="Modules"
         subtitle="Enable or disable platform features. Toggles take effect immediately for all users."
         actions={
-          <Button asChild variant="ghost" size="sm" className="gap-2">
-            <Link to="/admin">
-              <Home className="h-4 w-4" />
-              Back to Admin
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link to="/admin/plans">
+                <Layers className="h-4 w-4" />
+                Plans &amp; Pricing
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/admin">
+                <Home className="h-4 w-4" />
+                Back to Admin
+              </Link>
+            </Button>
+          </div>
         }
       />
 
