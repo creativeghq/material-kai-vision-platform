@@ -64,6 +64,8 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
+import { TechRadarFindingsCard, type TechRadarFindingsData } from './TechRadarFindingsCard';
+import { TechRadarReviewModal, type TechRadarFormState } from './TechRadarReviewModal';
 import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal';
 // PromptLibrary merged into PromptBuilderModal — its 35 design templates,
 // 10 room-filter chips, image-aware mode, and virtual-staging wizard hook
@@ -370,6 +372,8 @@ interface Message {
       source?: string;
     }>;
   };
+  /** Tech Radar review results (Pepper) — rendered as a ring-grouped findings card. */
+  techRadarData?: TechRadarFindingsData;
   /** When the agent emits this, AgentHub mounts a modal form so the user can fill
    *  job-site details (URL, type, country, etc.) instead of typing everything as prose.
    *  On submit, the modal sends a follow-up user message ("add kariera.gr to perplexity
@@ -491,6 +495,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
+  const [techRadarFormState, setTechRadarFormState] = useState<TechRadarFormState>(null);
   // Generic collect-then-send form for toolkit quick-starts that declare a `form`.
   const [toolkitFormState, setToolkitFormState] = useState<ToolkitFormModalState>(null);
   // Pending deterministic tool run (mode:'direct_tool'). Set by a quick-start
@@ -2263,6 +2268,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // Surface as a tool-progress log entry — the agent's text reply summarizes the change.
                 // (No rich card needed; a list of domains is concise enough as prose.)
                 console.debug('[agent-hub] job_sites chunk', chunk);
+              } else if (chunk.type === 'tech_radar_findings') {
+                // Pepper's Tech Radar review → render a ring-grouped findings card.
+                const m: Message = {
+                  id: `msg-techradar-${Date.now()}`,
+                  role: 'assistant',
+                  content: chunk.summary || 'Tech Radar review complete.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  techRadarData: {
+                    subject: chunk.subject,
+                    summary: chunk.summary,
+                    findings: chunk.findings || [],
+                    new_count: chunk.new_count,
+                    saved: chunk.saved,
+                  },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, techRadarData: m.techRadarData },
+                  });
+                }
+              } else if (chunk.type === 'tech_radar_form_open') {
+                // Vague request → mount the setup modal. No thread message; on submit
+                // the modal posts a structured follow-up that re-invokes the radar tools.
+                setTechRadarFormState({ prefill: chunk.prefill || undefined });
+              } else if (chunk.type === 'tech_radar_monitor' || chunk.type === 'tech_radar_list') {
+                // Concise enough as the agent's prose reply — just log.
+                console.debug('[agent-hub] tech_radar chunk', chunk);
               } else if (chunk.type === 'mention_tracking_started') {
                 const m: Message = {
                   id: `msg-mention-track-${Date.now()}`,
@@ -2824,6 +2860,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
           mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
           mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
+          techRadarData: msg.metadata?.techRadarData as any | undefined,
           // Job-research daily digest cards (cron-posted directly into the convo by the dispatcher,
           // so the chunk arrives as `metadata.chunk_type === 'job_findings'` rather than via a streaming chunk)
           jobFindingsData: (msg.metadata?.chunk_type === 'job_findings'
@@ -3497,6 +3534,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <div className="space-y-3">
                         <HeatingCostResultCard result={message.heatingCostData.result} />
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.techRadarData ? (
+                      <div className="space-y-3">
+                        <TechRadarFindingsCard data={message.techRadarData} />
+                        {message.content && <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />}
                       </div>
                     ) : message.jobFindingsData ? (
                       <div className="space-y-3">
@@ -5063,6 +5105,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             title: 'Form ready',
             description: 'Review the message in the input box and hit Send to apply.',
           });
+        }}
+      />
+
+      {/* Tech Radar setup modal — triggered by Pepper's tech_radar_form_open chunk */}
+      <TechRadarReviewModal
+        state={techRadarFormState}
+        onClose={() => setTechRadarFormState(null)}
+        onSubmit={(followupMessage) => {
+          setInput(followupMessage);
+          setTechRadarFormState(null);
+          setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
         }}
       />
 

@@ -181,8 +181,8 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
   }
 
   // Audit fix #43: skip jobs with current_slow_operation flag set within
-  // the last 2 minutes. Stages that legitimately take 5+ min (long Chandra
-  // batches, SLIG embedding fan-out) set this flag so heartbeat staleness
+  // the last 2 minutes. Stages that legitimately take 5+ min (long PaddleOCR
+  // structural passes, SLIG embedding fan-out) set this flag so heartbeat staleness
   // doesn't trigger spurious recovery while real work is in progress.
   const candidates = data || [];
   if (candidates.length === 0) return [];
@@ -748,7 +748,7 @@ async function scaleAllHfEndpointsToZero(reason: string): Promise<void> {
   }
   // Qwen endpoint retired 2026-05-01 (all vision now Claude). The PUT used to
   // 404 silently every recovery sweep. Removed from the list.
-  const endpoints = ['mh-slig', 'mh-yolo', 'mh-chandra'];
+  const endpoints = ['mh-slig'];  // only HF endpoint; PaddleOCR is Modal (self-scaling)
   for (const ep of endpoints) {
     try {
       // Read current scaling config so we preserve maxReplica

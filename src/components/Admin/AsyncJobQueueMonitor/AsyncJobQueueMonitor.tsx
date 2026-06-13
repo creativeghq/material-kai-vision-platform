@@ -3787,7 +3787,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Processing Time', value: meta.processing_time_ms ? `${(meta.processing_time_ms / 1000).toFixed(1)}s` : 'N/A' },
                                 ],
                               };
-                            // Stage 1.5: doc-level layout precompute (YOLO + bbox merge cache)
+                            // Stage 1.5: doc-level layout precompute (PaddleOCR structural-pass cache)
                             case 'stage_1_5_layout_precompute': {
                               const paths = (data.extraction_paths || {}) as Record<string, number>;
                               const pathsLine = Object.entries(paths)

@@ -1714,79 +1714,6 @@ export type Database = {
           },
         ]
       }
-      chandra_ocr_metrics: {
-        Row: {
-          attempt_number: number
-          blocks_count: number | null
-          caller: string
-          chars_count: number | null
-          cost_usd: number | null
-          created_at: string
-          document_id: string | null
-          failure_mode_head: string | null
-          id: string
-          image_id: string | null
-          job_id: string | null
-          latency_ms: number
-          outcome: string
-          temperature: number
-        }
-        Insert: {
-          attempt_number?: number
-          blocks_count?: number | null
-          caller: string
-          chars_count?: number | null
-          cost_usd?: number | null
-          created_at?: string
-          document_id?: string | null
-          failure_mode_head?: string | null
-          id?: string
-          image_id?: string | null
-          job_id?: string | null
-          latency_ms: number
-          outcome: string
-          temperature: number
-        }
-        Update: {
-          attempt_number?: number
-          blocks_count?: number | null
-          caller?: string
-          chars_count?: number | null
-          cost_usd?: number | null
-          created_at?: string
-          document_id?: string | null
-          failure_mode_head?: string | null
-          id?: string
-          image_id?: string | null
-          job_id?: string | null
-          latency_ms?: number
-          outcome?: string
-          temperature?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chandra_ocr_metrics_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "documents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "chandra_ocr_metrics_image_id_fkey"
-            columns: ["image_id"]
-            isOneToOne: false
-            referencedRelation: "document_images"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "chandra_ocr_metrics_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "background_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       changelog_entries: {
         Row: {
           body_md: string
@@ -3345,10 +3272,6 @@ export type Database = {
           visual_features: Json | null
           visual_metadata_extraction: Json | null
           workspace_id: string | null
-          yolo_confidence: number | null
-          yolo_detected: boolean | null
-          yolo_reading_order: number | null
-          yolo_region_type: string | null
         }
         Insert: {
           alt_text?: string | null
@@ -3412,10 +3335,6 @@ export type Database = {
           visual_features?: Json | null
           visual_metadata_extraction?: Json | null
           workspace_id?: string | null
-          yolo_confidence?: number | null
-          yolo_detected?: boolean | null
-          yolo_reading_order?: number | null
-          yolo_region_type?: string | null
         }
         Update: {
           alt_text?: string | null
@@ -3479,10 +3398,6 @@ export type Database = {
           visual_features?: Json | null
           visual_metadata_extraction?: Json | null
           workspace_id?: string | null
-          yolo_confidence?: number | null
-          yolo_detected?: boolean | null
-          yolo_reading_order?: number | null
-          yolo_region_type?: string | null
         }
         Relationships: [
           {

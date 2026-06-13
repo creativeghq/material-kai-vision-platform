@@ -868,6 +868,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_catalog_pdf', 'publish_catalog',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
+      'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -1013,6 +1015,9 @@ async function executeAgent(
     },
     'projects': {
       tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'],
+    },
+    'tech-radar': {
+      tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
     },
     'presentation-sheets': {
       tool_ids: ['generate_presentation_sheet'],
@@ -1226,6 +1231,9 @@ async function executeAgent(
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task'].includes(t));
+  // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
+  // (internal ops capability) — gate to admin/owner like price_lookup.
+  const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
   const CATALOG_TOOL_NAMES = [
     'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
     'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
@@ -1233,7 +1241,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1249,6 +1257,7 @@ async function executeAgent(
     needsCatalog      ? import('../_shared/tools/catalog-tools.ts') : null,
     needsJobResearch  ? import('../_shared/tools/job-research-tools.ts') : null,
     needsProjects     ? import('../_shared/tools/project-tools.ts') : null,
+    needsTechRadar    ? import('../_shared/tools/tech-radar-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1335,6 +1344,10 @@ async function executeAgent(
   const createListMyProjectsTool = projectsMod?.createListMyProjectsTool;
   const createFindProjectTool = projectsMod?.createFindProjectTool;
   const createAddTaskTool = projectsMod?.createAddTaskTool;
+  const createReviewSolutionTool = techRadarMod?.createReviewSolutionTool;
+  const createTrackTechRadarTool = techRadarMod?.createTrackTechRadarTool;
+  const createListTechRadarTool = techRadarMod?.createListTechRadarTool;
+  const createUpdateFindingTool = techRadarMod?.createUpdateFindingTool;
   const createCreateCatalogTool = catalogMod?.createCreateCatalogTool;
   const createAttachCatalogPdfsTool = catalogMod?.createAttachCatalogPdfsTool;
   const createExtractFromCatalogPdfsTool = catalogMod?.createExtractFromCatalogPdfsTool;
@@ -1573,6 +1586,20 @@ async function executeAgent(
   }
   if (config.tools.includes('add_task') && createAddTaskTool) {
     tools.push(createAddTaskTool(userId, onChunk));
+  }
+
+  // --- Tech Radar (Pepper's background brain) ---
+  if (config.tools.includes('review_solution') && createReviewSolutionTool) {
+    tools.push(createReviewSolutionTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('track_tech_radar') && createTrackTechRadarTool) {
+    tools.push(createTrackTechRadarTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('list_tech_radar') && createListTechRadarTool) {
+    tools.push(createListTechRadarTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('update_finding') && createUpdateFindingTool) {
+    tools.push(createUpdateFindingTool(userId, workspaceId, onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
