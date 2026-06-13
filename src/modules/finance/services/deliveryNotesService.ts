@@ -33,6 +33,36 @@ export interface WarehousePick {
   id: string; name: string; sku: string | null; unit: string | null; qty_on_hand: number | null; product_id: string | null;
 }
 
+/** One product line of an order that needs to ship, matched against warehouse stock. */
+export interface DispatchQueueLine {
+  description: string;
+  sku: string | null;
+  unit: string | null;
+  quantity: number;
+  warehouse_item_id: string | null;
+  product_id: string | null;
+  qty_on_hand: number | null;   // matched stock on hand; null when the line isn't a stocked item
+  shortfall: boolean;           // true when stock is tracked AND on-hand < ordered qty
+}
+
+/** A paid, shippable order in the daily dispatch board. */
+export interface DispatchQueueOrder {
+  invoice_id: string;
+  internal_number: string;
+  customer_company_id: string | null;
+  customer_contact_id: string | null;
+  customer_name: string | null;
+  ship_to: string | null;
+  transport_date: string | null;   // YYYY-MM-DD, drives the day-buckets
+  currency: string;
+  total: number;
+  notes: string | null;
+  lines: DispatchQueueLine[];
+  has_shortfall: boolean;
+  /** Linked dispatch note when one already exists (draft only — issued orders leave the board). */
+  dispatch: { id: string; status: string; number: string | null; fiscal_mark: string | null } | null;
+}
+
 export const deliveryNotesService = {
   async list(workspaceId: string): Promise<DeliveryNote[]> {
     const { data, error } = await supabase
@@ -70,6 +100,7 @@ export const deliveryNotesService = {
     shipFromStreet?: string; shipFromNumber?: string; shipFromPostal?: string; shipFromCity?: string;
     shipToStreet?: string; shipToNumber?: string; shipToPostal?: string; shipToCity?: string;
     relatedDocument?: string;
+    invoiceId?: string | null;
   }): Promise<string> {
     const { data: dn, error } = await supabase
       .from('delivery_notes')
@@ -78,6 +109,7 @@ export const deliveryNotesService = {
         kind: input.kind ?? 'dispatch',
         customer_company_id: input.customerCompanyId ?? null,
         customer_contact_id: input.customerContactId ?? null,
+        invoice_id: input.invoiceId ?? null,
         branch_code: input.branchCode ?? 0,
         notes: input.notes || null,
         transport_date: input.transportDate || null,
@@ -146,4 +178,121 @@ export const deliveryNotesService = {
     if (error) throw error;
     return data as string;
   },
+
+  /**
+   * Daily dispatch board — every paid, shippable order (`has_shipping=true`, `status='paid'`)
+   * that hasn't yet left the door. An order drops off once its dispatch note is issued; while
+   * the note is still a draft it stays on the board (with the draft linked) so the warehouse can
+   * issue + print it. Each order's lines are matched to warehouse stock so shortfalls show before
+   * picking. Buckets by `transport_date` happen on the client.
+   */
+  async listDispatchQueue(workspaceId: string): Promise<DispatchQueueOrder[]> {
+    const { data: invs, error } = await supabase
+      .from('invoices')
+      .select('id, internal_number, customer_company_id, customer_contact_id, ship_to, transport_date, currency, total, notes')
+      .eq('workspace_id', workspaceId)
+      .eq('has_shipping', true)
+      .eq('status', 'paid');
+    if (error) throw error;
+    const orders = (invs ?? []) as any[];
+    if (orders.length === 0) return [];
+
+    const invoiceIds = orders.map((o) => o.id);
+    const companyIds = [...new Set(orders.map((o) => o.customer_company_id).filter(Boolean))];
+    const contactIds = [...new Set(orders.map((o) => o.customer_contact_id).filter(Boolean))];
+
+    const [itemsRes, whRes, dnRes, companiesRes, contactsRes] = await Promise.all([
+      supabase.from('invoice_items').select('invoice_id, product_id, description, sku, unit, quantity').in('invoice_id', invoiceIds),
+      supabase.from('warehouse_items').select('id, name, sku, qty_on_hand, product_id').eq('workspace_id', workspaceId),
+      supabase.from('delivery_notes').select('id, invoice_id, status, delivery_note_number, fiscal_mark').eq('workspace_id', workspaceId).eq('kind', 'dispatch').in('invoice_id', invoiceIds).neq('status', 'void'),
+      companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const itemsByInvoice = new Map<string, any[]>();
+    for (const it of (itemsRes.data ?? []) as any[]) {
+      const arr = itemsByInvoice.get(it.invoice_id) ?? [];
+      arr.push(it); itemsByInvoice.set(it.invoice_id, arr);
+    }
+    const wh = (whRes.data ?? []) as WarehousePick[];
+    const dispatchByInvoice = new Map<string, any>();
+    for (const d of (dnRes.data ?? []) as any[]) dispatchByInvoice.set(d.invoice_id, d);
+    const companyName = new Map((((companiesRes as any).data ?? []) as any[]).map((c) => [c.id, c.name]));
+    const contactName = new Map((((contactsRes as any).data ?? []) as any[]).map((c) => [c.id, c.name]));
+
+    const result: DispatchQueueOrder[] = [];
+    for (const o of orders) {
+      // An order with an *issued* dispatch note is already out the door — drop it.
+      const dn = dispatchByInvoice.get(o.id);
+      if (dn && dn.status !== 'draft') continue;
+
+      const rawLines = itemsByInvoice.get(o.id) ?? [];
+      const lines: DispatchQueueLine[] = rawLines.map((l) => {
+        const match = matchWarehouseItem(l, wh);
+        const onHand = match?.qty_on_hand ?? null;
+        const qty = Number(l.quantity ?? 0);
+        return {
+          description: (l.description ?? '').trim() || 'Item',
+          sku: l.sku ?? match?.sku ?? null,
+          unit: l.unit ?? null,
+          quantity: qty,
+          warehouse_item_id: match?.id ?? null,
+          product_id: l.product_id ?? match?.product_id ?? null,
+          qty_on_hand: onHand,
+          shortfall: onHand != null && onHand < qty,
+        };
+      });
+
+      result.push({
+        invoice_id: o.id,
+        internal_number: o.internal_number,
+        customer_company_id: o.customer_company_id ?? null,
+        customer_contact_id: o.customer_contact_id ?? null,
+        customer_name: (o.customer_company_id && companyName.get(o.customer_company_id))
+          || (o.customer_contact_id && contactName.get(o.customer_contact_id)) || null,
+        ship_to: o.ship_to ?? null,
+        transport_date: o.transport_date ?? null,
+        currency: o.currency ?? 'EUR',
+        total: Number(o.total ?? 0),
+        notes: o.notes ?? null,
+        lines,
+        has_shortfall: lines.some((l) => l.shortfall),
+        dispatch: dn ? { id: dn.id, status: dn.status, number: dn.delivery_note_number ?? null, fiscal_mark: dn.fiscal_mark ?? null } : null,
+      });
+    }
+    return result;
+  },
+
+  /** Cut a draft dispatch note from a paid order, matched to warehouse stock and linked back to the invoice. */
+  async createDispatchFromOrder(workspaceId: string, order: DispatchQueueOrder): Promise<string> {
+    const lines: DeliveryLineInput[] = order.lines
+      .filter((l) => l.description.trim() && l.quantity > 0)
+      .map((l) => ({
+        warehouse_item_id: l.warehouse_item_id,
+        product_id: l.product_id,
+        description: l.description,
+        sku: l.sku,
+        quantity: l.quantity,
+        unit: l.unit,
+      }));
+    return this.create(workspaceId, {
+      kind: 'dispatch',
+      customerCompanyId: order.customer_company_id,
+      customerContactId: order.customer_contact_id,
+      invoiceId: order.invoice_id,
+      transportDate: order.transport_date || undefined,
+      shipTo: order.ship_to || undefined,
+      relatedDocument: order.internal_number,
+      notes: `Order ${order.internal_number}`,
+      lines,
+    });
+  },
 };
+
+/** Match an order line to a stock item: product_id → exact SKU → exact name. Null when non-stocked. */
+function matchWarehouseItem(line: { product_id?: string | null; sku?: string | null; description?: string | null }, wh: WarehousePick[]): WarehousePick | null {
+  if (line.product_id) { const m = wh.find((w) => w.product_id === line.product_id); if (m) return m; }
+  if (line.sku) { const s = String(line.sku).toLowerCase().trim(); const m = wh.find((w) => (w.sku ?? '').toLowerCase().trim() === s); if (m) return m; }
+  if (line.description) { const d = String(line.description).toLowerCase().trim(); const m = wh.find((w) => (w.name ?? '').toLowerCase().trim() === d); if (m) return m; }
+  return null;
+}

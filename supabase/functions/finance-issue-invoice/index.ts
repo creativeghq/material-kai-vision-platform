@@ -99,6 +99,70 @@ function json(body: any, status = 200): Response {
 }
 
 /**
+ * Authoritative buyer risk-gate, enforced server-side at ISSUANCE/TRANSMISSION (the client
+ * NewInvoiceDialog shows the same banner, but a client-only gate is bypassable). Returns the
+ * list of HARD blocks per the workspace's finance_settings risk rules. Drafts are never gated —
+ * only the act of issuing or transmitting. `vat_validated===false` ⇒ ΑΑΔΕ-inactive / VIES-rejected;
+ * null ⇒ never validated. Credit limit lives on the CRM party row; outstanding excludes this doc.
+ */
+async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string[]> {
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('workspace_id, customer_company_id, customer_contact_id, total')
+    .eq('id', invoiceId)
+    .single();
+  if (!inv) return [];
+
+  const { data: s } = await supabase
+    .from('finance_settings')
+    .select('risk_block_inactive_vat, risk_block_unvalidated_vat, risk_warn_over_credit_limit, risk_block_over_credit_limit')
+    .eq('workspace_id', inv.workspace_id)
+    .maybeSingle();
+  // No settings row ⇒ safe defaults (block inactive only).
+  const rules = {
+    block_inactive: s?.risk_block_inactive_vat ?? true,
+    block_unvalidated: s?.risk_block_unvalidated_vat ?? false,
+    block_over: s?.risk_block_over_credit_limit ?? false,
+  };
+
+  const blocks: string[] = [];
+  const isCompany = !!inv.customer_company_id;
+  const buyerId = inv.customer_company_id ?? inv.customer_contact_id;
+  if (!buyerId) return blocks;
+
+  // Companies carry vat_validated; contacts (retail/individuals) may not — only credit applies there.
+  const cols = isCompany ? 'vat_number, vat_validated, credit_limit' : 'vat_number, credit_limit';
+  const { data: buyer } = await supabase
+    .from(isCompany ? 'crm_companies' : 'crm_contacts')
+    .select(cols)
+    .eq('id', buyerId)
+    .maybeSingle();
+  if (!buyer) return blocks;
+
+  const hasVat = !!buyer.vat_number;
+  if (isCompany && hasVat) {
+    if (rules.block_inactive && buyer.vat_validated === false) blocks.push('the buyer ΑΦΜ is inactive / not recognised');
+    if (rules.block_unvalidated && (buyer.vat_validated === null || buyer.vat_validated === undefined)) blocks.push('the buyer VAT has never been validated');
+  }
+
+  if (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) {
+    const col = isCompany ? 'customer_company_id' : 'customer_contact_id';
+    const { data: openRows } = await supabase
+      .from('invoices')
+      .select('amount_due')
+      .eq('workspace_id', inv.workspace_id)
+      .eq(col, buyerId)
+      .neq('id', invoiceId)
+      .in('status', ['issued', 'partially_paid', 'overdue']);
+    const outstanding = (openRows ?? []).reduce((acc: number, r: any) => acc + (Number(r.amount_due) || 0), 0);
+    if (outstanding + (Number(inv.total) || 0) > Number(buyer.credit_limit)) {
+      blocks.push('this invoice exceeds the buyer credit limit');
+    }
+  }
+  return blocks;
+}
+
+/**
  * #202 — is this user a FINANCE MANAGER (not just an allowed-in accountant) for the
  * workspace that owns this quote? Managers = workspace owner/admin OR a global
  * admin/super_admin/finance role. Runs under service role (auth.uid() is null), so we
@@ -400,6 +464,19 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       });
       if (rpcErr) return json({ error: `issue_invoice_from_quote failed: ${rpcErr.message}` }, 500);
       invoiceId = created as string;
+    }
+
+    // 1b. Buyer risk-gate — authoritative server-side enforcement. Only gates the act of
+    //     issuing or transmitting (drafts are always allowed). Mirrors the client banner.
+    if (body.issue_now || body.submit_fiscal) {
+      const blocks = await buyerRiskBlocks(supabase, invoiceId);
+      if (blocks.length > 0) {
+        return json({
+          error: `Invoice blocked by risk check: ${blocks.join('; ')}. Fix the buyer in CRM or relax the rule under Finance → Settings → Buyer risk checks.`,
+          code: 'buyer_risk_blocked',
+          blocks,
+        }, 422);
+      }
     }
 
     // 2. Optional issue (draft → issued)

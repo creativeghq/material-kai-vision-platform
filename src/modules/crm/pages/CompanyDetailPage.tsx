@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
 import { validateVatViaVies } from '@/services/viesService';
+import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
@@ -79,6 +80,19 @@ interface Company {
   vat_validated_at?: string | null;
   vat_validated_name?: string | null;
   vat_validated_address?: string | null;
+  vat_validation_source?: string | null;
+  // ΑΑΔΕ enrichment (Greek businesses) — mirrors the columns the myaade-rgwspublic2 fn writes
+  commercial_title?: string | null;
+  legal_status?: string | null;
+  kad_primary?: string | null;
+  kad_primary_description?: string | null;
+  kad_secondary?: any;
+  business_start_date?: string | null;
+  profession?: string | null;
+  street?: string | null;
+  street_number?: string | null;
+  aade_data?: any;
+  aade_data_at?: string | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -98,6 +112,7 @@ export const CompanyDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
+  const [aadeBusy, setAadeBusy] = useState(false);
   const [editing, setEditing] = useState(isNew); // Start in editing mode for new companies
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
@@ -249,6 +264,88 @@ export const CompanyDetailPage: React.FC = () => {
     } finally {
       setViesBusy(false);
     }
+  };
+
+  /**
+   * Greek-only enrichment via ΑΑΔΕ RgWsPublic2. Manual button (operator controls when the
+   * TAXISnet notification fires). Prefills the form — including the structured myDATA-grade
+   * address (street + number) + ΚΑΔ + legal form — which then persists on Save. For an existing
+   * company we also pass companyId so the edge function caches the structured columns server-side.
+   *
+   * Counterparty lookup is legitimate here: we only enrich businesses we have a real relationship
+   * with (a CRM customer/supplier we will invoice or be invoiced by). reason='crm_enrichment'.
+   */
+  const lookupAade = async () => {
+    if (!company) return;
+    const rawAfm = (company.vat_number || '').replace(/[^0-9]/g, '');
+    if (rawAfm.length !== 9) {
+      toast({ title: 'Need a 9-digit ΑΦΜ', description: 'Type the Greek ΑΦΜ digits in the VAT field first.', variant: 'destructive' });
+      return;
+    }
+    setAadeBusy(true);
+    try {
+      const res = await aadeService.lookup({
+        afm: rawAfm,
+        companyId: isNew ? undefined : id,
+        reason: 'crm_enrichment',
+      });
+      if ('error' in res && res.error) {
+        toast({ title: 'ΑΑΔΕ lookup failed', description: (res.message || res.error), variant: 'destructive' });
+        return;
+      }
+      if ('ok' in res && res.ok) {
+        adoptAadeAll(res);
+        if (!editing) setEditing(true);
+        toast({
+          title: res.source === 'cache' ? 'ΑΑΔΕ data (cached)' : 'ΑΑΔΕ data fetched',
+          description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia} — review and Save.` : 'Business details pre-filled — review and Save.',
+        });
+      }
+    } finally {
+      setAadeBusy(false);
+    }
+  };
+
+  /** Adopt every ΑΑΔΕ field into the form. Persisted on Save (createCompany/updateCompany). */
+  const adoptAadeAll = (res: AadeLookupResult) => {
+    const r = res.basic_rec;
+    const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
+    const secondaryActs = res.activities.filter((a) => a.kind !== 1);
+    const combinedAddress = r.postal_address
+      ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
+      : null;
+    setCompany((prev) => prev ? {
+      ...prev,
+      // Authoritative for Greek businesses
+      name: r.onomasia ?? prev.name,
+      // Structured myDATA-grade address + the combined display address
+      street: r.postal_address ?? prev.street,
+      street_number: r.postal_address_no ?? prev.street_number,
+      address: combinedAddress ?? prev.address,
+      postal_code: r.postal_zip_code ?? prev.postal_code,
+      city: r.postal_area_description ?? prev.city,
+      country: r.postal_area_description ? (prev.country || 'Greece') : prev.country,
+      country_code: prev.country_code || 'EL',
+      tax_office: r.doy_descr ?? prev.tax_office,
+      profession: primaryAct?.description ?? prev.profession,
+      // ΑΑΔΕ structured columns (mirror what the edge function persists)
+      commercial_title: r.commer_title,
+      legal_status: r.legal_status_descr,
+      kad_primary: primaryAct?.code ?? null,
+      kad_primary_description: primaryAct?.description ?? null,
+      kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
+      business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
+      aade_data: { basic_rec: r, activities: res.activities },
+      aade_data_at: res.checked_at,
+      // ΑΑΔΕ active-flag is authoritative — fill the VIES-style verification columns too
+      vat_validated: r.deactivation_flag === '1' ? true : (r.deactivation_flag === '2' ? false : null),
+      vat_validated_at: res.checked_at,
+      vat_validated_name: r.onomasia,
+      vat_validated_address: combinedAddress
+        ? `${combinedAddress} ${r.postal_zip_code ?? ''} ${r.postal_area_description ?? ''}`.replace(/\s+/g, ' ').trim()
+        : prev.vat_validated_address,
+      vat_validation_source: 'aade',
+    } : prev);
   };
 
   /**
@@ -625,6 +722,22 @@ export const CompanyDetailPage: React.FC = () => {
 
                 {/* Validation status + action */}
                 <div className="flex flex-wrap items-center gap-3">
+                  {/* Greek businesses → ΑΑΔΕ (richer: ΔΟΥ, ΚΑΔ, legal form, structured address).
+                      Manual button so the operator controls when the TAXISnet notification fires. */}
+                  {(company.country_code || '').toUpperCase() === 'EL'
+                    && (company.vat_number || '').replace(/[^0-9]/g, '').length === 9 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={lookupAade}
+                      disabled={aadeBusy}
+                      title="Fetch full business details from ΑΑΔΕ and pre-fill the form"
+                    >
+                      {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+                      Fetch from ΑΑΔΕ
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     variant="outline"
@@ -637,11 +750,13 @@ export const CompanyDetailPage: React.FC = () => {
 
                   {company.vat_validated === true && (
                     <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                      VAT verified{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
+                      {company.vat_validation_source === 'aade' ? 'ΑΑΔΕ Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
                     </Badge>
                   )}
                   {company.vat_validated === false && (
-                    <Badge variant="destructive">VAT not recognised by VIES</Badge>
+                    <Badge variant="destructive">
+                      {company.vat_validation_source === 'aade' ? 'ΑΑΔΕ: business inactive' : 'VAT not recognised by VIES'}
+                    </Badge>
                   )}
 
                   {company.vat_validated_name && (
@@ -652,6 +767,27 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
                 {company.vat_validated_address && (
                   <p className="text-xs text-muted-foreground">{company.vat_validated_address}</p>
+                )}
+
+                {/* ΑΑΔΕ enrichment readout (Greek businesses) */}
+                {(company.kad_primary || company.legal_status || company.commercial_title) && (
+                  <div className="rounded-md border border-primary/15 bg-primary/[0.03] p-3 space-y-1 text-xs">
+                    {company.commercial_title && (
+                      <div><span className="text-muted-foreground">Commercial title: </span><span className="text-foreground">{company.commercial_title}</span></div>
+                    )}
+                    {company.legal_status && (
+                      <div><span className="text-muted-foreground">Legal form: </span><span className="text-foreground">{company.legal_status}</span></div>
+                    )}
+                    {company.kad_primary && (
+                      <div><span className="text-muted-foreground">Primary ΚΑΔ: </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>
+                    )}
+                    {Array.isArray(company.kad_secondary) && company.kad_secondary.length > 0 && (
+                      <div><span className="text-muted-foreground">Secondary ΚΑΔ: </span><span className="text-foreground">{company.kad_secondary.length} more</span></div>
+                    )}
+                    {company.business_start_date && (
+                      <div><span className="text-muted-foreground">Operating since: </span><span className="text-foreground">{company.business_start_date}</span></div>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -264,7 +264,7 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - Issue → series/AA allocation → transmit → MARK / offline-recovery state machine
 - Inbound `RequestDocs` sync, customer + supplier credit notes
 - Reports: VAT analysis (ΦΠΑ), myDATA reconciliation, ledgers (καρτέλα), accounting export bridges (γέφυρες CSV)
-- 9 `finance-*` edge functions; replaced the removed Oxygen connector
+- 9 `finance-*` edge functions; replaced a removed legacy ERP connector
 
 **[pos-retail-system.md](pos-retail-system.md)** — POS / retail
 - myDATA `11.1` retail receipts; cloud vPOS shifts + cash drawer + X/Z reports

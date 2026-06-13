@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
+import { Switch } from '@/components/core/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -137,7 +138,7 @@ export const CategoryManager: React.FC = () => {
   // Manuals) host docs the agent reads at runtime — deletion is intentionally
   // disabled. The DB trigger `kb_categories_block_locked_delete` is the real
   // guardrail; this just stops the button before the user hits a SQL error.
-  const isCategoryLocked = (c: KBCategory): boolean => c.access_level === 'agent';
+  const isCategoryLocked = (c: KBCategory): boolean => c.access_level === 'agent' || c.is_locked === true;
 
   const handleDelete = async (category: KBCategory) => {
     if (isCategoryLocked(category)) {
@@ -195,6 +196,7 @@ export const CategoryManager: React.FC = () => {
             color: editingCategory.color,
             sort_order: editingCategory.sort_order,
             access_level: editingCategory.access_level,
+            is_locked: editingCategory.is_locked === true,
             // Only persist trigger_keyword for agent-level categories; clear it otherwise
             trigger_keyword: editingCategory.access_level === 'agent'
               ? (editingCategory.trigger_keyword?.trim() || null)
@@ -427,6 +429,21 @@ export const CategoryManager: React.FC = () => {
                 </p>
               </div>
             )}
+
+            {/* Lock — protects every doc in the category from deletion */}
+            <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="cat_lock">Lock category</Label>
+                <p className="text-xs text-muted-foreground">
+                  When locked, every document in this category is protected from deletion and platform reset (unless a doc is explicitly unlocked).
+                </p>
+              </div>
+              <Switch
+                id="cat_lock"
+                checked={editingCategory.is_locked === true}
+                onCheckedChange={(checked) => setEditingCategory({ ...editingCategory, is_locked: checked })}
+              />
+            </div>
 
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowEditor(false)}>

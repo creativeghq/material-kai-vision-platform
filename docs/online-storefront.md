@@ -1,6 +1,6 @@
 # Online Storefront (`/store/:slug`)
 
-Part of the [Finance module](finance-system.md). A public mini-store that lets any workspace publish a subset of its priced catalog to a public URL, where anonymous visitors browse, build a cart, and check out via Stripe — handing off to the same `/pay/:token` flow used for invoice payment links. Parity with Oxygen/pelatologio.gr's "Open Link" feature (#207).
+Part of the [Finance module](finance-system.md). A public mini-store that lets any workspace publish a subset of its priced catalog to a public URL, where anonymous visitors browse, build a cart, and check out via Stripe — handing off to the same `/pay/:token` flow used for invoice payment links (#207).
 
 Edge function: `supabase/functions/finance-storefront/index.ts`. Public page: `src/pages/PublicStorefrontPage.tsx`. Route `/store/:slug` is registered **outside** `<AuthGuard>` in `src/App.tsx` (same pattern as `/board/:id`, `/c/:slug`).
 

@@ -813,6 +813,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      // Calculators (all users; deterministic, free, no upstream API)
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -884,6 +886,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'material_search', 'generate_3d', 'analyze_inspiration_url',
+      // Calculators (all users; deterministic, free, no upstream API)
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // Image-driven post-processing tools (require an existing room image in the conversation)
       'apply_lighting_preset', 'generate_vr_world',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
@@ -938,6 +942,7 @@ async function executeAgent(
   generationMode?: string, // Explicit mode override from UI chip selection
   conversation_id?: string | null, // Supabase conversation ID for background task dispatch
   selectedToolkits?: string[] | null, // Per-turn user-selected toolkit IDs (resolved server-side to tool IDs)
+  directTool?: { name: string; input: Record<string, any> } | null, // Deterministic single-tool run — skips the LLM entirely
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -1005,6 +1010,9 @@ async function executeAgent(
     },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
+    },
+    'projects': {
+      tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'],
     },
     'presentation-sheets': {
       tool_ids: ['generate_presentation_sheet'],
@@ -1352,6 +1360,18 @@ async function executeAgent(
 
   // --- Core tools (all users) ---
 
+  // 🌡️ Heat-pump sizer — deterministic, free, no upstream API. Self-contained
+  // import (no shared module batch needed).
+  if (config.tools.includes('calculate_heat_pump_sizing') || config.tools.includes('calculate_heating_cost_comparison')) {
+    try {
+      const calcMod = await import('../_shared/tools/calculator-tools.ts');
+      if (config.tools.includes('calculate_heat_pump_sizing')) tools.push(calcMod.createHeatPumpSizingTool(onChunk));
+      if (config.tools.includes('calculate_heating_cost_comparison')) tools.push(calcMod.createHeatingCostComparisonTool(onChunk));
+    } catch (calcErr) {
+      console.warn('⚠️ Could not register calculator tools:', calcErr);
+    }
+  }
+
   // 🧩 load_skill tool — injected whenever the agent has at least one skill
   // advertised in its system prompt. Kept above the other tools so it's the
   // first option the model considers when a task matches a skill.
@@ -1367,7 +1387,8 @@ async function executeAgent(
 
   // Knowledge Base search - always add first so agent checks KB before answering
   if (config.tools.includes('knowledge_base_search')) {
-    tools.push(createKnowledgeBaseSearchTool(workspaceId, isAdmin));
+    // agentId is passed so MIVAA can enforce per-doc allowed_agents allow-lists.
+    tools.push(createKnowledgeBaseSearchTool(workspaceId, isAdmin, agentId));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support
@@ -1705,6 +1726,66 @@ async function executeAgent(
     tools.push(createCostEstimationTool(workspaceId));
   }
 
+  // ─── Direct tool execution (deterministic run — no LLM) ──────────────────
+  // When the frontend fires a toolkit quick-start that carries a `run`
+  // descriptor, it posts mode:'direct_tool' with structured args instead of a
+  // chat message. We reuse the EXACT tool list built above — same toolkit
+  // gating, same RBAC (admin-only tools never got pushed for non-admins), same
+  // onChunk wiring — then find the requested tool and invoke it directly. The
+  // 403/404 guard is simply "tool not in the built list", so authorization is
+  // enforced by reuse, never re-implemented. The tool emits its own display
+  // chunk during invoke(), so the same result card renders with zero model
+  // latency or cost. zod (inside .invoke) is the input-validation boundary.
+  if (directTool) {
+    const matched = tools.find((t: any) => t.name === directTool.name);
+    if (!matched) {
+      try {
+        onChunk?.({
+          type: 'error',
+          error: 'tool_not_available',
+          message: `Tool "${directTool.name}" is not available for this agent or your role.`,
+        });
+      } catch { /* stream may be closed */ }
+      return {
+        text: `That action isn't available for your role or current agent.`,
+        toolResults: [],
+      };
+    }
+
+    try {
+      onChunk?.({ type: 'tool_call', tool: directTool.name, args: directTool.input, message: `Running ${directTool.name}...` });
+    } catch { /* stream may be closed */ }
+
+    let toolResult: string;
+    try {
+      toolResult = await matched.invoke(directTool.input);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Tool execution failed';
+      try {
+        onChunk?.({ type: 'error', error: 'tool_execution_failed', tool: directTool.name, message: msg });
+      } catch { /* stream may be closed */ }
+      return { text: `The "${directTool.name}" run failed: ${msg}`, toolResults: [] };
+    }
+
+    let parsed: any = null;
+    try { parsed = JSON.parse(toolResult); } catch { /* non-JSON tool result */ }
+
+    try {
+      onChunk?.({ type: 'tool_result', tool: directTool.name, result: toolResult, message: `${directTool.name} completed` });
+    } catch { /* stream may be closed */ }
+
+    // Prefer the tool's own human-readable message for the transcript line;
+    // fall back to a generic confirmation. The visual result comes from the
+    // tool's mid-stream display chunk, not from this text.
+    const summary = (parsed && typeof parsed.message === 'string' && parsed.message.trim())
+      ? parsed.message.trim()
+      : `Done — ran ${directTool.name}.`;
+
+    return {
+      text: summary,
+      toolResults: [{ tool: directTool.name, args: directTool.input, result: parsed ?? toolResult }],
+    };
+  }
 
   // Select model based on agent + per-turn complexity heuristic
   const selectedModel = getModelForAgent(agentId, messages, images);
@@ -2094,7 +2175,21 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null } = await req.json();
+    // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
+    // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
+    //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
+    //   executed directly (no model call); RBAC + toolkit gating still apply via
+    //   selected_toolkits — the frontend includes the owning toolkit id there.
+    const isDirectTool = mode === 'direct_tool';
+    if (isDirectTool) {
+      if (!direct_tool || typeof direct_tool.name !== 'string' || typeof direct_tool.input !== 'object' || direct_tool.input === null) {
+        return new Response(
+          JSON.stringify({ error: "mode 'direct_tool' requires direct_tool: { name: string, input: object }" }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
     // user_id: string | null — only honored when the caller authenticates with
     // the platform sb_secret_* admin key (server-to-server "act on behalf of"
     // pattern, same as generate-interior-gemini / generate-region-edit /
@@ -2377,6 +2472,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               generation_mode || undefined, // Explicit mode override from UI chip
               conversation_id, // Supabase conversation ID for background task dispatch
               selected_toolkits, // Per-turn user-selected toolkit IDs (primary toolkit-level gating)
+              isDirectTool ? { name: direct_tool.name, input: direct_tool.input } : null, // Deterministic single-tool run
             );
             if (finalResult) {
             }

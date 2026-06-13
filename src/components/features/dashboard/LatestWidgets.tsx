@@ -200,16 +200,32 @@ function KnowledgeWidget() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from('kb_docs')
-      .select('id, title, created_at, category_id')
-      .eq('status', 'published')
-      .order('created_at', { ascending: false })
-      .limit(6)
-      .then(({ data }) => {
-        setItems((data ?? []) as LatestDocument[]);
+    (async () => {
+      // Only surface docs that live in a PUBLIC category and are published +
+      // public-visibility — same rule as PublicKnowledgeBasePage. Internal
+      // (agent/admin) categories and private docs must never appear in this
+      // public-style feed.
+      const { data: pubCats } = await supabase
+        .from('kb_categories')
+        .select('id')
+        .eq('access_level', 'public');
+      const publicCategoryIds = (pubCats ?? []).map((c) => c.id);
+      if (publicCategoryIds.length === 0) {
+        setItems([]);
         setLoading(false);
-      });
+        return;
+      }
+      const { data } = await supabase
+        .from('kb_docs')
+        .select('id, title, created_at, category_id')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
+        .in('category_id', publicCategoryIds)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      setItems((data ?? []) as LatestDocument[]);
+      setLoading(false);
+    })();
   }, []);
 
   return (

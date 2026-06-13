@@ -110,6 +110,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [customerOptions, setCustomerOptions] = useState<Customer[]>([]);
   const [customerAddr, setCustomerAddr] = useState<any>(null);
   const [validatingVat, setValidatingVat] = useState(false);
+  // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
+  const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
+  const [buyerOutstanding, setBuyerOutstanding] = useState(0);
 
   // #193 — validate the counterpart's VAT via VIES before invoicing (caches onto crm_companies).
   const validateCounterpartVat = async () => {
@@ -273,15 +276,40 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return () => clearTimeout(t);
   }, [customerSearch, open]);
 
-  // Fetch the chosen customer's address (for preview + delivery prefill).
+  // Load the workspace's buyer risk-gate rules once per open.
   useEffect(() => {
-    if (!customer) { setCustomerAddr(null); return; }
+    if (!open) return;
+    (async () => {
+      try {
+        const s = await financeService.getSettings(workspaceId);
+        setRiskRules({
+          block_inactive: s.risk_block_inactive_vat,
+          block_unvalidated: s.risk_block_unvalidated_vat,
+          warn_over: s.risk_warn_over_credit_limit,
+          block_over: s.risk_block_over_credit_limit,
+        });
+      } catch { /* keep safe defaults */ }
+    })();
+  }, [open, workspaceId]);
+
+  // Fetch the chosen customer's address (for preview + delivery prefill) + their open balance.
+  useEffect(() => {
+    if (!customer) { setCustomerAddr(null); setBuyerOutstanding(0); return; }
     (async () => {
       const table = customer.type === 'company' ? 'crm_companies' : 'crm_contacts';
       const { data } = await supabase.from(table).select('*').eq('id', customer.id).maybeSingle();
       setCustomerAddr(data ?? null);
+      // Outstanding = sum of still-owed amounts on issued/partially-paid/overdue invoices.
+      const col = customer.type === 'company' ? 'customer_company_id' : 'customer_contact_id';
+      const { data: openRows } = await supabase
+        .from('invoices')
+        .select('amount_due')
+        .eq('workspace_id', workspaceId)
+        .eq(col, customer.id)
+        .in('status', ['issued', 'partially_paid', 'overdue']);
+      setBuyerOutstanding((openRows ?? []).reduce((s: number, r: any) => s + (Number(r.amount_due) || 0), 0));
     })();
-  }, [customer]);
+  }, [customer, workspaceId]);
 
   // Preview the series + next number for this doc type + establishment (read-only).
   useEffect(() => {
@@ -389,6 +417,31 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return { net, vat, fees, stamp, other, deduct, digital, withheld, total };
   }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee]);
 
+  // Buyer risk evaluation against the workspace rules. `vat_validated===false` means ΑΑΔΕ flagged
+  // the ΑΦΜ inactive (or VIES rejected it); `null` means it was never checked. Credit limit lives
+  // on the CRM company row; we compare current open balance + this invoice against it.
+  const buyerRisk = useMemo(() => {
+    const a = customerAddr;
+    const hasVat = !!a?.vat_number;
+    const inactiveVat = hasVat && a?.vat_validated === false;
+    const unvalidatedVat = hasVat && (a?.vat_validated === null || a?.vat_validated === undefined);
+    const creditLimit = a?.credit_limit != null ? Number(a.credit_limit) : null;
+    const projected = buyerOutstanding + (totals.total || 0);
+    const overCreditLimit = creditLimit != null && creditLimit > 0 && projected > creditLimit;
+    const blocks: string[] = [];
+    if (riskRules.block_inactive && inactiveVat) blocks.push('the buyer ΑΦΜ is inactive / not recognised');
+    if (riskRules.block_unvalidated && unvalidatedVat) blocks.push('the buyer VAT has never been validated');
+    if (riskRules.block_over && overCreditLimit) blocks.push('this invoice exceeds the buyer credit limit');
+    const warns: string[] = [];
+    if (riskRules.warn_over && !riskRules.block_over && overCreditLimit) {
+      warns.push(`Pushes the buyer to ${projected.toFixed(2)} ${currency}, over their ${creditLimit!.toFixed(2)} ${currency} credit limit.`);
+    }
+    if (unvalidatedVat && !riskRules.block_unvalidated) {
+      warns.push('Buyer VAT has not been validated against ΑΑΔΕ/VIES.');
+    }
+    return { inactiveVat, unvalidatedVat, overCreditLimit, creditLimit, projected, blocks, warns, hardBlocked: blocks.length > 0 };
+  }, [customerAddr, buyerOutstanding, totals.total, riskRules, currency]);
+
   // Apply the configured default withholding for the active doc type once the doc-type
   // defaults have loaded (covers the common case where the operator never changes the
   // doc-type Select). Preserves an explicit choice via `cur ||`. #207
@@ -412,6 +465,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!customer) { toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseFloat(l.quantity) > 0);
     if (clean.length === 0) { toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    if (buyerRisk.hardBlocked) {
+      toast({
+        title: 'Invoice blocked by risk check',
+        description: `Cannot issue because ${buyerRisk.blocks.join('; ')}. Fix the buyer in CRM, or relax the rule under Finance → Settings → Buyer risk checks.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       setBusy(true);
       // Use a DERIVED draft number (no counter advance). The gapless myDATA series/aa is
@@ -560,6 +621,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={validatingVat} onClick={validateCounterpartVat}>
                         {validatingVat ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Validate via VIES'}
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Buyer risk gate (ΑΑΔΕ status + credit limit). Hard blocks are red and disable
+                      issuance; soft warnings are amber and informational. Rules: Finance → Settings. */}
+                  {buyerRisk.hardBlocked && (
+                    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      <strong>Issuance blocked:</strong> {buyerRisk.blocks.join('; ')}. Fix the buyer in CRM or change the rule under Finance → Settings.
+                    </div>
+                  )}
+                  {!buyerRisk.hardBlocked && buyerRisk.warns.length > 0 && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+                      {buyerRisk.warns.map((w, i) => <div key={i}>⚠ {w}</div>)}
                     </div>
                   )}
                 </div>
@@ -984,7 +1058,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
         <DialogFooter className="border-t border-border/60 px-5 py-3">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSave} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
+          <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked} title={buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

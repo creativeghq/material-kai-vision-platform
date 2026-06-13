@@ -475,7 +475,7 @@ Complete documentation for Material Kai Vision Platform.
 - Invoices, credit notes (5.1/5.2), delivery notes (9.3), retail receipts (11.1)
 - Inbound `RequestDocs` sync, supplier bills + credit notes
 - Reports: VAT (ΦΠΑ), myDATA reconciliation, ledgers (καρτέλα), accounting export (γέφυρες)
-- Replaced the removed Oxygen connector
+- Replaced a removed legacy ERP connector
 
 **[pos-retail-system.md](pos-retail-system.md)** - POS / retail ✨ NEW (2026-06)
 - vPOS shifts + cash drawer + X/Z reports; Law 5155 card/IRIS signature flow; EFT-POS registry; thermal receipt

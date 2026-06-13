@@ -1,17 +1,18 @@
 /**
- * #205 / #207 — cloud POS (Ταμειακή Online), rebuilt to mirror the Oxygen vPOS
- * register layout: a two-panel cash register (left = transaction + numeric keypad,
- * right = product/category catalog). Issues a myDATA retail receipt — ΑΛΠ (11.1
- * Απόδειξη Λιανικής Πώλησης) or ΑΠΥ (11.2 Απόδειξη Παροχής Υπηρεσιών) — records the
- * cash/card/IRIS payment and prints. Reuses the existing invoice + fiscal-submit +
- * payment + cashier-shift (X/Z) machinery; only the UI was reshaped to match Oxygen.
+ * #205 / #207 — cloud POS (Ταμειακή Online): a two-panel cash register (left =
+ * transaction + numeric keypad, right = product/category catalog). Issues a myDATA
+ * retail receipt — ΑΛΠ (11.1 Απόδειξη Λιανικής Πώλησης) or ΑΠΥ (11.2 Απόδειξη Παροχής
+ * Υπηρεσιών) — records the cash/card/IRIS payment and prints. Reuses the existing
+ * invoice + fiscal-submit + payment + cashier-shift (X/Z) machinery.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Loader2, Trash2, Search, Printer, CheckCircle2, Wrench, Package,
   Delete, User, Wifi, CreditCard, ScanLine, X as XIcon, Plus, Minus,
+  Mail, Smartphone, ShoppingBag,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -39,6 +40,17 @@ interface SellItem {
   inc_cat: string | null;
 }
 interface CartLine extends SellItem { qty: number; line_vat: number; }
+
+// Issuer identity printed on the thermal receipt header (from finance_settings).
+interface Issuer {
+  name: string; vat: string; tax_office: string; profession: string;
+  address: string; street_number: string; postal_code: string; city: string; country: string;
+  phone: string; email: string; gemi: string; company_type: string;
+}
+
+// Thermal printer paper width. Greek receipt rolls are 80mm or 58mm.
+const PRINT_SIZES = { '80': '80mm', '58': '58mm' } as const;
+type PrintSize = keyof typeof PRINT_SIZES;
 
 // Document types selectable on the register (myDATA retail family).
 const DOC_TYPES = {
@@ -73,7 +85,8 @@ const PosPage: React.FC = () => {
   const [terminalId, setTerminalId] = useState<string>('');
   const [awaiting, setAwaiting] = useState<{
     posSignatureId: string; invoiceId: string; number: string; total: number; currency: string;
-    net: number; vat: number; method: 'card' | 'iris'; lines: { name: string; qty: number; unit_price: number }[];
+    net: number; vat: number; method: 'card' | 'iris'; vatRate: number; docType: DocType; customerName: string | null;
+    lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
   } | null>(null);
   const [txnId, setTxnId] = useState('');
   const [completing, setCompleting] = useState(false);
@@ -86,12 +99,18 @@ const PosPage: React.FC = () => {
   const [session, setSession] = useState<PosSession | null>(null);
   const [zReport, setZReport] = useState<PosReport | null>(null);
   const [result, setResult] = useState<{
+    invoiceId: string;
     number: string; total: number; currency: string; mark: string | null;
+    uid: string | null; qrUrl: string | null;
     net: number; vat: number; method: 'cash' | 'card' | 'iris'; issuedAt: string;
-    lines: { name: string; qty: number; unit_price: number }[];
+    vatRate: number; docType: DocType; customerName: string | null;
+    lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
   } | null>(null);
+  const [issuer, setIssuer] = useState<Issuer | null>(null);
+  const [printSize, setPrintSize] = useState<PrintSize>('80');
+  const [emailing, setEmailing] = useState(false);
 
-  // ── Register UI state (Oxygen-style) ──────────────────────────────────────
+  // ── Register UI state ─────────────────────────────────────────────────────
   const [docType, setDocType] = useState<DocType>('11.1');
   const [docTypeOpen, setDocTypeOpen] = useState(false);
   const [display, setDisplay] = useState('');         // numeric keypad entry
@@ -101,6 +120,8 @@ const PosPage: React.FC = () => {
   const [custOpen, setCustOpen] = useState(false);
   const [custQuery, setCustQuery] = useState('');
   const [custResults, setCustResults] = useState<{ party_type: string; party_id: string; display_name: string }[]>([]);
+  // Mobile: the register and the catalog each take the full width — switch between them.
+  const [mobilePane, setMobilePane] = useState<'register' | 'catalog'>('register');
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
@@ -112,11 +133,21 @@ const PosPage: React.FC = () => {
           .from('product_prices')
           .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
           .eq('workspace_id', activeWorkspaceId),
-        supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', activeWorkspaceId).maybeSingle(),
+        supabase.from('finance_settings').select(
+          'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_company_type',
+        ).eq('workspace_id', activeWorkspaceId).maybeSingle(),
         invoicingSetupService.listBranches(activeWorkspaceId).catch(() => [] as FinanceBranch[]),
       ]);
       if (cancelled) return;
       setBranches(br);
+      setIssuer(fs ? {
+        name: [fs.business_name, fs.business_company_type].filter(Boolean).join(' ') || (fs.business_name ?? ''),
+        vat: fs.business_vat ?? '', tax_office: fs.business_tax_office ?? '', profession: fs.business_profession ?? '',
+        address: fs.business_address ?? '', street_number: fs.business_street_number ?? '',
+        postal_code: fs.business_postal_code ?? '', city: fs.business_city ?? '', country: fs.business_country ?? '',
+        phone: fs.business_phone ?? '', email: fs.business_email ?? '', gemi: fs.business_gemi ?? '',
+        company_type: fs.business_company_type ?? '',
+      } : null);
       const sell: SellItem[] = (prices ?? [])
         .filter((r: any) => r.product && r.list_price != null)
         .map((r: any) => ({
@@ -335,9 +366,10 @@ const PosPage: React.FC = () => {
       if (itErr) throw itErr;
 
       const snapshot = {
+        invoiceId: invoice.id,
         number: num?.formatted as string, total: totals.total, currency,
-        net: totals.net, vat: totals.vat,
-        lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price })),
+        net: totals.net, vat: totals.vat, vatRate, docType, customerName: customer?.name ?? null,
+        lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price, line_vat: l.line_vat })),
       };
 
       setIssueOpen(false);
@@ -379,7 +411,11 @@ const PosPage: React.FC = () => {
 
   const finalizeSale = async (
     invoiceId: string,
-    snapshot: { number: string; total: number; currency: string; net: number; vat: number; lines: { name: string; qty: number; unit_price: number }[] },
+    snapshot: {
+      number: string; total: number; currency: string; net: number; vat: number;
+      vatRate: number; docType: DocType; customerName: string | null;
+      lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
+    },
     paidMethod: 'cash' | 'card' | 'iris',
     mark: string | null,
   ) => {
@@ -391,9 +427,17 @@ const PosPage: React.FC = () => {
         allocations: [{ target_id: invoiceId, target_type: 'invoice', amount: snapshot.total }],
       });
     } catch { /* non-fatal */ }
-    setResult({ ...snapshot, mark, method: paidMethod, issuedAt: new Date().toLocaleString() });
+    // The fiscal MARK/UID/QR are persisted on the invoice by finance-issue-invoice; re-read
+    // them so the printed receipt carries the authoritative values (mark arg is a fast path).
+    let uid: string | null = null; let qrUrl: string | null = null; let finalMark = mark;
+    try {
+      const { data: inv } = await supabase.from('invoices')
+        .select('fiscal_mark, fiscal_uid, fiscal_qr_url').eq('id', invoiceId).maybeSingle();
+      if (inv) { finalMark = inv.fiscal_mark ?? mark; uid = inv.fiscal_uid ?? null; qrUrl = inv.fiscal_qr_url ?? null; }
+    } catch { /* non-fatal — fall back to the passed mark */ }
+    setResult({ ...snapshot, invoiceId, mark: finalMark, uid, qrUrl, method: paidMethod, issuedAt: new Date().toLocaleString() });
     resetSale();
-    toast({ title: 'Receipt issued', description: mark ? `MARK ${mark}` : 'Saved (myDATA pending)' });
+    toast({ title: 'Receipt issued', description: finalMark ? `MARK ${finalMark}` : 'Saved (myDATA pending)' });
   };
 
   const chargeAndComplete = async () => {
@@ -416,10 +460,34 @@ const PosPage: React.FC = () => {
   };
   const cancelAwaiting = () => { setAwaiting(null); setTxnId(''); };
 
+  // ── Share by email (ΑΠΟΣΤΟΛΗ) — reuses the finance-send-invoice-email function. ──
+  const sendEmail = async (to?: string) => {
+    if (!result) return;
+    setEmailing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', {
+        body: { invoice_id: result.invoiceId, ...(to ? { to } : {}) },
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; sent_to?: string; error?: string };
+      // No customer email on file → ask for an address once and retry.
+      if (!res?.ok && /no customer email/i.test(res?.error ?? '')) {
+        const addr = window.prompt('Send receipt to email address:', '');
+        if (addr && addr.trim()) { setEmailing(false); return sendEmail(addr.trim()); }
+        toast({ title: 'No email address', variant: 'destructive' });
+        return;
+      }
+      if (!res?.ok) throw new Error(res?.error ?? 'Email send failed');
+      toast({ title: 'Receipt sent', description: res.sent_to });
+    } catch (err: any) {
+      toast({ title: 'Could not send', description: err?.message, variant: 'destructive' });
+    } finally { setEmailing(false); }
+  };
+
   // Keypad button
   const Key: React.FC<{ onClick: () => void; className?: string; children: React.ReactNode }> = ({ onClick, className, children }) => (
     <button type="button" onClick={onClick}
-      className={`flex items-center justify-center rounded-md text-xl font-medium transition-colors active:scale-[0.98] ${className ?? 'bg-neutral-700 text-white hover:bg-neutral-600'}`}>
+      className={`flex min-h-[3.25rem] items-center justify-center rounded-md text-xl font-medium transition-colors active:scale-[0.98] ${className ?? 'bg-neutral-700 text-white hover:bg-neutral-600'}`}>
       {children}
     </button>
   );
@@ -456,10 +524,25 @@ const PosPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile pane switch — register and catalog each take the full width on phones. */}
+      <div className="px-3 pt-3 lg:hidden">
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 bg-card p-1">
+          <button type="button" onClick={() => setMobilePane('register')}
+            className={`flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors ${mobilePane === 'register' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+            <CreditCard className="h-4 w-4" /> Ταμείο
+            {cart.length > 0 && <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">{cart.length}</Badge>}
+          </button>
+          <button type="button" onClick={() => setMobilePane('catalog')}
+            className={`flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors ${mobilePane === 'catalog' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+            <ShoppingBag className="h-4 w-4" /> Προϊόντα
+          </button>
+        </div>
+      </div>
+
       {/* ── Two-panel register ── */}
       <div className="grid grid-cols-1 gap-3 p-3 sm:p-6 lg:grid-cols-[minmax(0,460px)_1fr]">
-        {/* LEFT — transaction + keypad (dark, like Oxygen) */}
-        <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 text-white">
+        {/* LEFT — transaction + keypad (dark register) */}
+        <div className={`overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 text-white ${mobilePane === 'register' ? '' : 'hidden'} lg:block`}>
           {/* top bar */}
           <div className="flex items-center gap-2 bg-neutral-950/60 px-3 py-2">
             <button type="button" onClick={() => setDocTypeOpen(true)}
@@ -540,7 +623,7 @@ const PosPage: React.FC = () => {
         </div>
 
         {/* RIGHT — product / category catalog (light) */}
-        <Card className="overflow-hidden">
+        <Card className={`overflow-hidden ${mobilePane === 'catalog' ? '' : 'hidden'} lg:block`}>
           <CardContent className="space-y-3 p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -566,6 +649,14 @@ const PosPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+            )}
+            {/* Mobile: jump back to the register after adding items. */}
+            {cart.length > 0 && (
+              <button type="button" onClick={() => setMobilePane('register')}
+                className="flex w-full items-center justify-between rounded-lg bg-primary px-4 py-3 text-primary-foreground lg:hidden">
+                <span className="text-sm font-medium">{cart.reduce((s, l) => s + l.qty, 0)} είδη στο ταμείο</span>
+                <span className="flex items-center gap-2 font-semibold tabular-nums">{formatMoney(totals.total, currency)} <CreditCard className="h-4 w-4" /></span>
+              </button>
             )}
           </CardContent>
         </Card>
@@ -679,45 +770,77 @@ const PosPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Held card/IRIS receipt (Law-5155 terminal charge) ── */}
+      {/* ── Held card/IRIS receipt (Law-5155) — charge the terminal, then finalize → MARK ── */}
       <Dialog open={!!awaiting} onOpenChange={(o) => !o && cancelAwaiting()}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Receipt {awaiting?.number} signed</DialogTitle></DialogHeader>
+        <DialogContent className="max-h-[92vh] max-w-sm overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {awaiting?.method === 'iris' ? <Smartphone className="h-5 w-5 text-primary" /> : <CreditCard className="h-5 w-5 text-primary" />}
+              {awaiting?.method === 'iris' ? 'Πληρωμή IRIS' : 'Πληρωμή με κάρτα'}
+            </DialogTitle>
+          </DialogHeader>
           {awaiting && (
-            <div className="space-y-3">
-              <div className="text-2xl font-semibold">{formatMoney(awaiting.total, awaiting.currency)}</div>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-center">
+                <div className="text-xs text-muted-foreground">Απόδειξη {awaiting.number}</div>
+                <div className="text-3xl font-semibold tabular-nums">{formatMoney(awaiting.total, awaiting.currency)}</div>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Charge {formatMoney(awaiting.total, awaiting.currency)} on the EFT-POS terminal
-                {selectedTerminal ? <> (<span className="font-mono">{selectedTerminal.label}</span>)</> : null}. When it approves,
-                confirm below to transmit the {awaiting.method === 'iris' ? 'IRIS' : 'card'} receipt to myDATA.
+                Χρεώστε το ποσό στο τερματικό POS
+                {selectedTerminal ? <> (<span className="font-mono">{selectedTerminal.label}</span>)</> : null}. Μόλις εγκριθεί,
+                πατήστε <strong>ΕΞΟΦΛΗΣΗ POS</strong> για να ολοκληρωθεί η {awaiting.method === 'iris' ? 'IRIS' : 'κάρτα'} και να σταλεί στο myDATA.
               </p>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Terminal transaction ID (optional)</label>
-                <Input className="h-8 text-xs font-mono" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the terminal receipt" />
+                <label className="text-xs text-muted-foreground">Κωδικός συναλλαγής τερματικού (προαιρετικό)</label>
+                <Input className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="από την απόδειξη του POS" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={chargeAndComplete} disabled={completing}>
+                  {completing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />} ΕΞΟΦΛΗΣΗ POS
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={cancelAwaiting} disabled={completing}>Άκυρο</Button>
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={cancelAwaiting} disabled={completing}>Cancel</Button>
-            <Button onClick={chargeAndComplete} disabled={completing}>
-              {completing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Charge cleared — finalize
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Success dialog ── */}
+      {/* ── Success dialog — action grid (print / email / new) ── */}
       <Dialog open={!!result} onOpenChange={(o) => !o && setResult(null)}>
-        <DialogContent className="max-w-sm">
-          <div className="space-y-3 py-2 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
-            <div className="text-sm font-medium">Receipt {result?.number} issued</div>
-            <div className="text-2xl font-semibold">{result ? formatMoney(result.total, result.currency) : ''}</div>
-            {result?.mark ? <Badge variant="outline" className="font-mono text-[11px]">MARK {result.mark}</Badge> : <Badge variant="outline">myDATA pending</Badge>}
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" /> Print</Button>
-              <Button className="flex-1" onClick={() => setResult(null)}>New sale</Button>
+        <DialogContent className="max-h-[92vh] max-w-sm overflow-y-auto">
+          <div className="space-y-4 py-1 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+            <div>
+              <div className="text-sm font-medium">Το παραστατικό δημιουργήθηκε</div>
+              <div className="text-xs text-muted-foreground"># {result?.number}</div>
             </div>
+            <div className="text-3xl font-semibold tabular-nums">{result ? formatMoney(result.total, result.currency) : ''}</div>
+            {result?.mark
+              ? <Badge variant="outline" className="font-mono text-[11px]">ΥΠΟΒΛΗΘΗΚΕ ΣΤΟ myDATA · MARK {result.mark}</Badge>
+              : <Badge variant="outline">myDATA pending</Badge>}
+
+            {/* Thermal printer paper size */}
+            <div className="flex items-center justify-center gap-2 pt-1 text-xs text-muted-foreground">
+              <Printer className="h-3.5 w-3.5" /> Μέγεθος χαρτιού
+              <Select value={printSize} onValueChange={(v: PrintSize) => setPrintSize(v)}>
+                <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PRINT_SIZES) as PrintSize[]).map((k) => (
+                    <SelectItem key={k} value={k}>{PRINT_SIZES[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => window.print()}>
+                <Printer className="h-5 w-5" /> <span className="text-xs">ΕΚΤΥΠΩΣΗ</span>
+              </Button>
+              <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => sendEmail()} disabled={emailing}>
+                {emailing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />} <span className="text-xs">ΑΠΟΣΤΟΛΗ</span>
+              </Button>
+            </div>
+            <Button className="h-12 w-full text-base font-semibold" onClick={() => setResult(null)}>ΝΕΑ</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -748,37 +871,105 @@ const PosPage: React.FC = () => {
         </Dialog>
       )}
 
-      {/* Thermal-friendly receipt — hidden on screen, the ONLY thing printed. */}
+      {/* Thermal-friendly receipt — hidden on screen, the ONLY thing printed.
+          Width + font follow the selected paper size (80mm / 58mm). */}
       <style>{`
         #pos-receipt { display: none; }
         @media print {
           body * { visibility: hidden !important; }
           #pos-receipt, #pos-receipt * { visibility: visible !important; }
-          #pos-receipt { display: block !important; position: absolute; left: 0; top: 0; width: 80mm; padding: 6mm 4mm; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
-          @page { size: 80mm auto; margin: 0; }
+          #pos-receipt {
+            display: block !important; position: absolute; left: 0; top: 0;
+            width: ${PRINT_SIZES[printSize]};
+            padding: ${printSize === '58' ? '3mm 3mm' : '4mm 5mm'};
+            font-family: 'Courier New', monospace;
+            font-size: ${printSize === '58' ? '10px' : '12px'};
+            line-height: 1.35; color: #000;
+          }
+          #pos-receipt .r-row { display: flex; justify-content: space-between; gap: 6px; }
+          #pos-receipt .r-sep { border-top: 1px dashed #000; margin: 4px 0; }
+          #pos-receipt .r-c { text-align: center; }
+          #pos-receipt .r-b { font-weight: 700; }
+          @page { size: ${PRINT_SIZES[printSize]} auto; margin: 0; }
         }
       `}</style>
-      {result && (
-        <div id="pos-receipt" aria-hidden="true">
-          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>{DOC_TYPES[docType].code} / RECEIPT</div>
-          <div style={{ textAlign: 'center', marginBottom: 6 }}>No. {result.number}</div>
-          <div>{result.issuedAt}</div>
-          <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '4px 0' }}>
+      {result && (() => {
+        const payLabel = result.method === 'cash' ? 'Μετρητά' : result.method === 'iris' ? 'IRIS' : 'Κάρτα';
+        const addrLine = [
+          [issuer?.address, issuer?.street_number].filter(Boolean).join(' '),
+          issuer?.city, issuer?.postal_code, issuer?.country,
+        ].filter(Boolean).join(' ');
+        const num2 = (n: number) => Number(n ?? 0).toFixed(2);
+        return (
+          <div id="pos-receipt" aria-hidden="true">
+            <div className="r-c r-b" style={{ fontSize: printSize === '58' ? 12 : 14 }}>{DOC_TYPES[result.docType].label}</div>
+            <div className="r-c">----------</div>
+
+            {/* Issuer */}
+            {issuer && (
+              <div className="r-c" style={{ marginTop: 4 }}>
+                {issuer.name && <div className="r-b">{issuer.name}</div>}
+                {issuer.profession && <div>{issuer.profession}</div>}
+                <div>ΑΦΜ: {issuer.vat || '—'}{issuer.tax_office ? ` ΔΟΥ: ${issuer.tax_office}` : ''}</div>
+                {addrLine && <div>{addrLine}</div>}
+                {(issuer.phone || issuer.email) && <div>{[issuer.phone, issuer.email].filter(Boolean).join('  ')}</div>}
+                {issuer.gemi && <div>Γ.Ε.ΜΗ.: {issuer.gemi}</div>}
+              </div>
+            )}
+            <div className="r-c">---</div>
+
+            {/* Number + date */}
+            <div className="r-row"><span>Αριθμός: {result.number}</span></div>
+            <div className="r-row"><span>{result.issuedAt}</span></div>
+
+            {/* Lines */}
+            <div className="r-sep" />
+            <div className="r-row r-b"><span>ΠΕΡΙΓΡΑΦΗ</span><span>ΑΞΙΕΣ</span></div>
+            <div className="r-sep" />
             {result.lines.map((l, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{l.qty} × {l.name}</span>
+              <div className="r-row" key={i}>
+                <span>{num2(l.qty)} x {l.name} {l.line_vat}%</span>
                 <span>{formatMoney(l.unit_price * l.qty, result.currency)}</span>
               </div>
             ))}
+            <div className="r-sep" />
+
+            {/* Totals */}
+            <div className="r-row"><span>ΚΑΘΑΡΗ ΑΞΙΑ</span><span>{formatMoney(result.net, result.currency)}</span></div>
+            <div className="r-row"><span>ΣΥΝΟΛΟ ΦΠΑ</span><span>{formatMoney(result.vat, result.currency)}</span></div>
+            <div className="r-row r-b"><span>ΣΥΝΟΛΙΚΗ ΑΞΙΑ</span><span>{formatMoney(result.total, result.currency)}</span></div>
+            <div className="r-row"><span>Τρόπος πληρωμής</span><span>{payLabel}</span></div>
+
+            {/* VAT analysis */}
+            <div className="r-c r-b" style={{ marginTop: 6 }}>== ΑΝΑΛΥΣΗ ΦΠΑ ==</div>
+            <div className="r-row" style={{ fontSize: printSize === '58' ? 9 : 11 }}>
+              <span>ΚΑΘΑΡΗ €</span><span>ΦΠΑ %</span><span>ΠΟΣΟ ΦΠΑ €</span><span>ΤΕΛΙΚΗ €</span>
+            </div>
+            <div className="r-row">
+              <span>{num2(result.net)}</span><span>{num2(result.vatRate)}</span><span>{num2(result.vat)}</span><span>{num2(result.total)}</span>
+            </div>
+
+            <div className="r-c r-b" style={{ marginTop: 6 }}>ΕΥΧΑΡΙΣΤΟΥΜΕ</div>
+
+            {/* myDATA provenance */}
+            <div className="r-sep" />
+            {result.mark
+              ? <div style={{ wordBreak: 'break-all' }}>MARK: {result.mark}</div>
+              : <div>ΥΠΟΒΟΛΗ ΣΤΟ myDATA: ΣΕ ΕΞΕΛΙΞΗ</div>}
+            {result.uid && <div style={{ wordBreak: 'break-all' }}>UID: {result.uid}</div>}
+            <div style={{ marginTop: 2 }}>ΠΑΡΟΧΟΣ ΗΛ. ΤΙΜΟΛΟΓΗΣΗΣ: NOVUS</div>
+
+            {/* Authenticity */}
+            {result.qrUrl && (
+              <div className="r-c" style={{ marginTop: 6 }}>
+                <div>ΕΛΕΓΧΟΣ ΑΥΘΕΝΤΙΚΟΤΗΤΑΣ:</div>
+                <div style={{ wordBreak: 'break-all', marginBottom: 4 }}>{result.qrUrl}</div>
+                <QRCodeSVG value={result.qrUrl} size={printSize === '58' ? 96 : 120} level="M" />
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Net</span><span>{formatMoney(result.net, result.currency)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT</span><span>{formatMoney(result.vat, result.currency)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}><span>TOTAL</span><span>{formatMoney(result.total, result.currency)}</span></div>
-          <div style={{ marginTop: 4 }}>Paid: {result.method === 'cash' ? 'Cash' : result.method === 'iris' ? 'IRIS' : 'Card'}</div>
-          {result.mark && <div style={{ marginTop: 6, wordBreak: 'break-all' }}>MARK: {result.mark}</div>}
-          <div style={{ textAlign: 'center', marginTop: 8 }}>Thank you!</div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

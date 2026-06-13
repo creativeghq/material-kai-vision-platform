@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature, PackageCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -26,12 +26,13 @@ import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryN
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
+import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 
-type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'delivery_notes' | 'cheques' | 'expenses';
+type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
 const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?: string }>; enabled: boolean }[] = [
   { key: 'invoices', label: 'Invoices', icon: FileText, enabled: true },
@@ -39,6 +40,7 @@ const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?
   { key: 'credit_notes', label: 'Credit notes', icon: FileMinus, enabled: true },
   { key: 'payments', label: 'Payments', icon: Banknote, enabled: true },
   { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
+  { key: 'dispatch', label: 'Dispatch board', icon: PackageCheck, enabled: true },
   { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: true },
   { key: 'cheques', label: 'Cheques', icon: FileSignature, enabled: true },
 ];
@@ -171,6 +173,9 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
               </div>
             </div>
 
+            {type === 'dispatch' ? (
+              activeWorkspaceId ? <DispatchBoard workspaceId={activeWorkspaceId} readOnly={isAccountant} /> : null
+            ) : (
             <Card>
               <CardContent className="p-0">
                 {loading || wsLoading ? (
@@ -222,6 +227,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                 )}
               </CardContent>
             </Card>
+            )}
           </div>
         </div>
       </div>

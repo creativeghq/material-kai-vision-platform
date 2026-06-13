@@ -905,7 +905,7 @@ Complete reference of all platform features and capabilities.
 **Documentation**: See `docs/finance-system.md` and related cluster
 
 **Components:**
-- ✅ **Greek e-invoicing** — AADE/myDATA direct transmission via Novus connector (per-tenant issuer VAT + TaxisNet authorization). Replaced the removed Oxygen ERP connector (2026-06-07).
+- ✅ **Greek e-invoicing** — AADE/myDATA direct transmission via Novus connector (per-tenant issuer VAT + TaxisNet authorization). Replaced a removed legacy ERP connector (2026-06-07).
 - ✅ **POS** — Two-panel cash register (`docs/pos-retail-system.md`)
 - ✅ **Online Storefront** (`docs/online-storefront.md`)
 - ✅ **Warehouse & Billing** (`docs/warehouse-and-billing.md`)

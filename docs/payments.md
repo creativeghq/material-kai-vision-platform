@@ -249,7 +249,7 @@ Applied via `mcp__supabase__apply_migration` per the platform's [SQL workflow ru
 |---|---|
 | **`payments-stripe`** | Sibling. Owns Stripe-specific config + secrets. Declares `provides.payments=true`. |
 | **`sales-finance`** | Shares storage on `finance_settings` (business details + invoice config). Finance's `SettingsTab` and Payments' `BusinessDetailsPanel`/`InvoicingPanel` edit the same rows. STRIPE_SECRET_KEY linked here too for the pay-token flow. |
-| **(any ERP module)** | A module that declares `provides.invoicing=true` in its manifest wins the active-invoice-provider role when enabled. (None ships today — the Oxygen ERP connector was removed 2026-06-07; e-Invoicing to AADE/myDATA goes through the Novus connector, not a per-tenant ERP.) |
+| **(any ERP module)** | A module that declares `provides.invoicing=true` in its manifest wins the active-invoice-provider role when enabled. (None ships today — a legacy ERP connector was removed 2026-06-07; e-Invoicing to AADE/myDATA goes through the Novus connector, not a per-tenant ERP.) |
 | **`quotes`** | The `IssueInvoiceButton` on the quote admin page is a consumer of `useInvoiceProvider()` — hides for new quotes when ERP wins. |
 | **Stripe edge functions** | `stripe-checkout`, `stripe-webhooks`, `stripe-customer-portal`, `finance-pay-invoice` — unchanged behaviour. Read STRIPE_* secrets via env, bootstrapped from `platform_secrets` regardless of module slug. |
 

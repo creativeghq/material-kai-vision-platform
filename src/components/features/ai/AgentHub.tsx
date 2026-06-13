@@ -79,8 +79,8 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 // PromptBuilderModal as the "Prompt Library" tab.
 import { ToolkitPickerModal } from './ToolkitPickerModal';
 import {
-  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents,
-  type ToolkitDefinition,
+  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, buildToolInput,
+  type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
 import { WorkflowWizardCard } from './workflows/WorkflowWizardCard';
@@ -95,6 +95,8 @@ import type {
 } from './workflows/types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
+import { HeatPumpResultCard } from './HeatPumpResultCard';
+import { HeatingCostResultCard } from './HeatingCostResultCard';
 import { SearchSpecCard } from './SearchSpecCard';
 import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
 import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageCandidatesCard';
@@ -275,6 +277,14 @@ interface Message {
     room_type?: string | null;
     focus?: string;
   }; // Design inspiration URL analysis
+  heatPumpData?: {
+    input: Record<string, unknown>;
+    result: import('@/lib/calculators/heatPumpSizing').HeatPumpSizingResult;
+  }; // Heat-pump sizing estimate
+  heatingCostData?: {
+    input: Record<string, unknown>;
+    result: import('@/lib/calculators/heatingCostComparison').HeatingCostResult;
+  }; // Heating-method cost comparison
   searchSpec?: {
     intent: string;
     color_keywords?: string[];
@@ -483,6 +493,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
   // Generic collect-then-send form for toolkit quick-starts that declare a `form`.
   const [toolkitFormState, setToolkitFormState] = useState<ToolkitFormModalState>(null);
+  // Pending deterministic tool run (mode:'direct_tool'). Set by a quick-start
+  // with a `run` descriptor, consumed once by handleSendMessage on the next tick.
+  const pendingDirectRunRef = useRef<{
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    label: string;
+    toolkitId: string;
+  } | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -556,6 +574,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
     }
   }, [selectedAgent, activeToolkits, currentConversationId]);
+
+  // Fire a deterministic tool run for a quick-start that carries a `run`
+  // descriptor. Used by the formless run quick-starts (e.g. "List my projects")
+  // where there's nothing to collect — stash the payload + trigger the same
+  // send pipeline in mode:'direct_tool'. Returns true if a run was fired.
+  // (Form-bearing run quick-starts go through ToolkitFormModal → onRunTool.)
+  const fireDirectRun = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition): boolean => {
+    if (!qs.run) return false;
+    pendingDirectRunRef.current = {
+      toolName: qs.run.tool,
+      toolInput: buildToolInput(qs.run, {}),
+      label: qs.label,
+      toolkitId: tk.id,
+    };
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+    return true;
+  }, []);
 
   // Toolkit setter — writes to local state, persists to localStorage (browser
   // default for new chats), and saves to the current conversation's row when
@@ -1480,15 +1515,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, []);
 
   const handleSendMessage = useCallback(async () => {
-    if (!input.trim() && attachedImages.length === 0) {
+    // Consume any pending deterministic tool run (set by a quick-start carrying a
+    // `run` descriptor). When present we fire mode:'direct_tool' instead of an
+    // LLM turn — the same stream pipeline below renders the same result cards.
+    const directRun = pendingDirectRunRef.current;
+    pendingDirectRunRef.current = null;
+
+    if (!directRun && !input.trim() && attachedImages.length === 0) {
       return;
     }
     if (!userId) {
       return;
     }
 
-    const userInput = input;
-    const userAttachedImages = [...attachedImages];
+    // For a direct run the chat shows a compact "▶ <label>" chip instead of typed text.
+    const userInput = directRun ? `▶ ${directRun.label}` : input;
+    const userAttachedImages = directRun ? [] : [...attachedImages];
 
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -1594,7 +1636,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Check cache for similar queries (only for search-type queries without images)
       const workspaceId = session.user?.user_metadata?.workspace_id;
-      const canUseCache = userAttachedImages.length === 0 && selectedAgent === 'kai';
+      const canUseCache = !directRun && userAttachedImages.length === 0 && selectedAgent === 'kai';
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
       let pendingSearchSpec: Message['searchSpec'] | null = null;
@@ -1638,7 +1680,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // Always includes the always-on Core toolkit. Single source of truth for
           // tool gating; the per-tool restriction picker was removed 2026-05-09 in
           // favor of the visual toolkit picker + load_toolkit meta-tool.
-          selected_toolkits: activeToolkits,
+          // For a direct run we also force-include the owning toolkit so the server
+          // binds the target tool even if the user hasn't pre-enabled that cluster.
+          selected_toolkits: directRun
+            ? Array.from(new Set([...(activeToolkits || []), directRun.toolkitId]))
+            : activeToolkits,
+          // Deterministic single-tool run — skips the LLM. RBAC still enforced
+          // server-side (admin-only tools never bind for non-admins).
+          ...(directRun
+            ? { mode: 'direct_tool', direct_tool: { name: directRun.toolName, input: directRun.toolInput } }
+            : {}),
         };
 
         // Call Supabase Edge Function for agent execution with STREAMING
@@ -2011,6 +2062,49 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     role: 'assistant',
                     content: inspirationMsg.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, inspirationData: inspirationMsg.inspirationData },
+                  });
+                }
+              // Handle heat_pump_sizing — deterministic capacity estimate
+              } else if (chunk.type === 'heat_pump_sizing') {
+                const r = chunk.result;
+                const heatPumpMsg: Message = {
+                  id: `msg-heatpump-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Estimated heat-pump capacity: ${r?.recommendedRange?.minKW}–${r?.recommendedRange?.maxKW} kW (design load ${r?.totalDesignKW} kW).`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  heatPumpData: { input: chunk.input, result: r },
+                };
+                setMessages(prev => [...prev, heatPumpMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: heatPumpMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, heatPumpData: heatPumpMsg.heatPumpData },
+                  });
+                }
+              // Handle heating_cost_comparison — annual running-cost comparison
+              } else if (chunk.type === 'heating_cost_comparison') {
+                const r = chunk.result;
+                const cheapest = r?.cheapest;
+                const heatingMsg: Message = {
+                  id: `msg-heatingcost-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Cheapest heating method: ${cheapest?.label} at ~€${Math.round(cheapest?.annualCostEur)}/yr.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  heatingCostData: { input: chunk.input, result: r },
+                };
+                setMessages(prev => [...prev, heatingMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: heatingMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, heatingCostData: heatingMsg.heatingCostData },
                   });
                 }
               // Handle search_spec — explainable search dimensions
@@ -2723,6 +2817,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           virtualStagingData: msg.metadata?.virtualStagingData as any | undefined,
           materialsBoardData: msg.metadata?.materialsBoardData as any | undefined,
           inspirationData: msg.metadata?.inspirationData as any | undefined,
+          heatPumpData: msg.metadata?.heatPumpData as any | undefined,
+          heatingCostData: msg.metadata?.heatingCostData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
           mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
@@ -3188,6 +3284,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     setToolkitFormState({ quickStart: qs, toolkit: tkParam });
                     return;
                   }
+                  if (qs.run && fireDirectRun(qs, tkParam)) {
+                    return;
+                  }
                   if (qs.workflow_id) {
                     bootWorkflowLocally(qs.workflow_id);
                   } else {
@@ -3234,6 +3333,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   // step-by-step workflow tracker).
                   if (qs.form?.length) {
                     setToolkitFormState({ quickStart: qs, toolkit: tk });
+                    return;
+                  }
+                  if (qs.run && fireDirectRun(qs, tk)) {
                     return;
                   }
                   if (qs.workflow_id) {
@@ -3384,6 +3486,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           roomType={message.inspirationData.room_type}
                           focus={message.inspirationData.focus}
                         />
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.heatPumpData ? (
+                      <div className="space-y-3">
+                        <HeatPumpResultCard result={message.heatPumpData.result} />
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.heatingCostData ? (
+                      <div className="space-y-3">
+                        <HeatingCostResultCard result={message.heatingCostData.result} />
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.jobFindingsData ? (
@@ -4659,6 +4771,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             setToolkitFormState({ quickStart, toolkit });
             return;
           }
+          // Formless deterministic run — fire the tool directly, no prompt.
+          if (quickStart?.run && toolkit && fireDirectRun(quickStart, toolkit)) {
+            return;
+          }
           setInput(prompt);
           // Auto-send on next tick so the agent switch (if any) settles + the
           // input state is committed before send. handleSendMessageRef reads
@@ -4927,6 +5043,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           setInput(renderedPrompt);
           setToolkitFormState(null);
           setTimeout(() => { handleSendMessageRef.current(); }, 0);
+        }}
+        onRunTool={({ toolName, toolInput, toolkit, quickStart }) => {
+          // Deterministic run — stash the payload and fire the same send pipeline
+          // in mode:'direct_tool'. The agent switch (if any) already happened when
+          // the quick-start opened the form, so selectedAgent is correct here.
+          pendingDirectRunRef.current = { toolName, toolInput, label: quickStart.label, toolkitId: toolkit.id };
+          setToolkitFormState(null);
+          setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
         }}
       />
 

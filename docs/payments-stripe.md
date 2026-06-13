@@ -102,7 +102,7 @@ Steps to wire it up in the Stripe Dashboard:
 
 ## What this module does NOT do
 
-- **It does not handle invoice issuance.** That's the [parent Payments module](payments.md) (built-in invoicer) or an [ERP module](payments.md#two-capability-flags) (Oxygen today; future Xero, QuickBooks, SAP). Stripe just charges the customer for whatever invoice / subscription / credit purchase exists.
+- **It does not handle invoice issuance.** That's the [parent Payments module](payments.md) (built-in invoicer) or an [ERP module](payments.md#two-capability-flags) (e.g. future Xero, QuickBooks, SAP). Stripe just charges the customer for whatever invoice / subscription / credit purchase exists.
 - **It does not own business identity.** Business name, VAT, address are on the parent Payments module → Business tab.
 - **It does not declare `provides.invoicing`.** Stripe is a payment processor, not an invoice generator. If Stripe ever offered an invoice-issuance product the platform wanted to use, the flag would be set then.
 

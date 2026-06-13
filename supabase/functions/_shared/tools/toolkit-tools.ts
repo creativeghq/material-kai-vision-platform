@@ -32,7 +32,10 @@ const TOOLKITS_INDEX: Record<string, { name: string; tool_ids: string[]; admin_o
       'generate_catalog_pdf', 'publish_catalog',
     ],
   },
+  'calculators': { name: 'Calculators', tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'] },
   'mentions': { name: 'Mention Monitoring', tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'] },
+  'job-research': { name: 'Job Research', tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'] },
+  'projects': { name: 'Projects', tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'] },
   'presentation-sheets': { name: 'Presentation Sheets', tool_ids: ['generate_presentation_sheet'] },
   'generation': { name: 'Image / 3D / VR Generation', tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world'] },
   'seo-research': { name: 'SEO Research', tool_ids: ['seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps'] },
@@ -87,9 +90,9 @@ export const createLoadToolkitTool = (isAdmin: boolean, onChunk: ChunkSink) => {
       description:
         'Load an additional toolkit (cluster of tools) so the agent can use it. Use this when the user asks for capabilities that aren\'t in the currently bound toolset. ' +
         'The newly-loaded tools become available on the NEXT user turn — your response after calling this should briefly acknowledge the load and ask the user to re-send. ' +
-        'Available toolkits: catalogs, mentions, presentation-sheets, generation, seo-research, seo-domain, seo-backlinks, seo-content, seo-multi-engine, seo-composite, seo-article (admin), b2b (admin), sub-agents (admin), admin-misc (admin).',
+        'Available toolkits: calculators, catalogs, mentions, presentation-sheets, generation, seo-research, seo-domain, seo-backlinks, seo-content, seo-multi-engine, seo-composite, seo-article (admin), b2b (admin), sub-agents (admin), admin-misc (admin).',
       schema: z.object({
-        toolkit_id: z.string().describe('One of: catalogs, mentions, presentation-sheets, generation, seo-research, seo-domain, seo-backlinks, seo-content, seo-multi-engine, seo-composite, seo-article, b2b, sub-agents, admin-misc'),
+        toolkit_id: z.string().describe('One of: calculators, catalogs, mentions, presentation-sheets, generation, seo-research, seo-domain, seo-backlinks, seo-content, seo-multi-engine, seo-composite, seo-article, b2b, sub-agents, admin-misc'),
       }),
     },
   );

@@ -41,6 +41,9 @@ const CACHE_FRESH_MS = 90 * 24 * 3600 * 1000;
 interface LookupBody {
   afm: string;
   company_id?: string;
+  /** Why this lookup was made — audited because every live call notifies the looked-up ΑΦΜ. */
+  reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty' | string;
+  workspace_id?: string;
 }
 
 interface FirmActivity {
@@ -150,6 +153,24 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey);
     const creds = await resolveAadeCredentials(admin);
 
+    // Best-effort internal audit. AADE notifies the looked-up ΑΦΜ's TAXISnet inbox on every
+    // live ('aade') call — this is OUR record of who/when/why/which VAT. Never blocks the response.
+    const logLookup = async (source: 'aade' | 'cache', validAfm: boolean | null) => {
+      try {
+        await admin.from('aade_lookup_log').insert({
+          looked_up_afm: rawAfm,
+          company_id: body.company_id ?? null,
+          workspace_id: body.workspace_id ?? null,
+          requested_by: user.id,
+          reason: body.reason ?? null,
+          source,
+          valid_afm: validAfm,
+        });
+      } catch (logErr) {
+        console.error('[myaade-rgwspublic2] audit log insert failed:', logErr);
+      }
+    };
+
     if (!creds.username || !creds.password) {
       return jsonResponse({
         error: 'aade_not_configured',
@@ -168,6 +189,9 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       const sameAfm = cached?.vat_number && cached.vat_number.replace(/[^0-9]/g, '').endsWith(rawAfm);
       const fresh = cached?.aade_data_at && (Date.now() - new Date(cached.aade_data_at).getTime() < CACHE_FRESH_MS);
       if (sameAfm && fresh && cached!.aade_data) {
+        // deno-lint-ignore no-explicit-any
+        const cachedFlag = (cached!.aade_data as any)?.basic_rec?.deactivation_flag;
+        await logLookup('cache', cachedFlag === '1' ? true : (cachedFlag === '2' ? false : null));
         return jsonResponse({
           ok: true,
           source: 'cache',
@@ -193,8 +217,11 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       }, 503);
     }
 
+    // From here a real SOAP call reached ΑΑΔΕ — the TAXISnet notification has fired regardless
+    // of whether the record parsed cleanly, so the audit must record the attempt.
     const aadeError = summarizeAadeError(xml);
     if (!httpOk || aadeError) {
+      await logLookup('aade', null);
       // Surface the real ΑΑΔΕ message to Supabase logs so future failures don't
       // require digging into the response body to diagnose.
       console.error('[myaade-rgwspublic2] ΑΑΔΕ rejected lookup:', {
@@ -219,6 +246,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     const activities = parseActivities(xml);
 
     if (!basicRec) {
+      await logLookup('aade', null);
       return jsonResponse({
         error: 'aade_empty',
         message: 'ΑΑΔΕ returned no basic record — the ΑΦΜ may not exist.',
@@ -236,6 +264,8 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       activities,
       secret_sources: creds.sources,
     };
+
+    await logLookup('aade', result.valid_afm);
 
     // Cache + mirror into structured columns. Only when caller is the company owner OR admin.
     if (body.company_id) {

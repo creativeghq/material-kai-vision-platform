@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2 } from 'lucide-react';
+import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -36,6 +36,16 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 
 const knowledgeBaseService = KnowledgeBaseService.getInstance();
+
+// Agents that consume the Knowledge Base via agent KB search. Used by the
+// per-doc "Agent access" allow-list. Empty selection = all agents (default).
+// Enforcement lives server-side in MIVAA (rag search) via the agent_id param.
+const KB_AGENTS: { id: string; label: string }[] = [
+  { id: 'kai', label: 'KAI' },
+  { id: 'interior-designer', label: 'Interior Designer' },
+  { id: 'demo', label: 'Demo' },
+  { id: 'kai-task', label: 'KAI Background Task' },
+];
 
 interface DocumentEditorProps {
   documentId: string | null;
@@ -222,6 +232,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             visibility: document.visibility,
             metadata: document.metadata,
             price_doc_type: priceDocTypeToSave,
+            is_locked: document.is_locked ?? null,
+            allowed_agents: document.allowed_agents && document.allowed_agents.length > 0 ? document.allowed_agents : null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', documentId)
@@ -248,6 +260,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             visibility: document.visibility,
             metadata: document.metadata,
             price_doc_type: priceDocTypeToSave,
+            is_locked: document.is_locked ?? null,
+            allowed_agents: document.allowed_agents && document.allowed_agents.length > 0 ? document.allowed_agents : null,
             workspace_id: workspaceId,
             embedding_status: 'pending',
           })
@@ -455,6 +469,99 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   {document.visibility === 'private'
                     ? 'Private — readable by admins (UI + AI agents). Hidden from non-admin agent users and from the public Knowledge Base page.'
                     : 'Public — available to all agents, platform calls, and the public Knowledge Base page.'}
+                </p>
+
+                {/* Public deep-link — surfaces the live, externally-detectable URL once
+                    the doc is public + saved. The public KB page resolves ?doc=<id>
+                    only for published + public rows, so we hint if it isn't published yet. */}
+                {document.visibility === 'public' && document.id && (
+                  <div className="rounded-md border border-border bg-muted/40 p-2.5 space-y-1.5">
+                    <a
+                      href={`/knowledge-base?doc=${document.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      View on public Knowledge Base
+                    </a>
+                    {document.status !== 'published' && (
+                      <p className="text-xs text-amber-500 leading-snug">
+                        Set Status to <span className="font-medium">Published</span> for this link to be live and detectable externally.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Lock — protects the doc from deletion / platform reset. */}
+              {(() => {
+                const selectedCat = categories.find((c) => c.id === document.category_id);
+                const autoSynced = (document.metadata as Record<string, unknown> | undefined)?.auto_synced === true
+                  || (document.metadata as Record<string, unknown> | undefined)?.auto_synced === 'true';
+                const derivedLocked = selectedCat?.access_level === 'agent' || autoSynced;
+                const lockValue = document.is_locked === true ? 'locked' : document.is_locked === false ? 'unlocked' : 'auto';
+                const effectiveLocked = document.is_locked === true ? true : document.is_locked === false ? false : derivedLocked;
+                return (
+                  <div className="space-y-2">
+                    <Label htmlFor="lock">Lock</Label>
+                    <Select
+                      value={lockValue}
+                      onValueChange={(value) =>
+                        setDocument({
+                          ...document,
+                          is_locked: value === 'locked' ? true : value === 'unlocked' ? false : null,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">⚙️ Auto (follow category) — {derivedLocked ? 'locked' : 'unlocked'}</SelectItem>
+                        <SelectItem value="locked">🔒 Locked</SelectItem>
+                        <SelectItem value="unlocked">🔓 Unlocked</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      {effectiveLocked
+                        ? 'Locked — cannot be deleted and is preserved across a platform reset.'
+                        : 'Unlocked — can be deleted normally.'}
+                      {' '}Agent-readable categories lock their docs by default; choose <span className="font-medium">Unlocked</span> to override and allow deletion.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Agent access — which agents may retrieve this doc in agent KB search.
+                  Empty = all agents (default). Enforced server-side in MIVAA. */}
+              <div className="space-y-2">
+                <Label>Agent access</Label>
+                <div className="flex flex-wrap gap-2">
+                  {KB_AGENTS.map((a) => {
+                    const selected = (document.allowed_agents ?? []).includes(a.id);
+                    return (
+                      <Button
+                        key={a.id}
+                        type="button"
+                        size="sm"
+                        variant={selected ? 'default' : 'outline'}
+                        className="rounded-full"
+                        onClick={() => {
+                          const cur = document.allowed_agents ?? [];
+                          const next = selected ? cur.filter((x) => x !== a.id) : [...cur, a.id];
+                          setDocument({ ...document, allowed_agents: next });
+                        }}
+                      >
+                        {a.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug">
+                  {(document.allowed_agents?.length ?? 0) === 0
+                    ? 'All agents can read this doc in agent KB search (default).'
+                    : `Only the selected agent${document.allowed_agents!.length === 1 ? '' : 's'} can retrieve this doc in agent KB search. Admin reads are unaffected.`}
                 </p>
               </div>
             </div>

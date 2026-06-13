@@ -27,7 +27,7 @@ import { Label } from '@/components/core/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
-import { Plus, ExternalLink, Trash2, ListPlus, Save } from 'lucide-react';
+import { Plus, ExternalLink, Trash2, ListPlus, Save, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   jobResearchService, type JobSite, type JobSiteType,
@@ -50,9 +50,9 @@ const SITE_TYPES: Array<{ key: JobSiteType; label: string; description: string; 
   },
   {
     key: 'careers_page_default',
-    label: 'Default career pages',
+    label: 'Custom Pages',
     description:
-      'Company career pages scraped via Firecrawl with schema-guided extraction on every refresh, UNIONed with each tracked_job\'s own careers_page_urls. Handles JS-rendered job lists that Perplexity can\'t see. New tracked_jobs auto-enable the careers_pages source when any default exists. Firecrawl credits apply per page.',
+      'Any page we crawl directly — company career pages AND job-board / multi-listing pages — scraped via Firecrawl with schema-guided extraction on every refresh, UNIONed with each tracked_job\'s own careers_page_urls. The extractor pulls every job listing off the page, so a board search-results page works just as well as a single company careers page. Handles JS-rendered job lists that Perplexity can\'t see. New tracked_jobs auto-enable this source when any default exists. Firecrawl credits apply per page.',
     example: 'https://stripe.com/jobs',
   },
 ];
@@ -68,6 +68,11 @@ export function JobResearchSitesEditor() {
   const [draft, setDraft] = useState({
     url_or_domain: '', display_name: '', country_code: '', category: '', notes: '',
   });
+  const [editTarget, setEditTarget] = useState<JobSite | null>(null);
+  const [editDraft, setEditDraft] = useState({
+    url_or_domain: '', display_name: '', country_code: '', category: '', notes: '',
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
   const [bulkUrls, setBulkUrls] = useState('');
   const [bulkCountry, setBulkCountry] = useState('');
   const [bulkCategory, setBulkCategory] = useState('');
@@ -114,6 +119,42 @@ export function JobResearchSitesEditor() {
       setSites(prev => prev.filter(x => x.id !== s.id));
     } catch (e: unknown) {
       toast({ title: 'Delete failed', description: String(e), variant: 'destructive' });
+    }
+  };
+
+  const onEditOpen = (s: JobSite) => {
+    setEditTarget(s);
+    setEditDraft({
+      url_or_domain: s.url_or_domain,
+      display_name: s.display_name || '',
+      country_code: s.country_code || '',
+      category: s.category || '',
+      notes: s.notes || '',
+    });
+  };
+
+  const onSaveEdit = async () => {
+    if (!editTarget) return;
+    if (!editDraft.url_or_domain.trim()) {
+      toast({ title: 'URL / domain required', variant: 'destructive' });
+      return;
+    }
+    setEditSubmitting(true);
+    try {
+      const updated = await jobResearchService.updateSite(editTarget.id, {
+        url_or_domain: editDraft.url_or_domain.trim(),
+        display_name: editDraft.display_name.trim(),
+        country_code: editDraft.country_code.trim(),
+        category: editDraft.category.trim(),
+        notes: editDraft.notes.trim(),
+      });
+      setSites(prev => prev.map(x => x.id === updated.id ? updated : x));
+      setEditTarget(null);
+      toast({ title: 'Saved' });
+    } catch (e: unknown) {
+      toast({ title: 'Update failed', description: String(e), variant: 'destructive' });
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -215,39 +256,42 @@ export function JobResearchSitesEditor() {
                   No {config.label.toLowerCase()} yet. Click "Add resource" or "Bulk paste".
                 </div>
               ) : (
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>URL / Domain</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Country</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-center">Enabled</TableHead>
-                      <TableHead className="text-right w-16"></TableHead>
+                      <TableHead className="w-auto">URL / Domain</TableHead>
+                      <TableHead className="w-40">Name</TableHead>
+                      <TableHead className="w-20">Country</TableHead>
+                      <TableHead className="w-32">Category</TableHead>
+                      <TableHead className="w-20 text-center">Enabled</TableHead>
+                      <TableHead className="w-24 text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentRows.map(s => (
                       <TableRow key={s.id}>
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="font-mono text-xs align-top">
                           {tab === 'perplexity_domain' ? (
-                            s.url_or_domain
+                            <span className="break-all">{s.url_or_domain}</span>
                           ) : (
-                            <a href={s.url_or_domain} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                              <span className="truncate max-w-md">{s.url_or_domain}</span>
-                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            <a href={s.url_or_domain} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-start gap-1">
+                              <span className="break-all">{s.url_or_domain}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0 mt-0.5" />
                             </a>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">{s.display_name || '—'}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm align-top break-words">{s.display_name || '—'}</TableCell>
+                        <TableCell className="align-top">
                           {s.country_code ? <Badge variant="outline" className="text-[10px]">{s.country_code}</Badge> : '—'}
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{s.category || '—'}</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-xs text-muted-foreground align-top break-words">{s.category || '—'}</TableCell>
+                        <TableCell className="text-center align-top">
                           <Switch checked={s.is_enabled} onCheckedChange={(checked) => onToggle(s, checked)} />
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right whitespace-nowrap align-top">
+                          <Button size="icon" variant="ghost" onClick={() => onEditOpen(s)} title="Edit">
+                            <Pencil className="h-3 w-3 text-muted-foreground" />
+                          </Button>
                           <Button size="icon" variant="ghost" onClick={() => onDelete(s)} title="Remove">
                             <Trash2 className="h-3 w-3 text-muted-foreground" />
                           </Button>
@@ -309,6 +353,51 @@ export function JobResearchSitesEditor() {
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button onClick={onAddSingle}>
               <Save className="h-3 w-3 mr-1" />Add
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editTarget?.display_name || editTarget?.url_or_domain || 'resource'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">
+                {editTarget?.site_type === 'perplexity_domain' ? 'Domain (no scheme)' : 'URL'}
+              </Label>
+              <Input
+                value={editDraft.url_or_domain}
+                onChange={(e) => setEditDraft(d => ({ ...d, url_or_domain: e.target.value }))}
+                placeholder={config.example}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Display name (optional)</Label>
+                <Input value={editDraft.display_name} onChange={(e) => setEditDraft(d => ({ ...d, display_name: e.target.value }))} placeholder="Kariera.gr" />
+              </div>
+              <div>
+                <Label className="text-xs">Country (ISO-2, optional)</Label>
+                <Input value={editDraft.country_code} onChange={(e) => setEditDraft(d => ({ ...d, country_code: e.target.value.toUpperCase() }))} placeholder="GR" maxLength={3} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Category (optional)</Label>
+              <Input value={editDraft.category} onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))} placeholder="general | tech | remote | ..." />
+            </div>
+            <div>
+              <Label className="text-xs">Notes (optional)</Label>
+              <Input value={editDraft.notes} onChange={(e) => setEditDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Why added, who curated, etc." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditTarget(null)} disabled={editSubmitting}>Cancel</Button>
+            <Button onClick={onSaveEdit} disabled={editSubmitting || !editDraft.url_or_domain.trim()}>
+              <Save className="h-3 w-3 mr-1" />{editSubmitting ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

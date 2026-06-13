@@ -433,13 +433,13 @@ All tables use RLS policies that restrict access based on workspace membership. 
 The platform includes a multi-tenant finance and business operations stack layered on top of the core AI catalog. Key modules:
 
 - **Greek e-invoicing** — AADE/myDATA direct transmission via Novus connector (per-tenant issuer VAT + TaxisNet authorization). See `docs/finance-system.md`.
-- **POS** — Oxygen-style two-panel cash register (`docs/pos-retail-system.md`)
+- **POS** — two-panel cash register (`docs/pos-retail-system.md`)
 - **Online Storefront** (`docs/online-storefront.md`)
 - **Warehouse & Billing** (`docs/warehouse-and-billing.md`)
 - **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
 - **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
 
-Note: The Oxygen ERP connector (platform-wide `OXYGEN_API_KEY`) was removed 2026-06-07 — replaced by the per-tenant Novus/AADE direct transmission path.
+Note: A legacy ERP connector (platform-wide API key) was removed 2026-06-07 — replaced by the per-tenant Novus/AADE direct transmission path.
 
 ---
 

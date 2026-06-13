@@ -536,7 +536,7 @@ Full platform operations suite at `/admin`:
 
 A multi-tenant finance and business operations stack layered on the core AI catalog. See full docs in the finance cluster:
 
-- **Greek e-invoicing (AADE/myDATA)** — per-tenant direct transmission via Novus connector (`docs/finance-system.md`). Each tenant uses their own issuer VAT and TaxisNet authorization. Replaced the platform-wide Oxygen ERP connector (removed 2026-06-07).
+- **Greek e-invoicing (AADE/myDATA)** — per-tenant direct transmission via Novus connector (`docs/finance-system.md`). Each tenant uses their own issuer VAT and TaxisNet authorization. Replaced a platform-wide legacy ERP connector (removed 2026-06-07).
 - **POS** — Two-panel cash register (`docs/pos-retail-system.md`)
 - **Online Storefront** (`docs/online-storefront.md`)
 - **Warehouse & Billing** (`docs/warehouse-and-billing.md`)

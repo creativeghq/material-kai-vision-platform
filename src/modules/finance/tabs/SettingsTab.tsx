@@ -108,6 +108,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         auto_statement_only_outstanding: settings.auto_statement_only_outstanding,
         auto_statement_min_balance: settings.auto_statement_min_balance,
         auto_statement_side: settings.auto_statement_side,
+        risk_block_inactive_vat: settings.risk_block_inactive_vat,
+        risk_block_unvalidated_vat: settings.risk_block_unvalidated_vat,
+        risk_warn_over_credit_limit: settings.risk_warn_over_credit_limit,
+        risk_block_over_credit_limit: settings.risk_block_over_credit_limit,
       });
       setSettings(updated);
       onSettingsChanged(updated);
@@ -353,6 +357,32 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             <p className="text-[11px] text-muted-foreground">
               Blanket sell uplift applied over your cost when you add a catalog product to a quote (you can still edit each line).
             </p>
+          </div>
+
+          {/* Buyer risk checks enforced at invoice issuance (ΑΑΔΕ status + credit limit). */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div>
+              <div className="text-sm font-medium">Buyer risk checks</div>
+              <p className="text-xs text-muted-foreground">
+                Checked when you issue an invoice against a CRM customer. Uses the buyer's ΑΑΔΕ status and credit limit (set per-company in CRM).
+              </p>
+            </div>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">Block issuance when the buyer ΑΦΜ is <strong>ΑΑΔΕ-inactive</strong></span>
+              <Switch checked={settings.risk_block_inactive_vat} onCheckedChange={(v) => set('risk_block_inactive_vat', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">Block issuance when the buyer VAT was <strong>never validated</strong> <span className="text-muted-foreground">(stricter)</span></span>
+              <Switch checked={settings.risk_block_unvalidated_vat} onCheckedChange={(v) => set('risk_block_unvalidated_vat', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs"><strong>Warn</strong> when the invoice pushes the buyer over their credit limit</span>
+              <Switch checked={settings.risk_warn_over_credit_limit} onCheckedChange={(v) => set('risk_warn_over_credit_limit', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
+              <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
+            </label>
           </div>
 
           <Button onClick={save} disabled={saving} className="w-full">

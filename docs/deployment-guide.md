@@ -288,7 +288,7 @@ MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 |---------|---------|------------|------------|-----------|
 | **myAADE (ΑΑΔΕ)** | `AADE_USERNAME` + `AADE_PASSWORD` (also `AADE_AFM_CALLED_BY` optional) | Edge Function `myaade-rgwspublic2` (and any future `myaade-*` function) | https://www1.gsis.gr/sgsisapps/tokenservices/ → log in with TAXISnet → create "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" pair → authorize for `RgWsPublic2` service | ✅ Required if `myaade` module enabled (Greek business profile auto-fill) |
 
-> e-Invoicing transmission to AADE/myDATA is handled by the **Novus connector** (`NOVUS_API_KEY`), not a per-tenant ERP. (The Oxygen ERP connector was removed 2026-06-07 — see CLAUDE.md.)
+> e-Invoicing transmission to AADE/myDATA is handled by the **Novus connector** (`NOVUS_API_KEY`), not a per-tenant ERP. (A legacy ERP connector was removed 2026-06-07 — see CLAUDE.md.)
 
 ### **Supabase Edge Functions Secrets**
 

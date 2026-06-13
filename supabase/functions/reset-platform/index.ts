@@ -11,6 +11,12 @@ const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ============================================================
+// LOCK RULE: any row with a boolean `is_locked = true` is NEVER deleted, in
+// any cleared table (discovered dynamically via the reset_lock_aware_tables
+// RPC). Lockable tables today are flows + facet_canonical_values (both already
+// preserved); the guard is future-proof for anything lockable that later lands
+// in the clear list. Knowledge Base is preserved in full regardless.
+//
 // PRESERVED (never deleted during platform reset):
 //
 // DB Tables:
@@ -61,6 +67,48 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - brand_retailer_index            ← (brand, retailer_domain, country) cache
 //   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
 //
+//   ── Finance / Fiscal (LEGALLY RETAINED — NEVER WIPE) ──
+//   Greek myDATA/AADE records are legally required to be retained. A reset
+//   here is irreversible data destruction with compliance consequences.
+//   - invoices / invoice_items / credit_notes / credit_note_items
+//   - supplier_bills / supplier_credit_notes / supplier_credit_note_items
+//   - payments / payment_allocations / planned_payments / cheques
+//   - delivery_notes / delivery_note_items
+//   - purchase_orders / purchase_order_items / inbound_documents
+//   - marketplace_commission_ledger / stock_movements / time_entries
+//   - warehouses / warehouse_items / warehouse_pending_items
+//   - pos_sessions / pos_cash_movements / pos_signatures / pos_terminals
+//   - document_series             ← legal invoice/receipt numbering sequences
+//   - fiscal_connectors / fiscal_submissions   ← AADE/Novus transmission ledger
+//   - finance_settings / finance_branches / finance_categories / pricing_rules
+//   - workspace_fiscal_bindings / workspace_inbound_credentials
+//     / workspace_payment_config / workspace_storefront / workspace_doc_type
+//     / workspace_module_entitlements
+//
+//   ── Secrets & API keys (NEVER WIPE) ──
+//   - platform_secrets / platform_secret_module_links
+//   - api_keys                    ← CASCADE root: deleting wipes every external
+//                                    customer's tracked_queries/mentions/jobs
+//   - material_kai_keys
+//
+//   ── Customer-facing monitoring (DO NOT WIPE — same policy as price monitoring) ──
+//   Long-running observational series + external API consumer state.
+//   - tracked_mentions + mention_history / mention_outlets / mention_promoted_urls
+//     / mention_excluded_urls / mention_match_corrections / mention_alert_log
+//     / mention_classifier_verdict_cache / llm_mention_probes
+//   - tracked_jobs + job_listings / job_excluded_urls / job_match_corrections
+//     / job_alert_log / job_classifier_verdict_cache / job_research_sites
+//   - seo_tracked_domains / seo_research_runs / seo_domain_audit_history
+//
+//   ── Connection tokens (NEVER WIPE — re-auth pain) ──
+//   - social_accounts / social_zernio_profiles
+//   - messaging_channels / messaging_settings / messaging_optouts (compliance)
+//
+//   ── Config / reference ──
+//   - modules / api_endpoints / mydata_reference / aade_lookup_log
+//   - xml_mapping_templates / flow_area_registry / category_complement_rules
+//   - catalog_templates           ← admin branding assets (parallels quote-templates)
+//
 // Storage Buckets (6 buckets post-consolidation 2026-05-23):
 //   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
 //   - pdf-tiles                ← extracted/ (KB) + catalog-extracted/
@@ -99,6 +147,8 @@ const TABLES_TO_CLEAR = [
   // NOTE: 'flows' (definitions) is PRESERVED — admin config.
 
   // ── Quotes System (except global upsells and timeline steps) ────────
+  'quote_analytics_events',        // Quote view/interaction analytics
+  'quote_activities',              // Quote activity log
   'quote_timeline',                // Quote timeline progress
   'quote_upsells',                 // Quote upsells junction
   'quote_items',                   // Quote items
@@ -109,9 +159,60 @@ const TABLES_TO_CLEAR = [
   // ── Moodboards ──────────────────────────────────────────────────────
   'moodboard_comments',            // Comments on moodboards
   'moodboard_quote_requests',      // Moodboard quote requests
+  'moodboard_presentation_sheets', // Presentation sheets (child of moodboards, CASCADE)
   'moodboard_products',            // Moodboard products
   'moodboard_items',               // Moodboard items
   'moodboards',                    // Moodboards
+
+  // ── Catalogs & Presentation (user-generated deliverables) ───────────
+  // NOTE: 'catalog_templates' (admin branding) is PRESERVED.
+  'catalog_view_events',           // Catalog view analytics (child, CASCADE)
+  'catalog_access_log',            // Catalog access log (child, CASCADE)
+  'catalog_email_sends',           // Catalog email sends (child, CASCADE)
+  'catalog_email_grants',          // Catalog email grants (child, CASCADE)
+  'presentation_catalogs',         // Generated catalogs (output in pdf-documents, orphan-reaped)
+  'catalog_source_pdfs',           // Uploaded catalog source PDFs (storage orphan-reaped)
+
+  // ── Projects & Client Views (user work-product) ─────────────────────
+  'client_view_feedback',          // Client view approvals/comments (child, CASCADE)
+  'project_client_views',          // Project client-view deliverables (output orphan-reaped)
+  'project_tasks',                 // Project tasks (child, CASCADE)
+  'project_rooms',                 // Project rooms (child, CASCADE)
+  'project_events',                // Project timeline events (child, CASCADE)
+  'project_collaborators',         // Project collaborators (child, CASCADE)
+  'projects',                      // Projects
+  'proposals',                     // User proposals
+
+  // ── Designer module (user-generated) ────────────────────────────────
+  'designer_materials',            // Designer materials
+  'designer_assets',               // Designer assets
+  'designer_projects',             // Designer projects
+
+  // ── Storefront (transient commerce state) ───────────────────────────
+  'cart_items',                    // Cart line items (child of shopping_carts, CASCADE)
+  'shopping_carts',                // Shopping carts
+
+  // ── Social content (connection tokens are PRESERVED) ────────────────
+  'social_post_analytics',         // Post analytics (child of social_posts, CASCADE)
+  'social_posts',                  // Published/scheduled social posts
+
+  // ── Messaging content (channels/settings/optouts are PRESERVED) ─────
+  'messaging_conversation_messages', // WhatsApp thread messages (child, CASCADE)
+  'messaging_conversations',       // WhatsApp conversation threads
+  'messaging_campaign_recipients', // Campaign send recipients
+  'messaging_logs',                // Message delivery logs
+  'messaging_analytics',           // Messaging analytics
+  'campaign_recipients',           // Campaign recipients (child of campaigns, CASCADE)
+  'campaigns',                     // Marketing campaigns (operational)
+
+  // ── Public Tools lead-gen (cache + analytics log) ───────────────────
+  'public_lookup_log',             // Per-scan attempt log
+  'public_lookup_cache',           // 24h lookup cache (id-less — composite PK)
+
+  // ── Misc user-generated / derived ───────────────────────────────────
+  'material_reviews',              // User material reviews
+  'material_alerts',               // User low-stock / material alerts
+  'user_notifications',            // Delivered in-app notifications (derived)
 
   // ── 3D / Video / VR generation ──────────────────────────────────────
   'generation_3d_segments',        // 3D generation segments (child of generation_3d)
@@ -156,8 +257,6 @@ const TABLES_TO_CLEAR = [
   'chunk_product_relationships',   // Chunk↔product relevancies
   'chunk_image_relationships',     // Chunk↔image relevancies
   'chunk_relationships',           // Chunk↔chunk relationships
-  'material_metadata_values',      // Material metadata values
-  'material_metadata_relevancy',   // Material metadata relevancy
 
   // ── PDF Processing & Chunking (derivative data) ─────────────────────
   // job_checkpoints + job_progress dropped — history is now stored as
@@ -167,9 +266,11 @@ const TABLES_TO_CLEAR = [
   'claude_validation_queue',       // Claude validation queue
   'processing_queue',              // Generic processing queue
   'processing_metrics',            // Processing metrics
+  'pipeline_strategy_metrics',     // Chunking-strategy / Phase-3 distribution metrics
+  'chandra_ocr_metrics',           // Per-attempt Chandra OCR telemetry
   'batch_jobs',                    // Batch jobs
-  'embeddings',                    // Text/image embeddings (public schema)
   'embedding_stability_metrics',   // Embedding drift metrics
+  'product_prices',                // Product price rows (child of products, CASCADE)
   'product_tables',                // YOLO extracted tables
   'product_layout_regions',        // YOLO layout regions
   'product_enrichments',           // Product enrichment results
@@ -212,6 +313,7 @@ const TABLES_TO_CLEAR = [
   'scraping_sessions',             // Scraping sessions
 
   // ── Data Import ─────────────────────────────────────────────────────
+  'data_import_job_products',      // Imported product staging rows (child, CASCADE)
   'data_import_jobs',              // Data import jobs
   'data_import_history',           // Data import history
 
@@ -245,14 +347,70 @@ const TABLES_TO_CLEAR = [
 ];
 
 // ============================================================
+// NEVER_CLEAR — hard guard against catastrophic future edits.
+//
+// These tables hold legally-retained financial records, secrets, customer
+// API-key state, or long-running customer-facing observational data. If any
+// of them is ever added to TABLES_TO_CLEAR (by mistake, refactor, or a future
+// switch to a denylist), the reset ABORTS before deleting anything — see the
+// overlap assertion at the top of the handler. This is fail-closed by design.
+//
+// Do NOT "resolve" an overlap by removing the entry from here. Remove it from
+// TABLES_TO_CLEAR instead.
+const NEVER_CLEAR = new Set<string>([
+  // Finance / fiscal (legally retained)
+  'invoices', 'invoice_items', 'credit_notes', 'credit_note_items',
+  'supplier_bills', 'supplier_credit_notes', 'supplier_credit_note_items',
+  'payments', 'payment_allocations', 'planned_payments', 'cheques',
+  'delivery_notes', 'delivery_note_items', 'purchase_orders', 'purchase_order_items',
+  'inbound_documents', 'marketplace_commission_ledger', 'stock_movements', 'time_entries',
+  'warehouses', 'warehouse_items', 'warehouse_pending_items',
+  'pos_sessions', 'pos_cash_movements', 'pos_signatures', 'pos_terminals',
+  'document_series', 'fiscal_connectors', 'fiscal_submissions',
+  'finance_settings', 'finance_branches', 'finance_categories', 'pricing_rules',
+  'workspace_fiscal_bindings', 'workspace_inbound_credentials',
+  'workspace_payment_config', 'workspace_storefront', 'workspace_doc_type',
+  'workspace_module_entitlements',
+  // Secrets & API keys (api_keys is the CASCADE root for all external tracking)
+  'platform_secrets', 'platform_secret_module_links', 'api_keys', 'material_kai_keys',
+  // Customer-facing monitoring (same policy as price monitoring)
+  'tracked_queries', 'tracked_query_price_history', 'tracked_query_promoted_urls',
+  'tracked_query_excluded_urls', 'price_lookups', 'price_discrepancies',
+  'price_alert_log', 'match_corrections', 'classifier_verdict_cache',
+  'brand_retailer_index', 'retailer_extraction_recipes',
+  'tracked_mentions', 'mention_history', 'mention_outlets', 'mention_promoted_urls',
+  'mention_excluded_urls', 'mention_match_corrections', 'mention_alert_log',
+  'mention_classifier_verdict_cache', 'llm_mention_probes',
+  'tracked_jobs', 'job_listings', 'job_excluded_urls', 'job_match_corrections',
+  'job_alert_log', 'job_classifier_verdict_cache', 'job_research_sites',
+  'seo_tracked_domains', 'seo_research_runs', 'seo_domain_audit_history',
+  // Connection tokens + compliance
+  'social_accounts', 'social_zernio_profiles', 'messaging_channels',
+  'messaging_settings', 'messaging_optouts',
+  // Accounts / credits / RBAC / admin config
+  'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
+  'workspace_members', 'user_profiles', 'roles', 'role_permissions',
+  'prompts', 'extraction_prompts', 'system_settings', 'modules',
+]);
+
+// Tables whose primary key is NOT a uuid `id` column — the default
+// `.neq('id', <zero-uuid>)` delete-all predicate can't target them.
+// Map each to a non-null column we can use as an always-true predicate.
+const IDLESS_DELETE_COLUMN: Record<string, string> = {
+  public_lookup_cache: 'query_hash', // composite PK (query_hash, scan_type)
+};
+
+// ============================================================
 // Storage buckets to clear (AI/processing-generated content only)
 //
-// Post-consolidation (2026-05-23): 5 anchor buckets exist. We clear the two
+// Post-consolidation (2026-05-23): 6 anchor buckets exist. We clear the two
 // that hold regenerable AI/processing output. pdf-documents holds raw user
-// uploads (KB) plus generated outputs (catalog-output/, quote-output/,
-// moodboard-output/) — those outputs become orphans when their DB rows are
-// cleared above and the nightly storage-orphan-cleanup-cron sweeps them
-// within 24h.
+// uploads (KB) plus generated outputs (catalog-source/, catalog-output/,
+// quote-output/, moodboard-output/, client-view-output/) — those become
+// orphans when their DB rows are cleared above (presentation_catalogs,
+// catalog_source_pdfs, quotes, moodboards, project_client_views) and the
+// nightly storage-orphan-cleanup-cron sweeps them within its grace window.
+// pdf-tiles/catalog-extracted/ is removed outright since we wipe pdf-tiles whole.
 //
 // PRESERVED buckets:
 //   - pdf-documents                ← KB raw uploads + generated outputs (cleaned by orphan cron)
@@ -261,6 +419,18 @@ const TABLES_TO_CLEAR = [
 //   - moodboard-sheet-references   ← admin-curated UI illustrations
 // ============================================================
 const BUCKETS_TO_CLEAR = ['pdf-tiles', 'generation-images'];
+
+// Path prefixes inside a cleared bucket that hold SETTINGS / BRANDING assets,
+// not regenerable AI output. The whole-bucket wipe skips these so a reset
+// doesn't destroy admin-uploaded branding whose config row (finance_settings,
+// user_profiles) is preserved. Without this, the row survives pointing at a
+// deleted file (broken invoice/PDF logos). Mirrors the orphan-cron protection
+// added to build_storage_reference_set().
+const BUCKET_PROTECTED_PREFIXES: Record<string, string[]> = {
+  'generation-images': [
+    'business-logos/', // finance_settings.business_logo_path (invoice/business branding)
+  ],
+};
 
 /**
  * Recursively list every file path in a bucket folder (handles subdirectories).
@@ -352,6 +522,22 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       );
     }
 
+    // SAFETY GUARD (fail-closed): never proceed if any NEVER_CLEAR table has
+    // leaked into TABLES_TO_CLEAR. Protects legally-retained finance/fiscal
+    // records, secrets, customer API-key state, and long-running monitoring
+    // data from a bad edit. Abort the WHOLE reset before deleting anything.
+    const guardViolations = TABLES_TO_CLEAR.filter((t) => NEVER_CLEAR.has(t));
+    if (guardViolations.length > 0) {
+      console.error('🛑 Reset aborted — protected tables present in clear list:', guardViolations);
+      return new Response(
+        JSON.stringify({
+          error: 'Reset aborted: protected tables are present in the clear list',
+          protected_tables: guardViolations,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     console.log('🔄 Starting platform reset...');
     const results: any = {
       tables: [],
@@ -359,35 +545,65 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     };
     let totalDeleted = 0;
 
+    // LOCK GUARD: "anything locked is never deleted". Discover which clear-list
+    // tables carry a boolean `is_locked` column; for those, the delete skips
+    // rows where is_locked = true (keeps false / null). Self-maintaining — a
+    // new lockable table in the clear list is honored automatically. If the
+    // helper RPC is unavailable, fall back to no lock awareness (still safe:
+    // lockable tables are not currently in the clear list).
+    let lockAwareSet = new Set<string>();
+    try {
+      const { data: lockAware, error: lockErr } = await supabase.rpc('reset_lock_aware_tables', {
+        p_tables: TABLES_TO_CLEAR,
+      });
+      if (lockErr) {
+        console.warn('   ⚠️ reset_lock_aware_tables RPC failed — proceeding without lock awareness:', lockErr.message);
+      } else if (Array.isArray(lockAware)) {
+        lockAwareSet = new Set<string>(lockAware as string[]);
+        if (lockAwareSet.size > 0) {
+          console.log(`   🔒 Lock-aware tables (locked rows preserved): ${[...lockAwareSet].join(', ')}`);
+        }
+      }
+    } catch (e: any) {
+      console.warn('   ⚠️ Lock-awareness lookup threw — proceeding without it:', e?.message);
+    }
+
     // STEP 1: Clear database tables
     console.log('\n🗑️  STEP 1: Clear database tables');
     for (const tableName of TABLES_TO_CLEAR) {
       try {
         console.log(`   Clearing ${tableName}...`);
 
-        // Get count before deletion
-        const { count } = await supabase
-          .from(tableName)
-          .select('*', { count: 'exact', head: true });
+        const lockAware = lockAwareSet.has(tableName);
+
+        // Count rows that will actually be deleted (excludes locked rows on
+        // lock-aware tables) so the reported number is accurate.
+        let countQ = supabase.from(tableName).select('*', { count: 'exact', head: true });
+        if (lockAware) countQ = countQ.not('is_locked', 'is', true);
+        const { count } = await countQ;
 
         if (count === 0) {
-          console.log(`   ✅ ${tableName} is already empty`);
+          console.log(`   ✅ ${tableName} has no clearable rows`);
           results.tables.push({ table: tableName, deleted: 0 });
           continue;
         }
 
-        // Delete all rows
-        const { error } = await supabase
-          .from(tableName)
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+        // Delete all rows. Most tables use a uuid `id`; a few use a composite
+        // PK with no `id` column, so target a known non-null column instead.
+        // Lock-aware tables additionally keep rows where is_locked = true.
+        const idlessCol = IDLESS_DELETE_COLUMN[tableName];
+        let delQ = idlessCol
+          ? supabase.from(tableName).delete().not(idlessCol, 'is', null)
+          : supabase.from(tableName).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (lockAware) delQ = delQ.not('is_locked', 'is', true);
+        const { error } = await delQ;
 
         if (error) {
           console.error(`   ❌ Failed to clear ${tableName}:`, error);
           results.tables.push({ table: tableName, deleted: 0, error: error.message });
         } else {
-          console.log(`   ✅ Deleted ${count} rows from ${tableName}`);
-          results.tables.push({ table: tableName, deleted: count });
+          console.log(`   ✅ Deleted ${count} rows from ${tableName}${lockAware ? ' (locked rows preserved)' : ''}`);
+          results.tables.push({ table: tableName, deleted: count, lock_aware: lockAware || undefined });
           totalDeleted += count || 0;
         }
       } catch (error: any) {
@@ -404,11 +620,21 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
         console.log(`   Clearing bucket: ${bucketName}...`);
 
         // Recursively list all files including those in subdirectories
-        const allFiles = await listAllFiles(bucketName);
+        const listedFiles = await listAllFiles(bucketName);
+
+        // Skip protected settings/branding prefixes (preserved across reset).
+        const protectedPrefixes = BUCKET_PROTECTED_PREFIXES[bucketName] || [];
+        const allFiles = protectedPrefixes.length
+          ? listedFiles.filter((p) => !protectedPrefixes.some((pre) => p.startsWith(pre)))
+          : listedFiles;
+        const skipped = listedFiles.length - allFiles.length;
+        if (skipped > 0) {
+          console.log(`   🛡️  Preserving ${skipped} branding file(s) under [${protectedPrefixes.join(', ')}]`);
+        }
 
         if (allFiles.length === 0) {
-          console.log(`   ✅ Bucket ${bucketName} is already empty`);
-          results.storage.push({ bucket: bucketName, deleted: 0 });
+          console.log(`   ✅ Bucket ${bucketName} has no clearable files`);
+          results.storage.push({ bucket: bucketName, deleted: 0, preserved: skipped });
           continue;
         }
 
@@ -429,8 +655,8 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
           }
         }
 
-        console.log(`   ✅ Deleted ${totalDeletedFromBucket} files from ${bucketName}`);
-        results.storage.push({ bucket: bucketName, deleted: totalDeletedFromBucket, error: bucketError });
+        console.log(`   ✅ Deleted ${totalDeletedFromBucket} files from ${bucketName}${skipped > 0 ? ` (preserved ${skipped} branding file(s))` : ''}`);
+        results.storage.push({ bucket: bucketName, deleted: totalDeletedFromBucket, preserved: skipped, error: bucketError });
       } catch (error: any) {
         console.error(`   ❌ Error clearing bucket ${bucketName}:`, error);
         results.storage.push({ bucket: bucketName, deleted: 0, error: error.message });

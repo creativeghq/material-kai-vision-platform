@@ -91,6 +91,26 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Calculators (all users; deterministic, free) ──────────────────
+  {
+    id: 'calculate_heat_pump_sizing', name: 'Heat-pump Sizer', category: 'Calculators',
+    credits: 0,
+    desc: 'Estimate the heat-pump capacity (kW) a space needs from area, insulation, climate zone, ceiling height and emitter type. Free, instant, no upstream API.',
+    examples: [
+      'How big a heat pump do I need for a 120 m² apartment, post-1980, zone C, with fan coils?',
+      'Size a heat pump for a 90 m² well-insulated house with underfloor heating in Athens',
+    ],
+  },
+  {
+    id: 'calculate_heating_cost_comparison', name: 'Heating Cost Compare', category: 'Calculators',
+    credits: 0,
+    desc: 'Compare the annual running cost of 6 heating methods (oil, gas, A/C, heat pump, fireplaces) for one dwelling. Free, instant, no upstream API.',
+    examples: [
+      'Compare heating costs for a 200 m² home at 132 kWh/m²·yr — which is cheapest to run?',
+      'Is a heat pump cheaper to run than gas for my 150 m² apartment?',
+    ],
+  },
+
   // ── Mention monitoring (all users; module-gated; per-tool credits) ─
   {
     id: 'track_product_mentions', name: 'Track Mentions', category: 'Mentions',
@@ -123,6 +143,79 @@ const KAI_TOOLS: AgentToolEntry[] = [
     desc: 'List recent negative-sentiment mentions for a product. Use for reputation triage.',
     examples: [
       'Show me negative mentions for product 12345 in the last 30d',
+    ],
+  },
+
+  // ── Job Research (all users; module-gated) ────────────────────────────
+  {
+    id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
+    moduleSlug: 'job-research',
+    desc: 'Create, update, pause, resume, or delete a background job search. Discovers postings across Google Jobs, Perplexity, RSS + career pages with a daily digest.',
+    examples: [
+      'Track senior Python developer jobs, remote only, daily digest at 9am',
+    ],
+  },
+  {
+    id: 'list_my_job_searches', name: 'My Job Searches', category: 'Job Research',
+    moduleSlug: 'job-research',
+    desc: 'List your active job searches with their cadence and latest match counts.',
+    examples: [
+      'List my job searches',
+    ],
+  },
+  {
+    id: 'find_jobs', name: 'Find Jobs', category: 'Job Research',
+    moduleSlug: 'job-research',
+    desc: 'Fetch recent matched listings for one of your tracked job searches.',
+    examples: [
+      'Show me new job matches from this week',
+    ],
+  },
+  {
+    id: 'get_job_digest_preview', name: 'Digest Preview', category: 'Job Research',
+    moduleSlug: 'job-research',
+    desc: "Preview today's consolidated job digest before it's sent.",
+    examples: [
+      'Preview my job digest for today',
+    ],
+  },
+  {
+    id: 'manage_job_sites', name: 'Manage Job Sites', category: 'Job Research',
+    moduleSlug: 'job-research', adminOnly: true,
+    desc: 'List / add / remove / toggle the platform-wide job-source sites (Perplexity domains, RSS feeds, career pages). Admin-only writes.',
+    examples: [
+      'Which job boards do you search?',
+      'Add kariera.gr to the job search',
+    ],
+  },
+
+  // ── Projects (all users) ──────────────────────────────────────────────
+  {
+    id: 'create_project', name: 'Create Project', category: 'Projects',
+    desc: 'Create a new project to organize tasks and deliverables.',
+    examples: [
+      'Create a project called "Athens loft renovation"',
+    ],
+  },
+  {
+    id: 'list_my_projects', name: 'My Projects', category: 'Projects',
+    desc: 'List your projects with status and task counts.',
+    examples: [
+      'List my projects',
+    ],
+  },
+  {
+    id: 'find_project', name: 'Find Project', category: 'Projects',
+    desc: 'Look up a project by name or id and return its details + tasks.',
+    examples: [
+      'Find the "Athens loft renovation" project',
+    ],
+  },
+  {
+    id: 'add_task', name: 'Add Task', category: 'Projects',
+    desc: 'Add a task to a project.',
+    examples: [
+      'Add a task "order travertine samples" to the Athens loft project',
     ],
   },
 
@@ -735,7 +828,7 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
  * One field in a quick-start's collect-then-send form. Rendered generically by
  * ToolkitFormModal. The `key` is referenced from `promptTemplate` as `{{key}}`.
  */
-export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'tags';
+export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'country_code' | 'tags';
 
 export interface ToolkitFormFieldOption {
   value: string;
@@ -757,6 +850,37 @@ export interface ToolkitFormField {
   default?: string;
   /** Options for kind='select'. */
   options?: ToolkitFormFieldOption[];
+}
+
+/**
+ * Deterministic-run descriptor. When a quick-start carries `run`, submitting its
+ * form does NOT inject a prompt for the LLM to interpret — instead the collected
+ * field values are mapped to the target tool's structured arguments and the tool
+ * is invoked directly (mode:'direct_tool' on agent-chat), bypassing the model.
+ * RBAC + toolkit gating still apply server-side (the owning toolkit is sent in
+ * selected_toolkits; admin-only tools never bind for non-admins).
+ *
+ * Omit `run` to keep the legacy behavior: render `promptTemplate`/`prompt` and
+ * auto-send it as a chat message (right for multi-step workflows + creative seeds).
+ */
+export interface ToolkitQuickStartRun {
+  /** Target agent tool id (must match a registered tool name). */
+  tool: string;
+  /**
+   * Map form-field `key` → tool argument name. Fields not listed map to a tool
+   * arg of the same name (identity). Fields that map to nothing are dropped.
+   */
+  argMap?: Record<string, string>;
+  /** Static args merged into every run (e.g. a fixed `action: 'start'`). */
+  fixedArgs?: Record<string, unknown>;
+  /**
+   * Per-tool-arg value coercion (keyed by the RESOLVED tool-arg name):
+   *  - 'number' → Number(value)
+   *  - 'csv'    → split on commas → string[]
+   *  - 'lines'  → split on newlines/commas → string[]
+   * Text fields without a coercion pass through as trimmed strings.
+   */
+  coerce?: Record<string, 'number' | 'csv' | 'lines'>;
 }
 
 export interface ToolkitQuickStart {
@@ -782,6 +906,11 @@ export interface ToolkitQuickStart {
    * collected values. Falls back to `prompt` when omitted.
    */
   promptTemplate?: string;
+  /**
+   * When present, this quick-start runs its target tool deterministically from
+   * the collected form values instead of sending a prompt. See ToolkitQuickStartRun.
+   */
+  run?: ToolkitQuickStartRun;
 }
 
 export interface ToolkitDefinition {
@@ -824,6 +953,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Find materials', description: 'Search the catalog by description', icon: 'Search',
         prompt: 'Find me 5 cement-based grey tiles for a modern bathroom',
         promptTemplate: 'Find me {{count}} {{description}}.',
+        run: { tool: 'material_search', argMap: { description: 'query', count: 'limit' }, coerce: { limit: 'number' } },
         form: [
           { key: 'description', label: 'What are you looking for?', kind: 'text', required: true, placeholder: 'cement-based grey tiles for a modern bathroom' },
           { key: 'count', label: 'How many results?', kind: 'number', default: '5' },
@@ -833,6 +963,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Search the KB', description: 'Look up platform docs', icon: 'Compass',
         prompt: 'How does the 7-vector fusion search work?',
         promptTemplate: 'Search the knowledge base: {{query}}',
+        run: { tool: 'knowledge_base_search' },
         form: [
           { key: 'query', label: 'What do you want to look up?', kind: 'text', required: true, placeholder: 'How does the 7-vector fusion search work?' },
         ],
@@ -922,6 +1053,76 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'job-research',
+    name: 'Job Research',
+    description: 'Background job-discovery agent across Google Jobs, Perplexity, RSS + career pages with a consolidated daily digest.',
+    icon: 'Briefcase',
+    moduleSlug: 'job-research',
+    tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
+    quick_starts: [
+      {
+        label: 'Track a job search', description: 'Start a background search with a daily digest', icon: 'Plus',
+        prompt: 'Track a new job search for me.',
+        promptTemplate: 'Track a job search for "{{keywords}}"{{remote}} and send me a daily digest. Confirm the scope before saving.',
+        form: [
+          { key: 'keywords', label: 'Role / keywords', kind: 'text', required: true, placeholder: 'senior python developer' },
+          { key: 'remote', label: 'Remote only?', kind: 'select', default: ' (remote only)', options: [
+            { value: ' (remote only)', label: 'Remote only' },
+            { value: '', label: 'Any location' },
+          ] },
+        ],
+      },
+      {
+        label: 'My job searches', description: 'List your active searches', icon: 'ListChecks',
+        prompt: 'List my job searches.',
+        run: { tool: 'list_my_job_searches' },
+      },
+      {
+        label: 'Preview digest', description: "Today's consolidated digest", icon: 'Newspaper',
+        prompt: "Preview today's job digest.",
+        run: { tool: 'get_job_digest_preview' },
+      },
+      {
+        label: 'Which job boards?', description: 'List the searched job sites', icon: 'Globe',
+        prompt: 'Which job boards do you search?',
+        run: { tool: 'manage_job_sites', fixedArgs: { action: 'list' } },
+      },
+    ],
+  },
+  {
+    id: 'projects',
+    name: 'Projects',
+    description: 'Organize work into projects + tasks. Create, browse, and add tasks straight from chat.',
+    icon: 'FolderKanban',
+    tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'],
+    quick_starts: [
+      {
+        label: 'New project', description: 'Create a project', icon: 'Plus',
+        prompt: 'Create a new project.',
+        promptTemplate: 'Create a project called "{{name}}".',
+        run: { tool: 'create_project' },
+        form: [
+          { key: 'name', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
+          { key: 'description', label: 'Description', kind: 'textarea', placeholder: 'Optional summary' },
+        ],
+      },
+      {
+        label: 'My projects', description: 'List your projects', icon: 'ListChecks',
+        prompt: 'List my projects.',
+        run: { tool: 'list_my_projects' },
+      },
+      {
+        label: 'Find a project', description: 'Look up a project by name', icon: 'Search',
+        prompt: 'Find a project.',
+        promptTemplate: 'Find the "{{query}}" project.',
+        run: { tool: 'find_project' },
+        form: [
+          { key: 'query', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'presentation-sheets',
     name: 'Presentation Sheets',
     description: 'A3 client-ready moodboard sheets: material board / color palette / lighting plan / annotated render / FF&E / full deck.',
@@ -946,6 +1147,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: '3D render', description: 'Generate an interior render', icon: 'Sparkles',
         prompt: 'Render a modern Athens loft kitchen with travertine floors and warm lighting.',
         promptTemplate: 'Render {{scene}}.',
+        run: { tool: 'generate_3d', argMap: { scene: 'prompt' } },
         form: [
           { key: 'scene', label: 'Describe the room to render', kind: 'textarea', required: true, placeholder: 'a modern Athens loft kitchen with travertine floors and warm lighting' },
         ],
@@ -969,15 +1171,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Research a keyword', description: 'Full SERP + AI Overview snapshot', icon: 'Search',
         prompt: 'Research the keyword "porcelain tile installation" in the UK. Walk me through the SERP findings.',
         promptTemplate: 'Research the keyword "{{keyword}}" in {{country}}. Walk me through the SERP findings.',
+        run: { tool: 'seo_research_keyword', argMap: { country: 'country_code' } },
         form: [
           { key: 'keyword', label: 'Keyword', kind: 'text', required: true, placeholder: 'porcelain tile installation' },
-          { key: 'country', label: 'Market', kind: 'country', default: 'the United Kingdom' },
+          { key: 'country', label: 'Market', kind: 'country_code', default: 'GB' },
         ],
       },
       {
         label: 'Audit a URL', description: 'Lighthouse + on-page issues', icon: 'BadgeCheck',
         prompt: 'Audit a public URL.',
         promptTemplate: 'Audit this URL: {{url}}',
+        run: { tool: 'seo_audit_url' },
         form: [
           { key: 'url', label: 'URL to audit', kind: 'text', required: true, placeholder: 'https://flobali.gr/products/porcelain-12mm' },
         ],
@@ -986,6 +1190,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Suggest keywords', description: 'Phrase-match expansion with volume', icon: 'ListChecks',
         prompt: 'Expand a seed phrase into 30 keyword suggestions with volume + competition.',
         promptTemplate: 'Expand the seed phrase "{{seed}}" into {{count}} keyword suggestions with volume + competition.',
+        run: { tool: 'seo_keyword_suggestions', argMap: { seed: 'keyword', count: 'limit' }, coerce: { limit: 'number' } },
         form: [
           { key: 'seed', label: 'Seed phrase', kind: 'text', required: true, placeholder: 'travertine sealer' },
           { key: 'count', label: 'How many suggestions?', kind: 'number', default: '30' },
@@ -1008,6 +1213,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Snapshot a domain', description: 'Rank, keyword count, traffic, backlinks', icon: 'Globe',
         prompt: 'Give me an SEO snapshot for a domain.',
         promptTemplate: 'Give me an SEO snapshot for {{domain}}.',
+        run: { tool: 'seo_domain_snapshot' },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
         ],
@@ -1016,6 +1222,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Find content gaps', description: 'Keywords competitor ranks for that we don\'t', icon: 'Search',
         prompt: 'Find SEO keyword gaps between two domains.',
         promptTemplate: 'Find SEO keyword gaps where {{competitor}} ranks but {{your_domain}} does not.',
+        run: { tool: 'seo_keyword_gap', argMap: { competitor: 'competitor_domain' } },
         form: [
           { key: 'your_domain', label: 'Your domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
           { key: 'competitor', label: 'Competitor domain', kind: 'text', required: true, placeholder: 'carrelagedirect.fr' },
@@ -1025,9 +1232,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'List ranked keywords', description: 'What does a domain rank for', icon: 'ListChecks',
         prompt: 'List every keyword a domain currently ranks for, with positions + traffic share.',
         promptTemplate: 'List every keyword {{domain}} currently ranks for in {{country}}, with positions + traffic share.',
+        run: { tool: 'seo_ranked_keywords', argMap: { country: 'country_code' } },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
-          { key: 'country', label: 'Market', kind: 'country', default: 'Greece' },
+          { key: 'country', label: 'Market', kind: 'country_code', default: 'GR' },
         ],
       },
     ],
@@ -1045,6 +1253,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Backlinks summary', description: 'Total backlinks + referring domains + spam score', icon: 'Link2',
         prompt: 'Pull a backlinks summary for a domain.',
         promptTemplate: 'Pull a backlinks summary for {{domain}}.',
+        run: { tool: 'seo_backlinks_summary', argMap: { domain: 'target' } },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
         ],
@@ -1053,6 +1262,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Anchor texts', description: 'Top anchor patterns', icon: 'Link2',
         prompt: 'List the top anchor texts pointing to a domain.',
         promptTemplate: 'List the top anchor texts pointing to {{domain}}.',
+        run: { tool: 'seo_backlinks_anchors', argMap: { domain: 'target' } },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
         ],
@@ -1073,6 +1283,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Crawl a site', description: 'OnPage crawl up to 1000 pages', icon: 'FileSearch',
         prompt: 'Kick off a full OnPage crawl for a domain.',
         promptTemplate: 'Kick off a full OnPage crawl for {{domain}} (up to {{max_pages}} pages).',
+        run: { tool: 'seo_site_crawl_start', argMap: { domain: 'target' }, coerce: { max_pages: 'number' } },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
           { key: 'max_pages', label: 'Max pages', kind: 'number', default: '100' },
@@ -1082,6 +1293,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Tech stack', description: 'Detect CMS, analytics, frameworks', icon: 'FileSearch',
         prompt: 'Identify the tech stack of a domain.',
         promptTemplate: 'Identify the tech stack of {{domain}}.',
+        run: { tool: 'seo_domain_technologies' },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
         ],
@@ -1090,6 +1302,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'LLM mentions', description: 'What LLMs cite for a keyword', icon: 'Bot',
         prompt: 'Find what pages LLMs cite when answering questions about a keyword.',
         promptTemplate: 'Find what pages LLMs cite when answering questions about "{{keyword}}".',
+        run: { tool: 'seo_llm_mentions_search' },
         form: [
           { key: 'keyword', label: 'Keyword / topic', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
         ],
@@ -1111,6 +1324,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'YouTube search', description: 'Top YouTube videos for a keyword', icon: 'Layers',
         prompt: 'Search YouTube for "porcelain tile installation" — show top videos with view counts.',
         promptTemplate: 'Search YouTube for "{{keyword}}" — show the top videos with view counts.',
+        run: { tool: 'seo_youtube_search' },
         form: [
           { key: 'keyword', label: 'Keyword', kind: 'text', required: true, placeholder: 'porcelain tile installation' },
         ],
@@ -1119,6 +1333,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Google Trends', description: 'Interest-over-time + regional', icon: 'Layers',
         prompt: 'Run Google Trends for up to 5 keywords.',
         promptTemplate: 'Run Google Trends for these keywords: {{keywords}}.',
+        run: { tool: 'seo_google_trends', coerce: { keywords: 'lines' } },
         form: [
           { key: 'keywords', label: 'Keywords (up to 5, one per line)', kind: 'tags', required: true, placeholder: 'travertine\nporcelain tile\nterrazzo' },
         ],
@@ -1127,6 +1342,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Reddit threads', description: 'Real user discussion + pain points', icon: 'Layers',
         prompt: 'Find Reddit threads discussing a topic.',
         promptTemplate: 'Find Reddit threads discussing "{{topic}}".',
+        run: { tool: 'seo_reddit_search', argMap: { topic: 'keyword' } },
         form: [
           { key: 'topic', label: 'Topic', kind: 'text', required: true, placeholder: 'best porcelain tile installer' },
         ],
@@ -1144,6 +1360,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Full site review', description: 'Rank + keywords + competitors + backlinks in one call', icon: 'BadgeCheck',
         prompt: 'Run a full site review of a domain.',
         promptTemplate: 'Run a full site review of {{domain}}.',
+        run: { tool: 'seo_site_review' },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
         ],
@@ -1152,6 +1369,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Brand SERP audit', description: 'Knowledge Panel + AI Overview brand mention', icon: 'BadgeCheck',
         prompt: 'Run a brand-search audit for a brand.',
         promptTemplate: 'Run a brand-search audit for "{{brand}}".',
+        run: { tool: 'seo_brand_search_audit', argMap: { brand: 'brand_name' } },
         form: [
           { key: 'brand', label: 'Brand', kind: 'text', required: true, placeholder: 'Flobali' },
         ],
@@ -1185,6 +1403,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Just research', description: 'Stop at research stage', icon: 'Search',
         prompt: 'Run only Stage 1 (keyword research).',
         promptTemplate: 'Run only Stage 1 (keyword research) for the seed keyword "{{keyword}}".',
+        run: { tool: 'seo_keyword_research', argMap: { keyword: 'topic' } },
         form: [
           { key: 'keyword', label: 'Seed keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
         ],
@@ -1219,6 +1438,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Enrich a company', description: 'Apollo data for a known domain', icon: 'Building2',
         prompt: 'Pull Apollo enrichment for a single company.',
         promptTemplate: 'Pull Apollo enrichment for {{domain}}.',
+        run: { tool: 'company_enrichment' },
         form: [
           { key: 'domain', label: 'Company domain', kind: 'text', required: true, placeholder: 'example.com' },
         ],
@@ -1227,6 +1447,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Find contacts', description: 'Decision-maker emails for a company', icon: 'Mail',
         prompt: 'Find decision-maker emails at a company.',
         promptTemplate: 'Find decision-maker contacts ({{titles}}) at {{domain}}.',
+        run: { tool: 'contact_discovery', argMap: { titles: 'roles' }, coerce: { roles: 'csv' } },
         form: [
           { key: 'domain', label: 'Company domain', kind: 'text', required: true, placeholder: 'example.com' },
           { key: 'titles', label: 'Target roles', kind: 'text', default: 'CEO, Procurement, Sales' },
@@ -1248,6 +1469,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Deep research', description: 'Multi-step open-ended research', icon: 'Bot',
         prompt: 'Run a deep research analysis.',
         promptTemplate: 'Run a deep research analysis on: {{topic}}',
+        run: { tool: 'research_analysis', argMap: { topic: 'query' } },
         form: [
           { key: 'topic', label: 'Research question', kind: 'textarea', required: true, placeholder: "the EU Green Deal's impact on construction materials" },
         ],
@@ -1256,6 +1478,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Platform analytics', description: 'Usage / metric breakdowns', icon: 'Bot',
         prompt: 'Run an analytics question against the platform.',
         promptTemplate: 'Run a platform analytics question: {{question}}',
+        run: { tool: 'analytics_analysis', argMap: { question: 'query' } },
         form: [
           { key: 'question', label: 'What to investigate', kind: 'textarea', required: true, placeholder: 'How many active subjects do we have in mention monitoring this week?' },
         ],
@@ -1264,6 +1487,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Business breakdown', description: 'Revenue / customer / GMV', icon: 'Bot',
         prompt: 'Run a business-side analysis.',
         promptTemplate: 'Run a business-side analysis: {{question}}',
+        run: { tool: 'business_analysis', argMap: { question: 'query' } },
         form: [
           { key: 'question', label: 'What to break down', kind: 'textarea', required: true, placeholder: 'Top 10 customers by quote value this quarter' },
         ],
@@ -1282,6 +1506,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
         prompt: 'Pull a pricing-KB entry.',
         promptTemplate: 'Pull the pricing-KB entry for "{{query}}".',
+        run: { tool: 'price_lookup', argMap: { query: 'product_name' } },
         form: [
           { key: 'query', label: 'Product / SKU', kind: 'text', required: true, placeholder: 'Crema Marfil 600x600' },
         ],
@@ -1333,6 +1558,35 @@ export function findToolkitsForTool(toolId: string): ToolkitDefinition[] {
  * then doubled spaces / orphaned punctuation left behind are tidied so the final
  * message reads naturally.
  */
+/**
+ * Build a structured tool-input object from collected form values + a `run`
+ * descriptor. Empty/whitespace fields are dropped so the tool's own defaults
+ * apply. Coercions are keyed by the RESOLVED tool-arg name (post-argMap).
+ */
+export function buildToolInput(
+  run: ToolkitQuickStartRun,
+  values: Record<string, string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(run.fixedArgs ?? {}) };
+  for (const [fieldKey, raw] of Object.entries(values)) {
+    const argName = run.argMap?.[fieldKey] ?? fieldKey;
+    const v = (raw ?? '').trim();
+    if (v === '') continue; // let the tool default apply
+    const coercion = run.coerce?.[argName];
+    if (coercion === 'number') {
+      const n = Number(v);
+      if (!Number.isNaN(n)) out[argName] = n;
+    } else if (coercion === 'csv') {
+      out[argName] = v.split(',').map((s) => s.trim()).filter(Boolean);
+    } else if (coercion === 'lines') {
+      out[argName] = v.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    } else {
+      out[argName] = v;
+    }
+  }
+  return out;
+}
+
 export function renderPromptTemplate(
   template: string,
   values: Record<string, string>,

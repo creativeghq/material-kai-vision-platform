@@ -1,6 +1,6 @@
 /**
  * #207 — Time-tracking & billing. Log billable hours against a customer, then turn unbilled
- * entries into a draft invoice (one line per entry). Oxygen tasks_management + time-reports parity.
+ * entries into a draft invoice (one line per entry).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Clock, Search, FilePlus2, CheckCircle2, BarChart3, Users, Contact } from 'lucide-react';
@@ -40,7 +40,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [billing, setBilling] = useState(false);
 
-  // Time reports (Oxygen m=403 — per user / per contact)
+  // Time reports — per user / per contact
   const thisYear = new Date().getFullYear();
   const [repFrom, setRepFrom] = useState(`${thisYear}-01-01`);
   const [repTo, setRepTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -240,7 +240,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
         </CardContent>
       </Card>
 
-      {/* Time reports — per user / per contact (Oxygen m=403) */}
+      {/* Time reports — per user / per contact */}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
           <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Time reports</CardTitle>

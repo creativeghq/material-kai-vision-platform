@@ -9,6 +9,35 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
+ * Columns a client may write on create/update. Single source of truth so POST and PATCH
+ * stay in sync (a prior bug let PATCH persist VAT/tax fields that POST silently dropped, so a
+ * company created with a VAT number lost it). Includes the ΑΑΔΕ-enrichment columns the
+ * CompanyDetailPage adopts from a lookup so a brand-new Greek business persists its details
+ * on first Save without a second round trip.
+ */
+const COMPANY_WRITABLE_COLUMNS = [
+  'name', 'website', 'industry', 'employee_count', 'annual_revenue',
+  'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'notes',
+  'linkedin', 'twitter', 'facebook', 'description',
+  'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
+  // Tax / VAT identity
+  'vat_number', 'country_code', 'tax_office', 'profession', 'street', 'street_number',
+  // VIES / ΑΑΔΕ verification (mirrors the myaade-rgwspublic2 / vies-validate write set)
+  'vat_validated', 'vat_validated_at', 'vat_validated_name', 'vat_validated_address', 'vat_validation_source',
+  // ΑΑΔΕ structured enrichment
+  'commercial_title', 'legal_status', 'kad_primary', 'kad_primary_description', 'kad_secondary',
+  'business_start_date', 'aade_data', 'aade_data_at',
+] as const;
+
+function pickCompanyFields(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const col of COMPANY_WRITABLE_COLUMNS) {
+    if (body[col] !== undefined) out[col] = body[col];
+  }
+  return out;
+}
+
+/**
  * CRM Companies API
  * Handles company management: create, list, update, delete
  *
@@ -45,27 +74,8 @@ export async function handleCompanies(req: Request): Promise<Response> {
     // POST /api/companies - Create company
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
-      const {
-        name,
-        website,
-        industry,
-        employee_count,
-        annual_revenue,
-        email,
-        phone,
-        address,
-        city,
-        state,
-        postal_code,
-        country,
-        linkedin,
-        twitter,
-        facebook,
-        description,
-        notes,
-      } = body;
 
-      if (!name) {
+      if (!body.name) {
         return new Response(
           JSON.stringify({ error: 'Company name is required' }),
           { status: 400, headers: corsHeaders },
@@ -75,23 +85,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const { data, error } = await supabase
         .from('crm_companies')
         .insert({
-          name,
-          website,
-          industry,
-          employee_count,
-          annual_revenue,
-          email,
-          phone,
-          address,
-          city,
-          state,
-          postal_code,
-          country,
-          linkedin,
-          twitter,
-          facebook,
-          description,
-          notes,
+          ...pickCompanyFields(body),
           created_by: user.id,
         })
         .select();
@@ -187,44 +181,10 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const companyId = path[0];
       const body = await req.json();
 
-      const {
-        name, website, industry, employee_count, annual_revenue,
-        email, phone, address, city, state, postal_code, country,
-        linkedin, twitter, facebook, description,
-        is_supplier, is_customer, commercial_title, legal_status,
-        tax_office, profession, street, street_number, vat_number, country_code,
-        discount_percent, discount_notes, credit_limit,
-      } = body;
-      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (name !== undefined) updates.name = name;
-      if (website !== undefined) updates.website = website;
-      if (industry !== undefined) updates.industry = industry;
-      if (employee_count !== undefined) updates.employee_count = employee_count;
-      if (annual_revenue !== undefined) updates.annual_revenue = annual_revenue;
-      if (email !== undefined) updates.email = email;
-      if (phone !== undefined) updates.phone = phone;
-      if (address !== undefined) updates.address = address;
-      if (city !== undefined) updates.city = city;
-      if (state !== undefined) updates.state = state;
-      if (postal_code !== undefined) updates.postal_code = postal_code;
-      if (country !== undefined) updates.country = country;
-      if (linkedin !== undefined) updates.linkedin = linkedin;
-      if (twitter !== undefined) updates.twitter = twitter;
-      if (facebook !== undefined) updates.facebook = facebook;
-      if (description !== undefined) updates.description = description;
-      if (is_supplier !== undefined) updates.is_supplier = is_supplier;
-      if (is_customer !== undefined) updates.is_customer = is_customer;
-      if (commercial_title !== undefined) updates.commercial_title = commercial_title;
-      if (legal_status !== undefined) updates.legal_status = legal_status;
-      if (tax_office !== undefined) updates.tax_office = tax_office;
-      if (profession !== undefined) updates.profession = profession;
-      if (street !== undefined) updates.street = street;
-      if (street_number !== undefined) updates.street_number = street_number;
-      if (vat_number !== undefined) updates.vat_number = vat_number;
-      if (country_code !== undefined) updates.country_code = country_code;
-      if (discount_percent !== undefined) updates.discount_percent = discount_percent;
-      if (discount_notes !== undefined) updates.discount_notes = discount_notes;
-      if (credit_limit !== undefined) updates.credit_limit = credit_limit;
+      const updates: Record<string, unknown> = {
+        ...pickCompanyFields(body),
+        updated_at: new Date().toISOString(),
+      };
 
       const { data, error } = await supabase
         .from('crm_companies')

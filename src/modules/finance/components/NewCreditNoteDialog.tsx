@@ -1,6 +1,6 @@
 /**
  * New credit note from the Credit-notes list. Pick the invoice it corrects, then credit
- * its specific lines (full or partial quantity) — Oxygen pistotika_new parity. The note is
+ * its specific lines (full or partial quantity). The note is
  * created against the invoice (myDATA 5.1 correlated when the invoice has a MARK, else 5.2),
  * nets the invoice balance, and optionally transmits. Falls back to a whole-amount credit
  * for legacy invoices that have no stored line items.

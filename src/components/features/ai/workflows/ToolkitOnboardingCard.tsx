@@ -14,6 +14,7 @@ import {
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle, ArrowRight,
+  Briefcase, FolderKanban,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -24,6 +25,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle,
+  Briefcase, FolderKanban,
 };
 
 interface Props {

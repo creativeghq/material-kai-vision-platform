@@ -1153,6 +1153,11 @@ export interface FinanceSettings {
   auto_statement_min_balance: number;
   auto_statement_side: 'customer' | 'supplier' | 'both';
   auto_statement_last_run_at: string | null;
+  /** Buyer risk-gate rules enforced at invoice issuance (ΑΑΔΕ status + credit limit). */
+  risk_block_inactive_vat: boolean;
+  risk_block_unvalidated_vat: boolean;
+  risk_warn_over_credit_limit: boolean;
+  risk_block_over_credit_limit: boolean;
   updated_at: string;
 }
 
@@ -1366,6 +1371,8 @@ const _financeServiceV2 = {
       'auto_statement_enabled','auto_statement_frequency','auto_statement_interval_days',
       'auto_statement_day_of_week','auto_statement_day_of_month','auto_statement_hour_utc',
       'auto_statement_only_outstanding','auto_statement_min_balance','auto_statement_side',
+      'risk_block_inactive_vat','risk_block_unvalidated_vat',
+      'risk_warn_over_credit_limit','risk_block_over_credit_limit',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }

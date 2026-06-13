@@ -1546,7 +1546,7 @@
     "name": "finance-storefront",
     "tag": "Finance",
     "summary": "Public online storefront: browse products and submit cart checkout",
-    "description": "Anonymous action-discriminated endpoint for the workspace's public mini-store (Oxygen 'Open Link' parity). 'meta' returns storefront config, 'products' returns published products with prices, 'checkout' validates the cart server-side, creates a draft retail receipt (myDATA 11.1), and returns a Stripe pay link. Requires the sales-finance module for checkout.",
+    "description": "Anonymous action-discriminated endpoint for the workspace's public mini-store. 'meta' returns storefront config, 'products' returns published products with prices, 'checkout' validates the cart server-side, creates a draft retail receipt (myDATA 11.1), and returns a Stripe pay link. Requires the sales-finance module for checkout.",
     "security": [
       "public"
     ],

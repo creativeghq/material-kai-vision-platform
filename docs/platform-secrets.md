@@ -85,7 +85,7 @@ Each listed secret includes `value_masked`, `value_present`, `effective.{value_p
 
 **Platform-wide** (`primary_module_slug NULL`): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GEMINI_API_KEY`, `REPLICATE_API_TOKEN`, `HF_TOKEN`, `SLIG_ENDPOINT_TOKEN`, `WORLDLABS_API_KEY`, `PINTEREST_*`, `CRON_SECRET`, `ADMIN_RESTART_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_BILLING_SECRET_KEY`, `VAPID_*`.
 
-> Removed 2026-06-07: `OXYGEN_*` (connector deleted). Replaced by Twilio→`ZERNIO_*` for messaging 2026-06-08.
+> Removed 2026-06-07: the legacy ERP connector's secrets (connector deleted). Replaced by Twilio→`ZERNIO_*` for messaging 2026-06-08.
 
 ---
 

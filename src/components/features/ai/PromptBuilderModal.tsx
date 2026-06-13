@@ -30,7 +30,7 @@ import {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench,
   Plus, ListChecks, Palette, Grid3x3, Send, PencilLine, Mail,
-  ImageIcon, ArrowLeft, ArrowRight, type LucideIcon,
+  ImageIcon, ArrowLeft, ArrowRight, Briefcase, FolderKanban, type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -59,7 +59,7 @@ const ICONS: Record<string, LucideIcon> = {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench,
   Plus, ListChecks, Palette, Grid3x3, Send, PencilLine, Mail, Search: SearchIcon,
-  AlertCircle,
+  AlertCircle, Briefcase, FolderKanban,
 };
 function iconFor(name?: string): LucideIcon {
   if (!name) return Wrench;

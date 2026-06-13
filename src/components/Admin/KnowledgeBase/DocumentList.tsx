@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Plus,
   Edit,
@@ -11,6 +13,8 @@ import {
   ExternalLink,
   Globe,
   Lock,
+  Unlock,
+  Database,
   Filter,
   X,
 } from 'lucide-react';
@@ -76,6 +80,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   // trigger client-side so the delete button can be disabled BEFORE the user
   // gets a SQL error toast. Source of truth is still the DB trigger.
   const [categoryAccess, setCategoryAccess] = useState<Map<string, string>>(new Map());
+  const [categoryLocked, setCategoryLocked] = useState<Map<string, boolean>>(new Map());
+
+  // Pagination
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Embedding backfill
+  const [embedBacklog, setEmbedBacklog] = useState(0);
+  const [backfilling, setBackfilling] = useState(false);
 
   const { toast } = useToast();
 
@@ -83,27 +97,49 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     loadWorkspace();
   }, []);
 
+  // Reset to first page whenever the result set changes (filters / search).
+  useEffect(() => {
+    setPage(1);
+  }, [filters, searchQuery]);
+
   useEffect(() => {
     if (workspaceId) {
       loadDocuments();
       loadCategoryAccessMap();
+      loadEmbedBacklog();
     }
-  }, [workspaceId, filters, refreshTrigger]);
+  }, [workspaceId, filters, refreshTrigger, page, searchQuery]);
 
   const loadCategoryAccessMap = async () => {
     const { data } = await supabase
       .from('kb_categories')
-      .select('id, access_level')
+      .select('id, access_level, is_locked')
       .eq('workspace_id', workspaceId);
     const m = new Map<string, string>();
-    (data ?? []).forEach((c: any) => m.set(c.id, c.access_level));
+    const lk = new Map<string, boolean>();
+    (data ?? []).forEach((c: any) => { m.set(c.id, c.access_level); lk.set(c.id, c.is_locked === true); });
     setCategoryAccess(m);
+    setCategoryLocked(lk);
+  };
+
+  const loadEmbedBacklog = async () => {
+    const { count } = await supabase
+      .from('kb_docs')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .is('text_embedding', null)
+      .in('embedding_status', ['pending', 'failed']);
+    setEmbedBacklog(count || 0);
   };
 
   // Mirrors the SQL `kb_is_doc_protected(uuid)` function — keep these in sync.
   const isDocLocked = (doc: KBDocument): boolean => {
+    // Per-doc override wins over the derived state.
+    if (doc.is_locked === true) return true;
+    if (doc.is_locked === false) return false;
     const cat = doc.category_id ? categoryAccess.get(doc.category_id) : undefined;
     if (cat === 'agent') return true;
+    if (doc.category_id && categoryLocked.get(doc.category_id)) return true;
     const autoSynced = (doc.metadata as Record<string, unknown> | undefined)?.auto_synced;
     return autoSynced === true || autoSynced === 'true';
   };
@@ -132,16 +168,29 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     try {
       setIsLoading(true);
 
-      // Query kb_docs table directly
+      // Query kb_docs table directly, paginated (20/page). Search + filters
+      // are applied server-side so they work across the whole set, not just
+      // the current page.
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       let query: any = supabase
         .from('kb_docs')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
       query = applyKbFiltersToQuery(query, filters);
 
-      const { data, error } = await query;
+      const q = searchQuery.trim();
+      if (q) {
+        const esc = q.replace(/[%,()]/g, ' ');
+        query = query.or(`title.ilike.%${esc}%,content.ilike.%${esc}%`);
+      }
+
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) {
         // Check if table doesn't exist
@@ -158,6 +207,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       }
 
       setDocuments(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Failed to load documents:', error);
       toast({
@@ -371,6 +421,46 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
   };
 
+  // One-click lock / unlock from the row. Sets an explicit per-doc override
+  // (is_locked = true/false), which wins over category-derived lock state.
+  const toggleLock = async (doc: KBDocument) => {
+    const next = !isDocLocked(doc);
+    try {
+      const { error } = await supabase
+        .from('kb_docs')
+        .update({ is_locked: next })
+        .eq('id', doc.id)
+        .eq('workspace_id', workspaceId);
+      if (error) throw error;
+      toast({ title: next ? 'Locked' : 'Unlocked', description: `"${doc.title}" is now ${next ? 'locked (protected from deletion)' : 'unlocked'}.` });
+      loadDocuments();
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'Could not change lock state.', variant: 'destructive' });
+    }
+  };
+
+  // Kick the embedding backfill on demand (the pg_cron drains it automatically,
+  // but this lets an admin push a batch immediately and see progress).
+  const runBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('kb-embedding-backfill', {
+        body: { workspace_id: workspaceId, limit: 25 },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Embedding backfill ran',
+        description: `Embedded ${data?.succeeded ?? 0} doc(s)${data?.failed ? `, ${data.failed} failed` : ''}. ${data?.remaining ?? 0} remaining (the drain cron handles the rest).`,
+      });
+      await loadEmbedBacklog();
+      await loadDocuments();
+    } catch (err) {
+      toast({ title: 'Backfill failed', description: err instanceof Error ? err.message : 'Could not run backfill.', variant: 'destructive' });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
       draft: 'secondary',
@@ -386,10 +476,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     return <Clock className="h-4 w-4 text-yellow-500" />;
   };
 
-  const filteredDocuments = documents.filter((doc) =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.content.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Search + filters are applied server-side (see loadDocuments), so the
+  // current page is already the filtered set.
+  const filteredDocuments = documents;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
   const filteredIds = useMemo(() => filteredDocuments.map((d) => d.id), [filteredDocuments]);
@@ -430,6 +520,18 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                 title="Clear all filters"
               >
                 <X className="h-4 w-4" />
+              </Button>
+            )}
+            {embedBacklog > 0 && (
+              <Button
+                variant="outline"
+                className="rounded-full gap-2"
+                disabled={backfilling}
+                onClick={runBackfill}
+                title="Generate embeddings for docs that are pending or failed, so agents can retrieve them"
+              >
+                <Database className={`h-4 w-4 ${backfilling ? 'animate-pulse' : 'text-amber-500'}`} />
+                {backfilling ? 'Embedding…' : `Backfill embeddings (${embedBacklog})`}
               </Button>
             )}
             <Button onClick={onCreate}>
@@ -563,6 +665,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
+                        title={isDocLocked(doc) ? 'Unlock (allow deletion)' : 'Lock (protect from deletion)'}
+                        onClick={() => toggleLock(doc)}
+                      >
+                        {isDocLocked(doc)
+                          ? <Unlock className="h-4 w-4 text-amber-500" />
+                          : <Lock className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => onEdit(doc.id)}
                       >
                         <Edit className="h-4 w-4" />
@@ -582,6 +694,34 @@ export const DocumentList: React.FC<DocumentListProps> = ({
               ))}
             </TableBody>
           </Table>
+        )}
+        {totalCount > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t">
+            <span className="text-sm text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                disabled={page <= 1 || isLoading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">Page {page} / {totalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                disabled={page >= totalPages || isLoading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -605,10 +745,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
               <p className="text-sm text-muted-foreground italic">{viewingDoc.summary}</p>
             )}
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto prose max-w-none text-sm">
-            <div className="whitespace-pre-wrap font-sans leading-relaxed">
-              {viewingDoc.content || 'No content.'}
-            </div>
+          <div className="flex-1 overflow-y-auto text-sm">
+            {viewingDoc.content_markdown || viewingDoc.content ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {viewingDoc.content_markdown || viewingDoc.content || ''}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No content.</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

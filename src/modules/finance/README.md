@@ -15,7 +15,8 @@ This module is the platform's accounting and AADE/myDATA e-invoicing layer. Full
 - **[docs/api/finance-api.md](../../../docs/api/finance-api.md)** — `finance-*` edge function reference.
 
 ## Layout (`src/modules/finance/`)
-- `pages/` — `DocumentsPage` (Invoices / Credit Notes / Delivery Notes / Supplier Bills / Inbound / Parties / Planning / Reports / Settings), `PosPage`.
+- `pages/` — `DocumentsPage` (Invoices / Receipts / Credit Notes / Payments / Expenses inbox / Dispatch board / Delivery Notes / Cheques), `PosPage`.
+  - **Dispatch board** (`components/DispatchBoard.tsx`) — daily "what ships today" queue. Lists paid, shippable orders (`invoices.has_shipping` + `status='paid'`) that have no *issued* dispatch note yet, bucketed by `transport_date` (Overdue / Today / Next 7 / Later / No date). Each order matches its lines to warehouse stock (flags shortfalls), cuts a draft dispatch note in one click (`deliveryNotesService.createDispatchFromOrder` → linked via `delivery_notes.invoice_id`), then Issue & ship decrements stock via `issue_delivery_note`. An issued order drops off the board. "Print run sheet" renders a picking checklist client-side.
 - `tabs/` — `ReportsTab`, `PartiesTab`, `SettingsTab`, `PlanningTab`, `TimeBillingTab`.
 - `services/` — `financeService` (single merged service, all document/fiscal/payment/report/pay/digest ops + canonical `VAT_CATEGORIES`), `accountingExportService`, `inboundService`, `posSessionService`, `timeTrackingService`, `warehouseService`, `deliveryNotesService`, `projectsService` (billing).
 - `components/` — `AccountingExportCard`, `PosTerminalsCard`, `StorefrontCard`, `WarehousePanel`, `InboundSetupCard`, `BranchesCard`, `TeamInviteCard`, `CustomerFinanceTabs`, etc.
@@ -30,4 +31,4 @@ This module is the platform's accounting and AADE/myDATA e-invoicing layer. Full
 - Secrets resolve env-first, DB-second; Novus uses one platform-wide `NOVUS_API_KEY` with per-tenant issuer VAT from `finance_settings.business_vat`.
 
 ## Removed
-The Oxygen ERP connector was deleted 2026-06-07 (single-key model wrong for multi-tenancy). Replaced by Novus → AADE/myDATA per-tenant transmission. See [docs/finance-system.md §10](../../../docs/finance-system.md#10-removed-the-oxygen-connector).
+A legacy third-party ERP connector was deleted 2026-06-07 (single-key model wrong for multi-tenancy). Replaced by Novus → AADE/myDATA per-tenant transmission. See [docs/finance-system.md §10](../../../docs/finance-system.md#10-removed-the-legacy-erp-connector).

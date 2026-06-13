@@ -89,7 +89,7 @@ The module currently has one consumer:
 
 - [`src/components/core/Profile/BusinessSection.tsx`](../../components/core/Profile/BusinessSection.tsx) — shows a "Get full details from ΑΑΔΕ" button when country_code='EL' AND the VAT field has 9 digits. On success, fills `name`, `street`, `street_number`, `postal_code`, `city`, `country`, `country_code`, `tax_office`, `profession`.
 
-To add more consumers, import `aadeService` from `@/modules/myaade` — same boundary as Oxygen.
+To add more consumers, import `aadeService` from `@/modules/myaade` — same boundary pattern as other self-contained service modules.
 
 ## Removal
 

@@ -1,15 +1,13 @@
 /**
- * Public Tools Page (/tools)
+ * Shared scaffolding for the public /tools surface.
  *
- * Lead-gen surface. Anonymous visitors get 2 scans/day (combined across price
- * + mention). Identical queries within 24h return from cache without burning
- * quota or upstream credits. Every scan requires a fresh Cloudflare Turnstile
- * token.
- *
- * Route is registered OUTSIDE <AuthGuard> in App.tsx — no login required.
+ * Holds the common header/shell, the price + mention result cards, the
+ * scanning skeleton, the upsell card, the quota hook, and small formatters.
+ * Each tool page (price scan, mention scan, heat-pump sizer, …) imports what
+ * it needs and stays thin.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -22,13 +20,10 @@ import {
   Loader2,
   LogIn,
   LogOut,
-  MessageSquareText,
   Newspaper,
   PackageCheck,
   PackageX,
   Search,
-  Shield,
-  ShoppingBag,
   Sparkles,
   Store,
   TrendingDown,
@@ -36,54 +31,24 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
-
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
 import {
-  PublicToolsApiError,
   fetchQuota,
-  mentionScan,
-  priceScan,
+  type PublicMentionResult,
   type PublicMentionScanResponse,
   type PublicPriceResult,
-  type PublicMentionResult,
   type PublicPriceScanResponse,
   type PublicQuota,
 } from '@/services/publicToolsService';
 
-type ScanTab = 'price' | 'mention';
+// ── Quota hook ────────────────────────────────────────────────────────────
 
-export default function PublicToolsPage() {
-  const { user, session, signOut } = useAuth();
-  const accessToken = session?.access_token ?? null;
-  const isAuthenticated = !!user;
-
-  const [tab, setTab] = useState<ScanTab>('price');
+export function useToolsQuota(accessToken: string | null) {
   const [quota, setQuota] = useState<PublicQuota | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
-
-  const [productName, setProductName] = useState('');
-  const [manufacturer, setManufacturer] = useState('');
-  const [dimensions, setDimensions] = useState('');
-  const [priceCountry, setPriceCountry] = useState('');
-
-  const [subjectLabel, setSubjectLabel] = useState('');
-  const [mentionCountry, setMentionCountry] = useState('');
-
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileError, setTurnstileError] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileHandle>(null);
-
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [priceResult, setPriceResult] = useState<PublicPriceScanResponse | null>(null);
-  const [mentionResult, setMentionResult] = useState<PublicMentionScanResponse | null>(null);
 
   useEffect(() => {
     fetchQuota(accessToken)
@@ -91,88 +56,23 @@ export default function PublicToolsPage() {
       .catch((e: unknown) => setQuotaError(e instanceof Error ? e.message : 'Failed to load quota'));
   }, [accessToken]);
 
-  const turnstileSiteKey = quota?.turnstile_site_key ?? null;
-  const creditsPerScan = quota?.credits_per_scan ?? 5;
-  const balance = quota?.credits_balance ?? null;
-  // Block scanning when: anon hit 2/day cap, OR authed but balance < cost.
-  const limitReached = isAuthenticated
-    ? balance != null && balance < creditsPerScan
-    : quota?.remaining === 0;
+  return { quota, setQuota, quotaError };
+}
 
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-    setTurnstileError(null);
-  }, []);
+// ── Shell (shared header + container) ──────────────────────────────────────
 
-  const handleTurnstileExpired = useCallback(() => {
-    setTurnstileToken(null);
-  }, []);
-
-  const handleTurnstileError = useCallback((code: string) => {
-    setTurnstileError(code);
-    setTurnstileToken(null);
-  }, []);
-
-  const resetCaptcha = () => {
-    setTurnstileToken(null);
-    turnstileRef.current?.reset();
-  };
-
-  const onScan = async () => {
-    if (!turnstileToken) {
-      setScanError('Please complete the captcha first.');
-      return;
-    }
-    setScanning(true);
-    setScanError(null);
-    if (tab === 'price') setPriceResult(null);
-    else setMentionResult(null);
-    try {
-      if (tab === 'price') {
-        if (productName.trim().length < 2) {
-          setScanError('Product name must be at least 2 characters.');
-          return;
-        }
-        const res = await priceScan({
-          turnstileToken,
-          productName: productName.trim(),
-          manufacturer: manufacturer.trim() || undefined,
-          dimensions: dimensions.trim() || undefined,
-          countryCode: priceCountry.trim().toUpperCase() || undefined,
-          accessToken,
-        });
-        setPriceResult(res);
-        setQuota(res.quota);
-      } else {
-        if (subjectLabel.trim().length < 2) {
-          setScanError('Subject must be at least 2 characters.');
-          return;
-        }
-        const res = await mentionScan({
-          turnstileToken,
-          subjectLabel: subjectLabel.trim(),
-          countryCode: mentionCountry.trim().toUpperCase() || undefined,
-          accessToken,
-        });
-        setMentionResult(res);
-        setQuota(res.quota);
-      }
-    } catch (e: unknown) {
-      if (e instanceof PublicToolsApiError) {
-        if (e.detail.kind === 'quota_exceeded' || e.detail.kind === 'insufficient_credits') {
-          setQuota(e.detail.quota);
-          setScanError(null);
-        } else {
-          setScanError(e.detail.message);
-        }
-      } else {
-        setScanError(e instanceof Error ? e.message : 'Scan failed');
-      }
-    } finally {
-      setScanning(false);
-      resetCaptcha();
-    }
-  };
+export function ToolsShell({
+  headerRight,
+  backTo = '/tools',
+  children,
+}: {
+  headerRight?: ReactNode;
+  /** Where the back arrow points. Defaults to the tools hub. */
+  backTo?: string;
+  children: ReactNode;
+}) {
+  const { user, signOut } = useAuth();
+  const isAuthenticated = !!user;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -183,26 +83,15 @@ export default function PublicToolsPage() {
             <span>MaterialsHub</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 text-sm">
-            {quota && !isAuthenticated && (
-              <Badge variant="outline" className="hidden sm:inline-flex">
-                {quota.remaining} / {quota.limit} free scans left today
-              </Badge>
-            )}
-            {quota && isAuthenticated && balance != null && (
-              <Badge variant="outline" className="hidden sm:inline-flex gap-1.5">
-                <Coins className="h-3.5 w-3.5 text-primary" />
-                <span className="tabular-nums">{balance.toLocaleString()}</span>
-                <span className="text-muted-foreground">credits</span>
-              </Badge>
-            )}
+            {headerRight}
+            <Link to={backTo}>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">{backTo === '/tools' ? 'All tools' : 'Back'}</span>
+              </Button>
+            </Link>
             {isAuthenticated ? (
               <>
-                <Link to="/">
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Back to platform</span>
-                  </Button>
-                </Link>
                 <span className="hidden md:inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <UserIcon className="h-3.5 w-3.5" />
                   {user?.email}
@@ -228,202 +117,35 @@ export default function PublicToolsPage() {
           </div>
         </div>
       </header>
-
-      <main className="container mx-auto max-w-4xl px-4 py-10">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-semibold tracking-tight mb-3">
-            Free product intelligence
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Type any product or brand. See live retailer prices, recent press mentions, and
-            outlet coverage — pulled from across the web in seconds.
-          </p>
-        </div>
-
-        {quotaError && (
-          <Card className="mb-6 border-destructive/40">
-            <CardContent className="py-4 flex items-center gap-3 text-sm">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <span>Could not load quota: {quotaError}</span>
-            </CardContent>
-          </Card>
-        )}
-
-        {limitReached ? (
-          <UpsellCard quota={quota!} isAuthenticated={isAuthenticated} />
-        ) : (
-          <Card className="dashboard-card">
-            <CardHeader>
-              <Tabs value={tab} onValueChange={(v) => setTab(v as ScanTab)}>
-                <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                  <TabsTrigger
-                    value="price"
-                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                  >
-                    <ShoppingBag className="h-4 w-4" />
-                    <span>Price scan</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="mention"
-                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                  >
-                    <MessageSquareText className="h-4 w-4" />
-                    <span>Mention scan</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="price" className="pt-6 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <Label htmlFor="product-name">Product name</Label>
-                      <Input
-                        id="product-name"
-                        placeholder="e.g. Hansgrohe Talis E single-lever basin mixer"
-                        value={productName}
-                        onChange={(e) => setProductName(e.target.value)}
-                        maxLength={200}
-                        autoFocus
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="manufacturer">Manufacturer (optional)</Label>
-                      <Input
-                        id="manufacturer"
-                        placeholder="e.g. Hansgrohe"
-                        value={manufacturer}
-                        onChange={(e) => setManufacturer(e.target.value)}
-                        maxLength={120}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dimensions">Dimensions (optional)</Label>
-                      <Input
-                        id="dimensions"
-                        placeholder='e.g. 60x60 cm'
-                        value={dimensions}
-                        onChange={(e) => setDimensions(e.target.value)}
-                        maxLength={80}
-                      />
-                    </div>
-                    <div className="sm:col-span-2 sm:w-1/2">
-                      <Label htmlFor="price-country">Country (ISO 2-letter, optional)</Label>
-                      <Input
-                        id="price-country"
-                        placeholder="GR, DE, IT…"
-                        value={priceCountry}
-                        onChange={(e) => setPriceCountry(e.target.value)}
-                        maxLength={2}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="mention" className="pt-6 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <Label htmlFor="subject-label">Brand or product to monitor</Label>
-                      <Input
-                        id="subject-label"
-                        placeholder="e.g. Kohler, Roca, Geberit AquaClean Mera"
-                        value={subjectLabel}
-                        onChange={(e) => setSubjectLabel(e.target.value)}
-                        maxLength={200}
-                        autoFocus
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="mention-country">Country (ISO 2-letter, optional)</Label>
-                      <Input
-                        id="mention-country"
-                        placeholder="GR, DE, US…"
-                        value={mentionCountry}
-                        onChange={(e) => setMentionCountry(e.target.value)}
-                        maxLength={2}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {turnstileSiteKey ? (
-                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                  <div>
-                    <Label className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <Shield className="h-3.5 w-3.5" />
-                      <span>Bot check — required before each scan</span>
-                    </Label>
-                    <TurnstileWidget
-                      ref={turnstileRef}
-                      siteKey={turnstileSiteKey}
-                      action={tab === 'price' ? 'price_scan' : 'mention_scan'}
-                      onVerify={handleTurnstileVerify}
-                      onExpired={handleTurnstileExpired}
-                      onError={handleTurnstileError}
-                    />
-                    {turnstileError && (
-                      <p className="text-xs text-destructive mt-1">Captcha error: {turnstileError}</p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={onScan}
-                    disabled={scanning || !turnstileToken}
-                    className="gap-2 min-w-[160px]"
-                    size="lg"
-                  >
-                    {scanning ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Scanning…</span>
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4" />
-                        <span>Run scan</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading bot check…</span>
-                </div>
-              )}
-
-              {scanError && (
-                <div className="flex items-start gap-2 text-sm text-destructive">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{scanError}</span>
-                </div>
-              )}
-
-              {quota && !isAuthenticated && quota.remaining > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {quota.remaining} of {quota.limit} free scans remaining today.
-                  {' '}Identical queries within 24 hours are served instantly and don't count.
-                </p>
-              )}
-              {quota && isAuthenticated && balance != null && (
-                <p className="text-xs text-muted-foreground">
-                  {balance.toLocaleString()} credits available · each scan costs {creditsPerScan} credits.
-                  {' '}Identical queries within 24 hours are served instantly and don't debit.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {scanning && <ScanningPanel kind={tab} />}
-        {!scanning && tab === 'price' && priceResult && <PriceResultsCard data={priceResult} />}
-        {!scanning && tab === 'mention' && mentionResult && <MentionResultsCard data={mentionResult} />}
-      </main>
+      <main className="container mx-auto max-w-4xl px-4 py-10">{children}</main>
     </div>
   );
 }
 
-function ScanningPanel({ kind }: { kind: ScanTab }) {
+export function QuotaBadge({ quota, isAuthenticated }: { quota: PublicQuota | null; isAuthenticated: boolean }) {
+  if (!quota) return null;
+  if (isAuthenticated && quota.credits_balance != null) {
+    return (
+      <Badge variant="outline" className="hidden sm:inline-flex gap-1.5">
+        <Coins className="h-3.5 w-3.5 text-primary" />
+        <span className="tabular-nums">{quota.credits_balance.toLocaleString()}</span>
+        <span className="text-muted-foreground">credits</span>
+      </Badge>
+    );
+  }
+  if (!isAuthenticated) {
+    return (
+      <Badge variant="outline" className="hidden sm:inline-flex">
+        {quota.remaining} / {quota.limit} free scans left today
+      </Badge>
+    );
+  }
+  return null;
+}
+
+// ── Scanning skeleton ──────────────────────────────────────────────────────
+
+export function ScanningPanel({ kind }: { kind: 'price' | 'mention' }) {
   const isPrice = kind === 'price';
   const steps = isPrice
     ? [
@@ -492,7 +214,9 @@ function ScanningPanel({ kind }: { kind: ScanTab }) {
   );
 }
 
-function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
+// ── Price results ──────────────────────────────────────────────────────────
+
+export function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
   if (!data.success) {
     return (
       <Card className="mt-6 border-destructive/40">
@@ -528,20 +252,9 @@ function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
         </div>
         {data.stats.count > 0 && (
           <div className="grid grid-cols-3 gap-3 mt-4">
-            <StatTile
-              label="Lowest"
-              value={formatPrice(data.stats.min, data.stats.currency)}
-              accent="text-emerald-500 dark:text-emerald-400"
-            />
-            <StatTile
-              label="Median"
-              value={formatPrice(data.stats.median, data.stats.currency)}
-            />
-            <StatTile
-              label="Highest"
-              value={formatPrice(data.stats.max, data.stats.currency)}
-              accent="text-muted-foreground"
-            />
+            <StatTile label="Lowest" value={formatPrice(data.stats.min, data.stats.currency)} accent="text-emerald-500 dark:text-emerald-400" />
+            <StatTile label="Median" value={formatPrice(data.stats.median, data.stats.currency)} />
+            <StatTile label="Highest" value={formatPrice(data.stats.max, data.stats.currency)} accent="text-muted-foreground" />
           </div>
         )}
       </CardHeader>
@@ -567,9 +280,10 @@ function StatTile({ label, value, accent }: { label: string; value: string; acce
 
 function PriceResultRow({ r, isLowest }: { r: PublicPriceResult; isLowest: boolean }) {
   const domain = hostnameOf(r.product_url);
-  const discount = r.original_price && r.price && r.original_price > r.price
-    ? Math.round(((r.original_price - r.price) / r.original_price) * 100)
-    : null;
+  const discount =
+    r.original_price && r.price && r.original_price > r.price
+      ? Math.round(((r.original_price - r.price) / r.original_price) * 100)
+      : null;
   return (
     <a
       href={r.product_url}
@@ -590,9 +304,7 @@ function PriceResultRow({ r, isLowest }: { r: PublicPriceResult; isLowest: boole
           )}
           <AvailabilityTag availability={r.availability} />
         </div>
-        {r.product_title && (
-          <div className="text-xs text-muted-foreground truncate">{r.product_title}</div>
-        )}
+        {r.product_title && <div className="text-xs text-muted-foreground truncate">{r.product_title}</div>}
         <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground/80">
           {domain && <span className="truncate">{domain}</span>}
           {r.source && (
@@ -604,14 +316,10 @@ function PriceResultRow({ r, isLowest }: { r: PublicPriceResult; isLowest: boole
         </div>
       </div>
       <div className="text-right shrink-0 ml-2">
-        <div className="text-lg font-semibold tabular-nums">
-          {formatPrice(r.price, r.currency)}
-        </div>
+        <div className="text-lg font-semibold tabular-nums">{formatPrice(r.price, r.currency)}</div>
         {r.original_price && r.original_price !== r.price && (
           <div className="flex items-center justify-end gap-1.5 mt-0.5">
-            <span className="text-xs text-muted-foreground line-through tabular-nums">
-              {formatPrice(r.original_price, r.currency)}
-            </span>
+            <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(r.original_price, r.currency)}</span>
             {discount && discount > 0 && (
               <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-0 text-[10px] h-4 px-1.5 rounded-full">
                 −{discount}%
@@ -679,7 +387,9 @@ function RetailerFavicon({ domain }: { domain: string | null }) {
   );
 }
 
-function MentionResultsCard({ data }: { data: PublicMentionScanResponse }) {
+// ── Mention results ────────────────────────────────────────────────────────
+
+export function MentionResultsCard({ data }: { data: PublicMentionScanResponse }) {
   if (!data.success) {
     return (
       <Card className="mt-6 border-destructive/40">
@@ -699,9 +409,7 @@ function MentionResultsCard({ data }: { data: PublicMentionScanResponse }) {
               <Newspaper className="h-4 w-4 text-primary" />
               {data.total_results} mention{data.total_results === 1 ? '' : 's'} in the last 30 days
             </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              News, blogs, and editorial coverage from across the web.
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">News, blogs, and editorial coverage from across the web.</p>
           </div>
           {data.from_cache && (
             <Badge variant="secondary" className="gap-1.5 rounded-full">
@@ -712,20 +420,17 @@ function MentionResultsCard({ data }: { data: PublicMentionScanResponse }) {
         </div>
         {data.top_outlets.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-4">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium self-center mr-1">
-              Top outlets
-            </span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium self-center mr-1">Top outlets</span>
             {data.top_outlets.map((o) => (
-              <span
-                key={o.domain}
-                className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs"
-              >
+              <span key={o.domain} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs">
                 <img
                   src={`https://www.google.com/s2/favicons?domain=${o.domain}&sz=32`}
                   alt=""
                   loading="lazy"
                   className="h-3 w-3"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
                 />
                 <span>{o.domain}</span>
                 <span className="text-muted-foreground">·{o.count}</span>
@@ -756,32 +461,18 @@ function MentionRow({ m }: { m: PublicMentionResult }) {
     >
       <RetailerFavicon domain={domain} />
       <div className="min-w-0 flex-1">
-        <div className="font-medium truncate mb-1 group-hover:text-primary transition-colors">
-          {m.title || m.url}
-        </div>
-        {m.excerpt && (
-          <div className="text-sm text-muted-foreground line-clamp-2 mb-2">{m.excerpt}</div>
-        )}
+        <div className="font-medium truncate mb-1 group-hover:text-primary transition-colors">{m.title || m.url}</div>
+        {m.excerpt && <div className="text-sm text-muted-foreground line-clamp-2 mb-2">{m.excerpt}</div>}
         <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-          {(m.outlet_name || domain) && (
-            <span className="font-medium text-foreground/70">{m.outlet_name || domain}</span>
-          )}
+          {(m.outlet_name || domain) && <span className="font-medium text-foreground/70">{m.outlet_name || domain}</span>}
           {m.published_at && (
             <>
               <span>·</span>
               <span>{formatDate(m.published_at)}</span>
             </>
           )}
-          {m.source && (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] ml-1">
-              {prettifySource(m.source)}
-            </span>
-          )}
-          {m.language_code && (
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-              {m.language_code}
-            </span>
-          )}
+          {m.source && <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] ml-1">{prettifySource(m.source)}</span>}
+          {m.language_code && <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{m.language_code}</span>}
         </div>
       </div>
       <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors shrink-0 mt-1" />
@@ -789,7 +480,9 @@ function MentionRow({ m }: { m: PublicMentionResult }) {
   );
 }
 
-function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenticated: boolean }) {
+// ── Upsell (shown when quota / credits are exhausted) ──────────────────────
+
+export function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenticated: boolean }) {
   const resetMs = useMemo(() => {
     try {
       return new Date(quota.reset_at).getTime() - Date.now();
@@ -811,8 +504,7 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
             <div>
               <CardTitle className="text-xl">Out of credits</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                You have {(quota.credits_balance ?? 0).toLocaleString()} credits left —
-                each scan costs {quota.credits_per_scan}. Top up to keep scanning.
+                You have {(quota.credits_balance ?? 0).toLocaleString()} credits left — each scan costs {quota.credits_per_scan}. Top up to keep scanning.
               </p>
             </div>
           </div>
@@ -824,9 +516,7 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
               Buy credits
             </Button>
           </Link>
-          <p className="text-xs text-muted-foreground text-center">
-            Credits never expire · no subscription · pay as you go
-          </p>
+          <p className="text-xs text-muted-foreground text-center">Credits never expire · no subscription · pay as you go</p>
         </CardContent>
       </Card>
     );
@@ -842,8 +532,7 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
           <div>
             <CardTitle className="text-xl">You've used your {quota.limit} free scans today</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              The free tier resets in about {hours} hour{hours === 1 ? '' : 's'}.
-              Want to keep scanning right now?
+              The free tier resets in about {hours} hour{hours === 1 ? '' : 's'}. Want to keep scanning right now?
             </p>
           </div>
         </div>
@@ -861,9 +550,7 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
               <li>· Get alerts when prices drop or new mentions appear</li>
             </ul>
             <Link to="/auth?mode=signup&redirect=/tools" className="block">
-              <Button className="w-full gap-2">
-                Create free account
-              </Button>
+              <Button className="w-full gap-2">Create free account</Button>
             </Link>
           </div>
           <div className="rounded-lg border border-border/40 p-4 space-y-3">
@@ -877,15 +564,15 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
               <li>· Credits never expire</li>
             </ul>
             <Link to="/auth?mode=signup&redirect=/billing" className="block">
-              <Button variant="outline" className="w-full gap-2">
-                See credit packs
-              </Button>
+              <Button variant="outline" className="w-full gap-2">See credit packs</Button>
             </Link>
           </div>
         </div>
         <p className="text-xs text-muted-foreground text-center">
           Already have an account?{' '}
-          <Link to="/auth?redirect=/tools" className="text-primary hover:underline">Sign in</Link>{' '}
+          <Link to="/auth?redirect=/tools" className="text-primary hover:underline">
+            Sign in
+          </Link>{' '}
           to use your existing balance.
         </p>
       </CardContent>
@@ -893,7 +580,9 @@ function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isAuthenti
   );
 }
 
-function formatPrice(value: number | null | undefined, currency: string | null | undefined): string {
+// ── Formatters ─────────────────────────────────────────────────────────────
+
+export function formatPrice(value: number | null | undefined, currency: string | null | undefined): string {
   if (value == null) return '—';
   const cur = (currency || 'EUR').toUpperCase();
   try {
@@ -903,7 +592,7 @@ function formatPrice(value: number | null | undefined, currency: string | null |
   }
 }
 
-function formatDate(iso: string): string {
+export function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
@@ -911,7 +600,7 @@ function formatDate(iso: string): string {
   }
 }
 
-function hostnameOf(url: string): string | null {
+export function hostnameOf(url: string): string | null {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
   } catch {
@@ -919,7 +608,7 @@ function hostnameOf(url: string): string | null {
   }
 }
 
-function prettifySource(source: string): string {
+export function prettifySource(source: string): string {
   const map: Record<string, string> = {
     perplexity: 'Perplexity',
     perplexity_sonar: 'Perplexity',

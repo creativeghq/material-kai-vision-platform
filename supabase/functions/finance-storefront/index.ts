@@ -4,7 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
-// #207 — Public online storefront (Oxygen "Open Link" / mini-store parity).
+// #207 — Public online storefront (public link / mini-store).
 //
 // Anonymous, no auth. Three actions (discriminated by `action`):
 //   • meta     {slug}                         → storefront config + workspace branding

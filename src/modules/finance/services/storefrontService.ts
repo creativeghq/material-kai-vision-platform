@@ -1,5 +1,5 @@
 /**
- * #207 — Online storefront (Oxygen "Open Link" / mini-store). Public browse + checkout go
+ * #207 — Online storefront (public link / mini-store). Public browse + checkout go
  * through the anonymous `finance-storefront` edge function; admin config + publish toggles
  * are RLS-gated direct writes.
  */

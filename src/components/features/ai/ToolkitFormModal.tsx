@@ -22,7 +22,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import {
-  renderPromptTemplate,
+  renderPromptTemplate, buildToolInput,
   type ToolkitQuickStart, type ToolkitDefinition, type ToolkitFormField,
 } from './agentToolsCatalog';
 
@@ -36,7 +36,31 @@ interface Props {
   onClose: () => void;
   /** Called with the fully-rendered prompt. The parent injects + auto-sends it. */
   onSubmit: (renderedPrompt: string) => void;
+  /**
+   * Called for quick-starts that carry a `run` descriptor — the parent fires a
+   * deterministic tool run (mode:'direct_tool') instead of sending a prompt.
+   * When omitted, run-enabled quick-starts gracefully fall back to onSubmit.
+   */
+  onRunTool?: (args: {
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    toolkit: ToolkitDefinition;
+    quickStart: ToolkitQuickStart;
+  }) => void;
 }
+
+// Readable market name → ISO-3166 alpha-2 code for the `country_code` field
+// kind. Codes are what the SEO tools expect (z.string().length(2)).
+const COUNTRY_CODES: Array<{ code: string; label: string }> = [
+  { code: 'US', label: 'United States' }, { code: 'GB', label: 'United Kingdom' },
+  { code: 'GR', label: 'Greece' }, { code: 'DE', label: 'Germany' },
+  { code: 'FR', label: 'France' }, { code: 'IT', label: 'Italy' },
+  { code: 'ES', label: 'Spain' }, { code: 'NL', label: 'Netherlands' },
+  { code: 'CY', label: 'Cyprus' }, { code: 'PT', label: 'Portugal' },
+  { code: 'BE', label: 'Belgium' }, { code: 'AT', label: 'Austria' },
+  { code: 'CH', label: 'Switzerland' }, { code: 'IE', label: 'Ireland' },
+  { code: 'CA', label: 'Canada' }, { code: 'AU', label: 'Australia' },
+];
 
 // Readable market names for the `country` field kind. Values are the readable
 // strings so the rendered prompt flows naturally ("...in the United Kingdom").
@@ -46,7 +70,7 @@ const COMMON_MARKETS = [
   'Australia', 'Canada', 'globally',
 ];
 
-export function ToolkitFormModal({ state, onClose, onSubmit }: Props) {
+export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool }: Props) {
   const open = !!state;
   const [values, setValues] = useState<Record<string, string>>({});
 
@@ -73,6 +97,19 @@ export function ToolkitFormModal({ state, onClose, onSubmit }: Props) {
 
   const handleSubmit = () => {
     if (missingRequired.length > 0) return;
+    // Deterministic run: map collected values → structured tool args and fire a
+    // direct tool invocation (no LLM). Falls back to prompt-injection if the
+    // parent didn't provide onRunTool.
+    if (state.quickStart.run && onRunTool) {
+      onRunTool({
+        toolName: state.quickStart.run.tool,
+        toolInput: buildToolInput(state.quickStart.run, values),
+        toolkit: state.toolkit,
+        quickStart: state.quickStart,
+      });
+      onClose();
+      return;
+    }
     const template = state.quickStart.promptTemplate || state.quickStart.prompt;
     onSubmit(renderPromptTemplate(template, values));
     onClose();
@@ -153,6 +190,18 @@ const FieldInput: React.FC<{
           <SelectContent>
             {COMMON_MARKETS.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    case 'country_code':
+      // Shows readable market names, emits the ISO alpha-2 code the tools want.
+      return (
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger><SelectValue placeholder={field.placeholder || 'Select a market…'} /></SelectTrigger>
+          <SelectContent>
+            {COUNTRY_CODES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

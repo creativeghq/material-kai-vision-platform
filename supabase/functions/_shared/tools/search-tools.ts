@@ -257,7 +257,7 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
  * Searches Knowledge Base for articles, guides, and documentation
  * Returns relevant articles if found, helping the agent answer user questions
  */
-export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = false) => {
+export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
   return tool(
     async ({ query, searchTypes = ['chunks', 'products', 'kb_docs'], topK = 5, categorySlug, categoryId, priceDocType }) => {
       try {
@@ -280,6 +280,9 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
             caller: isAdmin ? 'admin' : 'agent',
           };
+          // Per-doc agent allow-list enforcement happens server-side in MIVAA:
+          // docs with a non-empty allowed_agents return only when this agent is listed.
+          if (agentId && !isAdmin) body.agent_id = agentId;
           if (categorySlug) body.category_slug = categorySlug;
           if (categoryId) body.category_id = categoryId;
           if (priceDocType) body.price_doc_type = priceDocType;

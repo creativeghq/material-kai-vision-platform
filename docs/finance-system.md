@@ -3,7 +3,7 @@
 > Module slug: **`sales-finance`** · category `core` · tier `pro` · `src/modules/finance/manifest.json`
 > Multi-tenant: **tenant = workspace**. Every table, view, RPC, and edge function is scoped to a `workspace_id`.
 
-The finance module is the platform's multi-tenant accounting and e-invoicing layer for Greek businesses. It issues legally-compliant documents to **AADE/myDATA** through the **Novus** provider connector, tracks AR/AP, and produces the reports a Greek business needs for VAT filing and bookkeeping. It replaced the removed Oxygen ERP connector (see [§10](#10-removed-the-oxygen-connector)).
+The finance module is the platform's multi-tenant accounting and e-invoicing layer for Greek businesses. It issues legally-compliant documents to **AADE/myDATA** through the **Novus** provider connector, tracks AR/AP, and produces the reports a Greek business needs for VAT filing and bookkeeping. It replaced a removed legacy third-party ERP connector (see [§10](#10-removed-the-legacy-erp-connector)).
 
 Related docs: [POS / Retail](pos-retail-system.md) · [Online Storefront](online-storefront.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Warehouse & Billing](warehouse-and-billing.md) · [Finance API reference](api/finance-api.md) · [myAADE module](../src/modules/myaade/README.md).
 
@@ -80,7 +80,7 @@ pos_complete?      { signatureToken } — finalize a held POS receipt
 2. No binding → defaults to `'novus'` for capabilities `legal_invoice` / `pre_invoice_notice` / `tax_submission`.
 3. Loads Novus config: `NOVUS_API_KEY` + `NOVUS_SANDBOX` + `NOVUS_API_BASE_URL` via `resolveSecret()` (env-first, DB-second).
 
-**This is a master-key model**: one platform-wide `NOVUS_API_KEY`. All sub-tenants transmit through it, distinguished by their own issuer VAT (`finance_settings.business_vat`). This is what makes it correct for multi-tenancy (unlike the removed Oxygen single-account model).
+**This is a master-key model**: one platform-wide `NOVUS_API_KEY`. All sub-tenants transmit through it, distinguished by their own issuer VAT (`finance_settings.business_vat`). This is what makes it correct for multi-tenancy (unlike the removed legacy single-account ERP model).
 
 ### 3.2 Invoice payload construction
 
@@ -236,9 +236,9 @@ Resolution is env-first, DB-second via `resolveSecret()`. Admin manages keys at 
 
 ---
 
-## 10. Removed: the Oxygen connector
+## 10. Removed: the legacy ERP connector
 
-The Oxygen/pelatologio.gr ERP connector was **removed entirely (2026-06-07)**: `src/modules/oxygen/`, `supabase/functions/oxygen-api/`, `supabase/functions/_shared/oxygen/`, `docs/api/oxygen-api.md`, the `push_to_oxygen` path in `finance-issue-invoice`, the `OXYGEN_*` `platform_secrets` rows + `oxygen` `modules` row, and all `oxygen_*` columns (0 data rows). It used a single platform-wide `OXYGEN_API_KEY` — architecturally wrong for multi-tenancy (every tenant's pre-invoices would land in the one operator account). Its purpose is fully replaced by the per-tenant Novus → AADE/myDATA path. Oxygen remains only the **competitive benchmark** in the #207 parity audit.
+The legacy third-party ERP connector was **removed entirely (2026-06-07)**: its module folder, edge functions, shared client, API docs, the `push_to_*` path in `finance-issue-invoice`, its `platform_secrets` rows + `modules` row, and all of its columns (0 data rows). It used a single platform-wide API key — architecturally wrong for multi-tenancy (every tenant's pre-invoices would land in the one operator account). Its purpose is fully replaced by the per-tenant Novus → AADE/myDATA path.
 
 ---
 

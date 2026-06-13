@@ -1,5 +1,5 @@
 /**
- * #207 — Time-tracking & billing (Oxygen tasks_management + time reports parity). Log billable
+ * #207 — Time-tracking & billing. Log billable
  * hours against a customer, then turn the unbilled entries into a draft invoice (one line per
  * entry) that flows through the normal issue → myDATA path.
  */
@@ -33,7 +33,7 @@ export interface NewTimeEntry {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-// Oxygen m=403 parity — aggregated time reports.
+// Aggregated time reports.
 export interface TimeReportUserRow {
   user_id: string | null; name: string; entries: number;
   hours: number; billable_hours: number; value: number; billed_value: number;
@@ -147,9 +147,9 @@ export const timeTrackingService = {
   },
 
   /**
-   * Time reports for a date range, aggregated per user and per contact
-   * (Oxygen taskstime_users / taskstime_contacts, m=403). Computed client-side
-   * from `time_entries`; volumes per workspace are small enough to not need an RPC.
+   * Time reports for a date range, aggregated per user and per contact.
+   * Computed client-side from `time_entries`; volumes per workspace are small
+   * enough to not need an RPC.
    */
   async report(workspaceId: string, from: string, to: string): Promise<{ byUser: TimeReportUserRow[]; byContact: TimeReportContactRow[] }> {
     const entries = await this.list(workspaceId, { from, to });

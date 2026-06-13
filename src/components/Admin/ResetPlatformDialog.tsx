@@ -98,8 +98,13 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>Agent Chat (conversations, messages, uploaded files)</li>
               <li>Background Agent runs, logs, checkpoints, memories &amp; tool-call history</li>
               <li>Flow Engine runs &amp; step history</li>
-              <li>Quotes System (quotes, items, timeline, upsells, status tags)</li>
-              <li>Moodboards (moodboards, items, products, comments, quote requests)</li>
+              <li>Quotes System (quotes, items, timeline, upsells, status tags, activity &amp; analytics)</li>
+              <li>Moodboards &amp; Presentation Sheets (moodboards, items, products, comments, sheets)</li>
+              <li>Catalogs (generated catalogs, source PDFs, access/email/view logs)</li>
+              <li>Projects &amp; Client Views (projects, rooms, tasks, events, client-view deliverables &amp; feedback)</li>
+              <li>Designer module (projects, materials, assets)</li>
+              <li>Storefront carts (shopping carts &amp; cart items)</li>
+              <li>Social post content &amp; Messaging conversations (connection tokens are kept)</li>
               <li>3D / Video / VR generation history (incl. WorldLabs VR worlds)</li>
               <li>Analytics (events, manufacturer analytics, quality &amp; recommendation metrics)</li>
               <li>User behavior profiles &amp; personalization state</li>
@@ -115,7 +120,8 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>Web Scraping (sessions, pages, temp materials)</li>
               <li>Data Import (jobs, history)</li>
               <li>AI / API / webhook call logs (ai_call_logs, ai_usage_logs, api_usage_logs, mivaa_api_usage_logs, webhook_calls)</li>
-              <li>Storage files (pdf-tiles, material-images, moodboard-images, 3d-renders)</li>
+              <li>Public lead-gen tools cache &amp; logs; pipeline &amp; OCR metrics</li>
+              <li>Storage files (<strong>pdf-tiles</strong> and <strong>generation-images</strong> buckets; catalog/quote/client-view output in pdf-documents is orphan-reaped)</li>
               <li><strong>MIVAA server /tmp folder</strong> (leftover PDFs, image extractions, processing cache)</li>
             </ul>
 
@@ -123,10 +129,15 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               ✅ The following data will be PRESERVED:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li><strong>Knowledge Base &amp; Documentation</strong> (kb_docs, categories, attachments, search analytics)</li>
+              <li><strong>Knowledge Base &amp; Documentation</strong> (kb_docs, categories, attachments, search analytics) — fully preserved</li>
+              <li><strong>Anything locked</strong> — any row marked <span className="font-mono">is_locked</span> is never deleted, in any table</li>
               <li>Users, Profiles &amp; Workspaces</li>
               <li>CRM (contacts, companies, relationships)</li>
               <li>Credits &amp; Billing (user_credits, transactions, packages)</li>
+              <li><strong>Finance &amp; Fiscal (legally retained)</strong> — invoices, credit notes, payments, supplier bills, POS sessions, time entries, stock movements, delivery/purchase orders, document numbering series, AADE/myDATA fiscal submissions &amp; connectors</li>
+              <li><strong>Secrets &amp; API keys</strong> (platform secrets, customer API keys, material KAI keys)</li>
+              <li><strong>Mention, Job &amp; SEO Monitoring</strong> (tracked subjects, history, classifier caches — long-running customer-facing state)</li>
+              <li><strong>Social &amp; Messaging connections</strong> (OAuth/WhatsApp account tokens, channels, opt-outs)</li>
               <li>Prompts &amp; extraction prompts (admin-managed); prompt_history is trimmed to the 5 most recent edits per prompt</li>
               <li>Background agent definitions &amp; flow definitions (admin-managed)</li>
               <li>Global Upsells &amp; Timeline Steps (admin-managed)</li>
@@ -134,7 +145,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>AI model pricing, subscription plans, webhook endpoints</li>
               <li>PDF files in pdf-documents bucket</li>
               <li><strong>System Settings &amp; Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
-              <li><strong>Uploaded Template Images</strong> (cover, back cover, items background in quote-templates)</li>
+              <li><strong>Uploaded branding &amp; template images</strong> (business/invoice logo, invoice &amp; statement template covers/footers, quote &amp; catalog templates)</li>
               <li><strong>User Avatars</strong> (profile pictures in profile-avatars)</li>
               <li><strong>Price Monitoring</strong> (tracked queries, competitor sources, price history, alert log, classifier cache, brand-retailer index, extraction recipes — long-running trend data and customer-facing API state)</li>
             </ul>

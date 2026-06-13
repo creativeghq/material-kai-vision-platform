@@ -28,6 +28,12 @@ export interface KBDocument {
   updated_by?: string;
   view_count: number;
   price_doc_type?: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'supplier_cost_list' | null;
+  // Per-doc lock override: null = follow category (agent-readable ⇒ locked),
+  // true = force-locked, false = force-unlocked. See kb_is_doc_protected().
+  is_locked?: boolean | null;
+  // Per-doc agent allow-list. null / empty = all agents may read it in agent KB
+  // search; non-empty = only the listed agent ids (kai, interior-designer, demo).
+  allowed_agents?: string[] | null;
 }
 
 export interface KBCategory {
@@ -44,6 +50,8 @@ export interface KBCategory {
   document_count?: number;
   access_level: 'admin' | 'agent' | 'public';
   trigger_keyword?: string | null;
+  // When true, every doc in this category is locked (protected from deletion).
+  is_locked?: boolean;
 }
 
 export type PriceDocType =

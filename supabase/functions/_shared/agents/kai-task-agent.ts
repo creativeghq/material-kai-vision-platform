@@ -45,7 +45,12 @@ function makeMaterialSearchTool(mivaaGatewayUrl: string, mivaaApiKey: string, wo
   };
 }
 
-function makeKBSearchTool(supabase: any, workspaceId: string | null) {
+function makeKBSearchTool(
+  mivaaGatewayUrl: string,
+  mivaaApiKey: string | undefined,
+  workspaceId: string | null,
+  agentId: string,
+) {
   return {
     name: 'knowledge_base_search',
     description: 'Search the knowledge base for relevant documents, articles, and product info.',
@@ -57,14 +62,30 @@ function makeKBSearchTool(supabase: any, workspaceId: string | null) {
       },
       required: ['query'],
     },
+    // Routes through MIVAA's 7-vector KB search (the same endpoint the chat
+    // agents use) rather than a bespoke RPC. caller='agent' + agent_id lets
+    // MIVAA enforce per-doc allowed_agents allow-lists for this background agent.
     invoke: async ({ query, top_k = 5 }: { query: string; top_k?: number }) => {
-      const { data, error } = await supabase.rpc('search_knowledge_base', {
-        query_text: query,
-        workspace_id_filter: workspaceId,
-        match_count: top_k,
+      const resp = await fetch(`${mivaaGatewayUrl}/api/rag/search/knowledge-base`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(mivaaApiKey ? { Authorization: `Bearer ${mivaaApiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          query,
+          workspace_id: workspaceId,
+          search_types: ['kb_docs'],
+          top_k,
+          caller: 'agent',
+          agent_id: agentId,
+        }),
       });
-      if (error) throw error;
-      return data ?? [];
+      if (!resp.ok) {
+        throw new Error(`Knowledge base search failed: ${resp.status} ${resp.statusText}`);
+      }
+      const data = await resp.json();
+      return data?.chunks ?? [];
     },
   };
 }
@@ -98,7 +119,7 @@ export class KaiTaskAgent implements AgentRunner {
     // ── Build tools ────────────────────────────────────────────────────────────
     const tools: any[] = [
       makeMaterialSearchTool(mivaaGatewayUrl, mivaaApiKey, workspaceId),
-      makeKBSearchTool(supabase, workspaceId),
+      makeKBSearchTool(mivaaGatewayUrl, mivaaApiKey, workspaceId, this.agentType),
     ];
 
     // ── System prompt ──────────────────────────────────────────────────────────

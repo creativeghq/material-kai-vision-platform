@@ -93,7 +93,7 @@ Today products have tabs for: Materials Data, Mentions, Pricing. Add SEO.
 
 ## Integration 3 — Manufacturer/Brand admin profile gets a "SEO Health" panel (MEDIUM)
 
-Brands with a `homepage_domain` field already in their CRM record (`crm_companies.country_code` and friends — see [Oxygen integration in CLAUDE.md](../CLAUDE.md)) get a persistent SEO health card.
+Brands with a `homepage_domain` field already in their CRM record (`crm_companies.country_code` and friends — see [CLAUDE.md](../CLAUDE.md)) get a persistent SEO health card.
 
 **Where**: wherever the brand admin profile lives (`src/components/business/crm/...`). I haven't audited that file tree fully — assume there's a brand-detail page.
 
