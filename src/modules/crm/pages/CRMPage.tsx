@@ -32,6 +32,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
 import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
 import { CategoriesPanel } from './CategoriesPage';
@@ -384,6 +385,11 @@ export const CRMManagement: React.FC = () => {
       />
 
       <div className="p-3 sm:p-6 space-y-6">
+        {/* #214 plan-quota usage (hidden when unlimited / operator root) */}
+        <div className="flex justify-end">
+          <WorkspaceQuotaBadge table="crm_contacts" quotaKey="max_contacts" label="contacts" />
+        </div>
+
         {/* Stats Cards - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <AdminStatCard

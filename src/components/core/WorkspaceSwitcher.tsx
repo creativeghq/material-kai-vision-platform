@@ -14,6 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
 
 export const WorkspaceSwitcher: React.FC = () => {
@@ -27,6 +28,7 @@ export const WorkspaceSwitcher: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
 
   const { canManageNetwork: canManage } = usePermissions();
+  const { planName } = useEntitlements();
   // Hide entirely for ordinary single-workspace users with nothing to manage.
   if (memberships.length <= 1 && !canManage) return null;
 
@@ -38,6 +40,7 @@ export const WorkspaceSwitcher: React.FC = () => {
             <Building2 className="h-4 w-4 shrink-0" />
             <span className="truncate font-light">{activeWorkspace?.name ?? 'Workspace'}</span>
             {rank && <Badge variant="outline" className="text-[10px] uppercase hidden md:inline-flex">{rank}</Badge>}
+            <Badge variant="secondary" className="text-[10px] hidden md:inline-flex">{planName}</Badge>
             <ChevronsUpDown className="h-3.5 w-3.5 opacity-60 shrink-0" />
           </Button>
         </DropdownMenuTrigger>

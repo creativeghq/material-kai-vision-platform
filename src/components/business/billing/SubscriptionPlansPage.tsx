@@ -13,6 +13,8 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { billingService, SubscriptionPlan, UserSubscription } from '@/services/billing.service';
+import { supabase } from '@/integrations/supabase/client';
+import { tierRank } from '@/services/planAdminService';
 
 export const SubscriptionPlansPage: React.FC = () => {
   const { toast } = useToast();
@@ -20,6 +22,13 @@ export const SubscriptionPlansPage: React.FC = () => {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
+  const [modules, setModules] = useState<{ name: string; price_tier: string | null; enabled: boolean }[]>([]);
+
+  // Modules a plan unlocks = every enabled module whose tier is at/below the plan's tier.
+  const modulesForPlan = (planName: string): string[] => {
+    const planRank = tierRank(planName.toLowerCase());
+    return modules.filter((m) => m.enabled && tierRank(m.price_tier) <= planRank).map((m) => m.name).sort();
+  };
 
   useEffect(() => {
     loadData();
@@ -28,12 +37,14 @@ export const SubscriptionPlansPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [plansData, subscriptionData] = await Promise.all([
+      const [plansData, subscriptionData, modulesRes] = await Promise.all([
         billingService.getSubscriptionPlans(),
         billingService.getUserSubscription().catch(() => null),
+        supabase.from('modules').select('name, price_tier, enabled').then((r) => r.data ?? []),
       ]);
       setPlans(plansData);
       setCurrentSubscription(subscriptionData);
+      setModules(modulesRes as { name: string; price_tier: string | null; enabled: boolean }[]);
     } catch (error) {
       console.error('Error loading subscription data:', error);
       toast({
@@ -178,10 +189,22 @@ export const SubscriptionPlansPage: React.FC = () => {
                         <span className="text-white/80 text-sm">
                           {typeof value === 'boolean' && value
                             ? key.replace(/_/g, ' ')
-                            : `${key.replace(/_/g, ' ')}: ${value}`}
+                            : `${key.replace(/_/g, ' ')}: ${value === -1 ? 'unlimited' : value}`}
                         </span>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Included modules (#214) — which features this plan unlocks. */}
+                {modulesForPlan(plan.name).length > 0 && (
+                  <div className="border-t border-white/10 pt-3">
+                    <p className="text-white/50 text-xs uppercase tracking-wide mb-1.5">Includes</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {modulesForPlan(plan.name).map((name) => (
+                        <span key={name} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/80">{name}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

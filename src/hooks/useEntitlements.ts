@@ -15,6 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface ModuleAccessRow { slug: string; available: boolean; tier: string | null }
 
+export const PLAN_NAMES = ['Free', 'Pro', 'Enterprise'] as const;
+
 export interface EntitlementsApi {
   loading: boolean;
   /** Is this module available to the active workspace (free, entitled, or operator-root)? */
@@ -23,28 +25,37 @@ export interface EntitlementsApi {
   availableSlugs: Set<string>;
   /** Price tier of a module ('free' | 'pro' | … | null when unknown). */
   tierOf: (slug: string) => string | null;
+  /** The active workspace's plan level (0=Free,1=Pro,2=Enterprise) from its owner's subscription. */
+  planLevel: number;
+  /** Friendly plan name for the active workspace. */
+  planName: string;
 }
 
 export function useEntitlements(): EntitlementsApi {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const [rows, setRows] = useState<ModuleAccessRow[]>([]);
+  const [planLevel, setPlanLevel] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!activeWorkspaceId) { setRows([]); setLoading(false); return; }
+    if (!activeWorkspaceId) { setRows([]); setPlanLevel(0); setLoading(false); return; }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_workspace_module_access', { p_workspace_id: activeWorkspaceId });
+      const [access, plan] = await Promise.all([
+        supabase.rpc('get_workspace_module_access', { p_workspace_id: activeWorkspaceId }),
+        supabase.rpc('workspace_plan_level', { p_workspace_id: activeWorkspaceId }),
+      ]);
       if (cancelled) return;
-      if (error) {
+      if (access.error) {
         // Fail OPEN on a transient error — never strip a paid surface from a paying tenant
         // because of a network blip. (The API/route remains the real boundary.)
-        console.error('[useEntitlements] access fetch failed:', error.message || error);
+        console.error('[useEntitlements] access fetch failed:', access.error.message || access.error);
         setRows([]);
       } else {
-        setRows((data ?? []) as ModuleAccessRow[]);
+        setRows((access.data ?? []) as ModuleAccessRow[]);
       }
+      setPlanLevel(typeof plan.data === 'number' ? plan.data : 0);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -61,6 +72,8 @@ export function useEntitlements(): EntitlementsApi {
       availableSlugs: available,
       isModuleAvailable: (slug: string) => (ready ? available.has(slug) : true),
       tierOf: (slug: string) => tierBySlug.get(slug) ?? null,
+      planLevel,
+      planName: PLAN_NAMES[planLevel] ?? 'Free',
     };
-  }, [rows, loading, wsLoading]);
+  }, [rows, loading, wsLoading, planLevel]);
 }
