@@ -20,8 +20,8 @@ export const GLOBAL_PIPELINE_FLOW = [
   { id: 'initialized', name: 'Initialized', icon: Clock, checkpoint: 'initialized' },
   { id: 'warmup', name: 'AI Warmup', icon: Flame, checkpoint: 'warmup_complete' },
   { id: 'discovery', name: 'Discovery', icon: Search, checkpoint: 'products_detected' },
-  // Stage 1.5: doc-level layout precompute (YOLO + bbox merge per physical
-  // page → document_layout_analysis cache). Runs once per job, between
+  // Stage 1: doc-level Surya structural pass (layout + OCR + figure boxes per
+  // physical page → document_layout_analysis cache). Runs once per job, before
   // discovery and per-product extraction.
   { id: 'layout_precompute', name: 'Layout Cache', icon: Cpu, checkpoint: 'stage_1_5_layout_precompute' },
   { id: 'extraction', name: 'PDF Extract', icon: FileText, checkpoint: 'pdf_extracted' },
@@ -79,7 +79,7 @@ export const PRODUCT_STAGES = [
     id: 'extraction',
     name: 'Page Extraction',
     icon: FileText,
-    description: 'Map catalog pages to PDF pages + YOLO layout detection',
+    description: 'Map catalog pages to PDF pages + Surya structural pass',
   },
   {
     id: 'chunking',

@@ -113,7 +113,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>PDF Processing (jobs, checkpoints, progress, queues, batch jobs)</li>
               <li>Products &amp; Materials Catalog (products, images, properties, categories, visual analysis)</li>
               <li>Document Data (chunks, embeddings, images, documents, OCR, spatial &amp; layout analysis)</li>
-              <li>YOLO Layout Data (layout regions, extracted tables)</li>
+              <li>Surya Layout Data (layout regions, extracted tables)</li>
               <li>Chunk derivatives (boundaries, classifications, quality flags, validation scores)</li>
               <li><strong>VECS Vector Collections</strong> (visual/SLIG, color, texture, style, material, <strong>understanding</strong>)</li>
               <li>Processing Results &amp; Quality Data</li>
