@@ -9,13 +9,13 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'rounded-2xl transition-all duration-300',
+      'gradient-border rounded-2xl transition-all duration-300',
       className,
     )}
     style={{
       background: 'var(--glass-background)',
       backdropFilter: `blur(var(--glass-blur))`,
-      border: '1px solid var(--glass-border)',
+      border: '1px solid transparent',
       ...style,
     }}
     {...props}

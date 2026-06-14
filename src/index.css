@@ -169,7 +169,7 @@ All colors MUST be HSL.
     --popover-foreground: 0 0% 92%;  /* Light text */
 
     /* Primary - Deep Plum brightened for dark bg */
-    --primary: 216 53% 47%;  /* Brightened plum */
+    --primary: 1 72% 59%;  /* Brightened plum */
     --primary-foreground: 0 0% 100%;  /* White text on red */
 
     /* Brand gradient (blue → red) — drives primary fills (buttons, active
@@ -203,14 +203,14 @@ All colors MUST be HSL.
     /* Borders - Subtle white borders */
     --border: 0 0% 16%;  /* #292929 - Subtle border */
     --input: 0 0% 16%;  /* #292929 - Input border */
-    --ring: 216 53% 47%;  /* Focus ring (primary plum) */
+    --ring: 1 72% 59%;  /* Focus ring (primary plum) */
 
     --radius: 0.5rem;  /* 8px */
 
     /* Sidebar/TopNav - Dark theme */
     --sidebar-background: 0 0% 9%;  /* Slightly lighter than bg */
     --sidebar-foreground: 0 0% 60%;  /* Medium gray text */
-    --sidebar-accent: 216 53% 47%;  /* Primary plum for active items */
+    --sidebar-accent: 1 72% 59%;  /* Primary plum for active items */
     --sidebar-accent-foreground: 0 0% 100%;  /* White text on plum */
     --sidebar-border: 0 0% 16%;  /* Subtle border */
 
@@ -332,7 +332,7 @@ All colors MUST be HSL.
     --popover-foreground: 0 0% 14%;
 
     /* Primary — plum, slightly deepened so white text stays AA on light */
-    --primary: 216 53% 47%;
+    --primary: 1 72% 59%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — muted warm grey surface, clearly deeper than cards */
@@ -359,12 +359,12 @@ All colors MUST be HSL.
     /* Borders / inputs — gentle warm grey lines, visible against cards */
     --border: 72 11% 82%;
     --input: 72 11% 83%;
-    --ring: 216 53% 47%;
+    --ring: 1 72% 59%;
 
     /* Sidebar / TopNav — clean card-toned bar with grey text, plum active */
     --sidebar-background: 72 26% 97%;
     --sidebar-foreground: 0 0% 40%;
-    --sidebar-accent: 216 53% 47%;
+    --sidebar-accent: 1 72% 59%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 72 11% 82%;
 
@@ -548,13 +548,35 @@ All colors MUST be HSL.
 
   /* Dashboard Card - Dark glass effect */
   .dashboard-card {
+    position: relative;
     background: var(--glass-background);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border-radius: var(--radius-lg);
     padding: var(--card-padding);
     transition: var(--transition-bounce);
-    border: 1px solid var(--glass-border);
+    border: 1px solid transparent;
+  }
+
+  /* Gradient border ring for boxes — a masked pseudo-element draws the
+     blue→red brand gradient only in the 1px border area. Preserves
+     border-radius and never touches the card's own background, blur or
+     hover state. Add `.gradient-border` to any other box to opt it in. */
+  .gradient-border { position: relative; }
+  .dashboard-card::before,
+  .gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--brand-gradient);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .dashboard-card:hover {
