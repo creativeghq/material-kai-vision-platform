@@ -313,7 +313,10 @@ function FactoryModal({
     <Dialog open={!!factory} onOpenChange={() => onClose()}>
       <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
         {/* Banner */}
-        <div className="scrim-hero brand-hero h-28 sm:h-36 relative overflow-hidden shrink-0">
+        <div
+          className="h-28 sm:h-36 relative overflow-hidden shrink-0"
+          style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+        >
           <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
 
@@ -332,7 +335,10 @@ function FactoryModal({
         <div className="bg-white shadow-sm shrink-0 relative z-10 px-3 sm:px-6 pb-4">
           <div className="flex items-start gap-4">
             {/* Factory icon pulled up over banner */}
-            <div className="scrim-hero brand-hero w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12">
+            <div
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12"
+              style={{ background: 'linear-gradient(135deg, hsl(330,43%,22%) 0%, hsl(280,35%,38%) 100%)' }}
+            >
               <Building2 className="h-8 w-8 text-white" />
             </div>
 

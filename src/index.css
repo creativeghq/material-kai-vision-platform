@@ -302,48 +302,43 @@ All colors MUST be HSL.
   }
 
   /* ========================================
-     LIGHT THEME — GRAPHITE + LIME (default)
-     Activated by `html.light` (set by ThemeProvider; light is the
-     default theme). Overrides only the COLOR + elevation tokens —
-     spacing, radii, typography and font weights are shared with dark.
-
-     Identity: warm graphite off-white surfaces, near-black "ink" for
-     buttons and active pills, a single electric-lime accent for focus
-     and selection highlights. Neutral + one bold accent.
-     Layered: the page is the DEEPER tone so cards lift without going
-     stark white (page #EDEFE8 → cards #F6F8F1).
+     LIGHT THEME
+     Activated by `html.light` (set by ThemeProvider).
+     Overrides only the COLOR tokens — spacing, radii,
+     typography and font weights are shared with dark.
+     Base surface: #f7f8f3 (hsl 72 24% 96%).
      ======================================== */
   html.light {
-    --background: 82 13% 88%;        /* page — deeper warm graphite #DEE2D6 so
-                                        cards clearly float above it */
-    --foreground: 220 12% 10%;       /* near-black ink #16181C */
+    /* Layered warm off-whites — the page is the deeper tone so cards read as
+       elevated WITHOUT being stark white. base #edefe6 → cards ~#f6f8f1. */
+    --background: 72 16% 93%;        /* page — soft warm off-white, not blinding */
+    --foreground: 0 0% 14%;          /* near-black ink */
 
-    --page-background: 82 13% 88%;
+    --page-background: 72 16% 93%;
 
-    /* Cards — crisp near-white, a clear step above the page so panels lift */
-    --card: 80 33% 99%;              /* #FCFDF9 */
-    --card-foreground: 220 12% 10%;
+    /* Cards — warm off-white (~the #f7f8f3 the brief specified), one step
+       lighter than the page so panels lift without going pure white. */
+    --card: 72 26% 97%;
+    --card-foreground: 0 0% 14%;
 
-    --popover: 80 36% 99%;
-    --popover-foreground: 220 12% 10%;
+    --popover: 72 30% 98%;
+    --popover-foreground: 0 0% 14%;
 
-    /* Primary — near-black ink. Buttons + active tabs/nav render as black
-       pills with white text, exactly like the reference dashboards. */
-    --primary: 220 10% 12%;          /* #1B1D20 */
+    /* Primary — plum, slightly deepened so white text stays AA on light */
+    --primary: 330 52% 40%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — muted sage #809284 (the brand's secondary colour).
-       Dark forest-ink text keeps AA contrast on the mid-tone fill. */
-    --secondary: 133 8% 54%;
-    --secondary-foreground: 150 22% 12%;
+    /* Secondary — muted warm grey surface, clearly deeper than cards */
+    --secondary: 72 13% 88%;
+    --secondary-foreground: 0 0% 20%;
 
     /* Muted */
-    --muted: 75 11% 89%;
-    --muted-foreground: 90 5% 40%;
+    --muted: 72 13% 89%;
+    --muted-foreground: 0 0% 38%;
 
-    /* Accent — pale electric-lime tint for hover / selection highlights */
-    --accent: 75 68% 90%;
-    --accent-foreground: 92 55% 20%;
+    /* Accent — warm peach tint */
+    --accent: 22 55% 90%;
+    --accent-foreground: 22 75% 30%;
 
     /* Amber */
     --amber: 32 90% 42%;
@@ -354,20 +349,20 @@ All colors MUST be HSL.
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders / inputs — gentle warm-graphite lines, visible against cards */
-    --border: 75 10% 83%;
-    --input: 75 10% 84%;
-    --ring: 80 72% 44%;              /* electric-lime focus ring */
+    /* Borders / inputs — gentle warm grey lines, visible against cards */
+    --border: 72 11% 82%;
+    --input: 72 11% 83%;
+    --ring: 330 52% 40%;
 
-    /* Sidebar / TopNav — clean card-toned bar, grey text, INK active pill */
-    --sidebar-background: 75 24% 97%;
-    --sidebar-foreground: 220 5% 42%;
-    --sidebar-accent: 220 10% 12%;   /* ink — active nav item is a black pill */
+    /* Sidebar / TopNav — clean card-toned bar with grey text, plum active */
+    --sidebar-background: 72 26% 97%;
+    --sidebar-foreground: 0 0% 40%;
+    --sidebar-accent: 330 52% 40%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 75 10% 83%;
+    --sidebar-border: 72 11% 82%;
 
     /* Hero */
-    --hero-background: 75 24% 97%;
+    --hero-background: 72 26% 97%;
 
     /* Stat bubble colors — coloured fills with white text still read fine */
     --bubble-sage: 95 25% 45%;
@@ -378,21 +373,20 @@ All colors MUST be HSL.
     --bubble-text-muted: 0 0% 92%;
 
     /* Card gradients */
-    --card-gradient-start: 75 28% 98%;
-    --card-gradient-end: 75 16% 95%;
+    --card-gradient-start: 72 30% 98%;
+    --card-gradient-end: 72 18% 95%;
 
-    /* Subtle gradients — lime-tinted low-alpha so they show on light */
-    --gradient-sage: linear-gradient(180deg, rgba(150, 175, 70, 0.08) 0%, rgba(150, 175, 70, 0.01) 100%);
+    /* Subtle gradients — black-based low-alpha so they show on light */
+    --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
     --gradient-gray: linear-gradient(180deg, rgba(0, 0, 0, 0.035) 0%, rgba(0, 0, 0, 0.006) 100%);
 
-    /* Shadows — soft, layered, genuinely present (was nearly flat before).
-       Two-layer ink-tinted shadows give cards real elevation without harsh edges. */
-    --shadow-xs: 0 1px 2px 0 rgb(20 22 28 / 0.05);
-    --shadow-sm: 0 1px 2px 0 rgb(20 22 28 / 0.06), 0 2px 6px -2px rgb(20 22 28 / 0.08);
-    --shadow: 0 2px 4px -1px rgb(20 22 28 / 0.07), 0 4px 12px -3px rgb(20 22 28 / 0.09);
-    --shadow-md: 0 4px 8px -2px rgb(20 22 28 / 0.08), 0 8px 20px -4px rgb(20 22 28 / 0.10);
-    --shadow-lg: 0 8px 16px -4px rgb(20 22 28 / 0.10), 0 16px 40px -8px rgb(20 22 28 / 0.14);
-    --shadow-card: 0 1px 2px 0 rgb(20 22 28 / 0.05), 0 6px 18px -6px rgb(20 22 28 / 0.11);
+    /* Shadows — lighter, lower alpha for light surfaces */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.10);
+    --shadow-lg: 0 4px 12px 0 rgb(0 0 0 / 0.12);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07);
 
     /* Status colors — saturated foreground + pale tinted backgrounds */
     --success: 142 65% 35%;
@@ -411,8 +405,8 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-bg: 210 85% 94%;
 
-    /* Chart colors — lime-led on light to match the accent identity */
-    --chart-1: 80 65% 42%;
+    /* Chart colors — slightly deepened for contrast on light */
+    --chart-1: 142 60% 40%;
     --chart-2: 210 80% 48%;
     --chart-3: 271 60% 52%;
     --chart-4: 32 90% 48%;
@@ -444,16 +438,14 @@ All colors MUST be HSL.
     --badge-draft-border: 0 0% 82%;
 
     /* ===== GLASSMORPHISM SYSTEM (Light) ===== */
-    /* Near-solid warm off-white so cards read as crisp, lifted surfaces (like
-       the reference dashboards) while keeping a faint glass quality over the
-       page gradient. Resting shadow is a soft two-layer lift. */
-    --glass-background: rgba(246, 248, 241, 0.90);
-    --glass-blur: 14px;
-    --glass-border: rgba(20, 22, 28, 0.06);
-    --glass-shadow: 0 1px 2px 0 rgba(20, 22, 28, 0.05), 0 8px 24px -8px rgba(20, 22, 28, 0.12);
+    /* Warm frosted off-white, not pure white, so glass cards match the palette */
+    --glass-background: rgba(249, 250, 244, 0.72);
+    --glass-blur: 12px;
+    --glass-border: rgba(0, 0, 0, 0.07);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
 
     /* ===== REFINED SHADOWS (Light) ===== */
-    --shadow-premium: 0 12px 28px -8px rgba(20, 22, 28, 0.16), 0 6px 14px -6px rgba(20, 22, 28, 0.10);
+    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.14), 0 5px 20px -5px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -466,14 +458,6 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
     background-attachment: fixed;
     font-weight: var(--font-normal);
-  }
-
-  /* Light theme — subtle warm-graphite page gradient so elevated cards read
-     with depth against the backdrop instead of sitting on a flat fill. */
-  html.light body {
-    background-image:
-      radial-gradient(120% 90% at 15% 0%, hsl(80 24% 95%) 0%, transparent 55%),
-      linear-gradient(160deg, hsl(75 18% 94%) 0%, hsl(78 12% 90%) 100%);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -555,9 +539,7 @@ All colors MUST be HSL.
     gap: var(--grid-gap);
   }
 
-  /* Dashboard Card - layered glass surface with a real resting shadow so
-     panels read as elevated (not flat). Both themes get the lift; the
-     --glass-shadow / --shadow-premium tokens differ per theme. */
+  /* Dashboard Card - Dark glass effect */
   .dashboard-card {
     background: var(--glass-background);
     backdrop-filter: blur(var(--glass-blur));
@@ -566,15 +548,12 @@ All colors MUST be HSL.
     padding: var(--card-padding);
     transition: var(--transition-bounce);
     border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
   }
 
-  /* No hover "float": cards keep their resting elevation on hover — no lift,
-     no shadow jump (user preference). Resting shadow stays so they're not flat. */
   .dashboard-card:hover {
-    transform: none;
-    box-shadow: var(--glass-shadow);
-    border-color: var(--glass-border);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   /* A card that holds a table must NOT repaint/lift its whole surface on
@@ -583,7 +562,6 @@ All colors MUST be HSL.
   .dashboard-card:has(table):hover {
     background: var(--glass-background);
     transform: none;
-    box-shadow: var(--glass-shadow);
     border-color: var(--glass-border);
   }
 
@@ -596,17 +574,6 @@ All colors MUST be HSL.
   /* Liquid Glass Utility */
   .glass-panel {
     @apply dashboard-card;
-  }
-
-  /* Brand hero gradient — graphite → forest, the new identity's dark hero
-     surface (replaces the old plum/purple page-hero gradients). Dark enough
-     for white text; theme-independent. Pair with `.scrim-hero` so white
-     content is protected from the light-theme text flip. */
-  .brand-hero {
-    background: linear-gradient(135deg,
-      hsl(82 16% 24%) 0%,
-      hsl(120 14% 19%) 50%,
-      hsl(150 16% 13%) 100%);
   }
 
   /* Card with subtle gradient (Notion-like) */
@@ -1078,24 +1045,6 @@ html.light [class*="from-purple-"] .text-white, html.light [class*="from-blue-"]
 html.light [class*="from-indigo-"] .text-white, html.light [class*="from-pink-"] .text-white,
 html.light [class*="from-emerald-"] .text-white, html.light [class*="from-green-"] .text-white { color: #fff; }
 
-/* ---- 7c. Explicit media / scrim hero opt-out ----
-   A hero with a photo or dark gradient background and a SEPARATE (sibling)
-   content layer can't be reached by the descendant-based scrim protection in
-   rule 7 — the white text lives next to the dark layer, not inside it. Mark
-   such a hero container with `.scrim-hero` and its white text + white-tint
-   chips + light borders stay light-on-dark in BOTH themes. Higher specificity
-   than rules 1/2/5 so it wins without !important. */
-html.light .scrim-hero .text-white,
-html.light .scrim-hero.text-white { color: #fff; }
-html.light .scrim-hero [class*="text-white\/"] { color: rgba(255, 255, 255, 0.72); }
-html.light .scrim-hero .bg-white\/5,  html.light .scrim-hero .hover\:bg-white\/5:hover  { background-color: rgba(255, 255, 255, 0.05); }
-html.light .scrim-hero .bg-white\/10, html.light .scrim-hero .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.10); }
-html.light .scrim-hero .bg-white\/15, html.light .scrim-hero .hover\:bg-white\/15:hover { background-color: rgba(255, 255, 255, 0.15); }
-html.light .scrim-hero .bg-white\/20, html.light .scrim-hero .hover\:bg-white\/20:hover { background-color: rgba(255, 255, 255, 0.20); }
-html.light .scrim-hero .bg-white\/25, html.light .scrim-hero .hover\:bg-white\/25:hover { background-color: rgba(255, 255, 255, 0.25); }
-html.light .scrim-hero .border-white\/10 { border-color: rgba(255, 255, 255, 0.10); }
-html.light .scrim-hero .border-white\/20 { border-color: rgba(255, 255, 255, 0.20); }
-
 /* ---- 8. Design-system component patches ---- */
 html.light .badge-neutral {
   background-color: hsl(0 0% 95%);
@@ -1119,22 +1068,3 @@ html.light .stat-bubble {
 }
 html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
-
-/* ============================================================
-   NO HOVER "FLOAT" — global (user preference 2026-06-14)
-   ------------------------------------------------------------
-   Cards, grids and list items must NOT lift, zoom, or cast a new
-   shadow on hover. These un-layered rules win over Tailwind's
-   utilities layer (so `hover:shadow-md`, `hover:-translate-y-*`,
-   `hover:scale-*` on any card are cancelled) without touching:
-     • <button>            — intentional hover lift/shadow kept
-     • <img>               — group-hover image zoom inside cards kept
-   Resting shadows are untouched; only the on-hover CHANGE is removed.
-   ============================================================ */
-.dashboard-card:hover {
-  transform: none !important;
-  box-shadow: var(--glass-shadow) !important;   /* resting elevation, no jump */
-}
-[class*="hover:shadow"]:hover:not(button):not(.dashboard-card) { box-shadow: none !important; }
-[class*="hover:-translate-y"]:hover:not(button) { transform: none !important; }
-[class*="hover:scale"]:hover:not(button):not(img) { transform: none !important; }

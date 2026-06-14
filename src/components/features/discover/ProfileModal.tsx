@@ -278,7 +278,10 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
         <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
 
           {/* ── Banner ──────────────────────────────────────────────────────── */}
-          <div className="scrim-hero brand-hero h-28 sm:h-36 relative overflow-hidden shrink-0">
+          <div
+            className="h-28 sm:h-36 relative overflow-hidden shrink-0"
+            style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+          >
             <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
             <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
             <div className="absolute top-8 right-16 w-40 h-40 rounded-full bg-accent/20 blur-2xl pointer-events-none" />
