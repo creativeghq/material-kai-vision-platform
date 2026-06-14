@@ -318,10 +318,14 @@ All colors MUST be HSL.
   html.light {
     /* Layered warm off-whites — the page is the deeper tone so cards read as
        elevated WITHOUT being stark white. base #edefe6 → cards ~#f6f8f1. */
-    --background: 72 16% 93%;        /* page — soft warm off-white, not blinding */
+    --background: 45 29% 97%;        /* page — #faf9f6 warm near-white */
     --foreground: 0 0% 14%;          /* near-black ink */
 
-    --page-background: 72 16% 93%;
+    --page-background: 45 29% 97%;
+
+    /* Surface hover — the previous page off-white (#edefe6), now reused as the
+       hover tint on cards, table rows and list items. */
+    --surface-hover: 72 16% 93%;
 
     /* Cards — warm off-white (~the #f7f8f3 the brief specified), one step
        lighter than the page so panels lift without going pure white. */
@@ -1092,8 +1096,22 @@ html.light .badge-neutral {
   border-color: hsl(0 0% 85%);
 }
 html.light .dashboard-card:hover {
-  background: rgba(0,0,0,0.03);
+  background: hsl(var(--surface-hover));
   border-color: rgba(0,0,0,0.08);
+}
+
+/* Unified hover tint (light) — cards, table rows and list items hover to the
+   previous page off-white (--surface-hover) so they read clearly against the
+   lighter #faf9f6 page. */
+html.light .hover\:bg-muted:hover,
+html.light .hover\:bg-muted\/20:hover,
+html.light .hover\:bg-muted\/30:hover,
+html.light .hover\:bg-muted\/40:hover,
+html.light .hover\:bg-muted\/50:hover,
+html.light .hover\:bg-muted\/60:hover,
+html.light .hover\:bg-muted\/80:hover,
+html.light .hover\:bg-accent:hover {
+  background-color: hsl(var(--surface-hover)) !important;
 }
 /* Same row-only-hover rule for light theme: a card wrapping a table keeps its
    resting surface on hover so only the hovered row changes colour. */
