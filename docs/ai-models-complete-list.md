@@ -1,8 +1,8 @@
 # Complete AI Models Inventory
 
-**Last Updated**: 2026-05-03
-**Version**: 4.1.0
-**Status**: Production (post-Qwen-removal migration)
+**Last Updated**: 2026-06-13
+**Version**: 4.2.0
+**Status**: Production (post-PaddleOCR-VL structural backbone)
 
 ---
 
@@ -61,9 +61,11 @@
 
 ---
 
-### 3. HuggingFace Inference Endpoints
+### 3. Hosted Inference Endpoints (HuggingFace + Modal)
 
-#### SLIG (SigLIP2 SO400M, 768D projected) — VISUAL EMBEDDINGS
+Two active endpoints: **SLIG on HuggingFace** (visual embeddings) and **PaddleOCR-VL on Modal** (the structural pass — layout + OCR + figure boxes). The structural pass is Modal-only; HuggingFace now hosts only SLIG.
+
+#### SLIG (SigLIP2 SO400M, 768D projected) — VISUAL EMBEDDINGS (HuggingFace)
 - **Use Cases**:
   - 5 specialized 768D visual embeddings per image (visual, color, texture, style, material)
   - Image-text similarity via similarity mode
@@ -272,9 +274,9 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 2. GPT-5 / GPT-4o (alternative)
 3. Claude Haiku 4.5 (tertiary, lower accuracy)
 
-### OCR
-1. **PaddleOCR-VL with retry-jitter** (3 attempts, temps 0.0/0.2/0.4)
-2. No fallback — `OCRResult.method='paddleocr_failed'` set on all attempts failing
+### Layout + OCR (structural pass)
+1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV2 RT-DETR + 0.9B VLM, runs before discovery
+2. No fallback — `OCRResult.method='paddleocr_failed'` set on inference failure
 
 ### Visual Embeddings
 1. SLIG SigLIP2 cloud endpoint (primary)

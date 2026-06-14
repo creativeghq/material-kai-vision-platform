@@ -161,7 +161,7 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 - Metadata (Claude Opus 4.7, inline with vision): rolled into classification line
 - Chunking (Claude Sonnet 4.6, ~500 chunks): ~$0.10
 - Visual Embeddings (SLIG endpoint): endpoint-metered (auto-pause)
-- Phase 3 OCR (Chandra v2): endpoint-metered
+- Phase 3 OCR (PaddleOCR-VL on Modal): runtime-metered (scale-to-zero)
 - Text + Understanding Embeddings (Voyage voyage-4): ~$0.05
 - **Total**: ~$0.39 per PDF
 

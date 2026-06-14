@@ -49,10 +49,10 @@ All three MUST be updated together.
 - ~~Models Tracked: Qwen3-VL-32B, Qwen3-VL-8B~~
 - **Status**: Qwen vision endpoint deleted 2026-05-01 (had been silently 404-ing for months). Vision now runs on Anthropic Claude Opus 4.7 via tool use — billed under section 2 (Anthropic). Qwen pricing entries were removed from [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) and the Operations dashboard widgets.
 
-### 3a. **HuggingFace Endpoint OCR (Chandra v2)**
-- **Pricing Unit**: HuggingFace Inference Endpoint hourly rate (auto-paused when idle)
-- **Models Tracked**: Chandra v2 (Datalab, sole OCR engine post-2026-05-01)
-- **Cost Calculation**: Endpoint runtime cost amortized across all OCR'd pages/images. Per-attempt latency tracked in `chandra_ocr_metrics`.
+### 3a. **Modal Endpoint OCR (PaddleOCR-VL)**
+- **Pricing Unit**: Modal GPU (L4) usage, billed per second of container runtime (scale-to-zero when idle: `min_containers=0`, $0 idle)
+- **Models Tracked**: PaddleOCR-VL (0.9B, PP-DocLayoutV2 detector + 0.9B VLM) on Modal — layout+OCR backbone post-2026-06-13. Replaced Surya-2, which had replaced Chandra v2.
+- **Cost Calculation**: Modal runtime cost amortized across all OCR'd pages/images. Per-attempt telemetry tracked in `paddleocr_metrics`.
 
 ### 3b. **HuggingFace Endpoint Visual Embeddings (SLIG SigLIP2)**
 - **Pricing Unit**: HuggingFace Inference Endpoint hourly rate (auto-paused when idle)
@@ -148,7 +148,7 @@ Pricing is split across two layers:
 
 | Layer | What it covers | Storage | How to update |
 |-------|----------------|---------|---------------|
-| **AI model + external service pricing** | Claude (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) / Voyage AI / SLIG SigLIP2 / Chandra v2 / OpenAI (alt) + Zernio WhatsApp, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. (Qwen pricing entries removed 2026-05-01; Twilio/SMS removed 2026-06-08 — replaced by Zernio WhatsApp at 0.005 cr/msg billed as `zernio-whatsapp`; legacy ERP pricing entries removed when that connector was retired.) | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
+| **AI model + external service pricing** | Claude (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) / Voyage AI / SLIG SigLIP2 / PaddleOCR-VL (Modal) / OpenAI (alt) + Zernio WhatsApp, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. (Qwen pricing entries removed 2026-05-01; Twilio/SMS removed 2026-06-08 — replaced by Zernio WhatsApp at 0.005 cr/msg billed as `zernio-whatsapp`; legacy ERP pricing entries removed when that connector was retired.) | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
 | **MIVAA gateway action pricing** | RAG search, image analysis (flat per-action credits) | Hardcoded TypeScript in [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) | Manual — these are platform-internal action-level prices, not third-party costs |
 
 ### Runtime behaviour

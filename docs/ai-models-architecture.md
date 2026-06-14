@@ -3,18 +3,18 @@
 **Last Updated**: 2026-06-13
 **Status**: Production
 
-> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **YOLO DocParser + Chandra OCR + `merge_layout` were deleted** and replaced by a single **PaddleOCR-VL** vision-language model (`PaddlePaddle/PaddleOCR-VL`) that returns layout regions + OCR text + figure boxes in one call, run **before discovery** (structure-first). The two warmed HF endpoints are now **SLIG + PaddleOCR**. Anywhere below that names YOLO or Chandra, read "PaddleOCR-VL structural pass". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
+> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on HuggingFace + PaddleOCR-VL on Modal**. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
 
 ## Executive Summary
 
-MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision is **Anthropic-only** (post-2026-05-01 migration); Qwen has been retired from every vision call site.
+MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision is **Anthropic-only** (post-2026-05-01 migration); Qwen has been retired from every vision call site.
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
 | **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
 | **Google (HuggingFace)** | SigLIP2 SO400M (768D projected) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
-| **Datalab (HuggingFace)** | Chandra v2 | OCR — sole OCR engine (pytesseract + EasyOCR removed 2026-05) |
+| **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV2 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
 ---
@@ -27,17 +27,21 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ DISCOVERY: Product Discovery (BEFORE extraction)                        │
-│ Model: Claude Opus 4.7 OR GPT-5                                         │
-│ Purpose: Identify products, count pages, map image-to-product           │
+│ STAGE 1 — STRUCTURAL PASS: Layout + Page OCR + figure boxes             │
+│   (structure-first — runs BEFORE discovery)                            │
+│ Model: PaddleOCR-VL 1.6 (PaddlePaddle on Modal)                        │
+│ Two-stage: PP-DocLayoutV2 (RT-DETR + pointer net) → regions/labels/    │
+│            reading-order; 0.9B VLM → content (text, tables→md,          │
+│            formulas→LaTeX, charts). One /parse call per page.           │
+│ Persists: document_layout_analysis (processing_version='paddleocr-vl') │
+│ Failure marker: OCRResult.method='paddleocr_failed'                     │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ LAYOUT + PAGE OCR                                                       │
-│ Model: Chandra v2 (Datalab on HuggingFace)                              │
-│ Purpose: YOLO layout detection + page OCR (3 retries, jittered temps)   │
-│ Failure marker: OCRResult.method='chandra_failed'                       │
-│ Cache status persisted: success/yolo_only/empty_page/ocr_failed         │
+│ DISCOVERY: Product Discovery                                            │
+│ Model: Claude Opus 4.7 OR GPT-5                                         │
+│ Purpose: Identify products, count pages, map image-to-product           │
+│ Reads PaddleOCR reading-order text from the Stage 1 cache (not raw text) │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -63,7 +67,7 @@ MIVAA Platform uses AI models from **4 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ PHASE 3 OCR: Per-image OCR for text-bearing images                      │
-│ Model: Chandra v2 (with retry-with-jitter)                              │
+│ Model: PaddleOCR-VL block OCR (mode=block on the crop)                  │
 │ Runs AFTER vision_analysis. Consumed by: icon-metadata extraction +     │
 │   image-search labels. NOT consumed by chunker (Stage 1.5 is canonical) │
 │   and NOT a vision_analysis prompt input (vision already ran).          │
@@ -235,24 +239,31 @@ HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_emb
 
 ---
 
-### 6. **Chandra v2 — OCR (sole OCR engine)** 📜
+### 6. **PaddleOCR-VL 1.6 — Structural Pass (layout + OCR + figure boxes, sole engine)** 📜
 
-**File**: `mivaa-pdf-extractor/app/services/ocr/chandra_endpoint_manager.py`
+**Files**:
+- `mivaa-pdf-extractor/app/services/pdf/paddleocr_endpoint_manager.py` (`PaddleOCRManager`; `run_structural_pass`=page, `run_block_ocr`=block)
+- `mivaa-pdf-extractor/app/services/pdf/paddleocr_pipeline.py` (maps `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema)
+- `mivaa-pdf-extractor/modal_app/paddleocr_vl.py` (the Modal app)
 
-**Pytesseract + EasyOCR were removed entirely in 2026-05** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed), and even when "working" it produced bbox-less text that silently degraded layout-merge.
+`PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) is a **two-stage** document parser hosted **in-process on Modal** (the full `paddleocr[doc-parser]` `PaddleOCRVL` pipeline on `paddlepaddle-gpu`, **NOT vLLM**): **PP-DocLayoutV2** (RT-DETR detector + pointer network) localizes regions, labels them, and predicts reading order; the **0.9B VLM** recognizes the content inside each region (text, tables→markdown, formulas→LaTeX, charts).
 
-**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8. Chandra freelances ("The image is...") ~50% at temp=0; jittering breaks the sticky-prose state and lifts success rate to >95%. (Widened from 0.0/0.1/0.2 in 2026-05-03 — the narrow spread kept the model in sticky-prose state through all three retries on graphic-heavy pages.)
+**Replaced Surya-2 on 2026-06-13** — tighter RT-DETR crop boxes (→ cleaner product crops → better SLIG visual embeddings) and reading order from a dedicated model; validated ~1-3s/page warm, near-perfect Greek OCR, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`; pytesseract + EasyOCR were removed before that in 2026-05.) `surya_endpoint_manager.py`, `surya_blocks.py`, `modal_app/surya_vllm.py`, and all `surya_*` config are deleted.
 
 **Used for**:
-- Stage 1.5 page-level OCR (with `cache_status` persistence: `success` / `yolo_only` / `empty_page` / `ocr_failed` / `page_failed`)
-- Phase 3 per-image OCR (text-bearing images: yolo_crop ∈ {TABLE, TEXT, TITLE, CAPTION} or embedded with `text_detected=True`)
+- Stage 1 document-level structural pass (runs **before discovery** — structure-first), persisted to `document_layout_analysis` with `processing_version='paddleocr-vl'`
+- Phase 3 per-image OCR + icon metadata + the admin re-OCR endpoint (`ocr_service._call_paddleocr` via `run_structural_pass` on the crop; `ocr_engine` setting = `paddleocr`)
 
-**Failure marker**: `OCRResult.method='chandra_failed'` — consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
+**Contract** (custom, NOT OpenAI/vLLM): `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{"regions":[{bbox:[x0,y0,x1,y1] px, label, content, order}], width, height}`. `mode=page` for the structural pass, `mode=block` for per-crop OCR. Pixel bboxes are normalized to 0..1 at the parser boundary.
 
-**Per-attempt metrics**: `chandra_ocr_metrics` table — `outcome`, `attempt_number`, `temperature`, `latency_ms`, `failure_mode_head`, `caller`.
+**Failure marker**: `OCRResult.method='paddleocr_failed'` — consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 
-**Cost**: HuggingFace endpoint with auto-pause
-**Speed**: 1-3 seconds per page (3 attempts worst-case)
+**Per-call metrics**: `paddleocr_metrics` table.
+
+**Host — Modal only**: app `paddleocr-vl` (workspace `basilakis`) at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. GPU L4, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=4`, forces `device="gpu"`. Cold start ~90s (model load + first-call JIT), paid once per job at warmup. Only required runtime secret: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default). CI auto-deploys on `modal_app/**` via the `deploy-modal` job (`MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`); manual redeploy via `modal deploy modal_app/paddleocr_vl.py`.
+
+**Cost**: Modal GPU L4, scale-to-zero ($0 idle)
+**Speed**: ~1-3 seconds per page warm; ~90s cold start
 
 ---
 
@@ -283,12 +294,12 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 
 | Stage | Default Model | Alternative |
 |-------|---------------|-------------|
+| Layout + Page OCR + figure boxes (Stage 1, before discovery) | PaddleOCR-VL 1.6 (Modal) | — |
 | Discovery | Claude Opus 4.7 | GPT-5 |
-| Layout + Page OCR | YOLO + Chandra v2 | — |
 | Chunking | Claude Sonnet 4.6 | — |
 | Vision (primary) | Claude Opus 4.7 (tool use) | — |
 | Vision (validation, low-confidence) | Claude Opus 4.7 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
-| Phase 3 OCR (per-image) | Chandra v2 | — |
+| Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
 | Visual Embeddings | SLIG (SigLIP2 SO400M (768D projected), 5×768D) | — |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
 | Text Embeddings | Voyage AI voyage-4 (1024D) | — |
@@ -307,11 +318,11 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 
 | Model | Usage | Cost |
 |-------|-------|------|
+| **PaddleOCR-VL 1.6** | Stage 1 layout + page OCR (100 pages, before discovery) | Modal GPU (scale-to-zero) |
 | **Claude Opus 4.7** | Product discovery (1 call) | ~$0.08 |
-| **Chandra v2** | Layout + page OCR (100 pages × ~1.5 retry avg) | endpoint |
 | **Claude Sonnet 4.6** | Chunking (~500 chunks) | ~$0.10 |
 | **Claude Opus 4.7** | Vision analysis (50 images, tool use) | ~$0.13 |
-| **Chandra v2** | Phase 3 per-image OCR (text-bearing only) | endpoint |
+| **PaddleOCR-VL 1.6** | Phase 3 per-image OCR (text-bearing only) | Modal GPU (scale-to-zero) |
 | **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |
 | **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
 | **TOTAL** | Per PDF | **~$0.36** |
@@ -337,8 +348,8 @@ Anthropic tool use guarantees the `VisionAnalysis` payload matches the Pydantic 
 ### 2. **Honest pricing**
 Pre-2026-05-01 the documented architecture said "Qwen for cheap bulk vision, Claude for validation" — but Qwen had been 404-ing for months. The platform was 100% Claude vision and the bill reflected it. The migration aligned the docs with reality.
 
-### 3. **OCR reliability**
-Chandra v2 with retry-with-jitter has >95% success rate. Pytesseract + EasyOCR were removed because pytesseract had been broken on production (TESSDATA_PREFIX unset) and even when working produced bbox-less text that silently degraded layout-merge.
+### 3. **Structure-first layout + OCR**
+PaddleOCR-VL's dedicated RT-DETR detector produces tighter region boxes than the prior merge-based pipelines (→ cleaner product crops → better SLIG visual embeddings), and reading order comes from a dedicated pointer network rather than a heuristic merge. Running it as Stage 1 before discovery means every downstream consumer reads reading-order text from one cache. (Earlier OCR stacks — pytesseract + EasyOCR, then YOLO + Chandra, then Surya-2 — were all retired.)
 
 ### 4. **VECS-only embeddings**
 No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, all halfvec for 50% storage savings vs full-precision vector. Boolean presence flags on `document_images` give O(1) presence checks.
@@ -351,7 +362,7 @@ No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, a
 |--------|----------------|----------------|
 | **Vision schema integrity** | JSON regex recovery (best effort) | Tool-use schema guarantee |
 | **Vision actual cost** | "Qwen $0.18/1M" (false — 404→Claude fallback) | Claude Opus 4.7 $5/$25 per 1M (honest) |
-| **OCR success rate** | ~60% (pytesseract broken in prod) | >95% (Chandra v2 jittered retry) |
+| **Layout + OCR engine** | ~60% (pytesseract broken in prod) | PaddleOCR-VL 1.6 structural pass on Modal (RT-DETR boxes + 0.9B VLM, ~1-3s/page warm) |
 | **Voyage drift detection** | None | `embedding_model` + `schema_version` on every row |
 
 ---
@@ -360,7 +371,7 @@ No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, a
 
 1. **Voyage `voyage-multimodal-3.5`** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. Watch for general availability.
 2. **Schema versioning** — the `schema_version` field is in place; bumps will trigger backfill via `POST /admin/understanding-embeddings/backfill`.
-3. **Chandra v3** — Datalab continues to ship improvements; the retry-with-jitter loop should adapt.
+3. **Voyage `voyage-multimodal-3` page embedding** — a planned 8th fusion vector (`vecs.page_embeddings`) to read product names baked inside photos, which the PaddleOCR-VL structural pass does not OCR (Image/Figure/chart regions are crop sources only).
 
 ---
 

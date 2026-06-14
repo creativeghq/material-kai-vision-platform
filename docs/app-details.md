@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, Chandra v2 OCR, plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -99,8 +99,8 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
 | Anthropic | Claude Sonnet 4.6 | Semantic chunking (PRIMARY chunker; was Qwen pre-2026-05-01, but Qwen had been silently 404-ing for months — migration made architecture honest) | Anthropic API |
 | Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
-| HuggingFace | Chandra v2 | OCR (sole engine post-2026-05-01) — retry-with-jitter (3 attempts at temps 0.0/0.1/0.2). Per-attempt metrics in `chandra_ocr_metrics`. Failure marker: `OCRResult.method='chandra_failed'`. (Pytesseract + EasyOCR removed entirely.) | Cloud endpoint |
-| HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint |
+| Modal | PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) | Layout + OCR backbone (sole engine post-2026-06-13) — two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), run as Stage 1 before discovery. Per-attempt metrics in `paddleocr_metrics`. Failure marker: `OCRResult.method='paddleocr_failed'`; `ocr_engine='paddleocr'`. Replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). | Modal endpoint (GPU L4, scale-to-zero) |
+| HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint (only model on HF) |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
 | Replicate | proplabs/virtual-staging | AI room staging from empty photos | 20 credits/run |
@@ -145,7 +145,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 6. Runs Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre-2026-05-01 ran Qwen3-VL with Claude fallback; the Qwen HF endpoint had been 404-ing for months (Stage 3 was effectively 100% Claude already), so the migration retired Qwen and went Anthropic-only.
 7. Generates all 5 SigLIP2 visual embedding types per image
 8. Extracts 200+ metadata fields per product (dimensions, material composition, certifications, weight, finish, slip resistance, etc.)
-9. YOLO layout detection + Camelot table extraction on complex page layouts
+9. PaddleOCR-VL layout detection + OCR (Modal-hosted, structure-first Stage 1) localizes regions, labels them, predicts reading order, and reads text/tables→markdown/formulas→LaTeX inside each region
 10. Creates fully searchable product records with all embeddings linked
 
 | PDF Size | Products Extracted | Processing Time |
@@ -646,7 +646,8 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- HuggingFace Endpoints: Pay-per-use for SigLIP2 (768D visual embeddings) + Chandra v2 OCR. Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
+- HuggingFace Endpoints: Pay-per-use for SigLIP2 (768D visual embeddings) — the only model now hosted on HF. Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
+- Modal: PaddleOCR-VL layout + OCR backbone (GPU L4, scale-to-zero → $0 idle, `max_containers=4`). Replaced the Surya-2 HF backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
 ---
@@ -695,7 +696,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | Anthropic (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, Chandra v2, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
+| AI models integrated | Anthropic (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 
@@ -713,7 +714,7 @@ Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic
 Ingestion + enrichment + search + design generation + VR visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.
 
 **4. 14-Stage Pipeline with Checkpoint Recovery**
-Enterprise-grade PDF processing at 95%+ accuracy with YOLO layout detection, table extraction, and 9-stage checkpoint recovery. This took significant engineering and handles everything from scanned PDFs to complex multi-product catalogs.
+Enterprise-grade PDF processing at 95%+ accuracy with a structure-first PaddleOCR-VL layout + OCR backbone (RT-DETR region detection, dedicated reading-order prediction, table/formula extraction) and 9-stage checkpoint recovery. This took significant engineering and handles everything from scanned PDFs to complex multi-product catalogs.
 
 **5. Halfvec Storage (50% Infrastructure Cost)**
 All 7 embedding types stored as float16 via pgvector. Halves vector storage costs with zero accuracy loss — critical for scaling to millions of products.
@@ -751,7 +752,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - 7-vector fusion search with query-adaptive weight profiles
 - Understanding embeddings (spec-based search via Claude Opus 4.7 vision_analysis tool use → Voyage AI; pre-2026-05-01 used Qwen3-VL, retired in the migration)
 - AI search re-ranking (Claude post-retrieval re-ordering with explanations)
-- PDF ingestion pipeline (14 stages, 9 checkpoints, YOLO layout detection)
+- PDF ingestion pipeline (14 stages, 9 checkpoints, PaddleOCR-VL structure-first layout + OCR backbone on Modal)
 - Web scraping ingestion (Firecrawl)
 - XML import with AI field mapping
 - KAI unified agent (material search, KB RAG, visual search, B2B research, SEO)

@@ -7,11 +7,10 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, FileMinus, Truck, Wallet, Banknote, FileSignature, PackageCheck } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -34,29 +33,31 @@ import { warehouseService, type WarehouseItem, type Warehouse } from '@/services
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
-const NAV: { key: DocType; label: string; icon: React.ComponentType<{ className?: string }>; enabled: boolean }[] = [
-  { key: 'invoices', label: 'Invoices', icon: FileText, enabled: true },
-  { key: 'receipts', label: 'Receipts', icon: Receipt, enabled: true },
-  { key: 'credit_notes', label: 'Credit notes', icon: FileMinus, enabled: true },
-  { key: 'payments', label: 'Payments', icon: Banknote, enabled: true },
-  { key: 'expenses', label: 'Expenses (Inbox)', icon: Wallet, enabled: true },
-  { key: 'dispatch', label: 'Dispatch board', icon: PackageCheck, enabled: true },
-  { key: 'delivery_notes', label: 'Delivery notes', icon: Truck, enabled: true },
-  { key: 'cheques', label: 'Cheques', icon: FileSignature, enabled: true },
-];
+// This page is ALWAYS rendered embedded — FinancePage's `DOC_TABS` sidebar is the single
+// source of truth for the document-type nav (labels, icons, order). Add new document types
+// THERE, not here. This map only resolves the heading + empty-state copy for the active type.
+const DOC_LABEL: Record<DocType, string> = {
+  invoices: 'Invoices',
+  receipts: 'Receipts',
+  credit_notes: 'Credit notes',
+  payments: 'Payments',
+  expenses: 'Expenses (Inbox)',
+  dispatch: 'Dispatch board',
+  delivery_notes: 'Delivery notes',
+  cheques: 'Cheques',
+};
 
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
 const transmitted = (s: any) => s === 'accepted' || s === 'offline';
 
-const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) => {
+const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant, canOperateFinance } = usePermissions();
 
-  const [internalType, setType] = useState<DocType>('invoices');
-  const type = embeddedType ?? internalType;
+  const type = embeddedType;
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
@@ -118,34 +119,13 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
   const statusVariant = (s: string) => s === 'overdue' ? 'destructive' : s === 'paid' ? 'default' : 'outline';
 
   return (
-    <div className={embeddedType ? '' : 'min-h-screen'}>
-      {!embeddedType && <GlobalAdminHeader title="Documents" description="Invoices, receipts and credit notes with myDATA status." badge="Finance" />}
-
-      <div className={embeddedType ? '' : 'p-3 sm:p-6'}>
+    <div>
+      <div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          {!embeddedType && (
-          <div className="flex w-full shrink-0 flex-row flex-wrap gap-1 sm:w-52 sm:flex-col">
-            {NAV.map((n) => (
-              <button
-                key={n.key}
-                type="button"
-                disabled={!n.enabled}
-                onClick={() => n.enabled && setType(n.key)}
-                className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors text-left
-                  ${type === n.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}
-                  ${!n.enabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >
-                <n.icon className="h-4 w-4" /> {n.label}
-                {!n.enabled && <span className="ml-auto text-[10px]">soon</span>}
-              </button>
-            ))}
-          </div>
-          )}
-
-          {/* Content */}
+          {/* Content — the document-type nav lives in FinancePage's DOC_TABS sidebar. */}
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold capitalize">{NAV.find((n) => n.key === type)?.label}</h2>
+              <h2 className="text-sm font-semibold capitalize">{DOC_LABEL[type]}</h2>
               <div className="flex items-center gap-2">
                 {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
@@ -206,7 +186,7 @@ const DocumentsPage: React.FC<{ embeddedType?: DocType }> = ({ embeddedType }) =
                     </thead>
                     <tbody>
                       {rows.length === 0 && (
-                        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {NAV.find((n) => n.key === type)?.label.toLowerCase()} yet.</td></tr>
+                        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
                       )}
                       {rows.map((i) => (
                         <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}>

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, MessageSquare, FileDown, ExternalLink, Globe, Archive, RefreshCw,
-  Trash2, Plus, BookOpen, Eye, Activity, Send, Mail, Inbox,
+  Trash2, Plus, BookOpen, Eye, Activity, Send, Mail, Inbox, FileText,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -24,6 +24,7 @@ import {
   type CatalogEmailSendRow,
 } from '@/services/catalogsService';
 import { SendToCustomersModal } from '@/components/business/catalogs/SendToCustomersModal';
+import { CatalogSourcesPanel } from '@/components/business/catalogs/CatalogSourcesPanel';
 
 const STATUS_VARIANT: Record<CatalogStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'secondary',
@@ -52,6 +53,7 @@ export const CatalogBuilderPage: React.FC = () => {
   const [grantEmail, setGrantEmail] = useState('');
   const [grantNote, setGrantNote] = useState('');
   const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('builder');
 
   const load = useCallback(async () => {
     if (!catalogId) return;
@@ -255,9 +257,10 @@ export const CatalogBuilderPage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
-      <Tabs defaultValue="builder">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="builder" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Builder</TabsTrigger>
+          <TabsTrigger value="sources" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4" /> Sources ({(catalog.source_pdf_ids || []).length})</TabsTrigger>
           <TabsTrigger value="cover" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Cover & Back</TabsTrigger>
           <TabsTrigger value="access" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Access ({grants.length})</TabsTrigger>
           <TabsTrigger value="log" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Visitors ({viewEvents.length + accessLog.length})</TabsTrigger>
@@ -270,8 +273,11 @@ export const CatalogBuilderPage: React.FC = () => {
             <Card>
               <CardContent className="p-12 text-center space-y-2">
                 <div className="font-medium">No sections yet</div>
-                <p className="text-sm text-muted-foreground">Use the KAI agent to extract sections from source PDFs or add materials manually.</p>
-                <Button onClick={handleOpenAgent}><MessageSquare className="mr-2 h-4 w-4" /> Open in KAI</Button>
+                <p className="text-sm text-muted-foreground">Upload a source PDF and extract products in the Sources tab, or let the KAI agent build it for you.</p>
+                <div className="flex gap-2 justify-center pt-1">
+                  <Button onClick={() => setActiveTab('sources')}><FileText className="mr-2 h-4 w-4" /> Go to Sources</Button>
+                  <Button variant="outline" onClick={handleOpenAgent}><MessageSquare className="mr-2 h-4 w-4" /> Open in KAI</Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -314,6 +320,10 @@ export const CatalogBuilderPage: React.FC = () => {
               </Card>
             ))
           )}
+        </TabsContent>
+
+        <TabsContent value="sources" className="mt-4">
+          <CatalogSourcesPanel catalog={catalog} onChanged={load} />
         </TabsContent>
 
         <TabsContent value="cover" className="space-y-4 mt-4">

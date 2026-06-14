@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Workflow,
   ChevronDown,
+  FileJson,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -295,6 +296,17 @@ const AdminDashboard: React.FC = () => {
                 <DropdownMenuItem onClick={() => window.open('https://v1api.materialshub.gr/redoc', '_blank')} className="flex items-center gap-2 cursor-pointer">
                   <FileText className="h-4 w-4" />
                   ReDoc
+                  <ExternalLink className="h-3 w-3 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.open('/api/edge-swagger.html', '_blank')} className="flex items-center gap-2 cursor-pointer">
+                  <DatabaseIcon className="h-4 w-4" />
+                  Supabase API Docs
+                  <ExternalLink className="h-3 w-3 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open('/api/openapi-edge.json', '_blank')} className="flex items-center gap-2 cursor-pointer">
+                  <FileJson className="h-4 w-4" />
+                  Supabase OpenAPI (JSON)
                   <ExternalLink className="h-3 w-3 ml-auto" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

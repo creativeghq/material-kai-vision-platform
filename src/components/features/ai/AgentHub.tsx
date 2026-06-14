@@ -33,6 +33,8 @@ import {
   ListChecks,
   GripVertical,
   Pencil,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -100,6 +102,7 @@ import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
 import { SearchSpecCard } from './SearchSpecCard';
+import { catalogsService } from '@/services/catalogsService';
 import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
 import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageCandidatesCard';
 import { SEOResearchCard, type SEOResearchCardData } from './SEOResearchCard';
@@ -847,6 +850,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const catalogPdfInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCatalogPdf, setUploadingCatalogPdf] = useState(false);
 
   // Track previous agent to detect actual agent switches
   const previousAgentRef = useRef<string | null>(null);
@@ -3035,6 +3040,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     input.click();
   }, [userId, selectedAgent, toast]);
 
+  // Attach a temporary catalog source PDF straight from chat. Reuses the exact
+  // same upload path as the admin builder (catalogsService.uploadSourcePdf →
+  // catalog_source_pdfs row), then prefills an instruction so the agent attaches
+  // it (attach_catalog_pdfs) and extracts — keeping the admin and agent flows
+  // identical. The PDF is NOT digested into the product DB.
+  const handleCatalogPdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast({ title: 'PDF only', description: 'Attach a PDF file for catalog extraction.', variant: 'destructive' });
+      return;
+    }
+    setUploadingCatalogPdf(true);
+    try {
+      const source = await catalogsService.uploadSourcePdf(file);
+      // Make sure the agent actually has the catalog tools bound (switches to the
+      // owning agent + enables the 'catalogs' toolkit) so the prefilled ask works.
+      const catalogToolkit = TOOLKITS.find((t) => t.id === 'catalogs');
+      if (catalogToolkit) ensureAgentAndToolkit(catalogToolkit);
+      toast({ title: 'PDF uploaded', description: file.name });
+      setInput(
+        `I uploaded a catalog source PDF.\n` +
+        `- source_pdf_id: ${source.id}\n` +
+        `- filename: ${source.original_filename}\n\n` +
+        `If we don't have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.`,
+      );
+    } catch (err) {
+      toast({ title: 'Upload failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+    } finally {
+      setUploadingCatalogPdf(false);
+    }
+  }, [toast, ensureAgentAndToolkit]);
+
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
 
@@ -4524,6 +4563,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               className="hidden"
               onChange={handleImageUpload}
             />
+            <input
+              ref={catalogPdfInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={handleCatalogPdfUpload}
+            />
 
             {/* Unified input container */}
             <TooltipProvider delayDuration={200}>
@@ -4574,6 +4620,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="left"><p>Attach images</p></TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => catalogPdfInputRef.current?.click()}
+                        disabled={uploadingCatalogPdf}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+                      >
+                        {uploadingCatalogPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left"><p>Attach catalog PDF (extract products)</p></TooltipContent>
                   </Tooltip>
 
                   <Tooltip>

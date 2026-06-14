@@ -1,16 +1,23 @@
 # PDF Processing Pipeline - Complete Technical Guide
 
 > **⚠️ ARCHITECTURE UPDATED 2026-06-13 — PaddleOCR-VL structural backbone (structure-first).**
-> The layout/OCR front-end below describes the **retired** YOLO + Chandra + `merge_layout`
-> design. It has been replaced by a single **PaddleOCR-VL** vision-language model that returns
-> layout regions + OCR text + figure boxes in one call, run as **Stage 1 BEFORE discovery**.
-> Discovery, chunking, and image crops all read its `document_layout_analysis` cache
-> (`processing_version='paddleocr-vl'`). YOLO/Chandra and their managers were deleted.
+> The layout + OCR front-end is now a single **PaddleOCR-VL** two-stage document parser
+> (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) hosted on **Modal**: **PP-DocLayoutV2** (RT-DETR
+> detector + pointer network) localizes regions, labels them, and predicts reading order; the
+> **0.9B VLM** recognizes the content inside each region (text, tables→markdown, formulas→LaTeX,
+> charts). It runs as **Stage 1, BEFORE discovery**, persisting `document_layout_analysis` rows
+> with `processing_version='paddleocr-vl'`; discovery (via `build_page_text_from_layout_cache`),
+> Stage 2 chunking, and Stage 3 image crops all read that cache. It **replaced Surya-2 on
+> 2026-06-13**; Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`** — so YOLO,
+> Chandra, Surya, and `merge_layout` (and their managers) are all **deleted with no consumer**.
+> OCR is also PaddleOCR (`ocr_service._call_paddleocr`). HuggingFace now hosts only **SLIG**
+> (visual embeddings); the structural pass is **Modal-only**.
 > See the **"PDF Pipeline — PaddleOCR-VL structural backbone"** section in `CLAUDE.md` and
 > [ai-models-complete-list.md](./ai-models-complete-list.md) for the current model map.
-> Wherever this doc says "YOLO detects regions" or "Chandra OCRs the page", read
-> "PaddleOCR does both in one structural pass". The remaining stages (vision analysis,
-> embeddings, chunking, products) are unchanged.
+> **Reading note:** older sub-sections below still carry YOLO/Chandra wording inline — wherever
+> this doc says "YOLO detects regions" or "Chandra OCRs the page", that is the **retired** design;
+> read "PaddleOCR-VL does both in one structural pass on Modal". The remaining stages (vision
+> analysis = Claude Opus 4.7, embeddings, chunking = Sonnet 4.6, products) are unchanged.
 
 14-stage intelligent pipeline for transforming material catalogs into searchable knowledge.
 
@@ -268,7 +275,7 @@
 
 Stage 0 discovers: `name="NOVA"`, `page_range=[12,13,14]`
 
-Stage 1 (Layout + Tables, FOR NOVA ONLY): YOLO detects 15 regions on pages 12-14; Camelot extracts 3 tables from page 13; tables stored with product_id = NOVA's ID.
+Stage 1 (Layout + Tables, FOR NOVA ONLY): the PaddleOCR-VL structural pass detects 15 regions on pages 12-14 and recognizes their content (table regions → markdown/HTML preserved in `metadata.html`); Camelot extracts 3 tables from page 13; tables stored with product_id = NOVA's ID. (Note: the structural pass actually runs once per document as Stage 1 BEFORE discovery; this per-product framing reflects how each product reads its slice of the shared `document_layout_analysis` cache.)
 
 Stage 2 (Text Chunking, FOR NOVA ONLY): Extracts text from pages 12-14 only, creates 45 chunks, each with product_id = NOVA's ID.
 
@@ -359,21 +366,29 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 ---
 
-### Stage 1: Focused Extraction + YOLO Layout Detection (15-30%)
+### Stage 1: Structure-First Layout + OCR (PaddleOCR-VL) — runs BEFORE discovery
 
-**File**: `app/api/pdf_processing/stage_1_focused_extraction.py`
+**File**: `app/api/pdf_processing/stage_1_layout_precompute.py` (structural pass) + `app/api/pdf_processing/stage_1_focused_extraction.py` (per-product slice + tables)
 
-**Purpose**: Extract product pages, detect layout regions, and extract tables
+> **Architecture (2026-06-13)**: This stage is now a single **PaddleOCR-VL** structural pass run
+> **once per document, BEFORE discovery** — not a per-product YOLO step. The text below has been
+> rewritten to the current design. The retired YOLO + Chandra + `merge_layout` front-end (and
+> Surya-2 before it) had no equivalent of structure-first ordering.
+
+**Purpose**: In one pass, localize + label every region, recognize its content, predict reading order, and persist a `document_layout_analysis` cache (`processing_version='paddleocr-vl'`) that discovery, chunking, and image crops all read.
 
 **Process**:
 1. **Page Mapping**: Map catalog pages to physical PDF pages
-2. **YOLO Layout Detection**: Detect TEXT, IMAGE, TABLE, TITLE, CAPTION regions
-3. **Table Extraction**: Extract structured tables using Camelot (NEW!)
-4. **Layout Region Storage**: Store detected regions for intelligent chunking
+2. **PaddleOCR-VL structural pass** (`mode=page`): **PP-DocLayoutV2** (RT-DETR detector + pointer network) localizes regions + labels them + predicts reading order; the **0.9B VLM** recognizes content inside each region (text, tables→markdown/HTML, formulas→LaTeX, charts).
+3. **Layout cache persistence**: Map the `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema and persist with `processing_version='paddleocr-vl'`.
+4. **Table Extraction**: Camelot extracts structured tables (table region `content` markdown/HTML is also preserved in `metadata.html`).
 
 **Services Used**:
-- `YOLOLayoutDetector` - Layout detection using YOLO model
-- `TableExtractor` - Table extraction using Camelot (guided by YOLO)
+- `PaddleOCRManager.from_config` (`paddleocr_endpoint_manager.py`) — `run_structural_pass` (page) holds inference + retry + `paddleocr_metrics` telemetry; lifecycle (warmup `/health` probe / scale-to-zero) delegated to `ModalEndpointProvider` in `endpoint_providers.py`
+- `paddleocr_pipeline.py` — maps `/parse` JSON onto `document_layout_analysis.layout_elements[]`; PP-DocLayout labels (`doc_title`/`paragraph_title`/`text`/`table`/`image`/`figure`/`chart`/…) → existing `region_type` vocab via `PADDLE_LABEL_TO_REGION_TYPE`. RT-DETR **pixel** bboxes → normalized 0..1 at the parser boundary → denormalized at crop render in `region_to_layout_element`
+- `TableExtractor` — table extraction using Camelot
+
+**Hosting**: Modal app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`, GPU L4, scale-to-zero (`min_containers=0` + `scaledown_window=120` = $0 idle, `max_containers=4`). Custom contract: `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox:[x0,y0,x1,y1] px, label, content, order}], width, height}`; `mode=page` = structural pass, `mode=block` = per-crop OCR. Cold start ~90s (paid once per job at warmup); ~1-3s/page warm.
 
 **Data Extracted**:
 
@@ -381,70 +396,80 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
    - Catalog page numbers → PDF page indices
    - Handles 2-page spreads and standard layouts
 
-2. **YOLO Layout Regions**
-   - TEXT regions - Body text, paragraphs
-   - IMAGE regions - Product images, diagrams
-   - TABLE regions - Specification tables, data grids
-   - TITLE regions - Headers, section titles
-   - CAPTION regions - Image captions, labels
+2. **Layout Regions** (PaddleOCR-VL, with content + reading order)
+   - `text` / `paragraph_title` / `doc_title` regions — body text, headings (content recognized inline)
+   - `image` / `figure` / `chart` regions — product images, diagrams (these are the product-crop sources)
+   - `table` regions — specification tables (content preserved as markdown/HTML in `metadata.html`)
+   - formula regions — recognized to LaTeX
 
-3. **Tables** (NEW!)
-   - Structured table data with headers and rows
+3. **Tables**
+   - Structured table data with headers and rows (Camelot) + markdown/HTML from the VLM in `metadata.html`
    - Table type classification (specifications, dimensions, etc.)
    - Confidence scores for extraction quality
    - Page numbers for linking to products
 
 **Database Storage**:
-- `product_layout_regions` table - YOLO-detected regions
-- `product_tables` table - Extracted tables with metadata
+- `document_layout_analysis` table — PaddleOCR-VL regions + recognized content + reading order (`processing_version='paddleocr-vl'`)
+- `product_layout_regions` table — per-product region slice
+- `product_tables` table — extracted tables with metadata
 
-**Returns**: A dict with `product_pages` (set of physical PDF page indices), `layout_regions` (list of YOLO-detected LayoutRegion objects), `layout_stats` (total_regions, text_regions, image_regions, table_regions, title_regions counts), and `tables_extracted` (integer count).
+**Returns**: A dict with `product_pages` (set of physical PDF page indices), `layout_regions` (list of LayoutRegion objects mapped from the PaddleOCR-VL `/parse` output), `layout_stats` (total_regions, text_regions, image_regions, table_regions, title_regions counts), and `tables_extracted` (integer count).
 
 **Benefits**:
 - 40-60% reduction in processing time
 - Focused on relevant content
 - Reduced noise in embeddings
-- **Layout-aware chunking** - Respects document structure
-- **Table extraction** - Structured data for product specs
+- **Layout-aware chunking** — respects document structure
+- **Structure-first reading order** — discovery reads reading-order text from the cache instead of raw `page.get_text()`
+- **Table extraction** — structured data for product specs
+- **Tighter product crops** — dedicated RT-DETR boxes → cleaner crops → better SLIG visual embeddings
 
 ---
 
-### Stage 1.5: Page-Level OCR + Layout Merge (post-2026-05 hardening)
+### Stage 1.5: Page-Level Layout + OCR cache (folded into the PaddleOCR-VL structural pass)
 
-**Purpose**: Run page-level OCR alongside YOLO layout, persist results to `document_layout_analysis`, drive resume-skip logic, and feed canonical page text into chunking.
+> **Architecture (2026-06-13)**: Layout + OCR are now a **single PaddleOCR-VL pass** (Stage 1
+> above). There is no longer a separate YOLO-layout-plus-Chandra-OCR merge step — the VLM
+> recognizes content inside every detected region in the same call, so `merge_layout` is deleted.
+> This sub-section is retained to document the resume-skip / cache-status mechanics, reframed to
+> PaddleOCR-VL. The historical Chandra/`merge_layout` retry mechanics below the divider are kept as
+> a **tombstone** of the retired design.
 
-**Model**: **Chandra v2 (sole OCR engine)** via HuggingFace endpoint, called through `chandra_endpoint_manager.run_inference`.
+**Purpose**: Run the PaddleOCR-VL structural pass, persist results to `document_layout_analysis` (`processing_version='paddleocr-vl'`), drive resume-skip logic, and feed canonical reading-order page text into discovery + chunking (via `build_page_text_from_layout_cache`).
 
-**Pytesseract + EasyOCR removed entirely (2026-05)** (`requirements.txt`, `deploy.yml`, `ocr_service.py`). Pytesseract had been broken on production for months (TESSDATA_PREFIX unset, no traineddata installed) and even when "working" produced bbox-less text that silently degraded layout-merge.
+**Model**: **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on **Modal**, called through `PaddleOCRManager.run_structural_pass` (`mode=page`).
 
-**Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8. Chandra freelances ("The image is...") ~50% at temp=0; the wider temperature spread breaks the sticky-prose state and lifts success rate to >90%. (The original narrow 0.0/0.1/0.2 spread was widened 2026-05-03 after a ~55% cumulative failure rate was observed at the original narrow range.)
+**Failure marker**: `OCRResult.method='paddleocr'` / `'paddleocr_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
 
-**Failure marker**: `OCRResult.method='chandra_failed'` (not empty list). Consumers must check `method`, not emptiness, to distinguish failure from "no text on page".
+**Per-attempt metrics** — `paddleocr_metrics` table (inference + retry telemetry held by `PaddleOCRManager`). The legacy `chandra_ocr_metrics` table describes the retired engine.
 
-**Balanced-bracket trimmer** (`_strip_fences_and_junk`): replaces the old `rfind(']')`-based trim that mis-trimmed `']` / `}"]` truncations. Recovers the bbox cleanly in those cases.
-
-**Per-attempt metrics** — `chandra_ocr_metrics` table:
-- `outcome` ∈ {`success`, `success_after_retry`, `failed_prose`, `failed_malformed_json`, `failed_http_error`}
-- `attempt_number`, `temperature`, `latency_ms`
-- `failure_mode_head`, `caller`
-
-**`cache_status` semantics** — written to `analysis_metadata.cache_status` on every `document_layout_analysis` row:
+**`processing_version` / `cache_status` semantics** — every `document_layout_analysis` row is stamped `processing_version='paddleocr-vl'`. `analysis_metadata.cache_status` still distinguishes "ran clean" from "ran but failed and should be retried":
 
 | cache_status | Meaning |
 |--------------|---------|
-| `success` | YOLO + Chandra ran clean and produced text |
-| `yolo_only` | YOLO ran, Chandra produced no text on a non-empty page |
-| `empty_page` | YOLO + Chandra agree the page is empty (no recovery needed) |
-| `ocr_failed` | Chandra's 3 attempts all failed — page should be retried, NOT skipped on resume |
-| `page_failed` | YOLO itself failed — page should be retried |
+| `success` | PaddleOCR-VL ran clean and produced regions + text |
+| `empty_page` | the page is empty (no recovery needed) |
+| `ocr_failed` | the structural pass failed — page should be retried, NOT skipped on resume |
 
-**Resume-skip query** in `precompute_document_layout` filters out `ocr_failed` + `page_failed` rows, so transient Chandra failures no longer permanently "skip" pages on every subsequent run (was a P1 silent-data-loss bug pre-2026-05).
+> **Retired cache_status values**: `yolo_only` ("YOLO ran, Chandra produced no text") and
+> `page_failed` ("YOLO itself failed") belonged to the YOLO+Chandra design and no longer occur —
+> there is no separate detector that can succeed while OCR fails, since one VLM does both.
 
-**Layout-merge config**: `MIN_CONTAINMENT_RATIO=0.30` in `merge_layout` — empirical, document-specific tuning may be needed (P2 follow-up).
+**Resume-skip query** in `precompute_document_layout` filters out `ocr_failed` rows (and accepts `processing_version='paddleocr-vl'`), so transient structural-pass failures no longer permanently "skip" pages on every subsequent run.
 
-**Image extraction bbox normalization**: bbox is now normalized 0..1 in both `pdf_processor.py` extraction paths — fixed a Stage 3 spread-assignment bug that had been treating it as PDF-points (every image was getting mis-assigned to the left page).
+**Image extraction bbox normalization**: bbox is normalized 0..1 in both `pdf_processor.py` extraction paths (RT-DETR pixel boxes are normalized at the parser boundary) — fixed a Stage 3 spread-assignment bug that had been treating it as PDF-points (every image was getting mis-assigned to the left page).
 
-**Returns**: A dict with `pages_processed`, `pages_succeeded`, `pages_with_ocr_failure`, `pages_with_yolo_failure`, plus per-page `cache_status` and `chandra_attempts`.
+**Returns**: A dict with `pages_processed`, `pages_succeeded`, `pages_with_ocr_failure`, plus per-page `cache_status`.
+
+---
+
+> **TOMBSTONE — retired layout/OCR front-end (history, do not implement):** Before 2026-06-13 the
+> backbone was YOLO + Chandra + `merge_layout` (then briefly Surya-2). Chandra v2 was the sole OCR
+> engine via a HuggingFace endpoint (`chandra_endpoint_manager.run_inference`) with retry-with-jitter
+> (3 attempts at temperatures 0.0 / 0.4 / 0.8, widened 2026-05-03 from 0.0/0.1/0.2 after a ~55%
+> cumulative failure rate), a balanced-bracket trimmer (`_strip_fences_and_junk`), the
+> `chandra_ocr_metrics` table, `OCRResult.method='chandra_failed'`, and `MIN_CONTAINMENT_RATIO=0.30`
+> in `merge_layout`. Pytesseract + EasyOCR were removed entirely in 2026-05. All of this is deleted.
 
 
 **Output**:
@@ -463,7 +488,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 **Process**:
 1. **Per-Product Processing**: Extract text for EACH product individually
 2. **Page Range Filtering**: Only process pages in product's page range
-3. **Layout-Aware Chunking**: Use YOLO regions to guide chunking
+3. **Layout-Aware Chunking**: Use the PaddleOCR-VL layout regions + reading order (from the `document_layout_analysis` cache) to guide chunking
 4. **Semantic Boundaries**: Respect paragraph/sentence structure
 5. **Product Context**: Add product_id and product_name to each chunk
 
@@ -501,17 +526,17 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **File**: `app/api/pdf_processing/stage_3_images.py`
 
-**Tool**: PyMuPDF + YOLO-Guided Extraction
+**Tool**: PyMuPDF + Layout-Region-Guided Extraction (PaddleOCR-VL cache)
 
 **Process**:
 1. **Per-Product Processing**: Extract images for EACH product individually
-2. **YOLO Region Filtering**: Only extract IMAGE regions detected by YOLO
+2. **Region Filtering**: Only extract `IMAGE` / `FIGURE` / `chart` regions from the PaddleOCR-VL `document_layout_analysis` cache (these are the product-crop sources)
 3. **Page Range Filtering**: Only process pages in product's page range
 4. **Immediate Upload**: Upload to Supabase Storage immediately
 5. **Product Linking**: Link images to product via product_id
 
 **Services Used**:
-- `VisionGuidedImageExtractor` - YOLO-guided image extraction
+- `VisionGuidedImageExtractor` - layout-region-guided image extraction (reads PaddleOCR-VL crop sources from the cache)
 - `PyMuPDF` - Image extraction from PDF
 - `Supabase Storage` - Cloud storage for images
 
@@ -521,7 +546,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
    - Image file (PNG/JPEG)
    - Product ID: Links image to specific product
    - Page Number: Source page for image
-   - Bounding Box: YOLO-detected region coordinates
+   - Bounding Box: PaddleOCR-VL (RT-DETR) detected region coordinates
    - Image Type: Product image, diagram, detail shot
    - Supabase URL: Public URL for image access
 
@@ -666,7 +691,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 |-------|-------|--------|-----------|-----|
 | Sibling propagation | 4.5 | Sibling product DB | 0.75 | No |
 | Text chunk regex | 4.6 | document_chunks text | 0.65 | No |
-| Image OCR regex | Phase 1 (inline) | Chandra v2 OCR output (`document_images.ocr_text`) | 0.70 | Yes (Chandra v2) |
+| Image OCR regex | Phase 1 (inline) | PaddleOCR OCR output (`document_images.ocr_text`) | 0.70 | Yes (PaddleOCR) |
 
 ---
 
@@ -818,7 +843,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 **Process**:
 1. Runs as background job (non-blocking)
 2. Analyze each image for material properties
-3. Extract OCR-aware fields (Phase 3 OCR via Chandra v2 enriches the prompt)
+3. Extract OCR-aware fields (Phase 3 per-image OCR via PaddleOCR — `ocr_service._call_paddleocr` / `run_block_ocr`, `OCRResult.method='paddleocr'`/`'paddleocr_failed'`; filter rules and the `document_images` OCR columns `ocr_text`/`ocr_blocks`/`ocr_failed`/`ocr_attempts`/`ocr_skipped_reason` are unchanged — only the engine changed from Chandra)
 4. Calculate quality scores
 
 **Output**: A JSON structure per image with `image_id`, `ocr_text`, `materials` (list), `properties` (dict with fields like weight and weave), and `quality_score`.
@@ -1077,19 +1102,22 @@ Usage: `GET /api/rag/products?document_id=YOUR_DOC_ID` (with tables, default) or
 
 ---
 
-## 🎯 YOLO Layout-Aware Chunking
+## 🎯 Layout-Aware Chunking
+
+> **Note (2026-06-13)**: layout regions now come from the **PaddleOCR-VL** structural pass
+> (Stage 1, before discovery), not YOLO. The chunking logic that consumes them is unchanged.
 
 ### Overview
 
-The YOLO Layout-Aware Chunking system uses detected layout regions to create intelligent, boundary-respecting chunks that preserve document structure and semantic meaning.
+The Layout-Aware Chunking system uses the PaddleOCR-VL layout regions (with predicted reading order) to create intelligent, boundary-respecting chunks that preserve document structure and semantic meaning.
 
 ### How It Works
 
-**Stage 1 (YOLO Detection)** → **Stage 2 (Layout-Aware Chunking)**
+**Stage 1 (PaddleOCR-VL structural pass)** → **Stage 2 (Layout-Aware Chunking)**
 
-1. **YOLO detects layout regions** (Stage 4.5)
-   - Stores regions in `product_layout_regions` table
-   - Each region has: type, bbox, confidence, reading_order, text_content
+1. **PaddleOCR-VL detects + labels layout regions and predicts reading order** (Stage 1, before discovery)
+   - Persists regions to the `document_layout_analysis` cache (`processing_version='paddleocr-vl'`); the per-product slice lands in `product_layout_regions`
+   - Each region has: type, bbox, confidence, reading_order, text_content (recognized inline by the VLM)
 
 2. **Chunking service reads regions** (Stage 2)
    - Fetches regions for current product
@@ -1128,12 +1156,12 @@ A CAPTION region chunk contains the caption text, `region_type: "CAPTION"`, a `r
 
 ### Configuration
 
-Layout-aware chunking is activated by passing `layout_regions_by_page` (a dict mapping 1-based page_number → list of YOLO layout regions) into `chunk_pages()`. The chunking config stays at the default `HYBRID` strategy (`max_chunk_size=1000`, `min_chunk_size=100`); per-page, if regions are provided, `_chunk_with_layout_regions` runs instead of the strategy dispatcher.
+Layout-aware chunking is activated by passing `layout_regions_by_page` (a dict mapping 1-based page_number → list of PaddleOCR-VL layout regions, read from the `document_layout_analysis` cache) into `chunk_pages()`. The chunking config stays at the default `HYBRID` strategy (`max_chunk_size=1000`, `min_chunk_size=100`); per-page, if regions are provided, `_chunk_with_layout_regions` runs instead of the strategy dispatcher.
 
 **Fallback Behavior:**
 - If no regions are provided for a page → falls back to the configured strategy (HYBRID by default)
 - If no layout regions found → Falls back to semantic chunking
-- If YOLO fails → Pipeline continues with semantic chunking
+- If the structural pass fails → Pipeline continues with semantic chunking
 
 ### Benefits
 
@@ -1154,7 +1182,7 @@ Layout-aware chunking is activated by passing `layout_regions_by_page` (a dict m
 
 ### Performance
 
-- **Processing Time**: +2-5 seconds per page (YOLO detection)
+- **Processing Time**: ~1-3 seconds per page warm (PaddleOCR-VL structural pass on Modal L4; ~90s cold start paid once per job at warmup)
 - **Chunk Quality**: 30-40% improvement in semantic coherence
 - **Search Accuracy**: 20-25% improvement in retrieval precision
 
@@ -1192,51 +1220,52 @@ A chunk would include a `hierarchy` object with `h1`, `h2`, and `h3` keys alongs
 
 ---
 
-### 2. Monitoring & Metrics for YOLO Performance
+### 2. Monitoring & Metrics for Structural-Pass Performance
+
+> **Note (2026-06-13)**: per-attempt PaddleOCR-VL inference/retry telemetry already lands in the
+> `paddleocr_metrics` table; the items below are additional per-page metrics still on the roadmap.
 
 **Planned Metrics:**
 
 #### Processing Metrics
-Metrics to track per-page: `yolo_processing_time_per_page`, `regions_detected_per_page`, `confidence_score_avg`, `confidence_score_min`, and `table_extraction_success_rate`.
+Metrics to track per-page: `structural_pass_time_per_page`, `regions_detected_per_page`, `confidence_score_avg`, `confidence_score_min`, and `table_extraction_success_rate`.
 
 #### Region Distribution
-Region counts by type: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA counts per document.
+Region counts by type: text, title, table, image/figure, chart, formula counts per document.
 
 #### Performance Tracking
-- **Processing time** per page (identify slow pages)
-- **Memory usage** during YOLO processing
+- **Processing time** per page (identify slow pages; warm vs cold-start)
+- **Modal container utilization** during the structural pass
 - **Error rates** and failure patterns
-- **Cost tracking** (if using paid endpoints)
+- **Cost tracking** (`PADDLEOCR_PRICING`; Modal L4 scale-to-zero = $0 idle)
 
 **Benefits:**
 - 🔍 Identify performance bottlenecks
 - 📊 Optimize confidence thresholds
 - 💰 Track processing costs
-- 🐛 Detect when YOLO is struggling
+- 🐛 Detect when the structural pass is struggling
 
-Metrics would be stored on the `background_jobs` row (as `stage_history` events) with a `stage: 'yolo_detection'` key. (The legacy `job_progress` table was dropped in 2026-04-25 — all stage data lives in `background_jobs.stage_history` JSONB.)
+Metrics would be stored on the `background_jobs` row (as `stage_history` events) with a `stage: 'layout_precompute'` key. (The legacy `job_progress` table was dropped in 2026-04-25 — all stage data lives in `background_jobs.stage_history` JSONB.)
 
 ---
 
 ### 3. GPU Acceleration
 
+> **Status (2026-06-13): realized.** The structural pass already runs GPU-accelerated on **Modal
+> GPU L4** (PaddleOCR-VL forces `device="gpu"` — the pipeline defaults to CPU, which is minutes/page).
+> Scale-to-zero (`min_containers=0` + `scaledown_window=120`) keeps idle cost at $0, with
+> `max_containers=4` for parallel fan-out. The local-CUDA auto-detect plan below is obsolete.
+
 **Current Performance:**
-- **CPU**: 8-15 seconds per page
-- **Memory**: ~2-4GB RAM
+- **Modal GPU L4 (warm)**: ~1-3 seconds per page
+- **Cold start**: ~90s (model load + first-call JIT), paid once per job at warmup
 
-**With GPU Acceleration:**
-- **GPU**: 2-5 seconds per page (3-5× faster)
-- **Memory**: ~4-6GB VRAM
-- **Batch Processing**: Process multiple pages simultaneously
-
-**Implementation Plan:**
-
-The system would auto-detect GPU availability using `torch.cuda.is_available()`. With GPU, it would process multiple pages in parallel batches (batch_size=4 for CUDA vs 1 for CPU), clearing GPU cache between batches with `torch.cuda.empty_cache()`. The device and batch size would be configurable via `YOLO_DEVICE` and `YOLO_BATCH_SIZE` environment variables.
+~~The system would auto-detect GPU availability using `torch.cuda.is_available()`...~~ *(obsolete — superseded by Modal GPU hosting)*
 
 **Benefits:**
-- ⚡ 3-5× faster processing
-- 📦 Batch processing for efficiency
-- 💾 Better memory utilization
+- ⚡ Faster processing
+- 📦 Parallel containers for efficiency (`max_containers=4`)
+- 💾 $0 idle via scale-to-zero
 - 🎯 Production-ready performance
 
 ---
@@ -1271,23 +1300,25 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 
 ---
 
-**Last Updated**: February 20, 2026
-**Pipeline Version**: Product-Centric Architecture with YOLO Layout Detection, Table Extraction & Cross-Product Field Propagation
+**Last Updated**: June 13, 2026
+**Pipeline Version**: Product-Centric Architecture with PaddleOCR-VL structure-first Layout + OCR, Table Extraction & Cross-Product Field Propagation
 **Status**: Production
 
 **Major Features**:
 - ✅ **Product-Centric Architecture**: Process each product individually (Stages 1-4)
-- ✅ **YOLO Layout Detection**: Intelligent region detection (Stage 1)
-  - 6 region types: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA
-  - Enabled by default (`YOLO_ENABLED=true`)
-  - Stores regions in `product_layout_regions` table
-  - Graceful degradation if YOLO fails
+- ✅ **PaddleOCR-VL Structure-First Layout + OCR** (Stage 1, BEFORE discovery; replaced Surya-2 → which had replaced YOLO+Chandra+`merge_layout`)
+  - Two-stage parser on Modal: PP-DocLayoutV2 (RT-DETR + pointer network) localizes/labels regions + predicts reading order; 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
+  - Persists `document_layout_analysis` rows with `processing_version='paddleocr-vl'`; discovery/chunking/crops all read the cache
+  - Region labels via `PADDLE_LABEL_TO_REGION_TYPE`; `image`/`figure`/`chart` are product-crop sources
+  - Modal-hosted (GPU L4, scale-to-zero = $0 idle); only required secret `PADDLEOCR_MODAL_API_KEY`
+  - OCR is also PaddleOCR (`OCRResult.method='paddleocr'`/`'paddleocr_failed'`, `ocr_engine='paddleocr'`)
+  - Graceful degradation if the structural pass fails (resume-skip via `cache_status='ocr_failed'`)
 - ✅ **Table Extraction**: Structured table data linked to products
   - Automatic extraction from TABLE regions
   - Multiple formats: JSON, CSV, Markdown
   - Stored in `product_tables` table
 - ✅ **Layout-Aware Chunking**: Boundary-respecting chunks
-  - Reads YOLO regions from database
+  - Reads PaddleOCR-VL regions from the `document_layout_analysis` cache
   - Combines TITLE + TEXT intelligently
   - Keeps tables intact
   - Preserves reading order
@@ -1305,7 +1336,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
   - Regex patterns for WxH cm sizes and Xmm thickness
   - Fills products still missing data after Stage 4.5
   - No AI calls, confidence 0.65, source: "document_text"
-- ✅ **Image OCR Dimension Extraction (inline, updated 2026-04)**: Regex on Chandra v2 OCR output (`document_images.ocr_text`) — moved from vision-output regex when OCR was decoupled from vision_analysis
+- ✅ **Image OCR Dimension Extraction (inline, updated 2026-04)**: Regex on PaddleOCR OCR output (`document_images.ocr_text`) — moved from vision-output regex when OCR was decoupled from vision_analysis (OCR engine cut over from Chandra → PaddleOCR on 2026-06-13)
   - Runs inline during Phase 1 image processing (no separate Phase 2)
   - Catches dimensions from product photo text overlays
   - Confidence 0.70, source: "image_text"
@@ -1320,9 +1351,10 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 
 **Future Enhancements** (Planned):
 - 🔮 Multi-level title hierarchy (H1, H2, H3)
-- 🔮 YOLO performance monitoring & metrics
-- 🔮 GPU acceleration (3-5× faster)
+- 🔮 Structural-pass performance monitoring & metrics (beyond the existing `paddleocr_metrics` table)
+- ✅ GPU acceleration — *realized* (PaddleOCR-VL on Modal GPU L4, scale-to-zero)
 - 🔮 Advanced chunking rules (lists, cross-references, formulas)
+- 🔮 Voyage `voyage-multimodal-3` page embedding → `vecs.page_embeddings` (8th fusion vector) for catalog-Q&A retrieval (known residual: `image`/`figure`/`chart` regions are crop sources but not OCR'd, so a product name baked inside a photo is still unread)
 
 ---
 

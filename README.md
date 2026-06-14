@@ -19,7 +19,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - 🔍 **Multi-Vector Search**: 7 specialized embeddings (text, visual, understanding, color, texture, style, material)
 - 💬 **AI Agents**: Jarvis unified agent (material search, B2B research, SEO), Interior Designer, Demo
 - 📊 **Knowledge Base**: Semantic chunking, quality scoring, and relationship mapping
-- 🎨 **Visual Recognition**: CLIP + Qwen3-VL Vision for image analysis
+- 🎨 **Visual Recognition**: SigLIP2 (SLIG) visual embeddings + Anthropic Claude Opus 4.7 vision for image analysis
 - 🏷️ **Auto-Metadata**: AI-powered metadata extraction (200+ fields)
 - 🏠 **Spatial Analysis**: AI-powered room layout optimization and accessibility analysis
 - 💰 **Price Monitoring**: Competitive price tracking across multiple sources
@@ -33,7 +33,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Search Accuracy**: 85%+
 - **Uptime**: 99.5%+
 - **API Endpoints**: 150+
-- **AI Models**: 12+ across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
+- **AI Models**: 12+ across 6 providers (Anthropic, OpenAI, Voyage AI, Modal, HuggingFace, WorldLabs)
 
 ---
 
@@ -65,9 +65,9 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 #### **AI Models** (12+ models across 5 providers)
 1. **Anthropic**: Claude Haiku 4.5 (fast classification/B2B search), Claude Opus 4.7 (deep enrichment, Jarvis agent)
 2. **OpenAI**: GPT-4o (alternative discovery), GPT-4o-mini (query parsing)
-3. **HuggingFace Endpoint**: Qwen3-VL 32B Vision (69.4% MMMU, vision analysis + understanding embeddings)
-4. **Voyage AI**: voyage-4 (primary text embeddings, 1024D)
-5. **SigLIP2 (HuggingFace)**: 5 visual embedding types (visual, color, texture, style, material — 768D each)
+3. **PaddleOCR-VL (Modal)**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) — two-stage document parser (PP-DocLayoutV2 detector + 0.9B VLM) that is the PDF/catalog layout + OCR backbone (structure-first, runs before discovery)
+4. **Voyage AI**: voyage-4 (primary text + understanding embeddings, 1024D)
+5. **SigLIP2 (HuggingFace)**: 5 visual embedding types (visual, color, texture, style, material — 768D each) — the only model still hosted on HuggingFace
 6. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
 7. **WorldLabs Marble**: 3D Gaussian Splat world generation (mini + plus models)
 
@@ -90,10 +90,11 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
                                           │
                     ┌─────────────────────┼─────────────────────┐
                     │                     │                     │
-           ┌────────▼────────┐   ┌───────▼────────┐   ┌───────▼────────┐
-           │  Voyage AI      │   │  Anthropic     │   │  HuggingFace   │
-           │  Embeddings     │   │  Claude 4.5    │   │  Qwen3-VL 32B  │
-           └─────────────────┘   └────────────────┘   └────────────────┘
+    ┌──────▼──────┐ ┌────▼─────┐ ┌────▼─────┐ ┌──────▼──────┐
+    │  Voyage AI  │ │ Anthropic│ │   Modal  │ │ HuggingFace │
+    │  Embeddings │ │ Claude   │ │ PaddleOCR│ │ SLIG SigLIP2│
+    │             │ │ Opus 4.7 │ │ -VL 1.6  │ │             │
+    └─────────────┘ └──────────┘ └──────────┘ └─────────────┘
 ```
 
 ---
@@ -170,9 +171,10 @@ OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 VOYAGE_API_KEY=your_voyage_key
 
-# Vision/Embedding Endpoints (HuggingFace)
-QWEN_ENDPOINT_URL=https://your-qwen-endpoint.aws.endpoints.huggingface.cloud
-QWEN_ENDPOINT_TOKEN=hf_...
+# Layout + OCR backbone (Modal — PaddleOCR-VL)
+PADDLEOCR_MODAL_API_KEY=...   # only required runtime secret; Modal URL is baked as the config default
+
+# Visual Embedding Endpoint (HuggingFace — SLIG only)
 SLIG_ENDPOINT_URL=https://your-slig-endpoint.aws.endpoints.huggingface.cloud
 SLIG_ENDPOINT_TOKEN=hf_...
 
@@ -287,7 +289,7 @@ curl https://v1api.materialshub.gr/docs
 
 **PDF Processing Pipeline** (14 stages)
 - Product-centric architecture with individual processing
-- YOLO layout detection for tables and regions
+- PaddleOCR-VL (Modal) layout + OCR backbone — structure-first, runs before discovery; tables/regions localized by PP-DocLayoutV2 and recognized by the 0.9B VLM
 - Page-aware chunking respecting document structure
 - 200+ metadata fields extracted automatically
 - 95%+ product detection accuracy
@@ -309,7 +311,7 @@ curl https://v1api.materialshub.gr/docs
 ### **2. Multi-Vector Search** (7 embedding types)
 - **Text Embeddings** (1024D, Voyage AI): Semantic text understanding
 - **Visual Embeddings** (768D, SigLIP2): General visual similarity
-- **Understanding Embeddings** (1024D, Voyage AI): Spec-based search via Qwen3-VL analysis
+- **Understanding Embeddings** (1024D, Voyage AI): Spec-based search via Claude Opus 4.7 vision analysis
 - **Color Embeddings** (768D, SigLIP2): Color palette and harmony matching
 - **Texture Embeddings** (768D, SigLIP2): Surface texture and pattern recognition
 - **Style Embeddings** (768D, SigLIP2): Design style recognition
@@ -391,7 +393,7 @@ curl https://v1api.materialshub.gr/docs
 - **Product Discovery**: 85%+ (AI-powered)
 - **Web Scraping Success**: 95%+ scraping, 85%+ discovery
 - **Entity Extraction**: 90%+ precision
-- **Material Recognition**: 90%+ accuracy (Qwen3-VL)
+- **Material Recognition**: 90%+ accuracy (Claude Opus 4.7 vision)
 - **Processing Success Rate**: 95%+
 - **Metadata Extraction**: 200+ fields with 90%+ accuracy
 
@@ -504,7 +506,8 @@ This project is proprietary software owned by Creative GHQ.
 
 - **OpenAI**: GPT models and embeddings
 - **Anthropic**: Claude 4.5 models + built-in web search
-- **HuggingFace**: Qwen3-VL 32B Vision
+- **Modal**: PaddleOCR-VL layout + OCR backbone
+- **HuggingFace**: SLIG SigLIP2 visual embeddings
 - **Voyage AI**: voyage-4 text embeddings
 - **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure

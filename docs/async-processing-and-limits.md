@@ -63,13 +63,13 @@ All methods update the `background_jobs` table in real-time with the current job
 |-------|-------|---------|
 | **Claude Vision Concurrent** | 2 | Vision analysis (post-2026-05-01: schema-locked via tool use) |
 | **SLIG Cloud Concurrent** | 20 | Visual + specialized embeddings |
-| **Chandra v2 Concurrent** | 8 | Page + per-image OCR (retry-with-jitter, 3 attempts) |
+| **PaddleOCR-VL Concurrent** | 8 | Layout + page/block OCR (Modal-hosted structural pass) |
 | **Batch Size** | 15 images | Memory optimization |
 
 **Why these limits?**
 - **Claude (2)**: vision-via-tool-use is the sole vision path post-2026-05-01; rate-limited → low concurrency
 - **SLIG (20)**: HuggingFace Inference Endpoint with auto-pause → high concurrency
-- **Chandra v2 (8)**: HuggingFace Inference Endpoint; the 3-attempt retry budget multiplies effective load
+- **PaddleOCR-VL (8)**: Modal-hosted endpoint (GPU L4, scale-to-zero, `max_containers=4`); concurrency bounded so warm containers aren't oversubscribed (post-2026-06-13: replaced the Surya-2 backbone, which had replaced YOLO + Chandra + merge_layout)
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
 - **Qwen retired**: pre-2026-05-01 had a "5 Qwen concurrent" gate; the HF Qwen endpoint had been 404-ing for months, falling through to Claude. Gate deleted along with `endpoint_controller.qwen` AdaptiveConcurrency.
 
@@ -201,24 +201,25 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 ### 4. AI Classification Timeouts
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Service**: `AIClientService` (Anthropic), `chandra_endpoint_manager`, `slig_client`
+**Service**: `AIClientService` (Anthropic), `paddleocr_endpoint_manager`, `slig_client`
 
 | Operation | Timeout | Purpose |
 |-----------|---------|---------|
 | **Claude Vision Request** | 120s | Vision analysis via Anthropic tool use |
-| **Chandra v2 OCR Request** | 60s per attempt × 3 retries | Page + per-image OCR |
+| **PaddleOCR-VL Request** | 60s per attempt | Layout + page/block OCR (Modal `/parse`; ~1-3s/page warm, ~90s cold start paid once at warmup) |
 | **SLIG Embedding Request** | 30s | 1× visual 768D vector (SigLIP2) |
 
 ---
 
 ## Rate Limiting
 
-### 1. HuggingFace Endpoints (SLIG SigLIP2 + Chandra v2)
+### 1. Inference Endpoints (SLIG SigLIP2 on HuggingFace + PaddleOCR-VL on Modal)
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Services**: `slig_client`, `chandra_endpoint_manager`
+**Services**: `slig_client`, `paddleocr_endpoint_manager`
 
-> **Note (2026-05-01)**: The `QwenEndpointService` and `Settings.qwen_*` are gone. Vision moved to Anthropic Claude Opus 4.7 via tool use; OCR moved to Chandra v2 only.
+> **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). HuggingFace now hosts **only SLIG**; the structural pass is Modal-only.
+> **Note (2026-05-01)**: The `QwenEndpointService` and `Settings.qwen_*` are gone. Vision moved to Anthropic Claude Opus 4.7 via tool use.
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
@@ -258,7 +259,7 @@ All three methods use the **SAME** services with **SAME** limits:
 
 **Used by**: PDF, Web Scraping, XML Import
 
-Shared limits across all methods (post-2026-05-01): 2 concurrent Claude vision requests, 20 concurrent SLIG embedding requests, 8 concurrent Chandra v2 OCR requests, 10 concurrent uploads, classification batch size of 15 images, SLIG batch size of 20 images.
+Shared limits across all methods (post-2026-06-13): 2 concurrent Claude vision requests, 20 concurrent SLIG embedding requests, 8 concurrent PaddleOCR-VL layout/OCR requests, 10 concurrent uploads, classification batch size of 15 images, SLIG batch size of 20 images.
 
 ---
 
@@ -323,7 +324,7 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 | API | Limit | Strategy |
 |-----|-------|----------|
 | **HuggingFace (SLIG SigLIP2)** | endpoint auto-pause | Semaphore (20 concurrent) |
-| **HuggingFace (Chandra v2)** | endpoint auto-pause | Semaphore (8 concurrent) + 3-attempt retry-jitter |
+| **Modal (PaddleOCR-VL)** | scale-to-zero, `max_containers=4` | Semaphore (8 concurrent) + retry |
 | **Anthropic Claude** | Circuit breaker | Semaphore (2 concurrent — sole vision path) |
 | **Voyage AI** | 429 with Retry-After | Honors header, 2 retries |
 | **OpenAI** | No limit | Batch processing (optional alternatives only) |
@@ -351,7 +352,7 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 |-------|-----|-----|-----|
 | **Claude Vision (tool use)** | 2 concurrent | 2 concurrent | 2 concurrent |
 | **SLIG Embeddings** | 20 concurrent | 20 concurrent | 20 concurrent |
-| **Chandra v2 OCR** | 8 concurrent | 8 concurrent | 8 concurrent |
+| **PaddleOCR-VL** | 8 concurrent | 8 concurrent | 8 concurrent |
 | **Image Classification Batch** | 15 images | 15 images | 15 images |
 | **Image Uploads** | 10 concurrent | 10 concurrent | 10 concurrent |
 | **SLIG Batch** | 20 images | 20 images | 20 images |
@@ -395,9 +396,9 @@ Always update the `background_jobs` table after each stage with the current prog
 ## Summary
 
 ✅ **All methods fully async**: PDF, Web Scraping, XML Import
-✅ **Same concurrency limits**: 2 Claude (sole vision path), 20 SLIG, 8 Chandra v2, 10 uploads
+✅ **Same concurrency limits**: 2 Claude (sole vision path), 20 SLIG, 8 PaddleOCR-VL, 10 uploads
 ✅ **Same timeout guards**: 300s discovery, 120s AI, 30s downloads
-✅ **Same rate limiting**: SLIG/Chandra endpoint-paced, circuit breaker on Claude, Voyage 429 with Retry-After
+✅ **Same rate limiting**: SLIG (HF) / PaddleOCR-VL (Modal) endpoint-paced, circuit breaker on Claude, Voyage 429 with Retry-After
 ✅ **Same shared services**: ImageProcessingService, RealEmbeddingsService, AsyncQueueService
 ✅ **Memory optimized**: Batch processing prevents OOM
 ✅ **Network optimized**: Semaphores prevent congestion
