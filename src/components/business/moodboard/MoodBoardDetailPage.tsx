@@ -316,7 +316,8 @@ export const MoodBoardDetailPage: React.FC = () => {
       />
 
       {/* ── Hero Section ─────────────────────────────────────────────────── */}
-      <div className="mt-4 mx-2 sm:mx-4 relative rounded-2xl h-[240px] sm:h-[380px] overflow-hidden">
+      {/* scrim-hero: keeps white text/chips light-on-dark in light theme too */}
+      <div className="scrim-hero mt-4 mx-2 sm:mx-4 relative rounded-2xl h-[240px] sm:h-[380px] overflow-hidden">
         {/* Background image */}
         {heroImage ? (
           <img
@@ -325,7 +326,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/60 to-primary/40" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[hsl(82,16%,26%)] via-[hsl(120,14%,20%)] to-[hsl(150,16%,14%)]" />
         )}
 
         {/* Dark gradient overlay */}

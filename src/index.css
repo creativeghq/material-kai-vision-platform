@@ -314,16 +314,17 @@ All colors MUST be HSL.
      stark white (page #EDEFE8 → cards #F6F8F1).
      ======================================== */
   html.light {
-    --background: 75 14% 92%;        /* page — warm graphite off-white #EDEFE8 */
+    --background: 82 13% 88%;        /* page — deeper warm graphite #DEE2D6 so
+                                        cards clearly float above it */
     --foreground: 220 12% 10%;       /* near-black ink #16181C */
 
-    --page-background: 75 14% 92%;
+    --page-background: 82 13% 88%;
 
-    /* Cards — one step lighter than the page so panels read as elevated */
-    --card: 75 24% 97%;              /* #F6F8F1 */
+    /* Cards — crisp near-white, a clear step above the page so panels lift */
+    --card: 80 33% 99%;              /* #FCFDF9 */
     --card-foreground: 220 12% 10%;
 
-    --popover: 75 28% 98%;
+    --popover: 80 36% 99%;
     --popover-foreground: 220 12% 10%;
 
     /* Primary — near-black ink. Buttons + active tabs/nav render as black
@@ -592,6 +593,17 @@ All colors MUST be HSL.
   /* Liquid Glass Utility */
   .glass-panel {
     @apply dashboard-card;
+  }
+
+  /* Brand hero gradient — graphite → forest, the new identity's dark hero
+     surface (replaces the old plum/purple page-hero gradients). Dark enough
+     for white text; theme-independent. Pair with `.scrim-hero` so white
+     content is protected from the light-theme text flip. */
+  .brand-hero {
+    background: linear-gradient(135deg,
+      hsl(82 16% 24%) 0%,
+      hsl(120 14% 19%) 50%,
+      hsl(150 16% 13%) 100%);
   }
 
   /* Card with subtle gradient (Notion-like) */
@@ -1062,6 +1074,24 @@ html.light [class*="from-primary"] .text-white, html.light [class*="from-primary
 html.light [class*="from-purple-"] .text-white, html.light [class*="from-blue-"] .text-white,
 html.light [class*="from-indigo-"] .text-white, html.light [class*="from-pink-"] .text-white,
 html.light [class*="from-emerald-"] .text-white, html.light [class*="from-green-"] .text-white { color: #fff; }
+
+/* ---- 7c. Explicit media / scrim hero opt-out ----
+   A hero with a photo or dark gradient background and a SEPARATE (sibling)
+   content layer can't be reached by the descendant-based scrim protection in
+   rule 7 — the white text lives next to the dark layer, not inside it. Mark
+   such a hero container with `.scrim-hero` and its white text + white-tint
+   chips + light borders stay light-on-dark in BOTH themes. Higher specificity
+   than rules 1/2/5 so it wins without !important. */
+html.light .scrim-hero .text-white,
+html.light .scrim-hero.text-white { color: #fff; }
+html.light .scrim-hero [class*="text-white\/"] { color: rgba(255, 255, 255, 0.72); }
+html.light .scrim-hero .bg-white\/5,  html.light .scrim-hero .hover\:bg-white\/5:hover  { background-color: rgba(255, 255, 255, 0.05); }
+html.light .scrim-hero .bg-white\/10, html.light .scrim-hero .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.10); }
+html.light .scrim-hero .bg-white\/15, html.light .scrim-hero .hover\:bg-white\/15:hover { background-color: rgba(255, 255, 255, 0.15); }
+html.light .scrim-hero .bg-white\/20, html.light .scrim-hero .hover\:bg-white\/20:hover { background-color: rgba(255, 255, 255, 0.20); }
+html.light .scrim-hero .bg-white\/25, html.light .scrim-hero .hover\:bg-white\/25:hover { background-color: rgba(255, 255, 255, 0.25); }
+html.light .scrim-hero .border-white\/10 { border-color: rgba(255, 255, 255, 0.10); }
+html.light .scrim-hero .border-white\/20 { border-color: rgba(255, 255, 255, 0.20); }
 
 /* ---- 8. Design-system component patches ---- */
 html.light .badge-neutral {

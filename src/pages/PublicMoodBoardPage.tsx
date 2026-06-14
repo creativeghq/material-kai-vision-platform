@@ -109,8 +109,8 @@ export default function PublicMoodBoardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero */}
-      <div className="relative h-64 md:h-80 bg-gradient-to-br from-primary/80 via-primary/60 to-primary/40 overflow-hidden">
+      {/* Hero — scrim-hero keeps white text/chips readable in light theme too */}
+      <div className="scrim-hero relative h-64 md:h-80 bg-gradient-to-br from-[hsl(82,16%,26%)] via-[hsl(120,14%,20%)] to-[hsl(150,16%,14%)] overflow-hidden">
         {/* Try first material thumbnail as hero */}
         {materialItems[0]?.material?.thumbnail_url && (
           <img

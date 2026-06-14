@@ -325,13 +325,10 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     <div className="min-h-screen bg-background">
 
       {/* Hero */}
-      <section
-        className="relative overflow-hidden py-20 px-4 text-center"
-        style={{ background: 'linear-gradient(135deg, hsl(330, 43%, 13%) 0%, hsl(315, 38%, 22%) 50%, hsl(290, 28%, 32%) 100%)' }}
-      >
+      <section className="scrim-hero brand-hero relative overflow-hidden py-20 px-4 text-center">
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-25" style={{ background: 'radial-gradient(circle, hsl(320,55%,55%) 0%, transparent 70%)' }} />
-          <div className="absolute -bottom-24 -right-16 w-96 h-96 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, hsl(280,45%,55%) 0%, transparent 70%)' }} />
+          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-25" style={{ background: 'radial-gradient(circle, hsl(80,60%,55%) 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-24 -right-16 w-96 h-96 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, hsl(140,40%,50%) 0%, transparent 70%)' }} />
         </div>
         <div className="relative max-w-2xl mx-auto">
           <h1 className="text-4xl font-light text-white mb-3 tracking-tight">Support &amp; Documentation</h1>
