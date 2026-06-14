@@ -105,7 +105,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - GPT-5
 - Claude Sonnet 4.6 (chunking — replaced Qwen 2026-05-01)
 - Voyage AI voyage-4 (updated 2026-04 — replaced OpenAI text-embedding-3-small)
-- Chandra v2 (sole OCR engine post-2026-05-01; pytesseract + EasyOCR removed)
+- PaddleOCR-VL on Modal (layout+OCR backbone post-2026-06-13; replaced Surya-2, which had replaced Chandra v2)
 
 (Qwen3-VL was retired 2026-05-01 — the HF endpoint had been 404-ing for months and silently falling through to Claude. Vision is now Anthropic-only via Claude Opus 4.7 tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. Operations dashboard widgets for Qwen were removed in the same migration.)
 

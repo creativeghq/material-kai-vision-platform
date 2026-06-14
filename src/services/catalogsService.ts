@@ -354,6 +354,83 @@ class CatalogsService {
     return (data || []) as CatalogSourcePdf[];
   }
 
+  /**
+   * Attach one or more uploaded source PDFs to a catalog (dedup-merged into
+   * `source_pdf_ids`). Same write the agent's `attach_catalog_pdfs` tool makes,
+   * so the inline-upload admin path and the agent path converge on one shape.
+   */
+  async attachSourcePdfs(catalogId: string, sourcePdfIds: string[]): Promise<PresentationCatalog> {
+    const cat = await this.get(catalogId);
+    if (!cat) throw new Error('Catalog not found');
+    const merged = Array.from(new Set([...(cat.source_pdf_ids || []), ...sourcePdfIds]));
+    return this.update(catalogId, { source_pdf_ids: merged } as any);
+  }
+
+  async detachSourcePdf(catalogId: string, sourcePdfId: string): Promise<PresentationCatalog> {
+    const cat = await this.get(catalogId);
+    if (!cat) throw new Error('Catalog not found');
+    const next = (cat.source_pdf_ids || []).filter((id) => id !== sourcePdfId);
+    return this.update(catalogId, { source_pdf_ids: next } as any);
+  }
+
+  /**
+   * Upload a PDF and immediately attach it to a catalog in one step — the inline
+   * "upload a temporary catalog" path. The source PDF is NOT digested into the
+   * platform product DB; it only feeds on-demand Vision extraction/translation.
+   */
+  async uploadAndAttachSourcePdf(
+    catalogId: string,
+    file: File,
+    opts?: { manufacturer_name?: string; manufacturer_url?: string; notes?: string },
+  ): Promise<{ source: CatalogSourcePdf; catalog: PresentationCatalog }> {
+    const source = await this.uploadSourcePdf(file, opts);
+    const catalog = await this.attachSourcePdfs(catalogId, [source.id]);
+    return { source, catalog };
+  }
+
+  /** Free-form Vision extraction over a catalog's attached source PDFs. Mirrors the agent's extract_from_catalog_pdfs tool. */
+  async extractFromPdfs(input: {
+    catalogId: string;
+    query: string;
+    maxResults?: number;
+    autoAdd?: boolean;
+  }): Promise<{ success: boolean; candidates: any[]; error?: string }> {
+    const cat = await this.get(input.catalogId);
+    if (!cat) throw new Error('Catalog not found');
+    if (!cat.source_pdf_ids || cat.source_pdf_ids.length === 0) {
+      throw new Error('No source PDFs attached. Upload or attach one first.');
+    }
+    const { data, error } = await supabase.functions.invoke('catalog-extract-from-pdfs', {
+      body: {
+        catalog_id: input.catalogId,
+        source_pdf_ids: cat.source_pdf_ids,
+        query: input.query,
+        max_results: input.maxResults ?? 12,
+      },
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || 'Extraction failed');
+    return data as { success: boolean; candidates: any[] };
+  }
+
+  /** Whole-PDF → catalog body translation. Mirrors the agent's translate_pdf_to_catalog tool. */
+  async translatePdf(input: {
+    sourcePdfId: string;
+    targetCatalogId: string;
+    preserveOriginalLayout?: boolean;
+  }): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('catalog-translate-pdf', {
+      body: {
+        source_pdf_id: input.sourcePdfId,
+        target_catalog_id: input.targetCatalogId,
+        preserve_original_layout: input.preserveOriginalLayout ?? false,
+      },
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || 'Translation failed');
+    return data;
+  }
+
   async deleteSourcePdf(sourcePdfId: string): Promise<void> {
     const { data: row } = await supabase
       .from('catalog_source_pdfs')

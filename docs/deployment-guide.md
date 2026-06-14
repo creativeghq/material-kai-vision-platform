@@ -72,21 +72,17 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for text embeddings | `pa-xxxxxxxxxxxxxxxx` |
-| ~~`QWEN_ENDPOINT_URL`~~ | — | **DEPRECATED 2026-05-01** | The Qwen HF endpoint is no longer wired — vision moved to Anthropic Claude Opus 4.7 via tool use. Safe to remove from systemd unit at next deploy. | — |
-| ~~`QWEN_ENDPOINT_NAME`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
-| ~~`QWEN_NAMESPACE`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
-| ~~`QWEN_MODEL`~~ | — | **DEPRECATED 2026-05-01** | (See above.) | — |
-| `YOLO_ENDPOINT_URL` | Public | Server ENV | YOLO HF endpoint URL | `https://f763mkb5o68lmwtu.us-east-1.aws.endpoints.huggingface.cloud` |
-| `YOLO_ENDPOINT_NAME` | Public | Server ENV | YOLO endpoint service name | `mh-yolo` |
-| `YOLO_NAMESPACE` | Public | Server ENV | YOLO endpoint namespace | `basiliskan` |
-| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR HF endpoint URL | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` |
-| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra endpoint service name | `chandra-ocr-2` |
-| `CHANDRA_NAMESPACE` | Public | Server ENV | Chandra endpoint namespace | `basiliskan` |
-| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` |
+| `PADDLEOCR_MODAL_API_KEY` | **Secret** | Server ENV | Bearer for the **PaddleOCR-VL** structural-pass endpoint on **Modal** (the layout+OCR backbone — replaced Surya-2 on 2026-06-13). **The only required runtime secret for the backbone** — must equal the `PADDLEOCR_API_KEY` value inside the `paddleocr-api-key` Modal secret. | `<openssl rand -hex 32>` |
+| `PADDLEOCR_MODAL_URL` | Public | Server ENV | Override for the Modal endpoint URL. Optional — the deployed app URL is baked as the `config.py` default. | `https://basilakis--paddleocr-vl-paddleservice-web.modal.run` |
+| `PADDLEOCR_ENABLED` | Public | Server ENV | Enable the PaddleOCR-VL structural pass. Empty → code default (enabled). | `true` |
+| ~~`QWEN_*` / `YOLO_*` / `CHANDRA_*`~~ | — | **REMOVED** | The Qwen (retired 2026-05-01), YOLO + Chandra (replaced by Surya-2, then PaddleOCR-VL on 2026-06-13) HF endpoints have **no consumer in the code**. Delete these GitHub Secrets and their systemd `Environment=` lines. | — |
+| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL (HF now hosts **only** SLIG; the structural pass is Modal-only) | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` |
 | `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token (usually same as `HUGGING_FACE_ACCESS_TOKEN`) | `hf_xxxxxxxxxxxxxxxx` |
 | `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-slig` |
 | `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
-| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | Single HF token used for the active endpoints (YOLO / Chandra v2 / SLIG resume + inference) — get from https://huggingface.co/settings/tokens. Qwen retired 2026-05-01. | `hf_xxxxxxxxxxxxxxxx` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | HF token for the SLIG endpoint (resume + inference) — get from https://huggingface.co/settings/tokens. HF now hosts only SLIG; YOLO/Chandra/Qwen retired. | `hf_xxxxxxxxxxxxxxxx` |
+| `MODAL_TOKEN_ID` | **Secret** | **GitHub Actions only** (not server ENV) | Modal API token id — lets the `deploy-modal` CI job run `modal deploy modal_app/paddleocr_vl.py`. Create at https://modal.com/settings/tokens | `ak-xxxxxxxxxxxx` |
+| `MODAL_TOKEN_SECRET` | **Secret** | **GitHub Actions only** (not server ENV) | Modal API token secret (pairs with `MODAL_TOKEN_ID`). | `as-xxxxxxxxxxxx` |
 | `MAX_CONCURRENT_PRODUCTS` | Public | Server ENV | How many products process in parallel inside one PDF job. **Set to `1` on a 4 GB droplet** (anything higher hits cgroup MemoryHigh). Bump to 2-3 on 8 GB+ | `1` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
@@ -100,34 +96,23 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis (post-2026-05-01: Anthropic-only) | `claude-opus-4-7` (default + recommended) |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
-| `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR v2 Inference Endpoint URL (defaults to live v2 endpoint, env override optional) | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` |
-| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra OCR v2 Inference Endpoint name for pause/resume | `chandra-ocr-2` (default) |
-| `CHANDRA_NAMESPACE` | Public | Server ENV | HuggingFace namespace/username for endpoint management | `basiliskan` (default) |
-| `CHANDRA_ENABLED` | Public | Server ENV | Enable Chandra v2 OCR (sole OCR engine post-2026-05-01) | `true` (default), `false` |
-| ~~`CHANDRA_CONFIDENCE_THRESHOLD`~~ | — | **DEPRECATED 2026-05-01** | Was the threshold below which Chandra ran in addition to EasyOCR. EasyOCR + pytesseract were removed entirely 2026-05-01; Chandra v2 is now the sole OCR engine and runs on every page/image. | — |
-| `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | Server ENV | Seconds of idle time before auto-pausing endpoint (prevents billing) | `60` (default) |
-| `CHANDRA_MAX_RESUME_RETRIES` | Public | Server ENV | Maximum retry attempts for resuming endpoint | `3` (default) |
-| `CHANDRA_RESUME_TIMEOUT` | Public | Server ENV | Timeout in seconds for endpoint resume operation | `300` (default, 5 minutes) |
-| `CHANDRA_INFERENCE_TIMEOUT` | Public | Server ENV | Timeout in seconds for OCR inference calls | `30` (default) |
-| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | HuggingFace token used by the backend deployment workflow — same value as `HF_TOKEN`, set in GitHub repo secrets | `hf_xxxxxxxxxxxxxxxx` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | HuggingFace token used by the backend deployment workflow for the SLIG endpoint, set in GitHub repo secrets | `hf_xxxxxxxxxxxxxxxx` |
 | `REDIS_URL` | Public | Server ENV | Redis connection URL for embedding cache (optional — disables cache if not set) | `redis://localhost:6379` or `redis://your-redis-host:6379` |
 | `ADMIN_RESTART_TOKEN` | **Secret** | Server ENV | Auth token for the `/api/admin/restart` endpoint — required to authenticate server restart requests from the agent | `your-secure-restart-token` |
 
-### **YOLO DocParser Inference Endpoint**
+### **PDF Pipeline Structural Backbone — PaddleOCR-VL on Modal**
+
+The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage parser (PP-DocLayoutV2 detector + 0.9B VLM) hosted on **Modal** with scale-to-zero (`$0` idle). It **replaced Surya-2 on 2026-06-13** (which had itself replaced YOLO + Chandra). HF now hosts only SLIG; the structural pass is **Modal-only**.
 
 | Secret Name | Type | Where Set | Description | Default |
 |------------|------|-----------|-------------|---------|
-| `YOLO_ENABLED` | Public | Server ENV | Enable YOLO document layout parser | `false` |
-| `YOLO_ENDPOINT_URL` | Public | Server ENV | YOLO HuggingFace Inference Endpoint URL | *(required if YOLO_ENABLED=true)* |
-| `YOLO_ENDPOINT_NAME` | Public | Server ENV | YOLO endpoint service name for pause/resume | *(required if YOLO_ENABLED=true)* |
-| `YOLO_NAMESPACE` | Public | Server ENV | HuggingFace namespace for YOLO endpoint | `basiliskan` |
-| `YOLO_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for layout detection | `0.5` |
-| `YOLO_AUTO_PAUSE_TIMEOUT` | Public | Server ENV | Seconds idle before auto-pausing endpoint | `60` |
-| `YOLO_MAX_RESUME_RETRIES` | Public | Server ENV | Max retry attempts for resuming endpoint | `3` |
-| `YOLO_RESUME_TIMEOUT` | Public | Server ENV | Timeout for resume operation (seconds) | `300` |
-| `YOLO_INFERENCE_TIMEOUT` | Public | Server ENV | Timeout for inference calls (seconds) | `30` |
-| `YOLO_WARMUP_TIMEOUT` | Public | Server ENV | Timeout for initial endpoint warmup (seconds) | `60` |
+| `PADDLEOCR_MODAL_API_KEY` | **Secret** | Server ENV | Bearer for the Modal endpoint — **only required runtime secret**. Equals the `paddleocr-api-key` Modal secret value. | *(required)* |
+| `PADDLEOCR_MODAL_URL` | Public | Server ENV | Endpoint URL override; baked default = deployed app | `https://basilakis--paddleocr-vl-paddleservice-web.modal.run` |
+| `PADDLEOCR_ENABLED` | Public | Server ENV | Enable the structural pass | `true` |
+| `MODAL_TOKEN_ID` | **Secret** | **GitHub Actions only** | Modal token id for the `deploy-modal` CI job (`modal deploy`). https://modal.com/settings/tokens | *(required for CI deploy)* |
+| `MODAL_TOKEN_SECRET` | **Secret** | **GitHub Actions only** | Modal token secret (pairs with `MODAL_TOKEN_ID`) | *(required for CI deploy)* |
+
+**Deploy / redeploy**: pushing a change under `mivaa-pdf-extractor/modal_app/**` to `main` auto-runs `modal deploy modal_app/paddleocr_vl.py` via the `deploy-modal` workflow job (gated on a `modal_app/**` paths-filter). Manual: `modal deploy modal_app/paddleocr_vl.py`. Full reference: [`mivaa-pdf-extractor/modal_app/README.md`](../mivaa-pdf-extractor/modal_app/README.md).
 
 ### **AI Service API Keys**
 
@@ -146,18 +131,15 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | **Kling AI** | `KLINGAI_SECRET_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
 | **Zernio** | `ZERNIO_API_KEY` | Edge Functions (`zernio-api`, `zernio-webhook-handler`, social background agents) | https://zernio.com/ → Settings → API | Social media scheduling |
 | **Zernio** | `ZERNIO_WEBHOOK_SECRET` | Edge Functions (`zernio-webhook-handler`) | Zernio webhook settings | HMAC-SHA256 signature verification |
-| **HuggingFace** | `HF_TOKEN` | Backend (Chandra, YOLO endpoint management) | https://huggingface.co/settings/tokens — needs **write** permission | Inference Endpoints pause/resume — auto-pause enabled |
-| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. YOLO and Chandra v2 read `HUGGING_FACE_ACCESS_TOKEN` directly — no per-endpoint token vars needed. (Qwen retired 2026-05-01.) |
-| **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | Set as GitHub repo secret — same value as `HF_TOKEN` |
+| **Modal** | `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` | GitHub Actions (`deploy-modal` job) | https://modal.com/settings/tokens (or `modal token new`) | Lets CI run `modal deploy` for the PaddleOCR-VL backbone |
+| **Modal** | `PADDLEOCR_MODAL_API_KEY` | Backend (PaddleOCR-VL structural pass) | Value of the `paddleocr-api-key` Modal secret | Bearer for the Modal `/parse` endpoint — **only required runtime backbone secret** |
+| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend (SLIG endpoint resume/inference) | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. HF now hosts only SLIG (YOLO/Chandra/Qwen retired). |
+| **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | Backend + GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | SLIG endpoint token; set as GitHub repo secret |
 | **HuggingFace** | `HUGGINGFACE_API_KEY` | Edge Functions (`health-check`) | https://huggingface.co/settings/tokens | Health status checks — same token, different name |
 
 ### **HuggingFace Inference Endpoints Configuration**
 
-The platform uses HuggingFace Inference Endpoints for vision models and visual embeddings:
-
-**~~Qwen Vision Endpoint~~ — RETIRED 2026-05-01:**
-
-The Qwen HuggingFace endpoint was deleted from the active platform on 2026-05-01. A 2026-05-01 audit discovered that the configured endpoint had been serving `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) while every vision call site asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s for months and silently falling through to Anthropic Claude. Vision is now Anthropic-only; segmentation, image classification, vision_analysis, and material analysis all run on `claude-opus-4-7` via Anthropic tool use (`VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL`). The `qwen_endpoint_manager.py` file, all `Settings.qwen_*` fields, qwen warmup, qwen pricing entries, and the `endpoint_controller.qwen` AdaptiveConcurrency gate are all deleted. The HF Qwen endpoint env vars on the systemd unit (`QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `QWEN_MODEL`) can be deleted at the next deploy.
+The platform uses **one** HuggingFace Inference Endpoint (SLIG visual embeddings). The PDF structural pass (layout + OCR) runs on **Modal**, not HF.
 
 **SLIG (SigLIP2) Endpoint:**
 - **URL**: `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud`
@@ -165,105 +147,56 @@ The Qwen HuggingFace endpoint was deleted from the active platform on 2026-05-01
 - **Namespace**: `basiliskan`
 - **Auto-pause**: Enabled
 
-**YOLO Layout Detection Endpoint:**
-- **URL**: `https://f763mkb5o68lmwtu.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `mh-yolo`
-- **Namespace**: `basiliskan`
+> **Retired**: the **Qwen** (2026-05-01, vision moved to Anthropic Claude Opus 4.7 via tool use), **YOLO** + **Chandra** (2026-06-13, replaced by Surya-2 then PaddleOCR-VL on Modal) HF endpoints are gone. Their `qwen_endpoint_manager.py` / `surya_*` / YOLO / Chandra code is deleted and has no consumer. Delete the `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` GitHub Secrets and their systemd `Environment=` lines, plus any `/etc/systemd/system/mivaa-pdf-extractor.service.d/{qwen,chandra,yolo}-*.conf` drop-ins.
 
-**Chandra OCR v2 Endpoint:**
-- **URL**: `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `chandra-ocr-2`
-- **Namespace**: `basiliskan`
-
-**Required GitHub Secrets** (the deploy workflow writes them as systemd `Environment=` lines into `mivaa-pdf-extractor.service` on every deploy — see `.github/workflows/deploy.yml` lines 793-823):
+**Required GitHub Secrets** (the deploy workflow writes them as systemd `Environment=` lines into `mivaa-pdf-extractor.service` — see `.github/workflows/deploy.yml`):
 
 ```
-HUGGING_FACE_ACCESS_TOKEN  ← single token used for the active endpoints
-YOLO_ENDPOINT_URL          YOLO_ENDPOINT_NAME      YOLO_NAMESPACE
-CHANDRA_ENDPOINT_URL       CHANDRA_ENDPOINT_NAME   CHANDRA_NAMESPACE
-SLIG_ENDPOINT_URL          SLIG_ENDPOINT_NAME      SLIG_NAMESPACE      SLIG_ENDPOINT_TOKEN
+PADDLEOCR_MODAL_API_KEY    ← bearer for the Modal structural-pass endpoint (only required backbone secret)
+PADDLEOCR_MODAL_URL        PADDLEOCR_ENABLED   (both optional — code/baked defaults)
+SLIG_ENDPOINT_URL          SLIG_ENDPOINT_NAME  SLIG_NAMESPACE   SLIG_ENDPOINT_TOKEN
+HUGGING_FACE_ACCESS_TOKEN  ← SLIG endpoint token
 MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
+MODAL_TOKEN_ID  MODAL_TOKEN_SECRET   ← GitHub Actions only; let the deploy-modal CI job run `modal deploy`
 ```
 
-> **Removed 2026-05-01**: `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `QWEN_MODEL`. The Qwen HF endpoint had been silently 404-ing for months; vision migrated to Anthropic Claude Opus 4.7 via tool use. Delete these GitHub Secrets and the matching systemd `Environment=` lines at the next deploy, plus the `/etc/systemd/system/mivaa-pdf-extractor.service.d/qwen-endpoint.conf` drop-in if it still exists.
-
-> When you rename or replace an active endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain like `lv7trhkha3b5757r…`), update the corresponding `*_ENDPOINT_URL` and `*_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. The next push rewrites the systemd unit with the new values. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values, making config drift hard to debug.
-
-**Benefits:**
-- ✅ Auto-pause reduces costs during inactivity
-- ✅ Dedicated GPU resources for consistent performance
-- ✅ No rate limiting concerns
-- ✅ Full control over model versions
+> When you rename or replace the SLIG endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain), update `SLIG_ENDPOINT_URL` + `SLIG_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values.
 
 ---
 
-### **Chandra OCR v2 Inference Endpoint Configuration**
+### **PDF Structural Pass — PaddleOCR-VL on Modal**
 
-**Chandra OCR v2** (model `chandra-ocr-2.Q8_0.gguf`) is a state-of-the-art OCR model deployed as a serverless HuggingFace Inference Endpoint. It returns structured bbox-JSON: each output entry is `{"text", "x", "y", "w", "h"}` with pixel coordinates on the source image. The strict response parser in `chandra_endpoint_manager.py` raises `ChandraResponseError` on unparseable output rather than writing empty/garbage text downstream.
+**PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) is the catalog pipeline's layout + OCR backbone, run as a two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM) in one GPU container on **Modal**. It localizes regions, labels them, predicts reading order, and recognizes content (text, tables→markdown, formulas→LaTeX, charts). It **replaced Surya-2 on 2026-06-13** (which replaced YOLO + Chandra).
 
 #### **How It Works:**
-1. **Chandra v2 (sole OCR engine)**: GPU-accelerated, structured bbox-JSON OCR with retry-with-jitter (3 attempts at temperatures 0.0/0.4/0.8). EasyOCR and Tesseract were removed 2026-05-01. Failure sets `OCRResult.method='chandra_failed'` — consumers must check `method`, not emptiness.
-2. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
-3. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused (T4 GPU at $0.50/hr while running)
+1. **Custom contract** (NOT vLLM): `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox, label, content, order}], width, height}`. `mode=page` = structural pass, `mode=block` = per-crop OCR.
+2. **Scale-to-zero**: `min_containers=0` + `scaledown_window=120` → **$0 idle**. First request after idle cold-starts a GPU (L4) container (~90s); MIVAA health-probes `/health` as warmup. `max_containers=4`.
+3. **In-process pipeline**: runs the full `paddleocr[doc-parser]` `PaddleOCRVL` pipeline on `paddlepaddle-gpu` (forces `device="gpu"`).
 
 #### **Required Secrets:**
 
 | Secret Name | Type | Default | Description |
 |------------|------|---------|-------------|
-| `HF_TOKEN` | **Secret** | *(required)* | HuggingFace API token with **write** permissions |
-| `CHANDRA_ENDPOINT_URL` | Public | `https://v75ni2jqufw1mtad.us-east-1.aws.endpoints.huggingface.cloud` | Chandra OCR v2 Inference Endpoint URL |
-| `CHANDRA_ENDPOINT_NAME` | Public | `chandra-ocr-2` | Endpoint name for pause/resume operations |
-| `CHANDRA_NAMESPACE` | Public | `basiliskan` | HuggingFace namespace/username |
-| `CHANDRA_ENABLED` | Public | `true` | Enable/disable Chandra OCR fallback |
-| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | `0.7` | Deprecated (was EasyOCR confidence threshold — EasyOCR removed 2026-05-01). Retained for config compat; has no effect. |
-| `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | `60` | Seconds before auto-pause (prevents billing) |
-| `CHANDRA_MAX_RESUME_RETRIES` | Public | `3` | Max retry attempts for resuming endpoint |
-| `CHANDRA_RESUME_TIMEOUT` | Public | `300` | Timeout for resume operation (seconds) |
-| `CHANDRA_INFERENCE_TIMEOUT` | Public | `30` | Timeout for OCR inference calls (seconds) |
+| `PADDLEOCR_MODAL_API_KEY` | **Secret** | *(required)* | Bearer for the Modal `/parse` endpoint — equals the `paddleocr-api-key` Modal secret value. **Only required runtime backbone secret.** |
+| `PADDLEOCR_MODAL_URL` | Public | baked → `https://basilakis--paddleocr-vl-paddleservice-web.modal.run` | Endpoint URL override |
+| `PADDLEOCR_ENABLED` | Public | `true` | Enable the structural pass |
+| `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` | **Secret** | *(required for CI deploy)* | GitHub Actions only — let the `deploy-modal` job run `modal deploy` |
 
-#### **Setup Instructions:**
+#### **Deploy / redeploy:**
 
-1. **Get HuggingFace Token:**
-   - Go to: https://huggingface.co/settings/tokens
-   - Click "New token"
-   - Name: "Chandra OCR Endpoint"
-   - Type: **Write** (required for pause/resume)
-   - Copy token (starts with `hf_...`)
+1. **Create the Modal API-key secret** (one-time): `modal secret create paddleocr-api-key PADDLEOCR_API_KEY=$(openssl rand -hex 32)` — this value becomes `PADDLEOCR_MODAL_API_KEY`.
+2. **Auto-deploy from CI**: any push under `mivaa-pdf-extractor/modal_app/**` to `main` runs `modal deploy modal_app/paddleocr_vl.py` via the `deploy-modal` workflow job (authenticated with `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`). Force with `workflow_dispatch → force_modal_deploy=true`.
+3. **Manual**: `modal deploy modal_app/paddleocr_vl.py`.
+4. Set `PADDLEOCR_MODAL_API_KEY` in GitHub Actions secrets so the next MIVAA deploy writes it to the systemd unit.
 
-2. **Create Inference Endpoint** (if not already created):
-   - Go to: https://ui.endpoints.huggingface.co/
-   - Click "New endpoint"
-   - Model: `prithivMLmods/chandra-ocr-2-GGUF` (community Q8 quant of `datalab-to/chandra-ocr-2`)
-   - Instance: GPU (`nvidia-t4` recommended; v2 is 4B params and runs comfortably on T4)
-   - Region: `us-east-1`
-   - Name: `chandra-ocr-2`
-   - Click "Create"
-   - Copy endpoint URL
+Full reference + tuning env vars: [`mivaa-pdf-extractor/modal_app/README.md`](../mivaa-pdf-extractor/modal_app/README.md).
 
-3. **Configure Environment Variables:** Set `HF_TOKEN` (required) plus the optional Chandra variables (`CHANDRA_ENDPOINT_URL`, `CHANDRA_ENDPOINT_NAME`, `CHANDRA_NAMESPACE`, `CHANDRA_ENABLED`, `CHANDRA_CONFIDENCE_THRESHOLD`, `CHANDRA_AUTO_PAUSE_TIMEOUT`) in the server environment.
-
-4. **Verify Endpoint Status:**
-   - Endpoint should be **PAUSED** by default (no billing)
-   - Will auto-resume when OCR is needed
-   - Will auto-pause after 60 seconds of idle time
-
-#### **Cost Estimation:**
-
-| Scenario | Time | Cost |
-|----------|------|------|
-| **Endpoint paused** | N/A | **$0/hour** ✅ |
-| **Endpoint running** | N/A | **~$0.60/hour** |
-| **30-page scanned PDF** | ~110s | **~$0.02** |
-| **100 documents/month** | N/A | **~$2/month** |
-
-**Key:** Endpoint is paused 99% of the time = **NO BILLING** 🎉
-
-#### **Billing Safety Features:**
-- ✅ Auto-pause after 60 seconds idle
-- ✅ Force-pause after batch processing
-- ✅ Endpoint status monitoring
-- ✅ Cost tracking per document
-- ✅ Retry-with-jitter (3 attempts at temperatures 0.0/0.4/0.8) on endpoint failure
+#### **Operate:**
+```bash
+modal app logs paddleocr-vl     # stream server logs
+modal app list                  # deployed apps + status
+modal app stop paddleocr-vl     # tear down
+```
 
 ---
 
@@ -662,7 +595,7 @@ All MIVAA service endpoints are available at:
 
 **Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, SLIG / YOLO / Chandra v2 endpoint URLs, tokens, names, and namespaces; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note (2026-05-01)**: `QWEN_*` env lines on the unit can be deleted at the next deploy — they're no longer read by the app.
+The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, the SLIG HF endpoint URL/token/name/namespace, and `PADDLEOCR_MODAL_API_KEY` for the Modal structural pass; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note**: the legacy `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` env lines have no consumer and can be deleted from the unit.
 
 ### 🚀 Deployment Process
 
@@ -789,7 +722,7 @@ All deployment results are displayed on the main GitHub Action page with:
 - **AI Integration**: OpenAI, Anthropic, Voyage AI, HuggingFace Inference Endpoints
 - **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint (768D, 5 specialized types)
 - **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked) — Qwen retired 2026-05-01
-- **OCR**: Chandra v2 via HuggingFace Endpoint (sole OCR engine post-2026-05-01; pytesseract + EasyOCR removed)
+- **Layout + OCR (structural pass)**: PaddleOCR-VL on Modal (replaced Surya-2, YOLO, and Chandra; pytesseract + EasyOCR removed)
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
 
@@ -886,7 +819,7 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
      - VOYAGE_API_KEY (for text embeddings)
      - SLIG_ENDPOINT_URL (for visual embeddings — SigLIP2)
      - SLIG_ENDPOINT_TOKEN (for visual embeddings — SigLIP2)
-     - CHANDRA_ENDPOINT_URL (for OCR — sole OCR engine; QWEN_ENDPOINT_* retired 2026-05-01)
+     - PADDLEOCR_MODAL_API_KEY (for the layout+OCR structural pass on Modal; YOLO/Chandra/Qwen retired)
      - FIRECRAWL_API_KEY (for price monitoring)
 
 2. **Environment Variable Mismatch**:
@@ -1279,19 +1212,19 @@ This section covers all third-party services used by the platform, their pricing
 
 ### 🤗 HuggingFace Inference Endpoints
 
-**Role**: GPU-accelerated visual embeddings (SigLIP2) and OCR (Chandra v2). Vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
+**Role**: GPU-accelerated visual embeddings (SigLIP2) — the **only** model still on HF. The layout+OCR structural pass moved to **Modal** (PaddleOCR-VL); vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
 
 **Dashboard**: https://ui.endpoints.huggingface.co
 **Pricing**: https://huggingface.co/pricing
 
-| Endpoint | Instance | Rate | Auto-pause |
-|----------|----------|------|-----------|
-| SigLIP2 (SLIG visual embeddings) | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
-| Chandra OCR v2 (`chandra-ocr-2.Q8_0.gguf`) | GPU (T4) | ~$0.50/hour | Yes (60 sec idle) |
-| YOLO DocParser | GPU (T4) | ~$0.50/hour | Yes (15 min idle) |
-| ~~Qwen3-VL-32B~~ | ~~GPU (A100)~~ | — | **DELETED 2026-05-01** — vision via Anthropic Claude Opus 4.7 |
+| Endpoint | Host | Instance | Rate | Auto-pause / scale-to-zero |
+|----------|------|----------|------|-----------|
+| SigLIP2 (SLIG visual embeddings) | HuggingFace | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
+| PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (L4) | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
+| ~~Chandra OCR v2 / YOLO DocParser~~ | ~~HuggingFace~~ | — | — | **REMOVED 2026-06-13** — replaced by PaddleOCR-VL on Modal |
+| ~~Qwen3-VL-32B~~ | ~~HuggingFace~~ | ~~GPU (A100)~~ | — | **DELETED 2026-05-01** — vision via Anthropic Claude Opus 4.7 |
 
-**Cost control**: All endpoints use auto-pause — billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
+**Cost control**: SLIG auto-pauses; PaddleOCR-VL scales to zero ($0 idle). Billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
 
 ---
 

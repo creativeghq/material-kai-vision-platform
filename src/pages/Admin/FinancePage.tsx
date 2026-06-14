@@ -52,7 +52,7 @@ import type { FinanceSettings } from '@/modules/finance/services/financeService'
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -62,6 +62,7 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
   { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit notes', icon: FileMinus },
   { value: 'doc_payments', type: 'payments', label: 'Payments', icon: Banknote },
   { value: 'doc_expenses', type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
+  { value: 'doc_dispatch', type: 'dispatch', label: 'Dispatch board', icon: PackageCheck },
   { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery notes', icon: Truck },
   { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];

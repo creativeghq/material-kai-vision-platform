@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'mk-theme';
-const DEFAULT_THEME: Theme = 'dark';
+const DEFAULT_THEME: Theme = 'light';
 
 interface ThemeContextType {
   theme: Theme;

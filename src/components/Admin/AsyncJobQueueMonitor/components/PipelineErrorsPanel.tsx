@@ -40,7 +40,7 @@ const severityClass = (s: PipelineError['severity']): string => {
 /**
  * Pipeline error observability panel — embedded in the AsyncJobQueueMonitor
  * job-detail modal. Pulls from the `pipeline_errors` SQL view (unified across
- * product_processing_status / background_jobs / chandra_ocr_metrics /
+ * product_processing_status / background_jobs / paddleocr_metrics /
  * recovery_history) and the `failure_summary` aggregate on background_jobs.
  *
  * Renders nothing when failureSummary is null/undefined (clean job).

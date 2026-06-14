@@ -19,11 +19,11 @@ import {
 export const GLOBAL_PIPELINE_FLOW = [
   { id: 'initialized', name: 'Initialized', icon: Clock, checkpoint: 'initialized' },
   { id: 'warmup', name: 'AI Warmup', icon: Flame, checkpoint: 'warmup_complete' },
+  // Stage 1 (structure-first): the PaddleOCR structural pass runs BEFORE discovery —
+  // one call per physical page → layout regions + OCR text + figure boxes →
+  // document_layout_analysis cache. Discovery then reads that cache.
+  { id: 'layout_precompute', name: 'PaddleOCR Layout+OCR', icon: Cpu, checkpoint: 'stage_1_5_layout_precompute' },
   { id: 'discovery', name: 'Discovery', icon: Search, checkpoint: 'products_detected' },
-  // Stage 1.5: doc-level layout precompute (YOLO + bbox merge per physical
-  // page → document_layout_analysis cache). Runs once per job, between
-  // discovery and per-product extraction.
-  { id: 'layout_precompute', name: 'Layout Cache', icon: Cpu, checkpoint: 'stage_1_5_layout_precompute' },
   { id: 'extraction', name: 'PDF Extract', icon: FileText, checkpoint: 'pdf_extracted' },
   { id: 'chunking', name: 'Chunking', icon: FileText, checkpoint: 'chunks_created' },
   { id: 'text_embeddings', name: 'Embeddings', icon: Cpu, checkpoint: 'text_embeddings_generated' },
@@ -79,7 +79,7 @@ export const PRODUCT_STAGES = [
     id: 'extraction',
     name: 'Page Extraction',
     icon: FileText,
-    description: 'Map catalog pages to PDF pages + YOLO layout detection',
+    description: 'Map catalog pages to PDF pages (layout read from PaddleOCR cache)',
   },
   {
     id: 'chunking',

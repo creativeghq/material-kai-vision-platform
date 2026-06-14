@@ -382,7 +382,7 @@ Complete reference of all platform features and capabilities.
 - Anthropic (Claude Opus 4.7 / Haiku 4.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
-- HuggingFace Endpoint — Chandra v2 OCR (sole engine post-2026-05-01; pytesseract + EasyOCR removed). (Qwen3-VL HF endpoint retired 2026-05-01; vision analysis is now Anthropic-only via Claude Opus 4.7 tool use.)
+- Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed). (Qwen3-VL HF endpoint retired 2026-05-01; vision analysis is now Anthropic-only via Claude Opus 4.7 tool use.)
 - SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
 - Replicate (14 interior design generation models)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)

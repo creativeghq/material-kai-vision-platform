@@ -55,10 +55,11 @@
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
 - Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
-- HuggingFace Endpoints: SLIG SigLIP2 (768D visual, 5 specialized types) + Chandra v2 (sole OCR engine)
+- Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
+- HuggingFace Endpoints: SLIG SigLIP2 (768D visual, 5 specialized types — the only HF-hosted model)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
-- Qwen retired 2026-05-01 (HF endpoint had been silently 404-ing for months)
+- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
 - Model usage by stage
 - Cost optimization
 
@@ -110,7 +111,7 @@
 - Embeddings Routes (3)
 - AI Services Routes (10)
 - Background Jobs (7)
-- HuggingFace Endpoint Routes (2 — SLIG SigLIP2 + Chandra v2; Qwen retired 2026-05-01)
+- HuggingFace Endpoint Routes (SLIG SigLIP2 — the only HF-hosted model; layout + OCR is PaddleOCR-VL on Modal as of 2026-06-13)
 - Anthropic Routes (3)
 - Monitoring Routes (3)
 - AI Metrics Routes (2)
@@ -340,7 +341,7 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 - **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 - **Database**: PostgreSQL 15, pgvector, Supabase
-- **AI**: Claude Opus 4.7 (vision tool use) / Sonnet 4.6 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); SLIG SigLIP2 (5×768D visual); Chandra v2 (sole OCR); GPT-4o/GPT-5 optional alternatives
+- **AI**: Claude Opus 4.7 (vision tool use) / Sonnet 4.6 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); PaddleOCR-VL 1.6 (Modal — layout + OCR backbone); SLIG SigLIP2 (5×768D visual); GPT-4o/GPT-5 optional alternatives
 
 ### API Categories
 1. PDF Processing (12 endpoints)

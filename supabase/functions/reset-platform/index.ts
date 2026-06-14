@@ -267,12 +267,12 @@ const TABLES_TO_CLEAR = [
   'processing_queue',              // Generic processing queue
   'processing_metrics',            // Processing metrics
   'pipeline_strategy_metrics',     // Chunking-strategy / Phase-3 distribution metrics
-  'chandra_ocr_metrics',           // Per-attempt Chandra OCR telemetry
+  'paddleocr_metrics',             // Per-attempt PaddleOCR structural-pass telemetry
   'batch_jobs',                    // Batch jobs
   'embedding_stability_metrics',   // Embedding drift metrics
   'product_prices',                // Product price rows (child of products, CASCADE)
-  'product_tables',                // YOLO extracted tables
-  'product_layout_regions',        // YOLO layout regions
+  'product_tables',                // Layout-extracted tables
+  'product_layout_regions',        // Layout regions
   'product_enrichments',           // Product enrichment results
   'product_merge_history',         // Product merge history
   'product_processing_status',     // Product processing status
@@ -282,7 +282,7 @@ const TABLES_TO_CLEAR = [
   'chunk_quality_flags',           // Chunk quality flags
   'chunk_validation_scores',       // Chunk validation scores
   'category_extractions',          // Category extraction results
-  'document_layout_analysis',      // YOLO document layout
+  'document_layout_analysis',      // PaddleOCR structural-pass layout cache
   'document_processing_status',    // Document processing status
   'document_quality_metrics',      // Document quality metrics
   'ocr_results',                   // OCR results

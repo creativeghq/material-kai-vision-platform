@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FOLD by Estudi{H}ac — Product Page (E2E Extraction Result)</title>
+<title>VALENOVA by SG NY — Product Page (E2E Extraction Result)</title>
 <style>
   :root {
     --bg: #0f0f0f;
@@ -50,6 +50,7 @@
   .kv .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
   .kv .value { font-size: 1rem; font-weight: 400; }
   .kv .value.muted { color: var(--text-muted); font-style: italic; }
+  .kv .value.good { color: var(--green); }
 
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
   th, td { padding: 10px 14px; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--card-border); vertical-align: top; }
@@ -65,7 +66,7 @@
   .dot.fail { background: var(--red); }
 
   .product-images { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .product-images img { width: 100%; border-radius: 10px; border: 1px solid var(--card-border); }
+  .product-images img { width: 100%; border-radius: 10px; border: 1px solid var(--card-border); background:#1a1a1a; min-height:120px; }
 
   .pipeline-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
   .pipeline-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; }
@@ -73,18 +74,15 @@
   .pipeline-item .plabel { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
 
   .description-text { font-size: 0.95rem; line-height: 1.8; color: var(--text); }
-  .description-missing { font-style: italic; color: var(--amber); font-size: 0.9rem; }
-
-  .pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-  .pack-item { text-align: center; padding: 10px 8px; background: rgba(255,255,255,0.03); border-radius: 8px; }
-  .pack-item .pval { font-size: 1.1rem; font-weight: 400; }
-  .pack-item .plbl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
 
   .compliance-row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .compliance-item { flex: 1; min-width: 140px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 14px; text-align: center; border: 1px dashed rgba(255,255,255,0.08); }
+  .compliance-item { flex: 1; min-width: 140px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 14px; text-align: center; border: 1px solid rgba(34,197,94,0.18); }
   .compliance-item .spec-name { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .compliance-item .spec-val { font-size: 1.1rem; margin-top: 4px; }
   .compliance-item .spec-val.empty { color: var(--amber); font-style: italic; font-size: 0.85rem; }
+
+  .cert-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .cert { padding:6px 12px; border-radius:6px; background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.25); font-size:0.8rem; }
 
   .vision-block { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.78rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 14px; color: #c0c0c0; line-height: 1.55; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
 
@@ -98,6 +96,9 @@
   .audit-row.warn .glyph { color: var(--amber); }
   .audit-row.fail .glyph { color: var(--red); }
 
+  .cost-table td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .cost-table tr.total td { font-weight:600; border-top:2px solid var(--card-border); }
+
   footer { margin-top: 48px; padding: 24px 0; border-top: 1px solid var(--card-border); text-align: center; color: var(--text-muted); font-size: 0.78rem; }
   footer a { color: var(--primary-light); text-decoration: none; }
 </style>
@@ -106,14 +107,14 @@
 
 <!-- HERO -->
 <div class="hero">
-  <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/6bc72143-0399-4bfe-bf9f-9e4a655b81c5/20260503_123012_page19_page_19_full_render.jpg" alt="FOLD porcelain tile">
+  <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b0ff169d-5d37-4d30-899e-97aedff0e814/20260614_104805_page14_page_14_full_render.jpg" alt="VALENOVA ceramic wall tile">
   <div class="hero-overlay">
-    <div class="sub">Harmony &mdash; Signature Collection &middot; Pages 32-37</div>
-    <h1>FOLD <span style="font-weight:200;opacity:0.6">by Estudi&#123;H&#125;ac</span></h1>
+    <div class="sub">Harmony &mdash; Signature Collection &middot; Pages 24-31</div>
+    <h1>VALENOVA <span style="font-weight:200;opacity:0.6">by SG NY</span></h1>
     <div style="display:flex; gap:8px; margin-top:8px;">
-      <span class="hero-badge">Porcelain Tile</span>
-      <span class="hero-badge" style="background:var(--accent)">Pleated Relief</span>
-      <span class="hero-badge" style="background:var(--green)">Confidence 0.98</span>
+      <span class="hero-badge">Ceramic Wall Tile</span>
+      <span class="hero-badge" style="background:var(--accent)">Folded-Paper Relief</span>
+      <span class="hero-badge" style="background:var(--green)">Confidence 0.95</span>
     </div>
   </div>
 </div>
@@ -124,15 +125,18 @@
 <section>
   <h2>Run Metadata</h2>
   <div class="kv-grid">
-    <div class="kv"><div class="label">Source PDF</div><div class="value">harmony-signature-book-24-25_compressed.pdf</div></div>
-    <div class="kv"><div class="label">Document ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">6bc72143-0399-4bfe-bf9f-9e4a655b81c5</div></div>
-    <div class="kv"><div class="label">Job ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">acff9ebb-8daf-48f0-acd3-4f77308faf8b</div></div>
-    <div class="kv"><div class="label">Product DB ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">e9b907f4-7285-4512-8b47-1709eef251dd</div></div>
-    <div class="kv"><div class="label">Product Index</div><div class="value">2 of 11 (FOLD)</div></div>
-    <div class="kv"><div class="label">Stage 3 Duration</div><div class="value">414.7 s</div></div>
-    <div class="kv"><div class="label">Outcome</div><div class="value"><span class="status ok"><span class="dot ok"></span> COMPLETED</span></div></div>
-    <div class="kv"><div class="label">Stages Completed</div><div class="value">extraction → chunking → images → creation → relationships</div></div>
+    <div class="kv"><div class="label">Source PDF</div><div class="value">harmony-signature-book-24-25_compressed.pdf (140 pp)</div></div>
+    <div class="kv"><div class="label">Document ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">b0ff169d-5d37-4d30-899e-97aedff0e814</div></div>
+    <div class="kv"><div class="label">Job ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">cb137e70-a7fd-4536-987a-3bf21dc211cb</div></div>
+    <div class="kv"><div class="label">Product DB ID</div><div class="value" style="font-size:0.78rem; font-family:monospace;">319b521a-5ed9-45ce-892f-8bec336afd90</div></div>
+    <div class="kv"><div class="label">Run mode</div><div class="value">Single-product E2E (<code>test_single_product=true</code>)</div></div>
+    <div class="kv"><div class="label">Stage 1.5 (layout)</div><div class="value">140 / 140 pages &middot; <span class="status ok"><span class="dot ok"></span> 0 failures</span></div></div>
+    <div class="kv"><div class="label">Outcome</div><div class="value"><span class="status ok"><span class="dot ok"></span> COMPLETED (1&rarr;100)</span></div></div>
+    <div class="kv"><div class="label">Backbone</div><div class="value">PaddleOCR-VL on Modal (A10G) &middot; SLIG &middot; Voyage &middot; Claude Opus 4.7</div></div>
   </div>
+  <p style="margin-top:12px; font-size:0.82rem; color:var(--text-muted);">
+    First fully-green run after the PaddleOCR-VL cold-start fix (<code>use_queues=False</code> + bounded-warmup self-recycle). Stage 1.5 parsed all 140 pages on Modal with zero hangs; discovery &rarr; product &rarr; embeddings &rarr; completion ran end to end.
+  </p>
 </section>
 
 <!-- DESCRIPTION (from chunks) -->
@@ -140,15 +144,13 @@
   <h2>About This Product</h2>
   <div class="card">
     <p class="description-text">
-      The latest collection by Estudi&#123;H&#125;ac is inspired by pleats and the accordion-like movement of pleated fabric.
-      <strong>Fold</strong> is a tile collection with character, conceived to lend surfaces a natural sense of movement when the tiles interact with the light.
+      <strong>VALENOVA by SG NY</strong> is the new Signature collaboration from Harmony. Stacy Garcia, a New York-based designer, draws inspiration from the elegance of folded paper, redefining the aesthetics of wall covering. Each tile captures the unique essence of textures, reliefs, and shapes that only paper can offer, creating a tactile and visual experience.
     </p>
     <p class="description-text" style="margin-top:12px;">
-      FOLD stands out for its illusion of depth from the top to the bottom of its pleats, achieved with minimal volumetric interplay.
-      This <strong>15x38 cm</strong> collection, in a choice of three colours (White, Clay and Green), features a combination of stone textures on its surface.
+      A small-format <strong>11.8 × 11.8 cm</strong> white-body ceramic wall tile with a three-dimensional faceted "LAYER TECH" relief, offered in four colourways &mdash; <strong>White, Sand, Taupe and Clay</strong> &mdash; across 12 distinct patterns per box.
     </p>
     <p style="margin-top:16px; font-size:0.78rem; color:var(--text-muted);">
-      Source: chunk #4 (id <code>266de8ea</code>), bilingual ES/EN, Voyage 3.5 1024D embedding present.
+      Source: chunks #3 + #4 (bilingual EN/ES), <code>chunk_type=product_description</code>, Voyage-4 1024D embedding present on all 4 chunks.
     </p>
   </div>
 </section>
@@ -158,58 +160,58 @@
   <h2>Designer</h2>
   <div class="card">
     <p class="description-text">
-      <strong>José Manuel Ferrero</strong> founded <strong>Estudi&#123;H&#125;ac</strong> in 2003 to bring to life all the ideas that kept buzzing round in his head. In the space of just 20 years, the design studio has become a leading reference in Spain and abroad. Estudi&#123;H&#125;ac specializes in bespoke product designs and creative concepts for projects.
-    </p>
-    <p style="margin-top:10px; font-style: italic; color: var(--text-muted); font-size: 0.9rem;">
-      "All projects by Estudi&#123;H&#125;ac share two common denominators: colour and simplicity of shape and texture."
+      <strong>Stacy Garcia</strong> is an established leader in the world of design &mdash; a successful creative entrepreneur and founder of multiple enterprises: <strong>LebaTex, Inc.</strong> (a distinctive textile supplier) and <strong>Stacy Garcia, Inc.</strong> (a licensing firm). New-York-based, she draws on the elegance of folded paper for the VALENOVA collection.
     </p>
     <p style="margin-top:16px; font-size:0.78rem; color:var(--text-muted);">
-      Source: chunk #1 (id <code>5a599fc3</code>), pages 32-33, bilingual.
+      Source: chunks #1 + #2 (designer bio, bilingual). Provenance: <code>designers</code> via chunk-regex (conf 0.90), reinforced by vision OCR ("Stacy Garcia", "Harmony").
     </p>
   </div>
 </section>
 
 <!-- PRODUCT IMAGES -->
 <section>
-  <h2>Extracted Images (4)</h2>
+  <h2>Analysed Images (4 of 21 extracted)</h2>
   <div class="product-images">
     <div>
-      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/6bc72143-0399-4bfe-bf9f-9e4a655b81c5/20260503_123009_page18_page_18_full_render.jpg" alt="FOLD Clay full render">
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b0ff169d-5d37-4d30-899e-97aedff0e814/20260614_104805_page14_page_14_full_render.jpg" alt="VALENOVA showroom">
       <div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
-        Page 34 &middot; <code>embedded</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.90)</span>
+        Page 26 &middot; <code>embedded</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.92)</span> &middot; OCR ✓
       </div>
       <div style="font-size:0.74rem; color:var(--text-muted); margin-top:4px;">
-        Pattern: chevron / herringbone &middot; Color: terracotta orange &middot; Material: ceramic tile (white body wall)
+        Pattern: triangular faceted grid &middot; Colors: white / sand / taupe / clay &middot; Finish: glossy &middot; Material: white-body ceramic
       </div>
     </div>
     <div>
-      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/6bc72143-0399-4bfe-bf9f-9e4a655b81c5/20260503_123008_page18_page_18_yolo_region_0.jpg" alt="FOLD Clay yolo crop">
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b0ff169d-5d37-4d30-899e-97aedff0e814/20260614_104806_page15_page_15_region_0.jpg" alt="VALENOVA region crop">
       <div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
-        Page 34 &middot; <code>yolo_crop</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.82)</span>
+        Page 28 &middot; <code>region_crop</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.82)</span> &middot; OCR (no text)
       </div>
       <div style="font-size:0.74rem; color:var(--text-muted); margin-top:4px;">
-        Pattern: chevron &middot; Color: clay red &middot; Material: extruded clay body tile
+        Pattern: origami triangular relief &middot; Colors: terracotta / warm coral / clay red &middot; Finish: matte
       </div>
     </div>
     <div>
-      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/6bc72143-0399-4bfe-bf9f-9e4a655b81c5/20260503_123012_page19_page_19_full_render.jpg" alt="FOLD White full render">
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b0ff169d-5d37-4d30-899e-97aedff0e814/20260614_104808_page15_page_15_full_render.jpg" alt="VALENOVA clay lounge">
       <div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
-        Page 36 &middot; <code>embedded</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.90)</span>
+        Page 28 &middot; <code>embedded</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.92)</span> &middot; OCR ✓
       </div>
       <div style="font-size:0.74rem; color:var(--text-muted); margin-top:4px;">
-        Pattern: pleat / accordion &middot; Color: white / warm clay &middot; Material: porcelain (structured relief)
+        Pattern: faceted geometric grid &middot; Color: terracotta clay &middot; Finish: matte &middot; OCR caught "Stacy Garcia", "VALENOVA CLAY LT"
       </div>
     </div>
     <div>
-      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/6bc72143-0399-4bfe-bf9f-9e4a655b81c5/20260503_123011_page19_page_19_yolo_region_0.jpg" alt="FOLD White yolo crop">
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b0ff169d-5d37-4d30-899e-97aedff0e814/20260614_104809_page16_page_16_full_render.jpg" alt="VALENOVA technical spec">
       <div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
-        Page 36 &middot; <code>yolo_crop</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.78)</span>
+        Page 30 &middot; <code>embedded</code> &middot; <span class="status ok"><span class="dot ok"></span> Claude Opus 4.7 (conf 0.90)</span> &middot; OCR ✓ (full spec table)
       </div>
       <div style="font-size:0.74rem; color:var(--text-muted); margin-top:4px;">
-        Pattern: chevron herringbone relief &middot; Color: white / off-white &middot; Material: porcelain (textured relief)
+        Tech sheet &mdash; OCR extracted SKUs 39656/39659/39660/39661, weights, Mapei/Kerakoll grout, 120×80×91 pallet
       </div>
     </div>
   </div>
+  <p style="margin-top:12px; font-size:0.82rem; color:var(--amber);">
+    Note: 21 images were extracted &amp; all 21 associated to the product, but only these <strong>4</strong> received the SLIG + vision + OCR bundle. The other 17 <code>embedded</code> images carry no embeddings, no <code>vision_provider</code>, and <strong>no <code>ocr_skipped_reason</code></strong> &mdash; an explicit-marker gap (see audit).
+  </p>
 </section>
 
 <!-- APPEARANCE -->
@@ -220,33 +222,29 @@
       <div>
         <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;">Color Palette (across 4 images)</div>
         <div class="swatch-row">
-          <div><div class="swatch" style="background:#B85638;"></div><div class="swatch-label">#B85638</div></div>
-          <div><div class="swatch" style="background:#B85A3E;"></div><div class="swatch-label">#B85A3E</div></div>
-          <div><div class="swatch" style="background:#E8E4DD;"></div><div class="swatch-label">#E8E4DD</div></div>
-          <div><div class="swatch" style="background:#EFEAE3;"></div><div class="swatch-label">#EFEAE3</div></div>
+          <div><div class="swatch" style="background:#F2EDE6;"></div><div class="swatch-label">white</div></div>
+          <div><div class="swatch" style="background:#D8C6A8;"></div><div class="swatch-label">sand</div></div>
+          <div><div class="swatch" style="background:#A8927B;"></div><div class="swatch-label">taupe</div></div>
+          <div><div class="swatch" style="background:#B05A3C;"></div><div class="swatch-label">clay</div></div>
+          <div><div class="swatch" style="background:#C8693F;"></div><div class="swatch-label">terracotta</div></div>
         </div>
         <div style="margin-top:14px;">
           <div class="tags">
-            <span class="tag">terracotta orange</span>
-            <span class="tag">sage green</span>
-            <span class="tag">clay red</span>
-            <span class="tag">burnt orange</span>
-            <span class="tag">white</span>
-            <span class="tag">off-white</span>
-            <span class="tag">warm clay</span>
-            <span class="tag">light beige</span>
+            <span class="tag">white</span><span class="tag">sand beige</span><span class="tag">taupe</span>
+            <span class="tag">clay</span><span class="tag">terracotta</span><span class="tag">warm coral</span>
+            <span class="tag">muted orange-red</span>
           </div>
         </div>
         <div style="margin-top:14px; font-size:0.82rem; color:var(--text-muted);">
-          SKU colors (catalog): <strong style="color:var(--text);">White &middot; Clay &middot; Green</strong>
+          SKU colours (catalog): <strong style="color:var(--text);">White &middot; Sand &middot; Taupe &middot; Clay</strong>
         </div>
       </div>
       <div>
         <div class="kv-grid" style="grid-template-columns: 1fr;">
-          <div class="kv"><div class="label">Pattern</div><div class="value">Chevron / herringbone pleat (accordion fold)</div></div>
-          <div class="kv"><div class="label">Texture</div><div class="value">3D pleated relief, stone texture</div></div>
-          <div class="kv"><div class="label">Finish</div><div class="value">Matte (4/4 images)</div></div>
-          <div class="kv"><div class="label">Design Style</div><div class="value">Modern minimalist / contemporary</div></div>
+          <div class="kv"><div class="label">Pattern</div><div class="value">Geometric triangular facets in grid (folded/origami relief, 12 patterns)</div></div>
+          <div class="kv"><div class="label">Texture</div><div class="value">Three-dimensional folded-paper relief ("LAYER TECH"), multi-texture surface</div></div>
+          <div class="kv"><div class="label">Finish</div><div class="value">Matte / glossy glazed (varies by colourway)</div></div>
+          <div class="kv"><div class="label">Design Style</div><div class="value">Contemporary / modern minimalist</div></div>
         </div>
       </div>
     </div>
@@ -257,169 +255,178 @@
 <section>
   <h2>Material Properties</h2>
   <div class="kv-grid">
-    <div class="kv"><div class="label">Material Category</div><div class="value">Ceramic / porcelain tile (vision-derived)</div></div>
-    <div class="kv"><div class="label">Subtype</div><div class="value">Structured relief wall tile</div></div>
-    <div class="kv"><div class="label">Format</div><div class="value">15 x 38 cm (vision &amp; chunk)</div></div>
-    <div class="kv"><div class="label">Applications</div><div class="value">Wall, feature wall, interior cladding, bathroom</div></div>
-    <div class="kv"><div class="label">Available colors</div><div class="value">White, Clay, Green</div></div>
-    <div class="kv"><div class="label">products.metadata.material_category</div><div class="value muted">null (Stage 4 didn't fill)</div></div>
+    <div class="kv"><div class="label">Material Category</div><div class="value good">wall_tile (rollup filled ✓)</div></div>
+    <div class="kv"><div class="label">Subtype</div><div class="value">ceramic tile &middot; white body</div></div>
+    <div class="kv"><div class="label">Format</div><div class="value">11.8 × 11.8 cm (4.65 × 4.65")</div></div>
+    <div class="kv"><div class="label">Thickness</div><div class="value">8.3 mm (0.33")</div></div>
+    <div class="kv"><div class="label">Applications</div><div class="value">Feature wall, kitchen backsplash, bathroom wall, accent wall</div></div>
+    <div class="kv"><div class="label">Available colors</div><div class="value">Clay, Red, Sand, Taupe, White</div></div>
   </div>
 </section>
 
-<!-- EXTRACTED METADATA (Stage 4 product row, raw) -->
+<!-- STAGE 4 METADATA -->
 <section>
   <h2>Stage 4 Product Metadata (raw)</h2>
   <div class="card">
     <div class="kv-grid">
-      <div class="kv"><div class="label">Designer</div><div class="value">Estudi&#123;H&#125;ac</div></div>
-      <div class="kv"><div class="label">Available colors</div><div class="value">white, clay, green</div></div>
-      <div class="kv"><div class="label">Page range</div><div class="value">32 → 37 (6 pages)</div></div>
-      <div class="kv"><div class="label">Confidence</div><div class="value">0.98</div></div>
+      <div class="kv"><div class="label">Designer</div><div class="value">Stacy Garcia</div></div>
+      <div class="kv"><div class="label">Collection</div><div class="value">Valenova</div></div>
+      <div class="kv"><div class="label">Factory</div><div class="value">Harmony</div></div>
+      <div class="kv"><div class="label">Page range</div><div class="value">24 → 31 (8 pages)</div></div>
+      <div class="kv"><div class="label">Confidence</div><div class="value">0.95 (text) / 0.89 (vision)</div></div>
       <div class="kv"><div class="label">Unit</div><div class="value">pcs</div></div>
-      <div class="kv"><div class="label">Consolidated at</div><div class="value">2026-05-03 12:08:32 UTC</div></div>
-      <div class="kv"><div class="label">Factory name</div><div class="value muted">null</div></div>
-      <div class="kv"><div class="label">Factory group</div><div class="value muted">null</div></div>
-      <div class="kv"><div class="label">Variants</div><div class="value muted">[ ] (empty)</div></div>
-      <div class="kv"><div class="label">Dimensions[]</div><div class="value muted">[ ] (empty)</div></div>
-      <div class="kv"><div class="label">Image indices</div><div class="value muted">[ ] (empty)</div></div>
-      <div class="kv"><div class="label">Material properties</div><div class="value muted">{ } (empty)</div></div>
-      <div class="kv"><div class="label">Performance</div><div class="value muted">{ } (empty)</div></div>
-      <div class="kv"><div class="label">Compliance</div><div class="value muted">{ } (empty)</div></div>
-      <div class="kv"><div class="label">Packaging</div><div class="value muted">{ } (empty)</div></div>
-      <div class="kv"><div class="label">Commercial</div><div class="value muted">{ } (empty)</div></div>
+      <div class="kv"><div class="label">Variants</div><div class="value good">4 SKUs (White/Sand/Taupe/Clay LT)</div></div>
+      <div class="kv"><div class="label">Packaging</div><div class="value good">filled ✓ (72 pcs/box, 0.5 m²/box, 126 boxes/pallet, 7.4 kg/box)</div></div>
+      <div class="kv"><div class="label">Commercial</div><div class="value good">filled ✓ (SKU codes + grout per variant)</div></div>
+      <div class="kv"><div class="label">Compliance</div><div class="value good">filled ✓ (14 certifications)</div></div>
+      <div class="kv"><div class="label">Material properties</div><div class="value good">filled ✓ (finish, body, thickness)</div></div>
+      <div class="kv"><div class="label">Performance</div><div class="value muted">{ } empty</div></div>
     </div>
-    <p style="margin-top:14px; font-size:0.82rem; color:var(--amber);">
-      Stage 4 emitted the scaffold but most groups stayed empty &mdash; the Estudi&#123;H&#125;ac chunk pair carries the description and the designer attribution but no spec table. Compliance / performance / packaging fields live on the catalog's shared legend pages (65-67), and the catalog-wide icon pre-pass (<code>process_catalog_wide_icons</code>) writes those onto every product downstream.
+    <p style="margin-top:14px; font-size:0.82rem; color:var(--green);">
+      Unlike the earlier FOLD run, Stage 4 here populated packaging, commercial, compliance and material-properties groups. Provenance is mixed and recorded per-field in <code>_extraction_metadata</code>: <code>ai_text_extraction</code> (0.95), <code>vision_rollup</code> (0.90), <code>claude_spec_vision</code> (0.85) and <code>chunk_regex</code> (0.90). Grout suppliers (Mapei / Kerakoll) came from the page-30 spec-table OCR.
     </p>
   </div>
 </section>
 
-<!-- COMPLIANCE / SPEC RATINGS -->
+<!-- COMMERCIAL VARIANTS -->
 <section>
-  <h2>Compliance &amp; Performance Ratings</h2>
-  <div class="compliance-row">
-    <div class="compliance-item"><div class="spec-name">Slip Resistance (R)</div><div class="spec-val empty">Not extracted</div></div>
-    <div class="compliance-item"><div class="spec-name">PEI Rating</div><div class="spec-val empty">Not extracted</div></div>
-    <div class="compliance-item"><div class="spec-name">Fire Rating</div><div class="spec-val empty">Not extracted</div></div>
-    <div class="compliance-item"><div class="spec-name">Frost Resistance</div><div class="spec-val empty">Not extracted</div></div>
-    <div class="compliance-item"><div class="spec-name">Water Absorption</div><div class="spec-val empty">Not extracted</div></div>
-    <div class="compliance-item"><div class="spec-name">Shade Variation</div><div class="spec-val empty">Not extracted</div></div>
+  <h2>Commercial Variants &amp; Grout (vision + OCR)</h2>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table>
+      <thead><tr><th>SKU</th><th>Variant</th><th>Color</th><th>Format</th><th>Grout (supplier · code)</th></tr></thead>
+      <tbody>
+        <tr><td>39656</td><td>VALENOVA WHITE LT</td><td>White</td><td>11,8×11,8</td><td>Mapei Ultracolor Plus · 100</td></tr>
+        <tr><td>39660</td><td>VALENOVA SAND LT</td><td>Sand</td><td>11,8×11,8</td><td>Mapei Ultracolor Plus · 132</td></tr>
+        <tr><td>39661</td><td>VALENOVA TAUPE LT</td><td>Taupe</td><td>11,8×11,8</td><td>Kerakoll Fugabella · 43</td></tr>
+        <tr><td>39659</td><td>VALENOVA CLAY LT</td><td>Clay</td><td>11,8×11,8</td><td>Kerakoll Fugabella · 40</td></tr>
+      </tbody>
+    </table>
   </div>
-  <div style="margin-top:16px; padding:16px; background:rgba(245,158,11,0.08); border-radius:8px; border:1px solid rgba(245,158,11,0.2);">
-    <p style="font-size:0.85rem; color:var(--amber);">
-      <strong>Why all empty?</strong> Compliance icons live on the catalog's shared legend pages (~65-67), not on FOLD's individual pages 32-37. Two pieces of the icon-rollup pipeline didn't fully fire on this run:
+</section>
+
+<!-- COMPLIANCE -->
+<section>
+  <h2>Compliance &amp; Certifications</h2>
+  <div class="card">
+    <div class="cert-grid">
+      <span class="cert">ISO 9001</span><span class="cert">ISO 14001</span><span class="cert">ISO 14021</span>
+      <span class="cert">GlobalEPD</span><span class="cert">UNE-EN 14411</span><span class="cert">DIN 51130</span>
+      <span class="cert">DIN 51097</span><span class="cert">UNE 41901 EX</span><span class="cert">BS 7976-2</span>
+      <span class="cert">ANSI A137.1</span><span class="cert">ISO 10545-6</span><span class="cert">ISO 10545-7</span>
+      <span class="cert">UNE 138002</span><span class="cert">FSC®</span>
+    </div>
+    <p style="margin-top:14px; font-size:0.82rem; color:var(--green);">
+      14 certifications captured via <code>catalog_knowledge_extraction</code> (source = <code>catalog_knowledge</code>). These live on the catalog's shared legend/technical pages and were rolled onto the product &mdash; the failure mode the FOLD report flagged (empty compliance) did <strong>not</strong> recur here. Discrete ratings (slip R-value, PEI, water absorption) were not isolated into individual fields:
     </p>
-    <ol style="font-size:0.82rem; color:var(--text-muted); margin-top:8px; padding-left:20px;">
-      <li><code>process_catalog_wide_icons</code> hadn't reached pages 65-67 by the time FOLD finished &mdash; it runs as a once-per-document pre-pass, but the timing/dependency window means FOLD's Stage 4 rollup ran before the icon rows were available.</li>
-      <li><strong>Phase 3 OCR did not fire</strong> on FOLD's 4 images (<code>ocr_attempts=0, ocr_skipped_reason=null</code> on every row) &mdash; per audit "explicit failure markers, not empty returns" rule, every persisted row should carry exactly one of {success / skipped+reason / failed}. Silent no-op is a regression.</li>
-    </ol>
+    <div class="compliance-row" style="margin-top:12px;">
+      <div class="compliance-item" style="border-color:rgba(245,158,11,0.2);"><div class="spec-name">Slip Resistance (R)</div><div class="spec-val empty">In cert set, not parsed to field</div></div>
+      <div class="compliance-item" style="border-color:rgba(245,158,11,0.2);"><div class="spec-name">PEI Rating</div><div class="spec-val empty">Not isolated</div></div>
+      <div class="compliance-item" style="border-color:rgba(245,158,11,0.2);"><div class="spec-name">Water Absorption</div><div class="spec-val empty">Not isolated</div></div>
+    </div>
   </div>
 </section>
 
 <!-- 7-VECTOR PIPELINE STATUS -->
 <section>
-  <h2>7-Vector Pipeline Status (FOLD)</h2>
+  <h2>Embedding Pipeline Status (VALENOVA)</h2>
   <div class="pipeline-grid">
     <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Visual SLIG (768D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Color SLIG (768D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Texture SLIG (768D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Style SLIG (768D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Material SLIG (768D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Color (1024D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Texture (1024D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Style (1024D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Material (1024D)</div></div>
     <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Understanding (1024D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">2/2</div><div class="plabel">Chunk Text (1024D)</div></div>
-    <div class="pipeline-item"><div class="count" style="color:var(--green);">1/1</div><div class="plabel">Product Text (1024D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">4/4</div><div class="plabel">Chunk Text (1024D)</div></div>
+    <div class="pipeline-item"><div class="count" style="color:var(--green);">1/1</div><div class="plabel">Product Text (voyage-4)</div></div>
   </div>
   <p style="margin-top:12px; font-size:0.82rem; color:var(--text-muted);">
-    All four images carry the full 6-vector image bundle (visual + color + texture + style + material + understanding). Both chunks have Voyage 3.5 1024D text embeddings. The product row has its own Voyage 4 1024D text embedding (name + description + metadata). Vision analysis was provided by <strong>Claude Opus 4.7</strong> via Anthropic tool use on every image &mdash; <code>vision_provider='claude'</code> across all four rows, schema v1.
+    The 4 analysed images each carry the full 6-vector bundle; all 4 chunks have Voyage-4 1024D text embeddings; the product row has its own voyage-4 text embedding. <strong>Entity linking populated 84 <code>chunk_image_relationships</code></strong> (4 chunks × 21 images) — the FOLD run produced 0 here. Per-product cost attribution worked too: 30 <code>ai_usage_logs</code> rows carry <code>product_id</code> (FOLD had 0).
   </p>
 </section>
 
-<!-- VISION ANALYSIS — RAW (per image) -->
+<!-- COST -->
+<section>
+  <h2>Cost — All-In (measured + GPU)</h2>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="cost-table">
+      <thead><tr><th>Provider / operation</th><th>Model</th><th class="num">Calls</th><th class="num">Billed (USD)</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Product discovery</td><td>claude-opus-4-7</td><td class="num">2</td><td class="num">1.7111</td><td><span class="status ok">measured</span></td></tr>
+        <tr><td>Image classification</td><td>claude-opus-4-7</td><td class="num">24</td><td class="num">1.4932</td><td><span class="status ok">measured</span></td></tr>
+        <tr><td>Product spec vision</td><td>claude-opus-4-7</td><td class="num">4</td><td class="num">0.9144</td><td><span class="status ok">measured</span></td></tr>
+        <tr><td>Knowledge / legend / metadata</td><td>claude-haiku-4-5</td><td class="num">~30</td><td class="num">0.2712</td><td><span class="status ok">measured</span></td></tr>
+        <tr><td>Text embeddings</td><td>voyage-4</td><td class="num">26</td><td class="num">0.0002</td><td><span class="status warn">logged, job_id NULL</span></td></tr>
+        <tr><td>PaddleOCR structural + OCR (Modal A10G)</td><td>paddleocr-vl</td><td class="num">144</td><td class="num">~0.50</td><td><span class="status fail">$0 logged (token path)</span></td></tr>
+        <tr><td>SLIG visual embeddings (HF)</td><td>basiliskan/slig</td><td class="num">4</td><td class="num">~0.01</td><td><span class="status fail">$0 logged (token path)</span></td></tr>
+        <tr class="total"><td colspan="3">All-in (true)</td><td class="num">~4.90</td><td><span class="status ok">$4.39 tracked + ~$0.51 GPU</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:14px; font-size:0.82rem; color:var(--amber);">
+    <strong>Why <code>total_ai_cost_usd</code> reads $4.31 not $4.90:</strong> two billing gaps. (1) Voyage / SLIG / PaddleOCR rows are written with <code>job_id = NULL</code>, so the completion rollup (which sums <code>WHERE job_id = job</code>) drops them. (2) GPU endpoints (Modal PaddleOCR, SLIG) are logged through the token-cost path → 0 tokens → <strong>$0.00</strong>, and the 140 page structural-passes aren't logged at all (only the 21 per-image OCR calls are). The correct logger (<code>log_time_based_call</code>, GPU-seconds) already exists — it just isn't called. Modal GPU ran <strong>1162.6 s across 144 calls</strong> (≈ $0.50 at A10G).
+  </p>
+</section>
+
+<!-- VISION ANALYSIS — RAW -->
 <section>
   <h2>Vision Analysis (Anthropic tool-use payloads)</h2>
   <div class="grid-2">
     <div class="card">
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 1 &middot; page 34 &middot; embedded</div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 1 &middot; page 26 &middot; embedded</div>
 <pre class="vision-block">{
-  "material_type": "ceramic tile",
-  "material_subtype": "white body wall tile",
-  "finish": "matte",
-  "pattern": "chevron / herringbone",
-  "texture": "matte textured with raised chevron relief",
-  "design_style": "modern contemporary",
-  "color_palette": ["terracotta orange","sage green","off-white"],
-  "primary_color_hex": "#B85638",
-  "applications": ["wall","interior decorative wall","feature wall"],
-  "physical_properties": {
-    "thickness": null,
-    "slip_rating": null,
-    "estimated_dimensions": "15x38 cm (6x15\")"
-  },
-  "confidence": 0.90,
-  "quality_assessment": "High quality catalog imagery..."
+  "material_type": "white body ceramic wall tile",
+  "material_subtype": "glazed three-dimensional relief tile",
+  "finish": "glossy",
+  "surface_pattern": "geometric triangular facets in grid layout",
+  "textures": ["3D geometric relief","faceted","glazed"],
+  "style": "modern minimalist",
+  "colors": ["white","sand beige","taupe","clay"],
+  "applications": ["kitchen backsplash","bathroom wall","feature wall cladding"],
+  "detected_text": ["VALENOVA by SG NY","White Body Tile","11,8x11,8 cm","LAYER TECH", ...],
+  "confidence": 0.92
 }</pre>
     </div>
     <div class="card">
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 2 &middot; page 34 &middot; yolo_crop</div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 2 &middot; page 28 &middot; region_crop</div>
 <pre class="vision-block">{
-  "material_type": "ceramic tile",
-  "material_subtype": "extruded clay body tile",
+  "material_type": "three-dimensional ceramic wall tile",
+  "material_subtype": "glazed relief ceramic tile",
   "finish": "matte",
-  "pattern": "chevron",
-  "texture": "lightly textured matte clay surface",
-  "design_style": "contemporary Mediterranean",
-  "color_palette": ["terracotta","burnt orange","clay red"],
-  "primary_color_hex": "#B85A3E",
-  "applications": ["wall","feature wall","interior cladding"],
-  "physical_properties": {
-    "thickness": null,
-    "slip_rating": null,
-    "estimated_dimensions": "approx 15x38 cm (6x15\")"
-  },
-  "confidence": 0.82,
-  "quality_assessment": "High-quality styled product image..."
+  "surface_pattern": "grid with origami-style triangular relief",
+  "textures": ["raised geometric relief","subtle matte ceramic surface"],
+  "style": "contemporary",
+  "colors": ["terracotta","warm coral","clay red"],
+  "applications": ["feature wall cladding","decorative interior wall","accent wall"],
+  "detected_text": [],
+  "confidence": 0.82
 }</pre>
     </div>
     <div class="card">
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 3 &middot; page 36 &middot; embedded</div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 3 &middot; page 28 &middot; embedded</div>
 <pre class="vision-block">{
-  "material_type": "porcelain tile",
-  "material_subtype": "structured relief wall tile",
+  "material_type": "three-dimensional ceramic wall tile",
   "finish": "matte",
-  "pattern": "chevron pleat / accordion fold",
-  "texture": "three-dimensional pleated relief with subtle stone texture",
-  "design_style": "modern minimalist",
-  "color_palette": ["white","warm clay","light beige"],
-  "primary_color_hex": "#E8E4DD",
-  "applications": ["wall","bathroom","feature wall","interior"],
-  "physical_properties": {
-    "thickness": "0.9 cm (Meraki Clay)",
-    "slip_rating": null,
-    "estimated_dimensions": "15x38 cm (Fold); 90x90 cm (Meraki Clay floor)"
-  },
-  "confidence": 0.90,
-  "quality_assessment": "High-quality catalog render..."
+  "surface_pattern": "geometric faceted grid",
+  "textures": ["3D relief","faceted geometric","folded paper effect"],
+  "style": "contemporary",
+  "colors": ["terracotta clay","warm coral","muted orange-red"],
+  "applications": ["feature wall cladding","interior wall covering","accent wall"],
+  "detected_text": ["VALENOVA by SG NY","VALENOVA CLAY LT/11,8X11,8","Harmony","Stacy Garcia"],
+  "confidence": 0.92
 }</pre>
     </div>
     <div class="card">
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 4 &middot; page 36 &middot; yolo_crop</div>
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Image 4 &middot; page 30 &middot; embedded (tech sheet)</div>
 <pre class="vision-block">{
-  "material_type": "porcelain tile",
-  "material_subtype": "textured relief tile",
+  "material_type": "white body ceramic wall tile",
+  "material_subtype": "glazed white body tile w/ folded-paper relief",
   "finish": "matte",
-  "pattern": "chevron herringbone relief",
-  "texture": "three-dimensional chevron/zigzag relief",
-  "design_style": "modern minimalist",
-  "color_palette": ["white","off-white"],
-  "primary_color_hex": "#EFEAE3",
-  "applications": ["wall","feature wall","interior cladding"],
-  "physical_properties": {
-    "thickness": null,
-    "slip_rating": null,
-    "estimated_dimensions": null
-  },
-  "confidence": 0.78,
-  "quality_assessment": "Image is clear and well-lit..."
+  "surface_pattern": "geometric folded/origami relief (12 patterns)",
+  "textures": ["multi-texture surface","soft relief","folded paper effect"],
+  "style": "contemporary",
+  "colors": ["white","taupe","sand beige","clay terracotta"],
+  "detected_text": ["39656 VALENOVA WHITE LT","39661 ... TAUPE","Mapei","Kerakoll","120X80X91", ...],
+  "confidence": 0.90
 }</pre>
     </div>
   </div>
@@ -429,88 +436,52 @@
 <section>
   <h2>Data Integrity Audit</h2>
   <div class="card">
-    <div class="audit-row ok">
-      <div class="glyph">●</div>
-      <div class="body">
-        <div class="ttl"><strong>products row created</strong> &middot; FOLD <code style="font-size:0.75rem;">e9b907f4-7285-4512-8b47-1709eef251dd</code></div>
-        <div class="det">Voyage-4 1024D text_embedding present, schema v1, created 12:08:33</div>
-      </div>
-    </div>
-    <div class="audit-row ok">
-      <div class="glyph">●</div>
-      <div class="body">
-        <div class="ttl"><strong>2 chunks persisted</strong>, both with text embeddings</div>
-        <div class="det">Voyage 3.5 1024D, has_text_embedding=true on both. Pages 33 (designer bio) + pages 36-37 (FOLD description).</div>
-      </div>
-    </div>
-    <div class="audit-row ok">
-      <div class="glyph">●</div>
-      <div class="body">
-        <div class="ttl"><strong>4 images persisted</strong>, all with full 6-vector embedding bundle</div>
-        <div class="det">visual + color + texture + style + material + understanding, all has_*_slig and has_understanding_embedding = true. Vision provider = Claude on all four.</div>
-      </div>
-    </div>
-    <div class="audit-row ok">
-      <div class="glyph">●</div>
-      <div class="body">
-        <div class="ttl"><strong>image_product_associations: 4</strong></div>
-        <div class="det">Stage 4.7 link table populated (image → product mapping intact).</div>
-      </div>
-    </div>
-    <div class="audit-row warn">
-      <div class="glyph">▲</div>
-      <div class="body">
-        <div class="ttl"><strong>chunk_image_relationships: 0</strong></div>
-        <div class="det">entity_linking_service.link_images_to_chunks didn't write any rows. Per CLAUDE.md, this is the canonical writer (relevancy_service was retired 2026-04). FOLD has 2 chunks and 4 images on overlapping pages — page-proximity links should exist.</div>
-      </div>
-    </div>
-    <div class="audit-row warn">
-      <div class="glyph">▲</div>
-      <div class="body">
-        <div class="ttl"><strong>Phase 3 OCR didn't run</strong></div>
-        <div class="det">All 4 images: ocr_attempts=0, ocr_failed=false, ocr_skipped_reason=null. Audit pattern requires exactly one of those to be set on every row. Silent no-op = regression of the explicit-marker invariant.</div>
-      </div>
-    </div>
-    <div class="audit-row warn">
-      <div class="glyph">▲</div>
-      <div class="body">
-        <div class="ttl"><strong>chunk_type='unclassified'</strong> on both chunks</div>
-        <div class="det">Sonnet 4.6 chunking classifier didn't tag the chunks. Could be benign (truly unclassifiable bilingual marketing copy) but worth confirming the model fired.</div>
-      </div>
-    </div>
-    <div class="audit-row fail">
-      <div class="glyph">●</div>
-      <div class="body">
-        <div class="ttl"><strong>ai_usage_logs.product_id NULL across all 0 entries attributed to FOLD</strong></div>
-        <div class="det">Per-product cost attribution audit gap: every Anthropic / Voyage / SLIG call in Stage 3 should carry product_id. We can't compute per-product cost on this run. Tracked separately for fix.</div>
-      </div>
-    </div>
-    <div class="audit-row warn">
-      <div class="glyph">▲</div>
-      <div class="body">
-        <div class="ttl"><strong>products.metadata.material_category = null</strong></div>
-        <div class="det">Despite vision_analysis identifying the material on every image (porcelain / ceramic), the product-level rollup didn't denormalize it. metadata.{compliance, packaging, performance, commercial} are all <code>{ }</code>.</div>
-      </div>
-    </div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>Pipeline ran 1&rarr;100</strong> — 140/140 layout pages (0 failures), discovery, product, embeddings, completion</div>
+      <div class="det">Modal PaddleOCR backbone stable across 144 calls, zero cold-start hangs after the fix.</div></div></div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>Stage 4 metadata richly populated</strong> — packaging, commercial (4 SKUs + grout), 14 certifications, material properties</div>
+      <div class="det">The empty-group failure mode from the FOLD run did not recur. Per-field provenance recorded in <code>_extraction_metadata</code>.</div></div></div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>chunk_image_relationships = 84</strong> (was 0 on FOLD)</div>
+      <div class="det">entity_linking_service.link_images_to_chunks fired — 4 chunks × 21 images via page proximity.</div></div></div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>chunk_type = product_description</strong> on all 4 chunks (was 'unclassified' on FOLD)</div>
+      <div class="det">Sonnet chunk classifier fired and tagged correctly.</div></div></div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>Phase-3 OCR ran</strong> on the product images (was 0 on FOLD) — 4 attempted, 3 with text</div>
+      <div class="det">Page-30 tech-sheet OCR recovered the full SKU/weight/grout table.</div></div></div>
+    <div class="audit-row ok"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>Per-product cost attribution worked</strong> — 30 <code>ai_usage_logs</code> rows carry <code>product_id</code> (FOLD had 0)</div>
+      <div class="det">…for Claude rows. Embedding / GPU rows still lack it (below).</div></div></div>
+    <div class="audit-row fail"><div class="glyph">●</div><div class="body">
+      <div class="ttl"><strong>GPU + embedding cost not attributed / billed $0</strong></div>
+      <div class="det">voyage-4, paddleocr-vl, slig rows all have <code>job_id = NULL</code>; PaddleOCR + SLIG bill $0 (token path, not <code>log_time_based_call</code>); the 140 page structural-passes aren't logged. → <code>total_ai_cost_usd</code> under-reports by the full GPU cost (~$0.50). [FIX #1]</div></div></div>
+    <div class="audit-row warn"><div class="glyph">▲</div><div class="body">
+      <div class="ttl"><strong>17 of 21 images unembedded with no skip reason</strong></div>
+      <div class="det">20 <code>embedded</code> images, only 3 + the 1 <code>region_crop</code> got SLIG/vision/OCR. The other 17 carry no embeddings, no <code>vision_provider</code>, and <code>ocr_skipped_reason = null</code> — violates the explicit-marker invariant. Likely a dedup/relevance cap that isn't recording its reason.</div></div></div>
+    <div class="audit-row warn"><div class="glyph">▲</div><div class="body">
+      <div class="ttl"><strong>Stage 1.5 ran serially (~9 s/page, ~19 min)</strong></div>
+      <div class="det"><code>STAGE_1_5_CONCURRENCY=1</code> (set during cold-start debugging). Parallelising across Modal containers is the main speed lever.</div></div></div>
+    <div class="audit-row warn"><div class="glyph">▲</div><div class="body">
+      <div class="ttl"><strong>kb_docs writes were failing (now fixed)</strong></div>
+      <div class="det">Every <code>upsert_kb_doc</code> hit the <code>valid_visibility</code> CHECK (code sends 'workspace', constraint allowed only public/private). Constraint widened to allow 'workspace' during this session — catalog KB docs now persist.</div></div></div>
   </div>
 </section>
 
-<!-- CONTEXT (the run that produced this) -->
+<!-- RUN CONTEXT -->
 <section>
   <h2>Run Context</h2>
   <div class="card">
     <p class="description-text">
-      <strong>Job <code>acff9ebb-8daf-48f0-acd3-4f77308faf8b</code></strong> processes the Harmony Signature Book 2024-2025 (140 pages). FOLD is product <strong>2 of 11</strong>. Product 1 (VALENOVA) had hit the 600 s per-product timeout (<code>CLAUDE_CONCURRENCY=2</code> hardcoded in <code>rate_limits.py</code> serialised the per-image classify pass). FOLD slipped under the wire at 414.7 s because it had only 4 images vs. VALENOVA's significantly larger image count.
-    </p>
-    <p class="description-text" style="margin-top:12px;">
-      <strong>Fix applied (not yet deployed):</strong> <code>get_claude_concurrency_limit()</code> raised from hardcoded <code>2</code> to <code>10</code> with env override <code>CLAUDE_VISION_CONCURRENCY</code>. With concurrency 10, the same VALENOVA workload would complete in ~80 s for the classify pass instead of 400+. See <code>mivaa-pdf-extractor/app/config/rate_limits.py:136-156</code>.
+      Job <code>cb137e70</code> is the first fully-green single-product E2E after resolving the PaddleOCR-VL cold-start hang. Root cause was two-fold: PaddleOCR-VL's default <code>use_queues=True</code> spawns a 3-thread queue pipeline whose <code>_worker_vlm</code> thread deadlocks at container startup; and even on the synchronous path the first VLM generation on a cold GPU intermittently wedges. Fix: force <code>use_queues=False</code> everywhere + a bounded warmup in <code>@modal.enter</code> that raises on a wedge so Modal recycles the container (only a warmed container reports healthy). GPU moved L4→A10G; <code>max_new_tokens</code> capped at 2048.
     </p>
   </div>
 </section>
 
 <footer>
-  Generated 2026-05-03 from job <code>acff9ebb</code> via direct Postgres queries.
-  Source: <code>products</code>, <code>document_chunks</code>, <code>document_images</code>, <code>image_product_associations</code>, <code>product_processing_status</code>, <code>chunk_image_relationships</code>, <code>ai_usage_logs</code>.
+  Generated 2026-06-14 from job <code>cb137e70</code> via direct Postgres queries.
+  Source: <code>products</code>, <code>document_chunks</code>, <code>document_images</code>, <code>image_product_associations</code>, <code>chunk_image_relationships</code>, <code>paddleocr_metrics</code>, <code>ai_usage_logs</code>.
 </footer>
 
 </div>

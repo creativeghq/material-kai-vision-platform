@@ -72,9 +72,9 @@ Complete documentation for Material Kai Vision Platform.
 
 **[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
 - Fully async architecture across all methods (PDF, Web, XML)
-- Unified concurrency limits (2 Claude, 10 uploads, 20 SLIG, 8 Chandra v2 — Qwen gate retired 2026-05-01)
+- Unified concurrency limits (2 Claude, 10 uploads, 20 SLIG, PaddleOCR-VL on Modal with scale-to-zero — Chandra/Qwen gates retired)
 - Timeout configuration (300s discovery, 120s AI, 30s downloads)
-- Rate limiting (circuit breaker on Claude; Chandra retries with jitter at 3 attempts)
+- Rate limiting (circuit breaker on Claude; PaddleOCR-VL inference retry in the Modal endpoint manager)
 - Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
 - Memory optimization (batch processing prevents OOM)
 - Network optimization (semaphores prevent congestion)
@@ -353,10 +353,11 @@ Complete documentation for Material Kai Vision Platform.
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
 - Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
-- HuggingFace Endpoints: SLIG SigLIP2 (5 visual embedding types, 768D each) + Chandra v2 (sole OCR engine, retry-with-jitter)
+- Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
+- HuggingFace Endpoints: SLIG SigLIP2 (5 visual embedding types, 768D each — the only HF-hosted model)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
-- Qwen retired 2026-05-01 (HF endpoint had been silently 404-ing for months)
+- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
 - 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
 - Model usage by pipeline stage
 - Cost optimization
@@ -399,27 +400,22 @@ Complete documentation for Material Kai Vision Platform.
 
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing ✨ UPDATED
 - Product-centric architecture (process each product individually)
-- Stage 0A: Product Discovery (0-10%) - Products + Metadata extraction
-- Stage 0B: Document Entity Discovery (10-15%) - Certificates, Logos, Specs
-- Stage 1: Extract Product Pages (15-25%)
-- Stage 2: Text Extraction (25-35%)
-- Stage 3: Image Extraction (35-45%)
-- Stage 4: Product Creation (45-50%)
-- **Stage 4.5: YOLO Layout Detection + Table Extraction (50-65%)** ✨ NEW
-  - 6 region types: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA
-  - Automatic table extraction (Camelot)
-  - Enabled by default (YOLO_ENABLED=true)
-  - Stores in product_layout_regions and product_tables
-- Stage 5: Entity Linking (65-70%)
-- Stage 6: AI Classification (70-75%) — Claude Opus 4.7 via Anthropic tool use
-- Stage 7: SLIG Embeddings (75-85%) — SigLIP2 cloud endpoint, 5×768D specialized
-- Stage 8: Vision Analysis (85-90%) — Claude Opus 4.7 schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`
-- **Layout-Aware Chunking** ✨ NEW
-  - Uses YOLO regions for intelligent chunking
+- **Stage 1: PaddleOCR-VL layout + OCR pass (structure-first, BEFORE discovery)** — PP-DocLayoutV2 localizes/labels regions + predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX). Persists `document_layout_analysis` rows (`processing_version="paddleocr-vl"`); tables preserved as markdown/HTML
+- Stage 0A: Product Discovery — reads reading-order text from the PaddleOCR layout cache (not raw `page.get_text()`)
+- Stage 0B: Document Entity Discovery - Certificates, Logos, Specs
+- Stage 2: Text Extraction / Chunking — reads the same PaddleOCR layout cache
+- Stage 3: Image Extraction — product crops sourced from PaddleOCR `IMAGE`/`FIGURE`/`chart` regions
+- Stage 4: Product Creation
+- Stage 5: Entity Linking
+- Stage 6: AI Classification — Claude Opus 4.7 via Anthropic tool use
+- Stage 7: SLIG Embeddings — SigLIP2 cloud endpoint, 5×768D specialized
+- Stage 8: Vision Analysis — Claude Opus 4.7 schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`
+- **Structure-first chunking** ✨
+  - Uses the PaddleOCR-VL layout cache for intelligent chunking
   - Respects region boundaries
   - Combines TITLE + TEXT
   - Keeps tables intact
-  - Preserves reading order
+  - Preserves model-predicted reading order
 - Checkpoint recovery (9 checkpoints)
 - Performance metrics
 - API endpoint
@@ -513,7 +509,7 @@ Complete documentation for Material Kai Vision Platform.
 - PDF Routes (4 endpoints)
 - Products Routes (3 endpoints)
 - Embeddings Routes (3 endpoints)
-- HuggingFace Endpoint Routes (2 endpoints — SLIG SigLIP2 + Chandra v2; Qwen retired 2026-05-01)
+- HuggingFace Endpoint Routes (SLIG SigLIP2 — the only HF-hosted model; layout + OCR is PaddleOCR-VL on Modal as of 2026-06-13)
 - Anthropic Routes (3 endpoints)
 - Monitoring Routes (3 endpoints)
 - AI Metrics Routes (2 endpoints)
@@ -602,7 +598,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), SLIG SigLIP2 (HuggingFace, 5×768D visual), Chandra v2 (HuggingFace, sole OCR engine), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (HuggingFace, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

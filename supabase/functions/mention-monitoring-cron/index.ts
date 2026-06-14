@@ -31,10 +31,7 @@ Deno.serve(withApiLogging('mention-monitoring-cron', async (req) => {
       });
     }
 
-    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL');
-    if (!pythonBackendUrl) {
-      throw new Error('PYTHON_BACKEND_URL environment variable not set');
-    }
+    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
 
     // Delegate to MIVAA's /cron-refresh endpoint (which validates the same secret)
     const response = await fetch(

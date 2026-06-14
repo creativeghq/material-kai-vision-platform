@@ -20,6 +20,7 @@ import { SocialAnalyticsSyncAgent } from '../modules/social-media/agents/social-
 import { SocialInsightsSyncAgent }  from '../modules/social-media/agents/social-insights-sync-agent.ts';
 import { FactoryEnrichmentAgent }   from './factory-enrichment-agent.ts';
 import { ModelHealthCheckAgent }    from './model-health-check-agent.ts';
+import { TechRadarAgent }           from './tech-radar-agent.ts';
 import { isModuleEnabled, moduleSupabaseClient } from '../modules/registry.ts';
 
 const RUNNERS: AgentRunner[] = [
@@ -30,6 +31,7 @@ const RUNNERS: AgentRunner[] = [
   new SocialInsightsSyncAgent(),
   new FactoryEnrichmentAgent(),
   new ModelHealthCheckAgent(),
+  new TechRadarAgent(),
 ];
 
 /**

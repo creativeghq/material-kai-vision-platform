@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, and Chandra v2 OCR.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings (SLIG on HuggingFace), and PaddleOCR-VL structural layout + OCR backbone (on Modal).
 
 ---
 
@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **AI stack**: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings, Chandra v2 OCR — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
+- **AI stack**: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on HuggingFace), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
 - **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
@@ -69,7 +69,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - Anthropic (Claude Opus 4.7 vision-via-tool-use + chunking via Sonnet 4.6 + Haiku 4.5 classifiers + built-in web_search_20250305)
 - Voyage AI (voyage-4, sole text + understanding embedder, 1024D)
 - SigLIP2 (SLIG) via HuggingFace Endpoint (5 visual embedding types, 768D each)
-- Chandra v2 (Datalab) via HuggingFace Endpoint (sole OCR engine, retry-with-jitter)
+- PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone (replaced Surya-2 2026-06-13)
 - OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
@@ -94,7 +94,7 @@ MIVAA API (FastAPI) → Creates background job
   3. Semantic Chunking (Anthropic)
   4. Text Embeddings (Voyage AI voyage-4, 1024D)
   5. Image Extraction
-  6. Image Analysis (Claude Opus 4.7 vision tool use → `VisionAnalysis` JSON → understanding embeddings via Voyage AI; per-image OCR via Chandra v2)
+  6. Image Analysis (Claude Opus 4.7 vision tool use → `VisionAnalysis` JSON → understanding embeddings via Voyage AI; per-image OCR via PaddleOCR-VL)
   7-10. Multi-Vector SigLIP2 Embeddings (768D halfvec: visual, color, texture, style, material)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
@@ -128,13 +128,15 @@ Real-time updates → Frontend displays results
 - **Performance**: 3x faster than Opus, 90% accuracy
 - **Pipeline Stages**: Product Discovery (Stage 4), Content Classification
 
-#### 2. HuggingFace Endpoint — Chandra v2 (sole OCR engine)
+#### 2. Modal — PaddleOCR-VL (structural layout + OCR backbone)
 
-- **Use Cases**: Stage 1.5 page-level OCR + Phase 3 per-image OCR for text-bearing images
-- **Retry-with-jitter**: 3 attempts at temperatures 0.0 / 0.4 / 0.8; >90% cumulative success rate
-- **Failure marker**: `OCRResult.method='chandra_failed'`
-- **Per-attempt metrics**: `chandra_ocr_metrics` table
-- **Replaced**: pytesseract + EasyOCR (both removed entirely 2026-05-01)
+- **Model**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B), a two-stage document parser — PP-DocLayoutV2 (RT-DETR detector + pointer network) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
+- **Hosting**: Modal app `paddleocr-vl` (GPU L4, scale-to-zero → $0 idle). Contract: `GET /health` + `POST /parse`. ~1-3s/page warm, ~90s cold start
+- **Use Cases**: Structure-first Stage 1 layout pass (runs BEFORE discovery, `processing_version="paddleocr-vl"`) + Phase 3 per-image OCR for text-bearing images + admin re-OCR
+- **Failure marker**: `OCRResult.method` = `paddleocr` / `paddleocr_failed` (`ocr_engine` = `paddleocr`)
+- **Per-attempt metrics**: `paddleocr_metrics` table
+- **Secret**: only `PADDLEOCR_MODAL_API_KEY` required at runtime (URL baked as config default); CI auto-deploys on `modal_app/**` via the `deploy-modal` job
+- **Replaced**: Surya-2 (2026-06-13), which had replaced YOLO + Chandra v2 + `merge_layout`
 
 #### 3. OpenAI Models (optional, not vision)
 
@@ -232,7 +234,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - Extract material properties
 - Quality scoring (0-100)
 - Classify image type (product, detail, mood, diagram)
-- Per-image OCR via Chandra v2 (text-bearing images only)
+- Per-image OCR via PaddleOCR-VL (text-bearing images only)
 
 **Stage 10: SLIG Embedding Generation (AI)**
 - SLIG (SigLIP2) cloud endpoint: Generate 5× 768D specialized embeddings per image (visual / color / texture / style / material), ~150-400ms per image
@@ -417,7 +419,7 @@ The platform uses **7 embedding types** for comprehensive search:
 8. AI Services (10 endpoints — AI model integration)
 9. Background Jobs (7 endpoints — async job tracking)
 10. Anthropic APIs (3 endpoints — Claude integration)
-11. HuggingFace Endpoint APIs (2 endpoints — SLIG SigLIP2 visual + Chandra v2 OCR; Qwen retired 2026-05-01)
+11. Model Endpoint APIs (SLIG SigLIP2 visual on HuggingFace + PaddleOCR-VL structural layout/OCR on Modal; Qwen retired 2026-05-01, Surya-2 → PaddleOCR-VL 2026-06-13)
 12. Monitoring Routes (3 endpoints — health checks, metrics)
 13. AI Metrics Routes (2 endpoints — AI performance tracking)
 14. Duplicate Detection (7 endpoints — factory-based duplicate detection + merging)

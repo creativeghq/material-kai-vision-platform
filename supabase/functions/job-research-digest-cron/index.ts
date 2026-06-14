@@ -33,10 +33,7 @@ Deno.serve(withApiLogging('job-research-digest-cron', async (req) => {
       });
     }
 
-    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL');
-    if (!pythonBackendUrl) {
-      throw new Error('PYTHON_BACKEND_URL environment variable not set');
-    }
+    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
 
     const currentHourUtc = new Date().getUTCHours();
     console.log(`📬 Dispatching digest for UTC hour ${currentHourUtc}`);

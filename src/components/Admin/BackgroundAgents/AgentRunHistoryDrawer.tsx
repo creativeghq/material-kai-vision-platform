@@ -9,6 +9,7 @@ import { listRuns, cancelRun, formatDuration, statusColor } from '@/services/bac
 import type { BackgroundAgent, AgentRun } from '@/services/backgroundAgents';
 import { AgentLogsViewer } from './AgentLogsViewer';
 import { JobResearchSavedJobsPanel } from './JobResearchSavedJobsPanel';
+import { TechRadarFindingsPanel } from './TechRadarFindingsPanel';
 
 interface AgentRunHistoryDrawerProps {
   agent:   BackgroundAgent | null;
@@ -56,6 +57,13 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
         {agent?.agent_type === 'job-research' && (agent.config?.tracked_job_id as string | undefined) && (
           <div className="mb-6 pb-4 border-b">
             <JobResearchSavedJobsPanel trackedJobId={agent.config.tracked_job_id as string} />
+          </div>
+        )}
+
+        {/* tech-radar agents get their accumulated findings inline above the run history */}
+        {agent?.agent_type === 'tech-radar' && (agent.config?.subject_id as string | undefined) && (
+          <div className="mb-6 pb-4 border-b">
+            <TechRadarFindingsPanel subjectId={agent.config.subject_id as string} />
           </div>
         )}
 

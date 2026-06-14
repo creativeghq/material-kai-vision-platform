@@ -31,10 +31,7 @@ Deno.serve(withApiLogging('job-research-cron', async (req) => {
       });
     }
 
-    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL');
-    if (!pythonBackendUrl) {
-      throw new Error('PYTHON_BACKEND_URL environment variable not set');
-    }
+    const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
 
     const response = await fetch(
       `${pythonBackendUrl}/api/v1/job-research/cron-refresh?limit=50`,
