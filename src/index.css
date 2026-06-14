@@ -562,9 +562,20 @@ All colors MUST be HSL.
      blue→red brand gradient only in the 1px border area. Preserves
      border-radius and never touches the card's own background, blur or
      hover state. Add `.gradient-border` to any other box to opt it in. */
-  .gradient-border { position: relative; }
+  /* The opt-in classes PLUS any bordered, rounded *container* box that isn't
+     already covered. Scoped to block-level containers with the exact `border`
+     utility + a large rounded corner; excludes form controls (not in the
+     element list) and Tailwind-positioned floating elements (absolute/fixed/
+     sticky) so dropdowns, popovers and tooltips are untouched. */
+  .gradient-border,
+  .section-container,
+  :is(div, section, article, aside, li):where([class~="border"]):where([class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"]):not(.dashboard-card):not(.gradient-border):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]) {
+    position: relative;
+  }
   .dashboard-card::before,
-  .gradient-border::before {
+  .gradient-border::before,
+  .section-container::before,
+  :is(div, section, article, aside, li):where([class~="border"]):where([class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"]):not(.dashboard-card):not(.gradient-border):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"])::before {
     content: "";
     position: absolute;
     inset: 0;
