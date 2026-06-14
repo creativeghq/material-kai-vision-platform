@@ -110,7 +110,7 @@ export default function PublicMoodBoardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <div className="relative h-64 md:h-80 bg-gradient-to-br from-primary/80 via-primary/60 to-primary/40 overflow-hidden">
+      <div className="relative h-64 md:h-80 overflow-hidden" style={{ background: 'var(--brand-gradient)' }}>
         {/* Try first material thumbnail as hero */}
         {materialItems[0]?.material?.thumbnail_url && (
           <img

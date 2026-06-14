@@ -169,8 +169,15 @@ All colors MUST be HSL.
     --popover-foreground: 0 0% 92%;  /* Light text */
 
     /* Primary - Deep Plum brightened for dark bg */
-    --primary: 330 50% 35%;  /* Brightened plum */
+    --primary: 216 53% 47%;  /* Brightened plum */
     --primary-foreground: 0 0% 100%;  /* White text on red */
+
+    /* Brand gradient (blue → red) — drives primary fills (buttons, active
+       tabs/nav, badges) and the hero banners. Solid --brand-blue below is
+       also the new --primary, so text/border/ring/icons read blue not plum. */
+    --brand-blue: 216 53% 47%;   /* #386BB7 */
+    --brand-red: 1 72% 59%;      /* #E24C4A */
+    --brand-gradient: linear-gradient(262deg, #386BB7 0%, #E24C4A 100%);
 
     /* Secondary - Dark gray surfaces */
     --secondary: 0 0% 14%;  /* #242424 - Dark surface */
@@ -196,14 +203,14 @@ All colors MUST be HSL.
     /* Borders - Subtle white borders */
     --border: 0 0% 16%;  /* #292929 - Subtle border */
     --input: 0 0% 16%;  /* #292929 - Input border */
-    --ring: 330 50% 35%;  /* Focus ring (primary plum) */
+    --ring: 216 53% 47%;  /* Focus ring (primary plum) */
 
     --radius: 0.5rem;  /* 8px */
 
     /* Sidebar/TopNav - Dark theme */
     --sidebar-background: 0 0% 9%;  /* Slightly lighter than bg */
     --sidebar-foreground: 0 0% 60%;  /* Medium gray text */
-    --sidebar-accent: 330 50% 35%;  /* Primary plum for active items */
+    --sidebar-accent: 216 53% 47%;  /* Primary plum for active items */
     --sidebar-accent-foreground: 0 0% 100%;  /* White text on plum */
     --sidebar-border: 0 0% 16%;  /* Subtle border */
 
@@ -325,7 +332,7 @@ All colors MUST be HSL.
     --popover-foreground: 0 0% 14%;
 
     /* Primary — plum, slightly deepened so white text stays AA on light */
-    --primary: 330 52% 40%;
+    --primary: 216 53% 47%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — muted warm grey surface, clearly deeper than cards */
@@ -352,12 +359,12 @@ All colors MUST be HSL.
     /* Borders / inputs — gentle warm grey lines, visible against cards */
     --border: 72 11% 82%;
     --input: 72 11% 83%;
-    --ring: 330 52% 40%;
+    --ring: 216 53% 47%;
 
     /* Sidebar / TopNav — clean card-toned bar with grey text, plum active */
     --sidebar-background: 72 26% 97%;
     --sidebar-foreground: 0 0% 40%;
-    --sidebar-accent: 330 52% 40%;
+    --sidebar-accent: 216 53% 47%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 72 11% 82%;
 
@@ -1068,3 +1075,19 @@ html.light .stat-bubble {
 }
 html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+/* ============================================================
+   BRAND GRADIENT ON PRIMARY FILLS — global
+   ------------------------------------------------------------
+   Every solid `bg-primary` fill (primary buttons, active tabs,
+   active top-nav items, default badges, agent message bubble, …)
+   renders the blue→red brand gradient instead of a flat plum.
+   --primary itself is now blue, so non-fill uses (text-primary,
+   border-primary, focus ring, icons) read blue — no more pink.
+   Un-layered so it beats Tailwind's utilities layer.
+   ============================================================ */
+.bg-primary,
+.hover\:bg-primary:hover,
+.data-\[state\=active\]\:bg-primary[data-state="active"] {
+  background-image: var(--brand-gradient) !important;
+}

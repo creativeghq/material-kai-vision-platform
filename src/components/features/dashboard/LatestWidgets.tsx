@@ -331,7 +331,7 @@ function FactoryDetailModal({
           {/* Banner */}
           <div
             className="h-24 sm:h-32 relative overflow-hidden shrink-0"
-            style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+            style={{ background: 'var(--brand-gradient)' }}
           >
             <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
             <div className="absolute top-3 right-3">
@@ -349,7 +349,7 @@ function FactoryDetailModal({
             <div className="flex items-start gap-4">
               <div
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-8 sm:-mt-10"
-                style={{ background: 'linear-gradient(135deg, hsl(330,43%,22%) 0%, hsl(280,35%,38%) 100%)' }}
+                style={{ background: 'var(--brand-gradient)' }}
               >
                 <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
               </div>

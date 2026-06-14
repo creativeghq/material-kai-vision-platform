@@ -327,7 +327,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       {/* Hero */}
       <section
         className="relative overflow-hidden py-20 px-4 text-center"
-        style={{ background: 'linear-gradient(135deg, hsl(330, 43%, 13%) 0%, hsl(315, 38%, 22%) 50%, hsl(290, 28%, 32%) 100%)' }}
+        style={{ background: 'var(--brand-gradient)' }}
       >
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-25" style={{ background: 'radial-gradient(circle, hsl(320,55%,55%) 0%, transparent 70%)' }} />

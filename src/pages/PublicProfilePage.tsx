@@ -376,7 +376,7 @@ export const PublicProfilePage: React.FC = () => {
       {/* ── Gradient banner ──────────────────────────────────────────────────── */}
       <div
         className="h-28 sm:h-36 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, hsl(330,43%,18%) 0%, hsl(280,35%,38%) 50%, hsl(260,50%,60%) 100%)' }}
+        style={{ background: 'var(--brand-gradient)' }}
       >
         <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />

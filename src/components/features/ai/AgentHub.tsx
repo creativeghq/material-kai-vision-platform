@@ -3535,7 +3535,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
-                        : 'bg-[#3E192A] text-white shadow-sm'
+                        : 'bg-primary text-white shadow-sm'
                     }`}
                   >
                     {message.demoData ? (

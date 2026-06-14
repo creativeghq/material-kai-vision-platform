@@ -325,7 +325,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/60 to-primary/40" />
+          <div className="absolute inset-0" style={{ background: 'var(--brand-gradient)' }} />
         )}
 
         {/* Dark gradient overlay */}

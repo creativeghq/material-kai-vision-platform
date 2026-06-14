@@ -231,7 +231,7 @@ export const PipelineStrategyMetricsPanel: React.FC = () => {
                       contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
                       labelStyle={{ color: '#fff' }}
                     />
-                    <Bar dataKey="count" fill="hsl(330 50% 55%)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="#386BB7" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
