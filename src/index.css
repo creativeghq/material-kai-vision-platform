@@ -332,9 +332,10 @@ All colors MUST be HSL.
     --primary: 220 10% 12%;          /* #1B1D20 */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — muted warm-graphite surface, clearly deeper than cards */
-    --secondary: 75 11% 88%;
-    --secondary-foreground: 220 8% 22%;
+    /* Secondary — muted sage #809284 (the brand's secondary colour).
+       Dark forest-ink text keeps AA contrast on the mid-tone fill. */
+    --secondary: 133 8% 54%;
+    --secondary-foreground: 150 22% 12%;
 
     /* Muted */
     --muted: 75 11% 89%;
@@ -568,9 +569,11 @@ All colors MUST be HSL.
     box-shadow: var(--glass-shadow);
   }
 
+  /* No hover "float": cards keep their resting elevation on hover — no lift,
+     no shadow jump (user preference). Resting shadow stays so they're not flat. */
   .dashboard-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-premium);
+    transform: none;
+    box-shadow: var(--glass-shadow);
     border-color: var(--glass-border);
   }
 
@@ -1116,3 +1119,22 @@ html.light .stat-bubble {
 }
 html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+/* ============================================================
+   NO HOVER "FLOAT" — global (user preference 2026-06-14)
+   ------------------------------------------------------------
+   Cards, grids and list items must NOT lift, zoom, or cast a new
+   shadow on hover. These un-layered rules win over Tailwind's
+   utilities layer (so `hover:shadow-md`, `hover:-translate-y-*`,
+   `hover:scale-*` on any card are cancelled) without touching:
+     • <button>            — intentional hover lift/shadow kept
+     • <img>               — group-hover image zoom inside cards kept
+   Resting shadows are untouched; only the on-hover CHANGE is removed.
+   ============================================================ */
+.dashboard-card:hover {
+  transform: none !important;
+  box-shadow: var(--glass-shadow) !important;   /* resting elevation, no jump */
+}
+[class*="hover:shadow"]:hover:not(button):not(.dashboard-card) { box-shadow: none !important; }
+[class*="hover:-translate-y"]:hover:not(button) { transform: none !important; }
+[class*="hover:scale"]:hover:not(button):not(img) { transform: none !important; }
