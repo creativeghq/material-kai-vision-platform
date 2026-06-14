@@ -1177,8 +1177,8 @@ The `messaging` module switched from **Twilio (SMS + WhatsApp)** to **Zernio Wha
 
 ## Design System Summary
 Full reference: `.claude/design-system.md`
-- **Theme**: Dark mode. **Background**: near black (`--background: 0 0% 7%`). **Foreground**: light (`--foreground: 0 0% 92%`).
-- **Primary**: brightened plum (`--primary: 330 50% 35%`). **Accent**: dark warm (`--accent: 22 60% 18%`).
+- **Theme**: Default is **LIGHT — "Graphite + Lime"** (2026-06-14). Light page is warm graphite off-white (`--background: 75 14% 92%`, cards `75 24% 97%`), ink `--primary` (`220 10% 12%` → black pills), electric-lime accent/focus (`--ring: 80 72% 44%`). Dark mode (near-black `0 0% 7%`, light text, plum primary) remains fully maintained as a toggle. Light tokens live in the `html.light` block, dark in `:root` — both in `src/index.css`. `.dashboard-card` carries a real resting shadow (`--glass-shadow`) and lifts on hover — the system is elevated, not flat.
+- **Primary**: light = ink (`220 10% 12%`); dark = brightened plum (`330 50% 35%`). **Accent**: light = pale-lime tint + lime focus ring; dark = warm (`22 60% 18%`).
 - **Navigation**: Horizontal top nav bar (h-14), not sidebar. Logo left, nav center, profile right. Admin accessed via `/admin` page boxes.
 - **Font**: Open Sans. `font-bold` → 300, `font-semibold/medium` → 400 globally. Headings are light weight by design.
 - **Glass cards**: `.dashboard-card` class (rgba white 0.05 + blur 12px on dark). Never recreate inline.
