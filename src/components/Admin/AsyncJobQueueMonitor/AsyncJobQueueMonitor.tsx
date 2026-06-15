@@ -3728,7 +3728,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           // Stage 2 - Chunking & Text Embeddings
                           if (stage === 'chunks_created') return { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400', icon: '📝' };
                           if (stage === 'text_embeddings_generated') return { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-400', icon: '🧠' };
-                          // Stage 3 - Images & CLIP Embeddings
+                          // Stage 3 - Images & SLIG Embeddings
                           if (stage === 'images_extracted') return { bg: 'bg-pink-500/10', border: 'border-pink-500/20', text: 'text-pink-400', icon: '🖼️' };
                           if (stage === 'image_embeddings_generated') return { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: '🎨' };
                           // Stage 4 - Product Creation
@@ -3871,7 +3871,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   { label: 'Chunks', value: meta.chunks_created || 0 },
                                 ],
                               };
-                            // Stage 3: Images & CLIP
+                            // Stage 3: Images & SLIG
                             case 'images_extracted':
                               return {
                                 title: `Images Extracted - ${data.product_name || 'Product'}`,
@@ -3885,11 +3885,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               };
                             case 'image_embeddings_generated':
                               return {
-                                title: `CLIP Embeddings Generated - ${data.product_name || 'Product'}`,
+                                title: `SLIG Embeddings Generated - ${data.product_name || 'Product'}`,
                                 details: [
                                   { label: 'Product', value: data.product_name || 'N/A' },
                                   { label: 'Product #', value: data.product_index },
-                                  { label: 'CLIP Embeddings', value: data.clip_embeddings_generated },
+                                  { label: 'SLIG Embeddings', value: data.clip_embeddings_generated },
                                   { label: 'Images', value: meta.images_processed || 0 },
                                 ],
                               };

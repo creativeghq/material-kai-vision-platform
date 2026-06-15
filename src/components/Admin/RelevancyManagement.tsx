@@ -747,7 +747,7 @@ export const RelevancyManagement: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex justify-between mb-1">
-                        <span>CLIP Score</span>
+                        <span>SLIG (SigLIP2) Score</span>
                         <span className="font-medium">{(selectedRel.clip_score * 100).toFixed(1)}%</span>
                       </div>
                       <Progress value={selectedRel.clip_score * 100} />

@@ -75,7 +75,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'visual_search', name: 'Visual Search', category: 'Search',
-    desc: 'Find similar materials from an attached image (CLIP/SigLIP). Requires an image attached to the message.',
+    desc: 'Find similar materials from an attached image (SLIG (SigLIP2)). Requires an image attached to the message.',
     imageRequired: true,
     examples: [
       'Find materials similar to this image',

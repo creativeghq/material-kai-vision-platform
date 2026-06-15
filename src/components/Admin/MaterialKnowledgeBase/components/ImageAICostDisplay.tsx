@@ -88,7 +88,7 @@ export const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) =
         {aiCost.clip > 0 && (
           <div className="flex justify-between">
             <span className="text-green-700 dark:text-green-300">
-              CLIP Embedding:
+              SLIG Embedding:
             </span>
             <span className="font-medium text-green-900 dark:text-green-100">
               ${aiCost.clip.toFixed(4)}
