@@ -128,7 +128,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
       if (imageData?.has_slig_embedding) {
         embeddings.push({
           embedding_type: 'Visual (SLIG)',
-          model_name: 'SigLIP2-SO400M',
+          model_name: 'SigLIP2-base-patch16-512',
           vector_dimensions: 768,
         });
       }

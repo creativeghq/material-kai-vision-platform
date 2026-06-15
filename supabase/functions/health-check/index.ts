@@ -6,7 +6,7 @@
  * AI providers (key validity):
  *   - Claude:      GET /v1/models          — no tokens consumed
  *   - OpenAI:      GET /v1/models          — no tokens consumed
- *   - HuggingFace: GET /api/whoami-v2      — verifies token + account name
+ *   - SLIG (Modal): GET /health            — SigLIP2 visual embeddings endpoint
  *   - Voyage AI:   POST /v1/embeddings     — minimal single-word embedding
  *
  * Python backend services:
@@ -25,7 +25,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
-const HUGGINGFACE_API_KEY = () => Deno.env.get('HUGGINGFACE_API_KEY') || '';
+const SLIG_MODAL_URL = () => Deno.env.get('SLIG_MODAL_URL') || 'https://basilakis--slig-sligservice-web.modal.run';
 const VOYAGE_API_KEY = () => Deno.env.get('VOYAGE_API_KEY') || '';
 const MIVAA_GATEWAY_URL   = Deno.env.get('MIVAA_GATEWAY_URL')   || 'https://v1api.materialshub.gr';
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')        || '';
@@ -78,19 +78,19 @@ async function checkOpenAI(): Promise<ServiceResult> {
   }
 }
 
-async function checkHuggingFace(): Promise<ServiceResult> {
-  if (!HUGGINGFACE_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
+async function checkSlig(): Promise<ServiceResult> {
+  // SLIG (SigLIP2) visual embeddings moved off HuggingFace to Modal 2026-06-14.
+  // Probe the unauthenticated GET /health; a 303 means the scale-to-zero
+  // container is cold-starting (still healthy, just waking up).
   const start = Date.now();
   try {
-    const res = await fetch('https://huggingface.co/api/whoami-v2', {
-      headers: { 'Authorization': `Bearer ${HUGGINGFACE_API_KEY()}` },
+    const res = await fetch(`${SLIG_MODAL_URL().replace(/\/$/, '')}/health`, {
+      redirect: 'manual',
       signal: AbortSignal.timeout(8000),
     });
     const latency_ms = Date.now() - start;
-    if (res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return { status: 'healthy', latency_ms, message: body?.name ? `Authenticated as ${body.name}` : 'Token valid' };
-    }
+    if (res.ok) return { status: 'healthy', latency_ms, message: 'SLIG on Modal (siglip2-base-512, 768D)' };
+    if (res.status === 303 || res.status === 0) return { status: 'healthy', latency_ms, message: 'SLIG cold-starting (Modal)' };
     return { status: 'unhealthy', latency_ms, error: `HTTP ${res.status}` };
   } catch (e) {
     return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
@@ -215,13 +215,13 @@ serve(withApiLogging('health-check', async (req) => {
   const externalChecks = activeServices.map(svc => checkExternalService(svc.url));
 
   const [
-    claude, openai, huggingface, voyage_ai,
+    claude, openai, slig, voyage_ai,
     embeddings, ai_services,
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
     checkOpenAI(),
-    checkHuggingFace(),
+    checkSlig(),
     checkVoyageAI(),
     checkPythonEndpoint('/api/embeddings/health'),
     checkPythonEndpoint('/api/v1/ai-services/health'),
@@ -236,7 +236,7 @@ serve(withApiLogging('health-check', async (req) => {
   }));
 
   return new Response(JSON.stringify({
-    claude, openai, huggingface, voyage_ai,
+    claude, openai, slig, voyage_ai,
     embeddings, ai_services,
     external,
     timestamp: new Date().toISOString(),

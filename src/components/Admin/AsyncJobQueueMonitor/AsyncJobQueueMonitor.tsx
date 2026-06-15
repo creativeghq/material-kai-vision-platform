@@ -3751,7 +3751,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           switch(cp.stage) {
                             case 'warmup_started':
                               return {
-                                title: 'HuggingFace Endpoint Warm-up Started',
+                                title: 'Endpoint Warm-up Started',
                                 details: [
                                   { label: 'Endpoints', value: data.endpoints_to_warmup?.join(', ') || 'N/A' },
                                   { label: 'Total', value: data.total_endpoints },
@@ -4170,9 +4170,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   'claude-haiku': { input: 0.80, output: 4.00, type: 'token' },
                   'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
                   'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
-                  // HuggingFace Endpoints (per GPU hour). 'qwen-vision' removed
+                  // Modal GPU endpoints (per GPU hour). 'qwen-vision' removed
                   // 2026-05-01 — vision discovery is on Claude Opus 4.7 (token-priced).
-                  'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings' },
+                  'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings (Modal)' },
                   'paddleocr': { gpuHourly: 0.80, type: 'gpu', description: 'PaddleOCR-VL Structural Pass (layout + OCR + figure boxes)' },
                   // Free/bundled models
                   'clip': { perImage: 0.0, type: 'free', description: 'OpenAI CLIP (open-source)' },

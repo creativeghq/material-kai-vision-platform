@@ -88,7 +88,7 @@ interface HealthStatus {
     ai_services?: AIServiceHealth;
     claude?: AIServiceHealth;
     chatgpt?: AIServiceHealth;
-    huggingface?: AIServiceHealth;
+    slig?: AIServiceHealth;
     voyage_ai?: AIServiceHealth;
     supabase?: AIServiceHealth;
     vercel?: AIServiceHealth;
@@ -156,7 +156,7 @@ export const SystemHealthMonitor: React.FC = () => {
       // Extract results from edge function
       const claudeResult      = edgeResults?.claude      ?? null;
       const openaiResult      = edgeResults?.openai      ?? null;
-      const hfResult          = edgeResults?.huggingface ?? null;
+      const hfResult          = edgeResults?.slig ?? null;
       const voyageResult      = edgeResults?.voyage_ai   ?? null;
       const embeddingsResult  = edgeResults?.embeddings  ?? null;
       const aiServicesResult  = edgeResults?.ai_services ?? null;
@@ -197,7 +197,7 @@ export const SystemHealthMonitor: React.FC = () => {
         chatgpt: openaiResult
           ? { status: openaiResult.status, latency_ms: openaiResult.latency_ms, message: openaiResult.message, error: openaiResult.error }
           : { status: 'unhealthy', error: 'Check unavailable' },
-        huggingface: hfResult
+        slig: hfResult
           ? { status: hfResult.status, latency_ms: hfResult.latency_ms, message: hfResult.message, error: hfResult.error }
           : { status: 'unhealthy', error: 'Check unavailable' },
         voyage_ai: voyageResult
@@ -597,30 +597,28 @@ export const SystemHealthMonitor: React.FC = () => {
                 </div>
               </div>
 
-              {/* Hugging Face — real token check */}
+              {/* SLIG (SigLIP2 visual embeddings) — Modal /health probe */}
               <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🤗</span>
-                    <span className="text-sm font-medium text-yellow-900">Hugging Face</span>
+                    <span className="text-lg">🎨</span>
+                    <span className="text-sm font-medium text-yellow-900">SLIG (Modal)</span>
                   </div>
-                  {health.ai_services.huggingface?.status === 'healthy' ? (
+                  {health.ai_services.slig?.status === 'healthy' ? (
                     <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
-                  ) : health.ai_services.huggingface?.error === 'API key not configured' ? (
-                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
                     <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-yellow-700">
-                  {health.ai_services.huggingface?.latency_ms != null && (
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.huggingface.latency_ms}ms</span>
+                  {health.ai_services.slig?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.slig.latency_ms}ms</span>
                   )}
-                  {health.ai_services.huggingface?.message && health.ai_services.huggingface.status === 'healthy' && (
-                    <span className="truncate">{health.ai_services.huggingface.message}</span>
+                  {health.ai_services.slig?.message && health.ai_services.slig.status === 'healthy' && (
+                    <span className="truncate">{health.ai_services.slig.message}</span>
                   )}
-                  {health.ai_services.huggingface?.error && health.ai_services.huggingface.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.huggingface.error}>{health.ai_services.huggingface.error}</span>
+                  {health.ai_services.slig?.error && health.ai_services.slig.error !== 'API key not configured' && (
+                    <span className="text-red-600 truncate" title={health.ai_services.slig.error}>{health.ai_services.slig.error}</span>
                   )}
                 </div>
               </div>

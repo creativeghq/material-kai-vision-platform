@@ -32,8 +32,8 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   // Qwen models removed 2026-05-01 — image classification + vision analysis
   // both run on Claude Opus 4.7 now (already listed under Anthropic above).
 
-  // Vision/Embedding Models (SLIG Cloud Endpoint)
-  { id: 'slig-768d', name: 'SLIG 768D', provider: 'huggingface' as any, model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Vision/Embedding Models (SLIG on Modal — siglip2-base-patch16-512, 768D)
+  { id: 'slig-768d', name: 'SLIG 768D', provider: 'modal' as any, model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
 ];
 
 export const EXT_SERVICE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
