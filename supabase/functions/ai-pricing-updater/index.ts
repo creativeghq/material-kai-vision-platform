@@ -46,14 +46,6 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
       'voyage-4': { input: 0.06, output: 0.00 },
     },
   },
-  qwen: {
-    // Qwen on HuggingFace Inference Endpoints (time-based billing)
-    // Note: These are estimated token-equivalent costs for comparison
-    fallback_prices: {
-      'qwen3-vl-32b': { input: 0.40, output: 0.40 },
-      'qwen2.5-vl-72b': { input: 0.40, output: 0.40 },
-    },
-  },
   google: {
     // Google AI pricing
     // https://ai.google.dev/gemini-api/docs/pricing

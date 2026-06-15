@@ -341,7 +341,7 @@ export function validateEmbedding(embedding: number[]): boolean {
 }
 
 /**
- * Generate semantic analysis for images using MIVAA Qwen Vision
+ * Generate semantic analysis for images using MIVAA (Claude Vision)
  *
  * @param imageData - Base64 image data or image URL
  * @param analysisType - Type of analysis to perform

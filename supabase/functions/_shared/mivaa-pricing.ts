@@ -27,7 +27,7 @@ export const MIVAA_ACTION_PRICING: Record<string, MivaaRoutePricing> = {
 
   // --- Visual/Image Search (1 credit) ---
   'images_search': { creditCost: 1, operationType: 'visual_search', description: 'Image-based visual search' },
-  'images_analyze': { creditCost: 1, operationType: 'image_analysis', description: 'Image analysis (Qwen3-VL)' },
+  'images_analyze': { creditCost: 1, operationType: 'image_analysis', description: 'Image analysis (Claude Vision)' },
   'images_upload_analyze': { creditCost: 1, operationType: 'image_upload_analyze', description: 'Upload and analyze image' },
 };
 

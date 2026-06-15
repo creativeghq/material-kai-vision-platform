@@ -109,7 +109,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
             <Textarea
               value={currentApproach}
               onChange={(e) => setCurrentApproach(e.target.value)}
-              placeholder="Chandra v2 OCR with retry-jitter at temps 0.0/0.4/0.8; no Tesseract; bbox normalized 0..1; per-attempt metrics in chandra_ocr_metrics."
+              placeholder="PaddleOCR-VL structural pass on Modal (PP-DocLayoutV2 detector + 0.9B VLM); layout regions + OCR text + figure boxes per page; bbox normalized 0..1; metrics in paddleocr_metrics."
               rows={4}
             />
           </div>

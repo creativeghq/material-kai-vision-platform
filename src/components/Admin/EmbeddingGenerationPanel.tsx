@@ -337,12 +337,13 @@ const EmbeddingGenerationPanel: React.FC = () => {
             <Card className="border-solid border-2 border-blue-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">HuggingFace</h3>
+                  <h3 className="font-semibold">SLIG (Modal)</h3>
                   <Badge className="bg-blue-100 text-blue-800">768D</Badge>
                 </div>
                 <p className="text-2xl font-bold text-blue-600">
                   {embeddingStats.find((stat) =>
-                    stat.model_name?.includes('huggingface'),
+                    stat.model_name?.toLowerCase().includes('siglip') ||
+                    stat.model_name?.toLowerCase().includes('slig'),
                   )?.count || 0}
                 </p>
                 <p className="text-sm text-blue-600">Active & Integrated</p>
