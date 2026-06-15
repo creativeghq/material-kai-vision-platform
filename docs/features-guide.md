@@ -383,7 +383,7 @@ Complete reference of all platform features and capabilities.
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
 - Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed). (Qwen3-VL HF endpoint retired 2026-05-01; vision analysis is now Anthropic-only via Claude Opus 4.7 tool use.)
-- SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
+- SLIG SigLIP2 via Modal Endpoint (5 visual embedding types, 768D each; moved off HuggingFace 2026-06-14)
 - Replicate (14 interior design generation models)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
 - Supabase (Database, auth, storage, edge functions)

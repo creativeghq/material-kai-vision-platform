@@ -431,7 +431,7 @@
         ],
         "summary": "Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs",
         "operationId": "post_auto_recovery_cron",
-        "description": "Scans background_jobs, scraping_sessions, and agent_runs for heartbeat-stale entries. Atomically claims each and re-dispatches to MIVAA or background-agent-runner. Terminally-failed exhausted PDF jobs are marked failed and HuggingFace endpoints are scaled to zero as a cost watchdog.\n\n**Response:** `{ success, totalStuck, exhausted_failed, recovered, failed, results }`",
+        "description": "Scans background_jobs, scraping_sessions, and agent_runs for heartbeat-stale entries. Atomically claims each and re-dispatches to MIVAA or background-agent-runner. Terminally-failed exhausted PDF jobs are marked failed. (The GPU endpoints — SLIG and PaddleOCR-VL — now run on Modal with native scale-to-zero; the old HuggingFace scale-to-zero watchdog was removed.)\n\n**Response:** `{ success, totalStuck, exhausted_failed, recovered, failed, results }`",
         "security": [
           {
             "cronSecret": []

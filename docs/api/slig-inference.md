@@ -2,14 +2,16 @@
 
 ## Endpoint
 
+SLIG runs on **Modal** (moved off HuggingFace 2026-06-14):
+
 ```
-POST https://<your-endpoint>.endpoints.huggingface.cloud
+POST https://basilakis--slig-sligservice-web.modal.run/infer
 ```
 
 ## Authentication
 
 ```
-Authorization: Bearer <HF_TOKEN>
+Authorization: Bearer <SLIG_MODAL_API_KEY>
 Content-Type: application/json
 ```
 
@@ -352,8 +354,8 @@ Recommendation: Always explicitly set `mode` for predictable behavior.
 ### Example 1: Classify Product Image
 
 ```bash
-curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
-  -H "Authorization: Bearer hf_xxxxx" \
+curl -X POST "https://basilakis--slig-sligservice-web.modal.run/infer" \
+  -H "Authorization: Bearer $SLIG_MODAL_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": "https://catalog.example.com/products/tile-001.jpg",
@@ -377,8 +379,8 @@ curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
 ### Example 2: Build Product Search Index
 
 ```bash
-curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
-  -H "Authorization: Bearer hf_xxxxx" \
+curl -X POST "https://basilakis--slig-sligservice-web.modal.run/infer" \
+  -H "Authorization: Bearer $SLIG_MODAL_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": [
@@ -395,8 +397,8 @@ curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
 ### Example 3: Embed Product Descriptions
 
 ```bash
-curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
-  -H "Authorization: Bearer hf_xxxxx" \
+curl -X POST "https://basilakis--slig-sligservice-web.modal.run/infer" \
+  -H "Authorization: Bearer $SLIG_MODAL_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": [
@@ -414,8 +416,8 @@ curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
 ### Example 4: Match Image to Descriptions
 
 ```bash
-curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
-  -H "Authorization: Bearer hf_xxxxx" \
+curl -X POST "https://basilakis--slig-sligservice-web.modal.run/infer" \
+  -H "Authorization: Bearer $SLIG_MODAL_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": {
@@ -439,8 +441,8 @@ curl -X POST "https://your-endpoint.endpoints.huggingface.cloud" \
 import requests
 import base64
 
-API_URL = "https://your-endpoint.endpoints.huggingface.cloud"
-HEADERS = {"Authorization": "Bearer hf_xxxxx"}
+API_URL = "https://basilakis--slig-sligservice-web.modal.run/infer"
+HEADERS = {"Authorization": "Bearer <SLIG_MODAL_API_KEY>"}
 
 # Zero-shot classification
 def classify_product(image_url: str, labels: list[str]) -> list[dict]:

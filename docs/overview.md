@@ -153,7 +153,7 @@ Real-time updates → Frontend displays results
 - **Dimensions**: 768 (halfvec in VECS)
 - **Use Cases**: Visual, color, texture, style, and material embeddings — 5 specialized 768D vectors per image
 - **Performance**: Superior quality vs CLIP 512D; text-guided specialized vectors via similarity mode
-- **Cost**: HuggingFace Inference Endpoint (auto-pause enabled)
+- **Cost**: Modal endpoint (scale-to-zero → $0 idle; moved off HuggingFace 2026-06-14)
 - **Pipeline Stages**: Image Embedding Generation (Stage 7)
 
 #### 5. Replicate Models
@@ -166,7 +166,7 @@ Real-time updates → Frontend displays results
 The platform generates **7 types of embeddings** stored as `halfvec` (float16, 50% storage savings):
 
 1. **Text Embeddings** (1024D) - Voyage AI voyage-4 (primary)
-2. **Visual Embeddings** (768D) - SigLIP2 via HuggingFace Endpoint
+2. **Visual Embeddings** (768D) - SigLIP2 via SLIG Modal Endpoint
 3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search). Provenance (`embedding_model`, `schema_version`) persisted per row.
 4. **Color Embeddings** (1024D) - Voyage AI from `VisionAnalysis.colors[]` (v2, post-2026-05-04; legacy was 768D SigLIP2)
 5. **Texture Embeddings** (1024D) - Voyage AI from `VisionAnalysis.textures[] + finish` (v2)

@@ -68,7 +68,7 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 **Core Tools** (all roles: viewer, member, admin, owner):
 - `material_search` — RAG-powered semantic search via MIVAA API
 - `knowledge_base_search` — Direct knowledge base retrieval
-- `visual_search` — Image-based product search via CLIP/SigLIP (sends `image_base64` to MIVAA `/api/rag/search?strategy=image`)
+- `visual_search` — Image-based product search via SigLIP2 (SLIG) (sends `image_base64` to MIVAA `/api/rag/search?strategy=image`)
 
 **Admin/Owner-Only Tools** (gated by RBAC):
 - `b2b_manufacturer_search` — Find manufacturers via Claude built-in web search (`web_search_20250305`, no extra key)

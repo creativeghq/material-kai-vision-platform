@@ -100,7 +100,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Anthropic | Claude Sonnet 4.6 | Semantic chunking (PRIMARY chunker; was Qwen pre-2026-05-01, but Qwen had been silently 404-ing for months — migration made architecture honest) | Anthropic API |
 | Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
 | Modal | PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) | Layout + OCR backbone (sole engine post-2026-06-13) — two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), run as Stage 1 before discovery. Per-attempt metrics in `paddleocr_metrics`. Failure marker: `OCRResult.method='paddleocr_failed'`; `ocr_engine='paddleocr'`. Replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). | Modal endpoint (GPU L4, scale-to-zero) |
-| HuggingFace | SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Cloud endpoint (only model on HF) |
+| Modal | SLIG SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Modal endpoint (scale-to-zero; moved off HuggingFace 2026-06-14) |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
 | Replicate | proplabs/virtual-staging | AI room staging from empty photos | 20 credits/run |
@@ -646,8 +646,8 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- HuggingFace Endpoints: Pay-per-use for SigLIP2 (768D visual embeddings) — the only model now hosted on HF. Qwen3-VL HF endpoint retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
-- Modal: PaddleOCR-VL layout + OCR backbone (GPU L4, scale-to-zero → $0 idle, `max_containers=4`). Replaced the Surya-2 HF backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
+- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. Qwen3-VL vision retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
+- Modal (PaddleOCR-VL): layout + OCR backbone (GPU L4, scale-to-zero → $0 idle, `max_containers=4`). Replaced the Surya-2 backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
 ---

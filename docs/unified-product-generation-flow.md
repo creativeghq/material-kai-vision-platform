@@ -46,9 +46,9 @@ All three methods converge into a shared storage and search layer. Each method f
 
 **METHOD 1 (PDF Processing)**: PDF Upload → PyMuPDF4LLM text extraction → `ProductDiscoveryService.discover_products()` → Products with metadata → `ChunkingService.create_chunks_and_embeddings()` → Text Embeddings (Voyage AI 1024D) and Image Extraction → SLIG visual 768D + Voyage 1024D aspect embeddings (color/texture/style/material, v2 post-2026-05-04) + Voyage understanding 1024D. (updated 2026-04)
 
-**METHOD 2 (Web Scraping)**: Firecrawl scraping → Markdown content from `scraping_pages` → `ProductDiscoveryService.discover_products_from_text()` → Products with metadata → same ChunkingService for text and CLIP pipelines.
+**METHOD 2 (Web Scraping)**: Firecrawl scraping → Markdown content from `scraping_pages` → `ProductDiscoveryService.discover_products_from_text()` → Products with metadata → same ChunkingService for text and image-embedding (SLIG/Voyage) pipelines.
 
-**METHOD 3 (XML Import)**: XML upload → Parse XML / extract products → Direct insert into products table → `_queue_text_processing()` for async chunking → Text Embeddings and image download from URLs → same CLIP pipeline.
+**METHOD 3 (XML Import)**: XML upload → Parse XML / extract products → Direct insert into products table → `_queue_text_processing()` for async chunking → Text Embeddings and image download from URLs → same image-embedding (SLIG/Voyage) pipeline.
 
 **Unified Storage (VECS Collections)**:
 - `chunks` table (text_embedding 1024D — Voyage AI)

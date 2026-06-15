@@ -108,7 +108,7 @@ MIVAA uses **3 primary relationship tables** to link entities:
    - Different page: `0.0`
 
 2. **Visual Similarity (40%)** - How visually similar is the image to the product?
-   - From AI detection (CLIP embeddings)
+   - From AI detection (SigLIP2/SLIG embeddings)
    - Default: `0.3`
 
 3. **Detection Score (20%)** - How confident is the AI that this image shows the product?

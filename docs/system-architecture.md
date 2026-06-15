@@ -25,7 +25,7 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - 115 REST API endpoints (15 categories)                   │
 │ - 9-stage PDF processing pipeline (optimized)              │
 │ - Memory-safe image processing (10-15MB constant)          │
-│ - Real-time CLIP embedding generation                      │
+│ - Real-time SigLIP2 (SLIG) embedding generation            │
 │ - RAG system (Claude Opus 4.7 + 7-Vector Direct VECS)      │
 │ - Search APIs (Multi-Vector, Semantic, Hybrid)             │
 │ - AI Services (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5,   │
