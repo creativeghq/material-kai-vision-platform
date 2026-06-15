@@ -60,10 +60,8 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
         exhaustedFailed = Number(failedCount) || 0;
         if (exhaustedFailed > 0) {
           console.log(`[AutoRecoveryCron] Terminally failed ${exhaustedFailed} exhausted PDF job(s)`);
-          // Cost watchdog: any time we terminally fail PDF jobs, ensure HF
-          // endpoints aren't left running. Idempotent — safe to call even
-          // when no other jobs are active.
-          await scaleAllHfEndpointsToZero(`fail_exhausted_pdf_jobs cleared ${exhaustedFailed} job(s)`);
+          // (No HF endpoint cost-watchdog anymore — both GPU endpoints are on
+          // Modal, which scales to zero on its own idle clock. 2026-06-14.)
         }
       }
     } catch (e) {
@@ -731,61 +729,7 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
     .update(updatePayload)
     .eq('id', job.id);
 
-  if (table === 'background_jobs' && job.type === 'pdf_processing') {
-    // P0-1 cost watchdog: when we give up on a PDF job, force-scale every HF
-    // endpoint to zero so we don't keep paying for replicas the dead worker
-    // never cleaned up.
-    await scaleAllHfEndpointsToZero(`exhausted job ${job.id}`);
-  }
-}
-
-async function scaleAllHfEndpointsToZero(reason: string): Promise<void> {
-  const hfToken = Deno.env.get('HUGGINGFACE_API_KEY') || Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-  const namespace = Deno.env.get('HF_NAMESPACE') || 'basiliskan';
-  if (!hfToken) {
-    console.warn('[AutoRecoveryCron] HF token not configured — cannot scale endpoints to zero');
-    return;
-  }
-  // Qwen endpoint retired 2026-05-01 (all vision now Claude). The PUT used to
-  // 404 silently every recovery sweep. Removed from the list.
-  const endpoints = ['mh-slig'];  // only HF endpoint; PaddleOCR is Modal (self-scaling)
-  for (const ep of endpoints) {
-    try {
-      // Read current scaling config so we preserve maxReplica
-      const getResp = await fetch(
-        `https://api.endpoints.huggingface.cloud/v2/endpoint/${namespace}/${ep}`,
-        { headers: { Authorization: `Bearer ${hfToken}` } }
-      );
-      if (!getResp.ok) {
-        console.warn(`[AutoRecoveryCron] Could not fetch ${ep}: ${getResp.status}`);
-        continue;
-      }
-      const cfg = await getResp.json();
-      const maxRep = cfg?.compute?.scaling?.maxReplica ?? 2;
-      const updResp = await fetch(
-        `https://api.endpoints.huggingface.cloud/v2/endpoint/${namespace}/${ep}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${hfToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            compute: {
-              ...cfg.compute,
-              scaling: { ...cfg.compute?.scaling, minReplica: 0, maxReplica: maxRep },
-            },
-          }),
-        }
-      );
-      if (updResp.ok) {
-        console.log(`[AutoRecoveryCron] ✅ Scaled ${ep} to 0 replicas (${reason})`);
-      } else {
-        console.warn(`[AutoRecoveryCron] ⚠️ Failed to scale ${ep}: ${updResp.status}`);
-      }
-    } catch (e) {
-      console.warn(`[AutoRecoveryCron] Failed to scale ${ep}: ${e}`);
-    }
-  }
+  // (PDF GPU endpoints — SLIG + PaddleOCR-VL — are Modal-hosted and scale to
+  // zero on Modal's idle clock, so there's no HF replica to drain on failure.)
 }
 
