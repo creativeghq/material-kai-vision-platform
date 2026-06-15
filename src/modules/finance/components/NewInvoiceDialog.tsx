@@ -429,7 +429,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const projected = buyerOutstanding + (totals.total || 0);
     const overCreditLimit = creditLimit != null && creditLimit > 0 && projected > creditLimit;
     const blocks: string[] = [];
-    if (riskRules.block_inactive && inactiveVat) blocks.push('the buyer ΑΦΜ is inactive / not recognised');
+    if (riskRules.block_inactive && inactiveVat) blocks.push('the buyer VAT number is inactive / not recognised');
     if (riskRules.block_unvalidated && unvalidatedVat) blocks.push('the buyer VAT has never been validated');
     if (riskRules.block_over && overCreditLimit) blocks.push('this invoice exceeds the buyer credit limit');
     const warns: string[] = [];
@@ -437,7 +437,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       warns.push(`Pushes the buyer to ${projected.toFixed(2)} ${currency}, over their ${creditLimit!.toFixed(2)} ${currency} credit limit.`);
     }
     if (unvalidatedVat && !riskRules.block_unvalidated) {
-      warns.push('Buyer VAT has not been validated against ΑΑΔΕ/VIES.');
+      warns.push('Buyer VAT has not been validated against AADE/VIES.');
     }
     return { inactiveVat, unvalidatedVat, overCreditLimit, creditLimit, projected, blocks, warns, hardBlocked: blocks.length > 0 };
   }, [customerAddr, buyerOutstanding, totals.total, riskRules, currency]);
@@ -912,7 +912,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Include in ΜΥΦ report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><input type="checkbox" className="h-4 w-4 rounded" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>

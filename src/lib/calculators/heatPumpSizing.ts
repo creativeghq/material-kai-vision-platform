@@ -174,7 +174,7 @@ export function computeHeatPumpSizing(input: HeatPumpSizingInput): HeatPumpSizin
   const emitter = EMITTER[input.emitter];
 
   const caveats = [
-    'This is a first-pass estimate, not a substitute for a thermal-loss study per ΕΛΟΤ ΕΝ 12831 / ΤΟΤΕΕ 20701.',
+    'This is a first-pass estimate, not a substitute for a thermal-loss study per EN 12831 / TOTEE 20701.',
     'Size close to the design load — oversizing a heat pump hurts COP and causes short-cycling.',
     input.includeDhw
       ? 'DHW is shown as a combined allowance; in practice it is usually handled by priority switching plus a cylinder, not added to peak space-heating output.'

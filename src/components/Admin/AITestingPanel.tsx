@@ -546,10 +546,10 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
       <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs defaultValue="legacy" className="w-full">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="legacy" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Legacy Tests</TabsTrigger>
-            <TabsTrigger value="multimodal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Multi-Modal Analysis</TabsTrigger>
-            <TabsTrigger value="similarity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Similarity Search</TabsTrigger>
-            <TabsTrigger value="results" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Test Results</TabsTrigger>
+            <TabsTrigger value="legacy">Legacy Tests</TabsTrigger>
+            <TabsTrigger value="multimodal">Multi-Modal Analysis</TabsTrigger>
+            <TabsTrigger value="similarity">Similarity Search</TabsTrigger>
+            <TabsTrigger value="results">Test Results</TabsTrigger>
           </TabsList>
 
           {/* Legacy Testing Tab */}

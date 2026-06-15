@@ -169,19 +169,19 @@ export const KnowledgeBaseManagement: React.FC = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between mb-6">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="documents" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="documents" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Documents
               </TabsTrigger>
-              <TabsTrigger value="search" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="search" className="flex items-center gap-2">
                 <Search className="h-4 w-4" />
                 Search
               </TabsTrigger>
-              <TabsTrigger value="categories" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="categories" className="flex items-center gap-2">
                 <FolderTree className="h-4 w-4" />
                 Categories
               </TabsTrigger>
-              <TabsTrigger value="attachments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="attachments" className="flex items-center gap-2">
                 <Link2 className="h-4 w-4" />
                 Product Links
               </TabsTrigger>

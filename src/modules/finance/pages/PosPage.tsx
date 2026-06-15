@@ -53,9 +53,11 @@ const PRINT_SIZES = { '80': '80mm', '58': '58mm' } as const;
 type PrintSize = keyof typeof PRINT_SIZES;
 
 // Document types selectable on the register (myDATA retail family).
+// `label` (Greek) is the legal name printed on the receipt; `labelEn`/`shortEn`
+// drive the English on-screen UI.
 const DOC_TYPES = {
-  '11.1': { code: 'ΑΛΠ', label: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ ΠΩΛΗΣΗΣ' },
-  '11.2': { code: 'ΑΠΥ', label: 'ΑΠΟΔΕΙΞΗ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ' },
+  '11.1': { code: '11.1', label: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ ΠΩΛΗΣΗΣ', labelEn: 'Retail receipt', shortEn: 'Receipt' },
+  '11.2': { code: '11.2', label: 'ΑΠΟΔΕΙΞΗ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ', labelEn: 'Service receipt', shortEn: 'Service' },
 } as const;
 type DocType = keyof typeof DOC_TYPES;
 const VAT_RATES = [24, 13, 6, 0];
@@ -267,7 +269,7 @@ const PosPage: React.FC = () => {
     if (!Number.isFinite(amt) || amt <= 0) return false;
     const qty = pendingQty ?? 1;
     setCart((c) => [...c, {
-      id: `manual-${Date.now()}`, name: docType === '11.2' ? 'Υπηρεσία' : 'Είδος',
+      id: `manual-${Date.now()}`, name: docType === '11.2' ? 'Service' : 'Item',
       item_type: docType === '11.2' ? 'service' : 'good', unit_price: round2(amt),
       currency, unit: null, vat_category: null, inc_type: null, inc_cat: null, qty, line_vat: vatRate,
     }]);
@@ -496,7 +498,7 @@ const PosPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader title="Point of Sale" description="Ταμειακή Online — ΑΛΠ / ΑΠΥ retail receipt → myDATA." badge="POS" />
+      <GlobalAdminHeader title="Point of Sale" description="Online register — retail / service receipt → myDATA." badge="POS" />
 
       {/* cashier shift bar (open/close, cash drawer, X/Z report) */}
       <div className="px-3 sm:px-6 pt-3">
@@ -529,12 +531,12 @@ const PosPage: React.FC = () => {
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 bg-card p-1">
           <button type="button" onClick={() => setMobilePane('register')}
             className={`flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors ${mobilePane === 'register' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-            <CreditCard className="h-4 w-4" /> Ταμείο
+            <CreditCard className="h-4 w-4" /> Register
             {cart.length > 0 && <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">{cart.length}</Badge>}
           </button>
           <button type="button" onClick={() => setMobilePane('catalog')}
             className={`flex items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors ${mobilePane === 'catalog' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-            <ShoppingBag className="h-4 w-4" /> Προϊόντα
+            <ShoppingBag className="h-4 w-4" /> Products
           </button>
         </div>
       </div>
@@ -547,7 +549,7 @@ const PosPage: React.FC = () => {
           <div className="flex items-center gap-2 bg-neutral-950/60 px-3 py-2">
             <button type="button" onClick={() => setDocTypeOpen(true)}
               className="flex flex-col items-center rounded-md bg-emerald-600 px-3 py-1 text-sm font-bold leading-tight hover:bg-emerald-500">
-              {dt.code}
+              {dt.shortEn}
             </button>
             <div className="flex items-center gap-2 text-neutral-400">
               <CreditCard className={`h-4 w-4 ${selectedTerminal ? 'text-emerald-400' : ''}`} />
@@ -559,13 +561,13 @@ const PosPage: React.FC = () => {
             </div>
           </div>
           <div className="bg-neutral-800 px-3 py-1 text-center text-[11px] font-semibold tracking-wide text-neutral-300">
-            {dt.label}{customer ? ` · ${customer.name}` : ''}
+            {dt.labelEn}{customer ? ` · ${customer.name}` : ''}
           </div>
 
           {/* line-items table */}
           <div className="min-h-[180px]">
             <div className="grid grid-cols-[1fr_64px_36px_48px_72px] gap-1 bg-neutral-950 px-3 py-1.5 text-[11px] font-semibold text-neutral-300">
-              <span>ΠΕΡΙΓΡΑΦΗ</span><span className="text-right">ΤΙΜΗ</span><span className="text-center">*</span><span className="text-right">ΦΠΑ%</span><span className="text-right">ΣΥΝΟΛΟ</span>
+              <span>DESCRIPTION</span><span className="text-right">PRICE</span><span className="text-center">*</span><span className="text-right">VAT%</span><span className="text-right">TOTAL</span>
             </div>
             <div className="max-h-[34vh] divide-y divide-neutral-800 overflow-auto bg-white text-neutral-900">
               {cart.length === 0 ? (
@@ -617,7 +619,7 @@ const PosPage: React.FC = () => {
             <Key onClick={keyDot}>.</Key>
             <Key onClick={keyClear} className="bg-neutral-700 text-white hover:bg-neutral-600">x</Key>
             <Key onClick={openIssue} className="bg-emerald-600 text-white hover:bg-emerald-500 text-base font-bold">
-              {issuing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'ΕΚΔΟΣΗ'}
+              {issuing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'ISSUE'}
             </Key>
           </div>
         </div>
@@ -627,13 +629,13 @@ const PosPage: React.FC = () => {
           <CardContent className="space-y-3 p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Αναζήτηση προϊόντων & υπηρεσιών…" className="pl-10" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products & services…" className="pl-10" />
             </div>
             {loading || wsLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : filtered.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
-                <p>Δεν υπάρχουν προϊόντα με τιμή στην ταμειακή.</p>
+                <p>No products with a price for the register.</p>
                 <p className="mt-1 text-xs">Add prices to products (Materials) or services (Finance → Settings → Services). You can still punch a free amount on the keypad.</p>
               </div>
             ) : (
@@ -654,7 +656,7 @@ const PosPage: React.FC = () => {
             {cart.length > 0 && (
               <button type="button" onClick={() => setMobilePane('register')}
                 className="flex w-full items-center justify-between rounded-lg bg-primary px-4 py-3 text-primary-foreground lg:hidden">
-                <span className="text-sm font-medium">{cart.reduce((s, l) => s + l.qty, 0)} είδη στο ταμείο</span>
+                <span className="text-sm font-medium">{cart.reduce((s, l) => s + l.qty, 0)} items in register</span>
                 <span className="flex items-center gap-2 font-semibold tabular-nums">{formatMoney(totals.total, currency)} <CreditCard className="h-4 w-4" /></span>
               </button>
             )}
@@ -662,16 +664,16 @@ const PosPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* ── Doc-type modal (ΑΛΠ / ΑΠΥ) ── */}
+      {/* ── Doc-type modal (retail / service receipt) ── */}
       <Dialog open={docTypeOpen} onOpenChange={setDocTypeOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Επιλέξτε Τύπο Παραστατικού</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Select document type</DialogTitle></DialogHeader>
           <div className="space-y-2">
             {(Object.keys(DOC_TYPES) as DocType[]).map((k) => (
               <button key={k} type="button" onClick={() => { setDocType(k); setDocTypeOpen(false); }}
                 className={`w-full rounded-md border p-3 text-left hover:border-primary ${docType === k ? 'border-primary bg-primary/5' : 'border-border/60'}`}>
-                <div className="font-semibold">{DOC_TYPES[k].code}</div>
-                <div className="text-xs text-muted-foreground">{DOC_TYPES[k].label}</div>
+                <div className="font-semibold">{DOC_TYPES[k].labelEn}</div>
+                <div className="text-xs text-muted-foreground">myDATA {k}</div>
               </button>
             ))}
           </div>
@@ -681,7 +683,7 @@ const PosPage: React.FC = () => {
       {/* ── Customer attach modal ── */}
       <Dialog open={custOpen} onOpenChange={setCustOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Πελάτης (προαιρετικά)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Customer (optional)</DialogTitle></DialogHeader>
           {customer && (
             <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
               <span>{customer.name}</span>
@@ -703,7 +705,7 @@ const PosPage: React.FC = () => {
       {/* ── Issue (payment + options) dialog ── */}
       <Dialog open={issueOpen} onOpenChange={(o) => !o && setIssueOpen(false)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{dt.code} · {formatMoney(totals.total, currency)}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dt.labelEn} · {formatMoney(totals.total, currency)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Net</span><span>{formatMoney(totals.net, currency)}</span></div>
@@ -776,29 +778,29 @@ const PosPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {awaiting?.method === 'iris' ? <Smartphone className="h-5 w-5 text-primary" /> : <CreditCard className="h-5 w-5 text-primary" />}
-              {awaiting?.method === 'iris' ? 'Πληρωμή IRIS' : 'Πληρωμή με κάρτα'}
+              {awaiting?.method === 'iris' ? 'IRIS payment' : 'Card payment'}
             </DialogTitle>
           </DialogHeader>
           {awaiting && (
             <div className="space-y-4">
               <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-center">
-                <div className="text-xs text-muted-foreground">Απόδειξη {awaiting.number}</div>
+                <div className="text-xs text-muted-foreground">Receipt {awaiting.number}</div>
                 <div className="text-3xl font-semibold tabular-nums">{formatMoney(awaiting.total, awaiting.currency)}</div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Χρεώστε το ποσό στο τερματικό POS
-                {selectedTerminal ? <> (<span className="font-mono">{selectedTerminal.label}</span>)</> : null}. Μόλις εγκριθεί,
-                πατήστε <strong>ΕΞΟΦΛΗΣΗ POS</strong> για να ολοκληρωθεί η {awaiting.method === 'iris' ? 'IRIS' : 'κάρτα'} και να σταλεί στο myDATA.
+                Charge the amount on the POS terminal
+                {selectedTerminal ? <> (<span className="font-mono">{selectedTerminal.label}</span>)</> : null}. Once approved,
+                press <strong>SETTLE POS</strong> to finalize the {awaiting.method === 'iris' ? 'IRIS' : 'card'} payment and send it to myDATA.
               </p>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Κωδικός συναλλαγής τερματικού (προαιρετικό)</label>
-                <Input className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="από την απόδειξη του POS" />
+                <label className="text-xs text-muted-foreground">Terminal transaction code (optional)</label>
+                <Input className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the POS receipt" />
               </div>
               <div className="flex flex-col gap-2">
                 <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={chargeAndComplete} disabled={completing}>
-                  {completing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />} ΕΞΟΦΛΗΣΗ POS
+                  {completing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />} SETTLE POS
                 </Button>
-                <Button variant="ghost" className="w-full" onClick={cancelAwaiting} disabled={completing}>Άκυρο</Button>
+                <Button variant="ghost" className="w-full" onClick={cancelAwaiting} disabled={completing}>Cancel</Button>
               </div>
             </div>
           )}
@@ -811,17 +813,17 @@ const PosPage: React.FC = () => {
           <div className="space-y-4 py-1 text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
             <div>
-              <div className="text-sm font-medium">Το παραστατικό δημιουργήθηκε</div>
+              <div className="text-sm font-medium">Document created</div>
               <div className="text-xs text-muted-foreground"># {result?.number}</div>
             </div>
             <div className="text-3xl font-semibold tabular-nums">{result ? formatMoney(result.total, result.currency) : ''}</div>
             {result?.mark
-              ? <Badge variant="outline" className="font-mono text-[11px]">ΥΠΟΒΛΗΘΗΚΕ ΣΤΟ myDATA · MARK {result.mark}</Badge>
+              ? <Badge variant="outline" className="font-mono text-[11px]">SENT TO myDATA · MARK {result.mark}</Badge>
               : <Badge variant="outline">myDATA pending</Badge>}
 
             {/* Thermal printer paper size */}
             <div className="flex items-center justify-center gap-2 pt-1 text-xs text-muted-foreground">
-              <Printer className="h-3.5 w-3.5" /> Μέγεθος χαρτιού
+              <Printer className="h-3.5 w-3.5" /> Paper size
               <Select value={printSize} onValueChange={(v: PrintSize) => setPrintSize(v)}>
                 <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -834,13 +836,13 @@ const PosPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => window.print()}>
-                <Printer className="h-5 w-5" /> <span className="text-xs">ΕΚΤΥΠΩΣΗ</span>
+                <Printer className="h-5 w-5" /> <span className="text-xs">PRINT</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => sendEmail()} disabled={emailing}>
-                {emailing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />} <span className="text-xs">ΑΠΟΣΤΟΛΗ</span>
+                {emailing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />} <span className="text-xs">SEND</span>
               </Button>
             </div>
-            <Button className="h-12 w-full text-base font-semibold" onClick={() => setResult(null)}>ΝΕΑ</Button>
+            <Button className="h-12 w-full text-base font-semibold" onClick={() => setResult(null)}>NEW</Button>
           </div>
         </DialogContent>
       </Dialog>

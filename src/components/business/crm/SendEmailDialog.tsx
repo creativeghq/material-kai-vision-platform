@@ -198,10 +198,10 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as 'template' | 'custom')}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="template" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="template">
               <FileText className="h-4 w-4 mr-1.5" /> From template
             </TabsTrigger>
-            <TabsTrigger value="custom" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="custom">
               <Mail className="h-4 w-4 mr-1.5" /> Custom email
             </TabsTrigger>
           </TabsList>

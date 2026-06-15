@@ -130,7 +130,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Supplier credit note (πιστωτικό προμηθευτή)</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Supplier credit note</DialogTitle></DialogHeader>
         <div className="space-y-3">
           {/* Bill link OR standalone supplier */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

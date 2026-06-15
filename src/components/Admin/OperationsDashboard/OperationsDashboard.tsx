@@ -839,51 +839,51 @@ const OperationsDashboardInner: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         <Tabs value={opsActiveTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="system-health" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="system-health">
               <Activity className="h-4 w-4 mr-2" />
               System Health
             </TabsTrigger>
-            <TabsTrigger value="data-processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="data-processing">
               <Database className="h-4 w-4 mr-2" />
               Data Processing
             </TabsTrigger>
-            <TabsTrigger value="ai-performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="ai-performance">
               <Bot className="h-4 w-4 mr-2" />
               AI Performance
             </TabsTrigger>
-            <TabsTrigger value="performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="performance">
               <Gauge className="h-4 w-4 mr-2" />
               Performance
             </TabsTrigger>
-            <TabsTrigger value="agent-chat" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="agent-chat">
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
-            <TabsTrigger value="search-analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="search-analytics">
               <Search className="h-4 w-4 mr-2" />
               Search Analytics
             </TabsTrigger>
-            <TabsTrigger value="services-billing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="services-billing">
               <Globe className="h-4 w-4 mr-2" />
               Services & Billing
             </TabsTrigger>
-            <TabsTrigger value="platform-overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="platform-overview">
               <BarChart3 className="h-4 w-4 mr-2" />
               Platform Overview
             </TabsTrigger>
-            <TabsTrigger value="factory-onboarding" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="factory-onboarding">
               <Users className="h-4 w-4 mr-2" />
               Factory Onboarding
             </TabsTrigger>
-            <TabsTrigger value="catalogs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="catalogs">
               <BookOpen className="h-4 w-4 mr-2" />
               Catalogs
             </TabsTrigger>
-            <TabsTrigger value="seo-toolkit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="seo-toolkit">
               <Search className="h-4 w-4 mr-2" />
               SEO Toolkit
             </TabsTrigger>
-            <TabsTrigger value="keys" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="keys">
               <KeyRound className="h-4 w-4 mr-2" />
               Keys
             </TabsTrigger>
@@ -906,8 +906,8 @@ const OperationsDashboardInner: React.FC = () => {
           <TabsContent value="factory-onboarding" className="space-y-4">
             <Tabs defaultValue="registrations" className="space-y-4">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="registrations" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Registrations</TabsTrigger>
-                <TabsTrigger value="access" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Access Requests</TabsTrigger>
+                <TabsTrigger value="registrations">Registrations</TabsTrigger>
+                <TabsTrigger value="access">Access Requests</TabsTrigger>
               </TabsList>
               <TabsContent value="registrations"><FactoryRegistrationsTab /></TabsContent>
               <TabsContent value="access"><FactoryAccessRequestsTab /></TabsContent>

@@ -303,15 +303,15 @@ export const SearchAnalyticsDashboard = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="performance" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Performance
           </TabsTrigger>
-          <TabsTrigger value="cache" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="cache" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Cache Effectiveness
           </TabsTrigger>

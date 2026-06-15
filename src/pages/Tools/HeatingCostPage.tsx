@@ -101,7 +101,7 @@ export default function HeatingCostPage() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground -mt-2">
-              Energy intensity from the building's ΠΕΑ. Typical: ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.
+              Energy intensity from the building's energy performance certificate (PEA). Typical: ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.
             </p>
 
             <Separator />

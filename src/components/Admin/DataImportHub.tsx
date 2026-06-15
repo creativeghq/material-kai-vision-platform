@@ -88,23 +88,23 @@ const DataImportHub: React.FC = () => {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="pdf" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="pdf">
                   <FileType className="h-4 w-4 mr-2" />
                   PDF Processing
                 </TabsTrigger>
-                <TabsTrigger value="xml" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="xml">
                   <FileText className="h-4 w-4 mr-2" />
                   XML Import
                 </TabsTrigger>
-                <TabsTrigger value="firecrawl" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="firecrawl">
                   <Globe className="h-4 w-4 mr-2" />
                   Web Scraping
                 </TabsTrigger>
-                <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="history">
                   <Upload className="h-4 w-4 mr-2" />
                   Import History
                 </TabsTrigger>
-                <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="categories">
                   <Tags className="h-4 w-4 mr-2" />
                   Categories
                 </TabsTrigger>

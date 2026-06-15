@@ -382,12 +382,12 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <Tabs defaultValue="details" className="w-full">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Details</TabsTrigger>
-              <TabsTrigger value="audience" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="audience">
                 <Users className="h-4 w-4 mr-2" />
                 Audience ({estimatedRecipients})
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="schedule">
                 <Calendar className="h-4 w-4 mr-2" />
                 Schedule
               </TabsTrigger>

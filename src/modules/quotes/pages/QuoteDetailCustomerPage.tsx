@@ -454,15 +454,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full mt-2">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="items" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
             </TabsTrigger>
-            <TabsTrigger value="extras" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="extras" className="flex items-center gap-2">
               <Gift className="h-4 w-4" />
               Extras ({quoteUpsells.length})
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
               <Milestone className="h-4 w-4" />
               Timeline
             </TabsTrigger>

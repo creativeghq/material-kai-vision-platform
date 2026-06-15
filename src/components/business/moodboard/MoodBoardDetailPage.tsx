@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Trash2,
   Loader2,
-  Plus,
   FileText,
   Eye,
   Tag,
@@ -16,9 +15,9 @@ import {
   Video,
   Globe,
   Image,
-  Share2,
   Link,
   LockKeyhole,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -30,6 +29,7 @@ import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
 import type { Product } from '@/components/features/products/types';
 import { PinterestImportModal } from './PinterestImportModal';
+import { MoodboardProductSearchModal } from './MoodboardProductSearchModal';
 import { RecommendationsService } from '@/services/recommendationsService';
 import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +93,7 @@ export const MoodBoardDetailPage: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [creatingProposal, setCreatingProposal] = useState(false);
   const [showPinterestImport, setShowPinterestImport] = useState(false);
+  const [showProductSearch, setShowProductSearch] = useState(false);
 
   const [relatedQuotes, setRelatedQuotes] = useState<any[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -328,8 +329,11 @@ export const MoodBoardDetailPage: React.FC = () => {
           <div className="absolute inset-0" style={{ background: 'var(--brand-gradient)' }} />
         )}
 
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+        {/* Dark gradient overlay — guarantees a contrast floor over any background (image or gradient).
+            Bottom scrim for the title/stats, top scrim for the controls, plus a mid-floor so the
+            bright middle of the brand gradient can't wash out white text. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         {/* Top-right controls */}
@@ -338,10 +342,10 @@ export const MoodBoardDetailPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className={`rounded-full gap-1.5 backdrop-blur-sm ${
+            className={`rounded-full gap-1.5 bg-black/35 backdrop-blur-sm ${
               moodboard.isPublic
-                ? 'text-green-300 hover:text-green-200 hover:bg-black/30'
-                : 'text-white/70 hover:text-white hover:bg-black/30'
+                ? 'text-green-300 hover:text-green-200 hover:bg-black/50'
+                : 'text-white hover:text-white hover:bg-black/50'
             }`}
             onClick={handleToggleShare}
             disabled={sharingToggle}
@@ -356,7 +360,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-full gap-1.5 text-white/70 hover:text-white hover:bg-black/30 backdrop-blur-sm"
+              className="rounded-full gap-1.5 bg-black/35 text-white hover:text-white hover:bg-black/50 backdrop-blur-sm"
               onClick={handleCopyShareLink}
               title="Copy share link"
             >
@@ -368,7 +372,7 @@ export const MoodBoardDetailPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full gap-1.5 text-white/70 hover:text-red-300 hover:bg-black/30 backdrop-blur-sm"
+            className="rounded-full gap-1.5 bg-black/35 text-white hover:text-red-300 hover:bg-black/50 backdrop-blur-sm"
             onClick={handleDeleteMoodboard}
             title="Delete this moodboard"
           >
@@ -391,13 +395,13 @@ export const MoodBoardDetailPage: React.FC = () => {
 
           {/* Stats row */}
           <div className="flex flex-wrap items-center gap-2 mb-5">
-            <Badge className="bg-white/15 text-white border-white/20 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
+            <Badge className="bg-black/40 text-white border-white/25 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
               <Layers className="h-3 w-3" />
               {items.length} {items.length === 1 ? 'material' : 'materials'}
             </Badge>
 
             {categories.length > 0 && (
-              <Badge className="bg-white/15 text-white border-white/20 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
+              <Badge className="bg-black/40 text-white border-white/25 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
                 <Tag className="h-3 w-3" />
                 {categories.slice(0, 3).join(', ')}
                 {categories.length > 3 && ` +${categories.length - 3}`}
@@ -405,7 +409,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             )}
 
             {factories.length > 0 && (
-              <Badge className="bg-white/15 text-white border-white/20 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
+              <Badge className="bg-black/40 text-white border-white/25 backdrop-blur-sm rounded-full gap-1.5 px-3 py-1">
                 <Building2 className="h-3 w-3" />
                 {factories.length} {factories.length === 1 ? 'factory' : 'factories'}
               </Badge>
@@ -414,7 +418,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             {relatedQuotes.length > 0 ? (
               <button
                 onClick={() => navigate(`/quotes?quote=${relatedQuotes[0].id}`)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-white/15 text-white border border-white/20 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-white/25 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1 bg-black/40 text-white border border-white/25 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-black/55 transition-colors"
               >
                 <FileText className="h-3 w-3" />
                 {relatedQuotes.length} {relatedQuotes.length === 1 ? 'quote' : 'quotes'}
@@ -424,7 +428,7 @@ export const MoodBoardDetailPage: React.FC = () => {
               <button
                 onClick={handleCreateProposal}
                 disabled={creatingProposal || items.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1 bg-white/15 text-white border border-white/20 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-white/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1 bg-black/40 text-white border border-white/25 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-black/55 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingProposal ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -435,10 +439,19 @@ export const MoodBoardDetailPage: React.FC = () => {
               </button>
             )}
 
+            {/* Add Products (catalog search) */}
+            <button
+              onClick={() => setShowProductSearch(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-black/40 text-white border border-white/25 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-black/55 transition-colors"
+            >
+              <Search className="h-3 w-3" />
+              Add Products
+            </button>
+
             {/* Pinterest Import */}
             <button
               onClick={() => setShowPinterestImport(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white/15 text-white border border-white/20 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-white/25 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1 bg-black/40 text-white border border-white/25 backdrop-blur-sm rounded-full text-xs font-medium hover:bg-black/55 transition-colors"
             >
               <svg viewBox="0 0 24 24" className="h-3 w-3 fill-current"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
               Import from Pinterest
@@ -453,14 +466,14 @@ export const MoodBoardDetailPage: React.FC = () => {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger
               value="products"
-              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="flex items-center gap-2"
             >
               <Layers className="h-4 w-4" />
               Items
             </TabsTrigger>
             <TabsTrigger
               value="sheets"
-              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="flex items-center gap-2"
             >
               <FileText className="h-4 w-4" />
               Tools
@@ -471,8 +484,8 @@ export const MoodBoardDetailPage: React.FC = () => {
         {items.length === 0 ? (
           <div className="dashboard-card rounded-2xl p-12 text-center">
             <p className="text-muted-foreground mb-4">No products in this moodboard yet</p>
-            <Button onClick={() => navigate('/agent-hub')} className="rounded-full">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={() => setShowProductSearch(true)} className="rounded-full">
+              <Search className="h-4 w-4 mr-2" />
               Find Products
             </Button>
           </div>
@@ -594,6 +607,18 @@ export const MoodBoardDetailPage: React.FC = () => {
           moodboardId={moodboard.id}
           moodboardName={moodboard.title}
           onImportComplete={() => { loadMoodboardDetails(); }}
+        />
+      )}
+
+      {/* Catalog product search → add to this moodboard */}
+      {moodboard && (
+        <MoodboardProductSearchModal
+          open={showProductSearch}
+          onClose={() => setShowProductSearch(false)}
+          moodboardId={moodboard.id}
+          moodboardTitle={moodboard.title}
+          existingMaterialIds={items.map((i) => i.material_id).filter((x): x is string => !!x)}
+          onAdded={() => { loadMoodboardDetails(); }}
         />
       )}
     </div>

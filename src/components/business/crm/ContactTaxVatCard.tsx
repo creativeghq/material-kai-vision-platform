@@ -183,7 +183,7 @@ export const ContactTaxVatCard: React.FC<ContactTaxVatCardProps> = ({
             onChange={(e) => setLocalTax(e.target.value)}
             onFocus={() => { taxFocused.current = true; }}
             onBlur={() => { taxFocused.current = false; handleTaxBlur(); }}
-            placeholder="Local tax authority (e.g. ΔΟΥ ΧΑΛΑΝΔΡΙΟΥ for GR)"
+            placeholder="Local tax authority (e.g. Tax Office Chalandriou for GR)"
           />
         </div>
       </CardContent>

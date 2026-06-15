@@ -39,7 +39,7 @@ export function HeatPumpResultCard({ result }: { result: HeatPumpSizingResult })
             First-pass estimate
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Not a substitute for a thermal-loss study (ΕΛΟΤ ΕΝ 12831 / ΤΟΤΕΕ 20701). Size close to the
+            Not a substitute for a thermal-loss study (EN 12831 / TOTEE 20701). Size close to the
             load — oversizing hurts COP.
           </p>
         </div>

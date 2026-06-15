@@ -336,27 +336,27 @@ export const PDFDocumentDetails: React.FC = () => {
       {/* Detailed Tabs */}
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-          <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="products">
             <Package className="h-4 w-4 mr-2" />
             Products ({document.products.length})
           </TabsTrigger>
-          <TabsTrigger value="chunks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="chunks">
             <Grid3X3 className="h-4 w-4 mr-2" />
             Chunks ({document.chunks.length})
           </TabsTrigger>
-          <TabsTrigger value="images" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="images">
             <ImageIcon className="h-4 w-4 mr-2" />
             Images ({document.images.length})
           </TabsTrigger>
-          <TabsTrigger value="entities" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="entities">
             <FileCheck className="h-4 w-4 mr-2" />
             Entities ({document.document_entities.length})
           </TabsTrigger>
-          <TabsTrigger value="businesses" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="businesses">
             <Building2 className="h-4 w-4 mr-2" />
             Businesses
           </TabsTrigger>
-          <TabsTrigger value="metadata" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="metadata">
             <FileText className="h-4 w-4 mr-2" />
             Metadata
           </TabsTrigger>

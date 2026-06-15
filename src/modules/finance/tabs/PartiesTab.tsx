@@ -372,7 +372,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
                 {/* Running ledger (καρτέλα) — printable */}
                 <Card>
                   <CardHeader className="border-b border-border/60 px-4 py-2 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
-                    <CardTitle className="text-xs flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger (Καρτέλα)</CardTitle>
+                    <CardTitle className="text-xs flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap">
                       <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}
                         className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
@@ -401,23 +401,23 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
                       <table className="w-full text-sm">
                         <thead className="text-xs text-muted-foreground">
                           <tr className="border-b border-border/60">
-                            <th className="px-3 py-2 text-left">Ημ/νία</th>
-                            <th className="px-3 py-2 text-left">Τύπος</th>
-                            <th className="px-3 py-2 text-left">Παραστατικό</th>
-                            <th className="px-3 py-2 text-right">Χρέωση</th>
-                            <th className="px-3 py-2 text-right">Πίστωση</th>
-                            <th className="px-3 py-2 text-right">Προοδ. Χρέωση</th>
-                            <th className="px-3 py-2 text-right">Προοδ. Πίστωση</th>
-                            <th className="px-3 py-2 text-right">Υπόλοιπο</th>
+                            <th className="px-3 py-2 text-left">Date</th>
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Document</th>
+                            <th className="px-3 py-2 text-right">Debit</th>
+                            <th className="px-3 py-2 text-right">Credit</th>
+                            <th className="px-3 py-2 text-right">Cumulative debit</th>
+                            <th className="px-3 py-2 text-right">Cumulative credit</th>
+                            <th className="px-3 py-2 text-right">Balance</th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr className="border-b border-border/30 bg-muted/30">
-                            <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Προηγούμενα Σύνολα · Opening balance</td>
+                            <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
                             <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
                           </tr>
                           {ledgerWithBalance.length === 0 ? (
-                            <tr><td colSpan={8} className="px-3 py-4 text-center text-xs text-muted-foreground">Καμία κίνηση στην περίοδο.</td></tr>
+                            <tr><td colSpan={8} className="px-3 py-4 text-center text-xs text-muted-foreground">No activity in this period.</td></tr>
                           ) : ledgerWithBalance.map((r, idx) => (
                             <tr key={idx} className="border-b border-border/30">
                               <td className="px-3 py-1.5">{r.entry_date ? new Date(r.entry_date).toLocaleDateString() : '—'}</td>
@@ -433,7 +433,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
                         </tbody>
                         <tfoot>
                           <tr className="border-t-2 border-border">
-                            <td colSpan={3} className="px-3 py-2 text-xs font-semibold">Σύνολα</td>
+                            <td colSpan={3} className="px-3 py-2 text-xs font-semibold">Totals</td>
                             <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
                             <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
                             <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>

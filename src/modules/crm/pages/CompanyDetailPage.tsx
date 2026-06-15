@@ -279,7 +279,7 @@ export const CompanyDetailPage: React.FC = () => {
     if (!company) return;
     const rawAfm = (company.vat_number || '').replace(/[^0-9]/g, '');
     if (rawAfm.length !== 9) {
-      toast({ title: 'Need a 9-digit ΑΦΜ', description: 'Type the Greek ΑΦΜ digits in the VAT field first.', variant: 'destructive' });
+      toast({ title: 'Need a 9-digit VAT number', description: 'Type the Greek VAT number (9 digits) in the VAT field first.', variant: 'destructive' });
       return;
     }
     setAadeBusy(true);
@@ -290,14 +290,14 @@ export const CompanyDetailPage: React.FC = () => {
         reason: 'crm_enrichment',
       });
       if ('error' in res && res.error) {
-        toast({ title: 'ΑΑΔΕ lookup failed', description: (res.message || res.error), variant: 'destructive' });
+        toast({ title: 'AADE lookup failed', description: (res.message || res.error), variant: 'destructive' });
         return;
       }
       if ('ok' in res && res.ok) {
         adoptAadeAll(res);
         if (!editing) setEditing(true);
         toast({
-          title: res.source === 'cache' ? 'ΑΑΔΕ data (cached)' : 'ΑΑΔΕ data fetched',
+          title: res.source === 'cache' ? 'AADE data (cached)' : 'AADE data fetched',
           description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia} — review and Save.` : 'Business details pre-filled — review and Save.',
         });
       }
@@ -333,7 +333,7 @@ export const CompanyDetailPage: React.FC = () => {
       legal_status: r.legal_status_descr,
       kad_primary: primaryAct?.code ?? null,
       kad_primary_description: primaryAct?.description ?? null,
-      kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
+      kad_secondary: secondaryActs.length> 0 ? secondaryActs : null,
       business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
       aade_data: { basic_rec: r, activities: res.activities },
       aade_data_at: res.checked_at,
@@ -440,10 +440,10 @@ export const CompanyDetailPage: React.FC = () => {
           title="Company Not Found"
           description="The requested company could not be found"
           badge="CRM"
-        />
+/>
         <div className="p-6">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 mr-2"/>
             Back to CRM
           </Button>
         </div>
@@ -457,13 +457,13 @@ export const CompanyDetailPage: React.FC = () => {
         title={isNew ? 'New Company' : company.name || 'Untitled Company'}
         description={isNew ? 'Create a new company' : `Company Details • Created ${new Date(company.created_at).toLocaleDateString()}`}
         badge="CRM"
-      />
+/>
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 mr-2"/>
             Back to CRM
           </Button>
           <div className="flex gap-2">
@@ -480,13 +480,13 @@ export const CompanyDetailPage: React.FC = () => {
                   Cancel
                 </Button>
                 <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 mr-2"/>
                   {saving ? 'Saving...' : (isNew ? 'Create Company' : 'Save Changes')}
                 </Button>
               </>
             ) : (
               <Button onClick={() => setEditing(true)}>
-                <Edit2 className="h-4 w-4 mr-2" />
+                <Edit2 className="h-4 w-4 mr-2"/>
                 Edit Company
               </Button>
             )}
@@ -496,45 +496,45 @@ export const CompanyDetailPage: React.FC = () => {
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Building2 className="h-4 w-4 mr-2" />
+            <TabsTrigger value="overview">
+              <Building2 className="h-4 w-4 mr-2"/>
               Overview
             </TabsTrigger>
-            <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Users className="h-4 w-4 mr-2" />
+            <TabsTrigger value="contacts">
+              <Users className="h-4 w-4 mr-2"/>
               Contacts ({company.contacts?.length || 0})
             </TabsTrigger>
-            <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Globe className="h-4 w-4 mr-2" />
+            <TabsTrigger value="social">
+              <Globe className="h-4 w-4 mr-2"/>
               Social & Web
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <FileText className="h-4 w-4 mr-2" />
+            <TabsTrigger value="notes">
+              <FileText className="h-4 w-4 mr-2"/>
               Notes
             </TabsTrigger>
-            <TabsTrigger value="seo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Search className="h-4 w-4 mr-2" />
+            <TabsTrigger value="seo">
+              <Search className="h-4 w-4 mr-2"/>
               SEO
             </TabsTrigger>
-            <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Wallet className="h-4 w-4 mr-2" />
+            <TabsTrigger value="account">
+              <Wallet className="h-4 w-4 mr-2"/>
               Account
             </TabsTrigger>
-            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <ScrollText className="h-4 w-4 mr-2" />
+            <TabsTrigger value="quotes">
+              <ScrollText className="h-4 w-4 mr-2"/>
               Quotes
             </TabsTrigger>
-            <TabsTrigger value="invoices" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Receipt className="h-4 w-4 mr-2" />
+            <TabsTrigger value="invoices">
+              <Receipt className="h-4 w-4 mr-2"/>
               Invoices
             </TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <CreditCard className="h-4 w-4 mr-2" />
+            <TabsTrigger value="payments">
+              <CreditCard className="h-4 w-4 mr-2"/>
               Payments
             </TabsTrigger>
             {company.is_supplier && (
-              <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Package className="h-4 w-4 mr-2" />
+              <TabsTrigger value="products">
+                <Package className="h-4 w-4 mr-2"/>
                 Products
               </TabsTrigger>
             )}
@@ -557,7 +557,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('name', e.target.value)}
                       disabled={!editing}
                       required
-                    />
+/>
                   </div>
 
                   {/* Industry */}
@@ -569,14 +569,14 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('industry', e.target.value)}
                       disabled={!editing}
                       placeholder="e.g., Technology, Healthcare"
-                    />
+/>
                   </div>
 
                   {/* Email */}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <div className="flex gap-2 items-start">
-                      <Mail className="h-4 w-4 mt-3 text-muted-foreground" />
+                      <Mail className="h-4 w-4 mt-3 text-muted-foreground"/>
                       <Input
                         id="email"
                         type="email"
@@ -584,7 +584,7 @@ export const CompanyDetailPage: React.FC = () => {
                         onChange={(e) => updateField('email', e.target.value)}
                         disabled={!editing}
                         placeholder="contact@company.com"
-                      />
+/>
                       <Button
                         type="button"
                         size="icon"
@@ -593,8 +593,8 @@ export const CompanyDetailPage: React.FC = () => {
                         disabled={!company.email}
                         title={company.email ? `Send email to ${company.email}` : 'No email on file'}
                         className="shrink-0"
-                      >
-                        <Send className="h-4 w-4" />
+>
+                        <Send className="h-4 w-4"/>
                       </Button>
                     </div>
                   </div>
@@ -603,7 +603,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone</Label>
                     <div className="flex gap-2">
-                      <Phone className="h-4 w-4 mt-3 text-muted-foreground" />
+                      <Phone className="h-4 w-4 mt-3 text-muted-foreground"/>
                       <Input
                         id="phone"
                         type="tel"
@@ -611,7 +611,7 @@ export const CompanyDetailPage: React.FC = () => {
                         onChange={(e) => updateField('phone', e.target.value)}
                         disabled={!editing}
                         placeholder="+1 (555) 123-4567"
-                      />
+/>
                     </div>
                   </div>
 
@@ -619,7 +619,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className="space-y-2">
                     <Label htmlFor="website">Website</Label>
                     <div className="flex gap-2">
-                      <Globe className="h-4 w-4 mt-3 text-muted-foreground" />
+                      <Globe className="h-4 w-4 mt-3 text-muted-foreground"/>
                       <Input
                         id="website"
                         type="url"
@@ -627,7 +627,7 @@ export const CompanyDetailPage: React.FC = () => {
                         onChange={(e) => updateField('website', e.target.value)}
                         disabled={!editing}
                         placeholder="https://company.com"
-                      />
+/>
                     </div>
                   </div>
 
@@ -641,7 +641,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('employee_count', e.target.value)}
                       disabled={!editing}
                       placeholder="e.g., 50, 1-10, 100-500, 500+"
-                    />
+/>
                   </div>
 
                   {/* Annual Revenue */}
@@ -653,7 +653,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('annual_revenue', e.target.value)}
                       disabled={!editing}
                       placeholder="e.g., $1M - $10M"
-                    />
+/>
                   </div>
                 </div>
 
@@ -667,7 +667,7 @@ export const CompanyDetailPage: React.FC = () => {
                     disabled={!editing}
                     placeholder="Brief description of the company..."
                     rows={3}
-                  />
+/>
                 </div>
               </CardContent>
             </Card>
@@ -676,7 +676,7 @@ export const CompanyDetailPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground"/>
                   Tax &amp; VAT
                 </CardTitle>
               </CardHeader>
@@ -692,7 +692,7 @@ export const CompanyDetailPage: React.FC = () => {
                       disabled={!editing}
                       placeholder="EL, DE, FR…"
                       maxLength={2}
-                    />
+/>
                   </div>
 
                   {/* VAT number */}
@@ -704,7 +704,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('vat_number', e.target.value)}
                       disabled={!editing}
                       placeholder="123456789"
-                    />
+/>
                   </div>
 
                   {/* Tax office */}
@@ -716,7 +716,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('tax_office', e.target.value)}
                       disabled={!editing}
                       placeholder="Optional"
-                    />
+/>
                   </div>
                 </div>
 
@@ -731,10 +731,10 @@ export const CompanyDetailPage: React.FC = () => {
                       variant="outline"
                       onClick={lookupAade}
                       disabled={aadeBusy}
-                      title="Fetch full business details from ΑΑΔΕ and pre-fill the form"
-                    >
-                      {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
-                      Fetch from ΑΑΔΕ
+                      title="Fetch full business details from AADE and pre-fill the form"
+>
+                      {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
+                      Fetch from AADE
                     </Button>
                   )}
 
@@ -743,19 +743,19 @@ export const CompanyDetailPage: React.FC = () => {
                     variant="outline"
                     onClick={handleVies}
                     disabled={viesBusy || !company.vat_number?.trim() || !company.country_code?.trim()}
-                  >
-                    {viesBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+>
+                    {viesBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldCheck className="h-4 w-4"/>}
                     Validate (VIES)
                   </Button>
 
                   {company.vat_validated === true && (
                     <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                      {company.vat_validation_source === 'aade' ? 'ΑΑΔΕ Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
+                      {company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
                     </Badge>
                   )}
                   {company.vat_validated === false && (
                     <Badge variant="destructive">
-                      {company.vat_validation_source === 'aade' ? 'ΑΑΔΕ: business inactive' : 'VAT not recognised by VIES'}
+                      {company.vat_validation_source === 'aade' ? 'AADE: business inactive' : 'VAT not recognised by VIES'}
                     </Badge>
                   )}
 
@@ -779,10 +779,10 @@ export const CompanyDetailPage: React.FC = () => {
                       <div><span className="text-muted-foreground">Legal form: </span><span className="text-foreground">{company.legal_status}</span></div>
                     )}
                     {company.kad_primary && (
-                      <div><span className="text-muted-foreground">Primary ΚΑΔ: </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>
+                      <div><span className="text-muted-foreground">Primary activity code (KAD): </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>
                     )}
-                    {Array.isArray(company.kad_secondary) && company.kad_secondary.length > 0 && (
-                      <div><span className="text-muted-foreground">Secondary ΚΑΔ: </span><span className="text-foreground">{company.kad_secondary.length} more</span></div>
+                    {Array.isArray(company.kad_secondary) && company.kad_secondary.length> 0 && (
+                      <div><span className="text-muted-foreground">Secondary activity codes: </span><span className="text-foreground">{company.kad_secondary.length} more</span></div>
                     )}
                     {company.business_start_date && (
                       <div><span className="text-muted-foreground">Operating since: </span><span className="text-foreground">{company.business_start_date}</span></div>
@@ -808,7 +808,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('address', e.target.value)}
                       disabled={!editing}
                       placeholder="123 Main Street"
-                    />
+/>
                   </div>
 
                   {/* City */}
@@ -820,7 +820,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('city', e.target.value)}
                       disabled={!editing}
                       placeholder="San Francisco"
-                    />
+/>
                   </div>
 
                   {/* State */}
@@ -832,7 +832,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('state', e.target.value)}
                       disabled={!editing}
                       placeholder="CA"
-                    />
+/>
                   </div>
 
                   {/* Postal Code */}
@@ -844,7 +844,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('postal_code', e.target.value)}
                       disabled={!editing}
                       placeholder="94102"
-                    />
+/>
                   </div>
 
                   {/* Country */}
@@ -856,7 +856,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('country', e.target.value)}
                       disabled={!editing}
                       placeholder="United States"
-                    />
+/>
                   </div>
                 </div>
               </CardContent>
@@ -866,7 +866,7 @@ export const CompanyDetailPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Percent className="h-4 w-4" />
+                  <Percent className="h-4 w-4"/>
                   Pricing
                 </CardTitle>
               </CardHeader>
@@ -887,7 +887,7 @@ export const CompanyDetailPage: React.FC = () => {
                       }}
                       disabled={!editing}
                       placeholder="e.g. 50"
-                    />
+/>
                     <p className="text-xs text-muted-foreground">
                       Applied automatically by the AI price lookup when this company is the quote customer. Leave empty for no customer discount.
                     </p>
@@ -906,7 +906,7 @@ export const CompanyDetailPage: React.FC = () => {
                       }}
                       disabled={!editing}
                       placeholder="e.g. 10000"
-                    />
+/>
                     <p className="text-xs text-muted-foreground">
                       Max outstanding receivable. Finance flags this customer when their open balance exceeds it. Leave empty for no limit.
                     </p>
@@ -921,7 +921,7 @@ export const CompanyDetailPage: React.FC = () => {
                     disabled={!editing}
                     placeholder="e.g. Long-term partner — 50% per 2025 agreement, valid until renewal."
                     rows={2}
-                  />
+/>
                 </div>
               </CardContent>
             </Card>
@@ -932,7 +932,7 @@ export const CompanyDetailPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
+                  <Tag className="h-4 w-4"/>
                   Role
                 </CardTitle>
               </CardHeader>
@@ -949,7 +949,7 @@ export const CompanyDetailPage: React.FC = () => {
                     id="is_supplier"
                     checked={!!company.is_supplier}
                     onCheckedChange={(v) => patchInline({ is_supplier: v })}
-                  />
+/>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -962,12 +962,12 @@ export const CompanyDetailPage: React.FC = () => {
                     id="is_customer"
                     checked={!!company.is_customer}
                     onCheckedChange={(v) => patchInline({ is_customer: v })}
-                  />
+/>
                 </div>
               </CardContent>
             </Card>
 
-            <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }} />
+            <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>
           </TabsContent>
 
           {/* Products Tab — only when is_supplier=true. Matches products by name
@@ -975,7 +975,7 @@ export const CompanyDetailPage: React.FC = () => {
               supplier. Read-only view for now. */}
           {company.is_supplier && (
             <TabsContent value="products" className="space-y-4">
-              <SupplierProductsTab supplierName={company.name} />
+              <SupplierProductsTab supplierName={company.name}/>
             </TabsContent>
           )}
 
@@ -990,22 +990,22 @@ export const CompanyDetailPage: React.FC = () => {
                   </p>
                 </div>
                 <Button onClick={() => setShowAddContactDialog(true)} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-2"/>
                   Add Contact
                 </Button>
               </CardHeader>
               <CardContent>
                 {!company.contacts || company.contacts.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50"/>
                     <p>No contacts attached to this company yet</p>
                     <Button
                       variant="outline"
                       size="sm"
                       className="mt-4"
                       onClick={() => setShowAddContactDialog(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
+>
+                      <Plus className="h-4 w-4 mr-2"/>
                       Add First Contact
                     </Button>
                   </div>
@@ -1029,7 +1029,7 @@ export const CompanyDetailPage: React.FC = () => {
                             <button
                               onClick={() => navigate(`/admin/crm/contacts/${contact.contact_id}`)}
                               className="text-primary hover:underline"
-                            >
+>
                               {contact.contact_name}
                             </button>
                           </TableCell>
@@ -1039,7 +1039,7 @@ export const CompanyDetailPage: React.FC = () => {
                               <a
                                 href={`mailto:${contact.contact_email}`}
                                 className="text-blue-600 hover:underline"
-                              >
+>
                                 {contact.contact_email}
                               </a>
                             ) : (
@@ -1051,7 +1051,7 @@ export const CompanyDetailPage: React.FC = () => {
                               <a
                                 href={`tel:${contact.contact_phone}`}
                                 className="text-blue-600 hover:underline"
-                              >
+>
                                 {contact.contact_phone}
                               </a>
                             ) : (
@@ -1068,8 +1068,8 @@ export const CompanyDetailPage: React.FC = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDetachContact(contact.relationship_id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
+>
+                              <Trash2 className="h-4 w-4 text-red-500"/>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -1099,7 +1099,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('linkedin', e.target.value)}
                       disabled={!editing}
                       placeholder="https://linkedin.com/company/..."
-                    />
+/>
                   </div>
 
                   {/* Twitter */}
@@ -1111,7 +1111,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('twitter', e.target.value)}
                       disabled={!editing}
                       placeholder="https://twitter.com/..."
-                    />
+/>
                   </div>
 
                   {/* Facebook */}
@@ -1123,7 +1123,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onChange={(e) => updateField('facebook', e.target.value)}
                       disabled={!editing}
                       placeholder="https://facebook.com/..."
-                    />
+/>
                   </div>
                 </div>
               </CardContent>
@@ -1133,7 +1133,7 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Notes Tab — timeline of separate note entries (replaced the
               single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
-            <CrmNotesTimeline targetKind="company" targetId={company.id || null} />
+            <CrmNotesTimeline targetKind="company" targetId={company.id || null}/>
           </TabsContent>
 
           {/* SEO Tab — DataForSEO Domain Rank + persistent monitoring */}
@@ -1143,30 +1143,30 @@ export const CompanyDetailPage: React.FC = () => {
               companyName={company.name}
               website={company.website || null}
               countryCode={(company as any).country_code || null}
-            />
+/>
           </TabsContent>
 
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
-            {company.id && <CustomerAccountOverview companyId={company.id} />}
+            {company.id && <CustomerAccountOverview companyId={company.id}/>}
           </TabsContent>
 
           {/* Quotes Tab */}
           <TabsContent value="quotes" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id} />}
-            {company.id && <CustomerQuotesTab companyId={company.id} />}
+            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
+            {company.id && <CustomerQuotesTab companyId={company.id}/>}
           </TabsContent>
 
           {/* Invoices Tab */}
           <TabsContent value="invoices" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id} />}
-            {company.id && <CustomerInvoicesTab companyId={company.id} />}
+            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
+            {company.id && <CustomerInvoicesTab companyId={company.id}/>}
           </TabsContent>
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id} />}
-            {company.id && <CustomerPaymentsTab companyId={company.id} />}
+            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
+            {company.id && <CustomerPaymentsTab companyId={company.id}/>}
           </TabsContent>
         </Tabs>
       </div>
@@ -1178,7 +1178,7 @@ export const CompanyDetailPage: React.FC = () => {
         toEmail={company.email || ''}
         toName={company.name || null}
         recipientLabel={company.name || 'Company'}
-      />
+/>
 
       {/* Add Contact Dialog */}
       <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
@@ -1198,7 +1198,7 @@ export const CompanyDetailPage: React.FC = () => {
                 excludeContactIds={company?.contacts?.map((c: any) => c.contact_id) || []}
                 placeholder="Search contacts..."
                 selectedContactId={selectedContactId || null}
-              />
+/>
             </div>
 
             {/* Role */}
@@ -1209,7 +1209,7 @@ export const CompanyDetailPage: React.FC = () => {
                 value={contactRole}
                 onChange={(e) => setContactRole(e.target.value)}
                 placeholder="e.g., CEO, Sales Manager, Developer"
-              />
+/>
             </div>
 
             {/* Primary Contact */}
@@ -1220,7 +1220,7 @@ export const CompanyDetailPage: React.FC = () => {
                 checked={isPrimaryContact}
                 onChange={(e) => setIsPrimaryContact(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300"
-              />
+/>
               <Label htmlFor="is-primary-contact" className="cursor-pointer">
                 Mark as primary contact for this company
               </Label>
@@ -1235,7 +1235,7 @@ export const CompanyDetailPage: React.FC = () => {
                 onChange={(e) => setContactNotes(e.target.value)}
                 placeholder="Additional notes about this relationship..."
                 rows={3}
-              />
+/>
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -1248,13 +1248,13 @@ export const CompanyDetailPage: React.FC = () => {
                 setIsPrimaryContact(false);
                 setContactNotes('');
               }}
-            >
+>
               Cancel
             </Button>
             <Button
               onClick={handleAttachContact}
               disabled={!selectedContactId || attachingContact}
-            >
+>
               {attachingContact ? 'Attaching...' : 'Attach Contact'}
             </Button>
           </div>

@@ -78,7 +78,7 @@ export default function HeatPumpToolPage() {
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           A first-pass estimate of the heat-pump capacity a space needs. Not a substitute for a full
-          thermal-loss study (ΕΛΟΤ ΕΝ 12831 / ΤΟΤΕΕ 20701) — but a fast, honest starting point.
+          thermal-loss study (EN 12831 / TOTEE 20701) — but a fast, honest starting point.
         </p>
       </div>
 
@@ -186,7 +186,7 @@ export default function HeatPumpToolPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="advanced" className="cursor-pointer">Advanced: exact design temperature</Label>
-                <p className="text-xs text-muted-foreground">Override the zone with the local ΤΟΤΕΕ winter design temp.</p>
+                <p className="text-xs text-muted-foreground">Override the zone with the local TOTEE winter design temp.</p>
               </div>
               <Switch id="advanced" checked={advanced} onCheckedChange={setAdvanced} />
             </div>

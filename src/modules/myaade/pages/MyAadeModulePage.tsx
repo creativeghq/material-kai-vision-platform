@@ -27,7 +27,7 @@ const MyAadeModulePage: React.FC = () => {
   const runLookup = async () => {
     const clean = afm.replace(/[^0-9]/g, '');
     if (clean.length !== 9) {
-      toast({ title: 'Invalid ΑΦΜ', description: 'Greek ΑΦΜ must be exactly 9 digits.', variant: 'destructive' });
+      toast({ title: 'Invalid VAT number', description: 'Greek VAT number must be exactly 9 digits.', variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -47,7 +47,7 @@ const MyAadeModulePage: React.FC = () => {
       <PageHeader
         icon={Building2}
         title="myAADE — Greek business lookup"
-        subtitle="ΑΑΔΕ RgWsPublic2 (TAXISnet). Looks up Greek businesses by ΑΦΜ and auto-fills the Business profile."
+        subtitle="AADE RgWsPublic2 (TAXISnet). Looks up Greek businesses by VAT number and auto-fills the Business profile."
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm" className="gap-2" title="Module Settings (API credentials)">
@@ -67,7 +67,7 @@ const MyAadeModulePage: React.FC = () => {
         {/* Credentials */}
         <SecretsManagerCard
           scope={{ mode: 'module', moduleSlug: 'myaade' }}
-          title="ΑΑΔΕ TAXISnet credentials"
+          title="AADE TAXISnet credentials"
           description="Platform-wide TAXISnet account used to query the RgWsPublic2 SOAP service. Environment variables take priority."
         />
 
@@ -76,24 +76,24 @@ const MyAadeModulePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-base">Don't have credentials yet?</CardTitle>
             <CardDescription>
-              ΑΑΔΕ requires a separate <strong>Ειδικοί Κωδικοί Πρόσβασης</strong> (Special Access Codes) credential pair — distinct from your regular TAXISnet login — created specifically for software to use on your behalf.
+              AADE requires a separate <strong>Special Access Codes</strong> credential pair — distinct from your regular TAXISnet login — created specifically for software to use on your behalf.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <ol className="list-decimal pl-5 space-y-2">
               <li>
                 Open <a href={TOKEN_SERVICES_APP_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
-                  Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ <ExternalLink className="h-3 w-3" />
+                  AADE Special Access Codes portal <ExternalLink className="h-3 w-3" />
                 </a> and sign in with your <strong>regular TAXISnet</strong> credentials.
               </li>
               <li>
-                Inside the app, create a new username + password pair and authorize it for the <strong>RgWsPublic2</strong> service ("Στοιχεία Επιχειρήσεων από ΑΦΜ").
+                Inside the app, create a new username + password pair and authorize it for the <strong>RgWsPublic2</strong> service (business details by VAT number).
               </li>
               <li>
-                Paste the new pair above as <code>AADE_USERNAME</code> + <code>AADE_PASSWORD</code>. (Optional: also set <code>AADE_AFM_CALLED_BY</code> to the platform's own company ΑΦΜ so the lookup audit trail names it.)
+                Paste the new pair above as <code>AADE_USERNAME</code> + <code>AADE_PASSWORD</code>. (Optional: also set <code>AADE_AFM_CALLED_BY</code> to the platform's own company VAT number so the lookup audit trail names it.)
               </li>
               <li>
-                Click <strong>Look up</strong> below with any 9-digit ΑΦΜ to confirm the credentials work end-to-end.
+                Click <strong>Look up</strong> below with any 9-digit VAT number to confirm the credentials work end-to-end.
               </li>
             </ol>
             <p className="text-xs text-muted-foreground pt-2">
@@ -103,7 +103,7 @@ const MyAadeModulePage: React.FC = () => {
               <a href={FAQ_PDF_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">Official FAQ (PDF, Greek)</a>
             </p>
             <p className="text-xs text-muted-foreground">
-              Heads-up: every successful lookup writes an audit entry into the looked-up ΑΦΜ's TAXISnet inbox. This is expected and per ΑΑΔΕ policy — we only call the service when a user verifies their <strong>own</strong> business.
+              Heads-up: every successful lookup writes an audit entry into the looked-up VAT number's TAXISnet inbox. This is expected and per AADE policy — we only call the service when a user verifies their <strong>own</strong> business.
             </p>
           </CardContent>
         </Card>
@@ -113,7 +113,7 @@ const MyAadeModulePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2"><Search className="h-4 w-4" />Test lookup</CardTitle>
             <CardDescription>
-              Live call to ΑΑΔΕ. Confirms the credentials work and shows you the data shape. Counts against your monthly TAXISnet quota.
+              Live call to AADE. Confirms the credentials work and shows you the data shape. Counts against your monthly TAXISnet quota.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -122,7 +122,7 @@ const MyAadeModulePage: React.FC = () => {
                 value={afm}
                 onChange={(e) => setAfm(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runLookup()}
-                placeholder="9-digit ΑΦΜ, e.g. 802349569"
+                placeholder="9-digit VAT number, e.g. 802349569"
                 maxLength={9}
                 className="flex-1 font-mono"
               />
@@ -156,7 +156,7 @@ const MyAadeModulePage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                   <KV label="Trade name" value={result.basic_rec.commer_title} />
                   <KV label="Legal form" value={result.basic_rec.legal_status_descr} />
-                  <KV label="ΔΟΥ" value={result.basic_rec.doy_descr ? `${result.basic_rec.doy_descr} (${result.basic_rec.doy ?? '—'})` : null} />
+                  <KV label="Tax office" value={result.basic_rec.doy_descr ? `${result.basic_rec.doy_descr} (${result.basic_rec.doy ?? '—'})` : null} />
                   <KV label="Start date" value={result.basic_rec.regist_date} />
                   <KV
                     label="Address"
@@ -168,7 +168,7 @@ const MyAadeModulePage: React.FC = () => {
                 </div>
                 {result.activities.length > 0 && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Activities (ΚΑΔ)</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Activities (KAD)</p>
                     <div className="space-y-1">
                       {result.activities.map((act, i) => (
                         <div key={i} className="text-xs flex items-start gap-2">

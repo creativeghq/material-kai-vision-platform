@@ -425,19 +425,19 @@ export const CRMManagement: React.FC = () => {
       {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
               Users
             </TabsTrigger>
-            <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="contacts">
               <Building2 className="h-4 w-4 mr-2" />
               Contacts
             </TabsTrigger>
-            <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="companies">
               <Building2 className="h-4 w-4 mr-2" />
               Companies
             </TabsTrigger>
-            <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="categories">
               <Tags className="h-4 w-4 mr-2" />
               Categories
             </TabsTrigger>

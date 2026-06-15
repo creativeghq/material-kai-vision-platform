@@ -39,9 +39,9 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
   { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
   // VAT / tax
-  { value: 'vat_return', label: 'VAT analysis (ΦΠΑ)', group: 'vat', period: 'range' },
+  { value: 'vat_return', label: 'VAT analysis', group: 'vat', period: 'range' },
   { value: 'mydata_reconciliation', label: 'myDATA reconciliation', group: 'vat', period: 'range' },
-  { value: 'myf', label: 'ΜΥΦ (per counterparty)', group: 'vat', period: 'range' },
+  { value: 'myf', label: 'MYF summary (per counterparty)', group: 'vat', period: 'range' },
   // Outstanding snapshots (no period)
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },

@@ -111,19 +111,19 @@ export const SEODashboardPanel: React.FC = () => {
 
       <Tabs value={activeSeoTab} onValueChange={handleSeoTabChange}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="research" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="research" className="flex items-center gap-2">
             <Search className="h-3.5 w-3.5" /> Keyword Research
           </TabsTrigger>
-          <TabsTrigger value="domains" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="domains" className="flex items-center gap-2">
             <Globe2 className="h-3.5 w-3.5" /> Domain Audit
           </TabsTrigger>
-          <TabsTrigger value="backlinks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="backlinks" className="flex items-center gap-2">
             <Link2 className="h-3.5 w-3.5" /> Backlinks
           </TabsTrigger>
-          <TabsTrigger value="competitive" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="competitive" className="flex items-center gap-2">
             <Target className="h-3.5 w-3.5" /> Competitive Intel
           </TabsTrigger>
-          <TabsTrigger value="interlinking" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="interlinking" className="flex items-center gap-2">
             <Waypoints className="h-3.5 w-3.5" /> Inter-linking
           </TabsTrigger>
         </TabsList>

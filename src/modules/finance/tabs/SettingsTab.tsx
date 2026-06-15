@@ -175,7 +175,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <TabsTrigger
             key={s.value}
             value={s.value}
-            className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="flex items-center gap-2"
           >
             <s.icon className="h-4 w-4" /> {s.label}
           </TabsTrigger>
@@ -247,7 +247,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <div>
                 <div className="text-sm font-medium">Automatic customer statements</div>
                 <p className="text-xs text-muted-foreground">
-                  Email each customer their own ledger statement (Καρτέλα) on a schedule. Off by default — nothing sends until you turn this on. Customers can be excluded per-party from their CRM record.
+                  Email each customer their own ledger statement on a schedule. Off by default — nothing sends until you turn this on. Customers can be excluded per-party from their CRM record.
                 </p>
               </div>
               <Switch
@@ -364,11 +364,11 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             <div>
               <div className="text-sm font-medium">Buyer risk checks</div>
               <p className="text-xs text-muted-foreground">
-                Checked when you issue an invoice against a CRM customer. Uses the buyer's ΑΑΔΕ status and credit limit (set per-company in CRM).
+                Checked when you issue an invoice against a CRM customer. Uses the buyer's AADE status and credit limit (set per-company in CRM).
               </p>
             </div>
             <label className="flex items-center justify-between gap-3">
-              <span className="text-xs">Block issuance when the buyer ΑΦΜ is <strong>ΑΑΔΕ-inactive</strong></span>
+              <span className="text-xs">Block issuance when the buyer VAT number is <strong>AADE-inactive</strong></span>
               <Switch checked={settings.risk_block_inactive_vat} onCheckedChange={(v) => set('risk_block_inactive_vat', v)} />
             </label>
             <label className="flex items-center justify-between gap-3">

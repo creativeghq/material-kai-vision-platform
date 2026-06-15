@@ -183,7 +183,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   const lookupAade = async () => {
     const rawAfm = businessForm.vat_number.replace(/[^0-9]/g, '');
     if (rawAfm.length !== 9) {
-      toast({ title: 'Need a 9-digit ΑΦΜ', description: 'Type the Greek ΑΦΜ digits in the VAT field first.', variant: 'destructive' });
+      toast({ title: 'Need a 9-digit VAT number', description: 'Type the Greek VAT number (9 digits) in the VAT field first.', variant: 'destructive' });
       return;
     }
     setAadeChecking(true);
@@ -192,13 +192,13 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
 
     if ('error' in res && res.error) {
       const msg = res.message || res.error;
-      toast({ title: 'ΑΑΔΕ lookup failed', description: msg, variant: 'destructive' });
+      toast({ title: 'AADE lookup failed', description: msg, variant: 'destructive' });
       setAadeLastResult(null);
       return;
     }
     if ('ok' in res && res.ok) {
       setAadeLastResult(res);
-      toast({ title: 'ΑΑΔΕ data fetched', description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia}` : 'Business details available.' });
+      toast({ title: 'AADE data fetched', description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia}` : 'Business details available.' });
       // Refresh the cache snapshot from DB so the read-only badges update
       if (businessId) void load();
     }
@@ -222,7 +222,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       tax_office: r.doy_descr ?? p.tax_office,
       profession: primaryAct?.description ?? p.profession,
     }));
-    toast({ title: 'Business profile pre-filled from ΑΑΔΕ' });
+    toast({ title: 'Business profile pre-filled from AADE' });
   };
 
   const startEdit = () => {
@@ -688,11 +688,11 @@ const AadeInline: React.FC<AadeInlineProps> = ({ show, checking, result, onLooku
           disabled={checking}
         >
           {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
-          <span className="ml-1.5">Get full details from ΑΑΔΕ</span>
+          <span className="ml-1.5">Get full details from AADE</span>
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        ⓘ This will create a lookup audit entry in your own ΑΦΜ's TAXISnet inbox — that is expected and confirms it was you.
+        ⓘ This will create a lookup audit entry in your own VAT number's TAXISnet inbox — that is expected and confirms it was you.
       </p>
 
       {result && (
@@ -711,20 +711,20 @@ const AadeInline: React.FC<AadeInlineProps> = ({ show, checking, result, onLooku
             {result.source === 'cache' && <Badge variant="secondary" className="text-[10px]">cache</Badge>}
           </div>
           <div className="text-[11px] text-muted-foreground space-y-0.5 pl-5">
-            {result.basic_rec.doy_descr && <div>ΔΟΥ: {result.basic_rec.doy_descr}</div>}
-            {result.basic_rec.legal_status_descr && <div>Νομική μορφή: {result.basic_rec.legal_status_descr}</div>}
+            {result.basic_rec.doy_descr && <div>Tax office: {result.basic_rec.doy_descr}</div>}
+            {result.basic_rec.legal_status_descr && <div>Legal form: {result.basic_rec.legal_status_descr}</div>}
             {result.activities.find((a) => a.kind === 1) && (
-              <div>Κύριος ΚΑΔ: {result.activities.find((a) => a.kind === 1)?.code} — {result.activities.find((a) => a.kind === 1)?.description}</div>
+              <div>Primary activity code: {result.activities.find((a) => a.kind === 1)?.code} — {result.activities.find((a) => a.kind === 1)?.description}</div>
             )}
             {result.basic_rec.postal_address && (
               <div>
-                Διεύθυνση: {result.basic_rec.postal_address} {result.basic_rec.postal_address_no},
+                Address: {result.basic_rec.postal_address} {result.basic_rec.postal_address_no},
                 {' '}{result.basic_rec.postal_zip_code} {result.basic_rec.postal_area_description}
               </div>
             )}
           </div>
           <Button type="button" size="sm" variant="ghost" className="h-7 text-xs ml-4" onClick={() => onAdopt(result)}>
-            <CornerDownLeft className="h-3 w-3 mr-1" />Pre-fill all fields from ΑΑΔΕ
+            <CornerDownLeft className="h-3 w-3 mr-1" />Pre-fill all fields from AADE
           </Button>
         </div>
       )}

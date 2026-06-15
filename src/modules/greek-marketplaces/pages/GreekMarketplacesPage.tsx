@@ -263,7 +263,7 @@ const GreekMarketplacesPage: React.FC = () => {
                   id="query"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. Maidtec 7012ΜΤ απορροφητήρας"
+                  placeholder="e.g. Maidtec 7012MT cooker hood"
                   disabled={searching || !moduleEnabled}
                   onKeyDown={(e) => { if (e.key === 'Enter') void runSearch(); }}
                 />
