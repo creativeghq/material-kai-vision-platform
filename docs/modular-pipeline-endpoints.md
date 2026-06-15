@@ -63,7 +63,7 @@ The `ai_config` object accepts the following optional fields:
 **DEFAULT_AI_CONFIG** (Balanced):
 - Best overall accuracy and reliability
 - Uses Claude Opus 4.7 for discovery and metadata
-- Uses SLIG (SigLIP2) for visual embeddings (768D, HuggingFace endpoint)
+- Uses SLIG (SigLIP2) for visual embeddings (768D, Modal endpoint)
 - Uses Voyage AI voyage-4 for text embeddings (1024D)
 - Uses Claude Opus 4.7 via Anthropic tool use for vision classification (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 used Qwen3-VL-32B-Instruct with Claude validation; the Qwen HF endpoint had been 404-ing for months → retired.
 
@@ -181,10 +181,10 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - The orchestrator passes only the `uploaded_images` output from upload-images endpoint
 - These are already filtered twice: (1) AI classification, (2) successful upload
 
-**AI Processing - Visual Embeddings (SLIG via HuggingFace Endpoint)**:
-- **Model**: SLIG (SigLIP2) via HuggingFace Inference Endpoint
+**AI Processing - Visual Embeddings (SLIG via Modal Endpoint)**:
+- **Model**: SLIG (SigLIP2 base, `siglip2-base-patch16-512`, native 768D) via Modal endpoint (app `slig`)
   - Cloud-based GPU inference for consistent performance
-  - Auto-pause enabled to reduce costs
+  - Scale-to-zero ($0 idle) to reduce costs
   - Superior to CLIP for material understanding
 - **Embedding Dimension**: 768D per embedding
 - **5 Embedding Types Per Image**:
@@ -195,7 +195,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   5. **Material** (768D): Text-guided SLIG embedding optimized for material type matching (text_embedding mode)
 
 **Technical Details**:
-- Uses SLIG HuggingFace endpoint exclusively for all visual embeddings
+- Uses SLIG Modal endpoint exclusively for all visual embeddings
 - Generates base visual embedding (768D) using SLIG image_embedding mode
 - Creates 1 visual SLIG embedding (768D, raw image)
 - Creates 4 per-aspect Voyage `voyage-3` embeddings (1024D each) of deterministic text strings derived from VisionAnalysis.
@@ -360,7 +360,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 ### AI Models Used
 1. **Product Discovery**: Claude Opus 4.7 or GPT-5 (configurable)
 2. **Image Classification**: Claude Opus 4.7 via Anthropic tool use (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01: Qwen3-VL-32B-Instruct → Claude validation; Qwen retired (HF endpoint 404-ing for months).
-3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
+3. **Visual Embeddings**: SLIG (SigLIP2) via Modal Endpoint - 5 types per image, 768D each
 4. **Text Embeddings**: Voyage AI voyage-4 (1024D) — sole provider (updated 2026-04)
 
 ### Thresholds
@@ -400,7 +400,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 1. **classify-images**: AI classification via Claude Opus 4.7 Anthropic tool use (post-2026-05-01 — sole vision pass; Qwen retired) to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
-3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via HuggingFace endpoint)
+3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via Modal endpoint)
 4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-4 1024D)
 5. **create-relationships**: Chunk-image and product-image relationships via similarity
 
@@ -410,7 +410,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 2. Classify ALL images with AI (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass; Qwen retired) → **material_images** + non_material_images
 3. Upload ONLY **material_images** to storage → **uploaded_images**
 4. Save ONLY **uploaded_images** to database
-5. Generate 5 visual embeddings per saved image (SLIG 768D via HuggingFace endpoint)
+5. Generate 5 visual embeddings per saved image (SLIG 768D via Modal endpoint)
 6. Create semantic chunks from text
 7. Generate text embeddings for chunks (Voyage AI voyage-4 1024D)
 8. Create relationships between chunks, images, and products
@@ -419,7 +419,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 - ✅ **Focused extraction by default** (only material images)
 - ✅ **Single-stage AI classification** (Claude Opus 4.7 via Anthropic tool use, post-2026-05-01 — sole vision pass, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`; pre-2026-05-01 was a two-stage Qwen→Claude pipeline that collapsed to single-stage when Qwen was retired)
-- ✅ **5 visual embeddings per image** (SLIG 768D via HuggingFace endpoint: visual, color, texture, style, material)
+- ✅ **5 visual embeddings per image** (SLIG 768D via Modal endpoint: visual, color, texture, style, material)
 - ✅ **High-quality text embeddings** (Voyage AI voyage-4 1024D)
 - ✅ **Semantic chunking** with product boundary respect
 - ✅ **Comprehensive progress tracking** (5% increments)

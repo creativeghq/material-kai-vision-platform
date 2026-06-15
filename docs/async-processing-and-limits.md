@@ -68,7 +68,7 @@ All methods update the `background_jobs` table in real-time with the current job
 
 **Why these limits?**
 - **Claude (2)**: vision-via-tool-use is the sole vision path post-2026-05-01; rate-limited → low concurrency
-- **SLIG (20)**: HuggingFace Inference Endpoint with auto-pause → high concurrency
+- **SLIG (20)**: Modal endpoint (scale-to-zero) → high concurrency
 - **PaddleOCR-VL (8)**: Modal-hosted endpoint (GPU L4, scale-to-zero, `max_containers=4`); concurrency bounded so warm containers aren't oversubscribed (post-2026-06-13: replaced the Surya-2 backbone, which had replaced YOLO + Chandra + merge_layout)
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
 - **Qwen retired**: pre-2026-05-01 had a "5 Qwen concurrent" gate; the HF Qwen endpoint had been 404-ing for months, falling through to Claude. Gate deleted along with `endpoint_controller.qwen` AdaptiveConcurrency.
@@ -213,12 +213,12 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 
 ## Rate Limiting
 
-### 1. Inference Endpoints (SLIG SigLIP2 on HuggingFace + PaddleOCR-VL on Modal)
+### 1. Inference Endpoints (SLIG SigLIP2 + PaddleOCR-VL, both on Modal)
 
 **Applies to**: PDF, Web Scraping, XML Import
 **Services**: `slig_client`, `paddleocr_endpoint_manager`
 
-> **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). HuggingFace now hosts **only SLIG**; the structural pass is Modal-only.
+> **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). Both SLIG and PaddleOCR-VL run on **Modal**; HuggingFace hosts nothing.
 > **Note (2026-05-01)**: The `QwenEndpointService` and `Settings.qwen_*` are gone. Vision moved to Anthropic Claude Opus 4.7 via tool use.
 
 | Limit | Value | Purpose |
@@ -323,7 +323,7 @@ Shared chunking logic with chunk size of 1000 characters and overlap of 200 char
 
 | API | Limit | Strategy |
 |-----|-------|----------|
-| **HuggingFace (SLIG SigLIP2)** | endpoint auto-pause | Semaphore (20 concurrent) |
+| **Modal (SLIG SigLIP2)** | scale-to-zero | Semaphore (20 concurrent) |
 | **Modal (PaddleOCR-VL)** | scale-to-zero, `max_containers=4` | Semaphore (8 concurrent) + retry |
 | **Anthropic Claude** | Circuit breaker | Semaphore (2 concurrent — sole vision path) |
 | **Voyage AI** | 429 with Retry-After | Honors header, 2 retries |
@@ -398,7 +398,7 @@ Always update the `background_jobs` table after each stage with the current prog
 ✅ **All methods fully async**: PDF, Web Scraping, XML Import
 ✅ **Same concurrency limits**: 2 Claude (sole vision path), 20 SLIG, 8 PaddleOCR-VL, 10 uploads
 ✅ **Same timeout guards**: 300s discovery, 120s AI, 30s downloads
-✅ **Same rate limiting**: SLIG (HF) / PaddleOCR-VL (Modal) endpoint-paced, circuit breaker on Claude, Voyage 429 with Retry-After
+✅ **Same rate limiting**: SLIG (Modal) / PaddleOCR-VL (Modal) endpoint-paced, circuit breaker on Claude, Voyage 429 with Retry-After
 ✅ **Same shared services**: ImageProcessingService, RealEmbeddingsService, AsyncQueueService
 ✅ **Memory optimized**: Batch processing prevents OOM
 ✅ **Network optimized**: Semaphores prevent congestion

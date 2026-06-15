@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-06-13
 
-> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **PaddleOCR-VL** two-stage structural pass (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) — **Surya-2 was deleted** (and Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`**). It runs before discovery (structure-first) and is hosted on **Modal**, not HuggingFace. Active endpoints are **SLIG on HuggingFace + PaddleOCR-VL on Modal**. Read "PaddleOCR-VL on Modal" wherever YOLO/Chandra/Surya appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
+> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **PaddleOCR-VL** two-stage structural pass (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) — **Surya-2 was deleted** (and Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`**). It runs before discovery (structure-first) and is hosted on **Modal**, not HuggingFace. Active endpoints are **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Read "PaddleOCR-VL on Modal" wherever YOLO/Chandra/Surya appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
@@ -24,11 +24,11 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | voyage-4 | Voyage AI | **PRIMARY, sole** text + understanding embedder | 1024D vectors | $0.06 input |
 | text-embedding-3-small | OpenAI | LEGACY (CI changelog only, retired 2026-04 from production); in-code fallback pinned to 1024D so legacy callers can't store wrong-dim text embeddings | 1536D historical | $0.02 input |
 | **Visual Embeddings** |
-| SLIG (SigLIP2 SO400M, 768D projected) Visual | HuggingFace Endpoint | General visual embeddings | 768D | endpoint |
-| SLIG (SigLIP2 SO400M, 768D projected) Color | HuggingFace Endpoint | Color-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 SO400M, 768D projected) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 SO400M, 768D projected) Style | HuggingFace Endpoint | Style-guided embeddings | 768D | endpoint |
-| SLIG (SigLIP2 SO400M, 768D projected) Material | HuggingFace Endpoint | Material-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 base, 768D) Visual | Modal Endpoint | General visual embeddings | 768D | endpoint |
+| SLIG (SigLIP2 base, 768D) Color | Modal Endpoint | Color-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 base, 768D) Texture | Modal Endpoint | Texture-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 base, 768D) Style | Modal Endpoint | Style-guided embeddings | 768D | endpoint |
+| SLIG (SigLIP2 base, 768D) Material | Modal Endpoint | Material-guided embeddings | 768D | endpoint |
 | **Layout + OCR** |
 | PaddleOCR-VL 1.6 (0.9B) | PaddlePaddle (Modal) | **SOLE LAYOUT + OCR ENGINE** — structural pass (PP-DocLayoutV2 RT-DETR + 0.9B VLM), runs before discovery | layout + OCR + figure boxes, ~1-3s/page warm | Modal GPU (scale-to-zero) |
 
@@ -143,9 +143,9 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 6-10. SLIG (SigLIP2 SO400M, 768D projected) Specialized Embeddings
+### 6-10. SLIG (SigLIP2 base, 768D) Specialized Embeddings
 
-**Purpose post-2026-05-04**: SLIG produces ONE per-image visual embedding (768D, `image_slig_embeddings`) via the `mh-slig` HuggingFace endpoint (`basiliskan` namespace, custom HF model `basiliskan/slig`, SigLIP2 SO400M with a 1152D → 768D projection head). The four "specialized" aspect collections (color/texture/style/material) are NOT produced by SLIG anymore — see Aspect Embeddings below.
+**Purpose post-2026-05-04**: SLIG produces ONE per-image visual embedding (768D, `image_slig_embeddings`) via the SLIG Modal endpoint (app `slig`, custom model `basiliskan/slig` duplicating `google/siglip2-base-patch16-512`, native 768D, no projection head). The four "specialized" aspect collections (color/texture/style/material) are NOT produced by SLIG anymore — see Aspect Embeddings below.
 
 **Visual (768D) → `image_slig_embeddings`**
 - Overall visual appearance, enables visual similarity search
@@ -173,7 +173,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 **Performance**:
 - Dimension: 768D (specialized) / 1024D (understanding)
 - Latency: 150-400ms per image
-- Cost: HuggingFace endpoint, auto-pause enabled
+- Cost: Modal endpoint, scale-to-zero
 
 ---
 
@@ -241,7 +241,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 | Vision (primary) | **Claude Opus 4.7 (tool use)** | was Qwen pre-2026-05-01 |
 | Vision (validation pass) | Claude Opus 4.7 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
 | Phase 3 per-image OCR | **PaddleOCR-VL block OCR** | text-bearing images only; runs AFTER vision |
-| Visual Embeddings | SLIG (SigLIP2 SO400M (768D projected), 5 types, 768D) | |
+| Visual Embeddings | SLIG (SigLIP2 base 768D, 5 types, 768D) | |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | from Claude vision_analysis JSON, parallel with Visual Embeddings |
 | Text Embeddings | Voyage AI voyage-4 (1024D) | sole text embedder |
 
@@ -253,7 +253,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 1. **Claude Sonnet for chunking** — Sonnet matches Opus output quality on chunking, so paying for Opus on this stage buys nothing
 2. **Claude Haiku for high-volume classification** — ~5× cheaper than Opus on input, ~5× on output
 3. **Voyage AI for text + understanding** — superior to OpenAI at $0.06/1M
-4. **SLIG cloud endpoint with auto-pause** — pay-as-you-process
+4. **SLIG Modal endpoint with scale-to-zero** — pay-as-you-process
 5. **PaddleOCR-VL on Modal scales to zero** — $0 idle; cold start (~90s) paid once per job at warmup, then ~1-3s/page warm
 
 **Example Cost per PDF** (recomputed at current Anthropic pricing — Opus 4.7 at $5/$25, Haiku 4.5 at $1/$5):
@@ -272,8 +272,8 @@ The canonical 100-page / 50-image reference workload lands at ~$0.36 — see the
 - `ANTHROPIC_API_KEY` — Anthropic Claude API key (vision + chunking + agents)
 - `OPENAI_API_KEY` — OpenAI API key (optional alternatives)
 - `VOYAGE_API_KEY` — Voyage AI API key (sole text + understanding embedder)
-- `SLIG_ENDPOINT_URL` — HuggingFace SLIG endpoint URL
-- `SLIG_ENDPOINT_TOKEN` — HuggingFace SLIG endpoint token
+- `SLIG_MODAL_URL` — SLIG Modal endpoint URL
+- `SLIG_MODAL_API_KEY` — SLIG Modal bearer (shared `paddleocr-api-key` Modal secret)
 - `PADDLEOCR_MODAL_API_KEY` — Modal PaddleOCR-VL endpoint key (the only required runtime var for the structural pass; the Modal URL is baked as a config default). CI auto-deploys the Modal app on `modal_app/**` changes via `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`.
 
 > **Removed (2026-05-01)**: `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_TOKEN`, and all `Settings.qwen_*` fields are gone. The HF Qwen endpoint env vars on the systemd unit can be deleted at the next deploy.
@@ -333,7 +333,7 @@ The model configuration maps each task to its designated model:
 2. text-embedding-3-small — Retired 2026-04 (CI changelog only); in-code fallback pinned to 1024D so legacy 1536D callers can't silently store wrong-dim text embeddings
 
 ### Visual Embeddings
-1. **SLIG (SigLIP2 SO400M, 768D projected)** (PRIMARY) — 5 specialized 768D types
+1. **SLIG (SigLIP2 base, 768D)** (PRIMARY) — 5 specialized 768D types
 2. 3-attempt retry on dim-mismatch
 3. Skip + flag if all fail
 

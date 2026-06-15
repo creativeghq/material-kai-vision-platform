@@ -10,8 +10,9 @@
 > Stage 2 chunking, and Stage 3 image crops all read that cache. It **replaced Surya-2 on
 > 2026-06-13**; Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`** — so YOLO,
 > Chandra, Surya, and `merge_layout` (and their managers) are all **deleted with no consumer**.
-> OCR is also PaddleOCR (`ocr_service._call_paddleocr`). HuggingFace now hosts only **SLIG**
-> (visual embeddings); the structural pass is **Modal-only**.
+> OCR is also PaddleOCR (`ocr_service._call_paddleocr`). Both GPU endpoints — **SLIG**
+> (visual embeddings) and PaddleOCR-VL (the structural pass) — run on **Modal**; HuggingFace
+> hosts nothing (SLIG migrated off HuggingFace 2026-06-14).
 > See the **"PDF Pipeline — PaddleOCR-VL structural backbone"** section in `CLAUDE.md` and
 > [ai-models-complete-list.md](./ai-models-complete-list.md) for the current model map.
 > **Reading note:** older sub-sections below still carry YOLO/Chandra wording inline — wherever

@@ -56,7 +56,7 @@
 - Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
-- HuggingFace Endpoints: SLIG SigLIP2 (768D visual, 5 specialized types — the only HF-hosted model)
+- Modal: SLIG SigLIP2 (768D visual, 5 specialized types — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
 - PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
@@ -111,7 +111,7 @@
 - Embeddings Routes (3)
 - AI Services Routes (10)
 - Background Jobs (7)
-- HuggingFace Endpoint Routes (SLIG SigLIP2 — the only HF-hosted model; layout + OCR is PaddleOCR-VL on Modal as of 2026-06-13)
+- Model Endpoint Routes (SLIG SigLIP2 visual embeddings on Modal; layout + OCR is PaddleOCR-VL on Modal — both GPU endpoints are Modal-hosted as of 2026-06-14)
 - Anthropic Routes (3)
 - Monitoring Routes (3)
 - AI Metrics Routes (2)

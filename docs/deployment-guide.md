@@ -76,11 +76,9 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `PADDLEOCR_MODAL_URL` | Public | Server ENV | Override for the Modal endpoint URL. Optional — the deployed app URL is baked as the `config.py` default. | `https://basilakis--paddleocr-vl-paddleservice-web.modal.run` |
 | `PADDLEOCR_ENABLED` | Public | Server ENV | Enable the PaddleOCR-VL structural pass. Empty → code default (enabled). | `true` |
 | ~~`QWEN_*` / `YOLO_*` / `CHANDRA_*`~~ | — | **REMOVED** | The Qwen (retired 2026-05-01), YOLO + Chandra (replaced by Surya-2, then PaddleOCR-VL on 2026-06-13) HF endpoints have **no consumer in the code**. Delete these GitHub Secrets and their systemd `Environment=` lines. | — |
-| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL (HF now hosts **only** SLIG; the structural pass is Modal-only) | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` |
-| `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token (usually same as `HUGGING_FACE_ACCESS_TOKEN`) | `hf_xxxxxxxxxxxxxxxx` |
-| `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-slig` |
-| `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
-| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | HF token for the SLIG endpoint (resume + inference) — get from https://huggingface.co/settings/tokens. HF now hosts only SLIG; YOLO/Chandra/Qwen retired. | `hf_xxxxxxxxxxxxxxxx` |
+| `SLIG_MODAL_URL` | Public | Server ENV | SLIG Modal endpoint URL (both GPU endpoints are on Modal; HuggingFace hosts nothing) | `https://basilakis--slig-sligservice-web.modal.run` |
+| `SLIG_MODAL_API_KEY` | **Secret** | Server ENV | SLIG Modal bearer (shared `paddleocr-api-key` Modal secret value) | `<openssl rand -hex 32>` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | No longer required for SLIG — SLIG moved to Modal 2026-06-14. HuggingFace hosts nothing in this platform now; this token can be removed. | `hf_xxxxxxxxxxxxxxxx` |
 | `MODAL_TOKEN_ID` | **Secret** | **GitHub Actions only** (not server ENV) | Modal API token id — lets the `deploy-modal` CI job run `modal deploy modal_app/paddleocr_vl.py`. Create at https://modal.com/settings/tokens | `ak-xxxxxxxxxxxx` |
 | `MODAL_TOKEN_SECRET` | **Secret** | **GitHub Actions only** (not server ENV) | Modal API token secret (pairs with `MODAL_TOKEN_ID`). | `as-xxxxxxxxxxxx` |
 | `MAX_CONCURRENT_PRODUCTS` | Public | Server ENV | How many products process in parallel inside one PDF job. **Set to `1` on a 4 GB droplet** (anything higher hits cgroup MemoryHigh). Bump to 2-3 on 8 GB+ | `1` |
@@ -96,13 +94,13 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis (post-2026-05-01: Anthropic-only) | `claude-opus-4-7` (default + recommended) |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
-| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | HuggingFace token used by the backend deployment workflow for the SLIG endpoint, set in GitHub repo secrets | `hf_xxxxxxxxxxxxxxxx` |
+| `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | No longer needed for SLIG — SLIG moved to Modal 2026-06-14. HuggingFace hosts nothing now; this deploy-workflow secret can be removed. | `hf_xxxxxxxxxxxxxxxx` |
 | `REDIS_URL` | Public | Server ENV | Redis connection URL for embedding cache (optional — disables cache if not set) | `redis://localhost:6379` or `redis://your-redis-host:6379` |
 | `ADMIN_RESTART_TOKEN` | **Secret** | Server ENV | Auth token for the `/api/admin/restart` endpoint — required to authenticate server restart requests from the agent | `your-secure-restart-token` |
 
 ### **PDF Pipeline Structural Backbone — PaddleOCR-VL on Modal**
 
-The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage parser (PP-DocLayoutV2 detector + 0.9B VLM) hosted on **Modal** with scale-to-zero (`$0` idle). It **replaced Surya-2 on 2026-06-13** (which had itself replaced YOLO + Chandra). HF now hosts only SLIG; the structural pass is **Modal-only**.
+The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage parser (PP-DocLayoutV2 detector + 0.9B VLM) hosted on **Modal** with scale-to-zero (`$0` idle). It **replaced Surya-2 on 2026-06-13** (which had itself replaced YOLO + Chandra). HuggingFace now hosts nothing; **both** the structural pass (PaddleOCR-VL) and SLIG run on Modal.
 
 | Secret Name | Type | Where Set | Description | Default |
 |------------|------|-----------|-------------|---------|
@@ -133,19 +131,19 @@ The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/
 | **Zernio** | `ZERNIO_WEBHOOK_SECRET` | Edge Functions (`zernio-webhook-handler`) | Zernio webhook settings | HMAC-SHA256 signature verification |
 | **Modal** | `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` | GitHub Actions (`deploy-modal` job) | https://modal.com/settings/tokens (or `modal token new`) | Lets CI run `modal deploy` for the PaddleOCR-VL backbone |
 | **Modal** | `PADDLEOCR_MODAL_API_KEY` | Backend (PaddleOCR-VL structural pass) | Value of the `paddleocr-api-key` Modal secret | Bearer for the Modal `/parse` endpoint — **only required runtime backbone secret** |
-| **HuggingFace** | `SLIG_ENDPOINT_TOKEN` | Backend (SLIG endpoint resume/inference) | https://huggingface.co/settings/tokens | Per-endpoint override; defaults to `HUGGING_FACE_ACCESS_TOKEN`. HF now hosts only SLIG (YOLO/Chandra/Qwen retired). |
-| **HuggingFace** | `HUGGING_FACE_ACCESS_TOKEN` | Backend + GitHub Actions (deploy workflow) | https://huggingface.co/settings/tokens | SLIG endpoint token; set as GitHub repo secret |
+| **Modal** | `SLIG_MODAL_API_KEY` | Backend (SLIG visual-embedding endpoint) | Value of the `paddleocr-api-key` Modal secret (shared with PaddleOCR-VL) | Bearer for the SLIG Modal endpoint — SLIG moved off HuggingFace to Modal 2026-06-14. |
 | **HuggingFace** | `HUGGINGFACE_API_KEY` | Edge Functions (`health-check`) | https://huggingface.co/settings/tokens | Health status checks — same token, different name |
 
-### **HuggingFace Inference Endpoints Configuration**
+### **SLIG (SigLIP2) Modal Endpoint**
 
-The platform uses **one** HuggingFace Inference Endpoint (SLIG visual embeddings). The PDF structural pass (layout + OCR) runs on **Modal**, not HF.
+The platform uses **no** HuggingFace Inference Endpoints. Both SLIG (visual embeddings) and PaddleOCR-VL (the PDF structural pass — layout + OCR) run on **Modal**. SLIG moved off HuggingFace to Modal on 2026-06-14.
 
 **SLIG (SigLIP2) Endpoint:**
-- **URL**: `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud`
-- **Service Name**: `mh-slig`
-- **Namespace**: `basiliskan`
-- **Auto-pause**: Enabled
+- **URL**: `https://basilakis--slig-sligservice-web.modal.run`
+- **App Name**: `slig` (Modal app, file `mivaa-pdf-extractor/modal_app/slig.py`)
+- **Workspace**: `basilakis`
+- **Model**: `basiliskan/slig` — a duplicate of stock `google/siglip2-base-patch16-512` (SigLIP2 base, native 768D, no projection head)
+- **Scale-to-zero**: Enabled ($0 idle; Modal owns autoscaling)
 
 > **Retired**: the **Qwen** (2026-05-01, vision moved to Anthropic Claude Opus 4.7 via tool use), **YOLO** + **Chandra** (2026-06-13, replaced by Surya-2 then PaddleOCR-VL on Modal) HF endpoints are gone. Their `qwen_endpoint_manager.py` / `surya_*` / YOLO / Chandra code is deleted and has no consumer. Delete the `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` GitHub Secrets and their systemd `Environment=` lines, plus any `/etc/systemd/system/mivaa-pdf-extractor.service.d/{qwen,chandra,yolo}-*.conf` drop-ins.
 
@@ -154,13 +152,12 @@ The platform uses **one** HuggingFace Inference Endpoint (SLIG visual embeddings
 ```
 PADDLEOCR_MODAL_API_KEY    ← bearer for the Modal structural-pass endpoint (only required backbone secret)
 PADDLEOCR_MODAL_URL        PADDLEOCR_ENABLED   (both optional — code/baked defaults)
-SLIG_ENDPOINT_URL          SLIG_ENDPOINT_NAME  SLIG_NAMESPACE   SLIG_ENDPOINT_TOKEN
-HUGGING_FACE_ACCESS_TOKEN  ← SLIG endpoint token
+SLIG_MODAL_URL             SLIG_MODAL_API_KEY   ← SLIG Modal endpoint URL + bearer (shared `paddleocr-api-key` secret)
 MAX_CONCURRENT_PRODUCTS    ← `1` on 4 GB droplet, 2-3 on 8 GB+
 MODAL_TOKEN_ID  MODAL_TOKEN_SECRET   ← GitHub Actions only; let the deploy-modal CI job run `modal deploy`
 ```
 
-> When you rename or replace the SLIG endpoint on HuggingFace (which auto-changes the URL — HF generates a fresh subdomain), update `SLIG_ENDPOINT_URL` + `SLIG_ENDPOINT_NAME` GitHub Secrets, then trigger a deploy. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values.
+> When you redeploy SLIG on Modal (`modal deploy modal_app/slig.py`), the app URL stays stable; update `SLIG_MODAL_URL` only if the Modal URL changes, then trigger a deploy. Do NOT rely on `/etc/systemd/system/mivaa-pdf-extractor.service.d/*.conf` drop-ins — those survive deploys and silently mask the GH Secret values.
 
 ---
 
@@ -513,11 +510,11 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 1. **Frontend**: Vercel (Static hosting + Edge functions)
 2. **MIVAA Service**: Systemd service with UV (Self-hosted server)
 3. **Database**: Supabase (Managed PostgreSQL)
-4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, HuggingFace, Replicate, WorldLabs)
+4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, Modal, Replicate, WorldLabs)
 
 ## 🏗️ Infrastructure Overview
 
-**Production Environment**: Vercel Frontend (Static + Edge) connects to MIVAA Service (Systemd + UV) and Supabase (Database + Auth). MIVAA Service also connects to External APIs (OpenAI, Anthropic, Voyage AI, HuggingFace).
+**Production Environment**: Vercel Frontend (Static + Edge) connects to MIVAA Service (Systemd + UV) and Supabase (Database + Auth). MIVAA Service also connects to External APIs (OpenAI, Anthropic, Voyage AI, Modal).
 
 **Development Environment**: Local Frontend (localhost:5173) connects to Local MIVAA (localhost:8000) and Supabase Cloud (Shared Instance). Local MIVAA also connects to the shared Supabase Cloud instance.
 
@@ -595,7 +592,7 @@ All MIVAA service endpoints are available at:
 
 **Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, the SLIG HF endpoint URL/token/name/namespace, and `PADDLEOCR_MODAL_API_KEY` for the Modal structural pass; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note**: the legacy `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` env lines have no consumer and can be deleted from the unit.
+The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, the SLIG Modal endpoint URL/bearer (`SLIG_MODAL_URL` / `SLIG_MODAL_API_KEY`), and `PADDLEOCR_MODAL_API_KEY` for the Modal structural pass; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note**: the legacy `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` env lines have no consumer and can be deleted from the unit.
 
 ### 🚀 Deployment Process
 
@@ -719,8 +716,8 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Process Management**: systemd service (mivaa-pdf-extractor.service)
 - **Web Framework**: FastAPI with Uvicorn ASGI server
 - **Database**: Supabase PostgreSQL with vector extensions
-- **AI Integration**: OpenAI, Anthropic, Voyage AI, HuggingFace Inference Endpoints
-- **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint (768D, 5 specialized types)
+- **AI Integration**: OpenAI, Anthropic, Voyage AI, Modal GPU Endpoints (SLIG + PaddleOCR-VL)
+- **Visual Embeddings**: SLIG (SigLIP2) via Modal Endpoint (768D, 5 specialized types)
 - **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked) — Qwen retired 2026-05-01
 - **Layout + OCR (structural pass)**: PaddleOCR-VL on Modal (replaced Surya-2, YOLO, and Chandra; pytesseract + EasyOCR removed)
 - **Monitoring**: Sentry error tracking and structured logging
@@ -738,7 +735,7 @@ All deployment results are displayed on the main GitHub Action page with:
 
 **`update-supabase-types.yml`** (Auto-generate TypeScript types): requires `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID`.
 
-**Backend Server Deployment** (manual SSH or orchestrated): requires `SSH_PRIVATE_KEY`, `SSH_HOST`, `SSH_USER`, plus all application environment variables including Supabase credentials, JWT secret, AI API keys, and HuggingFace endpoint configuration.
+**Backend Server Deployment** (manual SSH or orchestrated): requires `SSH_PRIVATE_KEY`, `SSH_HOST`, `SSH_USER`, plus all application environment variables including Supabase credentials, JWT secret, AI API keys, and Modal endpoint configuration (SLIG + PaddleOCR-VL).
 
 #### **Deployment Process**
 1. **Code Checkout**: Latest code from target branch
@@ -817,8 +814,8 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
      - OPENAI_API_KEY
      - ANTHROPIC_API_KEY
      - VOYAGE_API_KEY (for text embeddings)
-     - SLIG_ENDPOINT_URL (for visual embeddings — SigLIP2)
-     - SLIG_ENDPOINT_TOKEN (for visual embeddings — SigLIP2)
+     - SLIG_MODAL_URL (for visual embeddings — SigLIP2, on Modal)
+     - SLIG_MODAL_API_KEY (for visual embeddings — SigLIP2, on Modal)
      - PADDLEOCR_MODAL_API_KEY (for the layout+OCR structural pass on Modal; YOLO/Chandra/Qwen retired)
      - FIRECRAWL_API_KEY (for price monitoring)
 
@@ -842,7 +839,9 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
 
 #### **Remote GPU-Accelerated Embeddings (Optional)**
 
-Enable Hugging Face Inference API for 15x faster visual embeddings by adding the following to the systemd service: `VISUAL_EMBEDDING_MODE=remote`, `HUGGINGFACE_API_KEY` (your HF token), `HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384`, `HUGGINGFACE_BATCH_SIZE=10`, `HUGGINGFACE_TIMEOUT=60`, and optionally `VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384` to upgrade the local model to SigLIP v2.
+> **Obsolete (2026-06-14)**: visual embeddings now run on the **SLIG Modal endpoint** (`google/siglip2-base-patch16-512`, native 768D), configured via `SLIG_MODAL_URL` / `SLIG_MODAL_API_KEY` (see the SLIG Modal Endpoint section above). The HuggingFace-Inference-API local-vs-remote toggle below is stale and no longer used — HuggingFace hosts nothing in this platform.
+
+~~Enable Hugging Face Inference API for 15x faster visual embeddings by adding the following to the systemd service: `VISUAL_EMBEDDING_MODE=remote`, `HUGGINGFACE_API_KEY` (your HF token), `HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384`, `HUGGINGFACE_BATCH_SIZE=10`, `HUGGINGFACE_TIMEOUT=60`, and optionally `VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384` to upgrade the local model to SigLIP v2.~~
 
 **Benefits:**
 - ✅ GPU-accelerated: ~15x faster (12-17s → <1s per image)
@@ -1210,21 +1209,21 @@ This section covers all third-party services used by the platform, their pricing
 
 ---
 
-### 🤗 HuggingFace Inference Endpoints
+### ⚡ Modal GPU Endpoints
 
-**Role**: GPU-accelerated visual embeddings (SigLIP2) — the **only** model still on HF. The layout+OCR structural pass moved to **Modal** (PaddleOCR-VL); vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
+**Role**: GPU-accelerated visual embeddings (SigLIP2 via SLIG) and the PDF layout+OCR structural pass (PaddleOCR-VL). Both run on **Modal** — HuggingFace hosts nothing in this platform anymore. SLIG moved off HuggingFace to Modal on 2026-06-14; the structural pass moved to Modal earlier; vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
 
-**Dashboard**: https://ui.endpoints.huggingface.co
-**Pricing**: https://huggingface.co/pricing
+**Dashboard**: https://modal.com
+**Pricing**: https://modal.com/pricing
 
-| Endpoint | Host | Instance | Rate | Auto-pause / scale-to-zero |
+| Endpoint | Host | Instance | Rate | Scale-to-zero |
 |----------|------|----------|------|-----------|
-| SigLIP2 (SLIG visual embeddings) | HuggingFace | GPU (A10G) | ~$1-2/hour | Yes (15 min idle) |
+| SigLIP2 (SLIG visual embeddings) | **Modal** | GPU | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
 | PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (L4) | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
 | ~~Chandra OCR v2 / YOLO DocParser~~ | ~~HuggingFace~~ | — | — | **REMOVED 2026-06-13** — replaced by PaddleOCR-VL on Modal |
 | ~~Qwen3-VL-32B~~ | ~~HuggingFace~~ | ~~GPU (A100)~~ | — | **DELETED 2026-05-01** — vision via Anthropic Claude Opus 4.7 |
 
-**Cost control**: SLIG auto-pauses; PaddleOCR-VL scales to zero ($0 idle). Billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
+**Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
 
 ---
 
@@ -1277,7 +1276,7 @@ Credits are refunded on generation failure.
 | **Voyage AI** | $5–$30 | Embedding volume |
 | **Supabase** | $25–$75 | Pro + storage add-ons |
 | **Vercel** | $20/member | Pro plan |
-| **HuggingFace** | $5–$20 | Auto-paused endpoints |
+| **Modal** | $5–$20 | SLIG + PaddleOCR-VL GPU endpoints, scale-to-zero ($0 idle) |
 | **Firecrawl** | $16–$83 | Depends on scraping volume |
 | **DataForSEO** | $10–$50 | Depends on SEO pipeline usage |
 | **Zernio** | Subscription + per-message | WhatsApp messaging + social publishing |
@@ -1286,7 +1285,7 @@ Credits are refunded on generation failure.
 | **Total (est.)** | **~$160–$600/month** | Scales with usage |
 
 > **Cost optimization tips:**
-> - HuggingFace endpoints are auto-paused — ensure `auto_pause_timeout` is set correctly for all endpoints
+> - Modal endpoints (SLIG + PaddleOCR-VL) scale to zero — $0 idle, billed only while serving requests
 > - Resend Free plan covers 3,000 emails/month; upgrade to Pro only when needed
 > - Monitor Anthropic token usage in the console — KAI agent is the largest consumer
 > - Supabase PITR ($100/month) is optional but recommended for production data safety

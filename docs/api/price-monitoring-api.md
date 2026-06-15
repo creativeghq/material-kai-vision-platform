@@ -624,11 +624,9 @@ Only one of these is actually required — the rest have sensible defaults that 
 
 | Env var | Code default | Set in Secrets? |
 |---|---|---|
-| `SLIG_ENDPOINT_TOKEN` | `""` | **Required** — without it, SLIG requests get 401 |
-| `SLIG_ENDPOINT_URL` | `https://f4kbl5do4tz6svct.us-east-1.aws.endpoints.huggingface.cloud` | Optional — override only if endpoint changes |
-| `SLIG_ENDPOINT_NAME` | `mh-slig` | Optional |
-| `SLIG_NAMESPACE` | `basiliskan` | Optional |
-| `SLIG_MODEL_NAME` | `basiliskan/slig` | Optional (logs + validation only) |
+| `SLIG_MODAL_API_KEY` | `""` | **Required** — without it, SLIG requests get 401 (shared `paddleocr-api-key` Modal secret) |
+| `SLIG_MODAL_URL` | `https://basilakis--slig-sligservice-web.modal.run` | Optional — override only if the Modal URL changes |
+| `SLIG_MODEL_NAME` | `basiliskan/slig` | Optional (logs + validation only) — duplicates `google/siglip2-base-patch16-512`, native 768D |
 | `SLIG_EMBEDDING_DIMENSION` | `768` | Optional |
 | `SLIG_ENABLED` | `true` | Optional — set `false` to bypass SLIG entirely |
 | `SLIG_TIMEOUT` | `300` | Optional |
@@ -661,7 +659,7 @@ sudo systemctl daemon-reload && sudo systemctl restart mivaa-pdf-extractor.servi
 ```
 
 **Note on a drift between the legacy `.conf` and the code defaults** (worth knowing before you remove the file):
-- `SLIG_TIMEOUT`: `.conf` says `60`, code default is `300`. The 300s default is actually *preferred* (prevents HF endpoint re-warmup during long jobs). Recommend going with the code default unless you have a reason.
+- `SLIG_TIMEOUT`: `.conf` says `60`, code default is `300`. The 300s default is actually *preferred* (prevents Modal endpoint re-warmup during long jobs). Recommend going with the code default unless you have a reason.
 - (`SLIG_MODEL_NAME` previously drifted between `basiliskan/slig` in `.conf` and `basiliskan/siglip2` in the code default — fixed 2026-05-03; both now agree on `basiliskan/slig`.)
 
 ---

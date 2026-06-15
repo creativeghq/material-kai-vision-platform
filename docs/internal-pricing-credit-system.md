@@ -54,9 +54,9 @@ All three MUST be updated together.
 - **Models Tracked**: PaddleOCR-VL (0.9B, PP-DocLayoutV2 detector + 0.9B VLM) on Modal — layout+OCR backbone post-2026-06-13. Replaced Surya-2, which had replaced Chandra v2.
 - **Cost Calculation**: Modal runtime cost amortized across all OCR'd pages/images. Per-attempt telemetry tracked in `paddleocr_metrics`.
 
-### 3b. **HuggingFace Endpoint Visual Embeddings (SLIG SigLIP2)**
-- **Pricing Unit**: HuggingFace Inference Endpoint hourly rate (auto-paused when idle)
-- **Models Tracked**: SLIG (SigLIP2 ViT-SO400M) — 5 specialized 768D embedding types per image
+### 3b. **Modal Endpoint Visual Embeddings (SLIG SigLIP2)**
+- **Pricing Unit**: Modal GPU endpoint (scale-to-zero when idle, $0 idle). SLIG moved off HuggingFace to Modal 2026-06-14.
+- **Models Tracked**: SLIG (SigLIP2 base, `siglip2-base-patch16-512`, 768D) — 5 specialized 768D embedding types per image
 - **Cost Calculation**: Endpoint runtime cost amortized across all images embedded.
 
 ### 4. **Embedding Models** (updated 2026-04)

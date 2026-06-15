@@ -29,8 +29,8 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - RAG system (Claude Opus 4.7 + 7-Vector Direct VECS)      │
 │ - Search APIs (Multi-Vector, Semantic, Hybrid)             │
 │ - AI Services (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5,   │
-│   Voyage AI voyage-4, SLIG/SigLIP2 on HF, PaddleOCR-VL on  │
-│   Modal, GPT-5)                                             │
+│   Voyage AI voyage-4, SLIG/SigLIP2 on Modal, PaddleOCR-VL  │
+│   on Modal, GPT-5)                                         │
 │ - Product Management + Metadata Management                 │
 │ - Duplicate Detection & Merging (factory-based)            │
 │ - Admin & Monitoring                                        │
@@ -63,7 +63,7 @@ Frontend (Vercel)
             ├─→ Supabase (Data)
             ├─→ Voyage AI (Text + Understanding Embeddings, sole text embedder)
             ├─→ Anthropic (Claude Opus 4.7 vision tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
-            ├─→ HuggingFace Endpoint (SLIG SigLIP2 visual embeddings)
+            ├─→ Modal (SLIG SigLIP2 visual embeddings)
             ├─→ Modal (PaddleOCR-VL structural layout + OCR backbone)
             ├─→ OpenAI (optional alternative — GPT-4o/GPT-5; not vision)
             └─→ Supabase Storage (Images)
@@ -217,7 +217,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
    - Vision analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`)
 
 10. **Model Endpoint APIs** (Qwen retired 2026-05-01, Surya-2 → PaddleOCR-VL 2026-06-13)
-    - SLIG (SigLIP2) on HuggingFace — visual embeddings (768D, 5 specialized types)
+    - SLIG (SigLIP2) on Modal — visual embeddings (768D, 5 specialized types)
     - PaddleOCR-VL on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone
 
 11. **Monitoring Routes** (3 endpoints)
@@ -250,8 +250,8 @@ All tables use RLS policies that restrict access based on workspace membership. 
 - Provenance fields persisted (`embedding_model`, `schema_version`) for drift detection
 - OpenAI fallback DISABLED for understanding path (prevents VECS collection drift)
 
-**HuggingFace Endpoint** (SLIG only):
-- **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material). The structural pass moved to Modal, so this is now the sole HF endpoint.
+**Modal** (visual embeddings):
+- **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material). Model `basiliskan/slig` duplicates `google/siglip2-base-patch16-512` (native 768D, no projection head). Migrated off HuggingFace onto Modal 2026-06-14, so HuggingFace now hosts nothing.
 
 **Modal** (structural layout + OCR backbone):
 - **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — two-stage parser: PP-DocLayoutV2 (RT-DETR detector + pointer network) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Runs structure-first as Stage 1, BEFORE discovery (`processing_version="paddleocr-vl"`); also backs Phase 3 per-image OCR (`OCRResult.method` = `paddleocr`/`paddleocr_failed`, metrics in `paddleocr_metrics`, `ocr_engine`=`paddleocr`)
@@ -383,7 +383,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 **AI Services**:
 - Anthropic API (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5 — primary)
 - Voyage AI (text + understanding embeddings, sole text embedder)
-- HuggingFace Endpoint (SLIG SigLIP2 visual embeddings)
+- Modal (SLIG SigLIP2 visual embeddings)
 - Modal (PaddleOCR-VL structural layout + OCR backbone)
 - OpenAI API (optional alternative — GPT-4o/GPT-5; not vision)
 

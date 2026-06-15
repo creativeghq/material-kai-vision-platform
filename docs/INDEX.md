@@ -354,7 +354,7 @@ Complete documentation for Material Kai Vision Platform.
 - Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
-- HuggingFace Endpoints: SLIG SigLIP2 (5 visual embedding types, 768D each — the only HF-hosted model)
+- Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
 - PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
@@ -509,7 +509,7 @@ Complete documentation for Material Kai Vision Platform.
 - PDF Routes (4 endpoints)
 - Products Routes (3 endpoints)
 - Embeddings Routes (3 endpoints)
-- HuggingFace Endpoint Routes (SLIG SigLIP2 — the only HF-hosted model; layout + OCR is PaddleOCR-VL on Modal as of 2026-06-13)
+- Model Endpoint Routes (SLIG SigLIP2 visual embeddings on Modal; layout + OCR is PaddleOCR-VL on Modal — both GPU endpoints are Modal-hosted as of 2026-06-14)
 - Anthropic Routes (3 endpoints)
 - Monitoring Routes (3 endpoints)
 - AI Metrics Routes (2 endpoints)
@@ -581,7 +581,7 @@ Complete documentation for Material Kai Vision Platform.
 
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **20+** AI models across 8 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs, Replicate, Google Gemini, xAI)
+- **20+** AI models across 8 providers (Anthropic, OpenAI, Voyage AI, Modal, WorldLabs, Replicate, Google Gemini, xAI)
 - **14** processing pipeline stages
 - **170+** API endpoints (20 categories)
 - **60+** Supabase Edge Functions
@@ -598,7 +598,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (HuggingFace, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

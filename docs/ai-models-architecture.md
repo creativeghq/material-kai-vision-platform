@@ -3,7 +3,7 @@
 **Last Updated**: 2026-06-13
 **Status**: Production
 
-> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on HuggingFace + PaddleOCR-VL on Modal**. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
+> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
 
 ## Executive Summary
 
@@ -13,7 +13,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 |----------|-------------|-----------------|
 | **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
-| **Google (HuggingFace)** | SigLIP2 SO400M (768D projected) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
+| **Google (Modal)** | SigLIP2 base (768D) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
 | **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV2 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
@@ -220,12 +220,12 @@ Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as
 
 ---
 
-### 5. **SLIG (SigLIP2 SO400M, 768D projected) Cloud Endpoint** 🎯
+### 5. **SLIG (SigLIP2 base, 768D) Cloud Endpoint** 🎯
 
 **File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
-**HF endpoint**: `mh-slig` (namespace `basiliskan`), serves the custom HF model `basiliskan/slig`. Underlying architecture per the production env (`VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384`) is **SigLIP2 SO400M** (native 1152D), wrapped with a **1152D → 768D projection head** at the endpoint so every downstream consumer sees a uniform 768D output (`SLIG_EMBEDDING_DIMENSION=768`).
+**Modal endpoint**: app `slig`, URL `https://basilakis--slig-sligservice-web.modal.run`, serving the custom model `basiliskan/slig` which duplicates **`google/siglip2-base-patch16-512`** — stock SigLIP2 base, **native 768D, no projection head** (`SLIG_EMBEDDING_DIMENSION=768`).
 
-HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
+Modal endpoint (app: slig). Modes: `zero_shot`, `image_embedding`, `text_embedding`, `similarity`. For specialized embeddings (color, texture, material, style), the client obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends them with weighted averaging before normalizing to a unit vector.
 
 **Output**: 768D specialized embeddings (5 types per image), all halfvec in VECS. The previous-generation 1152D SigLIP-SO400M collections (image_siglip_embeddings + 1152D specialized) were dropped 2026-04 as 100% orphans from the pre-SLIG era.
 
@@ -233,7 +233,7 @@ HuggingFace inference endpoint. Modes: `zero_shot`, `image_embedding`, `text_emb
 - 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
 - Atomic specialized VECS upsert: writes all 4 vectors first, then sets flags only for those that landed
 
-**Cost**: HuggingFace endpoint with auto-pause
+**Cost**: Modal endpoint, scale-to-zero ($0 idle)
 **Speed**: 150-400ms per image
 **Output**: 768D float16 (halfvec) per type
 
@@ -300,7 +300,7 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 | Vision (primary) | Claude Opus 4.7 (tool use) | — |
 | Vision (validation, low-confidence) | Claude Opus 4.7 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
-| Visual Embeddings | SLIG (SigLIP2 SO400M (768D projected), 5×768D) | — |
+| Visual Embeddings | SLIG (SigLIP2 base 768D, 5×768D) | — |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
 | Text Embeddings | Voyage AI voyage-4 (1024D) | — |
 
