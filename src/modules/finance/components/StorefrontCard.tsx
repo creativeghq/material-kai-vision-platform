@@ -65,7 +65,7 @@ export const StorefrontCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2"><Store className="h-4 w-4" /> Online store</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Store className="h-4 w-4" /> Online Store</CardTitle>
         <Switch checked={cfg.enabled} onCheckedChange={(v) => setCfg({ ...cfg, enabled: v })} />
       </CardHeader>
       <CardContent className="space-y-4 p-5">

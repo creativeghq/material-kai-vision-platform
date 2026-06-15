@@ -59,7 +59,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2"><Tags className="h-4 w-4" /> Finance categories</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Tags className="h-4 w-4" /> Finance Categories</CardTitle>
         <Button size="sm" variant="outline" className="rounded-full" onClick={importDefaults} disabled={importing}>
           {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} Import default categories
         </Button>

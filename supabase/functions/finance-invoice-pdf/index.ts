@@ -396,11 +396,33 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   const payBits: string[] = [];
   if (inv.payment_method_code) payBits.push(`${L.paymentMethod}: ${PAY_LABELS[Number(inv.payment_method_code)] ?? inv.payment_method_code}`);
   if (inv.payment_method_info) payBits.push(String(inv.payment_method_info));
-  const bank = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
-  if (payBits.length || bank) {
+  // Multiple payment accounts (banks + PayPal + other) from fs.bank_accounts;
+  // fall back to the legacy single-bank columns when the array is empty.
+  const accounts: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
+  const accountLines: string[] = [];
+  if (accounts.length > 0) {
+    for (const a of accounts) {
+      let detail = '';
+      if (a?.type === 'bank') {
+        detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
+      } else if (a?.type === 'paypal') {
+        detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
+      } else {
+        detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
+      }
+      if (detail) accountLines.push(a?.label ? `${a.label}: ${detail}` : detail);
+    }
+  } else {
+    const legacy = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
+    if (legacy) accountLines.push(legacy);
+  }
+  if (payBits.length || accountLines.length) {
     if (y < M + 110) newPage();
     for (const pb of payBits) { text(pb, M, y, 8.5, font, MUTED); y -= 11; }
-    if (bank) { text(`${L.bank}: ${bank}`, M, y, 8.5, font, MUTED); y -= 11; }
+    accountLines.forEach((line, i) => {
+      if (y < M + 60) newPage();
+      text(i === 0 ? `${L.bank}: ${line}` : line, M, y, 8.5, font, MUTED); y -= 11;
+    });
     y -= 4;
   }
 

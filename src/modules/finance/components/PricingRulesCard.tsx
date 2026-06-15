@@ -4,12 +4,13 @@
  * per-product > per-category > default. Per-product overrides are set from the product
  * card; this card manages the category-level rules.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
 
@@ -21,6 +22,7 @@ interface Rule {
 export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rules, setRules] = useState<Rule[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [newCat, setNewCat] = useState('');
@@ -29,18 +31,28 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const load = async () => {
     try {
       setLoading(true);
-      const all = await financeService.listPricingRules(workspaceId);
+      const [all, cats] = await Promise.all([
+        financeService.listPricingRules(workspaceId),
+        financeService.listMaterialCategories(workspaceId).catch(() => []),
+      ]);
       setRules(all.filter((r) => r.scope === 'category'));
+      setCategories(cats);
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [workspaceId]);
 
+  // Only offer categories that don't already have a rule.
+  const availableCategories = useMemo(() => {
+    const taken = new Set(rules.map((r) => r.target_id));
+    return categories.filter((c) => !taken.has(c));
+  }, [categories, rules]);
+
   const addRule = async () => {
     const cat = newCat.trim().toLowerCase();
     const pct = parseFloat(newMarkup);
-    if (!cat) { toast({ title: 'Category required', variant: 'destructive' }); return; }
+    if (!cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(pct) || pct < 0) { toast({ title: 'Enter a markup %', variant: 'destructive' }); return; }
     setBusy(true);
     try {
@@ -60,7 +72,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Category markup rules</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Category Markup Rules</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
@@ -76,7 +88,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           <div className="space-y-2">
             {rules.map((r) => (
               <div key={r.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
-                <span className="capitalize">{r.target_id}</span>
+                <span className="capitalize">{r.target_id.replace(/_/g, ' ')}</span>
                 <div className="flex items-center gap-3">
                   <span className="font-medium">+{r.markup_pct}%</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(r.id)}>
@@ -91,16 +103,30 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end pt-1">
           <div className="space-y-1">
             <Label className="text-xs">Category</Label>
-            <Input className="h-8 text-xs" value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="tiles" />
+            <Select value={newCat} onValueChange={setNewCat} disabled={availableCategories.length === 0}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder={categories.length === 0 ? 'No catalog categories yet' : availableCategories.length === 0 ? 'All categories have rules' : 'Select a category'} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((c) => (
+                  <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Markup %</Label>
             <Input className="h-8 text-xs w-24" type="number" step="0.5" min="0" value={newMarkup} onChange={(e) => setNewMarkup(e.target.value)} placeholder="25" />
           </div>
-          <Button size="sm" variant="outline" onClick={addRule} disabled={busy}>
+          <Button size="sm" variant="outline" onClick={addRule} disabled={busy || !newCat}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           </Button>
         </div>
+        {categories.length === 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            Categories are read from your catalog products’ material category. Add products (or import a catalog) and they’ll appear here.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

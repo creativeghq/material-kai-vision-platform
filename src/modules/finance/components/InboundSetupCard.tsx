@@ -58,23 +58,24 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Inbox className="h-4 w-4" /> myDATA inbox (received documents)</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Inbox className="h-4 w-4" /> myDATA Inbox (Received Documents)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
-          Enter your AADE myDATA <strong>received-docs</strong> credentials (Special Access Codes with the RequestDocs scope — different from the VAT-lookup codes). Once enabled, documents suppliers issue to you appear under <strong>Documents → Expenses</strong>, ready to turn into supplier bills or warehouse intake.
+          Enter your <strong>myDATA REST API</strong> credentials — a <strong>User ID</strong> and a <strong>Subscription Key</strong> you get by registering an application in the AADE myDATA REST API portal (<a href="https://www1.aade.gr/saadeapps2/bookkeeper-web/" target="_blank" rel="noreferrer" className="text-primary underline">bookkeeper-web</a> → Registration → REST API). These are <strong>not</strong> the Special Access Codes used for VAT/registry lookups (those are username+password). Once enabled, documents suppliers issue to you appear under <strong>Documents → Expenses</strong>, ready to turn into supplier bills or warehouse intake.
         </p>
         <div className="space-y-1">
-          <Label className="text-xs">aade-user-id</Label>
-          <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="your myDATA user id" />
+          <Label className="text-xs">User ID <span className="text-muted-foreground">(sent as <code>aade-user-id</code>)</span></Label>
+          <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="your myDATA REST API user id" />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Subscription key</Label>
-          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• (configured — leave blank to keep)' : 'Ocp-Apim-Subscription-Key'} />
+          <Label className="text-xs">Subscription Key <span className="text-muted-foreground">(<code>Ocp-Apim-Subscription-Key</code>)</span></Label>
+          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• (configured — leave blank to keep)' : 'your myDATA REST API subscription key'} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Base URL (optional)</Label>
           <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://mydatapi.aade.gr/myDATA" />
+          <p className="text-[11px] text-muted-foreground">Production: <code>https://mydatapi.aade.gr/myDATA</code> · Sandbox: <code>https://mydataapidev.aade.gr/myDATA</code>. Leave blank for production.</p>
         </div>
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
           <div className="text-sm">Enabled</div>

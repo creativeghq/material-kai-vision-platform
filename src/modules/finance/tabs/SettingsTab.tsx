@@ -29,15 +29,15 @@ interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) =
 
 const SETTINGS_SECTIONS = [
   { value: 'general', label: 'General', icon: SlidersHorizontal },
-  { value: 'identity', label: 'Business identity', icon: Building2 },
+  { value: 'identity', label: 'Business Identity', icon: Building2 },
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
-  { value: 'storefront', label: 'Online store', icon: Store },
+  { value: 'storefront', label: 'Online Store', icon: Store },
   { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
-  { value: 'digest', label: 'Finance digest', icon: Mail },
+  { value: 'digest', label: 'Finance Digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
 ] as const;
 
@@ -221,7 +221,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="general" className="mt-0">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module settings</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
             <div>
@@ -395,7 +395,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="statements" className="mt-0">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Statement PDF design</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Statement PDF Design</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
           <p className="text-xs text-muted-foreground">
             Same dimensions as quote PDFs: A4 (595 × 842 pt). The statement table renders on top of these backdrops. PNG or JPG.
@@ -427,7 +427,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         <TabsContent value="digest" className="mt-0">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Finance digest</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Finance Digest</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
           <DigestPanel

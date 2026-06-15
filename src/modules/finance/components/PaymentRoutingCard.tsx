@@ -50,7 +50,7 @@ export const PaymentRoutingCard: React.FC<{ workspaceId: string }> = ({ workspac
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payout routing</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payout Routing</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         {loading ? (

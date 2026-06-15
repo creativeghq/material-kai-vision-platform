@@ -43,7 +43,7 @@ export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Invite team member</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Invite Team Member</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <div className="space-y-1">

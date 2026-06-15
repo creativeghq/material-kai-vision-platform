@@ -661,6 +661,17 @@ const _financeServiceCore = {
 
   // -------- Pricing rules (#176 markup overrides) --------
 
+  /**
+   * Distinct material categories used by catalog products (this workspace + root
+   * catalog). These are the values a per-category markup rule matches against
+   * (products.metadata->>'material_category'), so the UI offers them as a dropdown.
+   */
+  async listMaterialCategories(workspaceId: string): Promise<string[]> {
+    const { data, error } = await supabase.rpc('finance_list_material_categories', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return ((data ?? []) as Array<{ category: string }>).map((r) => r.category).filter(Boolean);
+  },
+
   async listPricingRules(workspaceId: string): Promise<Array<{
     id: string; scope: 'category' | 'product'; target_id: string;
     markup_pct: number | null; sell_price: number | null; currency: string;
