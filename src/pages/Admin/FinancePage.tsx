@@ -18,6 +18,8 @@ import {
   Users,
   Package,
   Settings as SettingsIcon,
+  Banknote as BanknoteIcon,
+  Ban,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -41,6 +43,8 @@ import {
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
+import { ManualEntryDialog } from '@/modules/finance/components/ManualEntryDialog';
+import { RecordPaymentDialog, type RecordPaymentPreset } from '@/modules/finance/components/RecordPaymentDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
@@ -103,6 +107,23 @@ const FinancePage: React.FC = () => {
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
+  // Un-invoiced receivables / payables
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualEntryDir, setManualEntryDir] = useState<'receivable' | 'payable'>('receivable');
+  const [settlePreset, setSettlePreset] = useState<RecordPaymentPreset | null>(null);
+  const [settleOpen, setSettleOpen] = useState(false);
+
+  const openManualEntry = (dir: 'receivable' | 'payable') => { setManualEntryDir(dir); setManualEntryOpen(true); };
+  const openSettle = (preset: RecordPaymentPreset) => { setSettlePreset(preset); setSettleOpen(true); };
+  const voidManual = async (id: string) => {
+    try {
+      await financeService.voidManualEntry(id);
+      toast({ title: 'Entry removed' });
+      if (workspaceId) void loadAll(workspaceId);
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -196,6 +217,14 @@ const FinancePage: React.FC = () => {
 
         <Tabs defaultValue="dashboard" orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+            {!isAccountant && (
+              <Link
+                to="/pos"
+                className="flex w-full items-center justify-start rounded-md px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+              >
+                <Receipt className="h-4 w-4 mr-2" /> Point of Sale
+              </Link>
+            )}
             <TabsTrigger value="dashboard" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <PieChart className="h-4 w-4 mr-2" /> Dashboard
             </TabsTrigger>
@@ -279,30 +308,6 @@ const FinancePage: React.FC = () => {
                 subtext={`${followUps.length} quote(s) need follow-up`}
               />
             </div>
-
-            {/* Point of Sale — quick B2C sale → myDATA retail receipt (11.1). The page lives at
-                /pos (outside the Finance tabs), so surface it here as the discoverable entry. */}
-            {!isAccountant && (
-              <Link to="/pos" className="block">
-                <Card className="dashboard-card border-0 transition-colors hover:bg-muted/40">
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                      <Receipt className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        Point of Sale
-                        <Badge variant="outline" className="text-[10px]">vPOS</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Cashier shifts, cash drawer &amp; X/Z reports. Ring up a walk-in sale and issue a myDATA retail receipt.
-                      </p>
-                    </div>
-                    <Button size="sm" variant="outline" className="shrink-0">Open POS</Button>
-                  </CardContent>
-                </Card>
-              </Link>
-            )}
 
             {/* Marketplace commission earned (downline catalog sales) — renders only when non-zero */}
             <CommissionSummaryCard />
@@ -406,12 +411,17 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── RECEIVABLES ─────────── */}
           <TabsContent value="ar" className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h3 className="text-sm font-semibold">Receivables — all open invoices</h3>
-                <p className="text-xs text-muted-foreground">Invoices issued, partially paid, or overdue. To invoice an accepted quote, use the Issue invoice button on the quote page.</p>
+                <h3 className="text-sm font-semibold">Receivables — money customers owe us</h3>
+                <p className="text-xs text-muted-foreground">Open invoices plus un-invoiced receivables (deposits, advances, fees). To invoice an accepted quote, use Issue invoice on the quote page.</p>
               </div>
-              {!isAccountant && <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>}
+              {!isAccountant && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => openManualEntry('receivable')}><Plus className="h-4 w-4 mr-1" /> Add receivable</Button>
+                  <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -443,11 +453,26 @@ const FinancePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {ar.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No open invoices.</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No open receivables.</td></tr>
                     )}
-                    {ar.map((r) => (
-                      <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${r.id}`)}>
-                        <td className="px-4 py-2 font-mono text-xs">{r.internal_number}</td>
+                    {ar.map((r) => {
+                      const isManual = r.entry_kind === 'manual';
+                      return (
+                      <tr
+                        key={r.id}
+                        className={`border-b border-border/30 hover:bg-muted/30 ${isManual ? '' : 'cursor-pointer'}`}
+                        onClick={isManual ? undefined : () => navigate(`${financeBase}/invoices/${r.id}`)}
+                      >
+                        <td className="px-4 py-2">
+                          {isManual ? (
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs">{r.description}</span>
+                              <Badge variant="secondary" className="text-[10px]">Un-invoiced</Badge>
+                            </span>
+                          ) : (
+                            <span className="font-mono text-xs">{r.internal_number}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
@@ -456,11 +481,25 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
-                        <td className="px-4 py-2 text-right">
-                          <InvoiceActionsMenu invoiceId={r.id} financeBase={financeBase} onChanged={() => loadAll(workspaceId)} />
+                        <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                          {isManual ? (
+                            !isAccountant && (
+                              <div className="flex items-center justify-end gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'received', targetType: 'manual_entry', targetId: r.id })}>
+                                  <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Remove" onClick={() => voidManual(r.id)}>
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )
+                          ) : (
+                            <InvoiceActionsMenu invoiceId={r.id} financeBase={financeBase} onChanged={() => loadAll(workspaceId)} />
+                          )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </CardContent>
@@ -469,12 +508,13 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── PAYABLES ─────────── */}
           <TabsContent value="ap" className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h3 className="text-sm font-semibold">Payables — supplier bills</h3>
-                <p className="text-xs text-muted-foreground">Open and overdue bills from suppliers. Suppliers must be marked <code>is_supplier</code> in CRM.</p>
+                <h3 className="text-sm font-semibold">Payables — money we owe</h3>
+                <p className="text-xs text-muted-foreground">Open supplier bills plus un-invoiced payables (rent, utilities, advances). Suppliers must be marked <code>is_supplier</code> in CRM.</p>
               </div>
               <div className="flex items-center gap-2">
+                {!isAccountant && <Button variant="outline" onClick={() => openManualEntry('payable')}><Plus className="h-4 w-4 mr-1" /> Add payable</Button>}
                 {!isAccountant && <Button variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
                 {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
               </div>
@@ -509,11 +549,22 @@ const FinancePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {ap.length === 0 && (
-                      <tr><td colSpan={isAccountant ? 7 : 8} className="px-4 py-8 text-center text-muted-foreground">No open supplier bills.</td></tr>
+                      <tr><td colSpan={isAccountant ? 7 : 8} className="px-4 py-8 text-center text-muted-foreground">No open payables.</td></tr>
                     )}
-                    {ap.map((r) => (
+                    {ap.map((r) => {
+                      const isManual = r.entry_kind === 'manual';
+                      return (
                       <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
-                        <td className="px-4 py-2 font-mono text-xs">{r.supplier_bill_number ?? '—'}</td>
+                        <td className="px-4 py-2">
+                          {isManual ? (
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs">{r.description}</span>
+                              <Badge variant="secondary" className="text-[10px]">Un-invoiced</Badge>
+                            </span>
+                          ) : (
+                            <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
@@ -524,13 +575,25 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         {!isAccountant && (
                           <td className="px-4 py-2 text-right">
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
-                              <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
-                            </Button>
+                            {isManual ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'paid_out', targetType: 'manual_entry', targetId: r.id })}>
+                                  <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Remove" onClick={() => voidManual(r.id)}>
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
+                                <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
+                              </Button>
+                            )}
                           </td>
                         )}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </CardContent>
@@ -639,6 +702,20 @@ const FinancePage: React.FC = () => {
         onOpenChange={setScnOpen}
         supplierBillId={scnBillId}
         onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+      />
+      <ManualEntryDialog
+        workspaceId={workspaceId}
+        direction={manualEntryDir}
+        open={manualEntryOpen}
+        onOpenChange={setManualEntryOpen}
+        onSaved={() => { if (workspaceId) void loadAll(workspaceId); }}
+      />
+      <RecordPaymentDialog
+        workspaceId={workspaceId}
+        open={settleOpen}
+        onOpenChange={setSettleOpen}
+        preset={settlePreset}
+        onSaved={() => { setSettleOpen(false); setSettlePreset(null); if (workspaceId) void loadAll(workspaceId); }}
       />
     </div>
   );

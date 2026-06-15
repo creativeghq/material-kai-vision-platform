@@ -244,6 +244,32 @@ export interface AgingRow {
   status: string;
   age_bucket: AgeBucket;
   days_overdue: number;
+  /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable. */
+  entry_kind?: 'invoice' | 'manual';
+  /** Free-text label for manual entries (null for invoices/bills). */
+  description?: string | null;
+}
+
+export type ManualEntryDirection = 'receivable' | 'payable';
+export type ManualEntryStatus = 'open' | 'partially_paid' | 'paid' | 'void';
+
+export interface ManualEntry {
+  id: string;
+  workspace_id: string;
+  direction: ManualEntryDirection;
+  counterparty_company_id: string | null;
+  counterparty_contact_id: string | null;
+  description: string;
+  category_id: string | null;
+  currency: string;
+  amount: number;
+  amount_paid: number;
+  amount_due: number;
+  status: ManualEntryStatus;
+  issued_at: string;
+  due_at: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 export interface FollowUpRow {
@@ -535,7 +561,7 @@ const _financeServiceCore = {
      * (payment→target). When omitted they default to `amount` / 1 (same-currency).
      */
     allocations: Array<{
-      target_id: string; target_type: 'invoice' | 'supplier_bill';
+      target_id: string; target_type: 'invoice' | 'supplier_bill' | 'manual_entry';
       amount: number; amount_doc?: number; fx_rate?: number;
     }>;
   }): Promise<string> {
@@ -561,6 +587,76 @@ const _financeServiceCore = {
     });
     if (error) throw error;
     return data as string;
+  },
+
+  // -------- Manual (un-invoiced) receivables / payables --------
+
+  /**
+   * List un-invoiced receivables/payables. By default only open + partially-paid
+   * are returned (the ones still owing); pass includeSettled to also pull paid/void.
+   */
+  async listManualEntries(opts: {
+    workspaceId: string;
+    direction?: ManualEntryDirection;
+    includeSettled?: boolean;
+    companyId?: string | null;
+    contactId?: string | null;
+  }): Promise<ManualEntry[]> {
+    let q = supabase
+      .from('finance_manual_entries')
+      .select('*')
+      .eq('workspace_id', opts.workspaceId)
+      .order('issued_at', { ascending: false });
+    if (opts.direction) q = q.eq('direction', opts.direction);
+    if (!opts.includeSettled) q = q.in('status', ['open', 'partially_paid']);
+    if (opts.companyId) q = q.eq('counterparty_company_id', opts.companyId);
+    if (opts.contactId) q = q.eq('counterparty_contact_id', opts.contactId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as ManualEntry[];
+  },
+
+  async createManualEntry(input: {
+    workspaceId: string;
+    direction: ManualEntryDirection;
+    description: string;
+    amount: number;
+    currency?: string;
+    counterpartyCompanyId?: string | null;
+    counterpartyContactId?: string | null;
+    categoryId?: string | null;
+    dueAt?: string | null;
+    issuedAt?: string | null;
+    notes?: string | null;
+  }): Promise<ManualEntry> {
+    const { data, error } = await supabase
+      .from('finance_manual_entries')
+      .insert({
+        workspace_id: input.workspaceId,
+        direction: input.direction,
+        description: input.description,
+        amount: input.amount,
+        currency: input.currency ?? 'EUR',
+        counterparty_company_id: input.counterpartyCompanyId ?? null,
+        counterparty_contact_id: input.counterpartyContactId ?? null,
+        category_id: input.categoryId ?? null,
+        due_at: input.dueAt ?? null,
+        issued_at: input.issuedAt ?? new Date().toISOString(),
+        notes: input.notes ?? null,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as ManualEntry;
+  },
+
+  /** Soft-delete: mark void so it drops out of aging + party rollups (history kept). */
+  async voidManualEntry(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('finance_manual_entries')
+      .update({ status: 'void' })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // -------- Pricing rules (#176 markup overrides) --------
