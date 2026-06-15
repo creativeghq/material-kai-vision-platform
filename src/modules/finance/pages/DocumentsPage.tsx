@@ -69,6 +69,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
+  const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
@@ -141,6 +142,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 {type === 'delivery_notes' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
+                {type === 'dispatch' && !isAccountant && (
+                  <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add manual note</Button>
+                )}
                 {type === 'cheques' && !isAccountant && (
                   <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
@@ -154,7 +158,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             </div>
 
             {type === 'dispatch' ? (
-              activeWorkspaceId ? <DispatchBoard workspaceId={activeWorkspaceId} readOnly={isAccountant} /> : null
+              activeWorkspaceId ? <DispatchBoard key={dispatchRefresh} workspaceId={activeWorkspaceId} readOnly={isAccountant} /> : null
             ) : (
             <Card>
               <CardContent className="p-0">
@@ -225,7 +229,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newDeliveryOpen}
           onOpenChange={setNewDeliveryOpen}
-          onCreated={() => { setNewDeliveryOpen(false); load(); }}
+          onCreated={() => { setNewDeliveryOpen(false); load(); setDispatchRefresh((n) => n + 1); }}
         />
       )}
       {activeWorkspaceId && (

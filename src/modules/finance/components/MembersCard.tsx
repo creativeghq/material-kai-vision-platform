@@ -21,13 +21,24 @@ export const MembersCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     (async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        // workspace_members has no FK to user_profiles, so PostgREST can't embed it.
+        // Fetch members, then resolve their profiles in a second query and join in JS.
+        const { data: members, error } = await supabase
           .from('workspace_members')
-          .select('user_id, role, status, profile:user_profiles!workspace_members_user_id_fkey(full_name, email)')
+          .select('user_id, role, status')
           .eq('workspace_id', workspaceId)
           .order('role');
         if (error) throw error;
-        setRows(data ?? []);
+        const userIds = (members ?? []).map((m) => m.user_id).filter(Boolean);
+        let profilesById: Record<string, { full_name: string | null; email: string | null }> = {};
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('user_profiles')
+            .select('user_id, full_name, email')
+            .in('user_id', userIds);
+          profilesById = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, { full_name: p.full_name, email: p.email }]));
+        }
+        setRows((members ?? []).map((m) => ({ ...m, profile: profilesById[m.user_id] ?? null })));
       } catch (err: any) {
         toast({ title: 'Failed to load members', description: err?.message, variant: 'destructive' });
       } finally { setLoading(false); }
