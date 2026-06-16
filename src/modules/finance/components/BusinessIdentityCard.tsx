@@ -13,7 +13,7 @@
  * Per-workspace (finance_settings); each business fills its own.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Plus, Trash2, Landmark } from 'lucide-react';
+import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Plus, Trash2, Landmark, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/core/ui/accordion';
@@ -24,6 +24,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { aadeService } from '@/modules/myaade';
 
 // ── Payment accounts (multiple banks + PayPal / other) ──────────────────────
 type AccountType = 'bank' | 'paypal' | 'other';
@@ -101,6 +102,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [aadeLoading, setAadeLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -156,6 +158,42 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
     } finally { setSaving(false); }
   };
 
+  /** Greek-only: prefill the issuer fields from ΑΑΔΕ (RgWsPublic2) using the VAT number.
+   *  Writes the Greek (base-key) values; review then Save. No companyId → this is the
+   *  workspace's OWN business, so nothing is cached onto a CRM company row. */
+  const lookupAade = async () => {
+    const afm = String(data.business_vat ?? '').replace(/[^0-9]/g, '');
+    if (afm.length !== 9) {
+      toast({ title: 'Need a 9-digit VAT number', description: 'Type the Greek VAT (9 digits) in the VAT number field first.', variant: 'destructive' });
+      return;
+    }
+    setAadeLoading(true);
+    try {
+      const res = await aadeService.lookup({ afm, reason: 'own_business', workspaceId });
+      if ('error' in res && res.error) {
+        toast({ title: 'ΑΑΔΕ lookup failed', description: res.message || res.error, variant: 'destructive' });
+        return;
+      }
+      if ('ok' in res && res.ok) {
+        const r = res.basic_rec;
+        const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
+        setData((d) => ({
+          ...d,
+          business_name: r.onomasia ?? d.business_name,
+          business_profession: primaryAct?.description ?? d.business_profession,
+          business_tax_office: r.doy_descr ?? d.business_tax_office,
+          business_address: r.postal_address ?? d.business_address,
+          business_street_number: r.postal_address_no ?? d.business_street_number,
+          business_postal_code: r.postal_zip_code ?? d.business_postal_code,
+          business_city: r.postal_area_description ?? d.business_city,
+          business_country: d.business_country || 'Greece',
+          business_country_code: d.business_country_code || 'GR',
+        }));
+        toast({ title: 'Prefilled from ΑΑΔΕ', description: r.onomasia ? `Registered as ${r.onomasia}. Review & Save.` : 'Review & Save.' });
+      }
+    } finally { setAadeLoading(false); }
+  };
+
   const copyBillingToContact = () => setData((d) => ({
     ...d,
     contact_title: d.business_name ?? '', contact_email: d.business_email ?? '',
@@ -205,7 +243,12 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
           </TabsList>
 
           <TabsContent value="billing">
-            <p className="text-xs text-muted-foreground mb-3">Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory.</p>
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <p className="text-xs text-muted-foreground">Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory.</p>
+              <Button size="sm" variant="outline" onClick={lookupAade} disabled={aadeLoading} className="shrink-0">
+                {aadeLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Fetch from ΑΑΔΕ
+              </Button>
+            </div>
             <FieldGrid fields={BILLING} data={data} set={set} lang={lang} />
           </TabsContent>
 

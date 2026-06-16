@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -24,6 +24,7 @@ import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
 import { MembersCard } from '@/modules/finance/components/MembersCard';
+import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -31,6 +32,7 @@ const SETTINGS_SECTIONS = [
   { value: 'general', label: 'General', icon: SlidersHorizontal },
   { value: 'identity', label: 'Business Identity', icon: Building2 },
   { value: 'documents', label: 'Documents', icon: FileText },
+  { value: 'einvoicing', label: 'e-Invoicing', icon: FileSignature },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'services', label: 'Services', icon: Wrench },
@@ -192,6 +194,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <DocumentSetupCard workspaceId={workspaceId} />
           <PosTerminalsCard workspaceId={workspaceId} />
           <InboundSetupCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="einvoicing" className="mt-0">
+          <EInvoicingCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="pricing" className="mt-0">
