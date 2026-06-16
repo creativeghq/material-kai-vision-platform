@@ -251,13 +251,13 @@ export const Auth: React.FC = () => {
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-4">
               <TabsTrigger
                 value="signin"
-                className="flex-1 flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex-1 flex items-center gap-2"
               >
                 Sign In
               </TabsTrigger>
               <TabsTrigger
                 value="signup"
-                className="flex-1 flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex-1 flex items-center gap-2"
               >
                 Sign Up
               </TabsTrigger>

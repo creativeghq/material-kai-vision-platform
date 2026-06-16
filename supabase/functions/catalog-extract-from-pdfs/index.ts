@@ -10,12 +10,25 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
 const MODEL = 'claude-sonnet-4-6';
+
+// Admin-editable at /admin/ai-configs (prompt_type='generation', category='catalog_extract').
+// This literal is the fallback used only if the DB row is missing. Variables:
+// {{filename}}, {{manufacturer}} (pre-formatted suffix or empty), {{query}}, {{max}}.
+const EXTRACT_PROMPT_FALLBACK =
+  `Source PDF: {{filename}}{{manufacturer}}.\n\n` +
+  `User query: "{{query}}"\n\n` +
+  `Identify up to {{max}} materials in this PDF that match the query. ` +
+  `For each, return its name (as printed), a short description (1-2 sentences from the page), ` +
+  `and any visible price + currency + specs (size, finish, color, SKU). ` +
+  `Set page_no to the 1-based page where the material appears. ` +
+  `If the query does not match anything in this PDF, return an empty candidates array.`;
 
 interface ExtractRequest {
   catalog_id: string;
@@ -134,15 +147,13 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
         const perPdfBudget = Math.max(2, Math.floor(maxResults / pdfs.length));
 
-        const userText =
-          `Source PDF: ${pdf.original_filename}` +
-          (pdf.manufacturer_name ? ` (manufacturer: ${pdf.manufacturer_name})` : '') +
-          `.\n\nUser query: "${body.query}"\n\n` +
-          `Identify up to ${perPdfBudget} materials in this PDF that match the query. ` +
-          `For each, return its name (as printed), a short description (1-2 sentences from the page), ` +
-          `and any visible price + currency + specs (size, finish, color, SKU). ` +
-          `Set page_no to the 1-based page where the material appears. ` +
-          `If the query does not match anything in this PDF, return an empty candidates array.`;
+        const promptTemplate = await getGenerationPrompt(supabase, 'catalog_extract', EXTRACT_PROMPT_FALLBACK);
+        const userText = renderPromptTemplate(promptTemplate, {
+          filename: pdf.original_filename,
+          manufacturer: pdf.manufacturer_name ? ` (manufacturer: ${pdf.manufacturer_name})` : '',
+          query: body.query,
+          max: perPdfBudget,
+        });
 
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',

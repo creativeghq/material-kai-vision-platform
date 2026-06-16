@@ -258,11 +258,11 @@ const XMLImportTab: React.FC = () => {
       {/* Source Type Tabs */}
       <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as 'file' | 'url')} className="w-full">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="file" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="file" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Upload File
           </TabsTrigger>
-          <TabsTrigger value="url" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="url" className="flex items-center gap-2">
             <Link className="h-4 w-4" />
             Remote URL
           </TabsTrigger>

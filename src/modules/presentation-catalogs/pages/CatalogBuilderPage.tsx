@@ -259,13 +259,13 @@ export const CatalogBuilderPage: React.FC = () => {
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="builder" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Builder</TabsTrigger>
-          <TabsTrigger value="sources" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4" /> Sources ({(catalog.source_pdf_ids || []).length})</TabsTrigger>
-          <TabsTrigger value="cover" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Cover & Back</TabsTrigger>
-          <TabsTrigger value="access" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Access ({grants.length})</TabsTrigger>
-          <TabsTrigger value="log" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Visitors ({viewEvents.length + accessLog.length})</TabsTrigger>
-          <TabsTrigger value="sends" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Sends ({sendBatches.length})</TabsTrigger>
-          <TabsTrigger value="pdf" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">PDF</TabsTrigger>
+          <TabsTrigger value="builder" className="flex items-center gap-2">Builder</TabsTrigger>
+          <TabsTrigger value="sources" className="flex items-center gap-2"><FileText className="h-4 w-4" /> Sources ({(catalog.source_pdf_ids || []).length})</TabsTrigger>
+          <TabsTrigger value="cover" className="flex items-center gap-2">Cover & Back</TabsTrigger>
+          <TabsTrigger value="access" className="flex items-center gap-2">Access ({grants.length})</TabsTrigger>
+          <TabsTrigger value="log" className="flex items-center gap-2">Visitors ({viewEvents.length + accessLog.length})</TabsTrigger>
+          <TabsTrigger value="sends" className="flex items-center gap-2">Sends ({sendBatches.length})</TabsTrigger>
+          <TabsTrigger value="pdf" className="flex items-center gap-2">PDF</TabsTrigger>
         </TabsList>
 
         <TabsContent value="builder" className="space-y-3 mt-4">

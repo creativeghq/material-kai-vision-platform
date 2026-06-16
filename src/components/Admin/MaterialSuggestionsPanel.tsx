@@ -325,10 +325,10 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
 
         <Tabs defaultValue="suggestions" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-            <TabsTrigger value="suggestions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="suggestions">
               Material Suggestions
             </TabsTrigger>
-            <TabsTrigger value="tests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="tests">
               Integration Tests
             </TabsTrigger>
           </TabsList>

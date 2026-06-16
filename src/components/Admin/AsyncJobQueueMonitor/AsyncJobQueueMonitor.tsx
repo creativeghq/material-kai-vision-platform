@@ -1531,19 +1531,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       {/* 🆕 Job Type Tabs */}
       <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as any)} className="space-y-4">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-          <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
+          <TabsTrigger value="all" className="flex items-center gap-2">
             All Jobs
             <Badge variant="secondary" className="ml-1">{metrics.all_jobs.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pdf_processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
+          <TabsTrigger value="pdf_processing" className="flex items-center gap-2">
             PDF Processing
             <Badge variant="secondary" className="ml-1">{metrics.pdf_processing.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="web_scraping" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
+          <TabsTrigger value="web_scraping" className="flex items-center gap-2">
             Web Scraping
             <Badge variant="secondary" className="ml-1">{metrics.web_scraping.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="xml_import" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
+          <TabsTrigger value="xml_import" className="flex items-center gap-2">
             XML Import
             <Badge variant="secondary" className="ml-1">{metrics.xml_import.total}</Badge>
           </TabsTrigger>

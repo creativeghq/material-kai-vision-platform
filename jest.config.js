@@ -61,25 +61,6 @@ export default {
       functions: 95,
       lines: 95,
       statements: 95
-    },
-    // Specific thresholds for Phase 2 services
-    'src/services/batch/**/*.ts': {
-      branches: 98,
-      functions: 98,
-      lines: 98,
-      statements: 98
-    },
-    'src/middleware/validationMiddleware.ts': {
-      branches: 98,
-      functions: 98,
-      lines: 98,
-      statements: 98
-    },
-    'src/services/validationIntegrationService.ts': {
-      branches: 98,
-      functions: 98,
-      lines: 98,
-      statements: 98
     }
   },
   

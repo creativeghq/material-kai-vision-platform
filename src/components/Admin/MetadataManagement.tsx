@@ -454,11 +454,11 @@ export const MetadataManagement: React.FC = () => {
     <div className="space-y-6">
         <Tabs defaultValue="metadata">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="metadata" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="metadata" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Metadata
             </TabsTrigger>
-            <TabsTrigger value="batch-categorization" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="batch-categorization" className="flex items-center gap-2">
               <Tags className="h-4 w-4" />
               Batch AI Categorization
             </TabsTrigger>

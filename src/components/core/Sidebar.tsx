@@ -76,7 +76,7 @@ export const Sidebar: React.FC = () => {
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
             isActive('/profile')
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
           }`}
         >
           <User className="w-4 h-4" />
@@ -109,7 +109,7 @@ export const Sidebar: React.FC = () => {
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
         isActive('/profile')
           ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
       }`}
     >
       <User className="w-4 h-4" />
@@ -142,7 +142,7 @@ export const Sidebar: React.FC = () => {
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
                         isActive(item.path)
                           ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                          : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
                       }`}
                     >
                       <item.icon className="w-4 h-4 flex-shrink-0" />
@@ -156,7 +156,7 @@ export const Sidebar: React.FC = () => {
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
                     isActive('/profile')
                       ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                      : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
                   }`}
                 >
                   <User className="w-4 h-4 flex-shrink-0" />
@@ -198,7 +198,7 @@ export const Sidebar: React.FC = () => {
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
               isActive(item.path)
                 ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
             }`}
           >
             <item.icon className="w-4 h-4 flex-shrink-0" />

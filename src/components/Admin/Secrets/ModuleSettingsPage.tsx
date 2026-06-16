@@ -103,7 +103,7 @@ const ModuleSettingsPage: React.FC = () => {
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
               <TabsTrigger
                 value="keys"
-                className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex items-center gap-2"
               >
                 <KeyRound className="h-3.5 w-3.5" />
                 Keys
@@ -114,7 +114,7 @@ const ModuleSettingsPage: React.FC = () => {
                   <TabsTrigger
                     key={p.id}
                     value={p.id}
-                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    className="flex items-center gap-2"
                   >
                     {Icon && <Icon className="h-3.5 w-3.5" />}
                     {p.label}

@@ -469,22 +469,22 @@ export const PublicProfilePage: React.FC = () => {
           {/* ── Tabs ─────────────────────────────────────────────────────────── */}
           <Tabs defaultValue="about" className="mt-5">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-              <TabsTrigger value="about" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="about" className="flex items-center gap-1.5">
                 <UserCircle className="h-4 w-4" /> About
               </TabsTrigger>
-              <TabsTrigger value="moodboards" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="moodboards" className="flex items-center gap-1.5">
                 <Grid3x3 className="h-4 w-4" /> Moodboards
                 {moodboards.length > 0 && <span className="text-xs opacity-70">{moodboards.length}</span>}
               </TabsTrigger>
-              <TabsTrigger value="skills" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="skills" className="flex items-center gap-1.5">
                 <Tag className="h-4 w-4" /> Skills
                 {profile.skill_tags.length > 0 && <span className="text-xs opacity-70">{profile.skill_tags.length}</span>}
               </TabsTrigger>
-              <TabsTrigger value="services" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="services" className="flex items-center gap-1.5">
                 <Briefcase className="h-4 w-4" /> Services
                 {richServices.length > 0 && <span className="text-xs opacity-70">{richServices.length}</span>}
               </TabsTrigger>
-              <TabsTrigger value="reviews" className="flex items-center gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="reviews" className="flex items-center gap-1.5">
                 <Star className="h-4 w-4" /> Reviews
                 {reviewStats && <span className="text-xs opacity-70">{reviewStats.count}</span>}
               </TabsTrigger>

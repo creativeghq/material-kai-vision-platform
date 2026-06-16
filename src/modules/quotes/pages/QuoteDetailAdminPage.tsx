@@ -833,27 +833,27 @@ export const QuoteDetailPage: React.FC = () => {
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full mt-2">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="items" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
             </TabsTrigger>
-            <TabsTrigger value="pricing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="pricing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Pricing
             </TabsTrigger>
-            <TabsTrigger value="extras" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="extras" className="flex items-center gap-2">
               <Gift className="h-4 w-4" />
               Extras ({quoteUpsells.length})
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
               <Milestone className="h-4 w-4" />
               Timeline ({quoteTimeline.length})
             </TabsTrigger>
-            <TabsTrigger value="activity" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="activity" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Activity
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
               <Eye className="h-4 w-4" />
               Analytics
             </TabsTrigger>

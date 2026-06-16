@@ -474,31 +474,31 @@ export const ContactDetailPage: React.FC = () => {
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="overview">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="companies">
               <Building2 className="h-4 w-4 mr-2" />
               Companies
             </TabsTrigger>
-            <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
-            <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="account">
               <Wallet className="h-4 w-4 mr-2" />
               Account
             </TabsTrigger>
-            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="quotes">
               <ScrollText className="h-4 w-4 mr-2" />
               Quotes
             </TabsTrigger>
-            <TabsTrigger value="invoices" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="invoices">
               <Receipt className="h-4 w-4 mr-2" />
               Invoices
             </TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="payments">
               <CreditCard className="h-4 w-4 mr-2" />
               Payments
             </TabsTrigger>

@@ -314,11 +314,11 @@ export const SubscriptionTab: React.FC = () => {
         className="space-y-4"
       >
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="api-keys" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="api-keys" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
             API Keys
           </TabsTrigger>
-          <TabsTrigger value="changelog" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="changelog" className="flex items-center gap-2">
             <Megaphone className="h-4 w-4" />
             Changes Log
           </TabsTrigger>

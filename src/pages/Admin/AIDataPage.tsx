@@ -54,16 +54,16 @@ const AIDataPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="metadata" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="metadata" className="flex items-center gap-2">
               <Database className="h-4 w-4" /> Metadata
             </TabsTrigger>
-            <TabsTrigger value="relevancy" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="relevancy" className="flex items-center gap-2">
               <Link2 className="h-4 w-4" /> Relevancy
             </TabsTrigger>
-            <TabsTrigger value="duplicates" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="duplicates" className="flex items-center gap-2">
               <Copy className="h-4 w-4" /> Duplicates
             </TabsTrigger>
-            <TabsTrigger value="categorization" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="categorization" className="flex items-center gap-2">
               <Tags className="h-4 w-4" /> Categorization
             </TabsTrigger>
           </TabsList>

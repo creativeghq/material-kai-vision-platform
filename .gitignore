@@ -46,3 +46,6 @@ src/modules/myaade/NovusProvider/
 # Build / test / CLI artifacts — generated, never commit
 test-results/
 supabase/.temp/
+
+# test coverage output
+coverage/

@@ -155,10 +155,10 @@ export const QuotesPage: React.FC = () => {
               End-users / staff / sales just see the quotes list with no tab chrome. */}
           {canManageNetwork && (
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2 mb-6">
-              <TabsTrigger value="quotes" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="quotes" className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4" /> My Quotes
               </TabsTrigger>
-              <TabsTrigger value="requests" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="requests" className="flex items-center gap-2">
                 <ArrowDownUp className="h-4 w-4" /> Requests
               </TabsTrigger>
             </TabsList>

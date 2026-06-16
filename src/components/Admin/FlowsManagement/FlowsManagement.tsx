@@ -118,19 +118,19 @@ export const FlowsManagement: React.FC = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="my-flows" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="my-flows" className="gap-2">
               <Workflow className="h-4 w-4" />
               My Flows
             </TabsTrigger>
-            <TabsTrigger value="builder" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="builder" className="gap-2">
               <Settings className="h-4 w-4" />
               Flow Builder
             </TabsTrigger>
-            <TabsTrigger value="areas" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="areas" className="gap-2">
               <LayoutGrid className="h-4 w-4" />
               System Areas
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="history" className="gap-2">
               <Clock className="h-4 w-4" />
               Run History
             </TabsTrigger>

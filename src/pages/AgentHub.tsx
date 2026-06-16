@@ -5,7 +5,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot } from 'lucide-react';
 
 import { AgentHub as AgentHubComponent } from '@/components/features/ai/AgentHub';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,7 @@ const AgentHubPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPrompt = searchParams.get('prompt') ?? undefined;
   const initialConversationId = searchParams.get('conversation') ?? undefined;
+  const initialMoodboardId = searchParams.get('moodboard') ?? undefined;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -50,7 +50,12 @@ const AgentHubPage: React.FC = () => {
   }, [navigate]);
 
   const handleConversationChange = (conversationId: string | null) => {
-    setSearchParams(conversationId ? { conversation: conversationId } : {}, { replace: true });
+    // Preserve the moodboard context across conversation changes so a reload
+    // doesn't lose "adding to moodboard X".
+    const next: Record<string, string> = {};
+    if (conversationId) next.conversation = conversationId;
+    if (initialMoodboardId) next.moodboard = initialMoodboardId;
+    setSearchParams(next, { replace: true });
   };
 
   const handleMaterialSelect = (materialId: string) => {
@@ -77,6 +82,7 @@ const AgentHubPage: React.FC = () => {
         onMaterialSelect={handleMaterialSelect}
         initialPrompt={initialPrompt}
         initialConversationId={initialConversationId}
+        initialMoodboardId={initialMoodboardId}
         onConversationChange={handleConversationChange}
       />
     </div>

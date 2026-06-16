@@ -258,16 +258,16 @@ export const ChunkQualityDashboard: React.FC = () => {
       {/* Tabs */}
       <Tabs defaultValue="recommendations" className="space-y-4">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-          <TabsTrigger value="recommendations" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="recommendations">
             Recommendations
           </TabsTrigger>
-          <TabsTrigger value="distribution" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="distribution">
             Quality Distribution
           </TabsTrigger>
-          <TabsTrigger value="flagged" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="flagged">
             Flagged Chunks
           </TabsTrigger>
-          <TabsTrigger value="stats" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="stats">
             Statistics
           </TabsTrigger>
         </TabsList>

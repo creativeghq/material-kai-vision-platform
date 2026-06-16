@@ -27,6 +27,22 @@ function setCachedPrompt(key: string, prompt: string): void {
 }
 
 /**
+ * Interpolate {{var}} placeholders in a prompt template. Uses the platform's
+ * standard double-brace syntax (same convention as flow-engine + the email
+ * renderer). Unknown placeholders are left untouched so a typo in the DB row
+ * is visible rather than silently blanked.
+ */
+export function renderPromptTemplate(
+  template: string,
+  vars: Record<string, string | number | null | undefined>,
+): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+    const v = vars[key];
+    return v === undefined || v === null ? `{{${key}}}` : String(v);
+  });
+}
+
+/**
  * Load an agent system prompt from the database.
  * prompt_type = 'agent', category = agentType
  */
@@ -100,21 +116,26 @@ export async function getGenerationPrompt(
   const cached = getCachedPrompt(cacheKey);
   if (cached) return cached;
 
+  // Read prompt_text FIRST — that's the column the canonical admin editor
+  // (/admin/ai-configs) writes for generation prompts. system_prompt is kept as
+  // a fallback for legacy rows. Reading system_prompt-only here is what made
+  // admin edits to generation prompts inert.
   const { data, error } = await supabase
     .from('prompts')
-    .select('system_prompt')
+    .select('prompt_text, system_prompt')
     .eq('prompt_type', 'generation')
     .eq('category', promptName)
     .eq('is_active', true)
     .eq('status', 'active')
     .single();
 
-  if (error || !data?.system_prompt) {
+  const dbText = data?.prompt_text || data?.system_prompt;
+  if (error || !dbText) {
     console.warn(`⚠️ No DB prompt for '${promptName}', using hardcoded fallback`);
     setCachedPrompt(cacheKey, fallback);
     return fallback;
   }
 
-  setCachedPrompt(cacheKey, data.system_prompt);
-  return data.system_prompt;
+  setCachedPrompt(cacheKey, dbText);
+  return dbText;
 }

@@ -66,6 +66,47 @@ export const fiscalConnectorService = {
     return (data as FiscalBinding) ?? null;
   },
 
+  /** Read-only connector status for this workspace's legal_invoice capability — whether the
+   *  operator master key is configured and whether we point at sandbox or live. The key itself
+   *  is operator-only and never leaves the server; this only returns booleans. */
+  async getStatus(workspaceId: string): Promise<{
+    connector_slug: string;
+    master_key_configured: boolean;
+    is_sandbox: boolean;
+    code?: string;
+    reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { fiscal_status: { workspace_id: workspaceId } },
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  /** e-Invoicing is ON by default (the registry defaults to Novus when no binding row exists).
+   *  Enabled = no binding OR an active one; a row with is_active=false explicitly disables it. */
+  async getEInvoicingEnabled(workspaceId: string): Promise<boolean> {
+    const b = await this.getBinding(workspaceId, 'legal_invoice');
+    return b ? b.is_active : true;
+  },
+
+  /** Toggle e-invoicing for the workspace by writing the Novus binding across the legal_invoice,
+   *  pre_invoice_notice and tax_submission capabilities (is_active drives transmission). */
+  async setEInvoicingEnabled(workspaceId: string, enabled: boolean): Promise<void> {
+    const caps: FiscalCapability[] = ['legal_invoice', 'pre_invoice_notice', 'tax_submission'];
+    const rows = caps.map((capability) => ({
+      workspace_id: workspaceId,
+      capability,
+      connector_slug: 'novus',
+      is_active: enabled,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase
+      .from('workspace_fiscal_bindings')
+      .upsert(rows, { onConflict: 'workspace_id,capability' });
+    if (error) throw error;
+  },
+
   async setBinding(workspaceId: string, capability: FiscalCapability, connectorSlug: string | null): Promise<void> {
     if (!connectorSlug) {
       const { error } = await supabase

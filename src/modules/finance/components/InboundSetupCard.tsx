@@ -19,7 +19,6 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [userId, setUserId] = useState('');
   const [key, setKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
-  const [baseUrl, setBaseUrl] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +32,6 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       setUserId(c?.aade_user_id ?? '');
       setKey(''); // never prefill the secret — the server only tells us whether one is set
       setHasKey(!!c?.has_key);
-      setBaseUrl(c?.base_url ?? '');
       setEnabled(c?.enabled ?? true);
       setLoading(false);
     })();
@@ -44,7 +42,8 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
     setSaving(true);
     try {
       // Only send the key when the manager typed a new one — blank preserves the stored key.
-      await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, baseUrl, enabled });
+      // Base URL is always production (myDATA RequestDocs) — the poller defaults to it.
+      await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, enabled });
       if (key.trim()) setHasKey(true);
       setKey('');
       toast({ title: 'Inbound credentials saved' });
@@ -71,11 +70,6 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         <div className="space-y-1">
           <Label className="text-xs">Subscription Key <span className="text-muted-foreground">(<code>Ocp-Apim-Subscription-Key</code>)</span></Label>
           <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• (configured — leave blank to keep)' : 'your myDATA REST API subscription key'} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Base URL (optional)</Label>
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://mydatapi.aade.gr/myDATA" />
-          <p className="text-[11px] text-muted-foreground">Production: <code>https://mydatapi.aade.gr/myDATA</code> · Sandbox: <code>https://mydataapidev.aade.gr/myDATA</code>. Leave blank for production.</p>
         </div>
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
           <div className="text-sm">Enabled</div>

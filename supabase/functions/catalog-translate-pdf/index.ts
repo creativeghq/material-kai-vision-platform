@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -22,6 +23,22 @@ const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
 const MODEL = 'claude-sonnet-4-6';
 const MAX_MATERIALS = 200;
+
+// Admin-editable at /admin/ai-configs (prompt_type='generation'). Two rows, one
+// per mode. These literals are the fallbacks used only if the DB row is missing.
+// Variables: {{filename}}, {{max}}.
+const TRANSLATE_PRESERVE_FALLBACK =
+  `Source PDF: {{filename}}.\n\n` +
+  `Mirror this catalog page-by-page. Create one section per PDF page. ` +
+  `Section title format: "Page N — <heading on the page>". List every distinct material visible on each page ` +
+  `with its name, short description, visible price + currency, and visible specs. Cap at {{max}} materials total.`;
+
+const TRANSLATE_RESTRUCTURE_FALLBACK =
+  `Source PDF: {{filename}}.\n\n` +
+  `Translate this manufacturer catalog into a clean editable catalog body. ` +
+  `Group materials into sensible category-based sections (e.g. "Porcelain Tiles", "Wood Flooring", "Metallic Finishes"). ` +
+  `Each material: name, short description, visible price + currency, visible specs. Set page_no per material. ` +
+  `Cap at {{max}} materials total. Skip filler / non-product pages (covers, contents, contact pages).`;
 
 interface TranslateRequest {
   source_pdf_id: string;
@@ -123,14 +140,13 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
     const bytes = new Uint8Array(await (blob as Blob).arrayBuffer());
     const base64 = base64Encode(bytes);
 
-    const userText = body.preserve_original_layout
-      ? `Source PDF: ${pdf.original_filename}.\n\nMirror this catalog page-by-page. Create one section per PDF page. ` +
-        `Section title format: "Page N — <heading on the page>". List every distinct material visible on each page ` +
-        `with its name, short description, visible price + currency, and visible specs. Cap at ${MAX_MATERIALS} materials total.`
-      : `Source PDF: ${pdf.original_filename}.\n\nTranslate this manufacturer catalog into a clean editable catalog body. ` +
-        `Group materials into sensible category-based sections (e.g. "Porcelain Tiles", "Wood Flooring", "Metallic Finishes"). ` +
-        `Each material: name, short description, visible price + currency, visible specs. Set page_no per material. ` +
-        `Cap at ${MAX_MATERIALS} materials total. Skip filler / non-product pages (covers, contents, contact pages).`;
+    const promptCategory = body.preserve_original_layout ? 'catalog_translate_preserve' : 'catalog_translate_restructure';
+    const promptFallback = body.preserve_original_layout ? TRANSLATE_PRESERVE_FALLBACK : TRANSLATE_RESTRUCTURE_FALLBACK;
+    const promptTemplate = await getGenerationPrompt(supabase, promptCategory, promptFallback);
+    const userText = renderPromptTemplate(promptTemplate, {
+      filename: pdf.original_filename,
+      max: MAX_MATERIALS,
+    });
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

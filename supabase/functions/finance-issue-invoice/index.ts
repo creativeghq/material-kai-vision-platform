@@ -41,6 +41,9 @@ interface RequestBody {
   /** #185 Law 5155 — finalize a held POS/IRIS receipt after the terminal charge succeeded.
    *  Calls Novus CompletionPosInvoices → transmits to AADE → returns MARK. */
   pos_complete?: { pos_signature_id?: string; invoice_id?: string; transaction_id: string; payment_amount?: number; tip_amount?: number };
+  /** Read-only: report whether the master e-invoicing connector key is configured for this
+   *  workspace's legal_invoice capability (drives the Finance → Settings → e-Invoicing card). */
+  fiscal_status?: { workspace_id: string };
 }
 
 // Platform cost per myDATA transmission (markup on Novus ~0.5-1 cr). Root transmits free.
@@ -200,8 +203,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete) {
-      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id or pos_complete is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete && !body.fiscal_status) {
+      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, pos_complete or fiscal_status is required' }, 400);
     }
 
     const supabase = createClient(
@@ -209,6 +212,36 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+
+    // ── Read-only e-invoicing connector status (no document, no billing) ───────
+    // Tells the Finance → Settings → e-Invoicing card whether the operator master key
+    // is configured + whether we're pointing at sandbox or live, for THIS workspace's
+    // legal_invoice binding. Any allowed finance role for the workspace may read it.
+    if (body.fiscal_status) {
+      const wsId = body.fiscal_status.workspace_id;
+      if (!wsId) return json({ error: 'fiscal_status.workspace_id is required' }, 400);
+      if (!(await userCanAccessWorkspace(supabase, auth.user!.id, wsId))) {
+        return json({ error: 'Forbidden' }, 403);
+      }
+      const r = await resolveWorkspaceConnector(supabase, wsId, 'legal_invoice');
+      if (r.ok) {
+        return json({
+          ok: true,
+          connector_slug: r.resolved.slug,
+          master_key_configured: r.resolved.isConfigured,
+          is_sandbox: r.resolved.ctx.isSandbox,
+        });
+      }
+      // not_configured / no_binding / not_implemented — surface the code + reason verbatim.
+      return json({
+        ok: true,
+        connector_slug: 'novus',
+        master_key_configured: false,
+        is_sandbox: true,
+        code: r.code,
+        reason: r.error,
+      });
+    }
 
     // ── #185 POS/IRIS completion path ─────────────────────────────────────────
     // The terminal charge succeeded (transaction_id from the bank/NSP); finalize the held

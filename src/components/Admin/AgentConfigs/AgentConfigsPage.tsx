@@ -313,27 +313,27 @@ export const AgentConfigsPage: React.FC = () => {
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
-            <TabsTrigger value="prompts" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="prompts" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               AI Prompts
             </TabsTrigger>
-            <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="extraction" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Extraction Prompts
             </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="templates" className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
               Prompt Templates
             </TabsTrigger>
-            <TabsTrigger value="sandbox" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="sandbox" className="flex items-center gap-2">
               <Cpu className="h-4 w-4" />
               Sandbox
             </TabsTrigger>
-            <TabsTrigger value="starters" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="starters" className="flex items-center gap-2">
               <ListChecks className="h-4 w-4" />
               Chat Starters
             </TabsTrigger>
-            <TabsTrigger value="pricing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="pricing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Model Pricing
             </TabsTrigger>

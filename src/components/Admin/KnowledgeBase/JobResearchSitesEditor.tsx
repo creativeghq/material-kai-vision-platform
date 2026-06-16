@@ -222,7 +222,7 @@ export function JobResearchSitesEditor() {
             <TabsTrigger
               key={t.key}
               value={t.key}
-              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="flex items-center gap-2"
             >
               {t.label}
               <Badge variant="outline" className="ml-1 text-[10px]">{enabledCount(t.key)}</Badge>
