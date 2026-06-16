@@ -130,7 +130,18 @@ export async function getGenerationPrompt(
     .single();
 
   const dbText = data?.prompt_text || data?.system_prompt;
-  if (error || !dbText) {
+
+  // Distinguish "row genuinely missing" from "transient fetch failure" (audit #217 M10).
+  // A real error other than PGRST116 (0-rows from .single()) means the DB was unreachable
+  // — return the fallback for THIS call but do NOT cache it, so the next call retries the
+  // DB instead of being stuck on the fallback for the full TTL after the DB recovers.
+  const isTransientError = !!error && (error as { code?: string }).code !== 'PGRST116';
+  if (isTransientError) {
+    console.warn(`⚠️ Transient DB error loading prompt '${promptName}' (not caching fallback):`, error.message);
+    return fallback;
+  }
+
+  if (!dbText) {
     console.warn(`⚠️ No DB prompt for '${promptName}', using hardcoded fallback`);
     setCachedPrompt(cacheKey, fallback);
     return fallback;

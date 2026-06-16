@@ -165,27 +165,39 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new Error('Either html or text body must be provided');
         }
 
-        // Get default sender settings
-        let defaultFromEmail = 'noreply@example.com';
+        // Get default sender settings. We deliberately do NOT fall back to a bogus
+        // `noreply@example.com` — that domain is unverified, so Resend rejects it (and
+        // a silent fallback masks a real misconfiguration). If neither the request nor
+        // email_settings supplies a real sender, fail loudly (audit #217 M1).
+        let defaultFromEmail = '';
         let defaultFromName = 'Material Kai';
 
         try {
-          const { data: emailSettings } = await supabaseClient
+          const { data: emailSettings, error: settingsError } = await supabaseClient
             .from('email_settings')
             .select('setting_key, setting_value')
             .in('setting_key', ['default_from_email', 'default_from_name']);
 
+          if (settingsError) throw settingsError;
+
           if (emailSettings) {
             emailSettings.forEach((setting: { setting_key: string; setting_value: string }) => {
-              if (setting.setting_key === 'default_from_email') defaultFromEmail = setting.setting_value;
-              else if (setting.setting_key === 'default_from_name') defaultFromName = setting.setting_value;
+              if (setting.setting_key === 'default_from_email') defaultFromEmail = setting.setting_value || '';
+              else if (setting.setting_key === 'default_from_name') defaultFromName = setting.setting_value || defaultFromName;
             });
           }
         } catch (error) {
-          console.error('Error loading email settings, using defaults:', error);
+          // Surface rather than silently sending from an invalid domain.
+          console.error('Error loading email settings:', error);
         }
 
         const fromEmail = body.from || defaultFromEmail;
+        if (!fromEmail) {
+          throw new Error(
+            'No sender address configured. Set `default_from_email` in email_settings, ' +
+            'or pass `from` in the request.',
+          );
+        }
         const fromName = body.fromName || defaultFromName;
         const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
         const toAddresses = Array.isArray(body.to) ? body.to : [body.to];
