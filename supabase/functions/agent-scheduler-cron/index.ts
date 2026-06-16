@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders }  from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
 
 // ── Cron expression parser (identical to flow-scheduler-cron) ────────────────
 
@@ -74,6 +75,17 @@ Deno.serve(withApiLogging('agent-scheduler-cron', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Cron-only: dispatches background agents. Allow the pg_cron service-role
+  // caller or a platform admin; reject other authenticated users.
+  if (!isServiceRoleRequest(req)) {
+    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+    if (!auth.success && !isAdminAccess(auth)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   const SUPABASE_URL             = Deno.env.get('SUPABASE_URL') ?? '';
