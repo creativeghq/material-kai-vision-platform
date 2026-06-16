@@ -177,7 +177,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
           current_availability: 'in_stock',
           current_price_updated_at: new Date().toISOString(),
           last_seen_at: new Date().toISOString(),
-        }))
+        })),
       );
       setMonitoringEnabled(getDemoMonitoringConfig().monitoring_enabled);
       setIsLoading(false);
@@ -339,7 +339,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         setIsDiscovering(false);
       }
     },
-    [productId, isDemo, loadSources, toast, verifyPrices]
+    [productId, isDemo, loadSources, toast, verifyPrices],
   );
 
   const handleToggleMonitoring = useCallback(async () => {
@@ -374,23 +374,23 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     () =>
       trackedSources
         .filter(
-          (s) => s.source_type === 'perplexity_web_search' || s.source_type === 'claude_web_search'
+          (s) => s.source_type === 'perplexity_web_search' || s.source_type === 'claude_web_search',
         )
         .slice(0, 10),
-    [trackedSources]
+    [trackedSources],
   );
   const marketplaces = useMemo(
     () => trackedSources.filter((s) =>
       s.source_type === 'marketplace_skroutz' ||
       s.source_type === 'marketplace_bestprice' ||
-      s.source_type === 'marketplace_shopflix'
+      s.source_type === 'marketplace_shopflix',
     ),
     [trackedSources],
   );
 
   const merchants = useMemo(
     () => trackedSources.filter((s) => s.source_type === 'dataforseo_shopping').slice(0, 10),
-    [trackedSources]
+    [trackedSources],
   );
   const custom = useMemo(() => trackedSources.filter((s) => s.source_type === 'firecrawl_url'), [trackedSources]);
 
@@ -815,7 +815,7 @@ const SimilarProductsSection: React.FC<{
       const reason = window.prompt(
         kind === 'exact'
           ? 'Why is this an exact match? (optional)'
-          : 'Why is this a variant? (optional)'
+          : 'Why is this a variant? (optional)',
       );
       // null = cancelled
       if (reason === null) return;
@@ -838,7 +838,7 @@ const SimilarProductsSection: React.FC<{
         setPendingId(null);
       }
     },
-    [onChange, toast]
+    [onChange, toast],
   );
 
   return (

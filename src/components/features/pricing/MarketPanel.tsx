@@ -50,7 +50,7 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
   const { stats, results, summary, from_monitoring_cache, cache_age_seconds } = market;
   const hits = useMemo(
     () => [...results].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity)),
-    [results]
+    [results],
   );
   // Percentile is only meaningful against the same set that powers the stats —
   // exact matches (or legacy null match_kind rows that predate identity verification).
@@ -75,7 +75,7 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
           in the expandable list so admins have context. */}
       {(() => {
         const exactCount = hits.filter(
-          (h) => h.match_kind === 'exact' || h.match_kind == null
+          (h) => h.match_kind === 'exact' || h.match_kind == null,
         ).length;
         return (
           <div className="flex items-center justify-between">
@@ -252,7 +252,7 @@ const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
           {hit.match_kind === 'unverifiable' && (
             <span
               className="text-[9px] px-1 rounded border border-gray-400 text-gray-400"
-              title={hit.match_note ?? "Product identity could not be confirmed — price shown is indicative."}
+              title={hit.match_note ?? 'Product identity could not be confirmed — price shown is indicative.'}
             >
               ?
             </span>

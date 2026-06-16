@@ -29,9 +29,12 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Active tab uses the same light-grey wash as the main-menu hover
-      // (bg-white/5); inactive tabs just brighten their label on hover.
-      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-foreground data-[state=active]:bg-white/5 data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+      // Mimic the header-menu nav exactly: hover AND active both render the
+      // blue→red brand gradient — the global `.bg-primary` / `.hover:bg-primary:hover`
+      // rule in index.css turns these bg-primary utilities into the gradient.
+      // Covers horizontal tabs and the vertical/sidebar tabs (e.g. Finance),
+      // since they all use this single TabsTrigger.
+      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary hover:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm',
       className,
     )}
     {...props}

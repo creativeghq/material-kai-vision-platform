@@ -359,7 +359,7 @@ export async function submitClassifierCorrection(args: {
   correctedMatchKind: 'exact' | 'variant' | 'family' | 'mismatch' | 'unverifiable' | 'should_drop';
   correctionNote?: string;
 }): Promise<void> {
-  await api(`/api/v1/price-monitoring/classifier-correction`, {
+  await api('/api/v1/price-monitoring/classifier-correction', {
     method: 'POST',
     body: JSON.stringify({
       tracked_query_history_id: args.trackedQueryHistoryId,
@@ -379,7 +379,7 @@ export async function promoteFamilyRow(args: {
   overrideKind: 'exact' | 'variant';
   reason?: string;
 }): Promise<void> {
-  await api(`/api/v1/price-monitoring/promote-family-row`, {
+  await api('/api/v1/price-monitoring/promote-family-row', {
     method: 'POST',
     body: JSON.stringify({
       tracked_query_history_id: args.trackedQueryHistoryId,
@@ -394,7 +394,7 @@ export async function demoteToFamily(args: {
   trackedQueryHistoryId: string;
   reason?: string;
 }): Promise<void> {
-  await api(`/api/v1/price-monitoring/demote-to-family`, {
+  await api('/api/v1/price-monitoring/demote-to-family', {
     method: 'POST',
     body: JSON.stringify({
       tracked_query_history_id: args.trackedQueryHistoryId,
@@ -446,7 +446,7 @@ export interface MarketCheckParams {
  * button in PriceLookupDrawer. Does NOT enroll the product into monitoring.
  */
 export async function marketCheck(params: MarketCheckParams): Promise<MarketCheckResponse> {
-  return api<MarketCheckResponse>(`/api/v1/price-monitoring/market-check`, {
+  return api<MarketCheckResponse>('/api/v1/price-monitoring/market-check', {
     method: 'POST',
     body: JSON.stringify({
       product_id: params.productId,

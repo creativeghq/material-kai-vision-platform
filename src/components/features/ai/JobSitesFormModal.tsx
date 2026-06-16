@@ -99,14 +99,14 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
   const handleSubmit = () => {
     if (!urlOrDomain.trim()) return;
     const parts: string[] = [];
-    parts.push(`Please add this job site to the platform list using manage_job_sites.`);
+    parts.push('Please add this job site to the platform list using manage_job_sites.');
     parts.push(`- site_type: \`${siteType}\``);
     parts.push(`- url_or_domain: \`${urlOrDomain.trim()}\``);
     if (displayName.trim()) parts.push(`- display_name: ${displayName.trim()}`);
     if (countryCode.trim()) parts.push(`- country_code: ${countryCode.trim().toUpperCase()}`);
     if (category.trim()) parts.push(`- category: ${category.trim()}`);
     if (notes.trim()) parts.push(`- notes: ${notes.trim()}`);
-    parts.push(`Use action: "add". Confirm back to me once it's done.`);
+    parts.push('Use action: "add". Confirm back to me once it\'s done.');
     onSubmit(parts.join('\n'));
     onClose();
   };
@@ -131,7 +131,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
           notes: bulkNotes.trim() || undefined,
         });
         toast({
-          title: `Bulk add complete`,
+          title: 'Bulk add complete',
           description: `${r.created} added, ${r.skipped} already existed${r.failed.length ? `, ${r.failed.length} failed` : ''}.`,
         });
       } else {

@@ -684,7 +684,7 @@ const OperationsDashboardInner: React.FC = () => {
           channel,
           label: CHANNEL_LABELS[channel] || channel,
           ...d,
-        })).sort((a, b) => b.total - a.total)
+        })).sort((a, b) => b.total - a.total),
       );
 
       // ── Tool call analytics (per-tool success/zero-result/latency) ──

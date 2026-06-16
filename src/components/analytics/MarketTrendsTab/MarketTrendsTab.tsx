@@ -1036,7 +1036,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                               <span className="tabular-nums shrink-0 text-muted-foreground">{stage.count.toLocaleString()}</span>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                              <div className={`h-1.5 rounded-full bg-muted-foreground/40`} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
+                              <div className={'h-1.5 rounded-full bg-muted-foreground/40'} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
                             </div>
                           </div>
                         );

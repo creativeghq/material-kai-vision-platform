@@ -197,7 +197,7 @@ export type UpdateTrackedJobInput = Partial<CreateTrackedJobInput & {
 
 export const jobResearchService = {
   async create(input: CreateTrackedJobInput): Promise<TrackedJob> {
-    const r = await api<{ tracked_job: TrackedJob }>(`/api/v1/job-research/track`, {
+    const r = await api<{ tracked_job: TrackedJob }>('/api/v1/job-research/track', {
       method: 'POST',
       body: JSON.stringify(input),
     });

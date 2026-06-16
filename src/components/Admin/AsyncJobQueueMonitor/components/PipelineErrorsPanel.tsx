@@ -110,7 +110,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
     summaryChips.push({
       label: failureSummary.recovery_succeeded > 0
         ? `Recovery (${failureSummary.recovery_succeeded}/${failureSummary.recovery_attempts} ok)`
-        : `Recovery attempts`,
+        : 'Recovery attempts',
       value: failureSummary.recovery_attempts,
       tone:
         failureSummary.recovery_exhausted > 0
@@ -120,7 +120,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
   }
 
   const stageBreakdown = Object.entries(failureSummary.products_failed_by_stage || {}).filter(
-    ([, n]) => n > 0
+    ([, n]) => n > 0,
   );
 
   return (

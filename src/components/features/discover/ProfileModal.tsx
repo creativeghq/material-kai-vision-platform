@@ -275,7 +275,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+        <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92vh] flex flex-col">
 
           {/* ── Banner ──────────────────────────────────────────────────────── */}
           <div
@@ -401,21 +401,21 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                 </div>
 
                 {/* Tabs nav */}
-                <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-1 bg-muted/50 rounded-xl mb-2">
-                  <TabsTrigger value="about" className="flex items-center gap-1.5 rounded-lg text-xs">
+                <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-0 mb-2">
+                  <TabsTrigger value="about" className="flex items-center gap-1.5 text-xs">
                     <UserCircle className="h-3.5 w-3.5" /> About
                   </TabsTrigger>
-                  <TabsTrigger value="moodboards" className="flex items-center gap-1.5 rounded-lg text-xs">
+                  <TabsTrigger value="moodboards" className="flex items-center gap-1.5 text-xs">
                     <Grid3x3 className="h-3.5 w-3.5" /> Moodboards
                     {moodboards.length > 0 && <span className="text-xs opacity-70">{moodboards.length}</span>}
                   </TabsTrigger>
-                  <TabsTrigger value="skills" className="flex items-center gap-1.5 rounded-lg text-xs">
+                  <TabsTrigger value="skills" className="flex items-center gap-1.5 text-xs">
                     <Tag className="h-3.5 w-3.5" /> Skills
                   </TabsTrigger>
-                  <TabsTrigger value="services" className="flex items-center gap-1.5 rounded-lg text-xs">
+                  <TabsTrigger value="services" className="flex items-center gap-1.5 text-xs">
                     <Briefcase className="h-3.5 w-3.5" /> Services
                   </TabsTrigger>
-                  <TabsTrigger value="reviews" className="flex items-center gap-1.5 rounded-lg text-xs">
+                  <TabsTrigger value="reviews" className="flex items-center gap-1.5 text-xs">
                     <Star className="h-3.5 w-3.5" /> Reviews
                     {reviewStats && <span className="text-xs opacity-70">{reviewStats.count}</span>}
                   </TabsTrigger>

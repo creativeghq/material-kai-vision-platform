@@ -127,11 +127,11 @@ export function getMaterialCategory(metadata?: Record<string, unknown> | null): 
  * Also handles free-text values like "ceramic tile" (returns "Ceramic Tile"),
  * controlled vocabulary slugs, and the handful of acronyms we know about.
  */
-const KNOWN_ACRONYMS = new Set(["3D", "2D", "LED", "LVT", "PVC", "EPDM", "SBR", "PEI", "SGN"]);
+const KNOWN_ACRONYMS = new Set(['3D', '2D', 'LED', 'LVT', 'PVC', 'EPDM', 'SBR', 'PEI', 'SGN']);
 
 export function formatMaterialCategory(
   value: string | null | undefined,
-  fallback: string = "—",
+  fallback: string = '—',
 ): string {
   if (!value) return fallback;
   const normalized = String(value).trim();
@@ -148,7 +148,7 @@ export function formatMaterialCategory(
       if (KNOWN_ACRONYMS.has(upper)) return upper;
       return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
     })
-    .join(" ");
+    .join(' ');
 }
 
 /**

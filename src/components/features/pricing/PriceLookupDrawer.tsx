@@ -264,7 +264,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       const url = `${supabaseUrl}/functions/v1/agent-chat`;
 
       const promptParts = [
-        `Look up the current price for this product:`,
+        'Look up the current price for this product:',
         `- Name: ${productName}`,
         sku ? `- SKU: ${sku}` : null,
         manufacturer ? `- Manufacturer: ${manufacturer}` : null,

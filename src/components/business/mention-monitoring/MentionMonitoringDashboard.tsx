@@ -60,7 +60,7 @@ const MentionMonitoringDashboard: React.FC = () => {
     return rows.filter((r) =>
       r.subject_label.toLowerCase().includes(q) ||
       (r.brand_name && r.brand_name.toLowerCase().includes(q)) ||
-      (r.product_id && productNames[r.product_id] && productNames[r.product_id].toLowerCase().includes(q))
+      (r.product_id && productNames[r.product_id] && productNames[r.product_id].toLowerCase().includes(q)),
     );
   }, [rows, search, productNames]);
 

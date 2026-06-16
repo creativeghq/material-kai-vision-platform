@@ -2,7 +2,7 @@ import type { ModuleDefinition } from './ModuleDefinition';
 
 const moduleLoaders = import.meta.glob<{ default: ModuleDefinition }>(
   '../*/index.ts',
-  { eager: true }
+  { eager: true },
 );
 
 const registry: Record<string, ModuleDefinition> = {};

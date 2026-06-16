@@ -238,7 +238,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     const items: any[] = data.items || [];
     return (
       <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-2">
-        <Header icon="🎯" title={`Keyword Gap`} subtitle={`${data.your_domain} vs ${data.competitor_domain} · ${items.length} gaps`} />
+        <Header icon="🎯" title={'Keyword Gap'} subtitle={`${data.your_domain} vs ${data.competitor_domain} · ${items.length} gaps`} />
         <ItemList rows={items.map((it: any) => {
           const rank = it.second_domain_serp_element?.rank_absolute;
           const vol = it.keyword_data?.keyword_info?.search_volume;
@@ -394,7 +394,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     const items: any[] = data.items || [];
     return (
       <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-2">
-        <Header icon="📉" title={`Google Trends`} subtitle={(data.keywords || []).join(', ')} />
+        <Header icon="📉" title={'Google Trends'} subtitle={(data.keywords || []).join(', ')} />
         <div className="text-[11px] text-white/60">{items.length} time-series buckets returned. Drill into the conversation for details.</div>
       </div>
     );

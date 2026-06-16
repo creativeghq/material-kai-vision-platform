@@ -374,7 +374,7 @@ const AdminDashboard: React.FC = () => {
                     });
                   }
                   return merged;
-                })()
+                })(),
               ).map(([category, sections]) => (
                 <div key={category}>
                   <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-800">

@@ -285,7 +285,7 @@ export const EmailTemplatesTab: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))
+          )),
           ])
         )}
       </div>

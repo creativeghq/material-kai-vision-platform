@@ -210,7 +210,7 @@ const CompanySEOPanel: React.FC<Props> = ({ companyName, website, countryCode })
 
               <div className="flex flex-wrap gap-2 text-xs">
                 <a
-                  href={`/admin/seo`}
+                  href={'/admin/seo'}
                   className="text-primary hover:underline inline-flex items-center gap-1">
                   Open in dashboard <ExternalLink className="h-3 w-3" />
                 </a>

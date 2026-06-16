@@ -68,9 +68,9 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
     if (!title.trim() || !currentApproach.trim()) return;
     const parts: string[] = [];
     if (cadence === 'once') {
-      parts.push(`Run a Tech Radar review using review_solution (save=true).`);
+      parts.push('Run a Tech Radar review using review_solution (save=true).');
     } else {
-      parts.push(`Set up a Tech Radar monitor using track_tech_radar (action: "create").`);
+      parts.push('Set up a Tech Radar monitor using track_tech_radar (action: "create").');
       parts.push(`- review_interval_hours: ${cadence}`);
     }
     parts.push(`- title: ${title.trim()}`);
@@ -78,7 +78,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
     if (repo.trim()) parts.push(`- repo: ${repo.trim()}`);
     parts.push(`- current_approach: ${currentApproach.trim()}`);
     if (constraints.trim()) parts.push(`- constraints: ${constraints.trim()}`);
-    parts.push(`Show me the findings grouped by ring when done.`);
+    parts.push('Show me the findings grouped by ring when done.');
     onSubmit(parts.join('\n'));
     onClose();
   };

@@ -270,7 +270,7 @@ const WizardStep: React.FC<{
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
               rows={3}
-              placeholder={`e.g. "Use a different template" — anything specific you want for this step.`}
+              placeholder={'e.g. "Use a different template" — anything specific you want for this step.'}
               autoFocus
             />
             <div className="flex items-center justify-between gap-2">

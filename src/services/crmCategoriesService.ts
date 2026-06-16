@@ -194,7 +194,7 @@ class CrmCategoriesService {
   async addMember(categoryId: string, target:
     | { user_id: string }
     | { crm_contact_id: string }
-    | { crm_company_id: string }
+    | { crm_company_id: string },
   ): Promise<CrmCategoryMember> {
     const { data: { user } } = await supabase.auth.getUser();
     const memberKind: CrmCategoryMemberKind =

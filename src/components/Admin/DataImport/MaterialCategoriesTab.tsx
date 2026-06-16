@@ -244,7 +244,7 @@ export const MaterialCategoriesTab: React.FC = () => {
     const confirmed = window.confirm(
       `Delete category "${row.display_name}"?\n\n` +
         `This is hard delete. Existing products / import jobs tagged with the key "${row.category_key}" will keep that string but the dropdown will no longer show this option.\n\n` +
-        `Prefer disabling (toggle Active off) over deleting unless you really mean to remove it.`,
+        'Prefer disabling (toggle Active off) over deleting unless you really mean to remove it.',
     );
     if (!confirmed) return;
 

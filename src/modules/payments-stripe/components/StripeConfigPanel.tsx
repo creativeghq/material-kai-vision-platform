@@ -27,7 +27,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(
       () => toast({ title: `${label} copied` }),
-      () => toast({ title: `Copy failed`, description: text, variant: 'destructive' }),
+      () => toast({ title: 'Copy failed', description: text, variant: 'destructive' }),
     );
   };
 

@@ -379,7 +379,7 @@ export async function createTrackedMention(
   input: CreateTrackedMentionInput,
 ): Promise<TrackedMention> {
   const res = await api<{ success: boolean; data: TrackedMention }>(
-    `/api/v1/mention-monitoring/track`,
+    '/api/v1/mention-monitoring/track',
     { method: 'POST', body: JSON.stringify(input) },
   );
   return res.data;
@@ -484,7 +484,7 @@ export async function submitMentionClassifierCorrection(args: {
   correctedSentiment?: MentionSentiment;
   correctionNote?: string;
 }): Promise<void> {
-  await api(`/api/v1/mention-monitoring/classifier-correction`, {
+  await api('/api/v1/mention-monitoring/classifier-correction', {
     method: 'POST',
     body: JSON.stringify({
       mention_history_id: args.mentionHistoryId,

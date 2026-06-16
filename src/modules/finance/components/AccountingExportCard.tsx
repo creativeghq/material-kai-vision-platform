@@ -47,12 +47,12 @@ export const AccountingExportCard: React.FC<{ workspaceId: string }> = ({ worksp
         const rows = await accountingExportService.salesJournal(workspaceId, range.from, range.to);
         if (!rows.length) { toast({ title: 'No sales documents in this period' }); return; }
         downloadCsv(`sales-journal_${tag}.csv`, journalToCsv(rows));
-        toast({ title: `Sales journal exported`, description: `${rows.length} documents` });
+        toast({ title: 'Sales journal exported', description: `${rows.length} documents` });
       } else if (which === 'purchases') {
         const rows = await accountingExportService.purchasesJournal(workspaceId, range.from, range.to);
         if (!rows.length) { toast({ title: 'No purchase documents in this period' }); return; }
         downloadCsv(`purchases-journal_${tag}.csv`, journalToCsv(rows));
-        toast({ title: `Purchases journal exported`, description: `${rows.length} documents` });
+        toast({ title: 'Purchases journal exported', description: `${rows.length} documents` });
       } else {
         const [sales, purchases] = await Promise.all([
           accountingExportService.salesJournal(workspaceId, range.from, range.to),

@@ -727,7 +727,7 @@ class CatalogsService {
       }
     }
     return [...map.values()].sort((a, b) =>
-      (b.last_sent_at || b.first_sent_at || '').localeCompare(a.last_sent_at || a.first_sent_at || '')
+      (b.last_sent_at || b.first_sent_at || '').localeCompare(a.last_sent_at || a.first_sent_at || ''),
     ).slice(0, limit);
   }
 

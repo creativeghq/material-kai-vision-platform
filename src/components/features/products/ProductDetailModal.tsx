@@ -1945,7 +1945,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         className="flex gap-2 overflow-x-auto px-1"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                       >
-                        <style>{`.thumb-strip::-webkit-scrollbar { display: none; }`}</style>
+                        <style>{'.thumb-strip::-webkit-scrollbar { display: none; }'}</style>
                         {images.map((image, index) => (
                           <button
                             key={image.id}
@@ -1987,7 +1987,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {(() => {
               const catConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
               const uploadCat = resolveUploadCategory(
-                product.metadata?.material_category || product.type || product.category
+                product.metadata?.material_category || product.type || product.category,
               );
 
               // ── Universal rows (always shown) ──────────────────────────
@@ -2338,7 +2338,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const sectionCatConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
           const activeSectionKeys = new Set(sectionCatConfig.sections.map(s => s.key));
           const sectionUploadCat = resolveUploadCategory(
-            product.metadata?.material_category || product.type || product.category
+            product.metadata?.material_category || product.type || product.category,
           );
 
           // Appearance card — shared across all categories (colors/patterns are universal)

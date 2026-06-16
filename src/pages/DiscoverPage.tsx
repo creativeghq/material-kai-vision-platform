@@ -311,7 +311,7 @@ function FactoryModal({
 
   return (
     <Dialog open={!!factory} onOpenChange={() => onClose()}>
-      <DialogContent hideClose className="w-[95vw] max-w-3xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[90vh] flex flex-col">
+      <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92vh] flex flex-col">
         {/* Banner */}
         <div
           className="h-28 sm:h-36 relative overflow-hidden shrink-0"
@@ -332,11 +332,11 @@ function FactoryModal({
         </div>
 
         {/* Info header — outside overflow-y so icon isn't clipped by scroll container */}
-        <div className="bg-white shadow-sm shrink-0 relative z-10 px-3 sm:px-6 pb-4">
+        <div className="bg-card border-b border-border/30 shrink-0 relative z-10 px-3 sm:px-6 pb-4">
           <div className="flex items-start gap-4">
             {/* Factory icon pulled up over banner */}
             <div
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-background shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12"
               style={{ background: 'var(--brand-gradient)' }}
             >
               <Building2 className="h-8 w-8 text-white" />
@@ -379,7 +379,7 @@ function FactoryModal({
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 bg-[#f7f6f4]">
+        <div className="overflow-y-auto flex-1 bg-background">
           {/* Products list */}
           <div className="p-3 sm:p-6 space-y-3">
             <p className="text-sm font-medium text-muted-foreground">

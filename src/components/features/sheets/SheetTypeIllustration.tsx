@@ -114,7 +114,7 @@ export function SheetTypeIllustration({ sheetType, className }: Props) {
             <line x1={120} y1={30} x2={120} y2={90} stroke={ink} strokeWidth={1} />
             <line x1={20} y1={90} x2={120} y2={90} stroke={ink} strokeWidth={1} />
             {/* Door swings */}
-            <path d={`M105,90 A15,15 0 0 1 120,75`} fill="none" stroke={ink} strokeWidth={0.5} strokeDasharray="2,2" />
+            <path d={'M105,90 A15,15 0 0 1 120,75'} fill="none" stroke={ink} strokeWidth={0.5} strokeDasharray="2,2" />
             {/* Fixtures: ⊕ recessed, ● pendant, ◐ wall, etc. */}
             <g>
               {/* Recessed downlights */}

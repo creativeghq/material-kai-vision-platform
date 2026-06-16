@@ -620,7 +620,7 @@ export const QuoteDetailPage: React.FC = () => {
                 size="sm"
                 variant="outline"
                 onClick={async () => {
-                  if (!confirm(`Create a new revision of this quote? The current quote stays as-is; a new draft revision is created with all items copied over.`)) return;
+                  if (!confirm('Create a new revision of this quote? The current quote stays as-is; a new draft revision is created with all items copied over.')) return;
                   try {
                     const newQuote = await quotesService.issueRevision(quote.id);
                     toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });

@@ -134,7 +134,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     setProbing(true);
     try {
       const r = await probeProductLlm(productId);
-      toast({ title: `LLM probe complete`, description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}` });
+      toast({ title: 'LLM probe complete', description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}` });
       const v = await getProductLlmVisibility(productId);
       setLlm(v);
     } catch (e: any) {

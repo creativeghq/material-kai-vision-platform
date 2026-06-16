@@ -147,7 +147,7 @@ export const CommandPalette: React.FC<Props> = ({
     return entries.filter((e) =>
       e.name.toLowerCase().includes(q) ||
       e.description.toLowerCase().includes(q) ||
-      e.id.toLowerCase().includes(q)
+      e.id.toLowerCase().includes(q),
     );
   }, [entries, query]);
 

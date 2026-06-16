@@ -24,7 +24,7 @@ export const SubscriptionTab: React.FC = () => {
   // When the bell deep-links us with ?changelog=<slug>, default to the
   // Changes Log sub-tab so the entry is visible without an extra click.
   const [devTab, setDevTab] = useState<'api-keys' | 'changelog'>(
-    changelogSlug ? 'changelog' : 'api-keys'
+    changelogSlug ? 'changelog' : 'api-keys',
   );
   const [loading, setLoading] = useState(false);
   const [currentTier, setCurrentTier] = useState<string>('free');

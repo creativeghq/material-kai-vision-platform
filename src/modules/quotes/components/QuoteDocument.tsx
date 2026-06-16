@@ -314,7 +314,7 @@ const ItemsPage: React.FC<{
         {/* Specifications & Delivery — only on last items page, only if any FF&E data */}
         {showTotals && (() => {
           const ffeItems = data.items.filter(
-            it => it.installation_requirements || it.delivery_date
+            it => it.installation_requirements || it.delivery_date,
           );
           if (ffeItems.length === 0) return null;
           return (

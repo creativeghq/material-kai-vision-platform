@@ -834,7 +834,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           steps: nextSteps,
           awaiting_input_step_id: nextAwaiting,
           awaiting_input_schema: nextSchema,
-          awaiting_input_prompt: nextAwaiting ? `Continuing after skip` : undefined,
+          awaiting_input_prompt: nextAwaiting ? 'Continuing after skip' : undefined,
         },
       };
     });
@@ -1153,7 +1153,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (data.tool && toolMessages[data.tool]) {
           return pickRandom(toolMessages[data.tool]);
         }
-        return `Executing AI tools. One moment.`;
+        return 'Executing AI tools. One moment.';
 
       case 'tool_result':
         return pickRandom(resultMessages);
@@ -2428,7 +2428,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       prev[k].definition_id === chunk.definition_id
                       && k !== chunk.run_id
                       && prev[k].metadata?.booted_locally
-                      && (prev[k].status === 'planning' || prev[k].status === 'running')
+                      && (prev[k].status === 'planning' || prev[k].status === 'running'),
                     );
                     if (localKey && localKey !== chunk.run_id) {
                       const next = { ...prev };
@@ -2543,7 +2543,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 } else if (event === 'published') {
                   line = `Published. Public URL: ${chunk.public_url}`;
                 } else if (event === 'unpublished') {
-                  line = `Catalog archived (no longer publicly accessible).`;
+                  line = 'Catalog archived (no longer publicly accessible).';
                 }
                 const m: Message = {
                   id: `msg-catalog-${event}-${Date.now()}`,
@@ -3090,10 +3090,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       if (catalogToolkit) ensureAgentAndToolkit(catalogToolkit);
       toast({ title: 'PDF uploaded', description: file.name });
       setInput(
-        `I uploaded a catalog source PDF.\n` +
+        'I uploaded a catalog source PDF.\n' +
         `- source_pdf_id: ${source.id}\n` +
         `- filename: ${source.original_filename}\n\n` +
-        `If we don't have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.`,
+        'If we don\'t have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.',
       );
     } catch (err) {
       toast({ title: 'Upload failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
@@ -4039,7 +4039,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           furnitureStyle={message.virtualStagingData.furniture_style}
                           creditsUsed={message.virtualStagingData.credits_used}
                           onAnalyzeQuality={() => {
-                            setInput(`Analyze the quality of this virtual staging result. Compare the original empty room with the staged version. Assess: lighting consistency, perspective accuracy, furniture scale vs room size, material realism, and edge blending. Score each dimension 1-10.`);
+                            setInput('Analyze the quality of this virtual staging result. Compare the original empty room with the staged version. Assess: lighting consistency, perspective accuracy, furniture scale vs room size, material realism, and edge blending. Score each dimension 1-10.');
                             if (message.virtualStagingData?.image_url) {
                               setAttachedImages([message.virtualStagingData.image_url]);
                             }

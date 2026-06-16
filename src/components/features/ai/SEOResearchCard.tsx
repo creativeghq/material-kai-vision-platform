@@ -103,7 +103,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-1 rounded-full transition ${
-              tab === t ? 'bg-primary text-primary-foreground' : 'bg-white/10 hover:bg-white/15'
+              tab === t ? 'bg-primary text-primary-foreground' : 'bg-white/10 hover:bg-primary hover:text-primary-foreground'
             }`}
           >
             {t === 'paa' ? 'PAA' : t.charAt(0).toUpperCase() + t.slice(1)}
