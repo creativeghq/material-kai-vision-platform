@@ -69,6 +69,7 @@ export const ReviewsSection: React.FC<{
 
   const load = async () => {
     setLoading(true);
+    try {
     const [{ data: reviewsData }, { data: summaryData }] = await Promise.all([
       supabase
         .from('profile_reviews')
@@ -107,8 +108,10 @@ export const ReviewsSection: React.FC<{
       const mine = list.find((r) => r.from_user_id === currentUserId) ?? null;
       setMyReview(mine);
     }
-
-    setLoading(false);
+    } finally {
+      // Never leave the section stuck loading on a network/RLS error.
+      setLoading(false);
+    }
   };
 
   if (loading) return null;
@@ -233,6 +236,7 @@ function ReviewCard({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState(review.reply ?? '');
   const [saving, setSaving] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   const initials = review.from_name
     .split(' ')
@@ -243,8 +247,14 @@ function ReviewCard({
 
   const saveReply = async () => {
     setSaving(true);
-    await supabase.from('profile_reviews').update({ reply: replyText }).eq('id', review.id);
+    setReplyError(null);
+    const { error } = await supabase.from('profile_reviews').update({ reply: replyText }).eq('id', review.id);
     setSaving(false);
+    if (error) {
+      // Don't close + report success on a failed write (silent data loss).
+      setReplyError(error.message || 'Could not save your reply. Please try again.');
+      return;
+    }
     setReplyOpen(false);
     onReplyUpdated();
   };
@@ -315,6 +325,7 @@ function ReviewCard({
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
           />
+          {replyError && <p className="text-xs text-destructive">{replyError}</p>}
           <div className="flex gap-2">
             <Button size="sm" className="rounded-full h-7 text-xs" onClick={saveReply} disabled={saving}>
               {saving ? 'Saving…' : 'Save Reply'}

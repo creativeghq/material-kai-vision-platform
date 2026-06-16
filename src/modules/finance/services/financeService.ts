@@ -530,6 +530,20 @@ const _financeServiceCore = {
   },
 
   async voidInvoice(invoiceId: string, reason: string): Promise<void> {
+    // A locally-voided invoice that was already transmitted to myDATA would leave
+    // the fiscal record live while the local row reads "void" — a compliance gap.
+    // A transmitted invoice must be reversed with a credit note instead.
+    const { data: inv, error: readErr } = await supabase
+      .from('invoices')
+      .select('fiscal_status, fiscal_mark, status')
+      .eq('id', invoiceId)
+      .single();
+    if (readErr) throw readErr;
+    const transmitted = (inv as any)?.fiscal_mark
+      || ['accepted', 'offline'].includes((inv as any)?.fiscal_status);
+    if (transmitted) {
+      throw new Error('This invoice was transmitted to myDATA and cannot be voided. Issue a credit note to reverse it.');
+    }
     const { error } = await supabase
       .from('invoices')
       .update({ status: 'void', notes: reason })
@@ -629,6 +643,12 @@ const _financeServiceCore = {
     issuedAt?: string | null;
     notes?: string | null;
   }): Promise<ManualEntry> {
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+    if (!input.description?.trim()) {
+      throw new Error('Description is required');
+    }
     const { data, error } = await supabase
       .from('finance_manual_entries')
       .insert({
@@ -908,7 +928,7 @@ const _financeServiceCore = {
       net_value: number; vat_amount: number; vat_category?: number | null; vat_percent?: number | null;
       income_classification_type?: string | null; income_classification_category?: string | null;
     }>;
-  }): Promise<{ credit_note_id: string }> {
+  }): Promise<{ credit_note_id: string; fiscal_submitted: boolean; fiscal_error?: string }> {
     if (input.lines && input.lines.length > 0) {
       const { data: cnId, error } = await supabase.rpc('issue_credit_note', {
         p_invoice_id: input.invoiceId,
@@ -917,8 +937,13 @@ const _financeServiceCore = {
         p_correlated: input.correlated ?? true,
       });
       if (error) throw error;
-      if (input.submitFiscal) { try { await this.submitCreditNoteFiscal(cnId as string); } catch { /* surfaced via list */ } }
-      return { credit_note_id: cnId as string };
+      let fiscalSubmitted = false;
+      let fiscalError: string | undefined;
+      if (input.submitFiscal) {
+        try { await this.submitCreditNoteFiscal(cnId as string); fiscalSubmitted = true; }
+        catch (e: any) { fiscalError = e?.message ?? 'myDATA transmission failed'; }
+      }
+      return { credit_note_id: cnId as string, fiscal_submitted: fiscalSubmitted, fiscal_error: fiscalError };
     }
 
     const { data: inv } = await supabase
@@ -952,11 +977,16 @@ const _financeServiceCore = {
     });
     if (error) throw error;
 
+    let fiscalSubmitted = false;
+    let fiscalError: string | undefined;
     if (input.submitFiscal) {
-      // Best-effort transmit; the note already exists + nets the invoice regardless.
-      try { await this.submitCreditNoteFiscal(cnId as string); } catch { /* surfaced via list */ }
+      // The note already exists + nets the invoice regardless, but DON'T silently
+      // swallow a myDATA transmission failure — surface it so the caller can warn
+      // the operator instead of reporting a clean success on an untransmitted note.
+      try { await this.submitCreditNoteFiscal(cnId as string); fiscalSubmitted = true; }
+      catch (e: any) { fiscalError = e?.message ?? 'myDATA transmission failed'; }
     }
-    return { credit_note_id: cnId as string };
+    return { credit_note_id: cnId as string, fiscal_submitted: fiscalSubmitted, fiscal_error: fiscalError };
   },
 
   /** Transmit an existing credit note to the workspace's legal connector (myDATA 5.1). */

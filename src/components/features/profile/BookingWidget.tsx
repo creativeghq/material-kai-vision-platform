@@ -81,6 +81,9 @@ export const BookingWidget: React.FC<{
       });
       setAvailMap(map);
       setLoading(false);
+    }).catch(() => {
+      // Network/RLS error must not leave the widget spinning forever.
+      setLoading(false);
     });
   }, [profileUserId]);
 

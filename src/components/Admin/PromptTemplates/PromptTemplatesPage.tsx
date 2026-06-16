@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { PromptTemplateEditorModal, type EditableTemplate } from './PromptTemplateEditorModal';
 
 interface PromptTemplate {
   id: string;
@@ -63,6 +64,8 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
   const [loading, setLoading] = useState(true);
   const [selectedStage, setSelectedStage] = useState<string>('all');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<EditableTemplate | null>(null);
 
   // Default workspace ID (you should get this from context/auth)
   const workspaceId = '00000000-0000-0000-0000-000000000000';
@@ -160,7 +163,7 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
             Refresh
           </Button>
           <Button
-            onClick={() => toast({ title: 'Coming Soon', description: 'Template creation UI will be available soon' })}
+            onClick={() => { setEditing(null); setEditorOpen(true); }}
             size="sm"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -266,7 +269,7 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
-                            onClick={() => toast({ title: 'Coming Soon', description: 'Template editing UI will be available soon' })}
+                            onClick={() => { setEditing({ ...template }); setEditorOpen(true); }}
                             variant="ghost"
                             size="sm"
                           >
@@ -282,6 +285,14 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
           </CardContent>
         </Card>
       </div>
+
+      <PromptTemplateEditorModal
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        workspaceId={workspaceId}
+        template={editing}
+        onSaved={loadTemplates}
+      />
     </div>
   );
 };

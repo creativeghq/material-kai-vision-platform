@@ -125,8 +125,9 @@ export const RecordPaymentDialog: React.FC<{
     try {
       // Refund: first issue the credit note (5.1 correlated) so myDATA nets the original invoice.
       let creditNoteRef: string | null = null;
+      let creditNoteFiscalError: string | undefined;
       if (kind === 'refund' && issueCreditNote && invoiceId) {
-        const { credit_note_id } = await financeService.createCreditNote({
+        const cn = await financeService.createCreditNote({
           workspaceId,
           invoiceId,
           amount: amt,
@@ -134,7 +135,8 @@ export const RecordPaymentDialog: React.FC<{
           correlated: true,
           submitFiscal: true,
         });
-        creditNoteRef = credit_note_id;
+        creditNoteRef = cn.credit_note_id;
+        creditNoteFiscalError = cn.fiscal_error;
       }
 
       const direction = kind === 'received' ? 'in' : 'out';
@@ -169,10 +171,20 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyContactId,
         allocations,
       });
-      toast({
-        title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded',
-        description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
-      });
+      if (creditNoteFiscalError) {
+        // Cash-out logged + credit note created, but myDATA transmission failed —
+        // don't pretend it's filed. Operator must retransmit from the credit-note list.
+        toast({
+          title: 'Refund recorded — myDATA transmission failed',
+          description: `The credit note was created and the cash-out logged, but it was NOT accepted by myDATA: ${creditNoteFiscalError}. Retransmit it from the credit notes list.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded',
+          description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
+        });
+      }
       onSaved(); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
