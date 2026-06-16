@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
-  StickyNote, UserPlus, X,
+  StickyNote, UserPlus, X, Bot,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -19,7 +19,7 @@ import {
 } from '@/components/core/ui/dialog';
 import {
   inboxApi, signInboxAttachment,
-  type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
+  type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel, type WhatsAppWindow,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -49,6 +49,7 @@ const InboxPage: React.FC = () => {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [participants, setParticipants] = useState<InboxParticipant[]>([]);
   const [activeThread, setActiveThread] = useState<InboxThread | null>(null);
+  const [waWindow, setWaWindow] = useState<WhatsAppWindow | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
 
   const [draft, setDraft] = useState('');
@@ -65,6 +66,9 @@ const InboxPage: React.FC = () => {
     () => isPlatformOperator || persona !== 'end_user',
     [isPlatformOperator, persona],
   );
+
+  // WhatsApp freeform replies are blocked outside Meta's 24h window (notes stay allowed).
+  const waBlocked = activeThread?.channel === 'whatsapp' && !!waWindow && !waWindow.open && !isNote;
 
   const loadThreads = useCallback(async () => {
     setLoadingThreads(true);
@@ -87,10 +91,11 @@ const InboxPage: React.FC = () => {
     setSearchParams((p) => { p.set('thread', id); return p; }, { replace: true });
     setLoadingThread(true);
     try {
-      const { thread, participants, messages } = await inboxApi.getThread(id);
+      const { thread, participants, messages, whatsapp_window } = await inboxApi.getThread(id);
       setActiveThread(thread);
       setParticipants(participants);
       setMessages(messages);
+      setWaWindow(whatsapp_window);
       // get_thread marks read server-side; reflect locally.
       setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, unread: false } : t)));
     } catch (e) {
@@ -101,6 +106,24 @@ const InboxPage: React.FC = () => {
   }, [setSearchParams, toast]);
 
   useEffect(() => { if (activeId) openThread(activeId); /* eslint-disable-next-line */ }, []);
+
+  // #209 fallback: if an inbox-conversion token survived an email-confirmation round trip,
+  // claim the thread here (the Auth page handles the immediate-session case).
+  useEffect(() => {
+    const pending = localStorage.getItem('inbox_claim_token');
+    if (!pending) return;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      try {
+        const r = await inboxApi.tokenClaim(pending, data.user.id);
+        localStorage.removeItem('inbox_claim_token');
+        await loadThreads();
+        if (r?.thread_id) openThread(r.thread_id);
+      } catch { localStorage.removeItem('inbox_claim_token'); }
+    })();
+    // eslint-disable-next-line
+  }, []);
 
   // Realtime: new messages on the open thread + thread-list bumps.
   useEffect(() => {
@@ -224,6 +247,20 @@ const InboxPage: React.FC = () => {
                 </div>
                 {isMember && (
                   <>
+                    <Button
+                      variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
+                      size="sm" className="rounded-full"
+                      title={activeThread.agent_state === 'active' ? 'Agent is handling this — click to take back' : 'Hand to AI agent'}
+                      onClick={async () => {
+                        const next = activeThread.agent_state === 'active' ? 'off' : 'active';
+                        try {
+                          await inboxApi.setAgent(activeThread.id, next);
+                          setActiveThread({ ...activeThread, agent_state: next });
+                        } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+                      }}
+                    >
+                      <Bot className="w-4 h-4" />
+                    </Button>
                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => setShowAdd(true)}>
                       <UserPlus className="w-4 h-4" />
                     </Button>
@@ -253,6 +290,12 @@ const InboxPage: React.FC = () => {
 
               {/* Composer */}
               <div className="border-t border-white/10 p-3 space-y-2">
+                {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
+                  <div className="text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded px-2 py-1.5">
+                    WhatsApp 24-hour reply window has closed. Freeform replies are blocked by Meta — an approved
+                    template is required to re-open the conversation. (Internal notes are still allowed.)
+                  </div>
+                )}
                 {isMember && (
                   <button
                     onClick={() => setIsNote((v) => !v)}
@@ -275,11 +318,12 @@ const InboxPage: React.FC = () => {
                   <Textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder={isNote ? 'Write a private note…' : 'Type a message…'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked) send(); } }}
+                    placeholder={isNote ? 'Write a private note…' : waBlocked ? 'Reply window closed — template required' : 'Type a message…'}
                     className="flex-1 min-h-[44px] max-h-32 resize-none"
+                    disabled={waBlocked}
                   />
-                  <Button className="rounded-full" onClick={send} disabled={sending || (!draft.trim() && !attachment)}>
+                  <Button className="rounded-full" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -320,12 +364,14 @@ const MessageBubble: React.FC<{ m: InboxMessage }> = ({ m }) => {
   }, [m]);
   const isNote = m.message_type === 'note';
   const isSystem = m.message_type === 'system';
+  const isAgent = m.message_type === 'agent';
   if (isSystem) {
     return <div className="text-center text-xs text-muted-foreground">{m.body}</div>;
   }
   return (
-    <div className={`rounded-lg px-3 py-2 max-w-[80%] ${isNote ? 'bg-amber-500/10 border border-amber-500/30 ml-auto' : 'bg-white/5'}`}>
+    <div className={`rounded-lg px-3 py-2 max-w-[80%] ${isNote ? 'bg-amber-500/10 border border-amber-500/30 ml-auto' : isAgent ? 'bg-primary/10 border border-primary/30' : 'bg-white/5'}`}>
       {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-400 mb-1"><Lock className="w-3 h-3" /> Private note</div>}
+      {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> Assistant</div>}
       {m.body && <div className="text-sm whitespace-pre-wrap break-words">{m.body}</div>}
       {(m.attachments || []).map((a, i) => {
         const k = a.storage_object_path || a.url || '';

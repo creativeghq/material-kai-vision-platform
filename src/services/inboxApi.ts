@@ -68,6 +68,12 @@ export interface InboxMessage {
   deleted_at: string | null;
 }
 
+export interface WhatsAppWindow {
+  open: boolean;
+  last_inbound_at: string | null;
+  expires_at: string | null;
+}
+
 export interface NewParticipantInput {
   type: InboxParticipantType;
   user_id?: string;
@@ -109,7 +115,12 @@ export const inboxApi = {
     return call<{ threads: InboxThread[] }>('list_threads', filters);
   },
   getThread(thread_id: string) {
-    return call<{ thread: InboxThread; participants: InboxParticipant[]; messages: InboxMessage[] }>('get_thread', { thread_id });
+    return call<{
+      thread: InboxThread;
+      participants: InboxParticipant[];
+      messages: InboxMessage[];
+      whatsapp_window: WhatsAppWindow | null;
+    }>('get_thread', { thread_id });
   },
   sendMessage(input: { thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note' }) {
     return call<{ message: InboxMessage }>('send_message', input);
@@ -125,6 +136,9 @@ export const inboxApi = {
   },
   setStatus(thread_id: string, status: InboxThreadStatus) {
     return call<{ ok: boolean }>('set_status', { thread_id, status });
+  },
+  setAgent(thread_id: string, agent_state: 'off' | 'suggesting' | 'active', agent_id?: string) {
+    return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
   },
 
   // ── Token actions (public customer thread) ──

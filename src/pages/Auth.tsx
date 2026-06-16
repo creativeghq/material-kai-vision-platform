@@ -4,6 +4,11 @@ import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { inboxApi } from '@/services/inboxApi';
+
+// #209 — a tokenized inbox customer who signs up adopts their thread post-auth. The token is
+// stashed so it survives an email-confirmation round trip that strips the query string.
+const INBOX_CLAIM_KEY = 'inbox_claim_token';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -68,13 +73,32 @@ export const Auth: React.FC = () => {
     return '/';
   })();
 
+  // Stash an inbox-conversion token so it survives an email-confirmation redirect.
+  useEffect(() => {
+    const t = searchParams.get('inbox_token');
+    if (t) localStorage.setItem(INBOX_CLAIM_KEY, t);
+  }, [searchParams]);
+
   // Redirect if already authenticated — but NOT while completing a password reset,
   // because Supabase signs the user into a recovery session and we still need them
-  // to set a new password before navigating away.
+  // to set a new password before navigating away. If an inbox conversion token is
+  // pending, claim the thread (+ client membership) first, then deep-link to it.
   useEffect(() => {
-    if (user && !isResetMode) {
-      navigate(redirectTo);
+    if (!user || isResetMode) return;
+    const pending = localStorage.getItem(INBOX_CLAIM_KEY);
+    if (pending) {
+      inboxApi.tokenClaim(pending, user.id)
+        .then((r) => {
+          localStorage.removeItem(INBOX_CLAIM_KEY);
+          navigate(r?.thread_id ? `/inbox?thread=${r.thread_id}` : redirectTo);
+        })
+        .catch(() => {
+          localStorage.removeItem(INBOX_CLAIM_KEY);
+          navigate(redirectTo);
+        });
+      return;
     }
+    navigate(redirectTo);
   }, [user, navigate, isResetMode, redirectTo]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {

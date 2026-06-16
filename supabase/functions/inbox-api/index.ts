@@ -19,11 +19,17 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { sendWhatsAppReply } from '../_shared/zernio.ts';
+import { generateWithClaude } from '../_shared/ai-client.ts';
+import { isModuleEnabled } from '../_shared/modules/registry.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const ATTACHMENT_BUCKET = 'generation-images';
+// Phase-2 agent takeover (§9): the workspace owner is billed per auto-reply.
+const INBOX_AGENT_REPLY_COST = 1;
+const DEFAULT_INBOX_AGENT_ID = 'kai';
 
 type Json = Record<string, unknown>;
 
@@ -109,6 +115,28 @@ async function callerParticipant(db: SupabaseClient, threadId: string, userId: s
     | null;
 }
 
+/**
+ * Meta's 24h service window: outside 24h since the customer's last inbound WhatsApp message,
+ * only an approved template may be sent. Inbound messages carry metadata.direction='incoming'.
+ */
+async function whatsappWindow(
+  db: SupabaseClient,
+  threadId: string,
+): Promise<{ open: boolean; last_inbound_at: string | null; expires_at: string | null }> {
+  const { data } = await db
+    .from('inbox_messages')
+    .select('created_at')
+    .eq('thread_id', threadId)
+    .eq('metadata->>direction', 'incoming')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const last = (data as { created_at?: string } | null)?.created_at ?? null;
+  if (!last) return { open: false, last_inbound_at: null, expires_at: null };
+  const expires = new Date(new Date(last).getTime() + 24 * 3600 * 1000);
+  return { open: expires > new Date(), last_inbound_at: last, expires_at: expires.toISOString() };
+}
+
 async function getThreadOrThrow(db: SupabaseClient, threadId: string) {
   const { data } = await db
     .from('inbox_threads')
@@ -117,6 +145,90 @@ async function getThreadOrThrow(db: SupabaseClient, threadId: string) {
     .maybeSingle();
   if (!data) throw new HttpError(404, 'Thread not found');
   return data as Record<string, unknown>;
+}
+
+/** First active owner/admin of a workspace — the billing user for agent replies. */
+async function workspaceOwner(db: SupabaseClient, workspaceId: string): Promise<string | null> {
+  const { data } = await db
+    .from('workspace_members').select('user_id')
+    .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).limit(1).maybeSingle();
+  return (data as { user_id?: string } | null)?.user_id ?? null;
+}
+
+/**
+ * Phase-2 agent takeover (§9). When a thread is in `agent_state='active'`, an inbound customer
+ * message triggers an AI reply: thread history → Claude → posted as message_type='agent', billed
+ * to the workspace owner via debit_user_credits. Gated on the `inbox` module + owner balance.
+ * Best-effort — any failure leaves the thread for a human, never throws to the caller.
+ */
+async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise<void> {
+  try {
+    const thread = await getThreadOrThrow(db, threadId);
+    if (thread.agent_state !== 'active') return;
+    if (!(await isModuleEnabled(db, 'inbox'))) return;
+
+    const workspaceId = String(thread.workspace_id);
+    const owner = await workspaceOwner(db, workspaceId);
+    if (!owner) return;
+
+    // Bill the owner first; skip the turn (leave for a human) if they can't pay.
+    const { data: debit } = await db.rpc('debit_user_credits', {
+      p_user_id: owner,
+      p_amount: INBOX_AGENT_REPLY_COST,
+      p_operation_type: 'inbox_agent_reply',
+      p_description: 'Inbox agent auto-reply (1 turn)',
+      p_metadata: { thread_id: threadId, billing_type: 'inbox_agent_reply' },
+    });
+    const debitRes = Array.isArray(debit) ? debit[0] : debit;
+    if (!debitRes?.success) return;
+
+    // Build the recent conversation (exclude private notes) for context.
+    const { data: history } = await db
+      .from('inbox_messages')
+      .select('body, message_type, sender_participant_id')
+      .eq('thread_id', threadId)
+      .is('deleted_at', null)
+      .neq('message_type', 'note')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    const { data: ws } = await db.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
+    const businessName = (ws as { name?: string } | null)?.name || 'our team';
+
+    const transcript = ((history || []) as Array<{ body: string | null; message_type: string }>)
+      .reverse()
+      .map((m) => `${m.message_type === 'agent' ? 'Assistant' : 'Customer/Team'}: ${m.body || '[attachment]'}`)
+      .join('\n');
+
+    const systemPrompt =
+      `You are a helpful assistant replying to a customer on behalf of ${businessName} over ${thread.channel}. ` +
+      `Be concise, warm, and professional. Answer what you can from the conversation. If you cannot help or the ` +
+      `customer needs a human (pricing commitments, account changes, complaints), say a team member will follow up shortly.`;
+
+    const result = await generateWithClaude(
+      `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
+      { systemPrompt, maxTokens: 600, temperature: 0.5, task: 'inbox_agent_reply' },
+    );
+    const replyText = (result.text || '').trim();
+    if (!replyText) return;
+
+    // The agent participant (created when the thread was handed over).
+    const { data: agentP } = await db
+      .from('inbox_participants').select('id')
+      .eq('thread_id', threadId).eq('participant_type', 'agent').eq('status', 'active')
+      .limit(1).maybeSingle();
+
+    await insertMessageAndNotify(db, {
+      thread,
+      senderParticipantId: (agentP as { id?: string } | null)?.id ?? null,
+      body: replyText,
+      attachments: [],
+      messageType: 'agent',
+      senderUserId: null,
+      senderLabel: 'Assistant',
+    });
+  } catch (e) {
+    console.warn('[inbox-api] agent reply failed:', e instanceof Error ? e.message : String(e));
+  }
 }
 
 /**
@@ -278,8 +390,8 @@ async function insertMessageAndNotify(
     .update({ last_message_at: new Date().toISOString(), status: 'open' })
     .eq('id', threadId);
 
-  // Channel relay (notes never leave the inbox; system/agent handled elsewhere).
-  if (thread.channel === 'whatsapp' && messageType === 'text' && body) {
+  // Channel relay (notes never leave the inbox). Member replies + agent replies both relay.
+  if (thread.channel === 'whatsapp' && (messageType === 'text' || messageType === 'agent') && body) {
     const meta = (thread.metadata as Json) || {};
     const accountId = String(meta.zernio_account_id || '');
     const conversationId = String(meta.zernio_conversation_id || '');
@@ -500,6 +612,13 @@ async function handleJwtAction(
       const body = payload.body != null ? String(payload.body) : null;
       const attachments = await normalizeAttachments(db, threadId, payload.attachments);
       if (!body && attachments.length === 0) throw new HttpError(400, 'message body or attachment required');
+      // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
+      if (thread.channel === 'whatsapp' && messageType !== 'note') {
+        const w = await whatsappWindow(db, threadId);
+        if (!w.open) {
+          throw new HttpError(409, 'WhatsApp 24h service window is closed — an approved template is required to message this customer again.');
+        }
+      }
       const msg = await insertMessageAndNotify(db, {
         thread,
         senderParticipantId: me?.id ?? null,
@@ -535,6 +654,42 @@ async function handleJwtAction(
       }
       await db.from('inbox_threads').update({ status }).eq('id', threadId);
       return json({ ok: true });
+    }
+
+    case 'set_agent': {
+      // Manual hand-to-agent / hand-back (§9). Members only.
+      const threadId = String(payload.thread_id || '');
+      const state = String(payload.agent_state || '');
+      if (!threadId || !['off', 'suggesting', 'active'].includes(state)) {
+        throw new HttpError(400, 'thread_id and a valid agent_state are required');
+      }
+      const thread = await getThreadOrThrow(db, threadId);
+      const me = await callerParticipant(db, threadId, userId);
+      if (!operator && (!me || me.participant_type !== 'member')) {
+        throw new HttpError(403, 'Only thread members may hand a thread to the agent');
+      }
+      const agentId = String(payload.agent_id || thread.agent_id || DEFAULT_INBOX_AGENT_ID);
+      await db.from('inbox_threads').update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
+
+      if (state === 'off') {
+        await db.from('inbox_participants').update({ status: 'left' })
+          .eq('thread_id', threadId).eq('participant_type', 'agent');
+      } else {
+        // Ensure exactly one active agent participant.
+        const { data: existing } = await db.from('inbox_participants')
+          .select('id').eq('thread_id', threadId).eq('participant_type', 'agent').eq('status', 'active').maybeSingle();
+        if (!existing) {
+          await db.from('inbox_participants').insert({
+            thread_id: threadId, participant_type: 'agent', agent_id: agentId, thread_role: 'agent', added_by: userId,
+          });
+        }
+      }
+      // System note so the transcript records the takeover.
+      await db.from('inbox_messages').insert({
+        thread_id: threadId, message_type: 'system',
+        body: state === 'off' ? 'Conversation handed back to the team.' : `Conversation handed to the AI assistant (${state}).`,
+      });
+      return json({ ok: true, agent_state: state });
     }
 
     case 'list_threads': {
@@ -602,7 +757,8 @@ async function handleJwtAction(
       const { data: messages } = await mq;
 
       if (me) await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
-      return json({ thread, participants: participants || [], messages: messages || [] });
+      const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;
+      return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
     }
 
     default:
@@ -680,20 +836,26 @@ async function handleTokenAction(db: SupabaseClient, action: string, payload: Js
         senderUserId: null,
         senderLabel: 'Customer reply',
       });
+      // Phase-2: auto-reply if the thread is handed to the agent.
+      await maybeRunAgentReply(db, String(thread.id));
       return json({ message: { id: (msg as { id: string }).id, created_at: (msg as { created_at: string }).created_at } });
     }
 
     case 'token_claim': {
-      // Conversion handshake: a freshly-signed-up user adopts the token's thread.
+      // Conversion handshake: a freshly-signed-up user adopts the token's thread and becomes a
+      // `client` member of the dealer's workspace.
       const userId = String(payload.user_id || '');
       if (!userId) throw new HttpError(400, 'user_id is required');
       const tok = await resolveToken(db, token);
       if (tok.claimed_by_user_id && tok.claimed_by_user_id !== userId) {
         throw new HttpError(409, 'This invite was already claimed');
       }
-      // Link the CRM contact to the account + carry the account onto the participant row so
-      // the converted customer reads the thread via RLS. participant_type stays 'customer'
-      // (a converted customer still must not see internal notes).
+      const thread = await getThreadOrThrow(db, String(tok.thread_id));
+      const workspaceId = String(thread.workspace_id);
+
+      // Link the CRM contact to the account + carry the account onto the participant row so the
+      // converted customer reads the thread via RLS. participant_type stays 'customer' (a
+      // converted customer still must not see internal notes).
       if (tok.contact_id) {
         await db.from('crm_contacts')
           .update({ user_id: userId, linked_at: new Date().toISOString(), linked_by: userId })
@@ -702,7 +864,26 @@ async function handleTokenAction(db: SupabaseClient, action: string, payload: Js
           .update({ user_id: userId })
           .eq('thread_id', tok.thread_id)
           .eq('contact_id', tok.contact_id);
+      } else {
+        // Token without a contact (rare): ensure the claimer is at least a participant.
+        const { data: existing } = await db.from('inbox_participants')
+          .select('id').eq('thread_id', tok.thread_id).eq('user_id', userId).maybeSingle();
+        if (!existing) {
+          await db.from('inbox_participants').insert({
+            thread_id: tok.thread_id, participant_type: 'customer', user_id: userId, thread_role: 'participant',
+          });
+        }
       }
+
+      // Become a `client` member of the dealer workspace (idempotent).
+      const { data: mem } = await db.from('workspace_members')
+        .select('id').eq('workspace_id', workspaceId).eq('user_id', userId).maybeSingle();
+      if (!mem) {
+        await db.from('workspace_members').insert({
+          workspace_id: workspaceId, user_id: userId, role: 'client', status: 'active',
+        });
+      }
+
       await db.from('inbox_thread_tokens').update({ claimed_by_user_id: userId }).eq('token', token);
       return json({ ok: true, thread_id: tok.thread_id });
     }
@@ -722,11 +903,24 @@ async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
+  // Env-first / DB-fallback secrets (ANTHROPIC_API_KEY for agent replies). authenticate() also
+  // bootstraps, but the token + internal branches skip it, so do it up front.
+  await bootstrapForFunction();
+
   const payload = (await req.json().catch(() => ({}))) as Json;
   const action = String(payload.action || '');
   if (!action) throw new HttpError(400, 'action is required');
 
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Internal branch — function-to-function (e.g. the Zernio webhook after a WhatsApp inbound).
+  // Guarded by the service-role bearer; never reachable by external callers.
+  if (action === 'internal_agent_reply') {
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
+    await maybeRunAgentReply(db, String(payload.thread_id || ''));
+    return json({ ok: true });
+  }
 
   // Token branch — unauthenticated customer, service-role only.
   if (TOKEN_ACTIONS.has(action)) {

@@ -265,6 +265,14 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
       body: preview, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
     }).catch(() => {});
   }
+
+  // Phase-2 agent takeover: if the thread is handed to the AI, let inbox-api generate + relay
+  // the reply (it owns the Claude call + credit metering). Service-role, best-effort.
+  await fetch(`${supabaseUrl}/functions/v1/inbox-api`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
+  }).catch(() => {});
 }
 
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
