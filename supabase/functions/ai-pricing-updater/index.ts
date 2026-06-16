@@ -16,6 +16,8 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 // Known pricing sources for major providers (per 1M tokens)
 // These are fallback values - the function will attempt to fetch from APIs first
@@ -94,6 +96,21 @@ Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Auth gate: this function has verify_jwt=false (so the cron can call it
+    // without a user JWT), so it MUST enforce its own auth — otherwise anyone
+    // could trigger a full pricing rewrite + upstream spend. Accept either the
+    // shared cron secret OR an admin/super_admin user JWT.
+    const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
+    const cronOk = isServiceRoleRequest(req) || (!!cronSecret && req.headers.get('x-cron-secret') === cronSecret);
+    if (!cronOk) {
+      const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+      if (!auth.success && !isAdminAccess(auth)) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     console.log('[AIPricingUpdater] Starting automated price update...');
 

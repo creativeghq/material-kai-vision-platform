@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import {
@@ -538,6 +538,15 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
     const user = auth.user;
     const userId = auth.userId;
+
+    // Tenant isolation: the body-supplied workspace_id runs under the service
+    // role (RLS-bypassing). Bind the caller to it, or any user could import
+    // products into a workspace they don't belong to.
+    if (!isAdminAccess(auth) && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
+      return new Response(JSON.stringify({ error: 'Not authorized for this workspace' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Forward the caller's auth header to the Python /api/import/process
     // handoff so Python can identify the user (this was a latent bug — the

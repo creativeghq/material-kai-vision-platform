@@ -16,7 +16,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import {
@@ -116,6 +116,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
     const requestBody = req.method === 'POST' ? await req.json() : {};
     const action = requestBody.action;
+
+    // Messaging is a platform-global feature (channels are not per-workspace) that
+    // spends the platform's WhatsApp credits and edits connection config. Gate the
+    // credit-spending / config-mutating actions to platform operators; reads stay
+    // open to any authenticated user.
+    const OPERATOR_ACTIONS = new Set(['send', 'send-bulk', 'connect-whatsapp', 'sync-channels', 'update-settings']);
+    if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
+      const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
+      if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);
+    }
 
     switch (action) {
       // ─────────────────────────────────────────────────────────────

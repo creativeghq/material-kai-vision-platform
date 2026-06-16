@@ -358,6 +358,19 @@ export function isAdminAccess(auth: AuthResult): boolean {
 }
 
 /**
+ * True when the request is authenticated as the platform service role — i.e. the
+ * Authorization bearer equals SUPABASE_SERVICE_ROLE_KEY. This is how pg_cron jobs
+ * call internal/cron edge functions (Bearer <platform_service_role_key>). Use this
+ * to gate cron-only functions that have `verify_jwt = false`, so an anonymous caller
+ * cannot trigger privileged platform-wide work.
+ */
+export function isServiceRoleRequest(req: Request): boolean {
+  const bearer = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim();
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  return !!key && !!bearer && bearer === key;
+}
+
+/**
  * Quick helper to check if request is a partner kai_* API key call.
  */
 export function isPartnerApiKeyAccess(auth: AuthResult): boolean {

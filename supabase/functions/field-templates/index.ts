@@ -1,7 +1,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+
+function forbidden() {
+  return new Response(JSON.stringify({ error: 'Not authorized for this workspace' }), {
+    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 /**
  * Field Templates API
@@ -29,6 +35,8 @@ Deno.serve(withApiLogging('field-templates', async (req) => {
 
     const user = auth.user;
     const userId = auth.userId;
+    // Secret-key / global-admin callers bypass per-workspace membership checks.
+    const admin = isAdminAccess(auth);
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -37,6 +45,7 @@ Deno.serve(withApiLogging('field-templates', async (req) => {
     if (req.method === 'GET') {
       const workspaceId = url.searchParams.get('workspace_id');
       if (!workspaceId) throw new Error('workspace_id required');
+      if (!admin && !(await userCanAccessWorkspace(supabase, userId, workspaceId))) return forbidden();
 
       const { data, error } = await supabase
         .from('field_templates')
@@ -59,6 +68,7 @@ Deno.serve(withApiLogging('field-templates', async (req) => {
       if (!workspace_id || !name || !fields) {
         throw new Error('workspace_id, name, and fields are required');
       }
+      if (!admin && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) return forbidden();
 
       const { data, error } = await supabase
         .from('field_templates')
@@ -98,6 +108,17 @@ Deno.serve(withApiLogging('field-templates', async (req) => {
     // DELETE /field-templates/:id
     if (req.method === 'DELETE') {
       const templateId = pathParts[0];
+
+      // Scope the delete to a template the caller may actually touch.
+      const { data: tpl } = await supabase
+        .from('field_templates')
+        .select('workspace_id, is_global')
+        .eq('id', templateId)
+        .maybeSingle();
+      if (!tpl) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // Global templates: admin only. Workspace templates: members only.
+      const allowed = admin || (!tpl.is_global && await userCanAccessWorkspace(supabase, userId, tpl.workspace_id));
+      if (!allowed) return forbidden();
 
       const { error } = await supabase
         .from('field_templates')

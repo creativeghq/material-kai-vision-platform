@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { authenticate, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
 
 // ── Cron expression parser (minute, hour, day-of-month, month, day-of-week) ──
 
@@ -81,6 +82,18 @@ Deno.serve(withApiLogging('flow-scheduler-cron', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Cron-only: fires scheduled flows (emails, webhooks, credit-spending actions).
+  // verify_jwt is disabled for this function, so gate it here — only the pg_cron
+  // service-role caller or a platform admin may trigger it.
+  if (!isServiceRoleRequest(req)) {
+    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+    if (!auth.success && !isAdminAccess(auth)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   const supabase = createClient(

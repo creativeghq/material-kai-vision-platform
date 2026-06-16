@@ -26,7 +26,7 @@ const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import {
@@ -79,6 +79,15 @@ Deno.serve(withApiLogging('trigger-factory-enrichment', async (req: Request) => 
   if (!workspace_id) {
     return new Response(JSON.stringify({ error: 'workspace_id is required' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Tenant isolation: only members (or secret-key/admin callers) may run
+  // enrichment against a workspace's products. The body-supplied workspace_id
+  // is otherwise unverified and runs under the service role.
+  if (!isAdminAccess(auth) && !(await userCanAccessWorkspace(supabase, auth.userId, workspace_id))) {
+    return new Response(JSON.stringify({ error: 'Not authorized for this workspace' }), {
+      status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
