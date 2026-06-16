@@ -225,53 +225,53 @@ const FinancePage: React.FC = () => {
                 <Receipt className="h-4 w-4 mr-2" /> Point of Sale
               </Link>
             )}
-            <TabsTrigger value="dashboard" className="w-full justify-start">
+            <TabsTrigger value="dashboard" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <PieChart className="h-4 w-4 mr-2" /> Dashboard
             </TabsTrigger>
-            <TabsTrigger value="ar" className="w-full justify-start">
+            <TabsTrigger value="ar" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowDownCircle className="h-4 w-4 mr-2" /> Receivables ({ar.length})
             </TabsTrigger>
-            <TabsTrigger value="ap" className="w-full justify-start">
+            <TabsTrigger value="ap" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
 
             <SectionLabel>Documents</SectionLabel>
             {DOC_TABS.map((d) => (
-              <TabsTrigger key={d.value} value={d.value} className="w-full justify-start">
+              <TabsTrigger key={d.value} value={d.value} className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <d.icon className="h-4 w-4 mr-2" /> {d.label}
               </TabsTrigger>
             ))}
             <SectionLabel>Tools</SectionLabel>
 
-            <TabsTrigger value="planning" className="w-full justify-start">
+            <TabsTrigger value="planning" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
             {!isAccountant && (
-              <TabsTrigger value="time" className="w-full justify-start">
+              <TabsTrigger value="time" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Clock className="h-4 w-4 mr-2" /> Time &amp; billing
               </TabsTrigger>
             )}
-            <TabsTrigger value="reports" className="w-full justify-start">
+            <TabsTrigger value="reports" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" /> Reports
             </TabsTrigger>
-            <TabsTrigger value="parties" className="w-full justify-start">
+            <TabsTrigger value="parties" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
             </TabsTrigger>
-            <TabsTrigger value="followups" className="w-full justify-start">
+            <TabsTrigger value="followups" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
             </TabsTrigger>
             {!isAccountant && (
-              <TabsTrigger value="marketplace" className="w-full justify-start">
+              <TabsTrigger value="marketplace" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
               </TabsTrigger>
             )}
             {!isAccountant && (
-              <TabsTrigger value="warehouse" className="w-full justify-start">
+              <TabsTrigger value="warehouse" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Package className="h-4 w-4 mr-2" /> Warehouse
               </TabsTrigger>
             )}
             {!isAccountant && (
-              <TabsTrigger value="settings" className="w-full justify-start">
+              <TabsTrigger value="settings" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <SettingsIcon className="h-4 w-4 mr-2" /> Settings
               </TabsTrigger>
             )}

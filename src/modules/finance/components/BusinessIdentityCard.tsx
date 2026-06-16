@@ -200,7 +200,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
         <Tabs defaultValue="billing" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {[['billing', '1. Billing'], ['contact', '2. Customer Contact'], ['personal', '3. Personal'], ['company', '4. My Company'], ['bank', 'Bank & Logo']].map(([v, l]) => (
-              <TabsTrigger key={v} value={v}>{l}</TabsTrigger>
+              <TabsTrigger key={v} value={v} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{l}</TabsTrigger>
             ))}
           </TabsList>
 

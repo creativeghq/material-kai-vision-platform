@@ -281,9 +281,9 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
           {/* Main tabs */}
           <Tabs defaultValue="feed">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="feed" className="flex items-center gap-2">Feed ({feed.length})</TabsTrigger>
-              <TabsTrigger value="outlets" className="flex items-center gap-2">Outlets</TabsTrigger>
-              <TabsTrigger value="llm" className="flex items-center gap-2">LLM Visibility</TabsTrigger>
+              <TabsTrigger value="feed" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Feed ({feed.length})</TabsTrigger>
+              <TabsTrigger value="outlets" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Outlets</TabsTrigger>
+              <TabsTrigger value="llm" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">LLM Visibility</TabsTrigger>
             </TabsList>
 
             {/* Feed */}

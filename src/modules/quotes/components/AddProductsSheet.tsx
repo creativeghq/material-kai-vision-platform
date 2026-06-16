@@ -327,11 +327,11 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
         <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'search' | 'custom')} className="flex-1 flex flex-col min-h-0 mt-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-4">
-            <TabsTrigger value="search" className="flex items-center gap-2">
+            <TabsTrigger value="search" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Search className="h-4 w-4" />
               Catalog Search
             </TabsTrigger>
-            <TabsTrigger value="custom" className="flex items-center gap-2">
+            <TabsTrigger value="custom" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <PenLine className="h-4 w-4" />
               Custom Product
             </TabsTrigger>

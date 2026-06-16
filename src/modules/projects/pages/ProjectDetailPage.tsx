@@ -167,22 +167,22 @@ export const ProjectDetailPage: React.FC = () => {
       <main className="px-4 sm:px-6 py-6">
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-5">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <LayoutDashboard className="h-3.5 w-3.5" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="rooms" className="flex items-center gap-2">
+            <TabsTrigger value="rooms" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Home className="h-3.5 w-3.5" />
               Rooms
             </TabsTrigger>
-            <TabsTrigger value="moodboards" className="flex items-center gap-2">
+            <TabsTrigger value="moodboards" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Palette className="h-3.5 w-3.5" />
               Moodboards
               {project.moodboard_count > 0 && (
                 <Badge variant="outline" className="ml-1 text-xs h-5">{project.moodboard_count}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
+            <TabsTrigger value="quotes" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-3.5 w-3.5" />
               Quotes
               {project.accepted_quote_count > 0 && (
@@ -190,28 +190,28 @@ export const ProjectDetailPage: React.FC = () => {
               )}
             </TabsTrigger>
             {isOwner && (
-              <TabsTrigger value="billing" className="flex items-center gap-2">
+              <TabsTrigger value="billing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Receipt className="h-3.5 w-3.5" />
                 Billing
               </TabsTrigger>
             )}
-            <TabsTrigger value="sheets" className="flex items-center gap-2">
+            <TabsTrigger value="sheets" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileImage className="h-3.5 w-3.5" />
               Sheets
             </TabsTrigger>
             {isOwner && (
-              <TabsTrigger value="client-view" className="flex items-center gap-2">
+              <TabsTrigger value="client-view" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Presentation className="h-3.5 w-3.5" />
                 Client View
               </TabsTrigger>
             )}
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
+            <TabsTrigger value="tasks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
             </TabsTrigger>
             {/* Timeline is owner-only — it would expose internal task + status churn to clients. */}
             {isOwner && (
-              <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Activity className="h-3.5 w-3.5" />
                 Timeline
               </TabsTrigger>

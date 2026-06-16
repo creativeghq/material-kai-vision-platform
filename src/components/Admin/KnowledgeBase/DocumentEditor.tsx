@@ -577,11 +577,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
               <div className="border-b px-6 py-2">
                 <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-                  <TabsTrigger value="edit">
+                  <TabsTrigger value="edit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Code className="h-4 w-4 mr-2" />
                     Edit
                   </TabsTrigger>
-                  <TabsTrigger value="preview">
+                  <TabsTrigger value="preview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Eye className="h-4 w-4 mr-2" />
                     Preview
                   </TabsTrigger>
@@ -590,7 +590,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                       pattern is generic so future internal-config docs (mention
                       outlets, price retailers, etc.) plug in the same way. */}
                   {(document.metadata as Record<string, unknown> | undefined)?.doc_kind === 'job_research_sites' && (
-                    <TabsTrigger value="manage">
+                    <TabsTrigger value="manage" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <Settings2 className="h-4 w-4 mr-2" />
                       Manage resources
                     </TabsTrigger>

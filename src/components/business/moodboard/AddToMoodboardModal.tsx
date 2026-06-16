@@ -16,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
 import { ProjectPickerInline } from '@/modules/projects/components/ProjectPickerInline';
-import { useActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
 
 interface AddToMoodboardModalProps {
   productId: string;
@@ -34,7 +33,6 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
   onSuccess,
 }) => {
   const { toast } = useToast();
-  const { activeMoodboard } = useActiveMoodboard();
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
@@ -54,10 +52,6 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
       setLoading(true);
       const data = await moodboardAPI.getUserMoodBoards();
       setMoodboards(data || []);
-      // Preselect the moodboard the user is actively curating, if it's theirs.
-      if (activeMoodboard && (data || []).some((m) => m.id === activeMoodboard.id)) {
-        setSelectedMoodboardId(activeMoodboard.id);
-      }
     } catch (error) {
       console.error('Error loading moodboards:', error);
       toast({

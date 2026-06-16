@@ -7,7 +7,6 @@ import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from '
 import {
   Bot,
   Search,
-  Palette,
   Package,
   Settings,
   Send,
@@ -116,8 +115,6 @@ import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
-import { moodboardAPI } from '@/services/moodboardAPI';
-import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
 import { GeminiEditModal } from './GeminiEditModal';
 import { RegionEditCanvas, type RegionEditResult } from './RegionEditCanvas';
 
@@ -430,8 +427,6 @@ interface AgentHubProps {
   onMaterialSelect?: (materialId: string) => void;
   initialPrompt?: string;
   initialConversationId?: string;
-  /** When arriving from a moodboard, products added from the agent go here. */
-  initialMoodboardId?: string;
   onConversationChange?: (conversationId: string | null) => void;
 }
 
@@ -489,26 +484,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   onMaterialSelect,
   initialPrompt,
   initialConversationId,
-  initialMoodboardId,
   onConversationChange,
 }) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [activeMoodboard, setActiveMoodboard] = useState<ActiveMoodboard | null>(null);
-
-  // Resolve the moodboard passed via `?moodboard=<id>` so products added from the
-  // agent land back in that moodboard (and we can show a context banner).
-  useEffect(() => {
-    let cancelled = false;
-    if (!initialMoodboardId) {
-      setActiveMoodboard(null);
-      return;
-    }
-    moodboardAPI.getMoodBoard(initialMoodboardId).then((mb) => {
-      if (!cancelled && mb) setActiveMoodboard({ id: mb.id, title: mb.title });
-    }).catch(() => { /* non-fatal — fall back to no context */ });
-    return () => { cancelled = true; };
-  }, [initialMoodboardId]);
   const [mobileConvOpen, setMobileConvOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
   // Initialize with JARVIS agent's default model
@@ -3099,7 +3078,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const AgentIcon = currentAgent?.icon || Bot;
 
   return (
-    <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
     <div className="flex flex-1 min-h-0">
       {/* Middle Panel - Conversation List (desktop only) */}
       <div className="hidden md:flex w-72 flex-col bg-sidebar border-r border-white/8 overflow-hidden flex-shrink-0">
@@ -3342,24 +3320,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <span className="text-sm font-medium truncate flex-1">
               {currentAgent?.name}
             </span>
-          </div>
-        )}
-        {/* Active moodboard context — products added from the agent land here */}
-        {activeMoodboard && (
-          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm">
-            <span className="flex items-center gap-2 min-w-0 text-foreground">
-              <Palette className="h-4 w-4 text-primary flex-shrink-0" />
-              <span className="truncate">
-                Adding to moodboard <span className="font-semibold">{activeMoodboard.title}</span>
-              </span>
-            </span>
-            <button
-              onClick={() => setActiveMoodboard(null)}
-              className="text-muted-foreground hover:text-foreground flex-shrink-0"
-              title="Stop adding to this moodboard"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         )}
         {/* Messages Area */}
@@ -5248,7 +5208,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
       )}
     </div>
-    </ActiveMoodboardProvider>
   );
 };
 

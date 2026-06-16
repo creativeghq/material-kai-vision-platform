@@ -552,13 +552,13 @@ export const DiscoverPage: React.FC = () => {
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <Tabs defaultValue="profiles">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="profiles" className="flex items-center gap-2">
+            <TabsTrigger value="profiles" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4" /> Profiles
             </TabsTrigger>
-            <TabsTrigger value="factory" className="flex items-center gap-2">
+            <TabsTrigger value="factory" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4" /> Factory
             </TabsTrigger>
-            <TabsTrigger value="products" className="flex items-center gap-2">
+            <TabsTrigger value="products" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Package className="h-4 w-4" /> Products
             </TabsTrigger>
           </TabsList>

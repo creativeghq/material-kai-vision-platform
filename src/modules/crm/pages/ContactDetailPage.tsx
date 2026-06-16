@@ -474,31 +474,31 @@ export const ContactDetailPage: React.FC = () => {
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="companies">
+            <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" />
               Companies
             </TabsTrigger>
-            <TabsTrigger value="notes">
+            <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
-            <TabsTrigger value="account">
+            <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Wallet className="h-4 w-4 mr-2" />
               Account
             </TabsTrigger>
-            <TabsTrigger value="quotes">
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ScrollText className="h-4 w-4 mr-2" />
               Quotes
             </TabsTrigger>
-            <TabsTrigger value="invoices">
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Receipt className="h-4 w-4 mr-2" />
               Invoices
             </TabsTrigger>
-            <TabsTrigger value="payments">
+            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CreditCard className="h-4 w-4 mr-2" />
               Payments
             </TabsTrigger>

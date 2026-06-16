@@ -17,7 +17,8 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Package, Layers, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw, Sparkles, Puzzle, Globe, Video, Box, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -36,6 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
   getCategoryDisplayConfig,
+  getKnownFieldKeys,
   resolveUploadCategory,
   type UploadCategory,
 } from '@/lib/categoryFieldRegistry';
@@ -236,6 +238,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [chunks, setChunks] = useState<any[]>([]);
+  const [embeddings, setEmbeddings] = useState<any>({});
+  const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
+  const [isRelinking, setIsRelinking] = useState(false);
   // Knowledge base docs attached to this product (via kb_doc_attachments)
   const [kbDocs, setKbDocs] = useState<Array<{
     id: string;
@@ -435,6 +440,77 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     loadKbDocs();
   }, [product?.id, isOpen]);
 
+  // Load admin data (embeddings, relevances — chunks are now loaded above)
+  useEffect(() => {
+    const loadAdminData = async () => {
+      if (!product?.id || !isAdmin || !isOpen) return;
+      // Skip DB queries for demo products (non-UUID IDs like "demo-wood-green-001")
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
+
+      try {
+        // Chunks already loaded by the effect above (for all users).
+        // This effect only handles admin-specific embedding/relevance data.
+
+        // Get relationship counts
+        const { count: chunkCount } = await supabase
+          .from('chunk_product_relationships')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        const { count: imageCount } = await supabase
+          .from('image_product_associations')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        setRelevanceCounts({
+          chunks: chunkCount || 0,
+          images: imageCount || 0,
+        });
+
+        // ── Embedding status (7-vector suite) ──────────────────────────────
+        // Text: exists whenever chunks were created (embedded together via Voyage AI)
+        const hasText = (chunkCount ?? 0) > 0;
+
+        // Visual SLIG + Phase 2: use get_product_embedding_status RPC.
+        // The Python backend sets has_slig_embedding / has_understanding_embedding /
+        // has_color_slig / has_texture_slig / has_style_slig / has_material_slig on
+        // document_images immediately after each successful VECS write — 100% accurate.
+        let hasVisualSlig = false;
+        let hasUnderstanding = false;
+        let hasColorSlig = false;
+        let hasTextureSlig = false;
+        let hasStyleSlig = false;
+        let hasMaterialSlig = false;
+
+        const { data: embStatus } = await supabase
+          .rpc('get_product_embedding_status', { p_product_id: product.id });
+
+        if (embStatus) {
+          hasVisualSlig    = (embStatus.has_slig_embedding ?? 0) > 0;
+          hasUnderstanding = (embStatus.has_understanding ?? 0) > 0;
+          hasColorSlig     = (embStatus.has_color_slig ?? 0) > 0;
+          hasTextureSlig   = (embStatus.has_texture_slig ?? 0) > 0;
+          hasStyleSlig     = (embStatus.has_style_slig ?? 0) > 0;
+          hasMaterialSlig  = (embStatus.has_material_slig ?? 0) > 0;
+        }
+
+        setEmbeddings({
+          'Text 1024D (Voyage)':          hasText,
+          'Visual SLIG 768D':             hasVisualSlig,
+          'Understanding 1024D (Voyage)': hasUnderstanding,
+          'Color SLIG 768D':              hasColorSlig,
+          'Texture SLIG 768D':            hasTextureSlig,
+          'Style SLIG 768D':              hasStyleSlig,
+          'Material SLIG 768D':           hasMaterialSlig,
+        });
+      } catch (error) {
+        console.error('[ProductDetailModal] Failed to load admin data:', error);
+      }
+    };
+
+    loadAdminData();
+  }, [product?.id, isAdmin, isOpen]);
+
   // AI grout suggestions — must be a hook so it lives before the conditional return
   const groutRecommendations = React.useMemo(() => {
     if (!product) return generateGroutRecommendations({});
@@ -462,6 +538,51 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setCurrentImageIndex((prev) =>
       prev === images.length - 1 ? 0 : prev + 1,
     );
+  };
+
+  const handleRelinkChunks = async () => {
+    if (!product?.source_document_id) {
+      console.error('[ProductDetailModal] No source_document_id found');
+      return;
+    }
+
+    try {
+      setIsRelinking(true);
+      console.log('[ProductDetailModal] Re-linking chunks for document:', product.source_document_id);
+
+      const response = await fetch('https://v1api.materialshub.gr/api/admin/linking/link-chunks-to-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          document_id: product.source_document_id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('[ProductDetailModal] Re-linking successful:', result);
+
+        // chunk_product_relationships table doesn't exist - skip reload
+        setChunks([]);
+        setRelevanceCounts(prev => ({
+          ...prev,
+          chunks: 0,
+        }));
+
+        toast.success(`✅ Successfully created ${result.chunk_product_links} chunk-product relationships!`);
+      } else {
+        console.error('[ProductDetailModal] Re-linking failed:', result.error);
+        toast.error(`❌ Re-linking failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('[ProductDetailModal] Re-linking error:', error);
+      toast.error(`❌ Re-linking error: ${error}`);
+    } finally {
+      setIsRelinking(false);
+    }
   };
 
   const currentImage = images[currentImageIndex];
@@ -1303,7 +1424,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
             Certifications & Compliance
           </h3>
         </div>
@@ -1395,7 +1515,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     title: string,
     data: Record<string, unknown>,
     lowConfidenceKeys?: Set<string>,
-    icon?: React.ReactNode,
   ) => {
     const filteredData = Object.entries(data).filter(([, value]) => {
       const str = renderValue(value);
@@ -1410,7 +1529,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return (
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{icon}{title}</h3>
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{title}</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
           {filteredData.map(([key, value]) => {
@@ -1488,7 +1607,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <Layers className="h-4 w-4" />
             Product Variants ({productVariants.length})
           </h3>
         </div>
@@ -1580,7 +1698,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <Package className="h-4 w-4" />
             Packaging per Variant ({rows.length})
           </h3>
         </div>
@@ -1636,85 +1753,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
-  // ─── Completeness infrastructure (category-agnostic) ────────────────────────
-  // The Details tab must surface EVERY metadata field that has a value,
-  // regardless of category. `consumedKeys` tracks every raw metadata key that
-  // a curated/structured renderer has already shown, so the catch-all at the
-  // bottom can render literally everything else without duplication. Seeded
-  // with the keys consumed by the special cards (appearance / certifications /
-  // variants) and the Key-Specs sidebar summary.
-  const consumedKeys = new Set<string>([
-    // Key Specs sidebar (summary) + packaging block
-    'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
-    'collection', 'material_category', 'zone_intent', 'body_type', 'finish',
-    'material_subtype', 'available_sizes', 'dimensions', 'size', 'thickness',
-    'rectified', 'pieces_per_box', 'planks_per_box', 'patterns_count',
-    'm2_per_box', 'sqft_per_box', 'm2_per_pallet', 'sqft_per_pallet',
-    'weight_per_box_kg', 'weight_per_box_lb', 'weight_kg', 'weight_lb',
-    'coverage_m2', 'coverage_sqft', 'boxes_per_pallet', 'weight_per_pallet_kg',
-    'weight_per_pallet_lb', 'pallet_dimensions_cm', 'per_variant',
-    // Appearance card
-    'colors', 'available_colors', 'colors_from_vision', 'primary_color_hex',
-    'patterns', 'pattern', 'texture', 'textures', 'category', 'subcategory',
-    'shade_variation', 'visual_effect', 'vision_description', 'detected_text',
-    // Certifications card
-    'certifications', 'standards', 'certifications_source', 'eco_friendly',
-    'sustainability_rating', 'fire_rating',
-    // Commercial card + Variants table
-    'product_codes', 'sku_codes', 'grout_suppliers', 'grout_mapei',
-    'grout_kerakoll', 'grout_isomat', 'grout_technica', 'grout_color_codes',
-    'vision_variants', 'grout_details', 'product_table',
-    // Internal / non-display / blobs
-    'extraction_timestamp', 'extraction_method', 'confidence_scores',
-    'source_page', 'chunk_index', 'product_name', 'name', 'description',
-    'long_description', 'image_url', 'images', 'vision_confidence',
-  ]);
-
-  // Look up a registry field key across the top-level metadata and every known
-  // nested group, so flat OR grouped storage both resolve. Returns the display
-  // string + the raw wrapper (for low-confidence detection).
-  const registryNestedGroups: Array<Record<string, unknown>> = [
-    allData as Record<string, unknown>,
-    materialPropsData as Record<string, unknown>,
-    performanceData as Record<string, unknown>,
-    applicationData as Record<string, unknown>,
-    designData as Record<string, unknown>,
-    appearanceData as Record<string, unknown>,
-    commercialData as Record<string, unknown>,
-    packagingData as Record<string, unknown>,
-    complianceData as Record<string, unknown>,
-  ];
-  const lookupRegistryField = (key: string): { value: string; raw: unknown } | null => {
-    for (const grp of registryNestedGroups) {
-      if (grp && typeof grp === 'object' && Object.prototype.hasOwnProperty.call(grp, key)) {
-        const raw = grp[key];
-        const v = extractValue(raw);
-        if (v && v !== 'N/A' && v !== '') return { value: v, raw };
-      }
-    }
-    return null;
-  };
-
-  // Per-section heading icon. Falls back to a neutral icon for unmapped keys.
-  const sectionIcon = (key: string): React.ReactNode => {
-    const map: Record<string, React.ReactNode> = {
-      material_specs: <Settings2 className="h-4 w-4" />,
-      electrical_specs: <Settings2 className="h-4 w-4" />,
-      thermal_performance: <Activity className="h-4 w-4" />,
-      water_performance: <Droplets className="h-4 w-4" />,
-      performance: <Activity className="h-4 w-4" />,
-      application: <Wrench className="h-4 w-4" />,
-      installation: <Wrench className="h-4 w-4" />,
-      dimensions: <Ruler className="h-4 w-4" />,
-      features: <Star className="h-4 w-4" />,
-      coverage: <Ruler className="h-4 w-4" />,
-      care: <Droplets className="h-4 w-4" />,
-      design: <Sparkles className="h-4 w-4" />,
-      commercial: <ShoppingCart className="h-4 w-4" />,
-    };
-    return map[key] || <Layers className="h-4 w-4" />;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -1767,7 +1805,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
                 materialType={asMetaString(product.metadata?.material_category)}
               />
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setPriceLookupOpen(true)}
+                  title="Get price from Pricing Knowledge Base"
+                >
+                  <DollarSign className="h-3.5 w-3.5 mr-1" />
+                  Get price
+                </Button>
+              )}
             </div>
+            <WorkspaceCostBadge productId={product.id} className="mt-2" />
+            <ProductPricingCard productId={product.id} />
+            {isAdmin && <ProductMydataCard productId={product.id} />}
           </div>
           {/* Description moved to Details tab — avoids duplication with the
               full description card that also falls back to chunk content. */}
@@ -1776,37 +1829,49 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tabs — end-users see Details / Knowledge / Related.
-            Admins additionally see Monitoring / SEO / Pricing after those. */}
+        {/* Tabs — end-users see Details/Knowledge/Similar/Works Well With.
+            Admins additionally see Chunks/Extraction/Monitor after those. */}
         <Tabs defaultValue="details" className="mt-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {/* End-user tabs (always visible) */}
-            <TabsTrigger value="details" className="flex items-center gap-2">
+            <TabsTrigger value="details" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Info className="h-4 w-4" />
               Details
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <TabsTrigger value="knowledge" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BookOpen className="h-4 w-4" />
               Knowledge
             </TabsTrigger>
-            <TabsTrigger value="related" className="flex items-center gap-2">
+            <TabsTrigger value="similar" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Sparkles className="h-4 w-4" />
-              Related
+              Similar
+            </TabsTrigger>
+            <TabsTrigger value="works-with" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Puzzle className="h-4 w-4" />
+              Works Well With
             </TabsTrigger>
             {/* Admin-only tabs (after end-user tabs) */}
             {isAdmin && (
               <>
-                <TabsTrigger value="monitoring" className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Monitoring
+                <TabsTrigger value="chunks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <FileText className="h-4 w-4" />
+                  Chunks ({chunks.length})
                 </TabsTrigger>
-                <TabsTrigger value="seo" className="flex items-center gap-2">
+                <TabsTrigger value="extraction" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Database className="h-4 w-4" />
+                  Extraction
+                </TabsTrigger>
+                <TabsTrigger value="monitor" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Activity className="h-4 w-4" />
+                  Monitor
+                </TabsTrigger>
+                <TabsTrigger value="mentions" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Sparkles className="h-4 w-4" />
+                  Mentions
+                </TabsTrigger>
+                <TabsTrigger value="seo" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Search className="h-4 w-4" />
                   SEO
-                </TabsTrigger>
-                <TabsTrigger value="pricing" className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Pricing &amp; Data
                 </TabsTrigger>
               </>
             )}
@@ -2397,7 +2462,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             return (
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Palette className="h-4 w-4" />Appearance</h3>
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">Appearance</h3>
                   {showLowConfidence && (
                     <Badge
                       variant="outline"
@@ -2446,35 +2511,93 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
           };
 
-          // ── Registry-driven section cards (category-agnostic, complete) ──
-          // Render EVERY section the registry defines for THIS category, with
-          // EVERY field that has a value — looked up across flat + nested
-          // metadata. Special sections rendered by dedicated cards below are
-          // skipped here. Each rendered key is marked consumed so the catch-all
-          // neither drops nor duplicates it. This is what lets lighting / wood /
-          // sanitary / kitchen show their full spec sheet rather than a
-          // tile-shaped subset (the old hardcoded lists were tile-centric).
-          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'packaging', 'commercial']);
-          const registrySectionCards = sectionCatConfig.sections
-            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
-            .map(section => {
-              const data: Record<string, unknown> = {};
-              const lowConf = new Set<string>();
-              for (const field of section.fields) {
-                const hit = lookupRegistryField(field.key);
-                if (!hit) continue;
-                consumedKeys.add(field.key);
-                data[field.label] = hit.value;
-                if (isLowConfidence(hit.raw)) lowConf.add(field.label);
+          // ── Merge Application + Design + Performance into one combined section ──
+          // Performance fields go first (most queried), then application, then design
+          const appDesignPerf: Record<string, unknown> = {};
+
+          // Performance fields (or category-specific alias)
+          const showPerf = activeSectionKeys.has('performance') || activeSectionKeys.has('thermal_performance')
+            || activeSectionKeys.has('water_performance') || activeSectionKeys.has('electrical_specs');
+          if (showPerf) {
+            Object.entries(performance).forEach(([k, v]) => {
+              if (v && renderValue(v) !== 'N/A') appDesignPerf[k] = v;
+            });
+          }
+
+          // Application fields
+          Object.entries(application).forEach(([k, v]) => {
+            if (v && renderValue(v) !== 'N/A' && !(k in appDesignPerf)) appDesignPerf[k] = v;
+          });
+          // Design fields
+          Object.entries(design).forEach(([k, v]) => {
+            if (v && renderValue(v) !== 'N/A' && !(k in appDesignPerf)) appDesignPerf[k] = v;
+          });
+
+          // Section title adapts to category
+          const mainSectionTitle = activeSectionKeys.has('thermal_performance') ? 'Specifications & Design'
+            : activeSectionKeys.has('water_performance') ? 'Specifications & Design'
+            : activeSectionKeys.has('electrical_specs') ? 'Specifications & Design'
+            : 'Specifications & Design';
+
+          // ── Features data ──
+          // `lowConfKeys` collects display labels for fields whose original
+          // {value, confidence} wrapper carried confidence < threshold.
+          // Threaded into renderMetadataCategory so those cells render dimmed.
+          const featuresData: Record<string, unknown> = {};
+          const featuresLowConf = new Set<string>();
+          if (activeSectionKeys.has('features')) {
+            const featureKeys = ['assembly_required', 'stackable', 'foldable', 'modular', 'reclining',
+              'storage', 'adjustable_height', 'indoor_outdoor', 'number_of_seats', 'removable_covers',
+              'thermostat_type', 'valve_type', 'reversible', 'dual_fuel', 'smart_compatible', 'ip_rating',
+              'rimless', 'soft_close_seat', 'quick_release_seat', 'overflow', 'thermostatic',
+              'soft_close', 'drawer_system', 'hinge_type', 'push_to_open', 'integrated_lighting',
+              'sensor', 'emergency', 'adjustable_tilt', 'number_of_lights', 'dimmable'];
+            featureKeys.forEach(k => {
+              const raw = allData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                featuresData[label] = v;
+                if (isLowConfidence(raw)) featuresLowConf.add(label);
               }
-              if (Object.keys(data).length === 0) return null;
-              return (
-                <React.Fragment key={section.key}>
-                  {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key))}
-                </React.Fragment>
-              );
-            })
-            .filter(Boolean);
+            });
+          }
+
+          // ── Installation data ──
+          const installData: Record<string, unknown> = {};
+          const installLowConf = new Set<string>();
+          if (activeSectionKeys.has('installation')) {
+            const installKeys = ['click_system', 'installation_method', 'subfloor_requirements',
+              'expansion_gap_mm', 'acclimation_days', 'underlay_required',
+              'mounting_type', 'connection_type', 'brackets_included',
+              'trap_type', 'connection_size', 'waste_size_mm', 'concealed_cistern',
+              'frame_compatibility', 'tap_hole_config', 'cartridge_type',
+              'ceiling_type', 'installation_zone', 'installation_type', 'mounting_method'];
+            installKeys.forEach(k => {
+              const raw = allData?.[k] ?? applicationData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                installData[label] = v;
+                if (isLowConfidence(raw)) installLowConf.add(label);
+              }
+            });
+          }
+
+          // ── Coverage data (paint_wall_decor) ──
+          const coverageData: Record<string, unknown> = {};
+          const coverageLowConf = new Set<string>();
+          if (activeSectionKeys.has('coverage')) {
+            ['coverage_per_litre_m2', 'coverage_per_roll_m2', 'roll_width_cm', 'roll_length_m', 'can_sizes'].forEach(k => {
+              const raw = allData?.[k];
+              const v = extractValue(raw);
+              if (v) {
+                const label = prettyFieldLabel(k);
+                coverageData[label] = v;
+                if (isLowConfidence(raw)) coverageLowConf.add(label);
+              }
+            });
+          }
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2503,7 +2626,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
                 <div className="mb-3">
                   <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <ScanText className="h-4 w-4" />
                     Detected Text ({detectedTextRaw.length})
                   </h3>
                   <p className="text-[11px] text-muted-foreground mt-1">
@@ -2530,158 +2652,218 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {renderAppearanceCard()}
               {renderDetectedTextCard()}
 
-              {/* All registry-defined spec sections for THIS category, complete.
-                  Every field with a value is shown — no category gating drops data. */}
-              {registrySectionCards}
+              {/* Specifications & Design (Performance + Application + Design merged) */}
+              {Object.keys(appDesignPerf).length > 0 &&
+                renderMetadataCategory(mainSectionTitle, appDesignPerf)}
 
-              {/* Commercial — curated (filters SKU/grout to THIS product, adds
-                  grout suggestions). Auto-hides if empty. */}
-              {renderMetadataCategory('Commercial Information', commercial, undefined, <ShoppingCart className="h-4 w-4" />)}
+              {/* Features */}
+              {activeSectionKeys.has('features') && renderMetadataCategory('Features', featuresData, featuresLowConf)}
 
-              {/* Variants table (per-variant SKU + grout) */}
+              {/* Installation */}
+              {activeSectionKeys.has('installation') && renderMetadataCategory('Installation', installData, installLowConf)}
+
+              {/* Care & Maintenance */}
+              {activeSectionKeys.has('care') && renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
+
+              {/* Commercial */}
+              {activeSectionKeys.has('commercial') && renderMetadataCategory('Commercial Information', commercial)}
+
+              {/* Coverage (paint/wallpaper) */}
+              {activeSectionKeys.has('coverage') && renderMetadataCategory('Coverage & Dimensions', coverageData, coverageLowConf)}
+
+              {/* Variants table */}
               {(activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable()}
+              {/* Packaging per Variant removed — packaging data is already in Key Specs sidebar */}
 
-              {/* Certifications (chips + compliance) — auto-hides if empty */}
-              {renderCertificationsCard()}
+              {/* Certifications — last section */}
+              {activeSectionKeys.has('certifications') && renderCertificationsCard()}
             </div>
           );
         })()}
 
-          {/* ── Dynamic groups + completeness net ───────────────────────────
-              Fully data-driven. The registry above gives curated headlines for
-              the 10 known categories. THIS block handles anything the registry
-              doesn't know about:
-                • An unknown nested group the extractor invented (e.g.
-                  `acoustic_properties: {...}`) becomes its OWN card with a
-                  headline derived from the group key itself — so new section
-                  names appear automatically, no code change.
-                • Leftover inner fields of known groups + flat orphan fields
-                  collect into a single "Other Specifications" card.
-              `consumedKeys` (sidebar + special cards + registry sections)
-              guarantees no duplication and that nothing is ever dropped. */}
+          {/* ── Additional Properties (dynamic discovery) ──────────────────
+              Renders any metadata fields that the extraction discovered
+              but aren't part of the category's known display sections.
+              This makes the system self-extending: new fields extracted
+              from PDFs show up automatically without code changes. */}
           {(() => {
-            // Groups the registry already rendered above — their leftover inner
-            // fields go to the generic bucket (not a duplicate titled card).
-            const KNOWN_GROUPS = new Set([
-              'design', 'appearance', 'material_properties', 'application',
-              'commercial', 'packaging', 'performance', 'compliance', 'dimensions',
-              '_extraction_metadata',
-            ]);
-            const seen = new Set<string>();
-            const leafExtras: Array<{ key: string; label: string; value: string }> = [];
-            const dynamicGroups: Array<{ key: string; title: string; fields: Array<{ key: string; label: string; value: string }> }> = [];
+            const categoryConfig = getCategoryDisplayConfig(
+              product.metadata, product.type, product.category,
+            );
+            const knownKeys = getKnownFieldKeys(categoryConfig);
 
-            // Collect the displayable, not-yet-consumed leaf fields of an object.
-            const collectFields = (obj: Record<string, unknown>) => {
-              const out: Array<{ key: string; label: string; value: string }> = [];
-              for (const [ik, iv] of Object.entries(obj)) {
-                if (!ik || ik.startsWith('_')) continue;
-                if (consumedKeys.has(ik) || seen.has(ik)) continue;
-                const str = extractValue(iv);
-                if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') continue;
-                seen.add(ik);
-                out.push({ key: ik, label: prettyFieldLabel(ik), value: str });
-              }
-              return out;
+            // Also exclude keys already rendered by the hardcoded sections above
+            const alreadyRendered = new Set([
+              // Key Specs sidebar
+              'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
+              'collection', 'material_category', 'zone_intent', 'body_type', 'finish',
+              'material_subtype', 'available_sizes', 'dimensions', 'size', 'thickness',
+              // Packaging sidebar
+              'pieces_per_box', 'patterns_count', 'm2_per_box', 'sqft_per_box',
+              'weight_per_box_kg', 'weight_per_box_lb', 'weight_kg', 'weight_lb',
+              'coverage_m2', 'coverage_sqft', 'boxes_per_pallet', 'weight_per_pallet_kg',
+              // Internal / non-display
+              'extraction_timestamp', 'extraction_method', 'confidence_scores',
+              'source_page', 'chunk_index', 'product_name', 'name', 'description',
+              'long_description', 'image_url', 'images',
+            ]);
+
+            // Collect extra key-value pairs from dynamically discovered fields.
+            //
+            // Sources (in priority order):
+            //   1. _discovered_extra — unknown_attributes the AI extracted that
+            //      weren't part of the category's known schema. Saved during
+            //      product_discovery_service merge step.
+            //   2. Top-level allData keys — any flat value in product.metadata
+            //      that isn't in the category's known display sections.
+            //
+            // This is what makes the system dynamic: the AI can discover new
+            // fields in a PDF, they get persisted to product.metadata, and they
+            // render here automatically without any code change.
+            const discoveredExtra = allData?._discovered_extra || {};
+
+            const extras: Array<{ key: string; label: string; value: string }> = [];
+            const seenKeys = new Set<string>();
+
+            const addIfUnknown = (key: string, val: unknown) => {
+              if (!key || seenKeys.has(key) || alreadyRendered.has(key) || knownKeys.has(key)) return;
+              // Skip internal/private keys
+              if (key.startsWith('_')) return;
+              const str = extractValue(val);
+              if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
+              seenKeys.add(key);
+              const label = prettyFieldLabel(key);
+              extras.push({ key, label, value: str });
             };
 
-            // AI-discovered unknown attributes → generic bucket.
-            const discoveredExtra = allData?._discovered_extra;
-            if (discoveredExtra && typeof discoveredExtra === 'object' && !Array.isArray(discoveredExtra)) {
-              leafExtras.push(...collectFields(discoveredExtra as Record<string, unknown>));
+            // Source 1: _discovered_extra (unknown_attributes from AI extraction)
+            if (discoveredExtra && typeof discoveredExtra === 'object') {
+              Object.entries(discoveredExtra).forEach(([k, v]) => addIfUnknown(k, v));
             }
 
-            // Walk every top-level metadata key.
-            Object.entries(allData || {}).forEach(([k, v]) => {
-              if (k.startsWith('_')) return;
-              const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
-                ? (v as Record<string, unknown>).value
-                : v;
-
-              // Nested group (object, not array) → descend.
-              if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-                const fields = collectFields(inner as Record<string, unknown>);
-                if (fields.length === 0) return;
-                if (KNOWN_GROUPS.has(k)) {
-                  // Already-titled above — surface only its leftovers generically.
-                  leafExtras.push(...fields);
-                } else {
-                  // Brand-new group the registry never heard of → its own card,
-                  // headline derived from the data.
-                  dynamicGroups.push({ key: k, title: prettyFieldLabel(k), fields });
-                }
-                return;
+            // Source 2: Walk all top-level allData keys for anything not covered
+            // by the category's known sections (catches fields the AI put into
+            // "discovered" that aren't in our registry yet).
+            Object.entries(allData).forEach(([k, v]) => {
+              if (typeof v === 'object' && !Array.isArray(v) && v !== null && 'value' in (v as Record<string, unknown>)) {
+                addIfUnknown(k, v);
+              } else if (typeof v !== 'object') {
+                addIfUnknown(k, v);
               }
-
-              // Flat orphan leaf.
-              if (consumedKeys.has(k) || seen.has(k)) return;
-              const str = extractValue(v);
-              if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
-              seen.add(k);
-              leafExtras.push({ key: k, label: prettyFieldLabel(k), value: str });
             });
 
-            if (dynamicGroups.length === 0 && leafExtras.length === 0) return null;
-
-            const renderGrid = (fields: Array<{ key: string; label: string; value: string }>) => (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {fields.map(({ key, label, value }) => (
-                  <div key={key} className="bg-muted/30 rounded-lg p-3">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      {label}
-                    </p>
-                    <p className="text-xs font-semibold">{value}</p>
-                  </div>
-                ))}
-              </div>
-            );
+            if (extras.length === 0) return null;
 
             return (
-              <div className="space-y-6 mt-6">
-                {/* One card per unknown group — title comes from the data itself */}
-                {dynamicGroups.map(group => (
-                  <div key={group.key} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                    <div className="mb-4">
-                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        {group.title}
-                      </h3>
-                    </div>
-                    {renderGrid(group.fields)}
-                  </div>
-                ))}
-
-                {/* Everything else not slotted into a section above */}
-                {leafExtras.length > 0 && (
-                  <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                    <div className="mb-4">
-                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        Other Specifications
-                        <Badge variant="outline" className="text-[10px] font-normal">
-                          {leafExtras.length}
-                        </Badge>
-                      </h3>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Every remaining field found in this product's data, not shown above.
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mt-6">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    Additional Properties
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {extras.length} discovered
+                    </Badge>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Automatically extracted from the source document
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {extras.map(({ key, label, value }) => (
+                    <div key={key} className="bg-muted/30 rounded-lg p-3">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                        {label}
                       </p>
+                      <p className="text-xs font-semibold">{value}</p>
                     </div>
-                    {renderGrid(leafExtras)}
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             );
           })()}
 
       </TabsContent>
 
+      {/* Chunks Tab - Admin Only */}
+      {isAdmin && (
+        <TabsContent value="chunks" className="mt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Related Chunks ({chunks.length})</h3>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{relevanceCounts.chunks} total relevances</Badge>
+                <Button
+                  onClick={handleRelinkChunks}
+                  disabled={isRelinking || !product?.source_document_id}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {isRelinking ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Re-linking...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Re-link Chunks
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {chunks.length > 0 ? (
+              <div className="space-y-3">
+                {chunks.map((chunk: any, index: number) => (
+                  <Card key={chunk.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm">Chunk #{index + 1}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Page {chunk.page_number}</Badge>
+                          <Badge>Score: {(chunk.relevance_score * 100).toFixed(0)}%</Badge>
+                          <Badge variant="secondary">{chunk.relationship_type}</Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {chunk.content}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="pt-6">
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                    <p className="text-muted-foreground mb-4">No chunks linked to this product</p>
+                    {product?.source_document_id && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          This product has a source document but no chunk relationships.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Click "Re-link Chunks" above to create chunk-product relationships.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      )}
+
+      {/* Knowledge Tab - Admin Only */}
       {/* Knowledge Tab — visible to all users */}
       <TabsContent value="knowledge" className="mt-6">
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Knowledge Base Articles
-          </h3>
+          <h3 className="text-lg font-semibold">Knowledge Base Articles</h3>
           {kbDocs.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
@@ -2768,70 +2950,115 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
       </TabsContent>
 
-      {/* Related Tab — Similar + Works Well With merged (visible to all users) */}
-      <TabsContent value="related" className="mt-6">
-        <div className="space-y-8">
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              Similar Products
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Other products from the same collection or with a matching visual style.
-            </p>
-            <ProductRecommendationsPanel
-              productId={product.id}
-              mode="similar"
-              onProductClick={(id) => setStackedProductId(id)}
-            />
-          </div>
+      {/* Extraction Tab - Admin Only */}
+      {isAdmin && (
+        <TabsContent value="extraction" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Extraction Metadata</h3>
 
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-              <Layers className="h-4 w-4" />
-              Works Well With
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Products from different collections that pair well — complementary colors, textures, and categories.
-            </p>
-            <ProductRecommendationsPanel
-              productId={product.id}
-              mode="complementary"
-              onProductClick={(id) => setStackedProductId(id)}
-            />
+            {/* Embeddings Summary — 7-vector suite */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">7-Vector Embeddings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(embeddings).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm font-medium">{key}</span>
+                      <Badge variant={value ? 'default' : 'outline'}>
+                        {value ? '✓' : '✗'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                {Object.values(embeddings).some(v => !v) && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    ✗ = Phase 2 not yet run. Understanding + SLIG specialized embeddings are generated asynchronously after upload.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Relevances Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Relevances</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Chunk Relevances:</span>
+                    <Badge>{relevanceCounts.chunks}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Image Relevances:</span>
+                    <Badge>{relevanceCounts.images}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Total Relationships:</span>
+                    <Badge variant="secondary">
+                      {relevanceCounts.chunks + relevanceCounts.images}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
+      )}
+
+      {/* Monitor Tab */}
+      {/* Similar Products Tab */}
+      <TabsContent value="similar" className="mt-6">
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-foreground">Similar Products</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Other products from the same collection or with a matching visual style.
+          </p>
+          <ProductRecommendationsPanel
+            productId={product.id}
+            mode="similar"
+            onProductClick={(id) => setStackedProductId(id)}
+          />
         </div>
       </TabsContent>
 
-      {/* Monitoring Tab — Admin only: price tracking + mention/LLM-visibility merged */}
-      {isAdmin && (
-        <TabsContent value="monitoring" className="mt-6">
-          <div className="space-y-8">
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Price Monitoring
-              </h3>
-              <ProductMonitorTab
-                productId={product.id}
-                productName={product.name}
-                currentPrice={product.pricing?.retail}
-                currency={product.pricing?.currency}
-              />
-            </div>
+      {/* Works Well With Tab */}
+      <TabsContent value="works-with" className="mt-6">
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-foreground">Works Well With</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Products from different collections that pair well — complementary colors, textures, and categories.
+          </p>
+          <ProductRecommendationsPanel
+            productId={product.id}
+            mode="complementary"
+            onProductClick={(id) => setStackedProductId(id)}
+          />
+        </div>
+      </TabsContent>
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                Mentions &amp; LLM Visibility
-              </h3>
-              <MentionMonitorTab
-                productId={product.id}
-                productName={product.name}
-                manufacturer={(product as any).manufacturer}
-              />
-            </div>
-          </div>
+      {/* Monitor Tab — Admin only (price tracking / supply monitoring) */}
+      {isAdmin && (
+        <TabsContent value="monitor" className="mt-6">
+          <ProductMonitorTab
+            productId={product.id}
+            productName={product.name}
+            currentPrice={product.pricing?.retail}
+            currency={product.pricing?.currency}
+          />
+        </TabsContent>
+      )}
+
+      {/* Mentions Tab — Admin only (cross-source mention tracking + LLM visibility) */}
+      {isAdmin && (
+        <TabsContent value="mentions" className="mt-6">
+          <MentionMonitorTab
+            productId={product.id}
+            productName={product.name}
+            manufacturer={(product as any).manufacturer}
+          />
         </TabsContent>
       )}
 
@@ -2845,38 +3072,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             homepageDomain={(product as any).manufacturer_homepage || (product.metadata as any)?.factory?.homepage_domain || null}
             category={(product as any).category || (product as any).subcategory || null}
           />
-        </TabsContent>
-      )}
-
-      {/* Pricing & Data Tab — Admin / operator only.
-          Moved out of the header: my-data (myDATA), catalog base price,
-          workspace cost, and the price-lookup action all live here now. */}
-      {isAdmin && (
-        <TabsContent value="pricing" className="mt-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Pricing &amp; My Data
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs rounded-full"
-                onClick={() => setPriceLookupOpen(true)}
-                title="Get price from Pricing Knowledge Base"
-              >
-                <DollarSign className="h-3.5 w-3.5 mr-1" />
-                Get price
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground -mt-2">
-              Internal pricing &amp; fiscal data — visible to admins and operators only.
-            </p>
-            <WorkspaceCostBadge productId={product.id} />
-            <ProductPricingCard productId={product.id} />
-            <ProductMydataCard productId={product.id} />
-          </div>
         </TabsContent>
       )}
     </Tabs>

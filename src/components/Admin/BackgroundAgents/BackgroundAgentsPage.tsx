@@ -161,11 +161,11 @@ export function BackgroundAgentsPage() {
       {/* Top-level mode selector — Background runs vs Chat agent activity */}
       <Tabs defaultValue="background" className="space-y-4 sm:space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="background" className="flex items-center gap-2">
+          <TabsTrigger value="background" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Bot className="h-4 w-4" />
             Background Tasks
           </TabsTrigger>
-          <TabsTrigger value="chat" className="flex items-center gap-2">
+          <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <MessageSquare className="h-4 w-4" />
             Chat Activity
           </TabsTrigger>
@@ -212,12 +212,12 @@ export function BackgroundAgentsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <Tabs value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-            <TabsTrigger value="processing">Running ({stats.running})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({stats.completed})</TabsTrigger>
-            <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled ({stats.cancelled})</TabsTrigger>
-            <TabsTrigger value="stuck">Stuck ({stats.stuck})</TabsTrigger>
+            <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">All ({stats.total})</TabsTrigger>
+            <TabsTrigger value="processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Running ({stats.running})</TabsTrigger>
+            <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Completed ({stats.completed})</TabsTrigger>
+            <TabsTrigger value="failed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Failed ({stats.failed})</TabsTrigger>
+            <TabsTrigger value="cancelled" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Cancelled ({stats.cancelled})</TabsTrigger>
+            <TabsTrigger value="stuck" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Stuck ({stats.stuck})</TabsTrigger>
           </TabsList>
         </Tabs>
 

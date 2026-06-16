@@ -39,35 +39,35 @@ export const UserProfilePage: React.FC = () => {
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="profile" className="flex items-center gap-2">
+          <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <User className="h-4 w-4" />
             Profile
           </TabsTrigger>
-          <TabsTrigger value="inbox" className="flex items-center gap-2">
+          <TabsTrigger value="inbox" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Inbox className="h-4 w-4" />
             Inbox
           </TabsTrigger>
-          <TabsTrigger value="appointments" className="flex items-center gap-2">
+          <TabsTrigger value="appointments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <CalendarCheck className="h-4 w-4" />
             Appointments
           </TabsTrigger>
-          <TabsTrigger value="reviews" className="flex items-center gap-2">
+          <TabsTrigger value="reviews" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Star className="h-4 w-4" />
             Reviews
           </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex items-center gap-2">
+          <TabsTrigger value="subscription" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <CreditCard className="h-4 w-4" />
             Subscription
           </TabsTrigger>
-          <TabsTrigger value="credits" className="flex items-center gap-2">
+          <TabsTrigger value="credits" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Coins className="h-4 w-4" />
             Credits
           </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center gap-2">
+          <TabsTrigger value="billing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <FileText className="h-4 w-4" />
             Billing
           </TabsTrigger>
-          <TabsTrigger value="social-accounts" className="flex items-center gap-2">
+          <TabsTrigger value="social-accounts" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Share2 className="h-4 w-4" />
             Social Accounts
           </TabsTrigger>

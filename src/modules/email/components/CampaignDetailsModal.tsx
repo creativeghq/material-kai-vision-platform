@@ -344,15 +344,15 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
 
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-            <TabsTrigger value="overview">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="recipients">
+            <TabsTrigger value="recipients" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" />
               Recipients ({campaign.recipient_count})
             </TabsTrigger>
-            <TabsTrigger value="settings">
+            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="h-4 w-4 mr-2" />
               Settings
             </TabsTrigger>

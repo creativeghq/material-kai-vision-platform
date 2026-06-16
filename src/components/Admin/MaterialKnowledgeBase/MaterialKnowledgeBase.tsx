@@ -1030,29 +1030,29 @@ export const MaterialKnowledgeBase: React.FC = () => {
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="overview">📋 Overview</TabsTrigger>
-          <TabsTrigger value="chunks">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">📋 Overview</TabsTrigger>
+          <TabsTrigger value="chunks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             📄 Chunks ({stats?.totalChunks || 0})
           </TabsTrigger>
-          <TabsTrigger value="images">
+          <TabsTrigger value="images" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             🖼️ Images ({stats?.totalImages || 0})
           </TabsTrigger>
-          <TabsTrigger value="embeddings">
+          <TabsTrigger value="embeddings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             🧠 Embeddings ({stats?.totalEmbeddings || 0})
           </TabsTrigger>
-          <TabsTrigger value="products">
+          <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             📦 Products ({products.length})
           </TabsTrigger>
-          <TabsTrigger value="metadata">
+          <TabsTrigger value="metadata" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             📊 Metadata ({metadataData?.summary?.total_entities || 0})
           </TabsTrigger>
-          <TabsTrigger value="relationships">
+          <TabsTrigger value="relationships" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             🔗 Relationships ({imageChunkRelationships.length})
           </TabsTrigger>
-          <TabsTrigger value="quality">
+          <TabsTrigger value="quality" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             ⭐ Quality ({getQualityItemsCount()})
           </TabsTrigger>
-          <TabsTrigger value="detections">
+          <TabsTrigger value="detections" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             🔍 Detections ({detectionsData?.total_detections || 0})
           </TabsTrigger>
         </TabsList>

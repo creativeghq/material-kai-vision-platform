@@ -125,7 +125,7 @@ export function JobResearchSavedJobsPanel({ trackedJobId }: JobResearchSavedJobs
             <TabsTrigger
               key={f.key}
               value={f.key}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               {f.label}
               <Badge variant="outline" className="ml-1 text-[10px]">{counts[f.key]}</Badge>

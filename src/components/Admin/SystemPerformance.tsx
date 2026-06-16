@@ -508,13 +508,13 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
 
         <Tabs defaultValue="enhanced-monitoring" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="enhanced-monitoring">
+            <TabsTrigger value="enhanced-monitoring" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Enhanced Monitoring
             </TabsTrigger>
-            <TabsTrigger value="ai-performance">AI Performance</TabsTrigger>
-            <TabsTrigger value="processing-queue">Processing Queue</TabsTrigger>
-            <TabsTrigger value="ml-tasks">ML Tasks</TabsTrigger>
-            <TabsTrigger value="system-health">System Health</TabsTrigger>
+            <TabsTrigger value="ai-performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">AI Performance</TabsTrigger>
+            <TabsTrigger value="processing-queue" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Processing Queue</TabsTrigger>
+            <TabsTrigger value="ml-tasks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">ML Tasks</TabsTrigger>
+            <TabsTrigger value="system-health" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">System Health</TabsTrigger>
           </TabsList>
 
           {/* Enhanced Monitoring Tab */}

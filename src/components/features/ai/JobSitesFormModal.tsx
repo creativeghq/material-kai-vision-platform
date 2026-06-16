@@ -167,10 +167,10 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
         </DialogHeader>
         <Tabs value={tab} onValueChange={v => setTab(v as 'single' | 'bulk')}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-3">
-            <TabsTrigger value="single" className="flex items-center gap-2">
+            <TabsTrigger value="single" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Single
             </TabsTrigger>
-            <TabsTrigger value="bulk" className="flex items-center gap-2">
+            <TabsTrigger value="bulk" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Bulk paste
             </TabsTrigger>
           </TabsList>

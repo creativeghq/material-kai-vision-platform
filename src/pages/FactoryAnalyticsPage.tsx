@@ -43,11 +43,11 @@ export default function FactoryAnalyticsPage() {
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {isFactory && (
-              <TabsTrigger value="my-factory" className="flex items-center gap-2">
+              <TabsTrigger value="my-factory" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Building2 className="h-4 w-4" />My Factory
               </TabsTrigger>
             )}
-            <TabsTrigger value="market-trends" className="flex items-center gap-2">
+            <TabsTrigger value="market-trends" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <TrendingUp className="h-4 w-4" />Market Trends
             </TabsTrigger>
           </TabsList>

@@ -210,31 +210,31 @@ export const MessagingManagement: React.FC = () => {
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-            <TabsTrigger value="channels">
+            <TabsTrigger value="channels" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="h-4 w-4 mr-2" />
               Channels
             </TabsTrigger>
-            <TabsTrigger value="templates">
+            <TabsTrigger value="templates" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               Templates
             </TabsTrigger>
-            <TabsTrigger value="campaigns">
+            <TabsTrigger value="campaigns" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               Campaigns
             </TabsTrigger>
-            <TabsTrigger value="logs">
+            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <MessageCircle className="h-4 w-4 mr-2" />
               Message Logs
             </TabsTrigger>
-            <TabsTrigger value="analytics">
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="optouts">
+            <TabsTrigger value="optouts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" />
               Opt-outs
             </TabsTrigger>
-            <TabsTrigger value="push">
+            <TabsTrigger value="push" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4 mr-2" />
               Push Notifications
             </TabsTrigger>

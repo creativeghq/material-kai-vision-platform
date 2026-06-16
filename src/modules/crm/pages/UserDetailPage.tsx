@@ -550,19 +550,19 @@ export const UserDetailPage: React.FC = () => {
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="subscription">
+            <TabsTrigger value="subscription" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CreditCard className="h-4 w-4 mr-2" />
               Subscription & Credits
             </TabsTrigger>
-            <TabsTrigger value="activity">
+            <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2" />
               Activity
             </TabsTrigger>
-            <TabsTrigger value="ai-usage">
+            <TabsTrigger value="ai-usage" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-4 w-4 mr-2" />
               AI Usage
             </TabsTrigger>

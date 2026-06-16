@@ -305,11 +305,11 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
   return (
     <Tabs value={tab} onValueChange={v => setTab(v as 'company' | 'contact')}>
       <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-        <TabsTrigger value="company" className="flex items-center gap-2">
+        <TabsTrigger value="company" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
           <Building2 className="h-3.5 w-3.5" />
           Company (B2B)
         </TabsTrigger>
-        <TabsTrigger value="contact" className="flex items-center gap-2">
+        <TabsTrigger value="contact" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
           <UserIcon className="h-3.5 w-3.5" />
           Contact (B2C)
         </TabsTrigger>

@@ -185,27 +185,27 @@ export const EmailManagement: React.FC = () => {
         {/* Main Content Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="analytics">
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="logs">
+            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Mail className="h-4 w-4 mr-2" />
               Email Logs
             </TabsTrigger>
-            <TabsTrigger value="domains">
+            <TabsTrigger value="domains" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Database className="h-4 w-4 mr-2" />
               Domains
             </TabsTrigger>
-            <TabsTrigger value="templates">
+            <TabsTrigger value="templates" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="h-4 w-4 mr-2" />
               Templates
             </TabsTrigger>
-            <TabsTrigger value="actions">
+            <TabsTrigger value="actions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Zap className="h-4 w-4 mr-2" />
               Actions
             </TabsTrigger>
-            <TabsTrigger value="campaigns">
+            <TabsTrigger value="campaigns" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Megaphone className="h-4 w-4 mr-2" />
               Campaigns
             </TabsTrigger>

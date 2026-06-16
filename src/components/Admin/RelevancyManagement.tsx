@@ -502,15 +502,15 @@ export const RelevancyManagement: React.FC = () => {
           <CardContent>
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="chunk-product">
+                <TabsTrigger value="chunk-product" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <FileText className="h-4 w-4 mr-2" />
                   Chunk → Product
                 </TabsTrigger>
-                <TabsTrigger value="product-image">
+                <TabsTrigger value="product-image" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <ImageIcon className="h-4 w-4 mr-2" />
                   Product → Image
                 </TabsTrigger>
-                <TabsTrigger value="chunk-image">
+                <TabsTrigger value="chunk-image" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Link2 className="h-4 w-4 mr-2" />
                   Chunk → Image
                 </TabsTrigger>

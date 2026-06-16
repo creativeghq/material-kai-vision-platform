@@ -1976,36 +1976,36 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
             {(article.status === 'completed' || article.markdown_content) && (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                  <TabsTrigger value="content" className="gap-1">
+                  <TabsTrigger value="content" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <FileText className="w-3.5 h-3.5" />
                     Content
                   </TabsTrigger>
                   {article.optimize_data && (
-                    <TabsTrigger value="optimize" className="gap-1">
+                    <TabsTrigger value="optimize" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <BarChart3 className="w-3.5 h-3.5" />
                       Optimize
                     </TabsTrigger>
                   )}
                   {article.brief_data && (
-                    <TabsTrigger value="brief" className="gap-1">
+                    <TabsTrigger value="brief" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <ListChecks className="w-3.5 h-3.5" />
                       Brief
                     </TabsTrigger>
                   )}
                   {article.gaps_gains_data && (
-                    <TabsTrigger value="gaps" className="gap-1">
+                    <TabsTrigger value="gaps" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <Search className="w-3.5 h-3.5" />
                       Gaps/Gains
                     </TabsTrigger>
                   )}
                   {article.research_tab_data && (
-                    <TabsTrigger value="research" className="gap-1">
+                    <TabsTrigger value="research" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <Search className="w-3.5 h-3.5" />
                       Research
                     </TabsTrigger>
                   )}
                   {article.interlinking_data && (
-                    <TabsTrigger value="interlink" className="gap-1">
+                    <TabsTrigger value="interlink" className="gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       <Link2 className="w-3.5 h-3.5" />
                       Inter-linking
                     </TabsTrigger>

@@ -216,11 +216,11 @@ export const ApiGatewayAdmin: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         <Tabs defaultValue="api-keys" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="api-keys" className="flex items-center gap-2">
+            <TabsTrigger value="api-keys" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Key className="h-4 w-4" />
               API Keys
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Analytics
             </TabsTrigger>

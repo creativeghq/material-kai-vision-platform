@@ -155,9 +155,9 @@ export const PriceMonitoringDashboard: React.FC = () => {
 
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="products">Monitored Products</TabsTrigger>
-          <TabsTrigger value="alerts">Price Alerts</TabsTrigger>
-          <TabsTrigger value="history">Price History</TabsTrigger>
+          <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Monitored Products</TabsTrigger>
+          <TabsTrigger value="alerts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Price Alerts</TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Price History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">

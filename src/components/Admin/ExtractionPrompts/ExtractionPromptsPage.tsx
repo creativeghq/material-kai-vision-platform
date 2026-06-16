@@ -420,10 +420,10 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
 
           <Tabs defaultValue="template" className="w-full">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-              <TabsTrigger value="template">
+              <TabsTrigger value="template" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Prompt Template
               </TabsTrigger>
-              <TabsTrigger value="system">
+              <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 System Prompt
               </TabsTrigger>
             </TabsList>
