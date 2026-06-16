@@ -44,6 +44,9 @@ export interface Invoice {
   paid_at: string | null;
   payment_terms_days: number | null;
   notes: string | null;
+  /** Invoice design template snapshot (set at creation; nullable for legacy rows). */
+  template_id: string | null;
+  template_colors: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -1295,6 +1298,9 @@ export interface FinanceSettings {
   risk_block_unvalidated_vat: boolean;
   risk_warn_over_credit_limit: boolean;
   risk_block_over_credit_limit: boolean;
+  /** Invoice design template selected for this workspace + per-role color overrides. */
+  invoice_template_id: string;
+  invoice_template_colors: Record<string, string>;
   updated_at: string;
 }
 
@@ -1510,6 +1516,7 @@ const _financeServiceV2 = {
       'auto_statement_only_outstanding','auto_statement_min_balance','auto_statement_side',
       'risk_block_inactive_vat','risk_block_unvalidated_vat',
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
+      'invoice_template_id','invoice_template_colors',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }

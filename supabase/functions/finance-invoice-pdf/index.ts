@@ -15,6 +15,7 @@ import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
 
 // Google Noto Sans (full Greek + Latin), served as real TTF from the official noto-fonts repo.
 const FONT_URLS = {
@@ -41,7 +42,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     descr: 'Περιγραφή', qty: 'Ποσ.', unit: 'Μ.Μ.', unitPrice: 'Τιμή Μον.', net: 'Καθαρή Αξία',
     vatPct: 'ΦΠΑ%', vatAmt: 'Αξία ΦΠΑ', lineTotal: 'Σύνολο',
     vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
-    withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό',
+    withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό', paid: 'Πληρωμένο', due2: 'Υπόλοιπο',
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
     digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
@@ -58,7 +59,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit price', net: 'Net',
     vatPct: 'VAT%', vatAmt: 'VAT', lineTotal: 'Total',
     vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
-    withheld: 'Withholding', total: 'Amount due',
+    withheld: 'Withholding', total: 'Amount due', paid: 'Paid', due2: 'Balance',
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
@@ -80,10 +81,6 @@ function docTitle(documentType: string | null, L: Record<string, string>): strin
 
 const A4 = { w: 595.28, h: 841.89 };
 const M = 40;
-const INK = rgb(0.12, 0.12, 0.12);
-const MUTED = rgb(0.45, 0.45, 0.45);
-const LINE = rgb(0.82, 0.82, 0.82);
-const HEADBG = rgb(0.95, 0.93, 0.95);
 
 function fmtMoney(n: any, currency: string, lang: Lang): string {
   const v = Number(n ?? 0);
@@ -191,8 +188,13 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* logo optional */ }
     }
 
-    const lang: Lang = inv.doc_language === 'en' ? 'en' : 'el';
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo });
+    // English is the default; Greek only when explicitly chosen (until translations launch).
+    const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
+    // Template: per-invoice snapshot wins, else workspace setting, else 'classic'.
+    const templateId = inv.template_id || fs?.invoice_template_id || 'classic';
+    const spec = getSpec(templateId);
+    const colors = toPdfColors(resolveColorsHex(templateId, inv.template_colors ?? fs?.invoice_template_colors));
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -210,11 +212,14 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, branch, lang, logo } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang, logo, spec, colors } = d;
   const L = LABELS[lang];
   const currency = inv.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
+  // Template colors shadow the monochrome defaults so the rest of the layout code is unchanged.
+  const INK = colors.text, MUTED = colors.muted, LINE = colors.line, HEADBG = colors.tableHeaderBg;
+  const WHITE = rgb(1, 1, 1);
 
   const fonts = await loadFonts();
   const pdf = await PDFDocument.create();
@@ -243,20 +248,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     return lines.length ? lines : [''];
   };
 
-  // ── Header: logo + issuer (left) + document title (right) ──
-  if (logo && inv.logo_mode !== 'none') {
-    try {
-      const img = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
-      const maxW = 120, maxH = 46;
-      const scale = Math.min(maxW / img.width, maxH / img.height);
-      page.drawImage(img, { x: M, y: y - img.height * scale + 6, width: img.width * scale, height: img.height * scale });
-      y -= img.height * scale - 6;
-    } catch { /* logo optional */ }
-  }
+  // ── Header (template-aware) ──
   const issuerName = fs?.business_name || '';
-  text(issuerName, M, y - 4, 16, bold);
-  textR(docTitle(inv.document_type, L), right, y - 2, 18, bold, rgb(0.48, 0.12, 0.36));
-  y -= 22;
+  const title = docTitle(inv.document_type, L);
   const issuerLines = [
     [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
     [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
@@ -267,11 +261,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
     fs?.business_gemh ? `${L.registry}: ${fs.business_gemh}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
-  ].filter(Boolean);
-  for (const l of issuerLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
-
-  // Document meta (right column, under the title)
-  let my = A4.h - M - 26;
+  ].filter(Boolean) as string[];
   const metaRows: [string, string][] = [
     [L.number, String(inv.internal_number ?? inv.legal_number ?? '')],
     inv.series ? [L.series, String(inv.series)] : ['', ''],
@@ -279,13 +269,59 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     inv.due_at ? [L.due, String(inv.due_at)] : ['', ''],
     inv.related_document ? [L.related, String(inv.related_document)] : ['', ''],
   ].filter((r) => r[0]) as [string, string][];
-  for (const [k, v] of metaRows) {
-    textR(k, right - 90, my, 8.5, font, MUTED);
-    textR(v, right, my, 9, bold);
-    my -= 12;
+
+  // Pre-embed the logo once so any layout branch can place it.
+  let logoImg: any = null, logoW = 0, logoH = 0;
+  if (logo && inv.logo_mode !== 'none') {
+    try {
+      logoImg = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
+      const s = Math.min(120 / logoImg.width, 46 / logoImg.height);
+      logoW = logoImg.width * s; logoH = logoImg.height * s;
+    } catch { logoImg = null; }
   }
 
-  y = Math.min(y, my) - 6;
+  const drawIssuerBlock = (x: number, topY: number, withLogo = true): number => {
+    let yc = topY;
+    if (withLogo && logoImg) { page.drawImage(logoImg, { x, y: yc - logoH, width: logoW, height: logoH }); yc -= logoH + 8; }
+    text(issuerName, x, yc - 12, 15, bold, INK); yc -= 16;
+    for (const l of issuerLines) { text(l, x, yc, 8.5, font, MUTED); yc -= 11; }
+    return yc;
+  };
+  const drawMeta = (topY: number): number => {
+    let my = topY;
+    for (const [k, v] of metaRows) { textR(k, right - 95, my, 8.5, font, MUTED); textR(v, right, my, 9, bold); my -= 12; }
+    return my;
+  };
+
+  if (spec.headerStyle === 'band') {
+    const bandH = 70;
+    page.drawRectangle({ x: 0, y: A4.h - bandH, width: A4.w, height: bandH, color: colors.headerBg });
+    let nx = M;
+    if (logoImg) { page.drawImage(logoImg, { x: M, y: A4.h - bandH + (bandH - logoH) / 2, width: logoW, height: logoH }); nx = M + logoW + 12; }
+    text(issuerName, nx, A4.h - bandH / 2 - 5, 16, bold, colors.headerText);
+    textR(title, right, A4.h - bandH / 2 - 6, 18, bold, colors.headerText);
+    y = A4.h - bandH - 18;
+    let iy = y; for (const l of issuerLines) { text(l, M, iy, 8.5, font, MUTED); iy -= 11; }
+    const metaEnd = drawMeta(y);
+    y = Math.min(iy, metaEnd) - 6;
+  } else if (spec.headerStyle === 'minimal') {
+    text(title, M, y - 30, 34, bold, INK);
+    const metaEnd = drawMeta(y - 6);
+    y = Math.min(y - 48, metaEnd) - 10;
+    y = drawIssuerBlock(M, y, true) - 6;
+  } else if (spec.titleStyle === 'left-xl') {
+    text(title, M, y - 26, 30, bold, INK);
+    const metaEnd = drawMeta(y - 6);
+    const issEnd = drawIssuerBlock(M, y - 44, true);
+    y = Math.min(issEnd, metaEnd) - 6;
+  } else {
+    // classic split: issuer left, title + meta right.
+    const issEnd = drawIssuerBlock(M, y, true);
+    textR(title, right, y - 2, 18, bold, colors.accent);
+    const metaEnd = drawMeta(y - 24);
+    y = Math.min(issEnd, metaEnd) - 6;
+  }
+
   page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.7, color: LINE });
   y -= 16;
 
@@ -307,7 +343,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   // ── Items table ──
   const cols = { descr: M, qty: 300, unit: 340, price: 390, net: 450, vatp: 500, total: right };
   const drawHead = () => {
-    page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 16, color: HEADBG });
+    if (spec.tableHeaderFill) {
+      page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 16, color: HEADBG });
+    }
     text(L.descr, cols.descr + 2, y, 8, bold);
     textR(L.qty, cols.qty + 28, y, 8, bold);
     text(L.unit, cols.unit, y, 8, bold);
@@ -315,6 +353,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     textR(L.net, cols.net + 42, y, 8, bold);
     textR(L.vatPct, cols.vatp + 22, y, 8, bold);
     textR(L.lineTotal, cols.total, y, 8, bold);
+    if (!spec.tableHeaderFill) {
+      page.drawLine({ start: { x: M, y: y - 5 }, end: { x: right, y: y - 5 }, thickness: 1, color: LINE });
+    }
     y -= 18;
   };
   const newPage = () => { page = pdf.addPage([A4.w, A4.h]); y = A4.h - M; };
@@ -370,6 +411,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   const withheld = Number(inv.total_withheld_amount ?? 0);
   const grand = Number(inv.total ?? totNet + totVat - withheld);
   const boxX = right - 220;
+  const totalsTop = y + 10;
   const row = (k: string, v: string, b = false) => {
     textR(k, right - 110, y, b ? 10 : 9, b ? bold : font, b ? INK : MUTED);
     textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
@@ -386,9 +428,26 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   if (digitalFee > 0) row(L.digitalFee, money(digitalFee));
   if (deductions > 0) row(L.deductions, `- ${money(deductions)}`);
   if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
-  page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
-  y -= 4;
-  row(L.total, money(grand), true);
+  // Grand total — presentation per template.
+  if (spec.totalsBoxStyle === 'accent') {
+    page.drawRectangle({ x: boxX, y: y - 4, width: right - boxX, height: 18, color: colors.accent });
+    textR(L.total, right - 110, y + 1, 10, bold, WHITE);
+    textR(money(grand), right, y + 1, 11, bold, WHITE);
+    y -= 20;
+  } else {
+    page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
+    y -= 4;
+    row(L.total, money(grand), true);
+  }
+  // Amount paid / balance due (mirrors the HTML preview).
+  const amountPaid = Number(inv.amount_paid ?? 0);
+  if (amountPaid > 0) {
+    row(L.paid, `- ${money(amountPaid)}`);
+    row(L.due2, money(Number(inv.amount_due ?? grand)), true);
+  }
+  if (spec.totalsBoxStyle === 'boxed') {
+    page.drawRectangle({ x: boxX - 8, y: y - 2, width: (right - boxX) + 14, height: totalsTop - (y - 2), borderColor: LINE, borderWidth: 1 });
+  }
   y = Math.min(y, vy) - 6;
 
   // ── Payment method + bank details ──

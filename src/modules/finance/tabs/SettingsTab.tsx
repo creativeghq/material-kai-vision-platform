@@ -15,6 +15,7 @@ import { financeService, type FinanceSettings } from '@/modules/finance/services
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
+import { InvoiceTemplateCard } from '@/modules/finance/components/InvoiceTemplateCard';
 import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
@@ -192,6 +193,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         <TabsContent value="documents" className="mt-0 space-y-4">
           <BranchesCard workspaceId={workspaceId} />
           <DocumentSetupCard workspaceId={workspaceId} />
+          <InvoiceTemplateCard workspaceId={workspaceId} />
           <PosTerminalsCard workspaceId={workspaceId} />
           <InboundSetupCard workspaceId={workspaceId} />
         </TabsContent>

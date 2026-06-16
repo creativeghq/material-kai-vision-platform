@@ -615,6 +615,15 @@ All colors MUST be HSL.
     box-shadow: var(--glass-shadow);
   }
 
+  /* Scope wrapper for static content (e.g. profile/detail modals) where the
+     dashboard-card panels are passive — fully neutralise the hover lift/lighten
+     so they don't react like interactive dashboard tiles. */
+  .no-card-hover .dashboard-card:hover {
+    background: var(--glass-background);
+    transform: none;
+    border-color: var(--glass-border);
+  }
+
   /* Liquid Glass Utility */
   .glass-panel {
     @apply dashboard-card;

@@ -30,6 +30,7 @@ import {
   type PaymentMethod,
 } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
 
@@ -57,6 +58,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [payLinkBusy, setPayLinkBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const handleDownloadPdf = async () => {
     if (!invoice) return;
@@ -194,6 +196,10 @@ const InvoiceDetailPage: React.FC = () => {
               <CheckCircle2 className="mr-2 h-4 w-4" /> Mark issued
             </Button>
           )}
+          <Button onClick={() => setPreviewOpen(true)} variant="outline">
+            <FileText className="mr-2 h-4 w-4" />
+            Preview
+          </Button>
           <Button onClick={handleDownloadPdf} variant="outline" disabled={pdfBusy}>
             {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             Download PDF
@@ -528,6 +534,12 @@ const InvoiceDetailPage: React.FC = () => {
         onOpenChange={setCreditNoteDialogOpen}
         invoice={invoice}
         onSaved={async () => { setCreditNoteDialogOpen(false); await load(); }}
+      />
+      <InvoicePreviewModal
+        invoiceId={invoice.id}
+        workspaceId={invoice.workspace_id}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
       />
     </div>
   );

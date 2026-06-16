@@ -22,6 +22,7 @@ import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingS
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
+import { DEFAULT_TEMPLATE_ID, resolveColors } from '@/modules/finance/invoice-templates';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 
@@ -152,7 +153,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [issueNow, setIssueNow] = useState(true);
   const [categoryId, setCategoryId] = useState('');
   const [branchCode, setBranchCode] = useState('0');
-  const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('el');
+  const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('en');
   const [withholdingCode, setWithholdingCode] = useState('');
   const [paymentMethodCode, setPaymentMethodCode] = useState('3'); // default "On credit"
   const [paymentMethodInfo, setPaymentMethodInfo] = useState('');
@@ -217,7 +218,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
     setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
-    setCategoryId(''); setBranchCode('0'); setDocLanguage('el'); setWithholdingCode('');
+    setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setSendSms(false); setNextNumber(null);
@@ -481,6 +482,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
       if (numErr) throw numErr;
 
+      // Snapshot the workspace's invoice design template + resolved colors onto this invoice,
+      // so changing the workspace template later never restyles an already-created invoice.
+      const { data: tplSettings } = await supabase.from('finance_settings')
+        .select('invoice_template_id, invoice_template_colors').eq('workspace_id', workspaceId).maybeSingle();
+      const snapshotTemplateId = (tplSettings as any)?.invoice_template_id || DEFAULT_TEMPLATE_ID;
+      const snapshotTemplateColors = resolveColors(snapshotTemplateId, (tplSettings as any)?.invoice_template_colors);
+
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: workspaceId,
         internal_number: draftNumber as string, series: null, series_number: null,
@@ -508,6 +516,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
         doc_language: docLanguage,
+        template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
         has_shipping: hasShipping,
         ship_from: hasShipping ? (shipFrom || null) : null, ship_to: hasShipping ? (shipTo || null) : null,
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
@@ -700,13 +709,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <SelectContent><SelectItem value="none">None</SelectItem>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Document language</Label>
-                <Select value={docLanguage} onValueChange={(v: any) => setDocLanguage(v)}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="el">Greek</SelectItem><SelectItem value="en">English</SelectItem></SelectContent>
-                </Select>
-              </div>
+              {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
               {branches.length > 1 && (
                 <div className="space-y-1 col-span-2">
                   <Label className="text-xs">Establishment</Label>

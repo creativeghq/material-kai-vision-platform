@@ -1,0 +1,89 @@
+// Shared invoice-template contract. Consumed by the React renderer (HTML preview)
+// AND mirrored by the pdf-lib generator (supabase/functions/finance-invoice-pdf)
+// so the on-screen invoice and the PDF stay visually similar. Keep the two registries
+// in sync — same ids, same layout flags, same default colors.
+
+export type InvoiceColorRole =
+  | 'accent'        // links, emphasis, accent rules / totals highlight
+  | 'headerBg'      // header band fill (band/stacked styles)
+  | 'headerText'    // text on the header band
+  | 'tableHeaderBg' // line-items header row fill
+  | 'text'          // primary ink
+  | 'muted'         // secondary text
+  | 'line';         // hairline rules / borders
+
+export type InvoiceColors = Record<InvoiceColorRole, string>;
+
+/** Header layout variants. */
+export type HeaderStyle =
+  | 'split'    // issuer left, title right (classic)
+  | 'band'     // full-width colored band with title + issuer inside
+  | 'stacked'  // issuer block, big title below
+  | 'minimal'; // oversized title, issuer small underneath
+
+export type TitleStyle = 'right' | 'left-xl' | 'on-band' | 'center';
+export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent';
+
+export interface InvoiceTemplateSpec {
+  id: string;
+  label: string;
+  description: string;
+  defaultColors: InvoiceColors;
+  headerStyle: HeaderStyle;
+  titleStyle: TitleStyle;
+  /** Whether the line-items header row gets a filled background (tableHeaderBg). */
+  tableHeaderFill: boolean;
+  totalsBoxStyle: TotalsBoxStyle;
+}
+
+// ── Normalized render data (the single field set both renderers draw) ──
+
+export interface InvoiceParty {
+  name: string;
+  /** Address / extra lines already formatted for display. */
+  lines: string[];
+}
+
+export interface InvoiceLineRow {
+  description: string;
+  /** color / size / line comments, joined. */
+  detail?: string;
+  sku?: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  net: number;
+  vatPct: number;
+  vatAmount: number;
+  lineTotal: number; // net + vat
+}
+
+export interface VatAnalysisRow { pct: number; net: number; vat: number }
+export interface TotalsExtraRow { label: string; value: number; negative?: boolean }
+
+export interface InvoiceRenderData {
+  lang: 'el' | 'en';
+  currency: string;
+  /** Document title resolved from document_type + language. */
+  title: string;
+  labels: Record<string, string>;
+  issuer: { name: string; lines: string[]; logoUrl?: string | null };
+  customer: InvoiceParty;
+  /** Right-column meta rows (number, series, date, due, related). */
+  meta: { label: string; value: string }[];
+  items: InvoiceLineRow[];
+  vatAnalysis: VatAnalysisRow[];
+  totals: {
+    subtotalNet: number;
+    totalVat: number;
+    extras: TotalsExtraRow[];
+    grand: number;
+    amountPaid: number;
+    amountDue: number;
+  };
+  payment: { method?: string; info?: string; accounts: string[] };
+  shipping?: { rows: string[] } | null;
+  notes?: string | null;
+  infoBox?: string | null;
+  fiscal?: { mark?: string; uid?: string; qrUrl?: string | null } | null;
+}
