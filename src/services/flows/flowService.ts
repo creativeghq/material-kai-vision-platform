@@ -138,17 +138,27 @@ class FlowService {
   async saveGraph(flowId: string, graph: FlowGraphDefinition, expectedVersion: number): Promise<Flow> {
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Extract trigger type from the graph's trigger node
+    // Extract trigger type + config from the graph's trigger node. The trigger node's
+    // `config` (cron expression, webhook secret, HTTP method, …) MUST be mirrored to the
+    // top-level `flows.trigger_config` — that's what flow-scheduler-cron reads for the
+    // cron and what flow-webhook reads for the secret. Previously only the graph was
+    // saved, so scheduled flows never fired and webhook secrets were never enforced
+    // (audit #217 H1).
     const triggerNode = graph.nodes.find(n => n.type === 'triggerNode');
-    const triggerType = triggerNode?.data.category === 'trigger'
-      ? (triggerNode.data as { triggerType: TriggerType }).triggerType
+    const triggerIsTrigger = triggerNode?.data.category === 'trigger';
+    const triggerType = triggerIsTrigger
+      ? (triggerNode!.data as { triggerType: TriggerType }).triggerType
       : 'manual';
+    const triggerConfig = triggerIsTrigger
+      ? ((triggerNode!.data as unknown as { config?: Record<string, unknown> }).config ?? {})
+      : {};
 
     const { data, error } = await supabase
       .from('flows')
       .update({
         graph_definition: graph as unknown as Record<string, unknown>,
         trigger_type: triggerType,
+        trigger_config: triggerConfig as unknown as Record<string, unknown>,
         version: expectedVersion + 1,
         updated_by: user?.id,
       })
@@ -183,7 +193,12 @@ class FlowService {
       body: { action: 'execute-flow', flow_id: flowId, trigger_data: triggerData || {} },
     });
     if (error) throw new Error(`Failed to execute flow: ${error.message}`);
-    return data as FlowRun;
+    // flow-engine returns { success, data: {...run} }. The run lives under `.data`,
+    // not the outer envelope — casting the wrapper left run.status/id undefined and
+    // the Flow Builder always toasted "status: unknown" (audit #217 H12).
+    const env = data as { success?: boolean; error?: string; data?: FlowRun };
+    if (env?.success === false) throw new Error(env.error || 'Flow execution failed');
+    return (env?.data ?? env) as FlowRun;
   }
 
   async testFlow(flowId: string, sampleData: Record<string, unknown>): Promise<FlowRun> {
@@ -191,7 +206,9 @@ class FlowService {
       body: { action: 'test-flow', flow_id: flowId, trigger_data: sampleData },
     });
     if (error) throw new Error(`Failed to test flow: ${error.message}`);
-    return data as FlowRun;
+    const env = data as { success?: boolean; error?: string; data?: FlowRun };
+    if (env?.success === false) throw new Error(env.error || 'Flow test failed');
+    return (env?.data ?? env) as FlowRun;
   }
 
   // ── Run History ─────────────────────────────────────────

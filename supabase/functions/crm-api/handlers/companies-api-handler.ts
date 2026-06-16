@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { getCrmScope, scopeAllows } from './_scope.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -37,6 +38,25 @@ function pickCompanyFields(body: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
+/** Verify a company id is reachable by the caller's workspace scope. */
+async function companyInScope(
+  companyId: string,
+  scope: import('./_scope.ts').CrmScope,
+): Promise<boolean> {
+  if (scope.isGlobalOperator) {
+    const { data } = await supabase.from('crm_companies').select('id').eq('id', companyId).maybeSingle();
+    return !!data;
+  }
+  if (scope.workspaceIds.length === 0) return false;
+  const { data } = await supabase
+    .from('crm_companies')
+    .select('id')
+    .eq('id', companyId)
+    .in('workspace_id', scope.workspaceIds)
+    .maybeSingle();
+  return !!data;
+}
+
 /**
  * CRM Companies API
  * Handles company management: create, list, update, delete
@@ -67,6 +87,11 @@ export async function handleCompanies(req: Request): Promise<Response> {
 
     const user = auth.user;
 
+    // Workspace scoping: the handler runs under the service role (RLS bypassed), so we
+    // must constrain every read/write to the caller's member workspaces (mirrors the
+    // is_workspace_member RLS on crm_companies). Global operators act across all tenants.
+    const scope = await getCrmScope(supabase, auth);
+
     const url = new URL(req.url);
     const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/companies/, '').split('/').filter(Boolean);
     const method = req.method;
@@ -82,10 +107,30 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
+      // Resolve the target workspace: an explicit body workspace_id must be in scope;
+      // otherwise default to the caller's primary (first active) membership.
+      const requestedWs = (body.workspace_id as string | undefined) || undefined;
+      const targetWs = scope.isGlobalOperator
+        ? requestedWs
+        : (requestedWs && scopeAllows(scope, requestedWs) ? requestedWs : scope.workspaceIds[0]);
+      if (!targetWs && !scope.isGlobalOperator) {
+        return new Response(
+          JSON.stringify({ error: 'No workspace in scope to create this company in' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+      if (requestedWs && !scopeAllows(scope, requestedWs)) {
+        return new Response(
+          JSON.stringify({ error: 'Not authorized for the requested workspace' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+
       const { data, error } = await supabase
         .from('crm_companies')
         .insert({
           ...pickCompanyFields(body),
+          ...(targetWs ? { workspace_id: targetWs } : {}),
           created_by: user.id,
         })
         .select();
@@ -109,11 +154,20 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const offset = parseInt(url.searchParams.get('offset') || '0');
       const search = url.searchParams.get('search');
 
+      // Non-global callers with no membership see nothing.
+      if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
+        return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
+      }
+
       let query = supabase
         .from('crm_companies')
         .select('*', { count: 'exact' })
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
+
+      if (!scope.isGlobalOperator) {
+        query = query.in('workspace_id', scope.workspaceIds);
+      }
 
       // Add search filter if provided — escape % and _ to prevent wildcard injection
       if (search) {
@@ -163,7 +217,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         .eq('id', companyId)
         .single();
 
-      if (error) {
+      if (error || !data || !scopeAllows(scope, (data as { workspace_id?: string }).workspace_id)) {
         return new Response(
           JSON.stringify({ error: 'Company not found' }),
           { status: 404, headers: corsHeaders },
@@ -181,10 +235,20 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const companyId = path[0];
       const body = await req.json();
 
+      if (!(await companyInScope(companyId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
       const updates: Record<string, unknown> = {
         ...pickCompanyFields(body),
         updated_at: new Date().toISOString(),
       };
+      // workspace_id is never reassignable through the writable-columns set; drop any
+      // attempt so a row can't be moved to another tenant via PATCH.
+      delete (updates as Record<string, unknown>).workspace_id;
 
       const { data, error } = await supabase
         .from('crm_companies')
@@ -209,6 +273,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
     if (method === 'DELETE' && path.length === 1) {
       const companyId = path[0];
 
+      if (!(await companyInScope(companyId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
       const { error } = await supabase
         .from('crm_companies')
         .delete()
@@ -232,6 +303,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const companyId = path[0];
       const body = await req.json();
       const { contact_id, role, is_primary, notes } = body;
+
+      if (!(await companyInScope(companyId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
 
       if (!contact_id) {
         return new Response(
@@ -266,12 +344,21 @@ export async function handleCompanies(req: Request): Promise<Response> {
 
     // DELETE /api/companies/{companyId}/contacts/{relationshipId} - Detach contact
     if (method === 'DELETE' && path.length === 3 && path[1] === 'contacts') {
+      const companyId = path[0];
       const relationshipId = path[2];
+
+      if (!(await companyInScope(companyId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
 
       const { error } = await supabase
         .from('crm_company_contacts')
         .delete()
-        .eq('id', relationshipId);
+        .eq('id', relationshipId)
+        .eq('company_id', companyId);
 
       if (error) {
         return new Response(

@@ -11,6 +11,19 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// MIVAA's /api/rag/* search endpoints now require authentication (audit #217 C4).
+// The agent is trusted infrastructure: it authenticates as the Material Kai platform
+// service with MIVAA_API_KEY and passes the user's workspace_id, which MIVAA trusts
+// for the service identity. Without this header these calls 401.
+const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+const mivaaAuthHeaders = (): Record<string, string> => {
+  const k = MIVAA_API_KEY();
+  return {
+    'Content-Type': 'application/json',
+    ...(k ? { Authorization: `Bearer ${k}` } : {}),
+  };
+};
+
 // Lazy imports — loaded only when inspiration URL tool is actually called
 // (keeps boot time fast for agent-chat which imports this module at startup)
 let _scrapeUrl: typeof import('../utils/web-scraper.ts').scrapeUrl | null = null;
@@ -111,7 +124,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
         try {
           const response = await fetch(url.toString(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: mivaaAuthHeaders(),
             body: JSON.stringify({
               query,
               workspace_id: workspaceId,
@@ -206,7 +219,7 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
         try {
           const response = await fetch(url.toString(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: mivaaAuthHeaders(),
             body: JSON.stringify({
               query: query || '',
               workspace_id: workspaceId,
@@ -289,7 +302,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
 
           const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/knowledge-base`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: mivaaAuthHeaders(),
             body: JSON.stringify(body),
             signal: controller.signal,
           });
@@ -570,7 +583,7 @@ ${scrapeResult.markdown.substring(0, 8000)}`;
         try {
           const searchResponse = await fetch(searchUrl.toString(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: mivaaAuthHeaders(),
             body: JSON.stringify({
               query: searchQuery,
               workspace_id: workspaceId,

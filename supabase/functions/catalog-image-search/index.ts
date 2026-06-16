@@ -103,6 +103,10 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const cronSecret = CRON_SECRET();
     if (cronSecret) headers['x-cron-secret'] = cronSecret;
+    // MIVAA /api/rag/search now requires auth (audit #217 C4) — authenticate as the
+    // platform service so this internal call isn't rejected with 401.
+    const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+    if (mivaaKey) headers['Authorization'] = `Bearer ${mivaaKey}`;
 
     const res = await fetch(url.toString(), {
       method: 'POST',

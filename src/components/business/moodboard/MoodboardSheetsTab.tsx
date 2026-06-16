@@ -116,7 +116,10 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   };
 
   const handleOpenPdf = async (sheet: PresentationSheet) => {
-    const url = sheet.pdf_url || (await moodboardSheetsService.refreshPdfUrl(sheet.id));
+    // Always re-sign from pdf_storage_path — the persisted pdf_url is a 7-day signed
+    // URL that 403s once expired (audit #217 H16). Fall back to the stored URL only
+    // if re-signing yields nothing (e.g. legacy rows without a storage path).
+    const url = (await moodboardSheetsService.refreshPdfUrl(sheet.id)) || sheet.pdf_url;
     if (url) window.open(url, '_blank');
     else {
       toast({

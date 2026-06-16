@@ -107,6 +107,23 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
   const creditCost = CREDIT_COSTS[model as VideoModel] ?? 15;
 
   // ③ Create prediction
+  let creditsDebited = false;
+  const refundCredits = async () => {
+    if (!creditsDebited) return;
+    creditsDebited = false; // guard against double refund
+    try {
+      await supabase.rpc('credit_user_credits', {
+        p_user_id: userId,
+        p_amount: creditCost,
+        p_operation_type: 'social_video_generation.refund',
+        p_description: `Refund: social video generation failed (${model})`,
+        p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
+      });
+    } catch (e) {
+      console.error('[generate-social-video] Refund failed (non-fatal):', e);
+    }
+  };
+
   try {
     let predictionId: string;
     let replicateModel: string;
@@ -163,6 +180,9 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     if (debitError || !debit?.success) {
       return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
     }
+    // Credits are now spent; refund on any failure path so we don't charge for a video
+    // that was never produced (audit #217 H4). Mirrors generate-interior-video-v2.
+    creditsDebited = true;
 
     replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-3.0'];
     const prediction = await createReplicatePrediction(replicateModel, {
@@ -247,13 +267,15 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       });
 
     } else {
-      // Replicate reported failure — credits already spent, log and return error
+      // Replicate reported failure — refund the upfront debit (no video produced).
       console.error('[generate-social-video] Replicate failure:', pollResult.error);
+      await refundCredits();
       return jsonResponse({ success: false, error: pollResult.error || 'Video generation failed' }, 500);
     }
 
   } catch (err) {
     console.error('[generate-social-video] Error:', err);
+    await refundCredits();
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
 }));

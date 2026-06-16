@@ -157,9 +157,14 @@ export const createPriceLookupTool = (
 
         let data: any;
         try {
+          // MIVAA KB search now requires auth (audit #217 C4) — authenticate as the platform service.
+          const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
           const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/knowledge-base`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(mivaaKey ? { Authorization: `Bearer ${mivaaKey}` } : {}),
+            },
             body: JSON.stringify(body),
             signal: controller.signal,
           });

@@ -194,24 +194,40 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         const drow = Array.isArray(debit) ? debit[0] : debit;
         if (!drow?.success) break; // out of credits — stop extracting for this workspace
 
-        const suggestions = await extractProductsFromLines(
-          usable.map((l: any, i: number) => ({ index: i, description: String(l.item_description), quantity: l.quantity ?? null })),
-        );
-        const byIdx = new Map(suggestions.map((s) => [s.index, s]));
-        const pendingRows = usable.map((l: any, i: number) => {
-          const s = byIdx.get(i);
-          const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
-          const unitCost = l.net_value != null ? r2(Number(l.net_value) / qty) : null;
-          const name = s ? [s.name, s.size, s.attributes].filter((x) => x && String(x).trim()).join(' ').trim() : String(l.item_description);
-          return {
-            workspace_id: workspaceId, inbound_document_id: d.id, line_index: i,
-            raw_description: String(l.item_description), name: name || 'Item',
-            sku: s?.sku ?? null, unit: s?.unit ?? null, size: s?.size ?? null, attributes: s?.attributes ?? null,
-            quantity: qty, unit_cost: unitCost, currency: d.currency ?? 'EUR',
-          };
-        });
-        await supabase.from('warehouse_pending_items').upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
-        extracted += pendingRows.length;
+        // Per-doc isolation: a single doc's extraction failure must (a) refund THAT
+        // doc's credit and (b) not abort the whole batch (audit #217 H14). Previously
+        // the catch was outside the loop → charged-but-not-delivered + lost intake.
+        try {
+          const suggestions = await extractProductsFromLines(
+            usable.map((l: any, i: number) => ({ index: i, description: String(l.item_description), quantity: l.quantity ?? null })),
+          );
+          const byIdx = new Map(suggestions.map((s) => [s.index, s]));
+          const pendingRows = usable.map((l: any, i: number) => {
+            const s = byIdx.get(i);
+            const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
+            const unitCost = l.net_value != null ? r2(Number(l.net_value) / qty) : null;
+            const name = s ? [s.name, s.size, s.attributes].filter((x) => x && String(x).trim()).join(' ').trim() : String(l.item_description);
+            return {
+              workspace_id: workspaceId, inbound_document_id: d.id, line_index: i,
+              raw_description: String(l.item_description), name: name || 'Item',
+              sku: s?.sku ?? null, unit: s?.unit ?? null, size: s?.size ?? null, attributes: s?.attributes ?? null,
+              quantity: qty, unit_cost: unitCost, currency: d.currency ?? 'EUR',
+            };
+          });
+          await supabase.from('warehouse_pending_items').upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
+          extracted += pendingRows.length;
+        } catch (docErr) {
+          console.error('[inbound-sync] extraction failed for doc', d.id, String(docErr));
+          // Refund the credit for this doc — nothing was queued.
+          try {
+            await supabase.rpc('credit_user_credits', {
+              p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
+              p_operation_type: 'expense_product_extraction.refund',
+              p_description: `Refund: extraction failed (inbound doc ${d.id})`,
+            });
+          } catch (refundErr) { console.error('[inbound-sync] refund failed (non-fatal)', String(refundErr)); }
+          // continue with the next doc
+        }
       }
     } catch (e) { console.error('[inbound-sync] product extraction failed', String(e)); }
 

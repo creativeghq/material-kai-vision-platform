@@ -2,11 +2,28 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { getCrmScope, scopeAllows, type CrmScope } from './_scope.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+/** Verify a contact id is reachable by the caller's workspace scope. */
+async function contactInScope(contactId: string, scope: CrmScope): Promise<boolean> {
+  if (scope.isGlobalOperator) {
+    const { data } = await supabase.from('crm_contacts').select('id').eq('id', contactId).maybeSingle();
+    return !!data;
+  }
+  if (scope.workspaceIds.length === 0) return false;
+  const { data } = await supabase
+    .from('crm_contacts')
+    .select('id')
+    .eq('id', contactId)
+    .in('workspace_id', scope.workspaceIds)
+    .maybeSingle();
+  return !!data;
+}
 
 /**
  * CRM Contacts API
@@ -45,6 +62,9 @@ export async function handleContacts(req: Request): Promise<Response> {
     const user = auth.user;
     const userId = auth.userId;
 
+    // Workspace scoping (service-role handler — mirrors is_workspace_member RLS on crm_contacts).
+    const scope = await getCrmScope(supabase, auth);
+
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
@@ -57,6 +77,23 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
+      const requestedWs = (body.workspace_id as string | undefined) || undefined;
+      const targetWs = scope.isGlobalOperator
+        ? requestedWs
+        : (requestedWs && scopeAllows(scope, requestedWs) ? requestedWs : scope.workspaceIds[0]);
+      if (!targetWs && !scope.isGlobalOperator) {
+        return new Response(
+          JSON.stringify({ error: 'No workspace in scope to create this contact in' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+      if (requestedWs && !scopeAllows(scope, requestedWs)) {
+        return new Response(
+          JSON.stringify({ error: 'Not authorized for the requested workspace' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+
       const { data, error } = await supabase
         .from('crm_contacts')
         .insert({
@@ -65,6 +102,7 @@ export async function handleContacts(req: Request): Promise<Response> {
           phone,
           company,
           notes,
+          ...(targetWs ? { workspace_id: targetWs } : {}),
           created_by: userId || 'system',
         })
         .select();
@@ -87,11 +125,18 @@ export async function handleContacts(req: Request): Promise<Response> {
       const limit = parseInt(url.searchParams.get('limit') || '50');
       const offset = parseInt(url.searchParams.get('offset') || '0');
 
+      if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
+        return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
+      }
+
       let listQuery = supabase
         .from('crm_contacts')
         .select('*')
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
+      if (!scope.isGlobalOperator) {
+        listQuery = listQuery.in('workspace_id', scope.workspaceIds);
+      }
       const { data, error } = await listQuery;
 
       if (error) {
@@ -125,7 +170,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         .eq('id', contactId)
         .single();
 
-      if (error) {
+      if (error || !data || !scopeAllows(scope, (data as { workspace_id?: string }).workspace_id)) {
         return new Response(
           JSON.stringify({ error: 'Contact not found' }),
           { status: 404, headers: corsHeaders },
@@ -142,6 +187,13 @@ export async function handleContacts(req: Request): Promise<Response> {
     if (method === 'PATCH' && path.length === 1) {
       const contactId = path[0];
       const body = await req.json();
+
+      if (!(await contactInScope(contactId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Contact not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
 
       const {
         name, email, phone, mobile, company, position, title,
@@ -207,14 +259,8 @@ export async function handleContacts(req: Request): Promise<Response> {
     if (method === 'DELETE' && path.length === 1 && !path[0].includes('unlink-user')) {
       const contactId = path[0];
 
-      // First check if contact exists
-      const { data: existingContact, error: checkError } = await supabase
-        .from('crm_contacts')
-        .select('id')
-        .eq('id', contactId)
-        .single();
-
-      if (checkError || !existingContact) {
+      // Existence + workspace-scope check in one (out-of-scope rows are reported as not found).
+      if (!(await contactInScope(contactId, scope))) {
         return new Response(
           JSON.stringify({ error: 'Contact not found' }),
           { status: 404, headers: corsHeaders },
@@ -256,6 +302,13 @@ export async function handleContacts(req: Request): Promise<Response> {
         return new Response(
           JSON.stringify({ error: 'userId is required' }),
           { status: 400, headers: corsHeaders },
+        );
+      }
+
+      if (!(await contactInScope(contactId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Contact not found' }),
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -307,6 +360,13 @@ export async function handleContacts(req: Request): Promise<Response> {
     if (method === 'DELETE' && path.length === 2 && path[1] === 'unlink-user') {
       const contactId = path[0];
 
+      if (!(await contactInScope(contactId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Contact not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
       const { data, error } = await supabase
         .from('crm_contacts')
         .update({
@@ -335,12 +395,20 @@ export async function handleContacts(req: Request): Promise<Response> {
 
     // GET /api/contacts/potential-matches - Get potential email matches
     if (method === 'GET' && path.length === 1 && path[0] === 'potential-matches') {
+      if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
+        return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
+      }
+
       // Find contacts with emails that match user emails
-      const { data: contacts } = await supabase
+      let pmQuery = supabase
         .from('crm_contacts')
         .select('id, name, email')
         .not('email', 'is', null)
         .is('user_id', null);
+      if (!scope.isGlobalOperator) {
+        pmQuery = pmQuery.in('workspace_id', scope.workspaceIds);
+      }
+      const { data: contacts } = await pmQuery;
 
       if (!contacts || contacts.length === 0) {
         return new Response(
@@ -405,6 +473,11 @@ export async function handleContacts(req: Request): Promise<Response> {
         const { contactId, userId } = link;
 
         try {
+          if (!(await contactInScope(contactId, scope))) {
+            errors.push({ contactId, userId, error: 'Contact not found' });
+            continue;
+          }
+
           // Check if user is already linked
           const { data: existingLink } = await supabase
             .from('crm_contacts')
@@ -467,7 +540,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         .eq('user_id', userId)
         .single();
 
-      if (error) {
+      if (error || !data || !scopeAllows(scope, (data as { workspace_id?: string }).workspace_id)) {
         return new Response(
           JSON.stringify({ error: 'Contact not found for this user' }),
           { status: 404, headers: corsHeaders },

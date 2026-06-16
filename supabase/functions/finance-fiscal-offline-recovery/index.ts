@@ -21,8 +21,10 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+  // Fail closed: this mutates legally-binding myDATA records across tenants, so an
+  // unset CRON_SECRET must REJECT rather than skip the check (audit #217 H8).
   const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
-  if (cronSecret && req.headers.get('x-cron-secret') !== cronSecret) return json({ error: 'unauthorized' }, 401);
+  if (!cronSecret || req.headers.get('x-cron-secret') !== cronSecret) return json({ error: 'unauthorized' }, 401);
 
   const results: Record<string, number> = { invoices_checked: 0, invoices_recovered: 0, credit_notes_checked: 0, credit_notes_recovered: 0 };
   // Cache one connector per workspace across the batch.

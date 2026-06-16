@@ -49,14 +49,13 @@ Deno.serve(withApiLogging('firecrawl-webhook', async (req: Request) => {
     });
   }
 
+  // Fail closed: an unset secret must REJECT, not skip the check (audit #217 H8).
   const webhookSecret = Deno.env.get('FIRECRAWL_WEBHOOK_SECRET') || '';
-  if (webhookSecret) {
-    const providedSecret = url.searchParams.get('webhook_secret');
-    if (providedSecret !== webhookSecret) {
-      return new Response(JSON.stringify({ error: 'Invalid webhook secret' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+  const providedSecret = url.searchParams.get('webhook_secret');
+  if (!webhookSecret || providedSecret !== webhookSecret) {
+    return new Response(JSON.stringify({ error: 'Invalid or unconfigured webhook secret' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   let payload: Record<string, unknown>;

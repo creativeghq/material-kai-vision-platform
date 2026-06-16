@@ -88,6 +88,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     const maxIterations = body.max_iterations || DEFAULT_MAX_ITERATIONS;
     let content = body.content_markdown;
     let fixIterations = 0;
+    // Track fix credits actually debited so the failure path can refund them too
+    // (the catch previously refunded only the analysis credit — audit #217 H15).
+    let fixCreditsDebited = 0;
 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
@@ -120,6 +123,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
           console.warn(`[seo-analyze] Cannot debit fix credits, stopping auto-fix`);
           break;
         }
+        fixCreditsDebited += FIX_CREDIT_COST;
 
         console.log(`[seo-analyze] Fix iteration ${i + 1}: applying ${autoFixableFixes.length} fixes...`);
 
@@ -153,12 +157,13 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   } catch (error: any) {
     console.error('[seo-analyze] Error:', error);
     try {
+      // Refund the analysis credit AND any auto-fix iteration credits already debited.
       await supabase.rpc('credit_user_credits', {
         p_user_id: userId,
-        p_amount: ANALYSIS_CREDIT_COST,
+        p_amount: ANALYSIS_CREDIT_COST + fixCreditsDebited,
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
-        p_metadata: { error: error.message },
+        p_metadata: { error: error.message, fix_credits_refunded: fixCreditsDebited },
       });
     } catch (refundErr) {
       console.error('[seo-analyze] Refund failed:', refundErr);

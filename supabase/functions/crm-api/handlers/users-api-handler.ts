@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { getCrmScope } from './_scope.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -43,6 +44,19 @@ export async function handleUsers(req: Request): Promise<Response> {
 
     const user = auth.user;
     const userId = auth.userId;
+
+    // This handler manages PLATFORM auth users (invite, global role_id changes, auth-user
+    // deletion, cross-user AI-usage/credits). That is a platform-operator capability, not a
+    // per-tenant one — authenticate()'s admin/factory gate is satisfied by a WORKSPACE-level
+    // admin, who must NOT be able to enumerate or mutate every platform user (roles, balances).
+    // Restrict to global operators (secret key, or global role admin/super_admin).
+    const scope = await getCrmScope(supabase, auth);
+    if (!scope.isGlobalOperator) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: platform-operator access required' }),
+        { status: 403, headers: corsHeaders },
+      );
+    }
 
     // POST / - Create (invite) a new user by email
     if (method === 'POST' && path.length === 0) {

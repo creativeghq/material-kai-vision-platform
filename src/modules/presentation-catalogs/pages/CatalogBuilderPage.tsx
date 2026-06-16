@@ -54,6 +54,9 @@ export const CatalogBuilderPage: React.FC = () => {
   const [grantNote, setGrantNote] = useState('');
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('builder');
+  // Fresh signed URL re-derived from pdf_storage_path. The persisted catalog.pdf_url is
+  // a 7-day signed URL that 403s once expired (audit #217 H16) — never serve it directly.
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!catalogId) return;
@@ -89,6 +92,16 @@ export const CatalogBuilderPage: React.FC = () => {
   }, [catalogId, batchRecipients, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Re-sign the catalog PDF whenever the stored object changes, so the iframe/Open
+  // button always use a fresh (non-expired) signed URL.
+  useEffect(() => {
+    if (catalog?.id && catalog?.pdf_storage_path) {
+      catalogsService.refreshPdfUrl(catalog.id).then(setPdfSignedUrl).catch(() => setPdfSignedUrl(null));
+    } else {
+      setPdfSignedUrl(null);
+    }
+  }, [catalog?.id, catalog?.pdf_storage_path, catalog?.pdf_generated_at]);
 
   const totalMaterials = useMemo(() => {
     if (!catalog) return 0;
@@ -597,11 +610,11 @@ export const CatalogBuilderPage: React.FC = () => {
         <TabsContent value="pdf" className="mt-4">
           <Card>
             <CardContent className="p-4 space-y-3">
-              {catalog.pdf_url ? (
+              {(pdfSignedUrl ?? catalog.pdf_url) ? (
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{catalog.page_count} pages • generated {catalog.pdf_generated_at && new Date(catalog.pdf_generated_at).toLocaleString()}</span>
-                    <Button size="sm" variant="outline" onClick={() => window.open(catalog.pdf_url!, '_blank')}>
+                    <Button size="sm" variant="outline" onClick={() => window.open((pdfSignedUrl ?? catalog.pdf_url)!, '_blank')}>
                       <ExternalLink className="mr-2 h-4 w-4" /> Open
                     </Button>
                     <Button size="sm" variant="ghost" onClick={handleGeneratePdf} disabled={busyAction === 'pdf'}>
@@ -609,7 +622,7 @@ export const CatalogBuilderPage: React.FC = () => {
                       Regenerate
                     </Button>
                   </div>
-                  <iframe src={catalog.pdf_url} className="w-full h-[80vh] border rounded" title="Catalog PDF" />
+                  <iframe src={pdfSignedUrl ?? catalog.pdf_url ?? undefined} className="w-full h-[80vh] border rounded" title="Catalog PDF" />
                 </>
               ) : (
                 <div className="text-sm text-muted-foreground py-4">

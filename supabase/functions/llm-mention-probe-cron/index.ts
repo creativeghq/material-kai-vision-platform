@@ -18,7 +18,8 @@ Deno.serve(withApiLogging('llm-mention-probe-cron', async (req) => {
   try {
     const cronSecret = req.headers.get('x-cron-secret');
     const expectedSecret = () => Deno.env.get('CRON_SECRET') || '';
-    if (cronSecret !== expectedSecret()) {
+    // Fail closed: an unset CRON_SECRET must reject (an empty header would otherwise match ''). (audit #217 M5)
+    if (!expectedSecret() || cronSecret !== expectedSecret()) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },

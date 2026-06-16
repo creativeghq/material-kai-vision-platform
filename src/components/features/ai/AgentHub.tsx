@@ -2899,6 +2899,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             : (msg.metadata?.jobFindingsData as any | undefined)),
           seoResearchData: msg.metadata?.seoResearchData as any | undefined,
           seoGenericData: msg.metadata?.seoGenericData as any | undefined,
+          // Agent-streamed sheet/catalog cards are saved to metadata but were omitted
+          // from this restore map, so they vanished on conversation reload (audit #217 H13).
+          sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
+          sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
+          catalogData: msg.metadata?.catalogData as any | undefined,
+          catalogExtractionData: msg.metadata?.catalogExtractionData as any | undefined,
+          catalogImageCandidatesData: msg.metadata?.catalogImageCandidatesData as any | undefined,
         })),
       );
     },
