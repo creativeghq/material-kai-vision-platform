@@ -40,11 +40,13 @@ export type Capability =
   | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers (#201)
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
-  | 'agent.use';            // KAI agent / chat
+  | 'agent.use'             // KAI agent / chat
+  | 'inbox.use';            // #209 multi-tenant inbox (directional messaging)
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
   'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use',
+  'inbox.use',
 ];
 
 /** Persona → granted capabilities. The ONE place gating policy lives. */
@@ -56,7 +58,7 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // Architects sell to end users (they have a downstream network) but never import catalog.
   architect: [...ALL_BUSINESS],
   // Team members run day-to-day but don't administer the node (no network/pricing).
-  staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
+  staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
   // Invited accountant: ONLY the Finance surface (nav + route). Within finance, settings
   // stay gated on `isWorkspaceManager` and write-ops on `canOperateFinance` (usePermissions),
   // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
@@ -66,9 +68,9 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // to push, email account info — all read-only via membership-gated RPCs). NO finance module
   // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
   // user_id); customer financials are workspace-scoped reads.
-  sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use'],
+  sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
-  end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use'],
+  end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
 };
 
 export interface PersonaInputs {

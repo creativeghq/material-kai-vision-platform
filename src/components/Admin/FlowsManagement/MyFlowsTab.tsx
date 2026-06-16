@@ -33,6 +33,7 @@ import {
   Share2,
   Lock,
   Unlock,
+  Inbox,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -114,6 +115,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
   inventory_low_stock: Package,
+  'inbox.message_received': Inbox,
+  'inbox.thread_assigned': UserPlus,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -164,6 +167,8 @@ const triggerLabels: Record<TriggerType, string> = {
   project_invitation_sent: 'Project Invite Sent',
   project_invitation_resent: 'Project Invite Resent',
   inventory_low_stock: 'Low Stock',
+  'inbox.message_received': 'Inbox Message Received',
+  'inbox.thread_assigned': 'Inbox Thread Assigned',
 };
 
 const statusColors: Record<FlowStatus, string> = {

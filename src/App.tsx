@@ -36,6 +36,8 @@ const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ defa
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
+const InboxPage = lazy(() => import('./pages/Inbox/InboxPage'));
+const PublicInboxThreadPage = lazy(() => import('./pages/PublicInboxThreadPage'));
 const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage'));
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
@@ -158,6 +160,8 @@ const App = () => (
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
+                {/* #209 — public customer inbox thread (tokenized, no auth) */}
+                <Route path="/i/:token" element={<PageErrorBoundary name="Inbox Thread"><PublicInboxThreadPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
                 <Route path="/tools/price-scan" element={<PageErrorBoundary name="Price Scan"><PriceScanPage /></PageErrorBoundary>} />
                 <Route path="/tools/mention-scan" element={<PageErrorBoundary name="Mention Scan"><MentionScanPage /></PageErrorBoundary>} />
@@ -470,6 +474,18 @@ const App = () => (
                       <Layout>
                         <AgentHub />
                       </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/inbox"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="inbox.use">
+                        <Layout>
+                          <InboxPage />
+                        </Layout>
+                      </CapabilityGuard>
                     </AuthGuard>
                   }
                 />

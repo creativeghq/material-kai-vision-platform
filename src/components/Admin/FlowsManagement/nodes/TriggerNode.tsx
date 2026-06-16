@@ -5,7 +5,7 @@ import {
   LogIn, CheckCircle2, XCircle, ClipboardCheck, Image, FileCheck, Package,
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
-  LayoutGrid, ImagePlus, Share2,
+  LayoutGrid, ImagePlus, Share2, Inbox,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -57,6 +57,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
   inventory_low_stock: Package,
+  'inbox.message_received': Inbox,
+  'inbox.thread_assigned': UserPlus,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

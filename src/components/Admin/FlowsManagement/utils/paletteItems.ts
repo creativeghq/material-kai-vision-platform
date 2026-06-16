@@ -159,6 +159,13 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'inventory_low_stock', group: 'Finance',
     label: 'Low Stock', description: 'A warehouse item drops to/below its reorder point', icon: 'Package', color: 'amber',
     defaultData: { label: 'Low Stock', category: 'trigger', triggerType: 'inventory_low_stock', config: {} } as TriggerNodeData },
+  // #209 — multi-tenant inbox
+  { type: 'triggerNode', category: 'trigger', subType: 'inbox.message_received', group: 'Inbox',
+    label: 'Inbox Message Received', description: 'A new message lands in an inbox thread', icon: 'Inbox', color: 'emerald',
+    defaultData: { label: 'Inbox Message Received', category: 'trigger', triggerType: 'inbox.message_received', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'inbox.thread_assigned', group: 'Inbox',
+    label: 'Inbox Thread Assigned', description: 'A thread is assigned/handed to a member', icon: 'UserPlus', color: 'emerald',
+    defaultData: { label: 'Inbox Thread Assigned', category: 'trigger', triggerType: 'inbox.thread_assigned', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

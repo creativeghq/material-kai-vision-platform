@@ -56,10 +56,15 @@ export type TriggerType =
   | 'stripe_payment_failed'
   | 'project_invitation_sent'
   | 'project_invitation_resent'
-  | 'inventory_low_stock';
+  | 'inventory_low_stock'
+  // #209 — multi-tenant inbox (dotted keys; payload-only, no custom config UI)
+  | 'inbox.message_received'
+  | 'inbox.thread_assigned';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
+export interface InboxMessageReceivedTriggerConfig {}
+export interface InboxThreadAssignedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -214,6 +219,8 @@ export type TriggerConfigMap = {
   project_invitation_sent: ProjectInvitationSentTriggerConfig;
   project_invitation_resent: ProjectInvitationResentTriggerConfig;
   inventory_low_stock: InventoryLowStockTriggerConfig;
+  'inbox.message_received': InboxMessageReceivedTriggerConfig;
+  'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
 };
 
 // =====================================================

@@ -10,6 +10,9 @@ max_rows = 10000
 # ==================== EXISTING FUNCTIONS ====================
 # Only functions that actually exist in supabase/functions/
 
+[functions.inbox-api]
+verify_jwt = false
+
 [functions.crm-companies-api]
 verify_jwt = false
 
