@@ -46,8 +46,10 @@ export interface InboxParticipant {
 }
 
 export interface InboxAttachment {
-  storage_bucket: string;
-  storage_object_path: string;
+  storage_bucket?: string;
+  storage_object_path?: string;
+  // Channel attachments (e.g. WhatsApp/Zernio) arrive as an external URL with no storage path.
+  url?: string;
   name?: string;
   content_type?: string;
   size?: number;
@@ -142,10 +144,13 @@ export const inboxApi = {
   },
 };
 
-/** Mint a fresh signed URL for a private inbox attachment (1h). */
+/** Resolve a viewable URL for an attachment: signed private-storage URL, or external channel URL. */
 export async function signInboxAttachment(att: InboxAttachment): Promise<string | null> {
-  const { data } = await supabase.storage
-    .from(att.storage_bucket)
-    .createSignedUrl(att.storage_object_path, 3600);
-  return data?.signedUrl ?? null;
+  if (att.storage_bucket && att.storage_object_path) {
+    const { data } = await supabase.storage
+      .from(att.storage_bucket)
+      .createSignedUrl(att.storage_object_path, 3600);
+    if (data?.signedUrl) return data.signedUrl;
+  }
+  return att.url ?? null;
 }

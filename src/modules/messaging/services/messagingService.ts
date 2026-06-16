@@ -20,8 +20,6 @@ import type {
   ConnectWhatsAppOptions,
   MessageLogFilters,
   MessagingAnalyticsResponse,
-  MessagingConversation,
-  MessagingConversationMessage,
 } from './types';
 
 export class MessagingService {
@@ -436,51 +434,10 @@ export class MessagingService {
     }
   }
 
-  // =====================================================
-  // Conversations (inbound replies — fast-follow inbox surface)
-  // =====================================================
-
-  /** List captured reply conversations (newest activity first). */
-  async listConversations(filters?: { status?: string; assignedTo?: string; limit?: number }): Promise<MessagingConversation[]> {
-    let query = supabase
-      .from('messaging_conversations')
-      .select('*')
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-      .limit(filters?.limit ?? 100);
-    if (filters?.status) query = query.eq('status', filters.status);
-    if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
-    const { data, error } = await query;
-    if (error) throw new Error('Failed to fetch conversations');
-    return data || [];
-  }
-
-  /** Get the messages of a conversation (oldest first). */
-  async getConversationMessages(conversationId: string): Promise<MessagingConversationMessage[]> {
-    const { data, error } = await supabase
-      .from('messaging_conversation_messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
-    if (error) throw new Error('Failed to fetch conversation messages');
-    return data || [];
-  }
-
-  /** Assign / reassign a conversation to a user. */
-  async assignConversation(conversationId: string, userId: string | null): Promise<void> {
-    const { error } = await supabase
-      .from('messaging_conversations')
-      .update({ assigned_to: userId, assigned_at: userId ? new Date().toISOString() : null })
-      .eq('id', conversationId);
-    if (error) throw new Error('Failed to assign conversation');
-  }
-
-  /** Update a conversation's status (open / snoozed / closed) and optionally reset unread. */
-  async updateConversationStatus(conversationId: string, status: string, resetUnread = false): Promise<void> {
-    const update: Record<string, unknown> = { status };
-    if (resetUnread) update.unread_count = 0;
-    const { error } = await supabase.from('messaging_conversations').update(update).eq('id', conversationId);
-    if (error) throw new Error('Failed to update conversation');
-  }
+  // Inbound WhatsApp replies are captured into the unified inbox (#209) by the
+  // zernio-webhook-handler (inbox_threads / inbox_participants / inbox_messages) and read
+  // through inboxApi + the /inbox UI. The former messaging_conversations holding pen was
+  // dropped — no separate conversation methods live here anymore.
 
   // =====================================================
   // Opt-out Management (Compliance)

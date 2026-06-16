@@ -134,42 +134,9 @@ export interface MessagingOptout {
   created_at: string;
 }
 
-// Inbound-reply capture layer (assign-on-reply). Outbound sends never create these.
-export interface MessagingConversation {
-  id: string;
-  channel_id?: string;
-  zernio_account_id?: string;
-  zernio_conversation_id?: string;
-  contact_phone: string;
-  contact_name?: string;
-  contact_wa_id?: string;
-  status: ConversationStatus;
-  assigned_to?: string;
-  assigned_at?: string;
-  campaign_id?: string;
-  last_message_at?: string;
-  last_message_preview?: string;
-  last_message_direction?: 'incoming' | 'outgoing';
-  unread_count: number;
-  metadata: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MessagingConversationMessage {
-  id: string;
-  conversation_id: string;
-  zernio_message_id?: string;
-  direction: 'incoming' | 'outgoing';
-  body?: string;
-  attachments: any[];
-  status: 'received' | 'sent' | 'delivered' | 'read' | 'failed';
-  sender_phone?: string;
-  sender_name?: string;
-  sent_at?: string;
-  metadata: Record<string, any>;
-  created_at: string;
-}
+// Inbound WhatsApp replies now live in the unified inbox (#209) — inbox_threads /
+// inbox_participants / inbox_messages, read via src/services/inboxApi.ts. The former
+// MessagingConversation / MessagingConversationMessage holding-pen types were removed.
 
 // =====================================================
 // Message Buttons (for interactive messages)

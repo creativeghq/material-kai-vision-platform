@@ -14,7 +14,9 @@
  *   post.failed         → social_posts.status = 'failed'
  *   post.cancelled      → social_posts.status = 'cancelled'
  *   account.disconnected → social_accounts.is_active = false
- *   message.received    → capture WhatsApp reply into messaging_conversations (+ assign on first reply, STOP/START)
+ *   message.received    → capture WhatsApp reply into the unified inbox (#209): inbox_threads
+ *                         (thread_type='customer', channel='whatsapp') + inbox_participants
+ *                         (channel-customer + assign-on-reply owner) + inbox_messages, STOP/START
  *   message.delivered|read|failed → update messaging_logs / campaign recipient delivery status
  *
  * This is the single Zernio webhook endpoint for BOTH social posts and WhatsApp
@@ -85,10 +87,62 @@ function contactPhoneOf(sender: any): string | undefined {
 }
 
 /**
- * Inbound WhatsApp reply (message.received). Captures it into the conversations
- * layer, assigns the thread (to the originating campaign owner) the FIRST time a
- * reply arrives, handles STOP/START keywords, and emits a flow event for notify.
- * Outbound campaign sends never reach here — only genuine replies surface a thread.
+ * Resolve the owning workspace for an inbound WhatsApp message from its Zernio account.
+ * Account → messaging_channels (by zernio_account_id) → config.profile_id →
+ * social_zernio_profiles → workspace_id. Local lookups only (no Zernio API call).
+ */
+async function resolveAccountWorkspace(
+  supabase: any,
+  accountId: string | undefined,
+): Promise<{ workspaceId: string | null; channelId: string | null; profileId: string | null }> {
+  if (!accountId) return { workspaceId: null, channelId: null, profileId: null };
+  const { data: channel } = await supabase
+    .from('messaging_channels').select('id, config').eq('zernio_account_id', accountId).maybeSingle();
+  const profileId = (channel?.config as { profile_id?: string } | null)?.profile_id ?? null;
+  let workspaceId: string | null = null;
+  if (profileId) {
+    const { data: prof } = await supabase
+      .from('social_zernio_profiles').select('workspace_id').eq('zernio_profile_id', profileId).maybeSingle();
+    workspaceId = prof?.workspace_id ?? null;
+  }
+  return { workspaceId, channelId: channel?.id ?? null, profileId };
+}
+
+/** First active owner/admin of a workspace — the default thread owner when no campaign owner exists. */
+async function resolveWorkspaceOwner(supabase: any, workspaceId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('workspace_members').select('user_id, role')
+    .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).limit(1).maybeSingle();
+  return data?.user_id ?? null;
+}
+
+/** Match an existing CRM contact by phone within a workspace, or create one. */
+async function matchOrCreateContact(
+  supabase: any,
+  workspaceId: string,
+  phone: string,
+  name: string | null,
+  createdBy: string | null,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from('crm_contacts').select('id')
+    .eq('workspace_id', workspaceId).or(`phone.eq.${phone},mobile.eq.${phone}`).limit(1).maybeSingle();
+  if (existing?.id) return existing.id;
+  // crm_contacts.created_by is NOT NULL — fall back to the workspace owner.
+  const owner = createdBy || (await resolveWorkspaceOwner(supabase, workspaceId));
+  if (!owner) return null;
+  const { data: created } = await supabase.from('crm_contacts').insert({
+    workspace_id: workspaceId, name: name || phone, phone, created_by: owner, lead_source: 'whatsapp',
+  }).select('id').single();
+  return created?.id ?? null;
+}
+
+/**
+ * Inbound WhatsApp reply (message.received) → the unified inbox (#209).
+ * A WhatsApp reply is a `thread_type='customer'`, `channel='whatsapp'` thread owned by the
+ * workspace whose WABA received it. The contact is a channel-customer participant (contact_id,
+ * user_id NULL — never converts to an app account). Assign-on-first-reply adds the campaign /
+ * workspace owner as the `owner` member participant. STOP/START opt-out handling preserved.
  */
 async function handleInboundMessage(supabase: any, payload: any): Promise<void> {
   const msg = payload.message || {};
@@ -99,11 +153,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   const phone = contactPhoneOf(msg.sender);
   if (!phone) { console.warn('[zernio-webhook] inbound message without resolvable phone'); return; }
 
-  // Map the Zernio account back to our channel.
-  const { data: channel } = await supabase
-    .from('messaging_channels').select('id').eq('zernio_account_id', accountId).maybeSingle();
-
-  // STOP / START keyword compliance.
+  // STOP / START keyword compliance (independent of thread resolution).
   const text = String(msg.text || '').trim();
   const upper = text.toUpperCase();
   if (OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
@@ -115,81 +165,104 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
     await supabase.from('messaging_optouts').delete().eq('phone_number', phone).eq('channel_type', 'whatsapp');
   }
 
-  // Find or create the conversation thread for (channel, contact).
-  const { data: existingConv } = await supabase
-    .from('messaging_conversations').select('id, assigned_to')
-    .eq('channel_id', channel?.id ?? null).eq('contact_phone', phone).maybeSingle();
-
-  const preview = (msg.text || '[attachment]').substring(0, 200);
-  let conversationId = existingConv?.id;
-
-  if (existingConv) {
-    const update: Record<string, unknown> = {
-      zernio_conversation_id: msg.conversationId,
-      contact_name: msg.sender?.name ?? undefined,
-      contact_wa_id: msg.sender?.businessScopedUserId ?? msg.sender?.id ?? undefined,
-      status: 'open',
-      last_message_at: msg.sentAt || new Date().toISOString(),
-      last_message_preview: preview,
-      last_message_direction: 'incoming',
-      unread_count: undefined, // bumped below via rpc-free increment
-    };
-    // increment unread atomically-ish (best-effort read-modify-write)
-    const { data: cur } = await supabase.from('messaging_conversations').select('unread_count').eq('id', existingConv.id).single();
-    update.unread_count = (cur?.unread_count || 0) + 1;
-
-    // Assign on first reply: if nobody owns it yet, hand it to the campaign owner.
-    if (!existingConv.assigned_to) {
-      const owner = await resolveCampaignOwner(supabase, phone);
-      if (owner) { update.assigned_to = owner; update.assigned_at = new Date().toISOString(); }
-    }
-    await supabase.from('messaging_conversations').update(update).eq('id', existingConv.id);
-  } else {
-    const owner = await resolveCampaignOwner(supabase, phone);
-    const { data: created } = await supabase.from('messaging_conversations').insert({
-      channel_id: channel?.id ?? null,
-      zernio_account_id: accountId,
-      zernio_conversation_id: msg.conversationId,
-      contact_phone: phone,
-      contact_name: msg.sender?.name ?? null,
-      contact_wa_id: msg.sender?.businessScopedUserId ?? msg.sender?.id ?? null,
-      status: 'open',
-      assigned_to: owner ?? null,
-      assigned_at: owner ? new Date().toISOString() : null,
-      last_message_at: msg.sentAt || new Date().toISOString(),
-      last_message_preview: preview,
-      last_message_direction: 'incoming',
-      unread_count: 1,
-    }).select('id, assigned_to').single();
-    conversationId = created?.id;
+  // Resolve owning workspace — required because inbox_threads.workspace_id is NOT NULL and the
+  // directional wall is keyed on it. Without a binding we can't safely place the thread.
+  const { workspaceId, channelId } = await resolveAccountWorkspace(supabase, accountId);
+  if (!workspaceId) {
+    console.warn(`[zernio-webhook] no workspace for Zernio account ${accountId} — inbound dropped`);
+    return;
   }
 
-  if (conversationId) {
-    await supabase.from('messaging_conversation_messages').insert({
-      conversation_id: conversationId,
-      zernio_message_id: msg.platformMessageId || msg.id || null,
-      direction: 'incoming',
-      body: msg.text ?? null,
-      attachments: msg.attachments ?? [],
-      status: 'received',
-      sender_phone: phone,
-      sender_name: msg.sender?.name ?? null,
-      sent_at: msg.sentAt || new Date().toISOString(),
-      metadata: msg.metadata ?? {},
-    });
+  const owner = (await resolveCampaignOwner(supabase, phone)) || (await resolveWorkspaceOwner(supabase, workspaceId));
+  const contactName = msg.sender?.name ?? null;
+  const contactId = await matchOrCreateContact(supabase, workspaceId, phone, contactName, owner);
 
-    // Notify via Flows (no-op until a flow is bound — wired with the inbox UI fast-follow).
-    const { data: conv } = await supabase
-      .from('messaging_conversations').select('assigned_to').eq('id', conversationId).maybeSingle();
-    await emitFlowEvent('whatsapp.reply_received', {
-      conversation_id: conversationId,
-      user_id: conv?.assigned_to ?? null,
-      contact_phone: phone,
-      contact_name: msg.sender?.name ?? null,
-      title: `New WhatsApp reply from ${msg.sender?.name || phone}`,
-      body: preview,
-      action_url: `/admin/modules/messaging?conversation=${conversationId}`,
-      type: 'whatsapp_reply',
+  // Find the existing whatsapp thread for this contact in this workspace.
+  let threadId: string | null = null;
+  if (contactId) {
+    const { data: cp } = await supabase
+      .from('inbox_participants').select('thread_id, inbox_threads!inner(channel, workspace_id)')
+      .eq('contact_id', contactId).eq('status', 'active')
+      .eq('inbox_threads.channel', 'whatsapp').eq('inbox_threads.workspace_id', workspaceId)
+      .limit(1).maybeSingle();
+    threadId = (cp as { thread_id?: string } | null)?.thread_id ?? null;
+  }
+
+  const meta = {
+    zernio_account_id: accountId,
+    zernio_conversation_id: msg.conversationId,
+    channel_id: channelId,
+    contact_phone: phone,
+  };
+
+  let customerParticipantId: string | null = null;
+
+  if (!threadId) {
+    // New thread + customer participant + owner member participant (assign-on-reply).
+    const { data: thread } = await supabase.from('inbox_threads').insert({
+      workspace_id: workspaceId, thread_type: 'customer', channel: 'whatsapp',
+      subject: contactName || phone, status: 'open', metadata: meta,
+      last_message_at: msg.sentAt || new Date().toISOString(),
+    }).select('id').single();
+    threadId = thread?.id ?? null;
+    if (!threadId) return;
+
+    const { data: cust } = await supabase.from('inbox_participants').insert({
+      thread_id: threadId, participant_type: 'customer', contact_id: contactId, thread_role: 'participant',
+    }).select('id').single();
+    customerParticipantId = cust?.id ?? null;
+
+    if (owner) {
+      await supabase.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'member', user_id: owner,
+        workspace_id: workspaceId, thread_role: 'owner', added_by: owner,
+      });
+      await emitFlowEvent('inbox.thread_assigned', {
+        user_id: owner, type: 'inbox_assigned',
+        title: 'You were assigned a WhatsApp conversation',
+        body: contactName || phone, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
+      }).catch(() => {});
+    }
+  } else {
+    // Existing thread: refresh channel binding + assign an owner if none yet.
+    await supabase.from('inbox_threads').update({
+      metadata: meta, status: 'open', last_message_at: msg.sentAt || new Date().toISOString(),
+    }).eq('id', threadId);
+
+    const { data: cp } = await supabase
+      .from('inbox_participants').select('id').eq('thread_id', threadId).eq('contact_id', contactId).maybeSingle();
+    customerParticipantId = (cp as { id?: string } | null)?.id ?? null;
+
+    const { data: ownerP } = await supabase
+      .from('inbox_participants').select('id').eq('thread_id', threadId)
+      .eq('participant_type', 'member').eq('status', 'active').limit(1).maybeSingle();
+    if (!ownerP && owner) {
+      await supabase.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'member', user_id: owner,
+        workspace_id: workspaceId, thread_role: 'owner', added_by: owner,
+      });
+    }
+  }
+
+  const preview = (msg.text || '[attachment]').substring(0, 200);
+  await supabase.from('inbox_messages').insert({
+    thread_id: threadId,
+    sender_participant_id: customerParticipantId,
+    body: msg.text ?? null,
+    attachments: msg.attachments ?? [],
+    message_type: 'text',
+    metadata: { channel: 'whatsapp', wamid: msg.platformMessageId || msg.id || null, direction: 'incoming' },
+  });
+
+  // Notify every member participant via the unified inbox event.
+  const { data: members } = await supabase
+    .from('inbox_participants').select('user_id')
+    .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active').not('user_id', 'is', null);
+  for (const m of (members || []) as Array<{ user_id: string }>) {
+    await emitFlowEvent('inbox.message_received', {
+      user_id: m.user_id, type: 'inbox_message',
+      title: `WhatsApp · ${contactName || phone}`,
+      body: preview, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
     }).catch(() => {});
   }
 }
@@ -244,8 +317,10 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
     }
   }
 
-  // Agent-reply messages in the conversation layer (best-effort).
-  await supabase.from('messaging_conversation_messages').update({ status }).eq('zernio_message_id', wamid);
+  // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata (best-effort).
+  await supabase.from('inbox_messages')
+    .update({ metadata: { delivery_status: status } })
+    .eq('metadata->>wamid', wamid);
 }
 
 Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {

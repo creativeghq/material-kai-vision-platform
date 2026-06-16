@@ -196,9 +196,9 @@ const TABLES_TO_CLEAR = [
   'social_post_analytics',         // Post analytics (child of social_posts, CASCADE)
   'social_posts',                  // Published/scheduled social posts
 
+  // ── Inbox (#209) — threads + child participants/messages/tokens (CASCADE) ──
+  'inbox_threads',                 // unified inbox (incl. WhatsApp customer threads)
   // ── Messaging content (channels/settings/optouts are PRESERVED) ─────
-  'messaging_conversation_messages', // WhatsApp thread messages (child, CASCADE)
-  'messaging_conversations',       // WhatsApp conversation threads
   'messaging_campaign_recipients', // Campaign send recipients
   'messaging_logs',                // Message delivery logs
   'messaging_analytics',           // Messaging analytics

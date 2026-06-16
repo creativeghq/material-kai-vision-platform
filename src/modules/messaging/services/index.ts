@@ -23,8 +23,6 @@ export type {
   MessagingAnalytics,
   MessagingCampaignRecipient,
   MessagingOptout,
-  MessagingConversation,
-  MessagingConversationMessage,
   // Message buttons
   MessageButton,
   // Service options

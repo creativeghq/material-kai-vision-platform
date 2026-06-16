@@ -313,7 +313,8 @@ const MessageBubble: React.FC<{ m: InboxMessage }> = ({ m }) => {
     (async () => {
       for (const a of m.attachments || []) {
         const u = await signInboxAttachment(a);
-        if (u) setUrls((p) => ({ ...p, [a.storage_object_path]: u }));
+        const k = a.storage_object_path || a.url || '';
+        if (u && k) setUrls((p) => ({ ...p, [k]: u }));
       }
     })();
   }, [m]);
@@ -326,12 +327,15 @@ const MessageBubble: React.FC<{ m: InboxMessage }> = ({ m }) => {
     <div className={`rounded-lg px-3 py-2 max-w-[80%] ${isNote ? 'bg-amber-500/10 border border-amber-500/30 ml-auto' : 'bg-white/5'}`}>
       {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-400 mb-1"><Lock className="w-3 h-3" /> Private note</div>}
       {m.body && <div className="text-sm whitespace-pre-wrap break-words">{m.body}</div>}
-      {(m.attachments || []).map((a) => (
-        <a key={a.storage_object_path} href={urls[a.storage_object_path]} target="_blank" rel="noreferrer"
-           className="flex items-center gap-1 text-xs text-primary mt-1 underline">
-          <Paperclip className="w-3 h-3" /> {a.name || 'attachment'}
-        </a>
-      ))}
+      {(m.attachments || []).map((a, i) => {
+        const k = a.storage_object_path || a.url || '';
+        return (
+          <a key={k || i} href={urls[k]} target="_blank" rel="noreferrer"
+             className="flex items-center gap-1 text-xs text-primary mt-1 underline">
+            <Paperclip className="w-3 h-3" /> {a.name || 'attachment'}
+          </a>
+        );
+      })}
       <div className="text-[10px] text-muted-foreground mt-1">{new Date(m.created_at).toLocaleString()}</div>
     </div>
   );
