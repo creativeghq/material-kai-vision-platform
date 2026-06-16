@@ -39,6 +39,44 @@ const AI_PRICING = {
   },
 };
 
+// ── DB-driven token pricing overlay (audit #217 H5) ───────────────────────────
+// The `ai_model_pricing` admin table is authoritative; AI_PRICING above is the
+// fallback used only when a model row is missing or the DB is unreachable. Cached
+// per-worker for 5 minutes so per-call logging stays cheap.
+interface TokenPrice { input: number; output: number }
+const DB_PRICE_TTL_MS = 5 * 60 * 1000;
+let _dbPriceCache: { data: Record<string, TokenPrice>; expiresAt: number } | null = null;
+let _dbPriceFetch: Promise<Record<string, TokenPrice>> | null = null;
+
+async function getDbTokenPricing(supabase: SupabaseClient): Promise<Record<string, TokenPrice>> {
+  const now = Date.now();
+  if (_dbPriceCache && _dbPriceCache.expiresAt > now) return _dbPriceCache.data;
+  if (!_dbPriceFetch) {
+    _dbPriceFetch = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ai_model_pricing')
+          .select('model_key, input_price_per_million, output_price_per_million')
+          .eq('billing_type', 'token_based')
+          .eq('is_active', true);
+        if (error || !data) return _dbPriceCache?.data || {};
+        const map: Record<string, TokenPrice> = {};
+        for (const r of data) {
+          const key = String(r.model_key || '').toLowerCase();
+          if (key) map[key] = { input: Number(r.input_price_per_million) || 0, output: Number(r.output_price_per_million) || 0 };
+        }
+        _dbPriceCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
+        return map;
+      } catch {
+        return _dbPriceCache?.data || {};
+      } finally {
+        _dbPriceFetch = null;
+      }
+    })();
+  }
+  return _dbPriceFetch;
+}
+
 interface ConfidenceBreakdown {
   model_confidence: number;
   completeness: number;
@@ -73,17 +111,32 @@ export class AICallLogger {
   /**
    * Calculate cost for AI API call
    */
-  private calculateCost(
+  private async calculateCost(
     model: string,
     inputTokens: number,
     outputTokens: number,
     provider?: string
-  ): number {
+  ): Promise<number> {
     const modelLower = model.toLowerCase();
-    
+
+    // DB-driven overlay first (audit #217 H5) — admin-edited prices win over the
+    // hardcoded AI_PRICING fallback below.
+    try {
+      const dbPricing = await getDbTokenPricing(this.supabase);
+      let dbHit = dbPricing[modelLower];
+      if (!dbHit) {
+        for (const [key, val] of Object.entries(dbPricing)) {
+          if (modelLower.includes(key) || key.includes(modelLower)) { dbHit = val; break; }
+        }
+      }
+      if (dbHit) {
+        return (inputTokens / 1_000_000) * dbHit.input + (outputTokens / 1_000_000) * dbHit.output;
+      }
+    } catch { /* fall through to hardcoded */ }
+
     // Determine provider if not specified
     let pricing: { input: number; output: number } | undefined;
-    
+
     if (provider === 'anthropic' || modelLower.includes('claude')) {
       pricing = Object.entries(AI_PRICING.claude).find(([key]) =>
         modelLower.includes(key.toLowerCase())
@@ -135,7 +188,7 @@ export class AICallLogger {
       // Calculate cost if tokens provided
       let cost = data.cost;
       if (!cost && data.input_tokens !== undefined && data.output_tokens !== undefined) {
-        cost = this.calculateCost(data.model, data.input_tokens, data.output_tokens);
+        cost = await this.calculateCost(data.model, data.input_tokens, data.output_tokens);
       }
 
       // Calculate confidence score if breakdown provided
