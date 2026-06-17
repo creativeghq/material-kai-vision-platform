@@ -22,7 +22,8 @@ import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingS
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
-import { DEFAULT_TEMPLATE_ID, resolveColors } from '@/modules/finance/invoice-templates';
+import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
+import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 
@@ -585,16 +586,55 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     } finally { setBusy(false); }
   };
 
-  const money = (n: number) => `${(n || 0).toFixed(2)} ${currency === 'EUR' ? '€' : currency}`;
+  // ── Live preview: same renderer + workspace template/colors as the real PDF, driven by the form ──
+  const previewTemplateId = issuer?.invoice_template_id || DEFAULT_TEMPLATE_ID;
+  const previewSpec = useMemo(() => getTemplateSpec(previewTemplateId), [previewTemplateId]);
+  const previewColors = useMemo(() => resolveColors(previewTemplateId, issuer?.invoice_template_colors), [previewTemplateId, issuer]);
+  const dueDatePreview = useMemo(() => {
+    const d = new Date(issueDate); d.setDate(d.getDate() + (parseInt(paymentTermsDays, 10) || 0));
+    return d.toISOString().slice(0, 10);
+  }, [issueDate, paymentTermsDays]);
+  const previewData = useMemo(() => buildInvoiceRenderData({
+    invoice: {
+      doc_language: 'en', currency, document_type: documentType,
+      internal_number: nextNumber?.number != null ? `${nextNumber.series ?? ''}${nextNumber.number}` : 'DRAFT',
+      issued_at: issueDate || null, due_at: dueDatePreview, related_document: relatedDocument || null,
+      vat_rate: parseFloat(vatRate) || 0,
+      total: totals.total, amount_paid: 0, amount_due: totals.total,
+      total_fees_amount: totals.fees, total_stamp_duty_amount: totals.stamp,
+      total_other_taxes_amount: totals.other, total_deductions_amount: totals.deduct,
+      total_withheld_amount: totals.withheld, digital_transaction_fee: totals.digital,
+      payment_method_code: paymentMethodCode ? parseInt(paymentMethodCode, 10) : null,
+      payment_method_info: paymentMethodInfo || null,
+      has_shipping: hasShipping, ship_from: hasShipping ? shipFrom : null, ship_to: hasShipping ? shipTo : null,
+      vehicle_number: hasShipping ? vehicleNumber : null, move_purpose: hasShipping ? movePurpose : null,
+      print_terms: printTerms, print_online_code: printOnlineCode, info_box: infoBox || null,
+      notes: notes || null, logo_mode: logoMode, fiscal_mark: null,
+    },
+    items: lines.filter((l) => l.description.trim()).map((l) => {
+      const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+      const net = lineNetOf(l);
+      return {
+        description: l.description, sku: l.sku || null, quantity: parseFloat(l.quantity) || 0,
+        unit: l.unit || null, measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
+        unit_price: parseFloat(l.unit_price) || 0, net_value: net, line_total: net,
+        vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null, vat_percent: pct,
+        selected_color: l.color || null, selected_size: l.size || null, line_comments: l.line_comments || null,
+      };
+    }),
+    settings: issuer,
+    customer: customerAddr ?? (customer ? { name: customer.label.replace(' (company)', '') } : null),
+    branch: null, logoUrl: null,
+  }), [issuer, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[94vh] overflow-hidden p-0">
-        <DialogHeader className="border-b border-border/60 px-5 py-3">
+      <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
+        <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
           <DialogTitle>New invoice</DialogTitle>
         </DialogHeader>
 
-        <div className="grid max-h-[calc(94vh-110px)] grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
+        <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[minmax(460px,520px)_1fr]">
           {/* ───────────── FORM (left) ───────────── */}
           <div className="space-y-5 overflow-y-auto px-5 py-4">
             {/* Parties + document */}
@@ -662,6 +702,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </section>
 
             <section className="grid grid-cols-2 gap-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Invoice details</Label>
               <div className="space-y-1 col-span-2">
                 <Label className="text-xs">Document type (myDATA)</Label>
                 <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
@@ -719,35 +760,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </Select>
                 </div>
               )}
-            </section>
-
-            {/* Payment + document flags */}
-            <section className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Payment method (myDATA)</Label>
-                <Select value={paymentMethodCode} onValueChange={setPaymentMethodCode}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Payment method…" /></SelectTrigger>
-                  <SelectContent>{paymentMethods.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.description}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Payment note</Label>
-                <Input className="h-9" value={paymentMethodInfo} onChange={(e) => setPaymentMethodInfo(e.target.value)} placeholder="e.g. IBAN, card ref, “on credit”" />
-              </div>
-              {currency !== 'EUR' && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Exchange rate → EUR</Label>
-                  <Input className="h-9" type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
-                </div>
-              )}
-              <label className="flex items-center gap-2 self-end text-xs">
-                <input type="checkbox" className="h-4 w-4 rounded" checked={vatSuspension} onChange={(e) => setVatSuspension(e.target.checked)} />
-                VAT payment suspension
-              </label>
-              <label className="flex items-center gap-2 self-end text-xs">
-                <input type="checkbox" className="h-4 w-4 rounded" checked={selfPricing} onChange={(e) => setSelfPricing(e.target.checked)} />
-                Self-pricing
-              </label>
             </section>
 
             {/* Global line defaults */}
@@ -896,6 +908,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
             {/* Document taxes */}
             <section className="grid grid-cols-2 gap-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Taxes</Label>
               <div className="space-y-1">
                 <Label className="text-xs">Withholding tax</Label>
                 <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
@@ -909,27 +922,35 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
             </section>
 
-            {/* Document settings (Ρυθμίσεις Παραστατικού) */}
-            <section className="rounded-md border border-border/60 p-3 space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document settings</Label>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><input type="checkbox" className="h-4 w-4 rounded" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Send by SMS on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} /></label>
-                <div className="flex items-center justify-between"><span>Logo</span>
-                  <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
-                    <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="auto">Business logo</SelectItem><SelectItem value="none">No logo</SelectItem></SelectContent>
+            {/* Payment */}
+            <section className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Payment</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment method (myDATA)</Label>
+                  <Select value={paymentMethodCode} onValueChange={setPaymentMethodCode}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Payment method…" /></SelectTrigger>
+                    <SelectContent>{paymentMethods.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.description}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Info box (printed, ≤250 chars)</Label>
-                <Input className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment note</Label>
+                  <Input className="h-9" value={paymentMethodInfo} onChange={(e) => setPaymentMethodInfo(e.target.value)} placeholder="e.g. IBAN, card ref, “on credit”" />
+                </div>
+                {currency !== 'EUR' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Exchange rate → EUR</Label>
+                    <Input className="h-9" type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 self-end text-xs">
+                  <input type="checkbox" className="h-4 w-4 rounded" checked={vatSuspension} onChange={(e) => setVatSuspension(e.target.checked)} />
+                  VAT payment suspension
+                </label>
+                <label className="flex items-center gap-2 self-end text-xs">
+                  <input type="checkbox" className="h-4 w-4 rounded" checked={selfPricing} onChange={(e) => setSelfPricing(e.target.checked)} />
+                  Self-pricing
+                </label>
               </div>
             </section>
 
@@ -982,79 +1003,40 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
             </section>
 
+            {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
+            <section className="rounded-md border border-border/60 p-3 space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document &amp; delivery options</Label>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><input type="checkbox" className="h-4 w-4 rounded" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Send by SMS on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} /></label>
+                <div className="flex items-center justify-between"><span>Logo</span>
+                  <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
+                    <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="auto">Business logo</SelectItem><SelectItem value="none">No logo</SelectItem></SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Info box (printed, ≤250 chars)</Label>
+                <Input className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
+              </div>
+            </section>
+
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" className="h-4 w-4 rounded" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} />
               Issue now (assigns the legal number + date)
             </label>
           </div>
 
-          {/* ───────────── PREVIEW (right) ───────────── */}
-          <div className="hidden overflow-y-auto border-l border-border/60 bg-muted/20 px-5 py-4 lg:block">
-            <div className="rounded-lg border border-border/60 bg-background p-5 text-sm shadow-sm">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-lg font-semibold">{groupDocTypes(docTypes).find((g) => g.items.some((t) => t.code === documentType))?.items.find((t) => t.code === documentType)?.description || 'Invoice'}</div>
-                  <div className="text-xs text-muted-foreground">{documentType}{branches.length > 1 ? ` · Est. #${branchCode}` : ''}</div>
-                </div>
-                <Badge variant="outline">{issueNow ? 'Issued' : 'Draft'}</Badge>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <div className="text-muted-foreground">Billed by</div>
-                  <div className="font-medium">{issuer?.business_name || '—'}</div>
-                  <div className="text-muted-foreground">{fmtAddr(issuer)}</div>
-                  {issuer?.business_vat && <div className="text-muted-foreground">VAT: {issuer.business_vat}</div>}
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Billed to</div>
-                  <div className="font-medium">{customer?.label?.replace(' (company)', '') || '—'}</div>
-                  <div className="text-muted-foreground">{fmtAddr(customerAddr)}</div>
-                  {customerAddr?.vat_number && <div className="text-muted-foreground">VAT: {customerAddr.vat_number}</div>}
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div><div className="text-muted-foreground">Date issued</div><div className="font-medium">{issueDate}</div></div>
-                <div><div className="text-muted-foreground">Due</div><div className="font-medium">{(() => { const d = new Date(issueDate); d.setDate(d.getDate() + (parseInt(paymentTermsDays, 10) || 0)); return d.toISOString().slice(0, 10); })()}</div></div>
-              </div>
-
-              <table className="mt-4 w-full text-xs">
-                <thead className="border-y border-border/60 text-muted-foreground">
-                  <tr><th className="py-1.5 text-left">Item</th><th className="py-1.5 text-right">Qty</th><th className="py-1.5 text-right">Unit</th><th className="py-1.5 text-right">Total</th></tr>
-                </thead>
-                <tbody>
-                  {lines.filter((l) => l.description.trim()).map((l, i) => {
-                    const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
-                    return (
-                      <tr key={i} className="border-b border-border/30">
-                        <td className="py-1.5">
-                          <div>{l.description}</div>
-                          {(l.color || l.size) && <div className="text-[10px] text-muted-foreground">{[l.color, l.size].filter(Boolean).join(' / ')}</div>}
-                        </td>
-                        <td className="py-1.5 text-right">{q}{l.unit ? ` ${l.unit}` : ''}</td>
-                        <td className="py-1.5 text-right">{money(p)}</td>
-                        <td className="py-1.5 text-right">{money(Math.max(0, q * p - disc))}</td>
-                      </tr>
-                    );
-                  })}
-                  {lines.filter((l) => l.description.trim()).length === 0 && <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">No items yet</td></tr>}
-                </tbody>
-              </table>
-
-              <div className="mt-3 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (net)</span><span className="tabular-nums">{money(totals.net)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{money(totals.vat)}</span></div>
-                {totals.fees > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Fees</span><span className="tabular-nums">{money(totals.fees)}</span></div>}
-                {totals.stamp > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Stamp duty</span><span className="tabular-nums">{money(totals.stamp)}</span></div>}
-                {totals.other > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Other taxes</span><span className="tabular-nums">{money(totals.other)}</span></div>}
-                {totals.digital > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Digital transaction fee</span><span className="tabular-nums">{money(totals.digital)}</span></div>}
-                {totals.deduct > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Deductions</span><span className="tabular-nums text-amber-600">- {money(totals.deduct)}</span></div>}
-                {totals.withheld > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Withholding</span><span className="tabular-nums text-amber-600">- {money(totals.withheld)}</span></div>}
-                <div className="flex justify-between border-t border-border/60 pt-1 text-sm font-semibold"><span>Grand total</span><span className="tabular-nums">{money(totals.total)}</span></div>
-              </div>
-
-              {notes && <div className="mt-4 rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground">{notes}</div>}
+          {/* ───────────── LIVE PREVIEW (right) — real template, updates as you type ───────────── */}
+          <div className="hidden overflow-auto border-l border-border/60 bg-muted/30 px-6 py-6 lg:flex lg:justify-center no-card-hover">
+            <div className="h-fit">
+              <InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} />
             </div>
           </div>
         </div>
