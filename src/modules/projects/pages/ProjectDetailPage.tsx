@@ -16,8 +16,11 @@ import {
   Eye,
   Presentation,
   Receipt,
+  Package,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -44,6 +47,8 @@ import { TasksTab } from '../components/tabs/TasksTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
+import { ProductsTab } from '../components/tabs/ProductsTab';
+import { FinanceTab } from '../components/tabs/FinanceTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -67,15 +72,19 @@ export const ProjectDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'moodboards' | 'quotes' | 'sheets' | 'client-view' | 'tasks' | 'timeline'>('overview');
+  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'tasks' | 'timeline'>('overview');
   const [showInvite, setShowInvite] = useState(false);
 
   // Ownership: project.user_id is the creator. Anyone else who can read the project
   // got here via a project_collaborators row (RLS guarantees this). Owner gets the
   // management surface; collaborator gets a read-only view with budget + timeline hidden.
   const isOwner = !!user && !!project && project.user_id === user.id;
+  // Finance + Products are professional surfaces (operator/dealer/architect), never the
+  // end customer. Gated identically to Billing: owner + finance.manage capability.
+  const canFinance = isOwner && can('finance.manage');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -175,6 +184,12 @@ export const ProjectDetailPage: React.FC = () => {
               <Home className="h-3.5 w-3.5" />
               Rooms
             </TabsTrigger>
+            {isOwner && (
+              <TabsTrigger value="products" className="flex items-center gap-2">
+                <Package className="h-3.5 w-3.5" />
+                Products
+              </TabsTrigger>
+            )}
             <TabsTrigger value="moodboards" className="flex items-center gap-2">
               <Palette className="h-3.5 w-3.5" />
               Moodboards
@@ -193,6 +208,12 @@ export const ProjectDetailPage: React.FC = () => {
               <TabsTrigger value="billing" className="flex items-center gap-2">
                 <Receipt className="h-3.5 w-3.5" />
                 Billing
+              </TabsTrigger>
+            )}
+            {canFinance && (
+              <TabsTrigger value="finance" className="flex items-center gap-2">
+                <Wallet className="h-3.5 w-3.5" />
+                Finance
               </TabsTrigger>
             )}
             <TabsTrigger value="sheets" className="flex items-center gap-2">
@@ -220,9 +241,11 @@ export const ProjectDetailPage: React.FC = () => {
 
           <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} /></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
+          {isOwner && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
           {isOwner && <TabsContent value="billing"><BillingTab projectId={project.id} /></TabsContent>}
+          {canFinance && <TabsContent value="finance"><FinanceTab projectId={project.id} /></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
           <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>

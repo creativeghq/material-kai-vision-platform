@@ -100,6 +100,80 @@ export interface ProjectCollaborator {
   created_at: string;
 }
 
+export type ProjectProductStatus = 'selection' | 'confirmed' | 'ordered' | 'shipped' | 'delivered';
+
+export const PROJECT_PRODUCT_STATUSES: ProjectProductStatus[] =
+  ['selection', 'confirmed', 'ordered', 'shipped', 'delivered'];
+
+export interface ProjectProduct {
+  id: string;
+  project_id: string;
+  workspace_id: string | null;
+  product_id: string | null;
+  source_quote_item_id: string | null;
+  status: ProjectProductStatus;
+  custom_name: string | null;
+  custom_sku: string | null;
+  custom_description: string | null;
+  quantity: number;
+  unit: string | null;
+  sold_price: number | null;
+  quoted_price: number | null;
+  price_source: string | null;
+  price_currency: string;
+  room_id: string | null;
+  notes: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  // joined / derived (read-only)
+  product?: { id: string; name: string; sku: string | null } | null;
+  quote_item?: { unit_price: number | null; discounted_price: number | null; room: string | null; dimensions: string | null } | null;
+}
+
+export interface ProjectProductWithDisplay extends ProjectProduct {
+  display_name: string;
+  display_sku: string | null;
+  /** Reference price: quote line (live) for quote-linked rows, else the row's quoted_price. */
+  reference_price: number | null;
+}
+
+/** Shape returned by the get_product_price_for_workspace RPC. */
+export interface ResolvedPrice {
+  mode: 'own_product' | 'operator_catalog' | string;
+  base_price: number | null;
+  cost_basis: number | null;
+  suggested_sell: number | null;
+  currency: string;
+  /** true when no upstream price exists → UI shows "Ask for a quote". */
+  ask_for_quote: boolean;
+  raw: Record<string, any>;
+}
+
+export interface ProjectFinanceRow {
+  kind: 'invoice' | 'manual' | 'supplier_bill';
+  id: string;
+  label: string | null;
+  total: number | null;
+  amount_paid: number | null;
+  amount_due: number | null;
+  status: string | null;
+  currency: string | null;
+  issued_at: string | null;
+  due_at: string | null;
+}
+
+export interface ProjectFinanceSummary {
+  receivables: ProjectFinanceRow[];
+  payables: ProjectFinanceRow[];
+  totals: {
+    receivable_total: number;
+    receivable_due: number;
+    payable_total: number;
+    payable_due: number;
+  };
+}
+
 export interface InvitationPreview {
   project_name: string;
   project_id: string;
@@ -499,6 +573,252 @@ class ProjectsService {
     return data as string;
   }
 
+  // ---------- PROJECT PRODUCTS ----------
+
+  async listProjectProducts(projectId: string): Promise<ProjectProductWithDisplay[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_products')
+      .select(`
+        *,
+        product:products(id, name, sku),
+        quote_item:quote_items!source_quote_item_id(unit_price, discounted_price, room, dimensions)
+      `)
+      .eq('project_id', projectId)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return ((data || []) as ProjectProduct[]).map((r) => this._decorateProduct(r));
+  }
+
+  private _decorateProduct(r: ProjectProduct): ProjectProductWithDisplay {
+    const display_name = r.product?.name || r.custom_name || 'Untitled item';
+    const display_sku = r.product?.sku ?? r.custom_sku ?? null;
+    // Quote-linked rows track the quote line live; manual rows use their own quoted_price.
+    const reference_price = r.source_quote_item_id
+      ? (r.quote_item?.discounted_price ?? r.quote_item?.unit_price ?? null)
+      : r.quoted_price;
+    return { ...r, display_name, display_sku, reference_price };
+  }
+
+  async addProjectProduct(input: {
+    project_id: string;
+    workspace_id?: string | null;
+    product_id?: string | null;
+    custom_name?: string | null;
+    custom_sku?: string | null;
+    custom_description?: string | null;
+    quantity?: number;
+    unit?: string | null;
+    sold_price?: number | null;
+    quoted_price?: number | null;
+    price_source?: string | null;
+    price_currency?: string;
+    room_id?: string | null;
+    status?: ProjectProductStatus;
+    notes?: string | null;
+  }): Promise<ProjectProduct> {
+    if (!input.product_id && !input.custom_name?.trim()) {
+      throw new Error('Pick a catalog product or give the custom line a name.');
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await (supabase as any)
+      .from('project_products')
+      .insert({
+        project_id: input.project_id,
+        workspace_id: input.workspace_id ?? null,
+        product_id: input.product_id ?? null,
+        custom_name: input.custom_name ?? null,
+        custom_sku: input.custom_sku ?? null,
+        custom_description: input.custom_description ?? null,
+        quantity: input.quantity ?? 1,
+        unit: input.unit ?? null,
+        sold_price: input.sold_price ?? null,
+        quoted_price: input.quoted_price ?? null,
+        price_source: input.price_source ?? (input.product_id ? null : 'manual'),
+        price_currency: input.price_currency ?? 'EUR',
+        room_id: input.room_id ?? null,
+        status: input.status ?? 'selection',
+        notes: input.notes ?? null,
+        created_by: user?.id ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectProduct;
+  }
+
+  async updateProjectProduct(id: string, input: Partial<{
+    status: ProjectProductStatus;
+    sold_price: number | null;
+    quoted_price: number | null;
+    price_source: string | null;
+    price_currency: string;
+    quantity: number;
+    unit: string | null;
+    room_id: string | null;
+    notes: string | null;
+    custom_name: string | null;
+    custom_sku: string | null;
+    custom_description: string | null;
+    position: number;
+  }>): Promise<ProjectProduct> {
+    const { data, error } = await (supabase as any)
+      .from('project_products')
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectProduct;
+  }
+
+  async deleteProjectProduct(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('project_products').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Import every line of the project's quotes into project_products, live-linked by
+   * source_quote_item_id. Idempotent: a quote line already imported is skipped (the
+   * partial unique index on source_quote_item_id guards against duplicates anyway).
+   * Returns the count of newly-imported lines.
+   */
+  async importProductsFromQuotes(projectId: string, opts: { acceptedOnly?: boolean } = {}): Promise<number> {
+    const project = await this.getProject(projectId);
+    let q = (supabase as any)
+      .from('quote_items')
+      .select('id, product_id, quantity, custom_product_name, custom_sku, custom_unit, unit_price, room_id, quote:quotes!inner(project_id, status, currency)')
+      .eq('quote.project_id', projectId);
+    if (opts.acceptedOnly) q = q.eq('quote.status', 'accepted');
+    const { data: items, error } = await q;
+    if (error) throw error;
+    const rows = (items || []) as any[];
+    if (rows.length === 0) return 0;
+
+    // Skip lines already linked.
+    const { data: existing } = await (supabase as any)
+      .from('project_products')
+      .select('source_quote_item_id')
+      .eq('project_id', projectId)
+      .not('source_quote_item_id', 'is', null);
+    const linked = new Set((existing || []).map((e: any) => e.source_quote_item_id));
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const toInsert = rows
+      .filter((it) => !linked.has(it.id))
+      .map((it, idx) => ({
+        project_id: projectId,
+        workspace_id: project?.workspace_id ?? null,
+        product_id: it.product_id ?? null,
+        source_quote_item_id: it.id,
+        custom_name: it.product_id ? null : (it.custom_product_name || 'Custom item'),
+        custom_sku: it.product_id ? null : (it.custom_sku ?? null),
+        quantity: it.quantity ?? 1,
+        unit: it.custom_unit ?? null,
+        quoted_price: it.unit_price ?? null,
+        price_source: 'quote',
+        price_currency: it.quote?.currency ?? 'EUR',
+        room_id: it.room_id ?? null,
+        status: 'selection',
+        position: idx,
+        created_by: user?.id ?? null,
+      }));
+    if (toInsert.length === 0) return 0;
+    const { error: insErr } = await (supabase as any).from('project_products').insert(toInsert);
+    if (insErr) throw insErr;
+    return toInsert.length;
+  }
+
+  /**
+   * Role-correct price for a catalog product, via the existing pricing-hierarchy RPC.
+   * Returns ask_for_quote=true when no upstream price exists for this workspace's chain.
+   */
+  async resolveProductPrice(workspaceId: string, productId: string): Promise<ResolvedPrice> {
+    const { data, error } = await (supabase as any).rpc('get_product_price_for_workspace', {
+      p_workspace_id: workspaceId,
+      p_product_id: productId,
+    });
+    if (error) throw error;
+    const r = (data || {}) as Record<string, any>;
+    const base = r.base_price == null ? null : Number(r.base_price);
+    const suggested = r.suggested_sell == null ? null : Number(r.suggested_sell);
+    return {
+      mode: r.mode ?? 'unknown',
+      base_price: base,
+      cost_basis: r.cost_basis == null ? null : Number(r.cost_basis),
+      suggested_sell: suggested,
+      currency: r.currency ?? 'EUR',
+      ask_for_quote: base == null && suggested == null,
+      raw: r,
+    };
+  }
+
+  // ---------- PROJECT FINANCE: attach payables / receivables ----------
+
+  async getProjectFinanceSummary(projectId: string): Promise<ProjectFinanceSummary> {
+    const { data, error } = await (supabase as any).rpc('get_project_finance_summary', { p_project_id: projectId });
+    if (error) throw error;
+    return (data || { receivables: [], payables: [], totals: { receivable_total: 0, receivable_due: 0, payable_total: 0, payable_due: 0 } }) as ProjectFinanceSummary;
+  }
+
+  /**
+   * Finance documents for the project's client/supplier that are NOT yet attached to
+   * any project — the candidate list for the "attach" picker. Scoped to the project's
+   * client contact/company (invoices + receivable manual entries) and, for payables,
+   * to all unattached supplier bills + payable manual entries in the workspace.
+   */
+  async listAttachableFinance(projectId: string): Promise<{ receivables: any[]; payables: any[] }> {
+    const project = await this.getProject(projectId);
+    const contactId = project?.client_contact_id ?? null;
+    const companyId = project?.client_company_id ?? null;
+
+    const invQ = (supabase as any)
+      .from('invoices')
+      .select('id, internal_number, total, amount_due, status, currency, issued_at, due_at')
+      .is('project_id', null);
+    if (companyId) invQ.eq('customer_company_id', companyId);
+    else if (contactId) invQ.eq('customer_contact_id', contactId);
+
+    const meRecvQ = (supabase as any)
+      .from('finance_manual_entries')
+      .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
+      .is('project_id', null).eq('direction', 'receivable');
+    if (companyId) meRecvQ.eq('counterparty_company_id', companyId);
+    else if (contactId) meRecvQ.eq('counterparty_contact_id', contactId);
+
+    const billQ = (supabase as any)
+      .from('supplier_bills')
+      .select('id, supplier_bill_number, total, amount_due, status, currency, issued_at, due_at')
+      .is('project_id', null);
+    const mePayQ = (supabase as any)
+      .from('finance_manual_entries')
+      .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
+      .is('project_id', null).eq('direction', 'payable');
+
+    const [inv, meRecv, bills, mePay] = await Promise.all([invQ, meRecvQ, billQ, mePayQ]);
+    if (inv.error) throw inv.error;
+    if (meRecv.error) throw meRecv.error;
+    if (bills.error) throw bills.error;
+    if (mePay.error) throw mePay.error;
+
+    const recv = [
+      ...(inv.data || []).map((i: any) => ({ kind: 'invoice', id: i.id, label: i.internal_number, total: i.total, amount_due: i.amount_due, status: i.status, currency: i.currency, issued_at: i.issued_at })),
+      ...(meRecv.data || []).map((m: any) => ({ kind: 'manual', id: m.id, label: m.description, total: m.amount, amount_due: m.amount_due, status: m.status, currency: m.currency, issued_at: m.issued_at })),
+    ];
+    const pay = [
+      ...(bills.data || []).map((b: any) => ({ kind: 'supplier_bill', id: b.id, label: b.supplier_bill_number, total: b.total, amount_due: b.amount_due, status: b.status, currency: b.currency, issued_at: b.issued_at })),
+      ...(mePay.data || []).map((m: any) => ({ kind: 'manual', id: m.id, label: m.description, total: m.amount, amount_due: m.amount_due, status: m.status, currency: m.currency, issued_at: m.issued_at })),
+    ];
+    return { receivables: recv, payables: pay };
+  }
+
+  /** Attach (project_id set) or detach (null) a finance document to/from a project. */
+  async setFinanceAttachment(kind: 'invoice' | 'manual' | 'supplier_bill', id: string, projectId: string | null): Promise<void> {
+    const table = kind === 'invoice' ? 'invoices' : kind === 'supplier_bill' ? 'supplier_bills' : 'finance_manual_entries';
+    const { error } = await (supabase as any).from(table).update({ project_id: projectId }).eq('id', id);
+    if (error) throw error;
+  }
+
   // ---------- TIMELINE (Phase 3) ----------
 
   async listEvents(projectId: string, opts: { limit?: number; eventTypes?: string[] } = {}): Promise<ProjectEvent[]> {
@@ -748,6 +1068,15 @@ class ProjectsService {
     const { data, error } = await q;
     if (error) throw error;
     return (data || []) as Array<{ id: string; name: string; email: string | null }>;
+  }
+
+  async searchProducts(query: string, limit = 12) {
+    const q = (supabase as any).from('products').select('id, name, sku').limit(limit);
+    if (query.trim()) q.or(`name.ilike.%${query}%,sku.ilike.%${query}%`);
+    q.order('name', { ascending: true });
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []) as Array<{ id: string; name: string; sku: string | null }>;
   }
 
   async searchContacts(query: string, limit = 10) {
