@@ -116,6 +116,59 @@ async function callerParticipant(db: SupabaseClient, threadId: string, userId: s
 }
 
 /**
+ * Shared-inbox access resolution (#209 §3 — "team inbox, not single-owner inbox").
+ * A thread is reachable when the caller is the platform operator, an explicit active
+ * participant, OR a business member of the thread's workspace on a shared customer/upstream
+ * thread (sales jump-in). `internal` threads stay strictly participant-scoped — they are
+ * private team DMs. `isMember` controls private-note visibility + member-only controls.
+ */
+async function resolveThreadAccess(
+  db: SupabaseClient,
+  userId: string,
+  thread: Record<string, unknown>,
+  operator: boolean,
+): Promise<{
+  canRead: boolean;
+  isMember: boolean;
+  participant: { id: string; participant_type: string; thread_role: string; status: string } | null;
+}> {
+  const participant = await callerParticipant(db, String(thread.id), userId);
+  if (participant) {
+    return { canRead: true, isMember: operator || participant.participant_type === 'member', participant };
+  }
+  if (operator) return { canRead: true, isMember: true, participant: null };
+  const threadType = String(thread.thread_type);
+  if (threadType === 'customer' || threadType === 'upstream') {
+    const role = await callerRoleInWorkspace(db, userId, String(thread.workspace_id));
+    if (role && BUSINESS_ROLES.has(role)) return { canRead: true, isMember: true, participant: null };
+  }
+  return { canRead: false, isMember: false, participant: null };
+}
+
+/** Get-or-create the caller's member participant row (sales jump-in becomes a real participant). */
+async function ensureMemberParticipant(
+  db: SupabaseClient,
+  thread: Record<string, unknown>,
+  userId: string,
+): Promise<string | null> {
+  const existing = await callerParticipant(db, String(thread.id), userId);
+  if (existing) return existing.id;
+  const { data } = await db
+    .from('inbox_participants')
+    .insert({
+      thread_id: thread.id,
+      participant_type: 'member',
+      user_id: userId,
+      workspace_id: thread.workspace_id,
+      thread_role: 'participant',
+      added_by: userId,
+    })
+    .select('id')
+    .single();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+/**
  * Meta's 24h service window: outside 24h since the customer's last inbound WhatsApp message,
  * only an approved template may be sent. Inbound messages carry metadata.direction='incoming'.
  */
@@ -543,10 +596,8 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && (!me || me.participant_type !== 'member')) {
-        throw new HttpError(403, 'Only thread members may add participants');
-      }
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may add participants');
       const callerRole = await callerRoleInWorkspace(db, userId, String(thread.workspace_id));
       const target = {
         type: String(payload.type),
@@ -586,10 +637,9 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       const participantId = String(payload.participant_id || '');
       if (!threadId || !participantId) throw new HttpError(400, 'thread_id and participant_id are required');
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && (!me || me.participant_type !== 'member')) {
-        throw new HttpError(403, 'Only thread members may remove participants');
-      }
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may remove participants');
       const { error } = await db
         .from('inbox_participants')
         .update({ status: 'removed' })
@@ -603,10 +653,10 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && !me) throw new HttpError(403, 'You are not a participant of this thread');
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.canRead) throw new HttpError(403, 'You are not a participant of this thread');
       const messageType = String(payload.message_type || 'text') as 'text' | 'note';
-      if (messageType === 'note' && me && me.participant_type !== 'member') {
+      if (messageType === 'note' && !access.isMember) {
         throw new HttpError(403, 'Only members may leave private notes');
       }
       const body = payload.body != null ? String(payload.body) : null;
@@ -619,9 +669,14 @@ async function handleJwtAction(
           throw new HttpError(409, 'WhatsApp 24h service window is closed — an approved template is required to message this customer again.');
         }
       }
+      // A member replying to a shared workspace thread they hadn't joined becomes a participant.
+      let senderParticipantId = access.participant?.id ?? null;
+      if (!senderParticipantId && access.isMember) {
+        senderParticipantId = await ensureMemberParticipant(db, thread, userId);
+      }
       const msg = await insertMessageAndNotify(db, {
         thread,
-        senderParticipantId: me?.id ?? null,
+        senderParticipantId,
         body,
         attachments,
         messageType: messageType === 'note' ? 'note' : 'text',
@@ -629,7 +684,9 @@ async function handleJwtAction(
         senderLabel: 'New message',
       });
       // Mark the sender as caught up.
-      if (me) await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
+      if (senderParticipantId) {
+        await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', senderParticipantId);
+      }
       return json({ message: msg });
     }
 
@@ -648,10 +705,9 @@ async function handleJwtAction(
       if (!threadId || !['open', 'snoozed', 'closed'].includes(status)) {
         throw new HttpError(400, 'thread_id and a valid status are required');
       }
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && (!me || me.participant_type !== 'member')) {
-        throw new HttpError(403, 'Only thread members may change status');
-      }
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may change status');
       await db.from('inbox_threads').update({ status }).eq('id', threadId);
       return json({ ok: true });
     }
@@ -664,10 +720,8 @@ async function handleJwtAction(
         throw new HttpError(400, 'thread_id and a valid agent_state are required');
       }
       const thread = await getThreadOrThrow(db, threadId);
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && (!me || me.participant_type !== 'member')) {
-        throw new HttpError(403, 'Only thread members may hand a thread to the agent');
-      }
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may hand a thread to the agent');
       const agentId = String(payload.agent_id || thread.agent_id || DEFAULT_INBOX_AGENT_ID);
       await db.from('inbox_threads').update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
 
@@ -696,37 +750,58 @@ async function handleJwtAction(
       const channelFilter = payload.channel ? String(payload.channel) : null;
       const typeFilter = payload.thread_type ? String(payload.thread_type) : null;
       const statusFilter = payload.status ? String(payload.status) : null;
+      // Operators may pull every thread across all workspaces with scope:'all'.
+      const wantAll = operator && payload.scope === 'all';
 
-      // Thread ids the caller participates in (or all, for an operator scope:'all').
-      let threadIds: string[] | null = null;
-      if (!(operator && payload.scope === 'all')) {
-        const { data: myParts } = await db
-          .from('inbox_participants')
-          .select('thread_id, last_read_at')
-          .eq('user_id', userId)
-          .eq('status', 'active');
-        const lastReadByThread = new Map<string, string | null>();
-        for (const p of (myParts || []) as Array<{ thread_id: string; last_read_at: string | null }>) {
-          lastReadByThread.set(p.thread_id, p.last_read_at);
+      // Threads the caller explicitly participates in — drives unread state and is the ONLY
+      // way internal (team DM) threads are visible.
+      const { data: myParts } = await db
+        .from('inbox_participants')
+        .select('thread_id, last_read_at')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+      const lastReadByThread = new Map<string, string | null>();
+      for (const p of (myParts || []) as Array<{ thread_id: string; last_read_at: string | null }>) {
+        lastReadByThread.set(p.thread_id, p.last_read_at);
+      }
+      const participantThreadIds = [...lastReadByThread.keys()];
+
+      // Workspaces where the caller is a BUSINESS member → they share the team support inbox:
+      // every customer/upstream thread in those workspaces, even ones they were never added to.
+      const businessWsIds: string[] = [];
+      if (!wantAll) {
+        const { data: myMems } = await db
+          .from('workspace_members')
+          .select('workspace_id, role, status')
+          .eq('user_id', userId);
+        for (const m of (myMems || []) as Array<{ workspace_id: string; role: string; status: string }>) {
+          if (ACTIVE_MEMBER(m.status) && m.role && BUSINESS_ROLES.has(m.role)) businessWsIds.push(m.workspace_id);
         }
-        threadIds = [...lastReadByThread.keys()];
-        if (threadIds.length === 0) return json({ threads: [] });
-        // attach lastRead for unread calc below
-        (payload as Json)._lastRead = Object.fromEntries(lastReadByThread);
       }
 
       let q = db.from('inbox_threads').select('*').order('last_message_at', { ascending: false }).limit(200);
-      if (threadIds) q = q.in('id', threadIds);
+      if (!wantAll) {
+        const ors: string[] = [];
+        if (participantThreadIds.length) ors.push(`id.in.(${participantThreadIds.join(',')})`);
+        if (businessWsIds.length) {
+          ors.push(`and(workspace_id.in.(${businessWsIds.join(',')}),thread_type.in.(customer,upstream))`);
+        }
+        if (ors.length === 0) return json({ threads: [] });
+        q = q.or(ors.join(','));
+      }
       if (channelFilter) q = q.eq('channel', channelFilter);
       if (typeFilter) q = q.eq('thread_type', typeFilter);
       if (statusFilter) q = q.eq('status', statusFilter);
       const { data: threads, error } = await q;
       if (error) throw new HttpError(500, error.message);
 
-      const lastRead = ((payload as Json)._lastRead as Record<string, string | null>) || {};
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
-        const lr = lastRead[String(t.id)];
-        const unread = !lr || new Date(String(t.last_message_at)) > new Date(lr);
+        const id = String(t.id);
+        // Threads visible only via workspace membership (not an explicit participant) start unread.
+        const lr = lastReadByThread.get(id);
+        const unread = lastReadByThread.has(id)
+          ? (!lr || new Date(String(t.last_message_at)) > new Date(lr))
+          : true;
         return { ...t, unread };
       });
       return json({ threads: enriched });
@@ -736,9 +811,9 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
-      const me = await callerParticipant(db, threadId, userId);
-      if (!operator && !me) throw new HttpError(403, 'You are not a participant of this thread');
-      const isMember = operator || (me && me.participant_type === 'member');
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.canRead) throw new HttpError(403, 'You are not a participant of this thread');
+      const isMember = access.isMember;
 
       const { data: participants } = await db
         .from('inbox_participants')
@@ -756,9 +831,69 @@ async function handleJwtAction(
       if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
       const { data: messages } = await mq;
 
-      if (me) await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
+      if (access.participant) {
+        await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
+      }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;
       return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
+    }
+
+    case 'get_thread_context': {
+      // Right-rail CRM context for the customer a member is talking to (#209 §UI col-3):
+      // the linked CRM contact + their company + recent quotes + projects. Members/operators only.
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may view conversation context');
+
+      // The customer participant's CRM contact id (first active customer on the thread).
+      const { data: custP } = await db
+        .from('inbox_participants')
+        .select('contact_id')
+        .eq('thread_id', threadId)
+        .eq('participant_type', 'customer')
+        .eq('status', 'active')
+        .not('contact_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
+      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [] });
+
+      const { data: contact } = await db
+        .from('crm_contacts')
+        .select('id, name, first_name, last_name, email, phone, mobile, company, position, country, country_code, city, lead_source, lead_status, is_client, vat_number, tags, user_id, created_at')
+        .eq('id', contactId)
+        .maybeSingle();
+
+      const [{ data: quotes }, { data: projects }] = await Promise.all([
+        db.from('quotes')
+          .select('id, quote_number, name, status, grand_total, currency, customer_company_id, created_at')
+          .eq('customer_contact_id', contactId)
+          .order('created_at', { ascending: false })
+          .limit(8),
+        db.from('projects')
+          .select('id, name, status, budget_amount, budget_currency, client_company_id, created_at')
+          .eq('client_contact_id', contactId)
+          .order('created_at', { ascending: false })
+          .limit(8),
+      ]);
+
+      // Company: prefer the most recent quote/project link, fall back to the contact's text name.
+      const companyId =
+        (quotes || []).map((q: { customer_company_id?: string }) => q.customer_company_id).find(Boolean) ||
+        (projects || []).map((p: { client_company_id?: string }) => p.client_company_id).find(Boolean) || null;
+      let company: Record<string, unknown> | null = null;
+      if (companyId) {
+        const { data: c } = await db
+          .from('crm_companies')
+          .select('id, name, website, city, country, vat_number, industry')
+          .eq('id', companyId)
+          .maybeSingle();
+        company = c as Record<string, unknown> | null;
+      }
+
+      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [] });
     }
 
     default:

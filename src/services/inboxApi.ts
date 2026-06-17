@@ -74,6 +74,64 @@ export interface WhatsAppWindow {
   expires_at: string | null;
 }
 
+export interface InboxContactContext {
+  id: string;
+  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  company: string | null;
+  position: string | null;
+  country: string | null;
+  country_code: string | null;
+  city: string | null;
+  lead_source: string | null;
+  lead_status: string | null;
+  is_client: boolean | null;
+  vat_number: string | null;
+  tags: string[] | null;
+  user_id: string | null;
+  created_at: string;
+}
+
+export interface InboxCompanyContext {
+  id: string;
+  name: string | null;
+  website: string | null;
+  city: string | null;
+  country: string | null;
+  vat_number: string | null;
+  industry: string | null;
+}
+
+export interface InboxQuoteRef {
+  id: string;
+  quote_number: string | null;
+  name: string | null;
+  status: string | null;
+  grand_total: number | null;
+  currency: string | null;
+  created_at: string;
+}
+
+export interface InboxProjectRef {
+  id: string;
+  name: string | null;
+  status: string | null;
+  budget_amount: number | null;
+  budget_currency: string | null;
+  created_at: string;
+}
+
+export interface InboxThreadContext {
+  contact: InboxContactContext | null;
+  company: InboxCompanyContext | null;
+  quotes: InboxQuoteRef[];
+  projects: InboxProjectRef[];
+}
+
 export interface NewParticipantInput {
   type: InboxParticipantType;
   user_id?: string;
@@ -124,6 +182,9 @@ export const inboxApi = {
   },
   sendMessage(input: { thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note' }) {
     return call<{ message: InboxMessage }>('send_message', input);
+  },
+  getThreadContext(thread_id: string) {
+    return call<InboxThreadContext>('get_thread_context', { thread_id });
   },
   addParticipant(input: { thread_id: string } & NewParticipantInput) {
     return call<{ participant: InboxParticipant }>('add_participant', input as unknown as Record<string, unknown>);
