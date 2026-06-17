@@ -48,7 +48,6 @@ interface MaterialCategoryRow {
   description: string | null;
   sort_order: number | null;
   is_active: boolean | null;
-  ai_confidence_threshold: number | null;
   default_unit: string;
 }
 
@@ -80,7 +79,6 @@ export const MaterialCategoriesTab: React.FC = () => {
     description: '',
     sort_order: 0,
     is_active: true,
-    ai_confidence_threshold: 0.8,
     default_unit: 'pcs',
   });
   const [saving, setSaving] = useState(false);
@@ -94,7 +92,7 @@ export const MaterialCategoriesTab: React.FC = () => {
     const { data, error } = await supabase
       .from('material_categories')
       .select(
-        'id, category_key, name, display_name, description, sort_order, is_active, ai_confidence_threshold, default_unit',
+        'id, category_key, name, display_name, description, sort_order, is_active, default_unit',
       )
       .order('sort_order', { ascending: true, nullsFirst: false });
 
@@ -118,7 +116,6 @@ export const MaterialCategoriesTab: React.FC = () => {
       description: '',
       sort_order: nextSortOrder,
       is_active: true,
-      ai_confidence_threshold: 0.8,
       default_unit: 'pcs',
     });
     setEditorOpen(true);
@@ -134,7 +131,6 @@ export const MaterialCategoriesTab: React.FC = () => {
       description: row.description ?? '',
       sort_order: row.sort_order ?? 0,
       is_active: row.is_active ?? true,
-      ai_confidence_threshold: row.ai_confidence_threshold ?? 0.8,
       default_unit: row.default_unit ?? 'pcs',
     });
     setEditorOpen(true);
@@ -167,11 +163,6 @@ export const MaterialCategoriesTab: React.FC = () => {
       });
       return;
     }
-    const threshold = Number(editing.ai_confidence_threshold ?? 0.8);
-    if (Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
-      toast({ title: 'Invalid threshold', description: 'AI confidence must be between 0 and 1.', variant: 'destructive' });
-      return;
-    }
 
     setSaving(true);
     const payload = {
@@ -181,7 +172,6 @@ export const MaterialCategoriesTab: React.FC = () => {
       description: (editing.description ?? '').trim() || null,
       sort_order: Number(editing.sort_order ?? 0),
       is_active: editing.is_active ?? true,
-      ai_confidence_threshold: threshold,
       default_unit: (editing.default_unit ?? 'pcs').trim() || 'pcs',
     };
 
@@ -289,7 +279,6 @@ export const MaterialCategoriesTab: React.FC = () => {
                 <TableHead>Display name</TableHead>
                 <TableHead>Key</TableHead>
                 <TableHead>Default unit</TableHead>
-                <TableHead>AI threshold</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -324,7 +313,6 @@ export const MaterialCategoriesTab: React.FC = () => {
                   <TableCell className="font-medium">{row.display_name}</TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{row.category_key}</TableCell>
                   <TableCell className="text-muted-foreground">{row.default_unit}</TableCell>
-                  <TableCell className="text-muted-foreground">{row.ai_confidence_threshold ?? '—'}</TableCell>
                   <TableCell>
                     <Switch checked={row.is_active ?? false} onCheckedChange={() => toggleActive(row)} />
                   </TableCell>
@@ -400,20 +388,6 @@ export const MaterialCategoriesTab: React.FC = () => {
                   value={editing.default_unit ?? 'pcs'}
                   onChange={(e) => setEditing({ ...editing, default_unit: e.target.value })}
                   placeholder="pcs"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cat-threshold">AI confidence (0–1)</Label>
-                <Input
-                  id="cat-threshold"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={editing.ai_confidence_threshold ?? 0.8}
-                  onChange={(e) =>
-                    setEditing({ ...editing, ai_confidence_threshold: Number(e.target.value) })
-                  }
                 />
               </div>
             </div>
