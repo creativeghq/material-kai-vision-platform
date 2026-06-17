@@ -5,7 +5,7 @@
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, Search, Package, MapPin } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { ToastAction } from '@/components/core/ui/toast';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
@@ -105,6 +105,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const handleQuotaError = useQuotaErrorHandler();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Parties
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -629,14 +630,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col relative">
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
           <DialogTitle>New invoice</DialogTitle>
         </DialogHeader>
 
-        <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[minmax(460px,520px)_1fr]">
-          {/* ───────────── FORM (left) ───────────── */}
-          <div className="space-y-5 overflow-y-auto px-5 py-4">
+        {/* ───────────── Single editable document (Oxygen-style) ───────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto bg-muted/20">
+          <div className="mx-auto max-w-5xl space-y-5 rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
+            {/* Document type quick-pick (segmented control) — mirrors Oxygen's top tabs */}
+            <div className="flex flex-wrap gap-2">
+              {([['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']] as const)
+                .filter(([code]) => !docTypes.length || docTypes.some((t) => t.code === code))
+                .map(([code, label]) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => { setDocumentType(code); applyDocDefault(code); }}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+            </div>
+
             {/* Parties + document */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
@@ -1033,18 +1050,26 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </label>
           </div>
 
-          {/* ───────────── LIVE PREVIEW (right) — real template, updates as you type ───────────── */}
-          <div className="hidden overflow-auto border-l border-border/60 bg-muted/30 px-6 py-6 lg:flex lg:justify-center no-card-hover">
-            <div className="h-fit">
-              <InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} />
-            </div>
-          </div>
         </div>
 
-        <DialogFooter className="border-t border-border/60 px-5 py-3">
+        <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
           <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked} title={buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
         </DialogFooter>
+
+        {/* Full styled-template preview overlay (Oxygen-style "Προεπισκόπηση") */}
+        {showPreview && (
+          <div className="absolute inset-0 z-50 flex flex-col bg-muted/40">
+            <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 h-14 shrink-0">
+              <span className="text-sm font-medium">Invoice preview</span>
+              <Button size="sm" variant="ghost" className="rounded-full gap-1.5" onClick={() => setShowPreview(false)}><ChevronLeft className="h-4 w-4" /> Back to edit</Button>
+            </div>
+            <div className="flex-1 overflow-auto flex justify-center px-6 py-6 no-card-hover">
+              <div className="h-fit"><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
