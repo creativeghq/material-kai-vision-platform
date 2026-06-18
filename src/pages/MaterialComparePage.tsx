@@ -334,7 +334,7 @@ export default function MaterialComparePage() {
                         variant="outline"
                         size="sm"
                         className="w-full rounded-full text-xs"
-                        onClick={() => navigate(`/products/${p.id}`)}
+                        onClick={() => navigate(`/compare?ids=${p.id}`)}
                       >
                         View Details
                       </Button>

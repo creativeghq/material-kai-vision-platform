@@ -275,6 +275,9 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
     if (error) {
       console.error('Error granting credits:', error);
+      // Throw so the outer catch returns non-2xx and Stripe retries this webhook.
+      // The idempotency guard above makes the retry safe (credits granted at most once).
+      throw new Error(`grant_credits failed for payment_intent ${paymentIntent.id}: ${error.message}`);
     } else {
       console.log(`Granted ${creditAmount} credits to user ${profile.user_id}`);
       // Credits are granted above (must stay in the webhook). The notification
@@ -463,6 +466,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
     if (error) {
       console.error(`Error granting monthly credits for invoice ${invoice.id}:`, error);
+      // Throw so the outer catch returns non-2xx and Stripe retries. The idempotency
+      // guard above (stripe_invoice_id) makes the retry safe.
+      throw new Error(`grant_credits failed for invoice ${invoice.id}: ${error.message}`);
     } else {
       console.log(`Granted ${monthlyCredits} monthly credits to user ${profile.user_id} (invoice: ${invoice.id})`);
     }

@@ -88,7 +88,7 @@ export const SimilarMaterials = ({ materialId, limit = 10 }: SimilarMaterialsPro
       source: 'similar_materials',
       source_material_id: materialId,
     });
-    navigate(`/products/${productId}`);
+    navigate(`/compare?ids=${productId}`);
   };
 
   if (loading) {

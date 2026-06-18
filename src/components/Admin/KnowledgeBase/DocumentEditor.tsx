@@ -121,7 +121,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         .from('workspaces')
         .select('id')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (workspaces) {
         setWorkspaceId(workspaces.id);
@@ -141,7 +141,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         .from('workspaces')
         .select('id')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (workspaces) {
         // Load categories directly from Supabase

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Search, Users, MapPin, Globe, Building2, Package,
-  Layers, X, Package2, ExternalLink, ChevronLeft, ChevronRight as ChevronRightIcon,
+  Layers, X, Package2, ExternalLink, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
@@ -23,6 +23,7 @@ import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodb
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
+import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
 import {
   CAT_COLORS, MATERIAL_CATS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
@@ -561,6 +562,9 @@ export const DiscoverPage: React.FC = () => {
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" /> Products
             </TabsTrigger>
+            <TabsTrigger value="marketplace" className="flex items-center gap-2">
+              <Store className="h-4 w-4" /> Marketplace
+            </TabsTrigger>
           </TabsList>
 
           {/* ── PROFILES ──────────────────────────────────────────────── */}
@@ -758,6 +762,11 @@ export const DiscoverPage: React.FC = () => {
             ) : (
               <ProductList products={filteredProducts} onView={openProduct} />
             )}
+          </TabsContent>
+
+          {/* ── MARKETPLACE (surplus / last-stock) ────────────────────── */}
+          <TabsContent value="marketplace" className="mt-6">
+            <MarketplaceTab />
           </TabsContent>
         </Tabs>
       </div>

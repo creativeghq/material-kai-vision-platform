@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
+import {
+  marketplaceService, type ActiveListingSummary, type ListingCondition, type DeliveryOption,
+} from '@/services/marketplaceService';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
@@ -22,6 +26,9 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [addWhOpen, setAddWhOpen] = useState(false);
+  // Active marketplace listings keyed by warehouse_item_id — drives the "Listed" row badge.
+  const [listings, setListings] = useState<Record<string, ActiveListingSummary>>({});
+  const [listItem, setListItem] = useState<WarehouseItem | null>(null);
 
   const load = async (whId?: string) => {
     setLoading(true);
@@ -33,6 +40,9 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       const active = whId || selectedWh || whs.find((w) => w.is_default)?.id || whs[0]?.id || '';
       setSelectedWh(active);
       setItems(active ? await warehouseService.listItems(workspaceId, active) : []);
+      // Best-effort: a listings read failure must never block the warehouse view.
+      try { setListings(await marketplaceService.activeListingsByItem(workspaceId)); }
+      catch { setListings({}); }
     } catch (err: any) {
       toast({ title: 'Failed to load stock', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -67,6 +77,13 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const remove = async (item: WarehouseItem) => {
     if (!confirm(`Delete ${item.name} from the warehouse?`)) return;
     try { await warehouseService.deleteItem(item.id); await load(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const unlist = async (item: WarehouseItem) => {
+    const l = listings[item.id];
+    if (!l || !confirm(`Withdraw "${item.name}" from the marketplace? Reserved stock is released.`)) return;
+    try { await marketplaceService.withdraw(l.id); toast({ title: 'Listing withdrawn' }); await load(selectedWh); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
@@ -113,9 +130,18 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               )}
               {items.map((it) => {
                 const low = it.qty_on_hand <= it.reorder_point && it.reorder_point > 0;
+                const listed = listings[it.id];
+                const available = it.qty_on_hand - it.qty_reserved;
                 return (
                   <tr key={it.id} className="border-b border-border/30">
-                    <td className="px-4 py-2 font-medium">{it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span></td>
+                    <td className="px-4 py-2 font-medium">
+                      {it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span>
+                      {listed && (
+                        <Badge variant="outline" className="ml-2 border-emerald-500/50 text-emerald-500">
+                          <Store className="h-3 w-3 mr-1" />listed €{listed.price}
+                        </Badge>
+                      )}
+                    </td>
                     <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
                     <td className="px-4 py-2 text-muted-foreground">{it.location ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">
@@ -129,6 +155,11 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         <Button size="sm" variant="ghost" title="Receive stock" onClick={() => move(it, 'in')}><PackagePlus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Issue stock" onClick={() => move(it, 'out')}><PackageMinus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Transfer to another warehouse" onClick={() => transfer(it)}><ArrowLeftRight className="h-4 w-4" /></Button>
+                        {listed ? (
+                          <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-500" /></Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" title={available > 0 ? 'List to Marketplace' : 'No available stock to list'} disabled={available <= 0} onClick={() => setListItem(it)}><Store className="h-4 w-4" /></Button>
+                        )}
                         <Button size="sm" variant="ghost" title="Delete" onClick={() => remove(it)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </td>
@@ -142,6 +173,13 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} warehouseId={selectedWh} onAdded={async () => { setAddOpen(false); await load(); }} />
       <AddWarehouseDialog open={addWhOpen} onOpenChange={setAddWhOpen} workspaceId={workspaceId} onAdded={async (id) => { setAddWhOpen(false); await load(id); }} />
+      <ListToMarketplaceDialog
+        item={listItem}
+        workspaceId={workspaceId}
+        warehouseLocation={warehouses.find((w) => w.id === selectedWh)?.location ?? null}
+        onOpenChange={(v) => { if (!v) setListItem(null); }}
+        onListed={async () => { setListItem(null); await load(selectedWh); }}
+      />
       </Card>
     </div>
   );
@@ -351,6 +389,196 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * #221 — "List to Marketplace". Auto-fills title / category / photos / specs / suggested price
+ * from the warehouse item's linked catalog product, so the seller realistically only confirms
+ * price (and maybe qty). Creating the listing reserves `qty_reserved` via the RPC.
+ */
+const CONDITIONS: { value: ListingCondition; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'open_box', label: 'Open box' },
+  { value: 'remnant', label: 'Remnant / offcut' },
+  { value: 'lot', label: 'Mixed lot' },
+];
+const DELIVERY: { value: DeliveryOption; label: string }[] = [
+  { value: 'pickup', label: 'Pickup only' },
+  { value: 'ship', label: 'Shipping' },
+  { value: 'both', label: 'Pickup or shipping' },
+];
+
+const ListToMarketplaceDialog: React.FC<{
+  item: WarehouseItem | null;
+  workspaceId: string;
+  warehouseLocation: string | null;
+  onOpenChange: (v: boolean) => void;
+  onListed: () => void;
+}> = ({ item, workspaceId, warehouseLocation, onOpenChange, onListed }) => {
+  const { toast } = useToast();
+  const open = !!item;
+  const available = item ? item.qty_on_hand - item.qty_reserved : 0;
+
+  const [loadingMeta, setLoadingMeta] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [specs, setSpecs] = useState<Record<string, unknown>>({});
+  const [comps, setComps] = useState<{ n: number; min: number | null; median: number | null; max: number | null } | null>(null);
+
+  const [price, setPrice] = useState('');
+  const [priceTouched, setPriceTouched] = useState(false);
+  const [qty, setQty] = useState('');
+  const [condition, setCondition] = useState<ListingCondition>('new');
+  const [batchLot, setBatchLot] = useState('');
+  const [city, setCity] = useState('');
+  const [delivery, setDelivery] = useState<DeliveryOption>('pickup');
+  const [expiry, setExpiry] = useState('');
+
+  useEffect(() => {
+    if (!item) return;
+    // reset
+    setLoadingMeta(true); setPriceTouched(false); setBusy(false);
+    setTitle(item.name); setDescription(''); setCategory(null); setImageUrls([]); setSpecs({}); setComps(null);
+    setPrice(''); setQty(String(available));
+    setCondition('new'); setBatchLot('');
+    setCity(warehouseLocation || item.location || '');
+    setDelivery('pickup');
+    const d = new Date(); d.setDate(d.getDate() + 60);
+    setExpiry(d.toISOString().slice(0, 10));
+
+    let cancelled = false;
+    (async () => {
+      try {
+        if (item.product_id) {
+          const a = await marketplaceService.buildAutofill(item.product_id);
+          if (cancelled) return;
+          if (a.title) setTitle(a.title);
+          setCategory(a.material_category);
+          setImageUrls(a.image_urls);
+          setSpecs(a.specs);
+          if (a.price_anchor) setPrice(String(a.price_anchor));
+          const c = await marketplaceService.priceComps(a.material_category, item.unit, workspaceId);
+          if (cancelled) return;
+          setComps({ n: c.n, min: c.min_price, median: c.median_price, max: c.max_price });
+        } else {
+          const c = await marketplaceService.priceComps(null, item.unit, workspaceId);
+          if (cancelled) return;
+          setComps({ n: c.n, min: c.min_price, median: c.median_price, max: c.max_price });
+        }
+      } catch {
+        /* autofill is best-effort; the seller can still fill the form */
+      } finally {
+        if (!cancelled) setLoadingMeta(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id]);
+
+  // If no catalog price anchor, suggest the comps median (until the user types their own).
+  useEffect(() => {
+    if (!priceTouched && !price && comps?.median != null) setPrice(String(Math.round(comps.median)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  const submit = async () => {
+    if (!item) return;
+    const p = parseFloat(price); const q = parseFloat(qty);
+    if (!Number.isFinite(p) || p <= 0) { toast({ title: 'Set a price', variant: 'destructive' }); return; }
+    if (!Number.isFinite(q) || q <= 0) { toast({ title: 'Set a quantity', variant: 'destructive' }); return; }
+    if (q > available) { toast({ title: `Only ${available} ${item.unit} available to list`, variant: 'destructive' }); return; }
+    try {
+      setBusy(true);
+      await marketplaceService.createListing({
+        warehouseItemId: item.id, price: p, qty: q,
+        condition, batchLot: batchLot.trim() || null,
+        locationCity: city.trim() || null, deliveryOption: delivery,
+        expiresAt: expiry ? new Date(`${expiry}T23:59:59Z`).toISOString() : null,
+        title: title.trim() || item.name, description: description.trim() || null,
+        materialCategory: category, specs, imageUrls,
+      });
+      toast({ title: 'Listed to marketplace' });
+      onListed();
+    } catch (err: any) {
+      toast({ title: 'Failed to list', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  if (!item) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>List “{item.name}” to Marketplace</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          {imageUrls.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto">
+              {imageUrls.slice(0, 4).map((u) => (
+                <img key={u} src={u} alt="" className="h-16 w-16 rounded-md object-cover border border-border/40" />
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+
+          {/* Suggested-price panel */}
+          <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            {loadingMeta ? (
+              <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking comparable surplus…</span>
+            ) : comps && comps.n > 0 ? (
+              <>Similar surplus: <span className="text-foreground font-medium">€{comps.min}–€{comps.max}</span> (median €{Math.round(comps.median ?? 0)}) across {comps.n} listing{comps.n === 1 ? '' : 's'}.</>
+            ) : (
+              <>No comparable surplus listed yet — you set the market.</>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Price (€)</Label>
+              <Input type="number" value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value); }} />
+            </div>
+            <div className="space-y-1">
+              <Label>Qty ({item.unit})</Label>
+              <Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
+              <span className="text-[11px] text-muted-foreground">{available} available</span>
+            </div>
+            <div className="space-y-1">
+              <Label>Condition</Label>
+              <Select value={condition} onValueChange={(v) => setCondition(v as ListingCondition)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{CONDITIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1"><Label>Batch / lot</Label><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} placeholder="optional" /></div>
+            <div className="space-y-1"><Label>Location</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" /></div>
+            <div className="space-y-1">
+              <Label>Delivery</Label>
+              <Select value={delivery} onValueChange={(v) => setDelivery(v as DeliveryOption)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{DELIVERY.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Listing expires</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
+          </div>
+
+          <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional — anything a buyer should know" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || available <= 0}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'List it'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

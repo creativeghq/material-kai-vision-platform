@@ -561,8 +561,9 @@ export const EmailTemplateBuilder: React.FC = () => {
 
   const loadTemplate = async () => {
     try {
-      const { data, error } = await supabase.from('email_templates').select('*').eq('id', id).single();
+      const { data, error } = await supabase.from('email_templates').select('*').eq('id', id).maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error('Template not found');
       setTemplate(data);
       setSubject(data.subject_template || '');
       setPreviewText(data.preview_text || '');

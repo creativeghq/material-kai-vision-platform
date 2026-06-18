@@ -261,7 +261,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       .from('products')
       .select('*')
       .eq('id', stackedProductId)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) setStackedProduct(data as unknown as Product);
       });

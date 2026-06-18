@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
 interface SessionManagerRequest {
   sessionId: string;
@@ -69,12 +69,18 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
   }
 
   try {
-    const { sessionId, action }: SessionManagerRequest = await req.json();
+    let parsed: SessionManagerRequest;
+    try {
+      parsed = await req.json();
+    } catch {
+      throw new HttpError(400, 'Invalid JSON body');
+    }
+    const { sessionId, action } = parsed;
 
     console.log(`Session manager: ${action} for session ${sessionId}`);
 
     if (!sessionId || !action) {
-      throw new Error('Missing required parameters: sessionId, action');
+      throw new HttpError(400, 'Missing required parameters: sessionId, action');
     }
 
     // Initialize Supabase client
@@ -92,7 +98,7 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
     const auth = await authenticate(req);
 
     if (!auth.success) {
-      throw new Error(auth.error || 'Authentication failed');
+      throw new HttpError(401, auth.error || 'Authentication failed');
     }
 
     const user = auth.user;
@@ -106,7 +112,7 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
         .eq('id', sessionId)
         .maybeSingle();
       if (session && session.user_id && session.user_id !== userId) {
-        throw new Error('Not authorized to manage this scraping session');
+        throw new HttpError(403, 'Not authorized to manage this scraping session');
       }
     }
 
@@ -122,7 +128,7 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
         await stopProcessing(supabase, sessionId);
         break;
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw new HttpError(400, `Unknown action: ${action}`);
     }
 
     return new Response(JSON.stringify({
@@ -134,6 +140,9 @@ Deno.serve(withApiLogging('scrape-session-manager', async (req) => {
     });
 
   } catch (error) {
+    // Client errors (bad input / auth / not-authorized) carry their own status and
+    // skip Sentry via the wrapper. Let them propagate.
+    if (error instanceof HttpError) throw error;
     console.error('Error in session manager:', error);
     // Top-level capture is handled by withApiLogging (returns 5xx → Sentry).
     return new Response(JSON.stringify({

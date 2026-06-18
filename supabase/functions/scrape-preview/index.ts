@@ -86,7 +86,7 @@ Deno.serve(withApiLogging('scrape-preview', async (req) => {
     const userId = auth.userId;
 
     // Use Firecrawl v2 with dynamic prompts and schema
-    const result = await scrapePreviewWithFirecrawl(url, options);
+    const result = await scrapePreviewWithFirecrawl(supabase, url, options);
     const materials = result.materials;
     const markdown = result.markdown;
 
@@ -130,7 +130,7 @@ Deno.serve(withApiLogging('scrape-preview', async (req) => {
   }
 }));
 
-async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ materials: PreviewMaterial[], markdown: string }> {
+async function scrapePreviewWithFirecrawl(supabase: any, url: string, options: any): Promise<{ materials: PreviewMaterial[], markdown: string }> {
   const apiKey = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
   if (!apiKey()) {
     throw new Error('Firecrawl API key not configured');

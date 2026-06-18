@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
 const resendApiKey = () => Deno.env.get('RESEND_API_KEY') || '';
@@ -126,7 +126,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             .single();
 
           if (templateError || !template) {
-            throw new Error(`Template not found: ${body.templateSlug}`);
+            throw new HttpError(404, `Template not found: ${body.templateSlug}`);
           }
 
           templateId = template.id;
@@ -486,9 +486,14 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         throw new Error('Invalid endpoint');
     }
   } catch (error) {
+    // Typed client errors carry their own status and skip Sentry via the wrapper.
+    if (error instanceof HttpError) throw error;
     console.error('Error:', error);
     // Top-level capture is handled by withApiLogging (returns 5xx → Sentry).
     const errMsg = error instanceof Error ? error.message : String(error);
+    // Map a couple of legacy string-thrown client errors; everything else is a genuine
+    // (likely transient/server) fault → 500 so it surfaces in Sentry and the client
+    // knows it can retry, rather than being mislabeled as a permanent 4xx.
     const statusCode = errMsg.includes('Unauthorized') ? 401 : errMsg.includes('not allowed') ? 405 : 500;
     return new Response(
       JSON.stringify({ success: false, error: errMsg }),

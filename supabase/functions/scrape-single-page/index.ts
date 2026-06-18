@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
 interface ScrapePageRequest {
   pageUrl: string;
@@ -54,13 +54,19 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
   }
 
   try {
-    const { pageUrl, sessionId, pageId, options = {} }: ScrapePageRequest = await req.json();
+    let parsed: ScrapePageRequest;
+    try {
+      parsed = await req.json();
+    } catch {
+      throw new HttpError(400, 'Invalid JSON body');
+    }
+    const { pageUrl, sessionId, pageId, options = {} } = parsed;
 
     console.log(`Processing page: ${pageUrl} for session: ${sessionId}, page: ${pageId}`);
 
     // Validate inputs
     if (!pageUrl || !sessionId || !pageId) {
-      throw new Error('Missing required parameters: pageUrl, sessionId, pageId');
+      throw new HttpError(400, 'Missing required parameters: pageUrl, sessionId, pageId');
     }
 
     // Initialize Supabase client
@@ -78,7 +84,7 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
     const auth = await authenticate(req);
 
     if (!auth.success) {
-      throw new Error(auth.error || 'Authentication failed');
+      throw new HttpError(401, auth.error || 'Authentication failed');
     }
 
     const user = auth.user;
@@ -172,6 +178,9 @@ Deno.serve(withApiLogging('scrape-single-page', async (req) => {
     });
 
   } catch (error) {
+    // Client errors (bad input / auth) carry their own status and skip Sentry. These
+    // all occur before the page row is touched, so no cleanup is bypassed.
+    if (error instanceof HttpError) throw error;
     console.error('Error in scrape-single-page:', error);
 
     return new Response(JSON.stringify({

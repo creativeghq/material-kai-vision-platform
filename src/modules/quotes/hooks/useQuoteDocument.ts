@@ -235,7 +235,7 @@ async function resolveClient(userId: string): Promise<QuoteDocumentClient> {
       .select('company_id')
       .eq('contact_id', contact.id)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (companyLink) {
       const { data: company } = await supabase
@@ -267,7 +267,7 @@ async function resolveClient(userId: string): Promise<QuoteDocumentClient> {
     .from('user_profiles')
     .select('full_name, email')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (profile) {
     empty.contact_name = profile.full_name;

@@ -3633,7 +3633,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                             <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Product</div>
                                             <button
                                               onClick={() => {
-                                                navigate(`/admin/materials?productId=${product.metrics.product_db_id}`);
+                                                navigate(`/admin/materials-data?productId=${product.metrics.product_db_id}`);
                                               }}
                                               className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
                                             >

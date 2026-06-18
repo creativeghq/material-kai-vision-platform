@@ -541,7 +541,7 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
               Open flow editor <ExternalLink className="h-3 w-3" />
             </Link>
             <span className="text-muted-foreground">·</span>
-            <Link to="/admin/email-templates" className="inline-flex items-center gap-1 text-primary hover:underline">
+            <Link to="/admin/emails" className="inline-flex items-center gap-1 text-primary hover:underline">
               Edit template design <ExternalLink className="h-3 w-3" />
             </Link>
           </div>

@@ -154,7 +154,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         .from('workspaces')
         .select('id')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (workspaces) {
         setWorkspaceId(workspaces.id);

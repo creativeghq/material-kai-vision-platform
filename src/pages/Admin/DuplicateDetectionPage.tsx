@@ -399,7 +399,7 @@ export function DuplicateDetectionPage() {
                     <TableCell className="max-w-[150px]">
                       <button
                         className="text-sm font-medium hover:underline text-left line-clamp-2"
-                        onClick={() => navigate(`/products/${pair.product_id_1}`)}
+                        onClick={() => navigate(`/compare?ids=${pair.product_id_1}`)}
                       >
                         {pair.product1?.name ?? pair.product_id_1.slice(0, 8) + '…'}
                       </button>
@@ -407,7 +407,7 @@ export function DuplicateDetectionPage() {
                     <TableCell className="max-w-[150px]">
                       <button
                         className="text-sm font-medium hover:underline text-left line-clamp-2"
-                        onClick={() => navigate(`/products/${pair.product_id_2}`)}
+                        onClick={() => navigate(`/compare?ids=${pair.product_id_2}`)}
                       >
                         {pair.product2?.name ?? pair.product_id_2.slice(0, 8) + '…'}
                       </button>

@@ -199,7 +199,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     try {
       const query = [productName, sku, manufacturer].filter(Boolean).join(' ').trim();
       // Resolve workspace — same pattern as other admin pages
-      const { data: ws } = await supabase.from('workspaces').select('id').limit(1).single();
+      const { data: ws } = await supabase.from('workspaces').select('id').limit(1).maybeSingle();
       if (!ws?.id) throw new Error('No workspace found');
 
       const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
@@ -496,7 +496,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       // Optionally upsert to product_prices — used when triggered from product detail page
       if (commitToProductPrices && productId) {
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: ws } = await supabase.from('workspaces').select('id').limit(1).single();
+        const { data: ws } = await supabase.from('workspaces').select('id').limit(1).maybeSingle();
         if (user && ws?.id) {
           await supabase.from('product_prices').upsert(
             {

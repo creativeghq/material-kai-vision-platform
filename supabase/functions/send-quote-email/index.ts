@@ -113,7 +113,7 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
   let token = quote.public_share_token as string | null;
   if (!quote.public_share_enabled || !token) {
     token = token || crypto.randomUUID();
-    await supabase
+    const { error: shareErr } = await supabase
       .from('quotes')
       .update({
         public_share_enabled: true,
@@ -121,6 +121,12 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
         public_share_created_at: quote.public_share_token ? undefined : new Date().toISOString(),
       })
       .eq('id', quote.id);
+    if (shareErr) {
+      // Abort before emailing — otherwise the email would carry a /q/{token} link that
+      // never resolves because the token was never persisted/enabled.
+      console.error('Failed to persist quote share token:', shareErr);
+      return json({ success: false, error: 'Failed to enable share link; email not sent.' }, 500);
+    }
   }
   const viewUrl = `${PUBLIC_APP_URL}/q/${token}`;
 

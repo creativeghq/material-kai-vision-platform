@@ -482,7 +482,7 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
   if (report === 'open_tasks') {
     return (
       <Table headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']} totals={totals} rows={rows.map((r: any) => [
-        r.quote_label, r.kind, new Date(r.scheduled_for).toLocaleString(), `${r.days_until}d`, r.body ?? '—',
+        r.quote_label, r.kind, r.scheduled_for ? new Date(r.scheduled_for).toLocaleString() : '—', `${r.days_until}d`, r.body ?? '—',
       ])} />
     );
   }

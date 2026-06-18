@@ -116,11 +116,12 @@ async function checkCredits(
   supabase: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<number> {
+  // maybeSingle: no user_credits row means 0 balance, not a 500.
   const { data, error } = await supabase
     .from('user_credits')
     .select('balance')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   if (error) throw new Error(`Failed to check credits: ${error.message}`);
   return data?.balance ?? 0;
 }
@@ -322,7 +323,12 @@ Deno.serve(withApiLogging('generate-pbr-maps', async (req) => {
 
   if (token === supabaseServiceKey) {
     // Internal server-to-server call — user_id must be in body
-    const rawBody = await req.json() as PbrRequest;
+    let rawBody: PbrRequest;
+    try {
+      rawBody = await req.json() as PbrRequest;
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
+    }
     if (!rawBody.user_id) {
       return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
     }

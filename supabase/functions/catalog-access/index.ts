@@ -134,7 +134,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       const tokenStr = match.granted ? generateToken() : null;
       const expiresAt = match.granted ? new Date(Date.now() + TOKEN_TTL_MS).toISOString() : null;
 
-      const { data: gateRow } = await supabase.from('catalog_access_log').insert({
+      const { data: gateRow, error: gateErr } = await supabase.from('catalog_access_log').insert({
         catalog_id: catalog.id,
         email,
         matched_kind: match.kind,
@@ -148,6 +148,13 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         cookie_token: tokenStr,
         cookie_expires_at: expiresAt,
       }).select('id').single();
+
+      // The access log row is the server-side record of the issued token. If it failed
+      // to persist, the token we'd hand back can't be validated later — fail closed.
+      if (gateErr || (match.granted && !gateRow?.id)) {
+        console.error('[catalog-access] Failed to persist access log row:', gateErr);
+        return jsonResponse({ error: 'Failed to record access; please retry.' }, 500);
+      }
 
       if (match.granted) {
         // Bump unique-email counter only when this is the first grant for

@@ -64,7 +64,7 @@ export const SocialAccountsTab: React.FC = () => {
       .from('workspace_members')
       .select('workspace_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
       .then(({ data }) => setWorkspaceId(data?.workspace_id ?? null));
     loadAccounts();
   }, [user]);

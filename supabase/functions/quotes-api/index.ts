@@ -2,7 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+
+async function parseJsonBody(req: Request): Promise<any> {
+  try {
+    return await req.json();
+  } catch {
+    throw new HttpError(400, 'Invalid JSON body');
+  }
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -43,7 +51,7 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
 
     // POST /api/quote-requests - Create quote request
     if (method === 'POST' && path[0] === 'quote-requests') {
-      const body = await req.json();
+      const body = await parseJsonBody(req);
       const { quote_id, workspace_id, notes } = body; // Changed from cart_id
 
       if (!quote_id) {
@@ -141,7 +149,7 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
     // PATCH /api/quote-requests/:id - Update quote request status
     if (method === 'PATCH' && path[0] === 'quote-requests' && path[1]) {
       const quoteId = path[1];
-      const body = await req.json();
+      const body = await parseJsonBody(req);
       const { status } = body;
 
       if (!status || !['pending', 'updated', 'approved', 'rejected'].includes(status)) {
@@ -248,7 +256,7 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
     // PATCH /api/proposals/:id - Update proposal status (accept/reject)
     if (method === 'PATCH' && path[0] === 'proposals' && path[1]) {
       const proposalId = path[1];
-      const body = await req.json();
+      const body = await parseJsonBody(req);
       const { status } = body;
 
       if (!status || !['accepted', 'rejected'].includes(status)) {
@@ -306,6 +314,8 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
       { status: 404, headers: corsHeaders },
     );
   } catch (error) {
+    // Client errors carry their own status and skip Sentry via the wrapper.
+    if (error instanceof HttpError) throw error;
     console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),

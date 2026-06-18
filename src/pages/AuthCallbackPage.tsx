@@ -44,7 +44,7 @@ export const AuthCallbackPage: React.FC = () => {
           .from('user_profiles')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         // If profile doesn't exist, create one with default role (user)
         if (!existingProfile) {
@@ -53,7 +53,7 @@ export const AuthCallbackPage: React.FC = () => {
             .from('roles')
             .select('id, name')
             .eq('name', 'user')
-            .single();
+            .maybeSingle();
 
           if (userRole) {
             // Update user metadata with role

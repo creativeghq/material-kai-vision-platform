@@ -67,7 +67,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
 
   const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.instagram;
 
-  // ① Debit credits upfront — non-refundable
+  // ① Debit credits upfront — refunded by refundCredits() if generation fails
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, 'social-caption', 'social_content_generation', 1,
     { platform, topic: topic.substring(0, 100), workspace_id },
@@ -127,7 +127,8 @@ Return exactly this JSON structure:
       console.warn('[generate-social-content] Logger failed:', logErr);
     }
 
-    const rawText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const firstBlock = Array.isArray(message.content) ? message.content[0] : undefined;
+    const rawText = firstBlock && firstBlock.type === 'text' ? firstBlock.text : '';
     let parsed: { captions: Array<{ variant: number; caption: string; char_count: number }>; hashtags: string[]; best_time_hint: string };
 
     try {
@@ -135,13 +136,22 @@ Return exactly this JSON structure:
       parsed = JSON.parse(cleaned);
     } catch {
       console.error('[generate-social-content] Failed to parse Claude response:', rawText);
+      await refundCredits(supabase, userId, debitResult.credits_debited, workspace_id);
       return jsonResponse({ success: false, error: 'Failed to parse AI response' }, 500);
+    }
+
+    // The AI may return a malformed shape — guard before mapping so we don't 500
+    // after the credit was already debited.
+    if (!parsed || !Array.isArray(parsed.captions)) {
+      console.error('[generate-social-content] AI response missing captions array:', rawText);
+      await refundCredits(supabase, userId, debitResult.credits_debited, workspace_id);
+      return jsonResponse({ success: false, error: 'AI response missing captions' }, 500);
     }
 
     // Fill in char_counts
     parsed.captions = parsed.captions.map(c => ({
       ...c,
-      char_count: c.caption.length,
+      char_count: (c?.caption || '').length,
     }));
 
     // Save draft post if no post_id provided
@@ -199,6 +209,23 @@ Return exactly this JSON structure:
 
   } catch (err) {
     console.error('[generate-social-content] Error:', err);
+    await refundCredits(supabase, userId, debitResult.credits_debited, workspace_id);
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
 }));
+
+/** Best-effort refund of the upfront debit when generation fails after the debit. */
+async function refundCredits(supabase: any, userId: string, amount: number, workspace_id?: string): Promise<void> {
+  if (!amount || amount <= 0) return;
+  try {
+    await supabase.rpc('credit_user_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_operation_type: 'social_content_generation_refund',
+      p_description: 'Refund: social content generation failed',
+      p_metadata: { workspace_id },
+    });
+  } catch (refundErr) {
+    console.error('[generate-social-content] Refund failed:', refundErr);
+  }
+}

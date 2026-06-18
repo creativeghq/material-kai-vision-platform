@@ -183,7 +183,7 @@ export const MultiStepScraperWizard: React.FC<MultiStepScraperWizardProps> = ({
           .from('workspaces')
           .select('id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         if (workspaceData) {
           setWorkspaceId(workspaceData.id);
         }
@@ -246,7 +246,7 @@ export const MultiStepScraperWizard: React.FC<MultiStepScraperWizardProps> = ({
         .from('workspaces')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const workspaceId = workspaceData?.id;
       if (!workspaceId) {
@@ -371,7 +371,7 @@ export const MultiStepScraperWizard: React.FC<MultiStepScraperWizardProps> = ({
         .from('workspaces')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const workspaceId = workspaceData?.id;
       if (!workspaceId) {

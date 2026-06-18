@@ -149,7 +149,7 @@ class MessagingCampaignService {
       .from('messaging_campaign_recipients')
       .select('campaign_id')
       .eq('id', recipientId)
-      .single();
+      .maybeSingle();
 
     const { error } = await supabase
       .from('messaging_campaign_recipients')

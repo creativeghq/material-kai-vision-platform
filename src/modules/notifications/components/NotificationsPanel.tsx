@@ -125,6 +125,7 @@ export const NotificationsPanel: React.FC = () => {
   // Load notifications when panel opens
   useEffect(() => {
     if (!open || !user) return;
+    let cancelled = false;
     setLoading(true);
     supabase
       .from('user_notifications')
@@ -133,9 +134,10 @@ export const NotificationsPanel: React.FC = () => {
       .order('created_at', { ascending: false })
       .limit(40)
       .then(({ data }) => {
-        setNotifications((data ?? []) as UserNotification[]);
-        setLoading(false);
+        if (!cancelled) setNotifications((data ?? []) as UserNotification[]);
+        if (!cancelled) setLoading(false);
       });
+    return () => { cancelled = true; };
   }, [open, user]);
 
   const markAllRead = async () => {

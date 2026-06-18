@@ -62,7 +62,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         .from('workspaces')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       if (data?.id) setWorkspaceId(data.id);
     };
     loadWorkspace();

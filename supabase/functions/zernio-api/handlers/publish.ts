@@ -96,26 +96,31 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     const platformTarget = (zernioPost?.platforms || [])[0] ?? {};
     const publishedUrl: string | undefined = platformTarget.platformPostUrl;
 
-    if (action === 'publish_now') {
-      await supabase.from('social_posts').update({
-        status: 'published',
-        published_at: new Date().toISOString(),
-        social_account_id,
-        zernio_post_id: zernioPostId,
-        updated_at: new Date().toISOString(),
-      }).eq('id', post_id);
-    } else {
-      await supabase.from('social_posts').update({
-        status: 'scheduled',
-        scheduled_at,
-        social_account_id,
-        zernio_post_id: zernioPostId,
-        updated_at: new Date().toISOString(),
-      }).eq('id', post_id);
+    // The post is already live/scheduled on Zernio (POST /posts succeeded above).
+    // Persist the local status, but surface a failure to update so the caller knows
+    // the local record is out of sync rather than getting a blind success:true.
+    const { error: statusUpdateErr } = action === 'publish_now'
+      ? await supabase.from('social_posts').update({
+          status: 'published',
+          published_at: new Date().toISOString(),
+          social_account_id,
+          zernio_post_id: zernioPostId,
+          updated_at: new Date().toISOString(),
+        }).eq('id', post_id)
+      : await supabase.from('social_posts').update({
+          status: 'scheduled',
+          scheduled_at,
+          social_account_id,
+          zernio_post_id: zernioPostId,
+          updated_at: new Date().toISOString(),
+        }).eq('id', post_id);
+
+    if (statusUpdateErr) {
+      console.error('[zernio-publish] Post published to Zernio but local status update failed:', statusUpdateErr);
     }
 
     return jsonResponse({
-      success: true,
+      success: !statusUpdateErr,
       action,
       post_id,
       zernio_post_id: zernioPostId,
@@ -124,7 +129,10 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
       published_url: publishedUrl,
       scheduled_at: action === 'schedule' ? scheduled_at : undefined,
       published_at: action === 'publish_now' ? new Date().toISOString() : undefined,
-    });
+      ...(statusUpdateErr
+        ? { warning: 'Published to Zernio but failed to update local post status', status_update_error: statusUpdateErr.message }
+        : {}),
+    }, statusUpdateErr ? 207 : 200);
 
   } catch (err) {
     console.error('[zernio-publish] Error:', err);

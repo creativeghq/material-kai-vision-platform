@@ -17,8 +17,8 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
 const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
-const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
+const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
 
 const MAX_SITEMAP_DEPTH = 3;
 const MAX_PAGES_HARD_CAP = 1000;
@@ -50,12 +50,12 @@ async function getUserIdFromJwt(req: Request): Promise<string | null> {
 }
 
 async function embedDocument(text: string): Promise<number[] | null> {
-  if (!MIVAA_API_KEY) return null;
+  if (!MIVAA_API_KEY()) return null;
   const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
   try {
-    const res = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
+    const res = await fetch(`${MIVAA_GATEWAY_URL()}/api/mivaa/gateway`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${MIVAA_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${MIVAA_API_KEY()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'generate_embedding',
         payload: { text: truncated, model: 'voyage-4', dimensions: 1024, input_type: 'document' },

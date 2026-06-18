@@ -10,6 +10,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, ArrowDownToLine, X } from 'lucide-react';
+import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -206,7 +207,7 @@ const RemoteOptionsPicker: React.FC<{
     let cancelled = false;
     loader()
       .then((opts) => { if (!cancelled) setOptions(opts); })
-      .catch((err) => toast({ title: 'Load failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' }))
+      .catch((err) => toast({ title: 'Load failed', description: getErrorMessage(err), variant: 'destructive' }))
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [loader, toast]);

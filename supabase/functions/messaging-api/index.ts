@@ -17,7 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import {
   zernioApi,
@@ -97,7 +97,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     );
 
     const auth = await authenticate(req);
-    if (!auth.success) throw new Error(auth.error || 'Unauthorized');
+    if (!auth.success) throw new HttpError(401, auth.error || 'Unauthorized');
     const user = auth.user;
 
     // Zernio is the engine for every WhatsApp action. Fail with a clean 503 +
@@ -114,7 +114,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       );
     }
 
-    const requestBody = req.method === 'POST' ? await req.json() : {};
+    let requestBody: any = {};
+    if (req.method === 'POST') {
+      try {
+        requestBody = await req.json();
+      } catch {
+        throw new HttpError(400, 'Invalid JSON body');
+      }
+    }
     const action = requestBody.action;
 
     // Messaging is a platform-global feature (channels are not per-workspace) that
@@ -478,10 +485,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw new HttpError(400, `Unknown action: ${action}`);
     }
   } catch (error) {
+    // Typed client errors carry their own status and skip Sentry via the wrapper.
+    if (error instanceof HttpError) throw error;
     console.error('Messaging API error:', error);
-    return jsonResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, 400);
+    // Genuine server/DB faults are 500 (not a blanket 400) so they surface in Sentry
+    // and the client can retry; validation/auth above are already typed HttpErrors.
+    return jsonResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 }));

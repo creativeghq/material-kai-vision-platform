@@ -4,7 +4,7 @@ import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import {
   classifyFields,
   type MappingSuggestion,
@@ -477,7 +477,12 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
   try {
     console.log('📥 Parsing request body...');
-    const requestBody = await req.json();
+    let requestBody: any;
+    try {
+      requestBody = await req.json();
+    } catch {
+      throw new HttpError(400, 'Invalid JSON body');
+    }
     console.log('✅ Request body parsed:', {
       has_workspace_id: !!requestBody.workspace_id,
       has_xml_content: !!requestBody.xml_content,
@@ -502,7 +507,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
     // Validate inputs
     if (!workspace_id || !xml_content) {
-      throw new Error('Missing required parameters: workspace_id, xml_content');
+      throw new HttpError(400, 'Missing required parameters: workspace_id, xml_content');
     }
 
     // Reject oversized uploads before we attempt to decode — holding a 20 MB
@@ -510,7 +515,8 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     // fastest way to OOM this function. See MAX_XML_BYTES docstring.
     if (typeof xml_content === 'string' && xml_content.length > MAX_BASE64_CHARS) {
       const approxMb = (xml_content.length * 0.75 / (1024 * 1024)).toFixed(1);
-      throw new Error(
+      throw new HttpError(
+        413,
         `XML too large: ~${approxMb} MB decoded (max ${MAX_XML_BYTES / (1024 * 1024)} MB). ` +
         `Split the file or reduce the number of products per upload.`
       );
@@ -533,7 +539,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     const auth = await authenticate(req);
 
     if (!auth.success) {
-      throw new Error(auth.error || 'Authentication failed');
+      throw new HttpError(401, auth.error || 'Authentication failed');
     }
 
     const user = auth.user;
@@ -583,16 +589,19 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       // entity-dense XML; we want the true byte count).
       const decodedBytes = new TextEncoder().encode(xmlString).length;
       if (decodedBytes > MAX_XML_BYTES) {
-        throw new Error(
+        throw new HttpError(
+          413,
           `XML too large: ${(decodedBytes / (1024 * 1024)).toFixed(1)} MB decoded ` +
           `(max ${MAX_XML_BYTES / (1024 * 1024)} MB). ` +
           `Split the file or reduce the number of products per upload.`
         );
       }
     } catch (decodeError: any) {
+      // Preserve an already-typed client error (e.g. the too-large HttpError).
+      if (decodeError instanceof HttpError) throw decodeError;
       console.error('❌ Error decoding base64:', decodeError);
       console.error('Base64 sample (first 100 chars):', xml_content.substring(0, 100));
-      throw new Error(`Failed to decode base64 XML content: ${decodeError?.message || decodeError}`);
+      throw new HttpError(400, `Failed to decode base64 XML content: ${decodeError?.message || decodeError}`);
     }
 
     // PREVIEW MODE: Detect fields and suggest mappings
@@ -674,7 +683,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       const previewDoc = parseXmlDoc(xmlString);
       const productNodes = findProductNodes(previewDoc);
       if (productNodes.length === 0) {
-        throw new Error('No product elements found in XML');
+        throw new HttpError(400, 'No product elements found in XML');
       }
       console.log(`Found ${productNodes.length} products, extracting first one for preview`);
 
@@ -701,7 +710,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
     // IMPORT MODE: Validate category is provided
     if (!category) {
-      throw new Error('Missing required parameter: category');
+      throw new HttpError(400, 'Missing required parameter: category');
     }
 
     // Parse XML and extract products. Manual-values fall back per-row when the
@@ -726,7 +735,8 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     // blob in data_import_jobs.metadata and held in memory by both this edge
     // function and the downstream Python /api/import/process handler.
     if (products.length > MAX_PRODUCTS_PER_IMPORT) {
-      throw new Error(
+      throw new HttpError(
+        413,
         `XML contains ${products.length} products (max ${MAX_PRODUCTS_PER_IMPORT} per import). ` +
         `Split the file into multiple smaller imports.`
       );
@@ -734,7 +744,7 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
 
     const validationResult = validateProducts(products);
     if (!validationResult.valid) {
-      throw new Error(`Product validation failed: ${validationResult.errors.join(', ')}`);
+      throw new HttpError(400, `Product validation failed: ${validationResult.errors.join(', ')}`);
     }
 
     const jobId = await createImportJob(
@@ -788,6 +798,9 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       }
     );
   } catch (error: any) {
+    // Client errors (bad input / auth / oversized) carry their own status and skip
+    // Sentry via the wrapper. Let them propagate.
+    if (error instanceof HttpError) throw error;
     console.error('❌ Error in XML import orchestrator:', error);
     console.error('Error stack:', error?.stack);
 

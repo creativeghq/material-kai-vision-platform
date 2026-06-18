@@ -543,7 +543,7 @@ async function handleJwtAction(
           .maybeSingle();
         creatorContactId = (c as { id?: string } | null)?.id ?? null;
       }
-      await db.from('inbox_participants').insert({
+      const { error: creatorPartErr } = await db.from('inbox_participants').insert({
         thread_id: (thread as { id: string }).id,
         participant_type: creatorIsCustomer ? 'customer' : 'member',
         user_id: userId,
@@ -552,6 +552,11 @@ async function handleJwtAction(
         thread_role: 'owner',
         added_by: userId,
       });
+      // The creator MUST be on the thread (owner / directional-ACL anchor). If this
+      // insert fails the thread is orphaned + inaccessible — surface it, don't swallow.
+      if (creatorPartErr) {
+        throw new HttpError(500, `Failed to add creator participant: ${creatorPartErr.message}`);
+      }
 
       // Optional initial participants.
       const requested = Array.isArray(payload.participants) ? payload.participants : [];
@@ -836,6 +841,99 @@ async function handleJwtAction(
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;
       return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
+    }
+
+    case 'create_marketplace_inquiry': {
+      // Surplus Marketplace (#222) — a BUYER contacts a SELLER about an active listing. This
+      // crosses the tenant wall (the buyer is not a member of the seller's workspace), so it can
+      // only run here under the service role. The buyer joins as a `customer`-type participant on
+      // a `customer` thread in the SELLER's workspace, so they are note-blind (resolveThreadAccess
+      // gives isMember=false to non-member participants); the seller's owner/admins are added as
+      // `member` participants so insertMessageAndNotify fires `inbox.message_received` to them.
+      const listingId = String(payload.listing_id || '');
+      const buyerWorkspaceId = String(payload.buyer_workspace_id || '');
+      if (!listingId || !buyerWorkspaceId) throw new HttpError(400, 'listing_id and buyer_workspace_id are required');
+
+      // Buyer must be an active business member of the workspace they inquire on behalf of.
+      const buyerRole = await callerRoleInWorkspace(db, userId, buyerWorkspaceId);
+      if (!buyerRole || !BUSINESS_ROLES.has(buyerRole)) {
+        throw new HttpError(403, 'You are not a business member of that workspace');
+      }
+
+      const { data: listing } = await db
+        .from('marketplace_listings')
+        .select('id, workspace_id, title, status, qty_remaining, unit')
+        .eq('id', listingId)
+        .maybeSingle();
+      const l = listing as { workspace_id?: string; title?: string; status?: string; unit?: string } | null;
+      if (!l || l.status !== 'active') throw new HttpError(404, 'Listing not available');
+      const sellerWorkspaceId = String(l.workspace_id);
+      if (sellerWorkspaceId === buyerWorkspaceId) throw new HttpError(400, 'You cannot inquire on your own listing');
+
+      const { data: buyerWs } = await db.from('workspaces').select('name').eq('id', buyerWorkspaceId).maybeSingle();
+      const buyerName = (buyerWs as { name?: string } | null)?.name || 'A buyer';
+      const qtyWanted = payload.qty_wanted != null ? Number(payload.qty_wanted) : null;
+      const customMsg = payload.message != null ? String(payload.message).trim() : '';
+
+      // Inquiry row (RLS would also allow the buyer to insert this directly; we do it here so the
+      // whole bridge is one atomic, server-authored call).
+      const { data: inq, error: inqErr } = await db.from('marketplace_inquiries').insert({
+        listing_id: listingId,
+        buyer_workspace_id: buyerWorkspaceId,
+        buyer_user_id: userId,
+        buyer_name: buyerName,
+        qty_wanted: qtyWanted,
+        message: customMsg || null,
+        status: 'open',
+      }).select('id').single();
+      if (inqErr) throw new HttpError(500, `Failed to create inquiry: ${inqErr.message}`);
+      const inquiryId = (inq as { id: string }).id;
+
+      // Thread in the seller's workspace.
+      const { data: thread, error: thErr } = await db.from('inbox_threads').insert({
+        workspace_id: sellerWorkspaceId,
+        thread_type: 'customer',
+        channel: 'internal',
+        subject: `Surplus inquiry: ${l.title || 'listing'}`,
+        created_by: userId,
+        metadata: { marketplace_listing_id: listingId, marketplace_inquiry_id: inquiryId, buyer_workspace_id: buyerWorkspaceId },
+      }).select('*').single();
+      if (thErr) throw new HttpError(500, `Failed to open conversation: ${thErr.message}`);
+      const threadRow = thread as Record<string, unknown>;
+      const threadId = String(threadRow.id);
+
+      // Buyer as note-blind customer participant (owner of the inquiry).
+      const { data: buyerPart } = await db.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'customer', user_id: userId,
+        workspace_id: null, thread_role: 'owner', added_by: userId,
+      }).select('id').single();
+
+      // Seller owner/admins as explicit member participants → shared inbox + notified.
+      const { data: sellerMembers } = await db.from('workspace_members')
+        .select('user_id, role, status').eq('workspace_id', sellerWorkspaceId).in('role', ['owner', 'admin']);
+      for (const m of (sellerMembers || []) as Array<{ user_id: string; status?: string }>) {
+        if (!ACTIVE_MEMBER(m.status)) continue;
+        await db.from('inbox_participants').insert({
+          thread_id: threadId, participant_type: 'member', user_id: m.user_id,
+          workspace_id: sellerWorkspaceId, thread_role: 'participant', added_by: userId,
+        });
+      }
+
+      // Initial message — notifies the seller participants (buyer is the sender, so skipped).
+      const qtyLine = qtyWanted ? ` Quantity wanted: ${qtyWanted} ${l.unit || ''}.`.trimEnd() : '';
+      const body = customMsg || `Hi, I'm interested in "${l.title || 'your listing'}".${qtyLine}`;
+      await insertMessageAndNotify(db, {
+        thread: threadRow,
+        senderParticipantId: (buyerPart as { id?: string } | null)?.id ?? null,
+        body,
+        attachments: [],
+        messageType: 'text',
+        senderUserId: userId,
+        senderLabel: `${buyerName} · marketplace`,
+      });
+
+      await db.from('marketplace_inquiries').update({ inbox_thread_id: threadId }).eq('id', inquiryId);
+      return json({ inquiry_id: inquiryId, thread_id: threadId });
     }
 
     case 'get_thread_context': {

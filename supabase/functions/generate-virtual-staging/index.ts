@@ -163,7 +163,12 @@ Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
 
   if (token === supabaseServiceKey) {
     // Internal call from agent-chat edge function — user_id must be in body
-    const rawBody = await req.json() as VirtualStagingRequest;
+    let rawBody: VirtualStagingRequest;
+    try {
+      rawBody = await req.json() as VirtualStagingRequest;
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
+    }
     if (!rawBody.user_id) {
       return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
     }

@@ -234,7 +234,7 @@ Return a list of materials found on the page.`);
         .from('workspaces')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const workspaceId = workspaceData?.id;
       if (!workspaceId) {
@@ -424,7 +424,7 @@ Return a list of materials found on the page.`);
         .from('workspaces')
         .select('id')
         .eq('user_id', currentUserId)
-        .single();
+        .maybeSingle();
 
       const workspaceId = workspaceData?.id || null;
 

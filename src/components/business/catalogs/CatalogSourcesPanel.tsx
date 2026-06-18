@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type PresentationCatalog, type CatalogSourcePdf } from '@/services/catalogsService';
+import { getErrorMessage } from '@/core/errors/utils';
 
 interface Props {
   catalog: PresentationCatalog;
@@ -81,7 +82,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       await load();
       onChanged();
     } catch (err) {
-      toast({ title: 'Upload failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -93,7 +94,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       await catalogsService.attachSourcePdfs(catalog.id, [sourceId]);
       onChanged();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyId(null); }
   };
 
@@ -103,7 +104,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       await catalogsService.detachSourcePdf(catalog.id, sourceId);
       onChanged();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyId(null); }
   };
 
@@ -114,7 +115,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       toast({ title: 'Translated', description: 'Sections added to the catalog body.' });
       onChanged();
     } catch (err) {
-      toast({ title: 'Translate failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Translate failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyId(null); }
   };
 
@@ -131,7 +132,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       setSectionTitle(`Extracted: ${extractQuery.trim().slice(0, 60)}`);
       if (cands.length === 0) toast({ title: 'No matches', description: 'The Vision pass found no products for that query.' });
     } catch (err) {
-      toast({ title: 'Extract failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Extract failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setExtracting(false); }
   };
 
@@ -146,7 +147,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       setExtractQuery('');
       onChanged();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 

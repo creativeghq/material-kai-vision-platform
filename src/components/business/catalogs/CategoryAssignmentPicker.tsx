@@ -14,6 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
+import { getErrorMessage } from '@/core/errors/utils';
 
 type Target =
   | { kind: 'user'; id: string }
@@ -43,7 +44,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
                                     await crmCategoriesService.listMembershipsForCompany(target.id);
       setMemberOf(new Set(ids));
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
         await crmCategoriesService.setMembershipsForCompany(target.id, wantManualMemberships);
       }
     } catch (err) {
-      toast({ title: 'Save failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Save failed', description: getErrorMessage(err), variant: 'destructive' });
       const ids =
         target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
         target.kind === 'contact' ? await crmCategoriesService.listMembershipsForContact(target.id) :

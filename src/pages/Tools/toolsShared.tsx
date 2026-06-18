@@ -510,7 +510,7 @@ export function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isA
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Link to="/billing" className="block">
+          <Link to="/billing/credits" className="block">
             <Button className="w-full gap-2" size="lg">
               <Sparkles className="h-4 w-4" />
               Buy credits

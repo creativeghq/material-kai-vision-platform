@@ -63,7 +63,7 @@ export const ProductAttachments: React.FC = () => {
         .from('workspaces')
         .select('id')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (workspaces) {
         setWorkspaceId(workspaces.id);

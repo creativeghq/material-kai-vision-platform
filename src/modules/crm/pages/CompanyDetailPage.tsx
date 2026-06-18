@@ -967,7 +967,7 @@ export const CompanyDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>
+            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
           </TabsContent>
 
           {/* Products Tab — only when is_supplier=true. Matches products by name

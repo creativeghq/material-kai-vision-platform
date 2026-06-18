@@ -9,6 +9,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type PresentationCatalog } from '@/services/catalogsService';
 import { crmCategoriesService, type CrmCategorySummary, type ResolvedRecipient } from '@/services/crmCategoriesService';
+import { getErrorMessage } from '@/core/errors/utils';
 
 interface Props {
   open: boolean;
@@ -46,7 +47,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
         const list = await crmCategoriesService.list();
         setCategories(list.filter((c) => c.is_active));
       } catch (err) {
-        toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+        toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
       } finally { setLoadingCats(false); }
     })();
   }, [open, catalog.title, toast]);
@@ -61,7 +62,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
       const res = await crmCategoriesService.resolveRecipients(categoryIds);
       setRecipients(res);
     } catch (err) {
-      toast({ title: 'Preview failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Preview failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setPreviewing(false); }
   }, [toast]);
 
@@ -101,7 +102,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
       toast({ title: `Sent to ${res.sent_count} recipients`, description: res.failed_count > 0 ? `${res.failed_count} failed.` : undefined });
       if (onSent) onSent(res.send_batch_id);
     } catch (err) {
-      toast({ title: 'Send failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Send failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setSending(false); }
   };
 

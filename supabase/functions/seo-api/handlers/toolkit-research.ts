@@ -110,7 +110,9 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
       data,
       latency_ms,
       error: ok ? null : (mivaaJson?.detail || `MIVAA ${resp.status}`),
-    });
+    // Reflect upstream failure in the HTTP status — never 200 on a failed MIVAA call.
+    // Use the upstream status when it's already an error, otherwise 502 (bad gateway).
+    }, ok ? 200 : (resp.status >= 400 ? resp.status : 502));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[seo-toolkit-research] error:', msg);

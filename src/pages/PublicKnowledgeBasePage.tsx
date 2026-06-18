@@ -146,7 +146,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       .eq('id', docId)
       .eq('status', 'published')
       .eq('visibility', 'public')
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setSelectedDoc(data as KBDocument);

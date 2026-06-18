@@ -5,6 +5,7 @@ import {
   Trash2, Plus, BookOpen, Eye, Activity, Send, Mail, Inbox, FileText,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -87,7 +88,7 @@ export const CatalogBuilderPage: React.FC = () => {
       const rows = await catalogsService.listSendRecipients(catalogId, batchId);
       setBatchRecipients((prev) => ({ ...prev, [batchId]: rows }));
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   }, [catalogId, batchRecipients, toast]);
 
@@ -122,7 +123,7 @@ export const CatalogBuilderPage: React.FC = () => {
       toast({ title: 'PDF generated', description: `${res.page_count} pages` });
       load();
     } catch (err) {
-      toast({ title: 'PDF failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'PDF failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -139,7 +140,7 @@ export const CatalogBuilderPage: React.FC = () => {
       toast({ title: 'Published', description: `/c/${slug}` });
       load();
     } catch (err) {
-      toast({ title: 'Publish failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Publish failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -154,7 +155,7 @@ export const CatalogBuilderPage: React.FC = () => {
       toast({ title: 'Archived' });
       load();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -165,7 +166,7 @@ export const CatalogBuilderPage: React.FC = () => {
       setCatalog(updated);
       toast({ title: 'Saved' });
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -178,7 +179,7 @@ export const CatalogBuilderPage: React.FC = () => {
       const g = await catalogsService.listEmailGrants(catalog.id);
       setGrants(g);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -188,7 +189,7 @@ export const CatalogBuilderPage: React.FC = () => {
       const g = await catalogsService.listEmailGrants(catalog!.id);
       setGrants(g);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -198,7 +199,7 @@ export const CatalogBuilderPage: React.FC = () => {
       const updated = await catalogsService.removeMaterial(catalog.id, sectionId, materialId);
       setCatalog(updated);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -209,7 +210,7 @@ export const CatalogBuilderPage: React.FC = () => {
       const updated = await catalogsService.removeSection(catalog.id, sectionId);
       setCatalog(updated);
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 

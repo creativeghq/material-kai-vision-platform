@@ -199,24 +199,35 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
 
   if (!threadId) {
     // New thread + customer participant + owner member participant (assign-on-reply).
-    const { data: thread } = await supabase.from('inbox_threads').insert({
+    const { data: thread, error: threadErr } = await supabase.from('inbox_threads').insert({
       workspace_id: workspaceId, thread_type: 'customer', channel: 'whatsapp',
       subject: contactName || phone, status: 'open', metadata: meta,
       last_message_at: msg.sentAt || new Date().toISOString(),
     }).select('id').single();
+    if (threadErr) {
+      // Transient DB fault — throw so the webhook returns 5xx and Zernio retries
+      // (rather than permanently dropping the inbound reply).
+      throw new Error(`inbox_threads insert failed: ${threadErr.message}`);
+    }
     threadId = thread?.id ?? null;
-    if (!threadId) return;
+    if (!threadId) throw new Error('inbox_threads insert returned no id');
 
-    const { data: cust } = await supabase.from('inbox_participants').insert({
+    const { data: cust, error: custErr } = await supabase.from('inbox_participants').insert({
       thread_id: threadId, participant_type: 'customer', contact_id: contactId, thread_role: 'participant',
     }).select('id').single();
+    if (custErr) {
+      throw new Error(`inbox_participants (customer) insert failed: ${custErr.message}`);
+    }
     customerParticipantId = cust?.id ?? null;
 
     if (owner) {
-      await supabase.from('inbox_participants').insert({
+      const { error: ownerErr } = await supabase.from('inbox_participants').insert({
         thread_id: threadId, participant_type: 'member', user_id: owner,
         workspace_id: workspaceId, thread_role: 'owner', added_by: owner,
       });
+      if (ownerErr) {
+        throw new Error(`inbox_participants (owner) insert failed: ${ownerErr.message}`);
+      }
       await emitFlowEvent('inbox.thread_assigned', {
         user_id: owner, type: 'inbox_assigned',
         title: 'You were assigned a WhatsApp conversation',
@@ -245,7 +256,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   }
 
   const preview = (msg.text || '[attachment]').substring(0, 200);
-  await supabase.from('inbox_messages').insert({
+  const { error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
     body: msg.text ?? null,
@@ -253,6 +264,10 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
     message_type: 'text',
     metadata: { channel: 'whatsapp', wamid: msg.platformMessageId || msg.id || null, direction: 'incoming' },
   });
+  if (msgErr) {
+    // The reply body itself failed to persist — throw so Zernio retries.
+    throw new Error(`inbox_messages insert failed: ${msgErr.message}`);
+  }
 
   // Notify every member participant via the unified inbox event.
   const { data: members } = await supabase
@@ -443,8 +458,14 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     }
 
   } catch (err) {
-    // Log but always return 200 to Zernio (prevent retry loops)
     console.error(`[zernio-webhook] Error handling ${event}:`, err);
+    // Inbound WhatsApp replies must NOT be silently dropped on a transient DB fault.
+    // Return 5xx so Zernio retries the delivery; the upsert/find-or-create logic above
+    // is idempotent enough for a retry to converge. Status-sync events (post.*, account.*,
+    // delivery status) stay 200 to avoid pointless retry loops on best-effort updates.
+    if (event === 'message.received') {
+      return jsonResponse({ error: 'Transient failure handling inbound message', event }, 500);
+    }
   }
 
   return jsonResponse({ received: true, event });

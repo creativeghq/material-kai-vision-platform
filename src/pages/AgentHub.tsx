@@ -25,7 +25,7 @@ const AgentHubPage: React.FC = () => {
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) {
-          navigate('/login');
+          navigate('/auth');
           return;
         }
 
@@ -34,7 +34,7 @@ const AgentHubPage: React.FC = () => {
           .from('workspace_members')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (workspaceData?.role) {
           setUserRole(workspaceData.role as 'viewer' | 'member' | 'admin' | 'owner');
@@ -60,7 +60,7 @@ const AgentHubPage: React.FC = () => {
 
   const handleMaterialSelect = (materialId: string) => {
     console.log('Material selected:', materialId);
-    navigate(`/catalog?material=${materialId}`);
+    navigate(`/compare?ids=${materialId}`);
   };
 
   if (isLoading) {

@@ -960,7 +960,7 @@ export const ContactDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />
+            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
           </TabsContent>
 
           {/* Companies Tab */}
@@ -1063,30 +1063,30 @@ export const ContactDetailPage: React.FC = () => {
           {/* Notes & Activity Tab — timeline of separate note entries
               (replaced the single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
-            <CrmNotesTimeline targetKind="contact" targetId={id ?? null} />
+            <CrmNotesTimeline targetKind="contact" targetId={contact.id || null} />
           </TabsContent>
 
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
-            {id && <CustomerAccountOverview contactId={id} />}
+            {contact.id && <CustomerAccountOverview contactId={contact.id} />}
           </TabsContent>
 
           {/* Quotes Tab */}
           <TabsContent value="quotes" className="space-y-4">
-            {id && <CustomerFinanceSummary contactId={id} />}
-            {id && <CustomerQuotesTab contactId={id} />}
+            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
+            {contact.id && <CustomerQuotesTab contactId={contact.id} />}
           </TabsContent>
 
           {/* Invoices Tab */}
           <TabsContent value="invoices" className="space-y-4">
-            {id && <CustomerFinanceSummary contactId={id} />}
-            {id && <CustomerInvoicesTab contactId={id} />}
+            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
+            {contact.id && <CustomerInvoicesTab contactId={contact.id} />}
           </TabsContent>
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-4">
-            {id && <CustomerFinanceSummary contactId={id} />}
-            {id && <CustomerPaymentsTab contactId={id} />}
+            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
+            {contact.id && <CustomerPaymentsTab contactId={contact.id} />}
           </TabsContent>
         </Tabs>
       </div>

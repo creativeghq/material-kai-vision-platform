@@ -1657,7 +1657,7 @@ export class QuotesService {
       .from('quotes')
       .select('id, parent_quote_id')
       .eq('id', quoteId)
-      .single();
+      .maybeSingle();
     if (!q) return [];
     const rootId = (q as any).parent_quote_id || (q as any).id;
 

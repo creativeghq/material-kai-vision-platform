@@ -121,7 +121,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     .from('user_credits')
     .select('balance')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   if (creditErr) return jsonResponse({ success: false, error: `Credit check failed: ${creditErr.message}` }, 500);
   if (!creditData || (creditData.balance ?? 0) < CREDITS_REQUIRED) {
     return jsonResponse({

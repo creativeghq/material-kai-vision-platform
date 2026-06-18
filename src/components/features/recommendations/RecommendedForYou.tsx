@@ -88,7 +88,7 @@ export const RecommendedForYou = ({ limit = 20, algorithm = 'user_user' }: Recom
       source: 'recommended_for_you',
       algorithm,
     });
-    navigate(`/products/${productId}`);
+    navigate(`/compare?ids=${productId}`);
   };
 
   if (loading) {

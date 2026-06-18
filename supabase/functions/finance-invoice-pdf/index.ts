@@ -122,7 +122,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   const OUT = kind === 'credit_note' ? 'credit-note-output' : kind === 'delivery_note' ? 'delivery-note-output' : 'invoice-output';
   const PREFIX = kind === 'credit_note' ? 'cn' : kind === 'delivery_note' ? 'dn' : 'inv';
 
-  const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).single();
+  const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).maybeSingle();
   if (!row) return json({ error: `${kind} not found` }, 404);
   // Tenancy: a finance user may only render documents in a workspace they belong to.
   if (!(await userCanAccessWorkspace(supabase, auth.userId, row.workspace_id))) {

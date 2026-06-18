@@ -67,7 +67,7 @@ export const SocialMediaAccountsPage: React.FC = () => {
       .select('workspace_id')
       .eq('user_id', user.id)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!membership) { setLoading(false); return; }
 

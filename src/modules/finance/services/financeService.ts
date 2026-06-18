@@ -369,7 +369,7 @@ const _financeServiceCore = {
     const { data: inv } = await supabase
       .from('invoices')
       .select('internal_number, legal_number, total, currency, fiscal_qr_url, customer_company_id, customer_contact_id')
-      .eq('id', invoiceId).single();
+      .eq('id', invoiceId).maybeSingle();
     if (!inv) return { ok: false, error: 'Invoice not found' };
     let phone: string | null = null;
     if ((inv as any).customer_company_id) {

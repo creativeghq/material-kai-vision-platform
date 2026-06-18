@@ -227,7 +227,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
         statusMessage = sendErr instanceof Error ? sendErr.message : 'send threw';
       }
 
-      await supabase.from('catalog_email_sends').insert({
+      const { error: auditErr } = await supabase.from('catalog_email_sends').insert({
         catalog_id: catalog.id,
         send_batch_id: sendBatchId,
         recipient_email: recipient.email,
@@ -247,7 +247,16 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
         sent_by: auth.userId || catalog.owner_user_id,
       });
 
-      if (status === 'sent') sent++; else failed++;
+      // If the audit row failed to persist, the send is unaccounted-for — count it as
+      // failed rather than reporting a "sent" the operator can't see/trace.
+      if (auditErr) {
+        console.error(`[catalog-send-to-customers] audit insert failed for ${recipient.email}:`, auditErr);
+        failed++;
+      } else if (status === 'sent') {
+        sent++;
+      } else {
+        failed++;
+      }
     }
 
     return jsonResponse({

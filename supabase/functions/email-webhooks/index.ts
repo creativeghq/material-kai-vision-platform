@@ -138,7 +138,16 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
       console.warn('RESEND_WEBHOOK_SECRET not set — skipping signature verification');
     }
 
-    const event: ResendWebhookEvent = JSON.parse(rawBody);
+    let event: ResendWebhookEvent;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      // Malformed body is a permanent error — return 400 so Resend does NOT retry.
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const eventType = RESEND_EVENT_MAP[event.type];
 
     if (!eventType) {
@@ -180,7 +189,15 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     }
 
     // Insert event record
-    await supabaseClient.from('email_events').insert(eventRecord);
+    const { error: insertError } = await supabaseClient.from('email_events').insert(eventRecord);
+    if (insertError) {
+      // Transient DB fault — return 500 so Resend retries (4xx is treated as permanent).
+      console.error('Failed to insert email_events row:', insertError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to persist email event' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     // The DB trigger automatically updates email_logs status based on email_events inserts.
     // For delivery events we also update delivered_at directly as a safety net.
@@ -216,9 +233,12 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     });
   } catch (error) {
     console.error('Error processing Resend webhook:', error);
+    // Parse/shape errors are handled inline above with explicit 400s. Anything reaching
+    // here is an unexpected (likely transient) server-side fault — return 500 so Resend
+    // retries rather than treating it as a permanent 4xx and giving up.
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 }));

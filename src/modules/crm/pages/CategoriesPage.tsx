@@ -9,6 +9,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Textarea } from '@/components/core/ui/textarea';
+import { getErrorMessage } from '@/core/errors/utils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -95,7 +96,7 @@ export const CategoriesPanel: React.FC = () => {
       toast({ title: 'Resync complete', description: `+${inserts} added · −${deletes} removed across professional_type / role categories.` });
       load();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -113,7 +114,7 @@ export const CategoriesPanel: React.FC = () => {
       setCreateName(''); setCreateDescription(''); setCreateColor('#22c55e');
       load();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -139,7 +140,7 @@ export const CategoriesPanel: React.FC = () => {
       setEditing(null);
       load();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setBusyAction(null); }
   };
 
@@ -154,7 +155,7 @@ export const CategoriesPanel: React.FC = () => {
       toast({ title: 'Deleted' });
       load();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -364,7 +365,7 @@ const CategoryMembersDialog: React.FC<{
   const loadMembers = useCallback(async () => {
     setLoading(true);
     try { setMembers(await crmCategoriesService.listMembers(category.id)); }
-    catch (err) { toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' }); }
+    catch (err) { toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [category.id, toast]);
 
@@ -392,7 +393,7 @@ const CategoryMembersDialog: React.FC<{
       }
       setSearchResults(out);
     } catch (err) {
-      toast({ title: 'Search failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Search failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setSearching(false);
     }
@@ -409,7 +410,7 @@ const CategoryMembersDialog: React.FC<{
       setSearchResults((prev) => prev.filter((r) => !(r.id === target.id && r.kind === target.kind)));
       loadMembers();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -418,7 +419,7 @@ const CategoryMembersDialog: React.FC<{
       await crmCategoriesService.removeMember(memberId);
       loadMembers();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 

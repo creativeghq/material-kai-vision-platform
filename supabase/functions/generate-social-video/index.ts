@@ -147,6 +147,12 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
           workspace_id,
         }),
       });
+      if (!veoRes.ok) {
+        // Surface the downstream failure instead of letting .json() throw opaquely
+        // on a non-JSON error body.
+        const errText = await veoRes.text().catch(() => '');
+        throw new Error(`Veo generation failed (${veoRes.status}): ${errText.substring(0, 300)}`);
+      }
       const veoResult = await veoRes.json();
       if (!veoResult.success) {
         throw new Error(veoResult.error || 'Veo generation failed');
@@ -241,7 +247,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
 
     } else if (pollResult.status === 'processing') {
       // Store for async polling — credits already debited
-      const { data: videoRecord } = await supabase.from('generation_videos').insert({
+      const { data: videoRecord, error: insertError } = await supabase.from('generation_videos').insert({
         user_id: userId,
         workspace_id,
         source_image_url,
@@ -256,11 +262,22 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         replicate_prediction_id: predictionId,
       }).select('id').single();
 
+      if (insertError || !videoRecord?.id) {
+        // Without a tracking row the user can never poll this job — refund and fail
+        // rather than returning success with an undefined job_id.
+        console.error('[generate-social-video] generation_videos insert failed:', insertError);
+        await refundCredits();
+        return jsonResponse(
+          { success: false, error: 'Failed to persist video job; credits refunded.' },
+          500,
+        );
+      }
+
       return jsonResponse({
         success: true,
         status: 'processing',
         prediction_id: predictionId,
-        job_id: videoRecord?.id,
+        job_id: videoRecord.id,
         model_used: model,
         credits_used: creditCost,
         message: 'Video is being generated. Poll using the job_id to check status.',

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
+import { getErrorMessage } from '@/core/errors/utils';
 import {
   Bot,
   Search,
@@ -949,7 +950,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           .eq('status', 'active')
           .order('joined_at', { ascending: true })
           .limit(1)
-          .single();
+          .maybeSingle();
         setWorkspaceId(memberRow?.workspace_id ?? user.user_metadata?.workspace_id);
       }
     };
@@ -3096,7 +3097,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         'If we don\'t have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.',
       );
     } catch (err) {
-      toast({ title: 'Upload failed', description: err instanceof Error ? err.message : '?', variant: 'destructive' });
+      toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setUploadingCatalogPdf(false);
     }

@@ -31,7 +31,12 @@ Deno.serve(withApiLogging('stripe-connect', async (req) => {
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.user) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
-  const body = (await req.json()) as Body;
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
   if (!body.workspace_id) return json({ error: 'workspace_id required' }, 400);
 
   const supabase = createClient(

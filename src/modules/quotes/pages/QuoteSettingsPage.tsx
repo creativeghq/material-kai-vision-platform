@@ -73,7 +73,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
         .from('system_settings')
         .select('*')
         .eq('setting_key', 'quote_expiration_days')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 

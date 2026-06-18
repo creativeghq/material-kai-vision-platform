@@ -9,7 +9,7 @@ import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { withApiLogging } from '../_shared/api-logger.ts';
+import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
 // =====================================================
 // TYPES
@@ -182,12 +182,22 @@ async function sendWebhooks(
         } catch (error) {
           attempt++;
           if (attempt > maxRetries) {
+            // Read the current failure_count so backoff actually accumulates — the
+            // passed-in `webhook` object never carries this column, so `webhook.failure_count
+            // + 1 || 1` always wrote 1 (NaN || 1).
+            const { data: current } = await supabase
+              .from('webhook_endpoints')
+              .select('failure_count')
+              .eq('id', webhook.id)
+              .maybeSingle();
+            const nextFailureCount = (Number(current?.failure_count) || 0) + 1;
+
             // Update webhook failure
             await supabase
               .from('webhook_endpoints')
               .update({
                 last_failure_at: new Date().toISOString(),
-                failure_count: (webhook as any).failure_count + 1 || 1,
+                failure_count: nextFailureCount,
               })
               .eq('id', webhook.id);
 
@@ -227,11 +237,20 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
   }
 
   try {
-    const { action, ...body } = await req.json();
+    let parsed: any;
+    try {
+      parsed = await req.json();
+    } catch {
+      throw new HttpError(400, 'Invalid JSON body');
+    }
+    const { action, ...body } = parsed;
 
     switch (action) {
       case 'send-push': {
         const { subscriptions, notification } = body;
+        if (!Array.isArray(subscriptions)) {
+          throw new HttpError(400, 'subscriptions must be an array');
+        }
         const result = await sendPushNotifications(subscriptions, notification);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -240,6 +259,9 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
 
       case 'send-webhook': {
         const { webhooks, payload } = body;
+        if (!Array.isArray(webhooks)) {
+          throw new HttpError(400, 'webhooks must be an array');
+        }
         const result = await sendWebhooks(webhooks, payload);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -274,6 +296,8 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
         );
     }
   } catch (error) {
+    // Let HttpError (client errors) carry its own status and skip Sentry via the wrapper.
+    if (error instanceof HttpError) throw error;
     console.error('Error in notification-dispatcher:', error);
     return new Response(
       JSON.stringify({ error: error.message }),

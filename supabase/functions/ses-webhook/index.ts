@@ -144,7 +144,16 @@ serve(withApiLogging('ses-webhook', async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const snsMessage: SNSMessage = await req.json();
+    let snsMessage: SNSMessage;
+    try {
+      snsMessage = await req.json();
+    } catch {
+      // Malformed request body — permanent error, return 400 (SNS won't retry-loop).
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
 
     // Verify the SNS message signature BEFORE acting on it. Without this, anyone can
     // POST forged bounce/complaint events (suppression-list / reputation tampering) and
@@ -178,9 +187,22 @@ serve(withApiLogging('ses-webhook', async (req) => {
 
     // Handle SNS notification
     if (snsMessage.Type === 'Notification') {
-      const message = JSON.parse(snsMessage.Message);
-      const notificationType = message.notificationType;
-      const mail = message.mail;
+      let message: any;
+      let notificationType: string;
+      let mail: any;
+      try {
+        message = JSON.parse(snsMessage.Message);
+        notificationType = message.notificationType;
+        mail = message.mail;
+        if (!mail || !mail.messageId) throw new Error('missing mail.messageId');
+      } catch (shapeErr) {
+        // Permanently-malformed SNS message — return 4xx so SNS does NOT retry-loop.
+        console.error('SES webhook: malformed notification message:', shapeErr);
+        return new Response(JSON.stringify({ error: 'Malformed SNS notification message' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
 
       console.log('SES Notification:', notificationType, mail);
 
@@ -308,6 +330,8 @@ serve(withApiLogging('ses-webhook', async (req) => {
     });
   } catch (error) {
     console.error('Error processing SES webhook:', error);
+    // Parse/shape errors are handled inline above with explicit 4xx. Anything reaching
+    // here is an unexpected (likely transient, e.g. DB) fault — return 500 so SNS retries.
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

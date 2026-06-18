@@ -98,7 +98,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
           .from('vr_worlds')
           .select('status, error_message, splat_url_100k, splat_url_500k, splat_url_full, collider_glb_url, panorama_url, thumbnail_url, caption')
           .eq('id', vrWorldId)
-          .single();
+          .maybeSingle();
 
         if (error || !data || isCancelled) return;
 

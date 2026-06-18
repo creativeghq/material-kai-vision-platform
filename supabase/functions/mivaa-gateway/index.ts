@@ -409,6 +409,9 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     );
   }
 
+  // Tracks a successful credit debit so the catch path can refund on downstream failure.
+  let debitInfo: { userId: string; amount: number; action: string } | null = null;
+
   try {
     const url = new URL(req.url);
     const contentType = req.headers.get('content-type') || '';
@@ -446,6 +449,21 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       return new Response(
         JSON.stringify({ error: 'Authentication required', action }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Validate action BEFORE any billing/debit so an unknown-but-priced action
+    // can never debit credits and then 400 without a refund.
+    if (!action || !MIVAA_ENDPOINTS[action]) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid action',
+          available_actions: Object.keys(MIVAA_ENDPOINTS),
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -488,6 +506,9 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
 
         console.log(`[mivaa-gateway] Debited ${pricing.creditCost} credits from user ${auth.userId} for: ${action}`);
 
+        // Remember the debit so the catch / non-OK path can refund on downstream failure.
+        debitInfo = { userId: auth.userId, amount: pricing.creditCost, action };
+
         // Log to ai_usage_logs (non-blocking)
         supabaseAdmin.from('ai_usage_logs').insert({
           user_id: auth.userId,
@@ -504,20 +525,6 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
           if (error) console.error('[mivaa-gateway] Usage log insert error:', error);
         });
       }
-    }
-
-    // Validate action
-    if (!action || !MIVAA_ENDPOINTS[action]) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid action',
-          available_actions: Object.keys(MIVAA_ENDPOINTS),
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
     }
 
     let endpoint = MIVAA_ENDPOINTS[action];
@@ -687,6 +694,28 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     console.error('❌ MIVAA Gateway Error:', errorMessage);
     console.error('❌ Full error:', error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+
+    // Refund any credits debited for this request — the downstream MIVAA call failed
+    // (this covers both the thrown !response.ok path and any other fetch/parse error).
+    if (debitInfo) {
+      try {
+        const supabaseAdmin = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
+        const { error: refundError } = await supabaseAdmin.rpc('credit_user_credits', {
+          p_user_id: debitInfo.userId,
+          p_amount: debitInfo.amount,
+          p_operation_type: 'refund',
+          p_description: `Refund for failed MIVAA action: ${debitInfo.action}`,
+          p_metadata: { action: debitInfo.action, gateway: 'mivaa', reason: 'downstream_failure' },
+        });
+        if (refundError) {
+          console.error(`[mivaa-gateway] Refund failed for user ${debitInfo.userId}:`, refundError);
+        } else {
+          console.log(`[mivaa-gateway] Refunded ${debitInfo.amount} credits to user ${debitInfo.userId} for failed action ${debitInfo.action}`);
+        }
+      } catch (refundEx) {
+        console.error('[mivaa-gateway] Refund threw:', refundEx);
+      }
+    }
 
     // Provide more detailed error information
     const errorDetails = {

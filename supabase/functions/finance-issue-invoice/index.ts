@@ -325,7 +325,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (body.credit_note_id) {
       const { data: cnRow } = await supabase
         .from('credit_notes').select('workspace_id, fiscal_status, invoice_id')
-        .eq('id', body.credit_note_id).single();
+        .eq('id', body.credit_note_id).maybeSingle();
       if (!cnRow) return json({ error: 'credit note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);
@@ -403,7 +403,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (body.delivery_note_id) {
       const { data: dnRow } = await supabase
         .from('delivery_notes').select('workspace_id, fiscal_status')
-        .eq('id', body.delivery_note_id).single();
+        .eq('id', body.delivery_note_id).maybeSingle();
       if (!dnRow) return json({ error: 'delivery note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);
@@ -479,7 +479,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       invoiceId = body.invoice_id;
       // Bind direct-invoice operations (issue / submit to myDATA) to the caller's workspace.
       // Without this, any finance user could issue/transmit another tenant's invoice by id.
-      const { data: invWs } = await supabase.from('invoices').select('workspace_id').eq('id', invoiceId).single();
+      const { data: invWs } = await supabase.from('invoices').select('workspace_id').eq('id', invoiceId).maybeSingle();
       if (!invWs) return json({ error: 'invoice not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, invWs.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);

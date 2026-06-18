@@ -24,7 +24,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 
-  const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoice_id).single();
+  const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoice_id).maybeSingle();
   if (!inv) return json({ error: 'invoice not found' }, 404);
   // Tenancy: bind to the caller's workspace so one tenant can't email another's invoice
   // (with full PII + myDATA MARK) to an arbitrary address by iterating invoice ids.

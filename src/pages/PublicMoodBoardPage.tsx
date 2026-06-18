@@ -52,7 +52,7 @@ export default function PublicMoodBoardPage() {
         .select('id, title, description, is_public, created_at')
         .eq('id', id)
         .eq('is_public', true)
-        .single();
+        .maybeSingle();
 
       if (boardError || !boardData) {
         setNotFound(true);

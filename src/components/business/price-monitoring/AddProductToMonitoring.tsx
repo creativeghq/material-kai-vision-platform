@@ -67,7 +67,7 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
           .from('profiles')
           .select('workspace_id')
           .eq('id', user.user.id)
-          .single();
+          .maybeSingle();
 
         if (!profile) throw new Error('Profile not found');
 

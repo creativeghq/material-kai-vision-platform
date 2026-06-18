@@ -65,7 +65,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (!wm) return;
       setWorkspaceId(wm.workspace_id);

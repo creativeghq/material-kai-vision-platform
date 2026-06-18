@@ -19,8 +19,8 @@
 
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const MIVAA_SERVICE_URL         = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
-const MIVAA_API_KEY             = Deno.env.get('MIVAA_API_KEY') || '';
+const MIVAA_SERVICE_URL         = () => Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+const MIVAA_API_KEY             = () => Deno.env.get('MIVAA_API_KEY') || '';
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -183,11 +183,11 @@ Deno.serve(withApiLogging('firecrawl-webhook', async (req: Request) => {
 
     // Trigger Python backend to create products from scraped pages
     try {
-      const resp = await fetch(`${MIVAA_SERVICE_URL}/api/scraping/process-session`, {
+      const resp = await fetch(`${MIVAA_SERVICE_URL()}/api/scraping/process-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MIVAA_API_KEY}`,
+          'Authorization': `Bearer ${MIVAA_API_KEY()}`,
         },
         body: JSON.stringify({
           session_id:   sessionId,

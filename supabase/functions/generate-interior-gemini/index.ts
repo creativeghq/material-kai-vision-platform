@@ -36,7 +36,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
+const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 const REPLICATE_API_TOKEN = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 /**
@@ -64,7 +64,7 @@ async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promi
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY()}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -425,11 +425,13 @@ async function checkCredits(
   userId: string,
   required: number,
 ): Promise<void> {
+  // maybeSingle: a user with no user_credits row is a legitimate "0 balance" case,
+  // not a 500 — let the explicit insufficient-credits branch handle it.
   const { data, error } = await supabase
     .from('user_credits')
     .select('balance')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   if (error) throw new Error(`Credit check failed: ${error.message}`);
   if (!data || (data.balance ?? 0) < required) {
     throw new Error(`Insufficient credits. Required: ${required}, Available: ${data?.balance ?? 0}`);
@@ -885,7 +887,9 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[generate-interior-gemini] Error (mode=${mode}):`, message);
-    return jsonResponse({ success: false, error: message }, 500);
+    // Insufficient credits is a client-state condition → 402, not a server error.
+    const status = message.startsWith('Insufficient credits') ? 402 : 500;
+    return jsonResponse({ success: false, error: message }, status);
   }
 }));
 

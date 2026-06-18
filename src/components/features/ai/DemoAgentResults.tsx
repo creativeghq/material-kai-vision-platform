@@ -260,11 +260,11 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                 <div className="grid grid-cols-2 gap-3 pb-3 border-b border-gray-200">
                   <div>
                     <p className="text-xs text-gray-600 mb-0.5">Retail</p>
-                    <p className="font-semibold text-gray-900">€{model.price_retail.toFixed(2)}</p>
+                    <p className="font-semibold text-gray-900">€{(model.price_retail ?? 0).toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 mb-0.5">Wholesale</p>
-                    <p className="font-semibold text-gray-900">€{model.price_wholesale.toFixed(2)}</p>
+                    <p className="font-semibold text-gray-900">€{(model.price_wholesale ?? 0).toFixed(2)}</p>
                   </div>
                 </div>
 

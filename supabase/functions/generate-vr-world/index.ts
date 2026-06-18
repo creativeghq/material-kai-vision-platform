@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -53,6 +54,10 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  // Populate env from platform_secrets before reading WORLDLABS_API_KEY — the
+  // service-role branch below skips authenticate() (which would normally bootstrap).
+  await bootstrapForFunction();
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

@@ -57,7 +57,7 @@ const ARPage: React.FC = () => {
           .from('products')
           .select(`id, name, metadata, ${PRODUCT_IMAGE_SELECT}`)
           .eq('id', productId)
-          .single();
+          .maybeSingle();
 
         if (cancelled) return;
 
@@ -67,7 +67,7 @@ const ARPage: React.FC = () => {
             .from('document_images')
             .select('id, description, image_url, metadata')
             .eq('id', productId)
-            .single();
+            .maybeSingle();
 
           if (cancelled) return;
 
