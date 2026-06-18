@@ -13,6 +13,7 @@ import { handleCompanies } from './handlers/companies-api-handler.ts';
 import { handleContacts } from './handlers/contacts-api-handler.ts';
 import { handleUsers } from './handlers/users-api-handler.ts';
 import { handleCrmStripe } from './handlers/stripe-api-handler.ts';
+import { handleAddressUnits } from './handlers/address-units-api-handler.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
@@ -20,6 +21,7 @@ const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
   contacts: handleContacts,
   users: handleUsers,
   stripe: handleCrmStripe,
+  'address-units': handleAddressUnits,
 };
 
 Deno.serve(withApiLogging('crm-api', async (req) => {

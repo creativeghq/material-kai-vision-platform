@@ -25,6 +25,7 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import {
@@ -861,6 +862,9 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
+            <AddressUnitsManager companyId={isNew ? undefined : id} readOnly={!editing} />
 
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>

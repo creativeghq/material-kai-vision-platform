@@ -26,6 +26,7 @@ import {
   type RoomType,
 } from '../services/projectsService';
 import { ClientPicker, type ClientPickerValue } from './ClientPicker';
+import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -65,6 +66,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     client_company_id: null,
     client_contact_id: null,
   });
+  // Chosen sub-unit address of the client (null = main address).
+  const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<RoomDraft[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomType, setNewRoomType] = useState<RoomType | ''>('');
@@ -76,6 +79,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setName('');
     setDescription('');
     setClient({ client_company_id: null, client_contact_id: null });
+    setAddrUnitId(null);
     setRooms([]);
     setNewRoomName('');
     setNewRoomType('');
@@ -113,6 +117,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         description: description.trim() || undefined,
         client_company_id: client.client_company_id,
         client_contact_id: client.client_contact_id,
+        client_address_unit_id: addrUnitId,
         deadline: deadline || null,
         budget_amount: budgetAmount ? parseFloat(budgetAmount) : null,
         budget_currency: budgetCurrency,
@@ -177,9 +182,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             <Label>{isAdmin ? 'Client (Optional)' : 'Client'}</Label>
             <ClientPicker
               value={client}
-              onChange={setClient}
+              onChange={(next) => { setClient(next); setAddrUnitId(null); }}
               disabled={processing}
               mode={isAdmin ? 'admin' : 'simple'}
+            />
+            {/* Address of the client this project is for — main or a sub-unit. Self-hides
+                when the client has no sub-units. */}
+            <AddressUnitSelect
+              companyId={client.client_company_id}
+              contactId={client.client_contact_id}
+              value={addrUnitId}
+              onChange={(id) => setAddrUnitId(id)}
+              label="Project address"
+              disabled={processing}
             />
           </div>
 

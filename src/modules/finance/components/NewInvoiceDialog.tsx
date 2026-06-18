@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
+import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { formatAddressLine } from '@/services/crm.service';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
@@ -112,6 +114,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerOptions, setCustomerOptions] = useState<Customer[]>([]);
   const [customerAddr, setCustomerAddr] = useState<any>(null);
+  // Chosen sub-unit address (null = the party's main address).
+  const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
   const [validatingVat, setValidatingVat] = useState(false);
   // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
   const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
@@ -313,6 +317,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBuyerOutstanding((openRows ?? []).reduce((s: number, r: any) => s + (Number(r.amount_due) || 0), 0));
     })();
   }, [customer, workspaceId]);
+
+  // Reset the chosen sub-unit when the customer changes (the picker re-adopts the new
+  // party's default unit, if any).
+  useEffect(() => { setAddrUnitId(null); }, [customer?.id]);
 
   // Preview the series + next number for this doc type + establishment (read-only).
   useEffect(() => {
@@ -519,6 +527,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
         doc_language: docLanguage,
         template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
+        customer_address_unit_id: addrUnitId,
         has_shipping: hasShipping,
         ship_from: hasShipping ? (shipFrom || null) : null, ship_to: hasShipping ? (shipTo || null) : null,
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
@@ -702,6 +711,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       {buyerRisk.warns.map((w, i) => <div key={i}>⚠ {w}</div>)}
                     </div>
                   )}
+
+                  {/* Bill-to address: main address or one of the party's sub-units. */}
+                  <AddressUnitSelect
+                    companyId={customer.type === 'company' ? customer.id : null}
+                    contactId={customer.type === 'contact' ? customer.id : null}
+                    value={addrUnitId}
+                    onChange={(id) => setAddrUnitId(id)}
+                    label="Bill-to address"
+                    mainAddressLine={customerAddr ? formatAddressLine(customerAddr) : undefined}
+                  />
                 </div>
               ) : (
                 <div className="relative">

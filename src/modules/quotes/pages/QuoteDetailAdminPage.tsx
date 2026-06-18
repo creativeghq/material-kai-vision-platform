@@ -10,6 +10,7 @@ import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
+import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
@@ -805,6 +806,22 @@ export const QuoteDetailPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Bill-to address — choose the customer's main address or one of their sub-units.
+            Self-hides when the party has no sub-units. Propagates to the invoice on conversion. */}
+        {(quote.customer_company_id || quote.customer_contact_id) && (
+          <AddressUnitSelect
+            className="max-w-md"
+            companyId={quote.customer_company_id}
+            contactId={quote.customer_contact_id}
+            value={quote.customer_address_unit_id ?? null}
+            label="Bill-to address"
+            onChange={async (unitId) => {
+              await quotesService.updateQuote(quote.id, { customer_address_unit_id: unitId } as any);
+              await loadQuoteDetails();
+            }}
+          />
+        )}
 
         {/* Notes & Custom Request (if present) */}
         {(quote.notes || quote.custom_request_text) && (

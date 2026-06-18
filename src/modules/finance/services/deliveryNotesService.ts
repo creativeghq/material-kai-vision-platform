@@ -99,6 +99,7 @@ export const deliveryNotesService = {
     shipTo?: string;
     shipFromStreet?: string; shipFromNumber?: string; shipFromPostal?: string; shipFromCity?: string;
     shipToStreet?: string; shipToNumber?: string; shipToPostal?: string; shipToCity?: string;
+    shipFromAddressUnitId?: string | null; shipToAddressUnitId?: string | null;
     relatedDocument?: string;
     invoiceId?: string | null;
   }): Promise<string> {
@@ -127,6 +128,8 @@ export const deliveryNotesService = {
         ship_to_number: input.shipToNumber || null,
         ship_to_postal: input.shipToPostal || null,
         ship_to_city: input.shipToCity || null,
+        ship_from_address_unit_id: input.shipFromAddressUnitId ?? null,
+        ship_to_address_unit_id: input.shipToAddressUnitId ?? null,
         related_document: input.relatedDocument || null,
       } as any)
       .select('id')

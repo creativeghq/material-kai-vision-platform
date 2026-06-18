@@ -42,6 +42,8 @@ export interface Quote {
   customer_company_id?: string | null;
   /** B2C / private customer. XOR with customer_company_id at the DB level. */
   customer_contact_id?: string | null;
+  /** Chosen sub-unit (branch) address of the customer; null = main address. */
+  customer_address_unit_id?: string | null;
   /** Public share link. Token is a random uuid surfaced at /q/:token. */
   public_share_enabled?: boolean;
   public_share_token?: string | null;

@@ -21,6 +21,8 @@ export interface Project {
   status: ProjectStatus;
   client_company_id: string | null;
   client_contact_id: string | null;
+  /** Chosen sub-unit (branch) address of the client; null = main address. */
+  client_address_unit_id: string | null;
   deadline: string | null;
   budget_amount: number | null;
   budget_currency: string;
@@ -189,6 +191,7 @@ export interface CreateProjectInput {
   description?: string;
   client_company_id?: string | null;
   client_contact_id?: string | null;
+  client_address_unit_id?: string | null;
   deadline?: string | null;
   budget_amount?: number | null;
   budget_currency?: string;
@@ -202,6 +205,7 @@ export interface UpdateProjectInput {
   status?: ProjectStatus;
   client_company_id?: string | null;
   client_contact_id?: string | null;
+  client_address_unit_id?: string | null;
   deadline?: string | null;
   budget_amount?: number | null;
   budget_currency?: string;
@@ -305,6 +309,7 @@ class ProjectsService {
         description: input.description ?? null,
         client_company_id: input.client_company_id ?? null,
         client_contact_id: input.client_contact_id ?? null,
+        client_address_unit_id: input.client_address_unit_id ?? null,
         deadline: input.deadline ?? null,
         budget_amount: input.budget_amount ?? null,
         budget_currency: input.budget_currency ?? 'EUR',

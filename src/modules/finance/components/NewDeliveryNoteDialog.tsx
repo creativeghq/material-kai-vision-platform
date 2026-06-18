@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { deliveryNotesService, type WarehousePick, type DeliveryLineInput } from '@/modules/finance/services/deliveryNotesService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
+import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 
 export const NewDeliveryNoteDialog: React.FC<{
   workspaceId: string;
@@ -40,13 +41,15 @@ export const NewDeliveryNoteDialog: React.FC<{
   const emptyAddr = { street: '', number: '', postal: '', city: '' };
   const [fromAddr, setFromAddr] = useState({ ...emptyAddr });
   const [toAddr, setToAddr] = useState({ ...emptyAddr });
+  // Chosen customer sub-unit as the delivery point (null = main address).
+  const [toUnitId, setToUnitId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
-    setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr });
+    setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr }); setToUnitId(null);
     (async () => {
       const [{ data: cos }, wh, { data: fs }, br] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
@@ -62,8 +65,10 @@ export const NewDeliveryNoteDialog: React.FC<{
     })();
   }, [open, workspaceId]);
 
-  // Prefill the delivery address from the selected customer's CRM record.
+  // Prefill the delivery address from the selected customer's main CRM address, and reset
+  // any previously-chosen sub-unit (the picker re-adopts the new customer's default).
   useEffect(() => {
+    setToUnitId(null);
     if (!open || !customer) return;
     (async () => {
       const { data: c } = await supabase
@@ -71,6 +76,7 @@ export const NewDeliveryNoteDialog: React.FC<{
         .eq('id', customer).maybeSingle();
       if (c) setToAddr({ street: (c as any).street ?? '', number: (c as any).street_number ?? '', postal: (c as any).postal_code ?? '', city: (c as any).city ?? '' });
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer, open]);
 
   // myDATA 9.3 needs a complete delivery address. Warn before issuing a dispatch note.
@@ -97,6 +103,7 @@ export const NewDeliveryNoteDialog: React.FC<{
         shipFromPostal: fromAddr.postal || undefined, shipFromCity: fromAddr.city || undefined,
         shipToStreet: toAddr.street || undefined, shipToNumber: toAddr.number || undefined,
         shipToPostal: toAddr.postal || undefined, shipToCity: toAddr.city || undefined,
+        shipToAddressUnitId: toUnitId,
       });
       if (issue) await deliveryNotesService.issue(id);
       toast({ title: issue ? 'Delivery note issued' : 'Draft saved' });
@@ -129,6 +136,25 @@ export const NewDeliveryNoteDialog: React.FC<{
                 <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
                 <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
+              {/* Deliver to a specific sub-unit of the customer (prefills the address below). */}
+              {customer && (
+                <AddressUnitSelect
+                  companyId={customer}
+                  value={toUnitId}
+                  label="Deliver to (sub-unit)"
+                  onChange={(id, unit) => {
+                    setToUnitId(id);
+                    if (unit) {
+                      setToAddr({
+                        street: unit.street ?? unit.address ?? '',
+                        number: unit.street_number ?? '',
+                        postal: unit.postal_code ?? '',
+                        city: unit.city ?? '',
+                      });
+                    }
+                  }}
+                />
+              )}
             </div>
             {branches.length > 1 && (
               <div className="space-y-1">

@@ -543,3 +543,111 @@ export const companiesAPI = {
     return response.json();
   },
 };
+
+// ---------------------------------------------------------------------------
+// Address sub-units (secondary / branch / ΑΑΔΕ establishment addresses)
+// ---------------------------------------------------------------------------
+
+/** A named secondary address attached to a CRM company or contact. */
+export interface AddressUnit {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  label: string;
+  branch_number: number | null;
+  address: string | null;
+  street: string | null;
+  street_number: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+  country_code: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AddressUnitInput = Partial<
+  Pick<
+    AddressUnit,
+    | 'label' | 'branch_number' | 'address' | 'street' | 'street_number'
+    | 'city' | 'state' | 'postal_code' | 'country' | 'country_code' | 'is_default'
+  >
+>;
+
+/** Build a one-line human-readable summary of an address (unit or main). */
+export function formatAddressLine(a: {
+  street?: string | null; street_number?: string | null; address?: string | null;
+  postal_code?: string | null; city?: string | null; country?: string | null;
+}): string {
+  const streetPart = [a.street || a.address, a.street_number].filter(Boolean).join(' ');
+  return [streetPart, a.postal_code, a.city, a.country].filter(Boolean).join(', ');
+}
+
+export const addressUnitsAPI = {
+  /** List the sub-units of a company OR contact (pass exactly one id). */
+  async list(parent: { companyId?: string; contactId?: string }): Promise<AddressUnit[]> {
+    const token = await getAuthToken();
+    const params = new URLSearchParams();
+    if (parent.companyId) params.set('company_id', parent.companyId);
+    if (parent.contactId) params.set('contact_id', parent.contactId);
+
+    const response = await fetch(`${getApiBase()}/crm-api/address-units?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to fetch address units');
+    }
+    return (await response.json()).data ?? [];
+  },
+
+  async create(
+    parent: { companyId?: string; contactId?: string },
+    unit: AddressUnitInput,
+  ): Promise<AddressUnit> {
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/address-units`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...unit,
+        company_id: parent.companyId,
+        contact_id: parent.contactId,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to create address unit');
+    }
+    return (await response.json()).data;
+  },
+
+  async update(id: string, unit: AddressUnitInput): Promise<AddressUnit> {
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/address-units/${id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(unit),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to update address unit');
+    }
+    return (await response.json()).data;
+  },
+
+  async remove(id: string): Promise<void> {
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/address-units/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to delete address unit');
+    }
+  },
+};

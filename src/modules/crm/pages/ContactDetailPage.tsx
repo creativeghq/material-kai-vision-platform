@@ -24,6 +24,7 @@ import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDr
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
+import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
@@ -720,6 +721,9 @@ export const ContactDetailPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
+              <AddressUnitsManager contactId={isNew ? undefined : id} readOnly={!editing} />
 
               {/* Link to User Account Card - Compact Design */}
               <Card>

@@ -68,6 +68,37 @@ function partyFromCrm(c: any): FiscalParty {
   };
 }
 
+/**
+ * If a sub-unit (branch / establishment) address was chosen on the document, re-address the
+ * counterpart to that unit instead of the party's main address, carrying its ΑΑΔΕ branch
+ * number. No-op when unitId is null/empty. Returns the (possibly) updated party.
+ */
+async function loadAddressUnit(supabase: any, unitId: string | null | undefined): Promise<any | null> {
+  if (!unitId) return null;
+  const { data } = await supabase.from('crm_address_units').select('*').eq('id', unitId).maybeSingle();
+  return data ?? null;
+}
+
+async function applyCounterpartAddressUnit(
+  supabase: any,
+  counterpart: FiscalParty,
+  unitId: string | null | undefined,
+): Promise<FiscalParty> {
+  const u = await loadAddressUnit(supabase, unitId);
+  if (!u) return counterpart;
+  return {
+    ...counterpart,
+    branch: Number(u.branch_number ?? counterpart.branch ?? 0),
+    address: {
+      street: u.street ?? u.address ?? '',
+      number: u.street_number ?? '',
+      postalCode: u.postal_code ?? '',
+      city: u.city ?? '',
+      country: u.country_code ?? counterpart.country ?? 'GR',
+    },
+  };
+}
+
 export async function buildInvoiceInputFromDb(
   supabase: any,
   invoiceId: string,
@@ -107,6 +138,7 @@ export async function buildInvoiceInputFromDb(
     const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
     if (c) counterpart = partyFromCrm(c);
   }
+  counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
   const rate = Number(inv.vat_rate ?? fs?.default_vat_rate ?? 24);
   const cat = vatCategory(rate);
@@ -289,6 +321,8 @@ export async function buildCreditNoteInputFromDb(
     const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
     if (c) counterpart = partyFromCrm(c);
   }
+  // Credit note inherits the corrected invoice's chosen sub-unit address.
+  counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
     const net = round2(Number(it.net_value ?? 0));
@@ -407,19 +441,24 @@ export async function buildDeliveryNoteInputFromDb(
   }));
 
   const movePurpose = dn.move_purpose ? parseInt(String(dn.move_purpose), 10) || 1 : 1;
-  // Per-note structured fields win; fall back to issuer/counterpart address parts, with
-  // the legacy free-text ship_from/ship_to as the street line.
+  // Optional sub-units chosen as the loading / delivery point.
+  const [fromUnit, toUnit] = await Promise.all([
+    loadAddressUnit(supabase, dn.ship_from_address_unit_id),
+    loadAddressUnit(supabase, dn.ship_to_address_unit_id),
+  ]);
+  // Precedence: per-note structured fields → legacy free-text street → chosen sub-unit →
+  // issuer/counterpart main address.
   const loadingAddress = {
-    street: dn.ship_from_street || dn.ship_from || issuer.address?.street || '',
-    number: dn.ship_from_number || issuer.address?.number || '',
-    postalCode: dn.ship_from_postal || issuer.address?.postalCode || '',
-    city: dn.ship_from_city || issuer.address?.city || '',
+    street: dn.ship_from_street || dn.ship_from || fromUnit?.street || fromUnit?.address || issuer.address?.street || '',
+    number: dn.ship_from_number || fromUnit?.street_number || issuer.address?.number || '',
+    postalCode: dn.ship_from_postal || fromUnit?.postal_code || issuer.address?.postalCode || '',
+    city: dn.ship_from_city || fromUnit?.city || issuer.address?.city || '',
   };
   const deliveryAddress = {
-    street: dn.ship_to_street || dn.ship_to || counterpart.address?.street || '',
-    number: dn.ship_to_number || counterpart.address?.number || '',
-    postalCode: dn.ship_to_postal || counterpart.address?.postalCode || '',
-    city: dn.ship_to_city || counterpart.address?.city || '',
+    street: dn.ship_to_street || dn.ship_to || toUnit?.street || toUnit?.address || counterpart.address?.street || '',
+    number: dn.ship_to_number || toUnit?.street_number || counterpart.address?.number || '',
+    postalCode: dn.ship_to_postal || toUnit?.postal_code || counterpart.address?.postalCode || '',
+    city: dn.ship_to_city || toUnit?.city || counterpart.address?.city || '',
   };
   const issueDate = String(dn.issued_at ?? dn.created_at ?? new Date().toISOString()).slice(0, 10);
 
