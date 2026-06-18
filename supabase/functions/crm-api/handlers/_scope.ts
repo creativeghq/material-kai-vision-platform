@@ -15,7 +15,14 @@ import type { AuthResult } from '../../_shared/auth.ts';
 export interface CrmScope {
   /** Secret-key or global admin/super_admin — unrestricted across all workspaces. */
   isGlobalOperator: boolean;
-  /** Active-membership workspace ids for a non-global caller (empty for global). */
+  /**
+   * The caller's own active-membership workspace ids. For a non-global caller this is
+   * the full set they may read/write. For a global-by-role operator it is still populated
+   * (their "home" workspaces) so creates can default to one — a global operator reads
+   * across all tenants but a new row must still belong to a single, concrete workspace
+   * (crm_companies/crm_contacts.workspace_id is NOT NULL). Empty for secret-key callers,
+   * which have no user context and must pass workspace_id explicitly on create.
+   */
   workspaceIds: string[];
 }
 
@@ -44,12 +51,15 @@ export async function getCrmScope(
       .eq('status', 'active'),
   ]);
 
+  const workspaceIds = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id);
+
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   if (globalRole && ['admin', 'super_admin'].includes(globalRole)) {
-    return { isGlobalOperator: true, workspaceIds: [] };
+    // Global read/write across all tenants, but keep the operator's own memberships so a
+    // create with no explicit workspace_id can default to their home workspace.
+    return { isGlobalOperator: true, workspaceIds };
   }
 
-  const workspaceIds = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id);
   return { isGlobalOperator: false, workspaceIds };
 }
 

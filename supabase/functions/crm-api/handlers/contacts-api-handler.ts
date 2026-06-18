@@ -77,20 +77,24 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
+      // Resolve the target workspace (crm_contacts.workspace_id is NOT NULL): an explicit
+      // workspace_id must be in scope (any workspace for a global operator); otherwise
+      // default to the caller's primary (first active) membership. A global operator that
+      // omits it still needs a concrete home workspace, so default the same way.
       const requestedWs = (body.workspace_id as string | undefined) || undefined;
-      const targetWs = scope.isGlobalOperator
-        ? requestedWs
-        : (requestedWs && scopeAllows(scope, requestedWs) ? requestedWs : scope.workspaceIds[0]);
-      if (!targetWs && !scope.isGlobalOperator) {
-        return new Response(
-          JSON.stringify({ error: 'No workspace in scope to create this contact in' }),
-          { status: 403, headers: corsHeaders },
-        );
-      }
       if (requestedWs && !scopeAllows(scope, requestedWs)) {
         return new Response(
           JSON.stringify({ error: 'Not authorized for the requested workspace' }),
           { status: 403, headers: corsHeaders },
+        );
+      }
+      const targetWs = (requestedWs && scopeAllows(scope, requestedWs))
+        ? requestedWs
+        : scope.workspaceIds[0];
+      if (!targetWs) {
+        return new Response(
+          JSON.stringify({ error: 'No workspace available to create this contact in. Pass workspace_id.' }),
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -102,7 +106,7 @@ export async function handleContacts(req: Request): Promise<Response> {
           phone,
           company,
           notes,
-          ...(targetWs ? { workspace_id: targetWs } : {}),
+          workspace_id: targetWs,
           created_by: userId || 'system',
         })
         .select();

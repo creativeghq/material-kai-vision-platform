@@ -107,22 +107,25 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
-      // Resolve the target workspace: an explicit body workspace_id must be in scope;
-      // otherwise default to the caller's primary (first active) membership.
+      // Resolve the target workspace: an explicit body workspace_id must be in scope
+      // (any workspace for a global operator); otherwise default to the caller's primary
+      // (first active) membership. workspace_id is NOT NULL, so a global operator that
+      // omits it still needs a concrete home workspace — without this, global admins/
+      // super_admins (workspaceIds derived from their own memberships) could not create.
       const requestedWs = (body.workspace_id as string | undefined) || undefined;
-      const targetWs = scope.isGlobalOperator
-        ? requestedWs
-        : (requestedWs && scopeAllows(scope, requestedWs) ? requestedWs : scope.workspaceIds[0]);
-      if (!targetWs && !scope.isGlobalOperator) {
-        return new Response(
-          JSON.stringify({ error: 'No workspace in scope to create this company in' }),
-          { status: 403, headers: corsHeaders },
-        );
-      }
       if (requestedWs && !scopeAllows(scope, requestedWs)) {
         return new Response(
           JSON.stringify({ error: 'Not authorized for the requested workspace' }),
           { status: 403, headers: corsHeaders },
+        );
+      }
+      const targetWs = (requestedWs && scopeAllows(scope, requestedWs))
+        ? requestedWs
+        : scope.workspaceIds[0];
+      if (!targetWs) {
+        return new Response(
+          JSON.stringify({ error: 'No workspace available to create this company in. Pass workspace_id.' }),
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -130,7 +133,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         .from('crm_companies')
         .insert({
           ...pickCompanyFields(body),
-          ...(targetWs ? { workspace_id: targetWs } : {}),
+          workspace_id: targetWs,
           created_by: user.id,
         })
         .select();
