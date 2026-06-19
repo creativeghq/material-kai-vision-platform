@@ -1311,6 +1311,7 @@ export interface FinanceSettings {
 
 export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number }
 export interface VatReportRow { section: 'output' | 'output_credit' | 'input' | 'input_credit'; vat_rate: number | null; net: number; vat: number; doc_count: number }
+export interface VatByCodeRow { vat_category: number | null; vat_rate: number | null; income_classification_type: string; income_classification_category: string; net: number; vat: number; line_count: number }
 export interface PartyLedgerRow { entry_date: string | null; doc_kind: string; doc_number: string | null; debit: number; credit: number; currency: string | null }
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
@@ -1551,6 +1552,14 @@ const _financeServiceV2 = {
     });
     if (error) throw error;
     return (data ?? []) as VatReportRow[];
+  },
+  /** #207 — VAT analysis by myDATA classification CODE (complements VAT-by-rate). */
+  async getVatByCode(workspaceId: string, from: string, to: string): Promise<VatByCodeRow[]> {
+    const { data, error } = await supabase.rpc('finance_vat_by_code', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as VatByCodeRow[];
   },
   /** #207 — myDATA reconciliation: every issued legal doc bucketed by its AADE state. */
   async getMyDataReconciliation(workspaceId: string, from: string, to: string): Promise<MyDataReconRow[]> {

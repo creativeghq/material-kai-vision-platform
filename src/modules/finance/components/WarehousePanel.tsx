@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -29,6 +29,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   // Active marketplace listings keyed by warehouse_item_id — drives the "Listed" row badge.
   const [listings, setListings] = useState<Record<string, ActiveListingSummary>>({});
   const [listItem, setListItem] = useState<WarehouseItem | null>(null);
+  // #207 — editing the catalog-depth fields (codes / myDATA classification) of an item.
+  const [editItem, setEditItem] = useState<WarehouseItem | null>(null);
 
   // #223 — stock filters (sqm/qty range, unit, low-stock, location, marketplace status).
   const [fSearch, setFSearch] = useState('');
@@ -219,7 +221,14 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         </Badge>
                       )}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
+                    <td className="px-4 py-2 font-mono text-xs">
+                      {it.sku ?? '—'}
+                      {(it.barcode || it.cpv_code || it.taric_code || it.serial_number) && (
+                        <div className="text-[10px] text-muted-foreground/70 normal-case font-sans">
+                          {[it.barcode && `bc:${it.barcode}`, it.serial_number && `s/n:${it.serial_number}`, it.cpv_code && `CPV:${it.cpv_code}`, it.taric_code && `TARIC:${it.taric_code}`].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-muted-foreground">{it.location ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">
                       {it.qty_on_hand}
@@ -232,6 +241,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         <Button size="sm" variant="ghost" title="Receive stock" onClick={() => move(it, 'in')}><PackagePlus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Issue stock" onClick={() => move(it, 'out')}><PackageMinus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Transfer to another warehouse" onClick={() => transfer(it)}><ArrowLeftRight className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" title="Edit codes & myDATA classification" onClick={() => setEditItem(it)}><Tag className="h-4 w-4" /></Button>
                         {listed ? (
                           <>
                             <Button size="sm" variant="ghost" title={`Record a marketplace sale (decrements stock)`} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-500" /></Button>
@@ -252,6 +262,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       </CardContent>
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} warehouseId={selectedWh} onAdded={async () => { setAddOpen(false); await load(); }} />
+      <EditItemCatalogDialog item={editItem} onOpenChange={(v) => { if (!v) setEditItem(null); }} onSaved={async () => { setEditItem(null); await load(selectedWh); }} />
       <AddWarehouseDialog open={addWhOpen} onOpenChange={setAddWhOpen} workspaceId={workspaceId} onAdded={async (id) => { setAddWhOpen(false); await load(id); }} />
       <ListToMarketplaceDialog
         item={listItem}
@@ -289,6 +300,13 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
   const [qty, setQty] = useState('0');
   const [reorder, setReorder] = useState('0');
   const [location, setLocation] = useState('');
+  // #207 — catalog depth
+  const [barcode, setBarcode] = useState('');
+  const [serial, setSerial] = useState('');
+  const [cpv, setCpv] = useState('');
+  const [taric, setTaric] = useState('');
+  const [clsType, setClsType] = useState('');
+  const [clsCategory, setClsCategory] = useState('');
   const [busy, setBusy] = useState(false);
   const searchSeq = useRef(0);
 
@@ -297,6 +315,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
     if (!open) {
       setQuery(''); setResults([]); setSelected(null);
       setUnit('pcs'); setQty('0'); setReorder('0'); setLocation('');
+      setBarcode(''); setSerial(''); setCpv(''); setTaric(''); setClsType(''); setClsCategory('');
     }
   }, [open]);
 
@@ -359,6 +378,10 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
         sku: selected.sku || undefined, unit: unit.trim() || 'pcs',
         qty_on_hand: parseFloat(qty) || 0, reorder_point: parseFloat(reorder) || 0,
         location: location.trim() || undefined,
+        barcode: barcode.trim() || null, serial_number: serial.trim() || null,
+        cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
+        mydata_classification_type: clsType.trim() || null,
+        mydata_classification_category: clsCategory.trim() || null,
       });
       onAdded();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
@@ -419,6 +442,18 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
               </div>
               <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional — e.g. Aisle 3 / Shelf B" /></div>
+              {/* #207 — codes & myDATA classification (optional) */}
+              <details className="rounded-md border border-border/60 px-3 py-2">
+                <summary className="cursor-pointer text-xs text-muted-foreground select-none">Codes &amp; myDATA classification (optional)</summary>
+                <div className="grid grid-cols-2 gap-3 pt-3">
+                  <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
+                  <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
+                  <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
+                  <div className="space-y-1"><Label className="text-xs">TARIC code</Label><Input value={taric} onChange={(e) => setTaric(e.target.value)} placeholder="customs" /></div>
+                  <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
+                  <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
+                </div>
+              </details>
             </div>
           )}
 
@@ -469,6 +504,63 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// #207 — edit an existing item's catalog-depth fields (codes + myDATA classification).
+const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange: (v: boolean) => void; onSaved: () => void }> = ({ item, onOpenChange, onSaved }) => {
+  const { toast } = useToast();
+  const open = !!item;
+  const [barcode, setBarcode] = useState('');
+  const [serial, setSerial] = useState('');
+  const [cpv, setCpv] = useState('');
+  const [taric, setTaric] = useState('');
+  const [clsType, setClsType] = useState('');
+  const [clsCategory, setClsCategory] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!item) return;
+    setBarcode(item.barcode ?? ''); setSerial(item.serial_number ?? '');
+    setCpv(item.cpv_code ?? ''); setTaric(item.taric_code ?? '');
+    setClsType(item.mydata_classification_type ?? ''); setClsCategory(item.mydata_classification_category ?? '');
+  }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = async () => {
+    if (!item) return;
+    try {
+      setBusy(true);
+      await warehouseService.updateItemCatalog(item.id, {
+        barcode: barcode.trim() || null, serial_number: serial.trim() || null,
+        cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
+        mydata_classification_type: clsType.trim() || null,
+        mydata_classification_category: clsCategory.trim() || null,
+      });
+      toast({ title: 'Item updated' });
+      onSaved();
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  if (!item) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Codes &amp; classification — {item.name}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
+          <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
+          <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
+          <div className="space-y-1"><Label className="text-xs">TARIC code</Label><Input value={taric} onChange={(e) => setTaric(e.target.value)} placeholder="customs" /></div>
+          <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
+          <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

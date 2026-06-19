@@ -21,6 +21,23 @@ export interface WarehouseItem {
   qty_reserved: number;
   reorder_point: number;
   location: string | null;
+  // #207 — catalog depth (Oxygen warehouse_products parity)
+  barcode: string | null;
+  serial_number: string | null;
+  cpv_code: string | null;
+  taric_code: string | null;
+  mydata_classification_type: string | null;
+  mydata_classification_category: string | null;
+}
+
+/** The #207 catalog-depth fields, set on create and editable afterwards. */
+export interface WarehouseItemCatalogFields {
+  barcode?: string | null;
+  serial_number?: string | null;
+  cpv_code?: string | null;
+  taric_code?: string | null;
+  mydata_classification_type?: string | null;
+  mydata_classification_category?: string | null;
 }
 
 export const warehouseService = {
@@ -76,7 +93,7 @@ export const warehouseService = {
   async createItem(input: {
     workspaceId: string; name: string; warehouse_id: string; sku?: string; unit?: string;
     qty_on_hand?: number; reorder_point?: number; location?: string; product_id?: string | null;
-  }): Promise<string> {
+  } & WarehouseItemCatalogFields): Promise<string> {
     const { data, error } = await supabase.from('warehouse_items').insert({
       workspace_id: input.workspaceId,
       warehouse_id: input.warehouse_id,
@@ -87,9 +104,28 @@ export const warehouseService = {
       reorder_point: input.reorder_point ?? 0,
       location: input.location ?? null,
       product_id: input.product_id ?? null,
+      barcode: input.barcode ?? null,
+      serial_number: input.serial_number ?? null,
+      cpv_code: input.cpv_code ?? null,
+      taric_code: input.taric_code ?? null,
+      mydata_classification_type: input.mydata_classification_type ?? null,
+      mydata_classification_category: input.mydata_classification_category ?? null,
     }).select('id').single();
     if (error) throw error;
     return (data as any).id as string;
+  },
+
+  /** Update a stock item's #207 catalog-depth fields (codes / classification). */
+  async updateItemCatalog(id: string, fields: WarehouseItemCatalogFields): Promise<void> {
+    const { error } = await supabase.from('warehouse_items').update({
+      barcode: fields.barcode ?? null,
+      serial_number: fields.serial_number ?? null,
+      cpv_code: fields.cpv_code ?? null,
+      taric_code: fields.taric_code ?? null,
+      mydata_classification_type: fields.mydata_classification_type ?? null,
+      mydata_classification_category: fields.mydata_classification_category ?? null,
+    }).eq('id', id);
+    if (error) throw error;
   },
 
   /** Minimal catalog product (name + sku) — used when building stock from a supplier

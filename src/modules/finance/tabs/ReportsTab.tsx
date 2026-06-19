@@ -15,7 +15,7 @@ type ReportKind =
   | 'purchases_per_product' | 'receipts_per_product'
   | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
-  | 'vat_return' | 'mydata_reconciliation' | 'myf'
+  | 'vat_return' | 'vat_by_code' | 'mydata_reconciliation' | 'myf'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
@@ -39,7 +39,8 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
   { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
   // VAT / tax
-  { value: 'vat_return', label: 'VAT analysis', group: 'vat', period: 'range' },
+  { value: 'vat_return', label: 'VAT analysis (by rate)', group: 'vat', period: 'range' },
+  { value: 'vat_by_code', label: 'VAT analysis (by myDATA code)', group: 'vat', period: 'range' },
   { value: 'mydata_reconciliation', label: 'myDATA reconciliation', group: 'vat', period: 'range' },
   { value: 'myf', label: 'MYF summary (per counterparty)', group: 'vat', period: 'range' },
   // Outstanding snapshots (no period)
@@ -136,6 +137,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportTopSupplierOutstanding(workspaceId); break;
         case 'vat_return':
           data = await financeService.getVatReport(workspaceId, range.from, range.to); break;
+        case 'vat_by_code':
+          data = await financeService.getVatByCode(workspaceId, range.from, range.to); break;
         case 'mydata_reconciliation':
           data = await financeService.getMyDataReconciliation(workspaceId, range.from, range.to); break;
         case 'myf':
@@ -308,6 +311,7 @@ function primarySortKey(report: ReportKind): string {
     case 'top_supplier_outstanding':
       return 'outstanding';
     case 'vat_return':
+    case 'vat_by_code':
       return 'vat';
     case 'myf':
       return 'gross';
@@ -396,6 +400,15 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: payable >= 0 ? 'VAT payable' : 'VAT credit', value: formatMoney(Math.abs(payable)) },
       ];
     }
+    case 'vat_by_code': {
+      let net = 0, vat = 0;
+      for (const r of rows) { net += Number(r.net || 0); vat += Number(r.vat || 0); }
+      return [
+        { label: 'Net', value: formatMoney(net) },
+        { label: 'VAT', value: formatMoney(vat) },
+        { label: 'Code groups', value: String(rows.length) },
+      ];
+    }
     case 'mydata_reconciliation': {
       const count = (b: string) => rows.filter((r) => r.bucket === b).length;
       const attention = rows.filter((r) => r.bucket !== 'accepted').length;
@@ -467,6 +480,16 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
     if (input) body.push(line('Purchases (supplier bills)', input));
     if (inputCredit) body.push(line('Less: supplier credit notes', inputCredit));
     return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
+  }
+  if (report === 'vat_by_code') {
+    const fmtRate = (rate: any) => rate == null ? '—' : `${Number(rate)}%`;
+    return (
+      <Table headers={['VAT cat', 'Rate', 'Classification type', 'Classification category', 'Net', 'VAT', 'Lines']} totals={totals} rows={rows.map((r: any) => [
+        r.vat_category == null ? '—' : String(r.vat_category), fmtRate(r.vat_rate),
+        r.income_classification_type ?? '—', r.income_classification_category ?? '—',
+        formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), String(r.line_count ?? 0),
+      ])} />
+    );
   }
   if (report === 'mydata_reconciliation') {
     return <MyDataReconTable rows={rows} totals={totals} />;

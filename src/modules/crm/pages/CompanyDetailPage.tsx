@@ -74,6 +74,18 @@ interface Company {
   credit_limit?: number | null;
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
+  // #207 — commercial depth
+  contact_group?: string | null;
+  include_in_myf?: boolean | null;
+  vat_exemption_reason?: string | null;
+  billing_name?: string | null;
+  billing_vat?: string | null;
+  billing_tax_office?: string | null;
+  billing_street?: string | null;
+  billing_street_number?: string | null;
+  billing_postal_code?: string | null;
+  billing_city?: string | null;
+  billing_country_code?: string | null;
   vat_number?: string | null;
   country_code?: string | null;
   tax_office?: string | null;
@@ -926,6 +938,80 @@ export const CompanyDetailPage: React.FC = () => {
                     placeholder="e.g. Long-term partner — 50% per 2025 agreement, valid until renewal."
                     rows={2}
 />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Invoicing & VAT (commercial) — #207 parity with Oxygen contact card:
+                segment, ΜΥΦ inclusion, default on-invoice VAT-exemption reason, and a
+                separate billing identity (different legal entity / ΑΦΜ / address used on
+                the myDATA counterpart when set). */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4"/>
+                  Invoicing &amp; VAT
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_group">Segment</Label>
+                    <Select
+                      value={company.contact_group || 'none'}
+                      onValueChange={(v) => updateField('contact_group', v === 'none' ? null : v)}
+                      disabled={!editing}
+                    >
+                      <SelectTrigger id="contact_group"><SelectValue placeholder="Unsegmented"/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unsegmented</SelectItem>
+                        <SelectItem value="b2b">B2B</SelectItem>
+                        <SelectItem value="retail">Retail</SelectItem>
+                        <SelectItem value="wholesale">Wholesale</SelectItem>
+                        <SelectItem value="public_sector">Public sector</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Groups this party for filtering and statement batches.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vat_exemption_reason">Default VAT-exemption category</Label>
+                    <Input
+                      id="vat_exemption_reason"
+                      value={company.vat_exemption_reason || ''}
+                      onChange={(e) => updateField('vat_exemption_reason', e.target.value)}
+                      disabled={!editing}
+                      placeholder="myDATA category 1–31 (for 0% lines)"
+/>
+                    <p className="text-xs text-muted-foreground">Pre-fills the exemption category on 0%-VAT invoice lines for this customer.</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="include_in_myf" className="cursor-pointer">Include in ΜΥΦ</Label>
+                    <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party.</p>
+                  </div>
+                  <Switch
+                    id="include_in_myf"
+                    checked={company.include_in_myf !== false}
+                    onCheckedChange={(v) => patchInline({ include_in_myf: v })}
+/>
+                </div>
+
+                {/* Separate billing identity */}
+                <div className="rounded-md border border-border/60 p-3 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than above (different ΑΦΜ / name / address). Leave blank to invoice the party as-is.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1"><Label htmlFor="billing_name">Billing name</Label><Input id="billing_name" value={company.billing_name || ''} onChange={(e) => updateField('billing_name', e.target.value)} disabled={!editing} placeholder="Legal entity name"/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_vat">Billing VAT (ΑΦΜ)</Label><Input id="billing_vat" value={company.billing_vat || ''} onChange={(e) => updateField('billing_vat', e.target.value)} disabled={!editing}/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_tax_office">Tax office (ΔΟΥ)</Label><Input id="billing_tax_office" value={company.billing_tax_office || ''} onChange={(e) => updateField('billing_tax_office', e.target.value)} disabled={!editing}/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_country_code">Country code</Label><Input id="billing_country_code" value={company.billing_country_code || ''} onChange={(e) => updateField('billing_country_code', e.target.value.toUpperCase().slice(0, 2))} disabled={!editing} maxLength={2} placeholder="EL"/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_street">Street</Label><Input id="billing_street" value={company.billing_street || ''} onChange={(e) => updateField('billing_street', e.target.value)} disabled={!editing}/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_street_number">Number</Label><Input id="billing_street_number" value={company.billing_street_number || ''} onChange={(e) => updateField('billing_street_number', e.target.value)} disabled={!editing}/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_postal_code">Postal code</Label><Input id="billing_postal_code" value={company.billing_postal_code || ''} onChange={(e) => updateField('billing_postal_code', e.target.value)} disabled={!editing}/></div>
+                    <div className="space-y-1"><Label htmlFor="billing_city">City</Label><Input id="billing_city" value={company.billing_city || ''} onChange={(e) => updateField('billing_city', e.target.value)} disabled={!editing}/></div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

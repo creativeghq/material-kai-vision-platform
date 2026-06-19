@@ -48,20 +48,28 @@ function vatCategory(pct: number): number {
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function partyFromCrm(c: any): FiscalParty {
-  const name = c.name ?? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
+  // #207 — a party may be invoiced under a SEPARATE billing identity (different
+  // legal entity / ΑΦΜ / address than the contact card). When any billing_* field
+  // is set we prefer it for the myDATA counterpart; otherwise fall back to the
+  // party's own identity. This keeps the CRM "separate billing identity" non-inert.
+  const hasBilling = !!(c.billing_vat || c.billing_name || c.billing_street || c.billing_city);
+  const name = (hasBilling && c.billing_name)
+    || c.name
+    || `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
+  const country = (hasBilling && c.billing_country_code) || c.country_code || 'GR';
   return {
-    vatNumber: c.vat_number ?? '',
-    country: c.country_code ?? 'GR',
+    vatNumber: (hasBilling && c.billing_vat) || c.vat_number || '',
+    country,
     branch: 0,
     name,
     profession: c.profession ?? undefined,
-    taxOffice: c.tax_office ?? undefined,
+    taxOffice: (hasBilling && c.billing_tax_office) || c.tax_office || undefined,
     address: {
-      street: c.street ?? c.address ?? '',
-      number: c.street_number ?? '',
-      postalCode: c.postal_code ?? '',
-      city: c.city ?? '',
-      country: c.country_code ?? 'GR',
+      street: (hasBilling && c.billing_street) || c.street || c.address || '',
+      number: (hasBilling && c.billing_street_number) || c.street_number || '',
+      postalCode: (hasBilling && c.billing_postal_code) || c.postal_code || '',
+      city: (hasBilling && c.billing_city) || c.city || '',
+      country,
     },
     email: c.email ?? undefined,
     phone: c.phone ?? undefined,

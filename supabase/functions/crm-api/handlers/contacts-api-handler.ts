@@ -205,6 +205,10 @@ export async function handleContacts(req: Request): Promise<Response> {
         status, lead_source, contact_type, vat_number, country_code, tax_office,
         first_name, last_name, profession, is_client, is_supplier,
         discount_pct, discount_percent, discount_notes, credit_limit,
+        // #207 — commercial depth
+        contact_group, include_in_myf, vat_exemption_reason,
+        billing_name, billing_vat, billing_tax_office, billing_street,
+        billing_street_number, billing_postal_code, billing_city, billing_country_code,
       } = body;
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (name !== undefined) updates.name = name;
@@ -239,6 +243,18 @@ export async function handleContacts(req: Request): Promise<Response> {
       else if (discount_pct !== undefined) updates.discount_percent = discount_pct;
       if (discount_notes !== undefined) updates.discount_notes = discount_notes;
       if (credit_limit !== undefined) updates.credit_limit = credit_limit;
+      // #207 — commercial depth
+      if (contact_group !== undefined) updates.contact_group = contact_group;
+      if (include_in_myf !== undefined) updates.include_in_myf = include_in_myf;
+      if (vat_exemption_reason !== undefined) updates.vat_exemption_reason = vat_exemption_reason;
+      if (billing_name !== undefined) updates.billing_name = billing_name;
+      if (billing_vat !== undefined) updates.billing_vat = billing_vat;
+      if (billing_tax_office !== undefined) updates.billing_tax_office = billing_tax_office;
+      if (billing_street !== undefined) updates.billing_street = billing_street;
+      if (billing_street_number !== undefined) updates.billing_street_number = billing_street_number;
+      if (billing_postal_code !== undefined) updates.billing_postal_code = billing_postal_code;
+      if (billing_city !== undefined) updates.billing_city = billing_city;
+      if (billing_country_code !== undefined) updates.billing_country_code = billing_country_code;
 
       const { data, error } = await supabase
         .from('crm_contacts')

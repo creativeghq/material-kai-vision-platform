@@ -21,6 +21,11 @@ const COMPANY_WRITABLE_COLUMNS = [
   'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'notes',
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
+  // #207 — commercial depth: segmentation, ΜΥΦ inclusion, on-invoice VAT-exemption
+  // reason, and a separate billing identity (consumed by partyFromCrm at issue).
+  'contact_group', 'include_in_myf', 'vat_exemption_reason',
+  'billing_name', 'billing_vat', 'billing_tax_office', 'billing_street',
+  'billing_street_number', 'billing_postal_code', 'billing_city', 'billing_country_code',
   // Tax / VAT identity
   'vat_number', 'country_code', 'tax_office', 'profession', 'street', 'street_number',
   // VIES / ΑΑΔΕ verification (mirrors the myaade-rgwspublic2 / vies-validate write set)

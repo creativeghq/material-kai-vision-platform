@@ -306,6 +306,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const table = customer.type === 'company' ? 'crm_companies' : 'crm_contacts';
       const { data } = await supabase.from(table).select('*').eq('id', customer.id).maybeSingle();
       setCustomerAddr(data ?? null);
+      // #207 — adopt the party's commercial defaults: ΜΥΦ inclusion preference and
+      // (for 0%-VAT lines) the party's default myDATA VAT-exemption category.
+      if (data && (data as any).include_in_myf === false) setIncludeInMyf(false);
       // Outstanding = sum of still-owed amounts on issued/partially-paid/overdue invoices.
       const col = customer.type === 'company' ? 'customer_company_id' : 'customer_contact_id';
       const { data: openRows } = await supabase
@@ -553,7 +556,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           unit_cost_snapshot: l.unit_cost.trim() ? parseFloat(l.unit_cost) : null,
           selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
-          vat_exemption_category: l.vat_exemption ? parseInt(l.vat_exemption, 10) : null,
+          // #207 — 0%-VAT lines fall back to the customer's default myDATA exemption
+          // category (crm party.vat_exemption_reason) when the line leaves it blank.
+          vat_exemption_category: l.vat_exemption
+            ? parseInt(l.vat_exemption, 10)
+            : (pct === 0 && customerAddr?.vat_exemption_reason
+                ? (parseInt(String(customerAddr.vat_exemption_reason), 10) || null)
+                : null),
           income_classification_type: l.income_classification_type || null,
           income_classification_category: l.income_classification_category || null,
           fees_amount: parseFloat(l.fees) || 0, stamp_duty_amount: parseFloat(l.stamp_duty) || 0,
