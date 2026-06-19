@@ -43,7 +43,16 @@ async function http(url, opts = {}) {
   }
 }
 
-/** Register a check. `fn` must throw on failure. Pass required=false to allow SKIP. */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const RETRIES = Number(process.env.SMOKE_RETRIES || 3);     // attempts per check
+const BACKOFF_MS = Number(process.env.SMOKE_BACKOFF_MS || 5000);
+
+/**
+ * Register a check. `fn` must throw on failure. SKIPs if a required env is missing.
+ * Each check is retried up to RETRIES times with backoff so a transient blip — a deploy
+ * restart, a cold start, a momentary network hiccup — doesn't page you. Only a SUSTAINED
+ * failure (still failing after all attempts) is reported as FAIL.
+ */
 async function check(name, requiredEnv, fn) {
   const missing = requiredEnv.filter((k) => !process.env[k] && !DEFAULTED[k]);
   if (missing.length) {
@@ -51,12 +60,19 @@ async function check(name, requiredEnv, fn) {
     return;
   }
   const started = Date.now();
-  try {
-    const detail = await fn();
-    results.push({ name, status: 'PASS', detail: detail || '', ms: Date.now() - started });
-  } catch (err) {
-    results.push({ name, status: 'FAIL', detail: String(err?.message || err), ms: Date.now() - started });
+  let lastErr;
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    try {
+      const detail = await fn();
+      const note = attempt > 1 ? `${detail || ''} (after ${attempt} attempts)` : (detail || '');
+      results.push({ name, status: 'PASS', detail: note, ms: Date.now() - started });
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < RETRIES) await sleep(BACKOFF_MS);
+    }
   }
+  results.push({ name, status: 'FAIL', detail: `${String(lastErr?.message || lastErr)} (${RETRIES} attempts)`, ms: Date.now() - started });
 }
 
 // Track which "env" keys we satisfied with a built-in default so check() doesn't SKIP them.
