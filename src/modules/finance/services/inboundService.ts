@@ -28,6 +28,7 @@ export interface InboundDocument {
   lines: InboundDocLine[];
   status: 'new' | 'classified' | 'received' | 'dismissed';
   created_supplier_bill_id: string | null;
+  category_id: string | null;
   created_at: string;
 }
 
@@ -66,6 +67,12 @@ export const inboundService = {
 
   async dismiss(docId: string): Promise<void> {
     const { error } = await supabase.from('inbound_documents').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', docId);
+    if (error) throw error;
+  },
+
+  /** Assign / clear the internal finance category on an inbound (myDATA) document. */
+  async setCategory(docId: string, categoryId: string | null): Promise<void> {
+    const { error } = await supabase.from('inbound_documents').update({ category_id: categoryId, updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;
   },
 

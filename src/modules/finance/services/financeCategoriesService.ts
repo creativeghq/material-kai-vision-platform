@@ -30,6 +30,16 @@ export const financeCategoriesService = {
     if (error) throw error;
   },
 
+  /** Rename / re-kind a category. Historical document references follow automatically (FK by id). */
+  async update(id: string, patch: { name?: string; kind?: FinanceCategory['kind'] }): Promise<void> {
+    const clean: Record<string, any> = {};
+    if (patch.name !== undefined) clean.name = patch.name.trim();
+    if (patch.kind !== undefined) clean.kind = patch.kind;
+    if (Object.keys(clean).length === 0) return;
+    const { error } = await supabase.from('finance_categories').update(clean as any).eq('id', id);
+    if (error) throw error;
+  },
+
   /** Set the default sell margin % for a category (used to auto-price received goods). */
   async setMargin(id: string, marginPct: number | null): Promise<void> {
     const { error } = await supabase.from('finance_categories').update({ margin_pct: marginPct } as any).eq('id', id);

@@ -52,6 +52,24 @@ const DOC_LABEL: Record<DocType, string> = {
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
 const transmitted = (s: any) => s === 'accepted' || s === 'offline';
 
+const NONE = '__none';
+
+/** Inline category picker used in document rows. Shows the current category + lets the
+ *  operator (re)assign it without leaving the list. '__none' clears the category. */
+const CategoryCell: React.FC<{
+  value: string | null;
+  options: FinanceCategory[];
+  onChange: (categoryId: string | null) => void;
+}> = ({ value, options, onChange }) => (
+  <Select value={value ?? NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
+    <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+    <SelectContent>
+      <SelectItem value={NONE}><span className="text-muted-foreground">Uncategorized</span></SelectItem>
+      {options.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);
+
 const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -66,7 +84,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
   const [cheques, setCheques] = useState<Cheque[]>([]);
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
+  const [categoryFilter, setCategoryFilter] = useState<string>('all'); // 'all' | 'none' | <category id>
   const [loading, setLoading] = useState(true);
   const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
@@ -101,6 +121,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         chequesService.list(activeWorkspaceId).catch(() => []),
         financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
       ]);
+      setCategories(cats ?? []);
       setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
       setInvoices(inv);
       setCreditNotes(cn);
@@ -113,12 +134,35 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
+  // Reset the category filter whenever the document type changes (categories are side-scoped).
+  useEffect(() => { setCategoryFilter('all'); }, [type]);
+
+  // Which finance-category side applies to the active surface (drives filter + inline picker).
+  const sideKind: 'income' | 'expense' | null =
+    type === 'expenses' ? 'expense' : (type === 'invoices' || type === 'receipts') ? 'income' : null;
+  const sideCategories = useMemo(
+    () => categories.filter((c) => !sideKind || c.kind === sideKind || c.kind === 'both'),
+    [categories, sideKind],
+  );
+  const matchesCategoryFilter = (categoryId: any) =>
+    categoryFilter === 'all' ? true : categoryFilter === 'none' ? !categoryId : categoryId === categoryFilter;
 
   const rows = useMemo(() => {
-    if (type === 'invoices') return invoices.filter((i) => !isReceipt((i as any).document_type));
-    if (type === 'receipts') return invoices.filter((i) => isReceipt((i as any).document_type));
-    return [];
-  }, [type, invoices]);
+    let base: Invoice[] = [];
+    if (type === 'invoices') base = invoices.filter((i) => !isReceipt((i as any).document_type));
+    else if (type === 'receipts') base = invoices.filter((i) => isReceipt((i as any).document_type));
+    return base.filter((i) => matchesCategoryFilter((i as any).category_id));
+  }, [type, invoices, categoryFilter]);
+
+  const filteredInbound = useMemo(() => inbound.filter((d) => matchesCategoryFilter((d as any).category_id)), [inbound, categoryFilter]);
+  const filteredPayments = useMemo(() => payments.filter((p) => matchesCategoryFilter((p as any).category_id)), [payments, categoryFilter]);
+
+  // Inline category assignment — optimistic local update so the cell reflects the change at once.
+  const setInvoiceCategory = async (invoiceId: string, categoryId: string | null) => {
+    setInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, category_id: categoryId } as Invoice : i));
+    try { await financeService.updateInvoice(invoiceId, { category_id: categoryId } as any); }
+    catch (err: any) { toast({ title: 'Failed to set category', description: err?.message, variant: 'destructive' }); void load(); }
+  };
 
   const statusVariant = (s: string) => s === 'overdue' ? 'destructive' : s === 'paid' ? 'default' : 'outline';
 
@@ -131,6 +175,16 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold capitalize">{DOC_LABEL[type]}</h2>
               <div className="flex items-center gap-2">
+                {(type === 'invoices' || type === 'receipts' || type === 'expenses' || type === 'payments') && (
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All categories" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      <SelectItem value="none">Uncategorized</SelectItem>
+                      {sideCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
                 {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
                 )}
@@ -180,9 +234,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'credit_notes' ? (
                   <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={inbound} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} />
+                  <InboundTable rows={filteredInbound} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
                 ) : type === 'payments' ? (
-                  <PaymentsTable rows={payments} categoryName={categoryName} />
+                  <PaymentsTable rows={filteredPayments} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={deliveryNotes} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'cheques' ? (
@@ -209,7 +263,13 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}>
                           <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
                           <td className="px-4 py-2">{i.issued_at ? new Date(i.issued_at).toLocaleDateString() : <span className="text-muted-foreground">Draft</span>}</td>
-                          <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName((i as any).category_id)}</td>
+                          <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                            {isAccountant ? (
+                              <span className="text-xs text-muted-foreground">{categoryName((i as any).category_id)}</span>
+                            ) : (
+                              <CategoryCell value={(i as any).category_id ?? null} options={sideCategories} onChange={(v) => setInvoiceCategory(i.id, v)} />
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
                           <td className="px-4 py-2 text-center"><Badge variant={statusVariant(i.status)} className="text-[10px]">{i.status}</Badge></td>
@@ -502,16 +562,22 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
   </table>
 );
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void }> = ({ rows, workspaceId, readOnly, onChanged }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
+  const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
 
   const createBill = async (id: string) => {
     setBusy(id);
     try { await inboundService.toSupplierBill(id); toast({ title: 'Supplier bill created' }); onChanged(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
+  };
+  const setCategory = async (id: string, categoryId: string | null) => {
+    setLocalCat((m) => ({ ...m, [id]: categoryId }));
+    try { await inboundService.setCategory(id, categoryId); }
+    catch (err: any) { toast({ title: 'Failed to set category', description: err?.message, variant: 'destructive' }); onChanged(); }
   };
   const dismiss = async (id: string) => {
     setBusy(id);
@@ -535,13 +601,16 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           <th className="px-4 py-2 text-left">Date</th>
           <th className="px-4 py-2 text-left">Issuer</th>
           <th className="px-4 py-2 text-left">Type</th>
+          <th className="px-4 py-2 text-left">Category</th>
           <th className="px-4 py-2 text-right">Total</th>
           <th className="px-4 py-2 text-center">Status</th>
           <th className="px-4 py-2 text-right" />
         </tr>
       </thead>
       <tbody>
-        {rows.map((d) => (
+        {rows.map((d) => {
+          const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
+          return (
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
             <td className="px-4 py-2">
@@ -549,6 +618,11 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               <div className="text-xs text-muted-foreground font-mono">{d.issuer_vat ?? ''}</div>
             </td>
             <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.doc_type ?? '—'}</Badge></td>
+            <td className="px-4 py-2">
+              {readOnly
+                ? <span className="text-xs text-muted-foreground">{categoryName(cat)}</span>
+                : <CategoryCell value={cat} options={categories} onChange={(v) => setCategory(d.id, v)} />}
+            </td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{d.status}</Badge></td>
             <td className="px-4 py-2 text-right">
@@ -567,7 +641,8 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               )}
             </td>
           </tr>
-        ))}
+          );
+        })}
       </tbody>
       {receiveDoc && workspaceId && (
         <ReceiveToWarehouseDialog
