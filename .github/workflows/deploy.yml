@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'public/**'
       - 'supabase/functions/**'
       - 'package.json'
       - 'package-lock.json'
