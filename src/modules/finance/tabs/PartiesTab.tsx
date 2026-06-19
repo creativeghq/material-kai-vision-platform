@@ -9,18 +9,21 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
+import { Link } from 'react-router-dom';
 import {
   financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow,
 } from '@/modules/finance/services/financeService';
+import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
+import { ExternalLink } from 'lucide-react';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment',
   supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
 };
 
-interface Props { workspaceId: string; statementsEnabled: boolean }
+interface Props { workspaceId: string; statementsEnabled: boolean; autoOpenParty?: string | null; financeBase?: string }
 
-export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled }) => {
+export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, autoOpenParty, financeBase }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<PartyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,15 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled }) 
   const [selected, setSelected] = useState<PartyRow | null>(null);
 
   useEffect(() => { void load(); }, [workspaceId, role]);
+
+  // Deep-link from another surface (e.g. the CRM Account tab → "View ledger in Finance")
+  // pre-opens that party's drill-down once the list has loaded.
+  useEffect(() => {
+    if (!autoOpenParty || rows.length === 0) return;
+    const [t, id] = autoOpenParty.split(':');
+    const match = rows.find((r) => r.party_type === t && r.party_id === id);
+    if (match) setSelected(match);
+  }, [autoOpenParty, rows]);
 
   const load = async () => {
     try {
@@ -148,6 +160,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled }) 
         open={selected !== null}
         onClose={() => setSelected(null)}
         statementsEnabled={statementsEnabled}
+        crmBase={financeBase === '/admin/finance' ? '/admin/crm' : '/crm'}
       />
     </div>
   );
@@ -160,9 +173,10 @@ interface DetailProps {
   open: boolean;
   onClose: () => void;
   statementsEnabled: boolean;
+  crmBase: string;
 }
 
-const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statementsEnabled }) => {
+const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statementsEnabled, crmBase }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -315,16 +329,24 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
 
         {!party ? null : (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <KpiBlock label="They owe us" value={formatMoney(Number(party.receivable_outstanding || 0))} accent={Number(party.receivable_outstanding) > 0 ? 'destructive' : undefined} />
-              <KpiBlock label="We owe them" value={formatMoney(Number(party.payable_outstanding || 0))} />
-              <KpiBlock label="Net position" value={formatMoney(Number(party.net_position || 0))} accent={Number(party.net_position) < 0 ? 'destructive' : undefined} />
-            </div>
+            <PartyAccountSummary
+              customer={(party.is_customer || Number(party.invoiced_total) > 0 || Number(party.receivable_outstanding) > 0)
+                ? { invoiced: Number(party.invoiced_total || 0), paid: Number(party.receivable_paid_total || 0), outstanding: Number(party.receivable_outstanding || 0) }
+                : null}
+              supplier={(party.is_supplier || Number(party.billed_total) > 0 || Number(party.payable_outstanding) > 0)
+                ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
+                : null}
+            />
 
-            <Button onClick={handleSend} disabled={sending || !statementsEnabled} className="w-full">
-              {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-              {statementsEnabled ? 'Email account statement' : 'Statements disabled (Settings)'}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={handleSend} disabled={sending || !statementsEnabled} className="flex-1">
+                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                {statementsEnabled ? 'Email account statement' : 'Statements disabled (Settings)'}
+              </Button>
+              <Link to={`${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}`} className="sm:w-auto">
+                <Button variant="outline" className="w-full"><ExternalLink className="h-4 w-4 mr-2" /> View in CRM</Button>
+              </Link>
+            </div>
 
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -454,13 +476,6 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
     </Dialog>
   );
 };
-
-const KpiBlock: React.FC<{ label: string; value: string; accent?: 'destructive' }> = ({ label, value, accent }) => (
-  <Card className="dashboard-card border-0"><CardContent className="p-3">
-    <div className="text-xs text-muted-foreground">{label}</div>
-    <div className={`text-lg font-semibold ${accent === 'destructive' ? 'text-destructive' : ''}`}>{value}</div>
-  </CardContent></Card>
-);
 
 const Section: React.FC<{ title: React.ReactNode; empty: string; children: React.ReactNode }> = ({ title, empty, children }) => (
   <Card>

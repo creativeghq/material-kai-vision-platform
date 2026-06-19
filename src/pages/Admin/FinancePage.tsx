@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp,
   ArrowDownCircle,
@@ -95,6 +95,17 @@ const FinancePage: React.FC = () => {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant } = usePermissions(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;
+  // Tab is URL-driven so other surfaces (e.g. the CRM Account tab) can deep-link
+  // straight to a view — /finance?tab=parties&party=company:<id>.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'dashboard';
+  const autoOpenParty = searchParams.get('party');
+  const onTabChange = (v: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set('tab', v);
+    if (v !== 'parties') p.delete('party');
+    setSearchParams(p, { replace: true });
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -243,7 +254,7 @@ const FinancePage: React.FC = () => {
           </Card>
         )}
 
-        <Tabs defaultValue="dashboard" orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             {!isAccountant && (
               <Link
@@ -650,7 +661,7 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── PARTIES ─────────── */}
           <TabsContent value="parties" className="space-y-4">
-            <PartiesTab workspaceId={workspaceId} statementsEnabled={settings?.statements_enabled ?? false} />
+            <PartiesTab workspaceId={workspaceId} statementsEnabled={settings?.statements_enabled ?? false} autoOpenParty={autoOpenParty} financeBase={financeBase} />
           </TabsContent>
 
           {/* ─────────── SETTINGS ─────────── */}

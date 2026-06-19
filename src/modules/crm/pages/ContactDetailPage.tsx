@@ -4,7 +4,6 @@ import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Sa
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
-  SupplierAccountOverview,
   CustomerQuotesTab,
   CustomerInvoicesTab,
   CustomerPaymentsTab,
@@ -1073,8 +1072,7 @@ export const ContactDetailPage: React.FC = () => {
 
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
-            {contact.id && <CustomerAccountOverview contactId={contact.id} />}
-            {contact.id && contact.is_supplier && <SupplierAccountOverview contactId={contact.id} />}
+            {contact.id && <CustomerAccountOverview contactId={contact.id} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />}
           </TabsContent>
 
           {/* Quotes Tab */}

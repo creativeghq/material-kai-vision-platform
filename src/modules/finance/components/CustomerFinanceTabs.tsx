@@ -3,7 +3,7 @@
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, ArrowUpRight, Mail, TrendingUp, Wallet, CalendarClock, ShoppingBag } from 'lucide-react';
+import { Loader2, FileText, ArrowUpRight, Mail, Wallet, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -63,35 +63,103 @@ export const CustomerFinanceSummary: React.FC<Target> = ({ contactId, companyId 
 };
 
 /**
- * #201 — consolidated customer account overview: KPIs (owed / total sales / revenue / open
- * orders / last payment) + the customer's top products to push + a one-click "email account
- * overview" (statement). Reused on the CRM contact/company detail pages so sales reps (and
- * managers) get the full picture in one place.
+ * Shared presentational account summary — the single source of layout for a party's money
+ * position, used by BOTH the CRM Account tab and the Finance → Parties drill-down so they
+ * look identical. Shows a net-position headline + an "As customer" and/or "As supplier"
+ * section (each only when that role has data). Pure: callers pass already-resolved numbers.
  */
-export const CustomerAccountOverview: React.FC<Target> = ({ contactId, companyId }) => {
+export const PartyAccountSummary: React.FC<{
+  customer?: { invoiced: number; paid: number; outstanding: number } | null;
+  supplier?: { billed: number; paid: number; outstanding: number; ordered?: number } | null;
+  meta?: Array<{ label: string; value: React.ReactNode }>;
+}> = ({ customer, supplier, meta }) => {
+  const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
+  const netLabel = net > 0 ? 'They owe us (net)' : net < 0 ? 'We owe them (net)' : 'Settled up';
+  const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
+  const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
+
+  const cell = (label: string, value: React.ReactNode, danger = false) => (
+    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
+      <CardContent className="p-3">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-3">
+      <Card className={`dashboard-card border-0 ${netRing}`}>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><Wallet className="h-3.5 w-3.5" /> {netLabel}</div>
+          <div className={`text-2xl font-semibold ${netTone}`}>{formatMoney(Math.abs(net))}</div>
+        </CardContent>
+      </Card>
+
+      {customer && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground">As customer</div>
+          <div className="grid grid-cols-3 gap-3">
+            {cell('Invoiced', formatMoney(customer.invoiced))}
+            {cell('Paid', formatMoney(customer.paid))}
+            {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
+          </div>
+        </div>
+      )}
+
+      {supplier && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {cell('Billed to us', formatMoney(supplier.billed))}
+            {cell('Paid to them', formatMoney(supplier.paid))}
+            {cell('We owe', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
+            {cell('Ordered', formatMoney(supplier.ordered ?? 0))}
+          </div>
+        </div>
+      )}
+
+      {meta && meta.length > 0 && (
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+          {meta.map((m, i) => <div key={i}>{m.label}: <span className="text-foreground">{m.value}</span></div>)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * #201 — consolidated account overview for the CRM party page: the shared PartyAccountSummary
+ * (customer + supplier net position) + open orders / last payment meta + the customer's top
+ * products to push + email-statement + an optional "View ledger in Finance" cross-link.
+ */
+export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ invoicedTotal: number; paidTotal: number; outstandingTotal: number; quoteCount: number } | null>(null);
+  const [supplierAcct, setSupplierAcct] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number; orderedTotal: number } | null>(null);
   const [lastPayment, setLastPayment] = useState<{ paid_at: string; amount: number; currency: string } | null>(null);
   const [openOrders, setOpenOrders] = useState(0);
   const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
   const [emailing, setEmailing] = useState(false);
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
   const load = async () => {
     if (!contactId && !companyId) return;
     setLoading(true);
     try {
-      const [acct, payments, topProds] = await Promise.all([
+      const [acct, supAcct, payments, topProds] = await Promise.all([
         financeService.getCustomerAccount({ contactId, companyId }),
+        isSupplier ? financeService.getSupplierAccount({ contactId, companyId }) : Promise.resolve(null),
         financeService.listPayments({ counterpartyContactId: contactId, counterpartyCompanyId: companyId, direction: 'in', limit: 1 }),
         activeWorkspaceId
           ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 })
           : Promise.resolve([] as CustomerTopProductRow[]),
       ]);
       setAccount(acct ? { invoicedTotal: acct.invoicedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal, quoteCount: acct.quoteCount } : null);
+      setSupplierAcct(supAcct ? { billedTotal: supAcct.billedTotal, paidTotal: supAcct.paidTotal, outstandingTotal: supAcct.outstandingTotal, orderedTotal: supAcct.orderedTotal } : null);
       const p = payments[0];
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
       setTopProducts(topProds);
@@ -129,32 +197,29 @@ export const CustomerAccountOverview: React.FC<Target> = ({ contactId, companyId
 
   if (loading) return <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>;
 
-  const kpi = (label: string, value: React.ReactNode, Icon: React.ElementType, danger = false) => (
-    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Icon className="h-3 w-3" /> {label}</div>
-        <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold text-primary">Account overview</h3>
-        <Button size="sm" variant="outline" onClick={emailOverview} disabled={emailing}>
-          {emailing ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-          Email account info
-        </Button>
+        <div className="flex items-center gap-2">
+          {ledgerHref && (
+            <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
+          )}
+          <Button size="sm" variant="outline" onClick={emailOverview} disabled={emailing}>
+            {emailing ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+            Email account info
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        {kpi('Owed', formatMoney(account?.outstandingTotal ?? 0), Wallet, (account?.outstandingTotal ?? 0) > 0)}
-        {kpi('Total sales', formatMoney(account?.invoicedTotal ?? 0), TrendingUp)}
-        {kpi('Revenue (paid)', formatMoney(account?.paidTotal ?? 0), TrendingUp)}
-        {kpi('Open orders', openOrders, ShoppingBag)}
-        {kpi('Last payment', lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—', CalendarClock)}
-      </div>
+      <PartyAccountSummary
+        customer={account ? { invoiced: account.invoicedTotal, paid: account.paidTotal, outstanding: account.outstandingTotal } : null}
+        supplier={supplierAcct ? { billed: supplierAcct.billedTotal, paid: supplierAcct.paidTotal, outstanding: supplierAcct.outstandingTotal, ordered: supplierAcct.orderedTotal } : null}
+        meta={[
+          { label: 'Open orders', value: openOrders },
+          { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },
+        ]}
+      />
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
@@ -192,50 +257,6 @@ export const CustomerAccountOverview: React.FC<Target> = ({ contactId, companyId
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-};
-
-/**
- * Supplier-side account overview — the AP mirror of CustomerAccountOverview. Shows, for a
- * party we buy from: total they've billed us, total we've paid them, and how much we still
- * owe (outstanding), plus ordered total + PO count. Mounts on the CRM company/contact page
- * when the party is_supplier. Data from getSupplierAccount (vw_supplier_account_summary).
- */
-export const SupplierAccountOverview: React.FC<Target> = ({ contactId, companyId }) => {
-  const [acct, setAcct] = useState<{ poCount: number; orderedTotal: number; billedTotal: number; paidTotal: number; outstandingTotal: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
-  const load = async () => {
-    if (!contactId && !companyId) return;
-    setLoading(true);
-    try { setAcct(await financeService.getSupplierAccount({ contactId, companyId })); }
-    finally { setLoading(false); }
-  };
-
-  if (loading) return <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>;
-
-  const owe = acct?.outstandingTotal ?? 0;
-  const kpi = (label: string, value: React.ReactNode, Icon: React.ElementType, danger = false) => (
-    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Icon className="h-3 w-3" /> {label}</div>
-        <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-primary">Supplier account</h3>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        {kpi('We owe', formatMoney(owe), Wallet, owe > 0)}
-        {kpi('Billed to us', formatMoney(acct?.billedTotal ?? 0), FileText)}
-        {kpi('Paid to them', formatMoney(acct?.paidTotal ?? 0), ArrowUpRight)}
-        {kpi('Ordered', formatMoney(acct?.orderedTotal ?? 0), ShoppingBag)}
-        {kpi('Purchase orders', acct?.poCount ?? 0, ShoppingBag)}
-      </div>
     </div>
   );
 };
