@@ -110,6 +110,230 @@
   </ol>
   <p class="feat">The lookup result is cached for about 90 days, so re-opening the record is instant and doesn't re-contact the registry. The same registry data also validates the VAT number before invoicing — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how invoices are transmitted to myDATA / ΑΑΔΕ.</p>
 
+  <h2>Contact fields in detail</h2>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/contact-form.png" alt="The New Contact form with grouped sections"><figcaption>The New Contact form — grouped sections.</figcaption></figure>
+  <p>The New Contact form is organised into groups. Required fields are marked with <strong>*</strong>.</p>
+
+  <h3>Contact Information</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Full Name *</strong></td><td>Required — the person's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Landline / main phone number.</td></tr>
+      <tr><td><strong>Mobile</strong></td><td>Mobile number.</td></tr>
+      <tr><td><strong>Position/Title</strong></td><td>Job title or role.</td></tr>
+      <tr><td><strong>Department</strong></td><td>Department within their organisation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Lead Information</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Lead Status</strong></td><td>Where the contact sits in your pipeline.</td></tr>
+      <tr><td><strong>Lead Source</strong></td><td>How the contact came to you.</td></tr>
+      <tr><td><strong>Created</strong></td><td>Set automatically when the record is saved.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Address</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Street Address</strong></td><td>Street and number.</td></tr>
+      <tr><td><strong>City</strong></td><td>City / town.</td></tr>
+      <tr><td><strong>Postal Code</strong></td><td>Postcode.</td></tr>
+      <tr><td><strong>State/Province</strong></td><td>Region / state / province.</td></tr>
+      <tr><td><strong>Country</strong></td><td>Country.</td></tr>
+      <tr><td><strong>Sub Units</strong></td><td>Additional address sub-units (e.g. floor, suite).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Linked User Account</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Search by email</strong></td><td>Search for and link an existing platform user to this contact.</td></tr>
+      <tr><td><strong>Create &amp; Invite User</strong></td><td>Create a login for this contact, inviting them as a user.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Pricing</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default discount %</strong></td><td>Discount applied by default for this contact.</td></tr>
+      <tr><td><strong>Credit limit</strong></td><td>Credit limit on the account.</td></tr>
+      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the discount arrangement.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Invoicing &amp; VAT</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Segment</strong></td><td>Customer segment (e.g. Unsegmented). Managed in <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Default VAT-exemption category</strong></td><td>The default VAT-exemption category. See <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Include in ΜΥΦ</strong></td><td>Include this contact in the Greek MyData clientele list (ΜΥΦ).</td></tr>
+      <tr><td><strong>Billing name</strong></td><td>Name to bill under.</td></tr>
+      <tr><td><strong>Billing VAT (ΑΦΜ)</strong></td><td>VAT number for billing.</td></tr>
+      <tr><td><strong>Tax office (ΔΟΥ)</strong></td><td>Greek tax office.</td></tr>
+      <tr><td><strong>Country code</strong></td><td>Billing country code.</td></tr>
+      <tr><td><strong>Street</strong></td><td>Billing street.</td></tr>
+      <tr><td><strong>Number</strong></td><td>Billing street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>Billing postcode.</td></tr>
+      <tr><td><strong>City</strong></td><td>Billing city.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Tax &amp; VAT</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>VAT number</strong></td><td>The contact's VAT number.</td></tr>
+      <tr><td><strong>Tax office</strong></td><td>The contact's tax office.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Role</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>This is a supplier</strong></td><td>Mark the contact as a supplier.</td></tr>
+      <tr><td><strong>This is a customer</strong></td><td>Mark the contact as a customer (either or both can apply).</td></tr>
+      <tr><td><strong>Contact type</strong></td><td>The kind of contact.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Company fields in detail</h2>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/company-form.png" alt="The New Company form"><figcaption>The New Company form.</figcaption></figure>
+  <p>The New Company form is organised into the same groups. Required fields are marked with <strong>*</strong>.</p>
+
+  <h3>Company Information</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Company Name *</strong></td><td>Required — the organisation's name.</td></tr>
+      <tr><td><strong>Industry</strong></td><td>Industry the company operates in.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Company email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Company phone number.</td></tr>
+      <tr><td><strong>Website</strong></td><td>Company website.</td></tr>
+      <tr><td><strong>Employee Count</strong></td><td>Number of employees.</td></tr>
+      <tr><td><strong>Annual Revenue</strong></td><td>Reported annual revenue.</td></tr>
+      <tr><td><strong>Description</strong></td><td>Free-text description of the company.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Tax &amp; VAT</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Country Code</strong></td><td>Country code for the VAT number.</td></tr>
+      <tr><td><strong>VAT Number</strong></td><td>The company's VAT number.</td></tr>
+      <tr><td><strong>Tax Office</strong></td><td>The company's tax office.</td></tr>
+      <tr><td><strong>Validate (VIES)</strong></td><td>Button to verify EU VAT numbers via VIES. See <a href="finance-einvoicing.html">Greek e-invoicing</a> for related VAT validation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Address</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Street Address</strong></td><td>Street and number.</td></tr>
+      <tr><td><strong>City</strong></td><td>City / town.</td></tr>
+      <tr><td><strong>State/Province</strong></td><td>Region / state / province.</td></tr>
+      <tr><td><strong>Postal Code</strong></td><td>Postcode.</td></tr>
+      <tr><td><strong>Country</strong></td><td>Country.</td></tr>
+      <tr><td><strong>Sub Units</strong></td><td>Additional address sub-units.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Pricing</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default discount %</strong></td><td>Discount applied by default for this company.</td></tr>
+      <tr><td><strong>Credit limit</strong></td><td>Credit limit on the account.</td></tr>
+      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the discount arrangement.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Invoicing &amp; VAT</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Segment</strong></td><td>Customer segment. Managed in <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Default VAT-exemption category</strong></td><td>The default VAT-exemption category. See <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Include in ΜΥΦ</strong></td><td>Include this company in the Greek MyData clientele list (ΜΥΦ).</td></tr>
+      <tr><td><strong>Billing name</strong></td><td>Name to bill under.</td></tr>
+      <tr><td><strong>Billing VAT (ΑΦΜ)</strong></td><td>VAT number for billing.</td></tr>
+      <tr><td><strong>Tax office (ΔΟΥ)</strong></td><td>Greek tax office.</td></tr>
+      <tr><td><strong>Country code</strong></td><td>Billing country code.</td></tr>
+      <tr><td><strong>Street</strong></td><td>Billing street.</td></tr>
+      <tr><td><strong>Number</strong></td><td>Billing street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>Billing postcode.</td></tr>
+      <tr><td><strong>City</strong></td><td>Billing city.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Role</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>This is a supplier</strong></td><td>Mark the company as a supplier.</td></tr>
+      <tr><td><strong>This is a customer</strong></td><td>Mark the company as a customer (either or both can apply).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout"><p>The <strong>Validate (VIES)</strong> button on a company verifies EU VAT numbers; for Greek customers and suppliers, VAT validation also feeds <a href="finance-einvoicing.html">Greek e-invoicing</a>. <strong>Segments</strong> and <strong>VAT-exemption categories</strong> used in the Invoicing &amp; VAT group are configured in <a href="finance-settings.html">Finance settings</a>.</p></div>
+
+  <h2>Categories</h2>
+  <p>The <strong>Categories</strong> tab lets you segment contacts and companies — for example by <strong>Professional type</strong> or <strong>Role</strong>. Use it to build the reusable labels you then apply on contact and company records.</p>
+  <ul class="feat">
+    <li><strong>New Category</strong> — add a new category.</li>
+    <li><strong>Edit</strong> — modify an existing category.</li>
+    <li><strong>Resync auto</strong> — refreshes the auto-derived categories.</li>
+    <li><strong>Search categories</strong> — filters the list to find a category quickly.</li>
+  </ul>
+
+  <h3>Step by step: add a category</h3>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Categories</strong> tab.</li>
+    <li>Click <strong>New Category</strong>.</li>
+    <li>Name the category and set its type / role.</li>
+    <li><strong>Save</strong>.</li>
+    <li>Assign the category on a contact or company record.</li>
+  </ol>
+
   <h2>Permissions &amp; the Admin sub-view</h2>
   <p>Access to the CRM is gated by the <code>crm.view</code> capability — users without it won't see this area. Operators get an additional <strong>Admin</strong> sub-view that adds platform-wide user management on top of the standard CRM, for administering accounts, roles and subscriptions across the platform.</p>
 

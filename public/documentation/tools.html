@@ -44,6 +44,23 @@
     <li>Optionally, <strong>domestic hot water</strong> for a chosen number of occupants.</li>
   </ul>
   <p>The result shows a recommended capacity range, the space-heating and (if included) hot-water loads, the effective specific load (W/m²), the flow temperature your chosen emitter needs, and notes on how that choice affects efficiency. It also lists the assumptions behind the figure.</p>
+  <h3>Inputs</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Heated area (m²)</td><td>Floor area of the space being heated.</td></tr>
+        <tr><td>Ceiling height (m)</td><td>Used with the area to derive the heated volume.</td></tr>
+        <tr><td>Insulation / building era</td><td>From no insulation through to passive-house / nZEB.</td></tr>
+        <tr><td>Climate zone</td><td>e.g. Zone C — Northern Greece.</td></tr>
+        <tr><td>Glazing / exposure</td><td>e.g. Typical — how much window area and exposed wall the space has.</td></tr>
+        <tr><td>Heat-emission system</td><td>e.g. Underfloor heating 35 °C — sets the required flow temperature.</td></tr>
+        <tr><td>Include domestic hot water</td><td>Toggle — adds hot-water load for a chosen number of occupants.</td></tr>
+        <tr><td>Advanced: exact design temperature</td><td>Override the climate zone with a precise winter design temperature.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Outputs a recommended capacity (in kW) for the space.</p>
   <div class="callout warn"><p>This is a <strong>coarse planning estimate</strong>, not a substitute for a full thermal-loss study (EN&nbsp;12831 / TOTEE&nbsp;20701). Always have a professional confirm the load before ordering — and size close to it, since oversizing a heat pump hurts efficiency.</p></div>
 
   <h2>Heating cost comparison</h2>
@@ -54,6 +71,23 @@
   </figure>
   <p>Compares the annual <strong>running cost</strong> of several heating options for the same home, so you can see which is most economical for a given scenario. Like the sizer, it runs live in your browser with no daily limit.</p>
   <p>You enter the home's <strong>area</strong> and its <strong>energy intensity</strong> (kWh/m²·yr, taken from an energy performance certificate), then adjust the <strong>unit prices</strong> for electricity, gas, oil and wood, plus a heat-pump efficiency figure and the type of air-conditioning. The tool then ranks the methods by yearly cost, highlights the cheapest, and shows how much more each other option would cost.</p>
+  <h3>Inputs</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Area (m²)</td><td>Floor area of the home.</td></tr>
+        <tr><td>kWh/m²·yr</td><td>Annual heat demand intensity, taken from an energy performance certificate.</td></tr>
+        <tr><td>Electricity €/kWh</td><td>Unit price of electricity.</td></tr>
+        <tr><td>Gas €/kWh</td><td>Unit price of gas.</td></tr>
+        <tr><td>Oil €/L</td><td>Unit price of heating oil.</td></tr>
+        <tr><td>Wood €/kg</td><td>Unit price of wood.</td></tr>
+        <tr><td>Heat-pump COP</td><td>Coefficient of performance (efficiency figure) of the heat pump.</td></tr>
+        <tr><td>A/C type</td><td>e.g. Inverter COP 3.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Outputs a side-by-side running-cost comparison across fuels.</p>
   <div class="callout"><p>The comparison covers <strong>running cost only</strong> — it excludes the price of the equipment, installation and maintenance. Use it to weigh ongoing fuel/energy spend, not total cost of ownership.</p></div>
 
   <h2>Price scan</h2>

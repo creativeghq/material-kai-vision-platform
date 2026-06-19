@@ -49,6 +49,122 @@
     <li>Save; issue/transmit when ready. Issued documents flow into the relevant balances and reports.</li>
   </ol>
 
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/new-invoice.png" alt="New invoice editor"><figcaption>The New Invoice editor — a full myDATA-compliant document form.</figcaption></figure>
+
+  <h2>The invoice editor in detail</h2>
+  <p>From <strong>Finance → Invoices</strong>, click <strong>New</strong> to open the editor. Other document types — Sales invoice, Service invoice, Receipt, Delivery note — use the same editor; pick the type at the top.</p>
+
+  <h3>Billed to</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Client</strong></td><td>Search your contacts/companies, or use <strong>+ Add new client</strong> to create one on the spot.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Invoice details</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Document type (myDATA)</strong></td><td>The classification code for the document, e.g. "1.1 — Sales Invoice".</td></tr>
+      <tr><td><strong>Related document</strong></td><td>Optional myDATA MARK or related invoice number.</td></tr>
+      <tr><td><strong>Date issued</strong></td><td>The issue date of the document.</td></tr>
+      <tr><td><strong>Payment terms (days)</strong></td><td>Number of days until payment is due.</td></tr>
+      <tr><td><strong>Currency</strong></td><td>The document currency, e.g. EUR.</td></tr>
+      <tr><td><strong>Default VAT %</strong></td><td>The default VAT rate applied to lines.</td></tr>
+      <tr><td><strong>Category</strong></td><td>Income type / income category for reporting.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Global line defaults</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Global line defaults</strong></td><td>Defaults applied to all rows.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Items / services</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Description, Qty, Price, Disc., Unit, VAT category</strong></td><td>The per-row fields for each item or service line.</td></tr>
+      <tr><td><strong>Prices include VAT</strong></td><td>Toggle for whether the entered prices are VAT-inclusive.</td></tr>
+      <tr><td><strong>Add row / Pick from products</strong></td><td>Add a blank line, or pull a line from the catalogue.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Taxes</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Withholding tax</strong></td><td>Withholding tax applied to the document.</td></tr>
+      <tr><td><strong>Digital transaction fee</strong></td><td>Digital transaction fee applied to the document.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Payment</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Payment method (myDATA)</strong></td><td>The myDATA payment method, e.g. "3 — On credit".</td></tr>
+      <tr><td><strong>Payment note</strong></td><td>IBAN, card reference, "on credit", etc.</td></tr>
+      <tr><td><strong>VAT payment suspension</strong></td><td>Toggle for VAT payment suspension.</td></tr>
+      <tr><td><strong>Self-pricing</strong></td><td>Toggle for self-pricing.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Notes</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Notes</strong></td><td>Free text shown on the invoice.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>B2G — public-sector invoice</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>B2G — public-sector invoice</strong></td><td>Toggle for selling to public bodies.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Document &amp; delivery options</h3>
+  <div class="feat">
+    <ul>
+      <li><strong>Submit to myDATA on issue</strong> — transmit electronically when issued.</li>
+      <li><strong>Print online code / QR</strong>.</li>
+      <li><strong>Include in MYF report</strong>.</li>
+      <li><strong>Move stock on issue</strong> — decrement warehouse.</li>
+      <li><strong>Print terms &amp; comments</strong>.</li>
+      <li><strong>Send by email on create / Send by SMS on create</strong>.</li>
+      <li><strong>Info box (printed, ≤250 chars)</strong> — extra printed note (warranty/delivery terms).</li>
+      <li><strong>Issue now</strong> — assigns the legal number + date (otherwise saved as draft).</li>
+    </ul>
+  </div>
+  <p>Click <strong>Preview</strong> to check the PDF, then <strong>Create invoice</strong>.</p>
+
+  <div class="callout"><p>Note: "Issue now" assigns the official myDATA number — drafts can be edited freely; issued documents are legal records.</p></div>
+
+  <p>See also: <a href="finance-einvoicing.html">e-invoicing</a> and <a href="finance-settings.html">Finance settings</a>.</p>
+
   <h2>Categories</h2>
   <p>Internal income and expense <strong>categories</strong> can be added and managed directly from a document's header, and used as filters across the document lists and reports. This keeps your books consistent without leaving the document you're working on.</p>
 

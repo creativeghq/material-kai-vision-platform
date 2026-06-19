@@ -112,6 +112,89 @@
     <li>The invitee lands on a <strong>public landing page</strong> and <strong>accepts</strong> the invite after signing in, gaining access to the project.</li>
   </ol>
 
+  <h2>Inside a project: the tabs</h2>
+  <p>Each tab on a project's detail page, at a glance:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tab</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Overview</td><td>Client, budget and deadline summary.</td></tr>
+      <tr><td>Rooms</td><td>Per-room breakdown of the project.</td></tr>
+      <tr><td>Products</td><td>Materials used in the project.</td></tr>
+      <tr><td>Moodboards</td><td>Boards attached to the project.</td></tr>
+      <tr><td>Quotes</td><td>The project's quotes.</td></tr>
+      <tr><td>Billing</td><td>Billing for the project.</td></tr>
+      <tr><td>Finance</td><td>Project-linked finance.</td></tr>
+      <tr><td>Sheets</td><td>Presentation sheets.</td></tr>
+      <tr><td>Client View</td><td>The client deliverable.</td></tr>
+      <tr><td>Tasks</td><td>To-dos for the project.</td></tr>
+      <tr><td>Timeline</td><td>Activity history.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
+    <figcaption>A project's Overview tab.</figcaption>
+  </figure>
+
+  <h3>Rooms</h3>
+  <p>Use <strong>Add a room</strong> to split the project's scope and budget per space. Each room captures:</p>
+  <ul class="feat">
+    <li><strong>Room name</strong> — e.g. <em>Master Bath</em>.</li>
+    <li><strong>Type</strong> — the kind of space.</li>
+    <li><strong>Budget</strong> — the amount allocated to that room.</li>
+    <li><strong>Date</strong> — a date for the room.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-rooms.png" alt="The Rooms tab — break a project into rooms with budgets">
+    <figcaption>The Rooms tab — break a project into rooms with budgets.</figcaption>
+  </figure>
+
+  <h2>Building a Client View (every field)</h2>
+  <p>Open the <strong>Client View</strong> tab and click <strong>New Client View</strong>. The builder offers these fields:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Title</td><td>The deliverable's title (e.g. <em>Modern Bathroom Design</em>).</td></tr>
+      <tr><td>Subtitle</td><td>A secondary line under the title.</td></tr>
+      <tr><td>Client name</td><td>Shown as "Prepared for…".</td></tr>
+      <tr><td>Date</td><td>The date for the deliverable.</td></tr>
+      <tr><td>Sheets to include</td><td>Pick and order the presentation sheets — drawn from any board in the project.</td></tr>
+      <tr><td>FF&amp;E source quote</td><td>Choose a <a href="quotes.html">quote</a> to render its live FF&amp;E table.</td></tr>
+      <tr><td>3D world</td><td>Choose a generated Marble world to embed an explorable walkthrough.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>When you're done, <strong>Save &amp; generate PDF</strong> — or <strong>Save draft</strong> to come back later.</p>
+
+  <ul class="feat">
+    <li>The online client page (<span class="badge route">/cv/:token</span>) can also show <strong>switchable lighting moods</strong> on the hero render.</li>
+    <li>Clients can <strong>approve or comment inline</strong> directly on the page.</li>
+    <li>The <strong>share link is revocable</strong> — disable it at any time to cut off access.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/client-view-builder.png" alt="The New Client View builder">
+    <figcaption>The New Client View builder.</figcaption>
+  </figure>
+
+  <h3>Step by step: deliver a Client View</h3>
+  <ol>
+    <li>Open the project → <strong>Client View</strong> → <strong>New Client View</strong>.</li>
+    <li>Set the <strong>Title</strong>, <strong>Subtitle</strong>, <strong>Client name</strong> and <strong>Date</strong>.</li>
+    <li><strong>Select and order</strong> the sheets to include.</li>
+    <li>Optionally pick an <strong>FF&amp;E source quote</strong> and a <strong>3D world</strong>.</li>
+    <li><strong>Save &amp; generate PDF</strong>.</li>
+    <li><strong>Copy the share link</strong> and send it to the client. See <a href="public-pages.html">Public pages &amp; sharing</a>.</li>
+    <li>Read the client's <strong>approvals and comments</strong> back in the project.</li>
+  </ol>
+
   <div class="callout"><p><strong>In short:</strong> create a project per client or job, do the design work in <a href="moodboards.html">moodboards</a> and price it in <a href="quotes.html">quotes</a>, then assemble the chosen sheets into a <strong>Client View</strong> and send the share link. Their feedback returns to the project.</p></div>
 </main>
 <script src="assets/nav.js"></script>
