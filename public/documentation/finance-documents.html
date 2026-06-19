@@ -13,6 +13,8 @@
   <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/invoices/:id</span> <span class="badge gated">finance.manage</span></div>
   <p class="lead">Create and manage the full set of financial documents — and keep them organised with editable income and expense categories.</p>
 
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → choose the <strong>Invoices</strong> (or Receipts / Credit notes / Expenses / Delivery notes) tab.</p></div>
+
   <h2>Document types</h2>
   <div class="table-wrap">
   <table>
@@ -54,6 +56,29 @@
   <p>Every document list supports <strong>text search</strong> (by supplier/customer, document number or reference) and category filtering, so large histories stay manageable.</p>
 
   <div class="callout"><p>Invoices and receipts you issue here feed <a href="finance-receivables-payables.html">Receivables</a> and the <a href="finance.html">Dashboard</a> automatically; expenses feed Payables and reporting.</p></div>
+
+  <h2>Step by step: create an invoice</h2>
+  <ol>
+    <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Invoices</strong> tab.</li>
+    <li>Start a new invoice.</li>
+    <li>Pick the customer. The VAT number is validated; for Greek customers the details can be enriched automatically from ΑΑΔΕ.</li>
+    <li>Add line items — choose catalogue products or add custom lines — each with a quantity, price and VAT rate.</li>
+    <li>Assign an <strong>income category</strong> from the document header (categories are editable and can be managed inline).</li>
+    <li>Review the totals (net, VAT and gross).</li>
+    <li>Issue the invoice. On issue it is transmitted to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> and appears in <a href="finance-receivables-payables.html">Receivables</a>.</li>
+    <li>Generate the PDF and share a payment link with the customer.</li>
+  </ol>
+  <div class="callout"><p>For the transmission details and statuses, see <a href="finance-einvoicing.html">e-invoicing</a>.</p></div>
+
+  <h2>Step by step: record an expense</h2>
+  <ol>
+    <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Expenses</strong> tab.</li>
+    <li>Start a new expense.</li>
+    <li>Pick the supplier.</li>
+    <li>Enter the amount and VAT.</li>
+    <li>Assign an <strong>expense category</strong> from the document header.</li>
+    <li>Save. The expense feeds <a href="finance-receivables-payables.html">Payables</a> and the finance <a href="finance.html">Reports</a>.</li>
+  </ol>
 </main>
 <script src="assets/nav.js"></script>
 </body>

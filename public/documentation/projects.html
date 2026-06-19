@@ -13,6 +13,8 @@
   <div class="routes"><span class="badge route">/projects</span> <span class="badge route">/projects/:id</span></div>
   <p class="lead">A project is the top-level container that ties together everything for one piece of work — the moodboards, presentation sheets, quotes and people involved — and gives you a single place to assemble and share a polished deliverable with the client.</p>
 
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Projects</strong> (module-gated — if it isn't shown, the Projects module isn't enabled for your workspace).</p></div>
+
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/projects.png" alt="Projects list">
     <figcaption>The Projects list. Create your first project to get started.</figcaption>
@@ -84,6 +86,31 @@
 
   <h2>Archiving</h2>
   <p>When a project is finished, archive it to hide it from the active list without deleting anything. Use <strong>Show archived</strong> on the list page to bring archived projects back into view at any time.</p>
+
+  <h2>Step by step: create a project</h2>
+  <ol>
+    <li>From the top navigation, open <strong>Projects</strong>, then click <strong>New Project</strong>.</li>
+    <li>Enter a <strong>name</strong> for the client or job, and add any <strong>scope / briefing notes</strong> to describe the work.</li>
+    <li>Create it, then <strong>open the project</strong> to reach its detail page.</li>
+    <li>Work across its tabs — rooms, products, <a href="moodboards.html">moodboards</a>, <a href="quotes.html">quotes</a>, sheets, and the rest — to assemble everything in one place.</li>
+  </ol>
+
+  <h2>Step by step: deliver a Client View</h2>
+  <ol>
+    <li>Open the project's <strong>Client View</strong> tab.</li>
+    <li><strong>Select and order</strong> the presentation sheets to include — you can draw them from any of the project's <a href="moodboards.html">boards</a>.</li>
+    <li><strong>Toggle which embeds to include</strong> — the 3D walkthrough, lighting moods, and a live FF&amp;E table pulled from a linked <a href="quotes.html">quote</a>.</li>
+    <li><strong>Generate the PDF</strong> version of the package.</li>
+    <li><strong>Copy the share link</strong> and send it to the client; revoke it at any time to cut off access. See <a href="public-pages.html">Public pages &amp; sharing</a> for how the public page behaves.</li>
+    <li>Read the client's inline <strong>approvals and comments</strong> back in the project.</li>
+  </ol>
+
+  <h2>Step by step: invite a collaborator</h2>
+  <ol>
+    <li><strong>Create an invite</strong> for the teammate or client you want to bring into the project.</li>
+    <li><strong>Share the invite link</strong> (<span class="badge route">/projects/invite/:token</span>) with them.</li>
+    <li>The invitee lands on a <strong>public landing page</strong> and <strong>accepts</strong> the invite after signing in, gaining access to the project.</li>
+  </ol>
 
   <div class="callout"><p><strong>In short:</strong> create a project per client or job, do the design work in <a href="moodboards.html">moodboards</a> and price it in <a href="quotes.html">quotes</a>, then assemble the chosen sheets into a <strong>Client View</strong> and send the share link. Their feedback returns to the project.</p></div>
 </main>

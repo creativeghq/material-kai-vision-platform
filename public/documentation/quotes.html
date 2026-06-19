@@ -13,6 +13,8 @@
   <div class="routes"><span class="badge route">/quotes</span> <span class="badge route">/quotes/:id</span> <span class="badge route">/quotes/requests</span></div>
   <p class="lead">Turn the products and ideas you've gathered into priced, client-ready quotes — capture full FF&amp;E specifications per item, preview a branded PDF, and send a secure link your customer can open and accept without logging in. The same area also collects incoming quote requests so you can triage them and convert them into quotes.</p>
 
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Quotes</strong>. Use the <strong>My Quotes</strong> and <strong>Requests</strong> tabs at the top.</p></div>
+
   <h2>The two tabs</h2>
   <p>Quotes is split into two views you switch between at the top of the page:</p>
   <ul class="feat">
@@ -85,6 +87,34 @@
     <li><strong>Convert it into a quote</strong> — start a real quote pre-populated from the request, then add line items, prices and FF&amp;E specifications as usual.</li>
     <li><strong>Filter</strong> the list to focus on what still needs attention.</li>
   </ul>
+
+  <h2>Step by step: build and send a quote</h2>
+  <ol>
+    <li>Open <strong>Quotes</strong> from the top navigation, then click <strong>New Quote</strong>.</li>
+    <li>Give the quote a <strong>name</strong>, and optionally add notes and link it to a <a href="public-pages.html">project</a>.</li>
+    <li>Add <strong>line items</strong> — pick catalogue products or add custom items — and set the <strong>quantity</strong> and <strong>price</strong> for each.</li>
+    <li>For each item, optionally fill in the <strong>FF&amp;E specs</strong>: <em>room</em>, <em>dimensions</em>, <em>installation requirements</em> and <em>delivery date</em>.</li>
+    <li>Open <strong>Preview</strong> <span class="badge route">/quotes/:id/preview</span> to check the branded PDF.</li>
+    <li>Use <strong>Email Quote</strong> or <strong>Share</strong> to send it to your customer.</li>
+    <li>The customer opens the token-protected public page <span class="badge route">/q/:token</span> <span class="badge public">Public</span> with no login and <strong>accepts</strong> it. See <a href="public-pages.html">Public &amp; Shared Pages</a>, and <a href="finance.html">Finance &amp; Invoicing</a> for what happens after acceptance.</li>
+  </ol>
+
+  <h2>Step by step: turn a request into a quote</h2>
+  <ol>
+    <li>Open <strong>Quotes</strong> and switch to the <strong>Requests</strong> tab <span class="badge route">/quotes/requests</span>.</li>
+    <li>Open a request from the list.</li>
+    <li><strong>Review</strong> what the customer is asking for.</li>
+    <li><strong>Create a quote from it</strong> — a real quote pre-populated from the request.</li>
+    <li>Continue as above: add line items, prices, FF&amp;E specs, preview, then send.</li>
+  </ol>
+
+  <h2>Step by step: quote from a moodboard</h2>
+  <ol>
+    <li>Open a <a href="moodboards.html">moodboard</a>.</li>
+    <li>Click <strong>Generate Quote</strong>.</li>
+    <li>The board's products become the line items of a new quote.</li>
+    <li>Finish in <strong>Quotes</strong>: set quantities, prices and FF&amp;E detail, then preview and send.</li>
+  </ol>
 
   <div class="callout"><p>Quotes is a module-gated area. Administrators have additional configuration that shapes how quotes look and behave — <strong>status tags</strong>, <strong>upsells</strong>, <strong>timeline steps</strong>, <strong>PDF templates</strong> and <strong>company/VAT settings</strong> — managed in the admin area. That configuration is outside the scope of this end-user guide.</p></div>
 </main>

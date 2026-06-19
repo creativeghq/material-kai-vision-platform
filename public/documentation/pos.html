@@ -13,6 +13,8 @@
   <div class="routes"><span class="badge route">/pos</span> <span class="badge gated">invoice.issue</span></div>
   <p class="lead">A counter checkout for issuing receipts and invoices on the spot — search for items, build a sale on a numeric keypad, and finalise the document in one tap. It's part of the <a href="finance.html">Finance</a> suite and reuses the same invoicing, payment and e-invoicing machinery.</p>
 
+  <div class="callout"><p><strong>How to open it:</strong> open <strong>Point of Sale</strong> at <span class="badge route">/pos</span> (part of the Finance suite; requires the invoice-issuing capability).</p></div>
+
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos.png" alt="Point of Sale">
     <figcaption>The POS screen — a two-panel register: transaction list and numeric keypad on the left, a searchable product/service catalogue on the right.</figcaption>
@@ -34,6 +36,18 @@
   </ul>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos-open-shift.png" alt="POS requires an open shift"><figcaption>Before a shift is open, receipts are blocked — use “Open shift” to start the register.</figcaption></figure>
+
+  <h2>Step by step: issue a receipt</h2>
+  <p>A receipt is produced in a few taps. The register requires an open shift first — until one is open you'll see <em>“No open shift — receipts are blocked until a shift is opened”</em>.</p>
+  <ol>
+    <li>Open <span class="badge route">/pos</span> from the <a href="finance.html">Finance</a> suite.</li>
+    <li>Click <strong>Open shift</strong> — receipts are blocked until a shift is open (you'll be asked for the opening cash float).</li>
+    <li>Search for a product or service and add it to the sale, or punch a free amount on the numeric keypad for a quick one-off line.</li>
+    <li>Set the <strong>quantity</strong> (− / + or the keypad's <strong>×</strong> key) and the <strong>VAT rate</strong> using the keypad's VAT-rate button.</li>
+    <li>Choose the <strong>document type</strong> (for example, <em>Receipt</em>) from the button at the top of the register.</li>
+    <li>Press <strong>ISSUE</strong> — the document is produced and, where applicable, transmitted to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a>. It then appears in your <a href="finance-documents.html">Finance documents</a>.</li>
+  </ol>
+  <div class="callout tip"><p>At the end of the day, <strong>close the shift</strong> (Close / Z) to finalise the register and produce the Z report.</p></div>
 
   <h2>Using the keypad</h2>
   <p>The keypad does more than enter quantities:</p>

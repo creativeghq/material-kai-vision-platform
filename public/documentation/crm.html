@@ -13,6 +13,8 @@
   <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
   <p class="lead">Your relationship hub — the single place to keep track of the people and organisations you do business with, alongside the users who belong to your workspace. Clean CRM records feed directly into quotes, projects and <a href="finance.html">Finance</a>, so an invoice always carries the right legal name, VAT number and address.</p>
 
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong>. Switch between the <strong>Users</strong>, <strong>Contacts</strong>, <strong>Companies</strong> and <strong>Categories</strong> tabs.</p></div>
+
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm.png" alt="CRM Management">
     <figcaption>CRM Management — the summary strip with live counts, and the Users / Contacts / Companies / Categories tabs.</figcaption>
@@ -88,6 +90,25 @@
   <div class="callout tip"><p><strong>Lookups are cached for about 90 days.</strong> Once you've fetched a company's details, repeating the lookup within that window is instant and doesn't re-contact the registry — so there's no penalty for re-opening a record.</p></div>
 
   <div class="callout warn"><p><strong>Each fresh lookup writes a notification to the looked-up company's TaxisNet inbox.</strong> This is required by tax-authority policy and can't be turned off. For that reason the lookup is meant for verifying your <em>own</em> business or a legitimate customer/supplier you actually trade with — not for researching arbitrary companies.</p></div>
+
+  <h2>Step by step: add a contact</h2>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Contacts</strong> tab.</li>
+    <li>Click <strong>Add Contact</strong> to open the New Contact form.</li>
+    <li>Fill in <strong>Full Name</strong> (required), then <strong>Email</strong>, <strong>Phone</strong> and any other details you have.</li>
+    <li>Optionally assign a <strong>category</strong> to segment the contact (the labels you manage in the Categories tab).</li>
+    <li><strong>Save</strong>. The person is now on file and can be linked to companies, quotes and projects.</li>
+  </ol>
+
+  <h2>Step by step: add a company and enrich it from ΑΑΔΕ</h2>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Companies</strong> tab.</li>
+    <li>Add a company and enter its core details.</li>
+    <li>For a Greek company, enter its <strong>ΑΦΜ</strong> (VAT number).</li>
+    <li>Run the <strong>ΑΑΔΕ lookup</strong> to auto-fill the legal name, registered address, tax office (ΔΟΥ), activity codes (ΚΑΔ) and status from the official tax-authority registry.</li>
+    <li><strong>Save</strong>. The confirmed billing details flow straight through to documents in <a href="finance.html">Finance</a>.</li>
+  </ol>
+  <p class="feat">The lookup result is cached for about 90 days, so re-opening the record is instant and doesn't re-contact the registry. The same registry data also validates the VAT number before invoicing — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how invoices are transmitted to myDATA / ΑΑΔΕ.</p>
 
   <h2>Permissions &amp; the Admin sub-view</h2>
   <p>Access to the CRM is gated by the <code>crm.view</code> capability — users without it won't see this area. Operators get an additional <strong>Admin</strong> sub-view that adds platform-wide user management on top of the standard CRM, for administering accounts, roles and subscriptions across the platform.</p>
