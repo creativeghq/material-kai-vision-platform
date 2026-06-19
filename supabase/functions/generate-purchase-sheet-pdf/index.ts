@@ -16,7 +16,8 @@
  * and returned as a 7-day signed URL.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
@@ -111,8 +112,7 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
   if (items.length === 0) throw new HttpError(400, 'No purchase items to render');
 
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const { regular: font, bold } = await embedOpenSans(pdf);
 
   if (mode === 'schedule' || mode === 'both') {
     await drawSchedulePages(pdf, font, bold, items, projectName);

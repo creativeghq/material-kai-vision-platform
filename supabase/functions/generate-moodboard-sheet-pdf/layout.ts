@@ -7,6 +7,7 @@ import {
   rgb,
   RGB,
 } from 'pdf-lib';
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 
 // A3 landscape in points (1190.55 x 841.89)
 export const PAGE_W = 1190.55;
@@ -33,10 +34,8 @@ export interface SheetFonts {
 }
 
 export async function loadFonts(pdfDoc: PDFDocument): Promise<SheetFonts> {
-  return {
-    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-  };
+  const { regular, bold } = await embedOpenSans(pdfDoc);
+  return { regular, bold };
 }
 
 export async function embedImageBytes(

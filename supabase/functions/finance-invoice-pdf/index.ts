@@ -17,10 +17,12 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
 
-// Google Noto Sans (full Greek + Latin), served as real TTF from the official noto-fonts repo.
+// Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
+// Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
+// the document "bold" (the app's heaviest loaded weight).
 const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Regular.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Bold.ttf',
+  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
+  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
 };
 let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
 async function loadFonts() {

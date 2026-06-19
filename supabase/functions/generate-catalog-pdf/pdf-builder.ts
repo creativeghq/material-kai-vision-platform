@@ -9,6 +9,7 @@ import {
 } from 'pdf-lib';
 import type { CatalogRow, CatalogSection, CatalogMaterial, OwnerBranding } from './types.ts';
 import { fetchUrlBytes } from './data-fetcher.ts';
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 
 // A4 portrait
 const PAGE_W = 595.28;
@@ -57,9 +58,9 @@ export async function buildCatalogPDF(args: {
   const { catalog, coverImageBytes, bgImageBytes, backCoverImageBytes, accentHex, branding } = args;
   const pdfDoc = await PDFDocument.create();
 
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+  const { regular: fontRegular, bold: fontBold } = await embedOpenSans(pdfDoc);
+  // Open Sans italic isn't embedded; use the regular face for the few italic captions.
+  const fontItalic = fontRegular;
 
   const accent = hexToRgb(accentHex) || COLOR_DARK;
 

@@ -8,6 +8,7 @@ import {
   RGB,
 } from 'pdf-lib';
 import { QuoteData, TemplateConfig } from './types.ts';
+import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 
 // A4 dimensions in points
 const PAGE_W = 595.28;
@@ -63,8 +64,7 @@ export async function buildQuotePDF(
   const pdfDoc = await PDFDocument.create();
 
   // Embed fonts
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const { regular: fontRegular, bold: fontBold } = await embedOpenSans(pdfDoc);
 
   // Embed images (each is optional — a missing template background just skips
   // that visual rather than failing PDF generation).

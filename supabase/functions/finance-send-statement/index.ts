@@ -65,11 +65,12 @@ const LABELS: Record<Lang, Record<string, string>> = {
   },
 };
 
-// Google Noto Sans (full Greek + Latin) — Greek customer names, addresses and labels
-// would throw under pdf-lib's WinAnsi standard fonts, so embed a Unicode TTF.
+// Open Sans (full Greek + Latin + Cyrillic) — the platform-wide typeface. Greek
+// customer names/labels would throw under pdf-lib's WinAnsi standard fonts, so embed
+// the Unicode TTF. SemiBold is the document "bold" (the app's heaviest weight).
 const FONT_URLS = {
-  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Regular.ttf',
-  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Bold.ttf',
+  regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
+  bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
 };
 let _fontCache: { regular: Uint8Array; bold: Uint8Array } | null = null;
 async function loadFonts() {
