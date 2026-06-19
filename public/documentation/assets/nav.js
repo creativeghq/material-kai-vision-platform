@@ -32,6 +32,7 @@
         { file: "finance-documents.html", title: "Documents" },
         { file: "finance-einvoicing.html", title: "Greek e-invoicing" },
         { file: "finance-operations.html", title: "Operations & Reports" },
+        { file: "finance-settings.html", title: "Settings (deep)" },
       ]},
       { file: "pos.html", title: "Point of Sale", icon: "🧮" },
       { file: "inbox.html", title: "Inbox", icon: "✉️" },

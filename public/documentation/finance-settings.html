@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Settings | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Settings</div>
+  <h1>Finance Settings</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">The configuration hub for your whole finance operation — business identity for invoicing, document design &amp; numbering, e-invoicing, pricing, categories, services, team members, your online store, statements and the finance digest. Set these up once during onboarding.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab. Settings is itself divided into the sub-sections below (a second row of tabs).</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-general.png" alt="Finance Settings — General">
+    <figcaption>Finance → Settings, showing the settings sub-sections (General, Business Identity, Documents, e-Invoicing, Pricing, Categories, Services, Team, Online Store, Statement PDF, Finance Digest, Payments).</figcaption>
+  </figure>
+
+  <h2>General</h2>
+  <p>Defaults applied to new documents and the issuance safety rules.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default email subject</strong></td><td>Pre-fills the subject when you email a document.</td></tr>
+      <tr><td><strong>Default email body</strong></td><td>Pre-fills the message body for emailed documents.</td></tr>
+      <tr><td><strong>Default payment terms (days)</strong></td><td>Default due-date offset on new invoices.</td></tr>
+      <tr><td><strong>Default VAT %</strong></td><td>VAT rate applied to new line items by default.</td></tr>
+      <tr><td><strong>Default catalog markup %</strong></td><td>Markup applied when pulling a catalogue price onto a document.</td></tr>
+      <tr><td><strong>Block issuance when the buyer VAT number is ΑΑΔΕ-inactive</strong></td><td>Stops you issuing to a VAT number the tax registry marks inactive.</td></tr>
+      <tr><td><strong>Block issuance when the buyer VAT was never validated (stricter)</strong></td><td>Requires every buyer VAT to be validated first.</td></tr>
+      <tr><td><strong>Warn when the invoice pushes the buyer over their credit limit</strong></td><td>Shows a warning at issue time.</td></tr>
+      <tr><td><strong>Block (instead of warn) when over the credit limit</strong></td><td>Hard-stops issuance over the credit limit.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Click <strong>Save settings</strong> to apply.</p>
+
+  <h2>Business Identity</h2>
+  <p>The issuer details printed on documents and sent to myDATA. Fields are <strong>bilingual</strong> — toggle <strong>EN</strong> / <strong>GR</strong> to enter each language — and grouped into <strong>1. Billing</strong>, <strong>2. Customer Contact</strong>, <strong>3. Personal</strong>, <strong>4. My Company</strong>, and <strong>Bank &amp; Logo</strong>.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-business-identity.png" alt="Finance Settings — Business Identity">
+    <figcaption>Business Identity — the issuer profile used for invoicing &amp; myDATA.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Company name</td><td>Legal name (per language).</td></tr>
+      <tr><td>Activity</td><td>Business activity description.</td></tr>
+      <tr><td>VAT number</td><td>e.g. <code>EL123456789</code>.</td></tr>
+      <tr><td>GEMI number</td><td>Greek business registry number.</td></tr>
+      <tr><td>Tax office</td><td>e.g. FAE Athinon.</td></tr>
+      <tr><td>Street · Number · Postal code · City · Country · Country code</td><td>Registered address.</td></tr>
+      <tr><td>Phone · Fax · Email</td><td>Contact details on documents.</td></tr>
+      <tr><td>Other</td><td>Branch / free-form notes.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout tip"><p><strong>Shortcut:</strong> for a Greek company, enter the VAT number and click <strong>Fetch from ΑΑΔΕ</strong> to auto-fill the legal name, activity, tax office and address from the official registry. Then <strong>Save</strong>.</p></div>
+
+  <h2>Documents</h2>
+  <p>How documents are numbered, branded and exchanged.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-documents.png" alt="Finance Settings — Documents">
+    <figcaption>Documents — establishments, series, invoice template and the myDATA inbox.</figcaption>
+  </figure>
+  <ul class="feat">
+    <li><strong>Establishments</strong> — your business premises/branches (<em>Add establishment</em>).</li>
+    <li><strong>Document Types &amp; Series</strong> — the numbering series for each document type.</li>
+    <li><strong>Invoice design template</strong> — choose a template (e.g. <em>Classic</em>) and set the brand <strong>Colors</strong>: Accent, Header background, Header text, Table header, Text, Secondary text, Lines / borders. <em>Save template</em> or <em>Reset to defaults</em>.</li>
+    <li><strong>EFT-POS Terminals</strong> — register card terminals (<em>Add terminal</em>).</li>
+    <li><strong>myDATA Inbox (Received Documents)</strong> — connect to pull received documents: <strong>User ID</strong> (sent as <code>aade-user-id</code>) and <strong>Subscription Key</strong> (<code>Ocp-Apim-Subscription-Key</code>).</li>
+  </ul>
+
+  <h2>e-Invoicing (Novus → myDATA)</h2>
+  <p>Tracks the activation status of electronic invoicing through the Novus connector to myDATA. Set the <strong>Status</strong> (e.g. <em>Not requested</em>) and an optional <strong>Note</strong> (contract no., date submitted, who handled it), then <strong>Save status</strong>. See <a href="finance-einvoicing.html">Greek e-invoicing</a> for how transmission works.</p>
+
+  <h2>Pricing</h2>
+  <p><strong>Category Markup Rules</strong> — set a <strong>Markup %</strong> per product <strong>Category</strong> so catalogue prices convert to sell prices automatically. Pick a category, enter the markup, and add the rule.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-pricing.png" alt="Finance Settings — Pricing">
+    <figcaption>Pricing — per-category markup rules.</figcaption>
+  </figure>
+
+  <h2>Categories</h2>
+  <p><strong>Finance Categories</strong> classify income and expenses for reporting and filtering across the document lists.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-categories.png" alt="Finance Settings — Categories">
+    <figcaption>Finance Categories — add income/expense categories used across documents and reports.</figcaption>
+  </figure>
+  <h3>Step by step: add a finance category</h3>
+  <ol>
+    <li>Open Finance → Settings → <strong>Categories</strong>.</li>
+    <li>Enter a <strong>Name</strong> (e.g. Materials, Rent, Services).</li>
+    <li>Choose the <strong>Kind</strong> — income, expense, or <strong>Both</strong>.</li>
+    <li>(Optional) set a default <strong>margin</strong> for the category.</li>
+    <li>Add it. Tip: use <strong>Import default categories</strong> to seed a standard set, then tweak.</li>
+  </ol>
+  <p>These categories are the ones you assign inline on invoices/expenses (see <a href="finance-documents.html">Documents</a>) and filter by in <a href="finance-operations.html">Reports</a>.</p>
+
+  <h2>Services</h2>
+  <p>Define billable <strong>Services</strong> (labour, delivery, installation, etc.) with <em>New service</em>, so they can be added to quotes, invoices and the <a href="pos.html">POS</a> alongside material products.</p>
+
+  <h2>Team</h2>
+  <p>Manage who can work in the workspace. Shows current <strong>Members</strong> and lets you invite more.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team.png" alt="Finance Settings — Team">
+    <figcaption>Team — members list plus the invite flow.</figcaption>
+  </figure>
+  <h3>Step by step: invite a team member</h3>
+  <ol>
+    <li>Open Finance → Settings → <strong>Team</strong>.</li>
+    <li>Under <strong>Invite Team Member</strong>, choose the <strong>Role</strong> to grant.</li>
+    <li>Click <strong>Generate invite link</strong> (under <strong>Invite &amp; referral links</strong>).</li>
+    <li>Send the link to your colleague; they join the workspace with the role you picked.</li>
+  </ol>
+  <div class="callout"><p>This is the platform's team-membership surface: the <strong>Role</strong> you grant determines which areas (CRM, Finance, Sales, etc.) the member can see — see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p></div>
+
+  <h2>Online Store</h2>
+  <p>Configure your public storefront (served at <span class="badge route">/store/:slug</span>): set the <strong>Headline</strong>, <strong>Subheadline</strong> and product search, then <strong>Save store settings</strong>.</p>
+
+  <h2>Statement PDF</h2>
+  <p>Brand the account-statement PDF: upload a <strong>Cover / page backdrop</strong> and an optional <strong>Footer</strong> image.</p>
+
+  <h2>Finance Digest</h2>
+  <p>Schedule a recurring finance summary email. Set the <strong>Frequency</strong> (e.g. Weekly), <strong>Day of week</strong>, <strong>Hour (UTC, 0–23)</strong> and <strong>Recipients</strong> (Add one or more). <strong>Save digest settings</strong>; use <strong>Send test</strong> to preview, or <strong>Send now to recipients</strong> to dispatch immediately.</p>
+
+  <h2>Payments</h2>
+  <p>The <strong>Payments</strong> settings section configures how customers can pay (payment links / methods surfaced on the public pay-invoice page, <span class="badge route">/pay/:token</span>).</p>
+
+  <div class="callout tip"><p><strong>Onboarding order:</strong> Business Identity (Fetch from ΑΑΔΕ) → Documents (series + template) → e-Invoicing status → Categories (Import defaults) → Pricing rules → Services → Team. After that, issuing invoices and running the POS works end-to-end.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
