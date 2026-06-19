@@ -130,6 +130,38 @@ for (const rpc of ['find_similar_products', 'find_complementary_products']) {
   });
 }
 
+// 4b. plpgsql contract lint — fails if a NEW function develops an error-level issue
+//   (broken column/table ref, type mismatch). This is the class that 500'd recommendations
+//   and silently broke quote→invoice. The 25 below are known pre-existing legacy breakages
+//   (mostly functions referencing tables dropped in past migrations) — tracked for cleanup,
+//   tolerated here so the gate only fires on NEW regressions. Shrink this list as they're fixed.
+const KNOWN_BROKEN_FUNCTIONS = new Set([
+  'cosine_similarity_workspace', 'count_vecs_embeddings', 'embedding_performance_stats',
+  'enhanced_vector_search_with_chunks', 'find_similar_documents', 'find_similar_searches',
+  'fix_image_associations', 'get_extraction_stats', 'get_hybrid_search_results',
+  'get_job_product_progress', 'get_latest_price', 'get_mivaa_service_health_summary',
+  'get_popular_searches', 'get_price_statistics', 'get_search_stats', 'get_similar_materials_visual',
+  'get_user_mivaa_processing_stats', 'get_users_for_daily_digest', 'get_webhook_outbound_status',
+  'get_workspace_document_stats', 'hybrid_search_workspace', 'log_agent_usage',
+  'report_sales_per_category', 'search_products_fts', 'validate_embedding_dimensions',
+]);
+await check('db.plpgsql-lint', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_plpgsql_errors`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_plpgsql_errors → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  const fresh = [];
+  for (const row of json) {
+    const base = String(row.fn || '').split('(')[0];
+    if (!KNOWN_BROKEN_FUNCTIONS.has(base)) fresh.push(`${base}: ${row.message}`);
+  }
+  assert(fresh.length === 0, `NEW broken function(s): ${fresh.join(' | ')}`);
+  return `${json.length} known-broken (no new regressions)`;
+});
+
 // 5. The price-monitoring cron path — the exact endpoint that 500'd on the .or_ dep drift.
 await check('mivaa.price-cron-refresh', ['MIVAA_CRON_SECRET'], async () => {
   const { res, json } = await http(`${MIVAA}/api/v1/price-monitoring/tracked-queries/cron-refresh?limit=1`, {
