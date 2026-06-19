@@ -29,6 +29,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isServiceRoleRequest } from '../_shared/auth.ts';
 
 interface CleanupStats {
   backgroundJobs: number;
@@ -55,9 +56,13 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // pg_cron calls with the platform service-role bearer; accept that (mirrors
+  // agent-scheduler/flow-scheduler). Otherwise require x-cron-secret. Without
+  // the service-role bypass this cron 401'd once CRON_SECRET got injected by
+  // the secrets-bootstrap, so weekly job/log cleanup silently stopped running.
   const cronSecret = req.headers.get('x-cron-secret');
   const expectedSecret = Deno.env.get('CRON_SECRET') || '';
-  if (!expectedSecret || cronSecret !== expectedSecret) {
+  if (!isServiceRoleRequest(req) && (!expectedSecret || cronSecret !== expectedSecret)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

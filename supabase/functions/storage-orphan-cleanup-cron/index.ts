@@ -38,6 +38,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isServiceRoleRequest } from '../_shared/auth.ts';
 
 interface BucketStat {
   bucket: string;
@@ -221,9 +222,13 @@ serve(withApiLogging('storage-orphan-cleanup-cron', async (req) => {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const sb = createClient(supabaseUrl, supabaseKey);
 
-  // Optional cron-secret gating
+  // Auth: pg_cron calls this with the platform service-role bearer, so accept
+  // that (mirrors agent-scheduler/flow-scheduler). Fall back to x-cron-secret
+  // for any external caller. Previously this gated ONLY on x-cron-secret, so
+  // once the secrets-bootstrap started injecting CRON_SECRET the nightly cron
+  // (which sends no x-cron-secret) 401'd and stopped cleaning storage entirely.
   const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
-  if (cronSecret()) {
+  if (!isServiceRoleRequest(req) && cronSecret()) {
     const provided = req.headers.get('x-cron-secret');
     if (provided !== cronSecret()) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), {
