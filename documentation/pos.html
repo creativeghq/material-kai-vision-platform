@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point of Sale | MaterialsHub Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Point of Sale</div>
+  <h1>Point of Sale</h1>
+  <div class="routes"><span class="badge route">/pos</span> <span class="badge gated">invoice.issue</span></div>
+  <p class="lead">A counter checkout for issuing receipts and invoices on the spot.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos.png" alt="Point of Sale">
+    <figcaption>The POS screen — product search, numeric keypad with VAT, and an ISSUE action.</figcaption>
+  </figure>
+
+  <h2>What this page is for</h2>
+  <p>POS is for in-person sales. You search for products and services, build a basket, apply VAT, and issue the document — all from one keypad-driven screen designed for speed at the counter.</p>
+
+  <h2>Layout &amp; controls</h2>
+  <ul class="feat">
+    <li><strong>Product search</strong> — “Search products &amp; services…” to add items to the sale.</li>
+    <li><strong>Numeric keypad</strong> — enter quantities/amounts, including a VAT rate button (e.g. <em>24.00 %</em>).</li>
+    <li><strong>Open shift</strong> — start a cash-register shift before transacting.</li>
+    <li><strong>Receipt</strong> — choose the document type.</li>
+    <li><strong>ISSUE</strong> — finalise the sale and produce the document.</li>
+  </ul>
+
+  <h2>Typical flow</h2>
+  <ol>
+    <li><strong>Open shift</strong> at the start of the day.</li>
+    <li>Search and add products/services to the current sale.</li>
+    <li>Adjust quantities and VAT on the keypad.</li>
+    <li>Press <strong>ISSUE</strong> to generate the receipt/invoice (transmitted to ΑΑΔΕ where applicable).</li>
+  </ol>
+
+  <div class="callout"><p>POS is part of the Finance suite and is gated by the invoice-issuing capability. Issued documents flow into the <a href="finance.html">Finance</a> records.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
