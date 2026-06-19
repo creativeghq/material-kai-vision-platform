@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,36 +11,62 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Dashboard</div>
   <h1>Dashboard</h1>
   <div class="routes"><span class="badge route">/</span></div>
-  <p class="lead">Your home screen and launch pad — a personalised overview of activity across the platform.</p>
+  <p class="lead">Your home screen and launch pad — a personalised overview of recent activity across the platform, with one-click access to materials, knowledge, profiles, factories and the AI assistant. It is the first page you see after signing in.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/dashboard/dashboard.png" alt="Dashboard">
-    <figcaption>The Dashboard with the platform hero, insights and latest activity feeds.</figcaption>
+    <figcaption>The Dashboard with the platform hero, AI Insights panel, latest-activity feeds and personalised recommendations.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The Dashboard is the first screen after signing in. It orients you with a welcome hero, surfaces AI-generated insights, and gives one-click access to the freshest materials, knowledge, profiles and factories on the platform. It's designed to get you exploring quickly rather than starting from a blank page.</p>
+  <p>The Dashboard orients you the moment you arrive. Rather than starting from a blank screen, it shows what's new and what's relevant to you: a welcome hero that points you at the AI assistant, a short insights panel, four live feeds of the freshest content on the platform, and a row of personalised recommendations. Everything on the page is a shortcut — most cards open the item right there in a pop-up, and every feed has a <strong>View all</strong> link to its full module.</p>
+  <p>The Dashboard is read-only: it surfaces and links to content, but you make changes elsewhere (in <a href="discover.html">Discover</a>, the <a href="knowledge-base.html">Knowledge Base</a>, <a href="moodboards.html">Moodboards</a>, or the <a href="agent-hub.html">Agent Hub</a>). It refreshes its feeds each time you load it, so the latest items are always current.</p>
 
-  <h2>Sections on the page</h2>
+  <h2>The hero — “Material Intelligence Agent Platform”</h2>
+  <p>The large panel at the top introduces the platform and gives you a single primary action.</p>
   <ul class="feat">
-    <li><strong>Hero — “Material Intelligence Agent Platform”</strong> with a <em>Start Exploring</em> button that takes you into discovery.</li>
-    <li><strong>AI Insights</strong> — automatically generated highlights based on recent platform activity.</li>
-    <li><strong>Latest Materials</strong> — recently added materials; each chip opens the material. <em>View all</em> jumps to the full library.</li>
-    <li><strong>Latest Knowledge</strong> — newest knowledge-base documents.</li>
-    <li><strong>Latest Profiles</strong> — recently active community members (designers, consultants, suppliers).</li>
-    <li><strong>Latest Factories</strong> — manufacturers and their material counts/categories.</li>
-    <li><strong>Recommended for You</strong> — personalised suggestions.</li>
+    <li><strong>Badge</strong> — a small “Powered by Advanced AI” marker.</li>
+    <li><strong>Headline</strong> — <em>Material Intelligence Agent Platform</em>, with a one-line description of what the platform does: AI-powered knowledge extraction, intelligent search and design generation.</li>
+    <li><strong>Start Exploring</strong> — the primary button. It opens the <a href="agent-hub.html">Agent Hub</a>, the conversational assistant where you can describe what you want in plain language and let it search, create and automate for you.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Tip:</strong> if you're not sure where to begin, press <strong>Start Exploring</strong> and just type what you need — for example “find matte grey porcelain tiles” or “build a moodboard from these images”.</p></div>
+
+  <h2>AI Insights panel</h2>
+  <p>Beside the hero is a compact <strong>AI Insights</strong> panel. It explains that the assistant is continuously learning from the new catalogs and materials added to the platform, and offers a rotating <strong>Pro Tip</strong> — a short suggestion for getting more out of the assistant, such as using it to compare technical specifications across manufacturers. Use it as a nudge toward the kinds of questions the assistant handles well.</p>
+
+  <h2>Latest activity feeds</h2>
+  <p>Below the hero are four side-by-side feeds, each showing the most recently added items in its category. Every feed has a <strong>View all</strong> link in its top-right corner that jumps to the full list, and most items open in a pop-up when clicked so you can stay on the Dashboard.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feed</th><th>Shows</th><th>Click an item</th><th>View all goes to</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Latest Materials</strong></td><td>Newest materials with a thumbnail and the date added.</td><td>Opens the material's detail pop-up.</td><td><a href="discover.html">Discover</a></td></tr>
+      <tr><td><strong>Latest Knowledge</strong></td><td>Newest published, public knowledge-base documents.</td><td>Listed for reference; open the full document from the Knowledge Base.</td><td><a href="knowledge-base.html">Knowledge Base</a></td></tr>
+      <tr><td><strong>Latest Profiles</strong></td><td>Recently joined community members (designers, consultants and other professionals) with their role and location.</td><td>Opens the member's profile pop-up.</td><td><a href="discover.html">Discover</a></td></tr>
+      <tr><td><strong>Latest Factories</strong></td><td>Manufacturers with their material count and primary category.</td><td>Opens the factory pop-up listing all of that maker's materials.</td><td><a href="discover.html">Discover</a></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The <strong>Latest Knowledge</strong> feed only ever shows documents that are published and marked public — internal, agent-only and private documents never appear here, so anything you see in this feed is safe to share.</p>
+  <p>From the <strong>Latest Factories</strong> pop-up you can drill in one more level: click any material listed for that maker to open its detail pop-up on top, then close it to return to the factory view.</p>
+
+  <h2>Recommended for You</h2>
+  <p>At the bottom of the page, <strong>Recommended for You</strong> shows materials picked for you based on what you and similar members have viewed and saved. The more you explore, save and interact with materials, the more relevant these suggestions become. Click any recommendation to open its detail pop-up, then save it to a <a href="moodboards.html">moodboard</a> or add it to a quote from there.</p>
+  <div class="callout"><p>If you're new, this row may be sparse or empty until the platform has enough of your activity to personalise it. Browsing <a href="discover.html">Discover</a> and saving a few materials is the quickest way to warm it up.</p></div>
+
+  <h2>Things you can do here</h2>
+  <ul class="feat">
+    <li><strong>Open an item in place</strong> — click any material, profile or factory card to view its details in a pop-up without leaving the Dashboard.</li>
+    <li><strong>Jump to a full list</strong> — use a feed's <strong>View all</strong> link to open the matching module (<a href="discover.html">Discover</a> or the <a href="knowledge-base.html">Knowledge Base</a>).</li>
+    <li><strong>Start a conversation</strong> — press <strong>Start Exploring</strong> to open the <a href="agent-hub.html">Agent Hub</a>.</li>
+    <li><strong>Act on a recommendation</strong> — open a recommended material and save it to a <a href="moodboards.html">moodboard</a> or add it to a quote.</li>
+    <li><strong>Switch workspace or open your profile</strong> — use the header at the top of the screen; it stays available on every page, so you can change workspace or reach your account settings at any time.</li>
   </ul>
 
-  <h2>Things you can do</h2>
-  <ul>
-    <li>Click any <strong>material, profile or factory</strong> card to open its detail.</li>
-    <li>Use the <strong>View all</strong> links to jump to the full <a href="knowledge-base.html">Knowledge Base</a> or <a href="discover.html">Discover</a> lists.</li>
-    <li>Press <strong>Start Exploring</strong> to begin a guided discovery flow.</li>
-    <li>Switch workspace or open your profile from the header at any time.</li>
-  </ul>
+  <h2>If a feed looks empty</h2>
+  <p>Feeds read from your current workspace and the platform's public content. If one shows “Nothing here yet”, it usually means there isn't any matching content yet — for example a brand-new workspace with no materials imported, or no public knowledge documents published. Add or import content in the relevant module, or switch to a workspace that has data, and the feed will fill in on the next load.</p>
 
-  <div class="callout tip"><p><strong>Tip:</strong> the fastest way to act on anything you see here is to ask the <a href="agent-hub.html">Agent Hub</a> — e.g. “find tiles like this one” or “add this material to a moodboard”.</p></div>
+  <div class="callout tip"><p><strong>Fastest way to act on anything you see:</strong> the <a href="agent-hub.html">Agent Hub</a>. Instead of clicking through menus, ask it directly — “find tiles like this one”, “add this material to a moodboard”, or “compare the specs of these two products” — and it will do the work and return interactive results in the chat.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

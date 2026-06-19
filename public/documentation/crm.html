@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CRM | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,36 +11,78 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / CRM</div>
   <h1>CRM</h1>
   <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
-  <p class="lead">Manage the people and companies you do business with, alongside platform users.</p>
+  <p class="lead">Your relationship hub — the single place to keep track of the people and organisations you do business with, alongside the users who belong to your workspace. Clean CRM records feed directly into quotes, projects and <a href="finance.html">Finance</a>, so an invoice always carries the right legal name, VAT number and address.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm.png" alt="CRM Management">
-    <figcaption>CRM Management — summary counts and the Users / Contacts / Companies / Categories tabs.</figcaption>
+    <figcaption>CRM Management — the summary strip with live counts, and the Users / Contacts / Companies / Categories tabs.</figcaption>
   </figure>
 
-  <h2>What this page is for</h2>
-  <p>The CRM is your relationship hub. A summary strip shows <strong>Total Users</strong>, <strong>Active Users</strong>, <strong>Total Contacts</strong> and <strong>Total Companies</strong>, and the work is organised into tabs.</p>
+  <h2>What this area is for</h2>
+  <p>The CRM brings together three kinds of records that the rest of the platform relies on:</p>
+  <ul class="feat">
+    <li><strong>Platform users</strong> — the people with login access to your workspace, their roles and subscriptions.</li>
+    <li><strong>Contacts</strong> — the individual people you deal with (a buyer, an architect, a site contact).</li>
+    <li><strong>Companies</strong> — the organisations you trade with: customers, suppliers and partners.</li>
+  </ul>
+  <p>Keeping these tidy means that when you raise a quote, start a project or issue an invoice, the counter-party is already on file with verified details — no re-typing, no mismatched names.</p>
+
+  <h2>The summary strip</h2>
+  <p>Across the top of the page a live summary strip gives you a quick read on the size of your network:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Metric</th><th>What it counts</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Total Users</strong></td><td>Everyone with access to your workspace.</td></tr>
+      <tr><td><strong>Active Users</strong></td><td>Users currently active (not deactivated).</td></tr>
+      <tr><td><strong>Total Contacts</strong></td><td>Individual people on record.</td></tr>
+      <tr><td><strong>Total Companies</strong></td><td>Organisations on record.</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <h2>Tabs</h2>
+  <p>The work is organised into four tabs:</p>
   <ul class="feat">
-    <li><strong>Users</strong> — platform users, their roles and subscriptions, with a search box.</li>
-    <li><strong>Contacts</strong> — individual people you deal with.</li>
-    <li><strong>Companies</strong> — organisations, suppliers and customers.</li>
-    <li><strong>Categories</strong> — labels to segment contacts and companies.</li>
+    <li><strong>Users</strong> — the platform users in your workspace. Shows each user's role and subscription, with a search box to find someone quickly by name or email.</li>
+    <li><strong>Contacts</strong> — individual people. Add a person, store their contact details, tag them with categories, and link them to a company.</li>
+    <li><strong>Companies</strong> — organisations, suppliers and customers. This is where your billing counter-parties live, including the Greek business-registry lookup described below.</li>
+    <li><strong>Categories</strong> — reusable labels you create to segment contacts and companies (for example by relationship type, region or industry). Apply them on a record's detail page, then use them to filter and group.</li>
   </ul>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-contacts.png" alt="CRM Contacts tab">
-    <figcaption>The Contacts tab.</figcaption>
+    <figcaption>The Contacts tab — your list of individual people, searchable and filterable by category.</figcaption>
   </figure>
 
-  <h2>Contact &amp; company detail</h2>
-  <p>Clicking a contact or company opens its detail page (<span class="badge route">/crm/contacts/:id</span> · <span class="badge route">/crm/companies/:id</span>) where you manage its information, categories and associated records.</p>
+  <h2>Contact &amp; company detail pages</h2>
+  <p>Clicking any contact or company opens its own detail page — <span class="badge route">/crm/contacts/:id</span> for a person, <span class="badge route">/crm/companies/:id</span> for an organisation. From there you can:</p>
+  <ul class="feat">
+    <li><strong>Edit core information</strong> — name, email, phone, address, VAT/tax details, notes.</li>
+    <li><strong>Assign categories</strong> — apply the segment labels you defined in the Categories tab.</li>
+    <li><strong>See associated records</strong> — the contacts linked to a company, and the documents and activity tied to the record, so the whole relationship is in one view.</li>
+  </ul>
+  <p>A company's billing details flow straight through to documents, so the legal name, address and VAT number you confirm here are exactly what appears on an invoice in <a href="finance.html">Finance</a>.</p>
 
-  <h2>Greek business lookup (ΑΑΔΕ)</h2>
-  <p>For Greek companies, the platform can auto-fill the business profile from the official ΑΑΔΕ registry using the company's ΑΦΜ (VAT number): legal name, address, tax office, activity codes (ΚΑΔ) and status. This keeps customer/supplier records accurate and is used to validate VAT before issuing invoices. Results are cached, so repeat lookups of the same company are instant.</p>
+  <h2>Greek business lookup (ΑΑΔΕ / myAADE)</h2>
+  <p>For Greek companies, MaterialsHub can fill in the business profile automatically from the official tax-authority registry (ΑΑΔΕ) using the company's <strong>ΑΦΜ</strong> (VAT number). On a company's detail page, enter the ΑΦΜ and run the lookup; the platform retrieves and fills:</p>
+  <ul class="feat">
+    <li><strong>Legal name</strong> and commercial title.</li>
+    <li><strong>Registered address</strong> — street, number, postcode and city.</li>
+    <li><strong>Tax office</strong> (ΔΟΥ).</li>
+    <li><strong>Activity codes</strong> (ΚΑΔ) — the company's primary and secondary business activities.</li>
+    <li><strong>Status</strong> — whether the VAT number is active or has been deactivated.</li>
+  </ul>
+  <p>This is the recommended way to <strong>validate a VAT number before invoicing</strong> a Greek customer or supplier, so your documents are issued against accurate, registry-confirmed details. The same data underpins Greek e-invoicing — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how invoices are transmitted to myDATA / ΑΑΔΕ.</p>
 
-  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. The <strong>Admin</strong> sub-view (visible to operators) adds platform-wide user management beyond the standard CRM.</p></div>
+  <div class="callout tip"><p><strong>Lookups are cached for about 90 days.</strong> Once you've fetched a company's details, repeating the lookup within that window is instant and doesn't re-contact the registry — so there's no penalty for re-opening a record.</p></div>
+
+  <div class="callout warn"><p><strong>Each fresh lookup writes a notification to the looked-up company's TaxisNet inbox.</strong> This is required by tax-authority policy and can't be turned off. For that reason the lookup is meant for verifying your <em>own</em> business or a legitimate customer/supplier you actually trade with — not for researching arbitrary companies.</p></div>
+
+  <h2>Permissions &amp; the Admin sub-view</h2>
+  <p>Access to the CRM is gated by the <code>crm.view</code> capability — users without it won't see this area. Operators get an additional <strong>Admin</strong> sub-view that adds platform-wide user management on top of the standard CRM, for administering accounts, roles and subscriptions across the platform.</p>
+
+  <div class="callout"><p>CRM records are the backbone of billing and projects. For what happens to a company once you start invoicing it, see <a href="finance.html">Finance &amp; Invoicing</a>; for transmitting those invoices to the Greek tax authority, see <a href="finance-einvoicing.html">Greek e-invoicing</a>.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

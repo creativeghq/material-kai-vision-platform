@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Free Tools | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,46 +11,78 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Free Tools</div>
   <h1>Free Tools</h1>
   <div class="routes"><span class="badge route">/tools</span> <span class="badge public">Public</span></div>
-  <p class="lead">A set of free, no-login utilities — useful on their own and a friendly on-ramp to the platform.</p>
+  <p class="lead">A small set of free, no-login utilities for sourcing, pricing and specifying. Each one is useful on its own — and a friendly on-ramp to the rest of the platform. Every tool here is also available inside the <a href="agent-hub.html">Agent Hub</a> assistant, so you can run the same calculations and scans by just asking in plain language.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/tools.png" alt="Free tools hub">
-    <figcaption>The Free Tools hub.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/tools.png" alt="The Free Tools hub with cards for each tool">
+    <figcaption>The Free Tools hub at <code>/tools</code> — a card per tool, each linking to its own page.</figcaption>
   </figure>
+
+  <h2>What's here</h2>
+  <p>The hub groups four tools into two kinds:</p>
+  <ul class="feat">
+    <li><strong>Instant calculators</strong> — the <em>Heat-pump sizer</em> and <em>Heating cost comparison</em>. These run entirely in your browser, update live as you type, and have no daily limit and no bot check.</li>
+    <li><strong>Live web scans</strong> — <em>Price scan</em> and <em>Mention scan</em>. These call real sources across the web, so they're protected by a small daily allowance, a quick bot check, and short-term caching of identical queries (see <a href="#fair-use">Fair use</a> below).</li>
+  </ul>
+  <p>You don't need an account to use any of them. The header shows your remaining free scans for the day; signing in raises the limit and unlocks ongoing, tracked monitoring with alerts.</p>
 
   <h2>Heat-pump sizer</h2>
   <div class="routes"><span class="badge route">/tools/heat-pump</span> <span class="badge public">Public</span></div>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/heat-pump.png" alt="Heat-pump sizer">
-    <figcaption>Heat-pump sizer.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/heat-pump.png" alt="Heat-pump sizer with space details on the left and a recommended kW range on the right">
+    <figcaption>The Heat-pump sizer — describe the space on the left, get a recommended capacity range on the right.</figcaption>
   </figure>
-  <p>Estimate the heat-pump capacity a space needs based on its characteristics — a quick sizing aid for specifiers and homeowners.</p>
+  <p>A first-pass estimate of the heat-pump capacity (in kW) a space needs, so specifiers and homeowners can sanity-check a quote before committing. You describe the space and the result updates instantly — there's no quota and nothing is sent to a server.</p>
+  <p>You provide:</p>
+  <ul class="feat">
+    <li><strong>Heated area</strong> (m²) and <strong>ceiling height</strong> (m).</li>
+    <li><strong>Insulation / building era</strong> — from no insulation through to passive-house / nZEB.</li>
+    <li><strong>Climate zone</strong> (warmest to coldest), or an <strong>advanced</strong> override with the exact winter design temperature.</li>
+    <li><strong>Glazing / exposure</strong> — how much window area and exposed wall the space has.</li>
+    <li><strong>Heat-emission system</strong> — underfloor, fan coils, low-temp radiators or existing radiators, which sets the required flow temperature.</li>
+    <li>Optionally, <strong>domestic hot water</strong> for a chosen number of occupants.</li>
+  </ul>
+  <p>The result shows a recommended capacity range, the space-heating and (if included) hot-water loads, the effective specific load (W/m²), the flow temperature your chosen emitter needs, and notes on how that choice affects efficiency. It also lists the assumptions behind the figure.</p>
+  <div class="callout warn"><p>This is a <strong>coarse planning estimate</strong>, not a substitute for a full thermal-loss study (EN&nbsp;12831 / TOTEE&nbsp;20701). Always have a professional confirm the load before ordering — and size close to it, since oversizing a heat pump hurts efficiency.</p></div>
 
   <h2>Heating cost comparison</h2>
   <div class="routes"><span class="badge route">/tools/heating-cost</span> <span class="badge public">Public</span></div>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/heating-cost.png" alt="Heating cost comparison">
-    <figcaption>Heating cost comparison.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/heating-cost.png" alt="Heating cost comparison ranking several heating methods by annual running cost">
+    <figcaption>Heating cost comparison — methods ranked by annual running cost, cheapest highlighted.</figcaption>
   </figure>
-  <p>Compare the running cost of different heating options so you can see which is most economical for a given scenario.</p>
+  <p>Compares the annual <strong>running cost</strong> of several heating options for the same home, so you can see which is most economical for a given scenario. Like the sizer, it runs live in your browser with no daily limit.</p>
+  <p>You enter the home's <strong>area</strong> and its <strong>energy intensity</strong> (kWh/m²·yr, taken from an energy performance certificate), then adjust the <strong>unit prices</strong> for electricity, gas, oil and wood, plus a heat-pump efficiency figure and the type of air-conditioning. The tool then ranks the methods by yearly cost, highlights the cheapest, and shows how much more each other option would cost.</p>
+  <div class="callout"><p>The comparison covers <strong>running cost only</strong> — it excludes the price of the equipment, installation and maintenance. Use it to weigh ongoing fuel/energy spend, not total cost of ownership.</p></div>
 
   <h2>Price scan</h2>
   <div class="routes"><span class="badge route">/tools/price-scan</span> <span class="badge public">Public</span></div>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/price-scan.png" alt="Price scan">
-    <figcaption>Price scan.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/price-scan.png" alt="Price scan results listing retailers with prices and lowest/median/highest stats">
+    <figcaption>Price scan — retailers found across the web, with lowest / median / highest summary stats.</figcaption>
   </figure>
-  <p>Type a product or brand name and get back real retailer prices — minimum, median and maximum across the shops that carry it. A free taste of the platform's full <strong>price monitoring</strong>.</p>
+  <p>Type any product or brand name and get back <strong>real retailer prices</strong> from across the web. The scan searches multiple shopping sources and reads product pages directly to verify the price, then summarises the result as <strong>lowest</strong>, <strong>median</strong> and <strong>highest</strong>.</p>
+  <p>Each row shows the retailer, the live price (with any was/now discount), stock availability, a "verified" mark where the price was confirmed by a direct page read, and a link straight to the listing. A scan typically takes a few seconds and returns several retailers.</p>
+  <p>This is a free taste of the platform's full <strong>price monitoring</strong>: once you sign in you can keep tracking a product over time and be alerted to price drops, new retailers and promotions, rather than running a one-off scan. See <a href="agent-tools.html">Tools &amp; Capabilities</a> for what the assistant can do with tracked pricing.</p>
 
   <h2>Mention scan</h2>
   <div class="routes"><span class="badge route">/tools/mention-scan</span> <span class="badge public">Public</span></div>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/mention-scan.png" alt="Mention scan">
-    <figcaption>Mention scan.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/mention-scan.png" alt="Mention scan listing recent press mentions grouped with top outlets">
+    <figcaption>Mention scan — recent coverage of a brand or product, with the top outlets surfaced.</figcaption>
   </figure>
-  <p>Enter a brand or product and see recent press mentions and the top outlets talking about it — a preview of the platform's <strong>mention monitoring</strong>.</p>
+  <p>Enter a brand or product and see <strong>recent press mentions</strong> — news, blogs and editorial coverage from the last 30 days — together with the <strong>top outlets</strong> talking about it. Each result shows the headline, a short excerpt, the outlet, the publish date and a link to the article.</p>
+  <p>It's a preview of the platform's <strong>mention monitoring</strong>: signing in lets you track a subject continuously and get alerted to spikes in coverage, negative sentiment from reputable outlets, and brand-new outlets picking up the story — instead of a single snapshot. The same capability is available to the assistant in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
 
-  <div class="callout"><p><strong>Fair-use:</strong> the public scans are protected by a daily limit per visitor and a bot check, and identical recent queries are served from cache. Signing up unlocks tracked, ongoing monitoring with alerts via the <a href="agent-hub.html">Agent Hub</a>.</p></div>
+  <h2 id="fair-use">Fair use &amp; limits</h2>
+  <p>The two web scans (price and mention) call real, paid sources on every run, so they're kept fair with a few light guards:</p>
+  <ul class="feat">
+    <li><strong>Daily allowance</strong> — a small number of free scans per visitor each day, shared across both scan types. The header badge shows how many you have left, and the count resets daily.</li>
+    <li><strong>Bot check</strong> — a quick, mostly invisible challenge before a scan runs, to keep automated abuse out.</li>
+    <li><strong>Caching</strong> — if someone recently ran the exact same query, you get the cached result instantly, and it doesn't count against your allowance.</li>
+  </ul>
+  <p>The instant calculators (heat-pump sizer, heating cost) have <strong>no</strong> limit or bot check — they don't touch a server.</p>
+  <div class="callout tip"><p><strong>Want more than a snapshot?</strong> When your free scans run out you'll be offered a free account (which raises the daily quota and lets you save and track scans over time, with alerts) or pay-as-you-go credits. Tracked, ongoing monitoring lives inside the platform — start in the <a href="agent-hub.html">Agent Hub</a>, where the assistant can set up and manage it for you.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Knowledge Base | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,28 +11,69 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Knowledge Base</div>
   <h1>Knowledge Base</h1>
   <div class="routes"><span class="badge route">/knowledge-base</span> <span class="badge public">Public</span></div>
-  <p class="lead">The searchable public library of materials and documents extracted from supplier catalogues.</p>
+  <p class="lead">The platform's searchable, image-rich library of materials and knowledge documents — built automatically from supplier PDFs and catalogues. Because it's public, it doubles as a shareable catalogue you can send to a customer or open without signing in.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/knowledge-base/knowledge-base.png" alt="Knowledge Base">
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/knowledge-base/knowledge-base.png" alt="The public Knowledge Base, showing searchable materials and knowledge documents">
     <figcaption>The public Knowledge Base — browse and search materials and knowledge documents.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The Knowledge Base is the front door to everything the platform knows about materials. Supplier PDFs and catalogues are processed by the platform's extraction pipeline into structured, searchable entries — each with imagery, specifications and descriptive metadata. The page is public, so it doubles as a shareable catalogue for customers.</p>
+  <p>The Knowledge Base is the front door to everything the platform knows about materials. When a supplier PDF or catalogue is processed, the platform's extraction pipeline reads it page by page, finds each product, lifts out its imagery, recognises its specifications, and writes a clean, structured entry. The result is a single library where every material is consistent and searchable — no matter which supplier or catalogue layout it came from.</p>
+  <p>Each entry typically carries product imagery, a description, technical specifications, and a link back to the catalogue it came from. Because the page is public, it works equally well as your internal reference library and as a customer-facing catalogue you can share.</p>
 
   <h2>How search works</h2>
-  <p>Behind the scenes, search blends several signals — the text of a material, its visual appearance, an AI “understanding” of it, and colour/texture/style/material characteristics — so you can find items by what they <em>are</em> and what they <em>look like</em>, not just by keyword. You can search in natural language and filter by the available facets (category, colour, material, finish, and more).</p>
+  <p>Search here is not a plain keyword match. The platform compares your query against several different signals at once and blends them into a single relevance score, so you can find materials by <em>what they are</em> and by <em>what they look like</em> — described in your own words.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Signal</th><th>What it captures</th></tr></thead>
+    <tbody>
+      <tr><td>Text</td><td>The words on the entry — name, description and written specifications.</td></tr>
+      <tr><td>Visual appearance</td><td>How the material actually looks in its images, so a photo or a "looks like…" phrase can match.</td></tr>
+      <tr><td>Understanding</td><td>An AI reading of each material — what it is, where it's used and how it would be described.</td></tr>
+      <tr><td>Colour</td><td>The dominant colours and tones of the material.</td></tr>
+      <tr><td>Texture</td><td>Surface character — smooth, grainy, ribbed, matte, glossy, and so on.</td></tr>
+      <tr><td>Style</td><td>The overall aesthetic — modern, rustic, industrial, classic.</td></tr>
+      <tr><td>Material</td><td>The underlying material family — ceramic, wood, stone, metal, textile.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Because these signals are combined, natural-language queries work well. Searching for "warm matte stone for a bathroom floor" weighs the words, the look, the colour family and the surface together — rather than only matching the exact characters you typed.</p>
 
-  <h2>Things you can do</h2>
+  <div class="callout tip"><p><strong>Tip:</strong> describe the <em>feel</em> you want, not just the name. "Soft grey concrete-look with a fine texture" usually returns more useful results than a single keyword, because the visual and texture signals have something to work with.</p></div>
+
+  <h2>Filtering with facets</h2>
+  <p>Alongside the search box, facet filters let you narrow the library by its structured attributes. Pick one or more values and the results update to match:</p>
   <ul class="feat">
-    <li><strong>Search</strong> for materials by name, attribute or description.</li>
-    <li><strong>Filter</strong> using facets such as category, colour, material and finish.</li>
-    <li><strong>Open a material</strong> to view its imagery, specifications and source.</li>
-    <li><strong>Act on results</strong> — add to a <a href="moodboards.html">moodboard</a>, include in a <a href="quotes.html">quote</a>, or <a href="compare.html">compare</a> several at once.</li>
+    <li><strong>Category</strong> — the type of product (for example tiles, flooring, fixtures).</li>
+    <li><strong>Colour</strong> — filter to a colour family.</li>
+    <li><strong>Material</strong> — the material family the item is made from.</li>
+    <li><strong>Finish</strong> — surface finish such as matte, polished or textured.</li>
+    <li><strong>…and more</strong> — additional facets appear automatically based on what the catalogues contain.</li>
+  </ul>
+  <p>Facets are populated from the structured data the pipeline extracts, and equivalent values across languages and spellings are grouped together — so "white", for instance, gathers its variants under one filter instead of scattering across dozens of near-duplicates. You can combine facets with a text or natural-language query to zero in quickly.</p>
+
+  <h2>Opening a material</h2>
+  <p>Select any result to open its detail view, where you'll find:</p>
+  <ul class="feat">
+    <li><strong>Imagery</strong> — the product photos and crops the pipeline extracted from the catalogue.</li>
+    <li><strong>Specifications</strong> — the recognised technical attributes (dimensions, finish, material and other catalogue details).</li>
+    <li><strong>Source</strong> — a reference back to the catalogue or document the entry was built from, so you can trace any figure to its origin.</li>
   </ul>
 
-  <div class="callout tip"><p><strong>Tip:</strong> for conversational or visual queries (“something like travertine but darker”), the <a href="agent-hub.html">Agent Hub</a> runs the same search engine and explains <em>why</em> each result matched.</p></div>
+  <h2>Acting on a result</h2>
+  <p>The Knowledge Base is a starting point, not a dead end. From a material — or from a set of results — you can carry it straight into the rest of the platform:</p>
+  <div class="cards">
+    <a class="card" href="moodboards.html"><div class="ico">🎨</div><h3>Add to a moodboard</h3><p>Collect materials onto a visual board to develop a scheme or share a concept.</p></a>
+    <a class="card" href="quotes.html"><div class="ico">🧾</div><h3>Include in a quote</h3><p>Drop a material into a quote and build a priced proposal for a client.</p></a>
+    <a class="card" href="compare.html"><div class="ico">⚖️</div><h3>Compare several</h3><p>Put materials side by side to weigh their specifications and look.</p></a>
+    <a class="card" href="agent-hub.html"><div class="ico">🤖</div><h3>Ask the Agent Hub</h3><p>Search conversationally or by image, and get an explanation of why results matched.</p></a>
+  </div>
+
+  <h2>Conversational and visual search</h2>
+  <p>For anything that's easier to describe than to filter — "something like travertine but darker", or finding matches for a photo you upload — the <a href="agent-hub.html">Agent Hub</a> runs the same blended search engine. The difference is that it works as a conversation: you can refine across several turns, attach images, and it will explain <em>why</em> each result matched (the colour, the style, the material it picked up on). If you want to confirm whether an item in a photo exists in the library, <a href="recognition.html">Recognition</a> identifies materials directly from an image.</p>
+
+  <div class="callout warn"><p><strong>Good to know:</strong> the Knowledge Base reflects the catalogues that have been processed for your workspace. If a material seems to be missing, it usually means its source catalogue hasn't been added or finished processing yet — not that the platform can't represent it.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

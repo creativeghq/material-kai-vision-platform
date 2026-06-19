@@ -4,34 +4,69 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Material Compare | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / Material Compare</div>
   <h1>Material Compare</h1>
-  <div class="routes"><span class="badge route">/compare</span></div>
-  <p class="lead">Place materials side by side to evaluate them on the attributes that matter.</p>
+  <div class="routes"><span class="badge route">/compare</span> <span class="badge public">Open to all users</span></div>
+  <p class="lead">Put two or more materials next to each other and judge them together — imagery and specifications lined up in one table — instead of flipping back and forth between separate detail pages.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/compare/compare.png" alt="Material Comparison">
-    <figcaption>Material Comparison — add materials to build a side-by-side view.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/compare/compare.png" alt="The Material Comparison view with materials shown as side-by-side columns">
+    <figcaption>Material Comparison — each material is a column; differing values are highlighted so they're easy to spot.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The comparison tool helps you make a decision between candidates. Add two or more materials and the page lines them up so you can scan their imagery and specifications together instead of flipping between detail pages.</p>
+  <p>When you've narrowed a search down to a small shortlist, the question is no longer "what's out there" but "which of these is right". Compare is built for exactly that final step. It places your candidates side by side so you can scan their photos, attributes and specifications at a glance, and it draws your eye to the points where they actually differ — which is usually where the decision is made.</p>
+  <p>You can compare <strong>two to four materials</strong> at once. Two is the minimum needed for a meaningful comparison; four is the ceiling so the columns stay readable.</p>
 
-  <h2>Using it</h2>
+  <h2>What you can see for each material</h2>
+  <p>Every material you add becomes a column. At the top of the column you get its <strong>image, name and status</strong>, plus a small set of quality indicators; below that, two grouped sections of values run down the page so each row lines the materials up on the same attribute.</p>
+  <ul class="feat">
+    <li><strong>Image &amp; name</strong> — the material's main photo and title, so you're never comparing on numbers alone.</li>
+    <li><strong>Quality indicators</strong> — small bars for <em>Quality</em>, <em>Confidence</em> and <em>Completeness</em>. These describe how rich and well-verified the catalogue record is, which is useful context when one option simply has more (or better) data behind it.</li>
+    <li><strong>Properties</strong> — descriptive attributes such as colour, finish, material type and the like.</li>
+    <li><strong>Specifications</strong> — the more technical, measurable values where they exist.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Differences are highlighted for you.</strong> Where a row's value is the same across all the materials it stays quiet; where the values diverge, the row is highlighted and flagged. A small legend at the bottom of the page explains the markers — one for "values differ", one for "values match" — so you can focus on the rows that matter to your choice.</p></div>
+
+  <h2>The controls</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Add Material</strong></td><td>Opens a search box; type a name, pick a material from the catalogue, and it's added as a new column. Repeat to build up the comparison. The button stops appearing once you reach four — remove one first to add another.</td></tr>
+      <tr><td><strong>Remove (×)</strong></td><td>The × on a column drops that material from the comparison. Use it to clear out options you've ruled out and keep the table focused on the real contenders.</td></tr>
+      <tr><td><strong>Back</strong></td><td>Returns you to wherever you opened Compare from — for example your search results or a moodboard — so you can keep browsing.</td></tr>
+      <tr><td><strong>Empty state</strong></td><td>Before you've added anything, the page shows <em>"No materials selected"</em> with a prompt to add at least two materials and an <strong>Add Material</strong> button to get started.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Step by step</h2>
   <ol>
-    <li>Click <strong>Add Material</strong> and pick an item from the catalogue.</li>
-    <li>Repeat to add more — they appear as columns side by side.</li>
-    <li>Compare imagery and attributes; remove any you've ruled out.</li>
-    <li>Use <strong>Back</strong> to return to where you came from.</li>
+    <li>Open Compare. If you arrive empty-handed you'll see the <strong>No materials selected</strong> state.</li>
+    <li>Click <strong>Add Material</strong>, search by name, and select a material to place the first column.</li>
+    <li>Repeat <strong>Add Material</strong> until you have two to four candidates side by side.</li>
+    <li>Scan top to bottom: start with the images, then read down the <strong>Properties</strong> and <strong>Specifications</strong>, paying attention to the highlighted rows where the materials disagree.</li>
+    <li><strong>Remove (×)</strong> any option you've ruled out to keep the table clean.</li>
+    <li>When you've decided, use <strong>Back</strong> to return to where you came from and act on your choice — add it to a <a href="moodboards.html">moodboard</a> or include it on a <a href="quotes.html">quote</a>.</li>
   </ol>
 
-  <div class="callout tip"><p><strong>Tip:</strong> you can send a shortlist straight into comparison from search results, the <a href="knowledge-base.html">Knowledge Base</a>, or a <a href="moodboards.html">moodboard</a>.</p></div>
+  <h2>What to compare on</h2>
+  <p>There's no single "right" attribute — it depends on the project — but a useful order of attack is:</p>
+  <ul class="feat">
+    <li><strong>Imagery first.</strong> The fastest disqualifier is often visual: colour, texture and overall look should suit the space before any number matters.</li>
+    <li><strong>Then the specifications.</strong> Where measurable values exist, the highlighted differences are where trade-offs live — let the rows that diverge drive the conversation.</li>
+    <li><strong>Mind the data, not just the values.</strong> If one option's quality/completeness indicators are low, its blank or sparse rows may reflect a thin catalogue record rather than a genuinely worse material; treat missing values as "unknown", not "zero".</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Build the shortlist elsewhere, decide here.</strong> Compare is usually the last stop. You can send a set of materials straight into a side-by-side view from <strong>search results</strong>, from the <a href="knowledge-base.html">Knowledge Base</a>, or from a <a href="moodboards.html">moodboard</a> — so the heavy discovery happens where it's natural and the final judgement happens here. To find candidates by photo or sample first, see <a href="recognition.html">Material Recognition</a>.</p></div>
+
+  <div class="callout"><p>Compare reads directly from the catalogue, so it always shows the latest record for each material. If a value looks missing, open the material's own detail page from your search or the <a href="knowledge-base.html">Knowledge Base</a> for the full record.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

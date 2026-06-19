@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greek e-invoicing (myDATA) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Greek e-invoicing</div>
+  <h1>Greek e-invoicing (myDATA / ΑΑΔΕ)</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Issue compliant invoices and transmit them to the Greek tax authority (ΑΑΔΕ / myDATA) directly from the platform.</p>
+
+  <h2>What it does</h2>
+  <p>When you issue an invoice (or a receipt from the <a href="pos.html">POS</a>), the platform can transmit it electronically to <strong>myDATA</strong>, the Greek tax authority's e-bookkeeping system. This replaces manual entry into a separate accounting portal — the document you create here becomes the official record.</p>
+
+  <h2>Multi-tenant by design</h2>
+  <p>Transmission is per-workspace: each workspace issues under <strong>its own VAT identity and authorisation</strong>, so businesses sharing the platform never cross-file. Your workspace's issuer details are configured once and used on every submission.</p>
+
+  <h2>VAT validation before issuing</h2>
+  <p>Customer/supplier VAT numbers are validated before a document is issued — Greek numbers against the <strong>ΑΑΔΕ registry</strong> and EU numbers against <strong>VIES</strong> — reducing rejected submissions and keeping counter-party details correct. This ties into the Greek business lookup used across <a href="crm.html">CRM</a>.</p>
+
+  <h2>How it fits the document flow</h2>
+  <ol>
+    <li>Create an invoice under <a href="finance-documents.html">Documents → Invoices</a> (or issue a receipt at the POS).</li>
+    <li>The counter-party's VAT is validated.</li>
+    <li>On issue, the document is transmitted to ΑΑΔΕ / myDATA and marked accordingly.</li>
+    <li>The issued document feeds your <a href="finance-receivables-payables.html">Receivables</a>, <a href="finance.html">Dashboard</a> and reports.</li>
+  </ol>
+
+  <div class="callout"><p><strong>Setup:</strong> e-invoicing requires your workspace's fiscal details and tax-authority authorisation to be configured (under Finance → Settings / by an administrator). Once connected, transmission happens as part of issuing — there's no separate export step.</p></div>
+
+  <div class="callout tip"><p>Because VAT is validated up front, fixing a wrong customer VAT before issuing is much cheaper than correcting a rejected or mis-filed document later.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

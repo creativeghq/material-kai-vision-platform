@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MoodBoards | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,51 +11,78 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / MoodBoards</div>
   <h1>MoodBoards</h1>
   <div class="routes"><span class="badge route">/moodboard</span> <span class="badge route">/moodboard/:id</span></div>
-  <p class="lead">Curate and organise your favourite materials, then turn a board into client-ready presentation sheets or a quote.</p>
+  <p class="lead">Curate your favourite materials, images and finishes into boards, then turn a board into client-ready presentation sheets, a quote, or a shareable public page. MoodBoards are the bridge between browsing the catalogue, chatting with the <a href="agent-hub.html">Agent Hub</a>, and delivering a finished proposal.</p>
 
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboards.png" alt="MoodBoards list">
-    <figcaption>The MoodBoards list. Each board shows its visibility (Public/Private) and item count.</figcaption>
-  </figure>
+  <h2>What a MoodBoard is for</h2>
+  <p>A MoodBoard is a working collection — a place to gather the products and inspiration for one room, project or concept. You add catalogue materials, pull in images (from Pinterest or from the AI chat), and let the platform suggest matching products. When the board is ready you can render polished presentation sheets, generate a quote from its products, or publish it as a public link a client can open. For larger deliverables that combine sheets from <em>several</em> boards, MoodBoards feed into <a href="projects.html">Projects → Client Views</a>.</p>
 
   <h2>The list page</h2>
-  <p>This is where all your boards live. Create a new one with <strong>New MoodBoard</strong>; each card shows the board name, whether it's <strong>Public</strong> or <strong>Private</strong>, and how many materials it holds. From a card you can open, rename, change visibility or delete the board.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboards.png" alt="MoodBoards list">
+    <figcaption>The MoodBoards list. Each card shows the board name, its visibility (Public/Private) and how many items it holds.</figcaption>
+  </figure>
+  <p>This is the home for every board you own. Each board appears as a card showing:</p>
+  <ul class="feat">
+    <li><strong>Name</strong> — what the board is called.</li>
+    <li><strong>Visibility</strong> — a <span class="badge public">Public</span> or <span class="badge gated">Private</span> badge.</li>
+    <li><strong>Item count</strong> — how many materials and images are on the board.</li>
+  </ul>
+  <p>Use <strong>New MoodBoard</strong> to start a fresh board. From a card you can <strong>open</strong> it, <strong>rename</strong> it, change its <strong>visibility</strong>, or <strong>delete</strong> it. Deleting a board removes it and its generated sheets — it does not delete the underlying catalogue products.</p>
 
   <h2>The board detail page</h2>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
     <figcaption>A board's detail view with the Items / Tools tabs and the action toolbar.</figcaption>
   </figure>
-  <p>Opening a board reveals two tabs and an action toolbar:</p>
-  <ul class="feat">
-    <li><strong>Items tab</strong> — the materials and images on the board, arranged as a visual collection.</li>
-    <li><strong>Tools tab</strong> — board-level helpers, including <strong>Find Products</strong> to discover matching catalogue items.</li>
-    <li><strong>Add Products</strong> — add catalogue materials directly to the board.</li>
-    <li><strong>Import from Pinterest</strong> — paste a pin or connect Pinterest to pull images in; imported images are auto-matched to catalogue products.</li>
-    <li><strong>Generate Quote</strong> — turn the board's products into a <a href="quotes.html">quote</a> (enabled once the board has products).</li>
-    <li><strong>Public / Private</strong> toggle and <strong>Delete</strong>.</li>
-  </ul>
+  <p>Opening a board gives you two tabs and an action toolbar.</p>
+
+  <h3>Items tab</h3>
+  <p>The <strong>Items</strong> tab is the board itself — the materials and images you've collected, arranged as a visual grid. This is where you review what's on the board, open an individual item, or remove items you no longer want.</p>
+
+  <h3>Tools tab</h3>
+  <p>The <strong>Tools</strong> tab holds board-level helpers. The key one is <strong>Find Products</strong>, which looks across the catalogue for materials that match what's already on the board — a quick way to round out a concept with complementary items.</p>
+
+  <h3>The action toolbar</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Add Products</strong></td><td>Add catalogue materials directly to the board.</td></tr>
+      <tr><td><strong>Import from Pinterest</strong></td><td>Paste a single pin URL, or connect your Pinterest account to browse boards and import images in bulk. Imported images are automatically matched against the catalogue so the platform can suggest the products that look closest.</td></tr>
+      <tr><td><strong>Generate Quote</strong></td><td>Turn the board's products into a <a href="quotes.html">quote</a>. Enabled once the board contains at least one product.</td></tr>
+      <tr><td><strong>Public / Private</strong></td><td>Toggle the board's visibility. Public boards can be opened by anyone with the share link.</td></tr>
+      <tr><td><strong>Delete</strong></td><td>Remove the board and its generated sheets.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout tip"><p><strong>Saving from the AI chat:</strong> when the <a href="agent-hub.html">Agent Hub</a> returns a product or generated image you like, you can save it straight into a moodboard. A <em>copy</em> of the image is kept on the board, so it survives even if you later delete the conversation it came from.</p></div>
 
   <h2>Presentation sheets</h2>
-  <p>From a board you can produce <strong>presentation sheets</strong> — polished, A3 client deliverables generated via the <a href="agent-hub.html">Agent Hub</a>. Sheet types include:</p>
+  <p>From a board you can produce <strong>presentation sheets</strong> — polished, client-ready A3 pages. Sheets are generated through the <a href="agent-hub.html">Agent Hub</a>: you describe the sheet you want, the assistant assembles it, and the finished PDF is attached to the board so you can re-open and re-render it later.</p>
+  <div class="table-wrap">
   <table>
     <thead><tr><th>Sheet</th><th>What it is</th></tr></thead>
     <tbody>
-      <tr><td>Material board</td><td>A grid of selected products with optional descriptions.</td></tr>
-      <tr><td>Color palette</td><td>Swatches with names, optionally pulled from board images.</td></tr>
-      <tr><td>Concept board</td><td>Free-form image layout with captions.</td></tr>
+      <tr><td>Material board</td><td>A grid of selected products with optional descriptive chips.</td></tr>
+      <tr><td>Color palette</td><td>Named colour swatches, optionally sampled from images on the board.</td></tr>
+      <tr><td>Concept board</td><td>A free-form image layout with captions for a mood or story.</td></tr>
       <tr><td>Lighting plan</td><td>Fixture symbols placed on a backdrop, with a legend.</td></tr>
-      <tr><td>Annotated render</td><td>Callouts pointing to products on a render.</td></tr>
-      <tr><td>Elevation / render pair</td><td>Dimensions and tile callouts across an elevation + render.</td></tr>
-      <tr><td>FF&amp;E schedule</td><td>A furniture/fixtures/equipment table, often from a quote.</td></tr>
-      <tr><td>Area breakdown</td><td>A one-page room spec (hero render + plan + finishes + palette).</td></tr>
-      <tr><td>Full deck</td><td>Several sheets combined with a cover into one PDF.</td></tr>
+      <tr><td>Annotated render</td><td>Callouts pointing to specific products on a render.</td></tr>
+      <tr><td>Elevation / render pair</td><td>An elevation and render side by side with dimensions and tile callouts.</td></tr>
+      <tr><td>FF&amp;E schedule</td><td>A furniture, fixtures &amp; equipment table — typically pulled from a quote.</td></tr>
+      <tr><td>Area breakdown</td><td>A one-page room spec: hero render plus plan, elevation, materials &amp; finishes, fittings and a palette strip.</td></tr>
+      <tr><td>Full deck</td><td>Several sheets combined behind a cover page into one PDF.</td></tr>
     </tbody>
   </table>
-  <p>Some sheets are interactive — the platform opens an in-chat canvas so you can place symbols, draw dimensions or position callouts before rendering the PDF.</p>
+  </div>
+  <div class="callout"><p><strong>Interactive sheets:</strong> some sheet types — Lighting plan, Annotated render and Elevation / render pair — open an <strong>in-chat canvas</strong> first. You place fixture symbols, draw dimensions, or position callouts directly on the image, and only then is the PDF rendered. The passive sheet types render immediately. The full list of what the assistant can build is in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p></div>
 
-  <h2>Sharing</h2>
-  <p>A board can be made <strong>Public</strong> and shared via a link (<span class="badge route">/board/:id</span>). For richer, project-level deliverables that bundle sheets across multiple boards, see <a href="projects.html">Projects → Client Views</a>.</p>
+  <h2>Sharing &amp; deliverables</h2>
+  <p>A board you make <span class="badge public">Public</span> can be opened by anyone with its link at <span class="badge route">/board/:id</span> — handy for sending a quick visual reference to a client or colleague without giving them an account.</p>
+  <p>When you need a richer, branded deliverable that bundles sheets across <em>multiple</em> boards — with an embedded 3D walkthrough, lighting moods, a live FF&amp;E table and inline client approval — use a <strong>Client View</strong>. Client Views live at the project level; see <a href="projects.html">Projects → Client Views</a>.</p>
+
+  <div class="callout tip"><p><strong>Tip:</strong> build the board first, then ask the <a href="agent-hub.html">Agent Hub</a> to generate the sheets you need, then either <strong>Generate Quote</strong> for pricing or assemble the sheets into a Client View for the final hand-off.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

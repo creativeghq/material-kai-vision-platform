@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Account & Billing | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,49 +11,85 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Account &amp; Billing</div>
   <h1>Account &amp; Billing</h1>
   <div class="routes"><span class="badge route">/profile</span> <span class="badge route">/billing/subscriptions</span> <span class="badge route">/billing/credits</span></div>
-  <p class="lead">Manage your public profile, business details, services, subscription, credits, billing and connected accounts.</p>
+  <p class="lead">Everything about <em>you</em> on MaterialsHub: your public profile and the services you offer, your messages, appointments and reviews, plus the credits, subscription and billing that power AI and generation features across the platform.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile.png" alt="My Profile">
-    <figcaption>My Profile — appearance, personal information, business and services.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile.png" alt="My Profile page">
+    <figcaption>My Profile — appearance and avatar, personal information, business details and the services you offer.</figcaption>
   </figure>
 
-  <h2>Profile tabs</h2>
-  <p>Your profile page is organised into tabs:</p>
+  <h2>Where to find it</h2>
+  <p>Open your profile from the avatar menu in the top-right of the app, or go straight to <span class="badge route">/profile</span>. The page is organised into tabs along the top; each is covered below. If you're brand new, start with <a href="getting-started.html">Getting Started</a> first.</p>
+
+  <h2>The profile tabs at a glance</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Profile</strong></td><td>Your public profile, appearance/avatar, personal info, business details and the services you offer.</td></tr>
+      <tr><td><strong>Inbox</strong></td><td>Your personal messages and conversations.</td></tr>
+      <tr><td><strong>Appointments</strong></td><td>Meetings and bookings scheduled with you.</td></tr>
+      <tr><td><strong>Reviews</strong></td><td>Feedback others have left about you.</td></tr>
+      <tr><td><strong>Subscription</strong></td><td>Your current plan and what it unlocks.</td></tr>
+      <tr><td><strong>Credits</strong></td><td>Your credit balance and a history of what used credits.</td></tr>
+      <tr><td><strong>Billing</strong></td><td>Payment details and invoices for your subscription.</td></tr>
+      <tr><td><strong>Social Accounts</strong></td><td>Connect social platforms so you can publish to them.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Profile tab</h2>
+  <p>The Profile tab is where you set up how you appear to the rest of the platform. It's divided into a few sections:</p>
   <ul class="feat">
-    <li><strong>Profile</strong> — public profile, appearance/avatar, personal info, business details and the services you offer. A <em>Copy link</em> button shares your public profile.</li>
-    <li><strong>Inbox</strong> — your personal messages.</li>
-    <li><strong>Appointments</strong> — scheduled meetings.</li>
-    <li><strong>Reviews</strong> — feedback others have left.</li>
-    <li><strong>Subscription</strong> — your current plan.</li>
-    <li><strong>Credits</strong> — balance and usage history.</li>
-    <li><strong>Billing</strong> — payment details and invoices for your subscription.</li>
-    <li><strong>Social Accounts</strong> — connect social platforms for publishing.</li>
+    <li><strong>Appearance &amp; avatar</strong> — upload a profile photo and set how your name and role are presented.</li>
+    <li><strong>Personal information</strong> — your name, contact details and role.</li>
+    <li><strong>Business details</strong> — company name, address, VAT/tax details and other registration info. For Greek companies these can be <strong>enriched from the ΑΑΔΕ business registry</strong>: enter your Greek VAT number and pull official details in one step (see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how the same registry data is used for tax documents).</li>
+    <li><strong>Services you offer</strong> — list the services you provide using the <em>Add Service</em> button. These appear on your public profile so others know what you do.</li>
   </ul>
 
   <h3>Your public profile</h3>
-  <p>The Profile tab controls what others see at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span>: your name, business, role, and the services you list (add them with <em>Add Service</em>). Business details can be enriched from the ΑΑΔΕ registry for Greek companies.</p>
+  <p>What you put in the Profile tab feeds a sharable public page at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span>. Use the <em>Copy link</em> button to grab the URL and share it with clients or partners — they can view your name, business, role and listed services without needing an account.</p>
+
+  <div class="callout tip"><p><strong>Tip:</strong> A complete profile with an avatar and a clear list of services makes a much stronger impression when you share your public link or appear elsewhere on the platform.</p></div>
 
   <h2>Credits</h2>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile-credits.png" alt="Credits tab">
-    <figcaption>The Credits tab — balance and history.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile-credits.png" alt="Credits tab showing balance and history">
+    <figcaption>The Credits tab — your current balance and a history of credit usage.</figcaption>
   </figure>
-  <p>Credits power the platform's AI/generation actions. This tab shows your current balance and a history of what consumed credits.</p>
+  <p>Credits are the platform's currency for <strong>AI and generation actions</strong> — things like generating images, presentation sheets, scans, 3D/VR worlds, and other metered tools. The Credits tab shows:</p>
+  <ul class="feat">
+    <li><strong>Balance</strong> — how many credits you have available right now.</li>
+    <li><strong>Usage history</strong> — a record of what consumed credits, so you can see where they went.</li>
+  </ul>
+  <div class="callout"><p>Everyday chatting and searching in the <a href="agent-hub.html">Agent Hub</a> is inexpensive. Only explicit generation actions are metered, and the assistant tells you the cost before it runs one. A full list of which actions cost credits is in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p></div>
 
   <h2>Buying credits</h2>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-credits.png" alt="Credit packages">
-    <figcaption>Credit packages (/billing/credits).</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-credits.png" alt="Credit packs available for purchase">
+    <figcaption>Credit packs at /billing/credits.</figcaption>
   </figure>
-  <p>Top up at <span class="badge route">/billing/credits</span> by choosing a credit pack. Checkout is handled securely.</p>
+  <p>When you run low, top up at <span class="badge route">/billing/credits</span>. Choose one of the available credit packs and complete the purchase through secure checkout. Your new balance is reflected in the Credits tab right after payment.</p>
 
   <h2>Plans &amp; subscriptions</h2>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-subscriptions.png" alt="Subscription plans">
-    <figcaption>Subscription plans (/billing/subscriptions).</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-subscriptions.png" alt="Subscription plans page">
+    <figcaption>Subscription plans at /billing/subscriptions.</figcaption>
   </figure>
-  <p>Upgrade or change your plan at <span class="badge route">/billing/subscriptions</span>. Higher plans raise your quotas and unlock additional capabilities across modules.</p>
+  <p>Your plan is shown in the <strong>Subscription</strong> tab. To upgrade or change it, go to <span class="badge route">/billing/subscriptions</span> and pick a plan. <strong>Higher plans raise your quotas and unlock additional capabilities</strong> across the platform's modules — so if you're hitting limits or want more advanced features, this is where to do it.</p>
+  <p>Payment details and the invoices for your subscription live in the <strong>Billing</strong> tab.</p>
+
+  <h2>Social Accounts</h2>
+  <p>The <strong>Social Accounts</strong> tab lets you connect social media platforms to your account. Once connected, you can publish content to them directly from MaterialsHub. Connecting and disconnecting accounts is managed entirely from this tab.</p>
+
+  <h2>Inbox, Appointments &amp; Reviews</h2>
+  <ul class="feat">
+    <li><strong>Inbox</strong> — your personal messages and conversations in one place. For the workspace-wide, multi-channel messaging experience, see the dedicated <a href="inbox.html">Inbox</a> documentation.</li>
+    <li><strong>Appointments</strong> — meetings and bookings that have been scheduled with you, so you can keep track of what's coming up.</li>
+    <li><strong>Reviews</strong> — feedback that others have left about you, visible on your profile.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Putting it together:</strong> set up your <strong>Profile</strong> and services first, connect any <strong>Social Accounts</strong> you publish to, then top up <strong>Credits</strong> or change your <strong>plan</strong> as your usage grows.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

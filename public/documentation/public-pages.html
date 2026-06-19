@@ -4,44 +4,116 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Public & Shared Pages | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / Public &amp; Shared Pages</div>
   <h1>Public &amp; Shared Pages</h1>
-  <p class="lead">The screens your customers and prospects see — usually opened from a link, without signing in.</p>
+  <p class="lead">The screens your customers, clients and prospects see — usually opened from a link you send them, on any device, without ever signing in.</p>
 
-  <p>Many of the platform's outputs are designed to be shared with people who don't have an account. These pages are reached through links you generate (often token-protected and revocable), so recipients can view, approve, pay or respond without logging in.</p>
+  <p>Many of the things you create in MaterialsHub are meant to leave the workspace and land in front of someone else: a quote to approve, an invoice to pay, a project deck to sign off, a catalogue to browse. Rather than exporting a file and emailing it, the platform turns each of these into a <strong>live, link-based page</strong>. The recipient clicks the link, sees an up-to-date view, and acts on it directly — and whatever they do (accept a quote, leave a comment, pay an invoice) flows straight back into the record it came from.</p>
 
-  <h2>Shareable deliverables</h2>
+  <div class="callout tip"><p>These pages sit <strong>outside</strong> the signed-in app. There is no login wall and no menu — just the single deliverable you shared. If you are looking for the screens <em>you</em> use to create them, follow the cross-links beside each entry below.</p></div>
+
+  <h2>The shareable pages at a glance</h2>
+  <p>Each row is a public surface, the link pattern behind it, and what the person on the other end can do. <span class="badge public">public</span> pages need only the link; <span class="badge gated">gated</span> ones may also ask the visitor for an email address before showing content.</p>
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Page</th><th>Route</th><th>What the recipient does</th></tr></thead>
+    <thead><tr><th>Page</th><th>Route</th><th>Access</th><th>What the recipient does</th></tr></thead>
     <tbody>
-      <tr><td>Public quote</td><td><span class="badge route">/q/:token</span></td><td>Review a quote's items, specs and totals, and accept it.</td></tr>
-      <tr><td>Pay invoice</td><td><span class="badge route">/pay/:token</span></td><td>View an invoice and pay it online.</td></tr>
-      <tr><td>Public moodboard</td><td><span class="badge route">/board/:id</span></td><td>Browse a moodboard you've made public.</td></tr>
-      <tr><td>Client view</td><td><span class="badge route">/cv/:token</span></td><td>Open a project deliverable: deck PDF, 3D walkthrough, lighting moods, FF&amp;E, and approve/comment.</td></tr>
-      <tr><td>Shared sheet</td><td><span class="badge route">/sheets/share/:token</span></td><td>View a single presentation sheet.</td></tr>
-      <tr><td>Public catalog</td><td><span class="badge route">/c/:slug</span></td><td>Browse a published presentation catalogue (may be email-gated).</td></tr>
-      <tr><td>Online storefront</td><td><span class="badge route">/store/:slug</span></td><td>Browse a seller's public storefront.</td></tr>
-      <tr><td>Public profile</td><td><span class="badge route">/u/:userId</span></td><td>See a member's public profile and services.</td></tr>
-      <tr><td>Public inbox thread</td><td><span class="badge route">/i/:token</span></td><td>Take part in a shared conversation without an account.</td></tr>
-      <tr><td>AR material preview</td><td><span class="badge route">/ar/:productId</span></td><td>View a material in augmented reality (QR hand-off from desktop).</td></tr>
+      <tr>
+        <td>Public quote</td>
+        <td><span class="badge route">/q/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Reviews the quote's line items, specifications and totals, then <strong>accepts</strong> it online. See <a href="quotes.html">Quotes</a>.</td>
+      </tr>
+      <tr>
+        <td>Pay invoice</td>
+        <td><span class="badge route">/pay/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Views an invoice and <strong>pays it online</strong>. See <a href="finance.html">Finance &amp; Invoicing</a>.</td>
+      </tr>
+      <tr>
+        <td>Public moodboard</td>
+        <td><span class="badge route">/board/:id</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Browses a moodboard you've chosen to make public. See <a href="moodboards.html">Moodboards</a>.</td>
+      </tr>
+      <tr>
+        <td>Client view</td>
+        <td><span class="badge route">/cv/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Opens a project deliverable — deck PDF, 3D walkthrough, lighting moods and live FF&amp;E — and can <strong>approve or comment</strong>. See <a href="projects.html">Projects</a>.</td>
+      </tr>
+      <tr>
+        <td>Shared sheet</td>
+        <td><span class="badge route">/sheets/share/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Views a single presentation sheet on its own. See <a href="moodboards.html">Moodboards</a>.</td>
+      </tr>
+      <tr>
+        <td>Public catalogue</td>
+        <td><span class="badge route">/c/:slug</span></td>
+        <td><span class="badge gated">may be email-gated</span></td>
+        <td>Browses a published presentation catalogue; some catalogues ask for an email first.</td>
+      </tr>
+      <tr>
+        <td>Online storefront</td>
+        <td><span class="badge route">/store/:slug</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Browses a seller's public storefront and the products on offer. See <a href="discover.html">Discover</a>.</td>
+      </tr>
+      <tr>
+        <td>Public profile</td>
+        <td><span class="badge route">/u/:userId</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Sees a member's public profile and the services they offer. See <a href="account.html">Account</a>.</td>
+      </tr>
+      <tr>
+        <td>Public inbox thread</td>
+        <td><span class="badge route">/i/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Takes part in a shared conversation — reads and replies — without an account. See <a href="inbox.html">Inbox</a>.</td>
+      </tr>
+      <tr>
+        <td>AR material preview</td>
+        <td><span class="badge route">/ar/:productId</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Views a material in augmented reality, typically by scanning a QR code handed off from a desktop screen.</td>
+      </tr>
     </tbody>
   </table>
+  </div>
+
+  <h2>What each page does</h2>
+  <div class="cards">
+    <div class="card"><h3>🧾 Public quote</h3><p>A clean, read-only presentation of a quote: every line item with its description and specification, sub-totals, taxes and the grand total. The recipient can accept it with one click — turning a proposal into a confirmed order without back-and-forth email.</p></div>
+    <div class="card"><h3>💳 Pay invoice</h3><p>Shows the invoice and an online payment option, so a customer can settle the amount the moment they open the link. The payment is reconciled back against the invoice in your Finance workspace.</p></div>
+    <div class="card"><h3>🎨 Public moodboard</h3><p>A shareable view of a moodboard — the images, materials and products you've gathered — for a client or collaborator to browse at their leisure.</p></div>
+    <div class="card"><h3>📐 Client view</h3><p>The richest deliverable: a project sign-off page that bundles the deck as a PDF, an explorable 3D walkthrough, switchable lighting moods over the hero render, a live FF&amp;E list, and inline approve/comment controls so the client can respond in place.</p></div>
+    <div class="card"><h3>🗂️ Shared sheet</h3><p>A single presentation sheet on its own page — handy when you want to send just one board (a material schedule, a colour palette, an annotated render) rather than a whole deck.</p></div>
+    <div class="card"><h3>📚 Public catalogue</h3><p>A published, browsable catalogue of products. Some catalogues are open; others ask the visitor for an email address first, which also lets you see who's looking.</p></div>
+    <div class="card"><h3>🏬 Online storefront</h3><p>A seller's public shop page, where prospects can browse what's available and find their way into an enquiry or quote.</p></div>
+    <div class="card"><h3>👤 Public profile</h3><p>A member's public-facing page — who they are and the services they provide — useful as a shareable business card.</p></div>
+    <div class="card"><h3>💬 Public inbox thread</h3><p>A shared conversation that an outside party can read and reply to without registering, so they can take part directly in a discussion you've opened to them.</p></div>
+    <div class="card"><h3>🔍 AR material preview</h3><p>An augmented-reality view of a material. Usually reached by scanning a QR code on a desktop screen so the visitor can preview the material in their own space on a phone or tablet.</p></div>
+  </div>
 
   <h2>How sharing works</h2>
   <ul class="feat">
-    <li><strong>Generated on demand</strong> — you create the link from the relevant screen (a quote, invoice, board, project, etc.).</li>
-    <li><strong>Token-protected</strong> — links carry a unique token; they can be <strong>revoked</strong> or set to <strong>expire</strong>.</li>
-    <li><strong>No account needed</strong> — recipients interact directly: view, accept, pay or comment.</li>
-    <li><strong>Feedback returns to you</strong> — approvals and comments flow back into the originating record (e.g. a project's Client View).</li>
+    <li><strong>Generated on demand</strong> — you create each link from the screen it belongs to: a quote, an invoice, a moodboard, a project, a catalogue or a conversation. Nothing is public until you choose to share it.</li>
+    <li><strong>Token-protected</strong> — most links carry a unique, hard-to-guess token (the <code>:token</code> in the routes above). Only someone holding that exact link can open the page.</li>
+    <li><strong>Revocable and time-limited</strong> — you can <strong>revoke</strong> a link at any time, and many can be set to <strong>expire</strong> on a date. Once revoked or expired, the page stops working for everyone who has it.</li>
+    <li><strong>No account needed</strong> — recipients interact straight away: view, accept, pay, browse or comment. They never see your dashboard or anyone else's data.</li>
+    <li><strong>Responses come back to you</strong> — an accepted quote, a paid invoice and a client's approvals or comments all flow back into the originating record, so your workspace always reflects the latest state.</li>
   </ul>
 
-  <div class="callout"><p>Because these pages are public by design, only share the links with intended recipients, and revoke them when a deliverable is no longer current.</p></div>
+  <h2>Keeping shared links safe</h2>
+  <div class="callout warn">
+    <p>Because these pages are <strong>public by design</strong>, anyone with the link can open them. Send links only to the people they're meant for, avoid posting them anywhere they could be picked up by others, and <strong>revoke or let expire</strong> any link to a deliverable that's no longer current — for example an old quote, a superseded project deck or a paid invoice.</p>
+  </div>
+  <p>If you suspect a link has been forwarded further than intended, revoking it from the originating screen and issuing a fresh one is the quickest way to cut off access while keeping the underlying record intact.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

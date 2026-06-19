@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sales Portal | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,15 +11,32 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Sales Portal</div>
   <h1>Sales Portal</h1>
   <div class="routes"><span class="badge route">/sales</span> <span class="badge gated">sales.portal</span></div>
-  <p class="lead">A dedicated workspace for sales representatives.</p>
+  <p class="lead">A focused workspace for sales representatives — your own orders, quotes, customers and opportunities, kept separate from the full back-office so you can concentrate on selling.</p>
 
-  <div class="callout warn"><p><strong>Access note:</strong> the Sales Portal is restricted to accounts with the <code>sales.portal</code> capability. Other roles (including operators without it) see an “Access Restricted” message that states their current access level. For that reason this page is documented without a screenshot.</p></div>
+  <div class="callout warn"><p><strong>Access note:</strong> the Sales Portal is restricted to accounts that hold the <code>sales.portal</code> capability. Anyone without it — including operators who haven't been granted it — sees an <strong>“Access Restricted”</strong> card that states their current access level instead of the portal. Because the page is gated this way, this guide is written without a screenshot.</p></div>
 
-  <h2>What this page is for</h2>
-  <p>The Sales Portal gives sales reps a focused view of their pipeline and selling activity — the customers, quotes and opportunities relevant to them — separate from the full back-office. It complements the <a href="quotes.html">Quotes</a> and <a href="crm.html">CRM</a> areas, surfacing just what a rep needs to move deals forward.</p>
+  <h2>What this area is for</h2>
+  <p>The Sales Portal gives a sales rep a streamlined view of just their own selling activity. Rather than navigating the whole platform, you work from one screen built around the rep workflow: see your orders, start a new one for a customer, and hand off to the full quote builder to add products and pricing. It complements — and links into — the <a href="quotes.html">Quotes</a> and <a href="crm.html">CRM</a> areas without exposing the entire workspace.</p>
+  <p>You only ever see <strong>your own</strong> orders. Each rep's orders are private to them, so one rep never sees another rep's pipeline.</p>
+
+  <h2>What you'll find on the page</h2>
+  <ul class="feat">
+    <li><strong>Summary stats</strong> — quick counts across your orders: total orders, submitted, accepted and drafts.</li>
+    <li><strong>My Orders</strong> — a table of every order you've created, showing the order name, customer, status, item count and the date it was created. Each row opens the order.</li>
+    <li><strong>New Order</strong> — start a fresh order for a customer (see below).</li>
+  </ul>
+
+  <h2>Creating an order</h2>
+  <p>Choosing <strong>New Order</strong> opens a short dialog:</p>
+  <ol>
+    <li><strong>Pick a customer</strong> — search your existing CRM contacts and companies by name or email, or use <strong>Quick add</strong> to create a new contact on the spot (name required, email optional).</li>
+    <li><strong>Name the order</strong> — give it a clear title, e.g. a project or job name.</li>
+    <li><strong>Create &amp; add products</strong> — this starts the order as a draft quote and takes you straight into the full quote detail screen, where you build the line items from the catalogue.</li>
+  </ol>
+  <div class="callout tip"><p>An order in the Sales Portal is a <a href="quotes.html">quote</a> under the hood, so everything the quote builder offers — catalogue products, custom line items, pricing and document output — applies once you continue into it. Customers come from your <a href="crm.html">CRM</a>, and customer names in the orders table link straight back to the matching CRM record.</p></div>
 
   <h2>Getting access</h2>
-  <p>If you should have access but see the restriction, ask a workspace administrator to grant the <strong>sales</strong> capability to your account. Once enabled, <strong>Sales</strong> appears in the navigation and opens the rep portal.</p>
+  <p>If you should have the portal but see the restriction, ask a workspace administrator to grant your account the <strong>sales</strong> capability. Once it's enabled, <strong>Sales</strong> appears in the navigation and opens the rep portal for you.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

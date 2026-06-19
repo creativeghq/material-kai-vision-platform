@@ -6,7 +6,7 @@
 
   var APP_URL = "https://app.materialshub.gr/";
 
-  // Ordered table of contents (drives the sidebar AND the prev/next pager)
+  // Ordered table of contents. Items may have `children` (sub-pages).
   var GROUPS = [
     { title: "Overview", items: [
       { file: "index.html", title: "Introduction", icon: "📘" },
@@ -14,7 +14,10 @@
     ]},
     { title: "Core", items: [
       { file: "dashboard.html", title: "Dashboard", icon: "🏠" },
-      { file: "agent-hub.html", title: "Agent Hub", icon: "🤖" },
+      { file: "agent-hub.html", title: "Agent Hub", icon: "🤖", children: [
+        { file: "agent-agents.html", title: "AI Agents" },
+        { file: "agent-tools.html", title: "Tools & Capabilities" },
+      ]},
       { file: "knowledge-base.html", title: "Knowledge Base", icon: "📚" },
       { file: "recognition.html", title: "Material Recognition", icon: "🔍" },
       { file: "compare.html", title: "Material Compare", icon: "⚖️" },
@@ -24,7 +27,12 @@
       { file: "projects.html", title: "Projects", icon: "📁" },
       { file: "quotes.html", title: "Quotes & Requests", icon: "🧾" },
       { file: "crm.html", title: "CRM", icon: "👥" },
-      { file: "finance.html", title: "Finance & Invoicing", icon: "💶" },
+      { file: "finance.html", title: "Finance & Invoicing", icon: "💶", children: [
+        { file: "finance-receivables-payables.html", title: "Receivables & Payables" },
+        { file: "finance-documents.html", title: "Documents" },
+        { file: "finance-einvoicing.html", title: "Greek e-invoicing" },
+        { file: "finance-operations.html", title: "Operations & Reports" },
+      ]},
       { file: "pos.html", title: "Point of Sale", icon: "🧮" },
       { file: "inbox.html", title: "Inbox", icon: "✉️" },
     ]},
@@ -48,7 +56,12 @@
   }
   function flat() {
     var out = [];
-    GROUPS.forEach(function (g) { g.items.forEach(function (it) { out.push(it); }); });
+    GROUPS.forEach(function (g) {
+      g.items.forEach(function (it) {
+        out.push(it);
+        if (it.children) it.children.forEach(function (c) { out.push(c); });
+      });
+    });
     return out;
   }
   function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
@@ -59,8 +72,9 @@
     el.innerHTML =
       '<button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>' +
       '<a class="hbrand" href="index.html">' +
-        '<span class="logo">M</span>' +
-        '<span class="t">MaterialsHub<small>User Documentation</small></span>' +
+        '<img class="logo-img" src="assets/mh-logo.png" alt="MaterialsHub">' +
+        '<span class="divider"></span>' +
+        '<span class="t-sub">Documentation</span>' +
       "</a>" +
       '<span class="spacer"></span>' +
       '<a class="hlink" href="' + APP_URL + '" target="_blank" rel="noopener">Open app ↗</a>';
@@ -75,10 +89,18 @@
     GROUPS.forEach(function (g) {
       html += '<div class="nav-group"><h4>' + g.title + '</h4><nav class="nav">';
       g.items.forEach(function (it) {
-        var active = it.file === cur ? " active" : "";
+        var childActive = it.children && it.children.some(function (c) { return c.file === cur; });
+        var cls = (it.file === cur ? "active" : "") + (childActive ? " parent-active" : "");
         html +=
-          '<a class="' + active.trim() + '" href="' + it.file + '">' +
+          '<a class="' + cls.trim() + '" href="' + it.file + '">' +
           '<span class="ic">' + it.icon + "</span>" + it.title + "</a>";
+        if (it.children) {
+          html += '<div class="subnav">';
+          it.children.forEach(function (c) {
+            html += '<a class="' + (c.file === cur ? "active" : "") + '" href="' + c.file + '">' + c.title + "</a>";
+          });
+          html += "</div>";
+        }
       });
       html += "</nav></div>";
     });
@@ -90,7 +112,7 @@
     var toc = document.createElement("aside");
     toc.className = "toc";
     var hs = content.querySelectorAll("h2");
-    if (hs.length < 2) return toc; // not worth showing
+    if (hs.length < 2) return toc;
     var html = "<h5>On this page</h5>";
     hs.forEach(function (h, i) {
       if (!h.id) {
@@ -123,10 +145,8 @@
     var content = document.querySelector(".content");
     if (!content) return;
 
-    // Header
     document.body.insertBefore(buildHeader(), document.body.firstChild);
 
-    // Layout grid: sidebar | content | toc
     var layout = document.createElement("div");
     layout.className = "layout";
     content.parentNode.insertBefore(layout, content);
@@ -134,7 +154,6 @@
     var sidebar = buildSidebar(cur);
     var toc = buildTOC(content);
 
-    // Pager + footer go inside content
     var pager = buildPager(cur);
     if (pager) content.appendChild(pager);
     var foot = document.createElement("div");
@@ -157,6 +176,10 @@
     };
     scrim.onclick = closeNav;
     sidebar.addEventListener("click", function (e) { if (e.target.closest("a")) closeNav(); });
+
+    // Keep the active sidebar item in view
+    var act = sidebar.querySelector("a.active");
+    if (act && act.scrollIntoView) act.scrollIntoView({ block: "center" });
 
     // TOC scroll-spy
     var tlinks = toc.querySelectorAll("a[data-tref]");

@@ -4,43 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Getting Started | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / Getting Started</div>
   <h1>Getting Started</h1>
-  <p class="lead">Sign in, understand your workspace and role, learn the navigation, and see how credits power AI features.</p>
+  <p class="lead">Everything you need for your first hour on MaterialsHub: create an account, understand the workspace you're working in, learn what your role lets you do, find your way around the top navigation, and see how credits power the AI features.</p>
 
   <h2>Signing in</h2>
   <div class="routes"><span class="badge route">/auth</span> <span class="badge public">Public</span></div>
-  <p>The authentication screen has two tabs — <strong>Sign In</strong> and <strong>Sign Up</strong>. To create an account you provide your full name, email and a password; new accounts get a <strong>30-day free trial</strong>. You can also continue with <strong>Google</strong>. A <em>Forgot Password?</em> link sends a reset email.</p>
+  <p>The sign-in screen is the only page you can reach without an account. It has two tabs — <strong>Sign In</strong> and <strong>Sign Up</strong> — and a few helpers around them.</p>
   <ul class="feat">
-    <li><strong>Sign Up</strong> — full name, email, password → confirm to create your account.</li>
-    <li><strong>Sign In</strong> — email + password, or the Google button for single-click login.</li>
-    <li>After signing in you land on the <a href="dashboard.html">Dashboard</a>.</li>
+    <li><strong>Sign Up</strong> — enter your <strong>full name</strong>, <strong>email</strong> and a <strong>password</strong>, then confirm to create your account. New accounts start on a <strong>30-day free trial</strong>, so you can explore the platform before choosing a plan.</li>
+    <li><strong>Sign In</strong> — return with your email and password.</li>
+    <li><strong>Continue with Google</strong> — sign in or register in a single click with your Google account; no separate password to remember.</li>
+    <li><strong>Forgot Password?</strong> — sends a reset link to your email so you can choose a new password.</li>
   </ul>
+  <p>After you sign in you land on the <a href="dashboard.html">Dashboard</a>, the home base for your workspace.</p>
+
+  <div class="callout tip"><p>If your email isn't recognised on the Sign In tab, you probably haven't registered yet — switch to <strong>Sign Up</strong>. If you originally joined with Google, use the Google button rather than a password.</p></div>
 
   <h2>Workspaces</h2>
-  <p>Everything you do lives inside a <strong>workspace</strong>. The workspace switcher sits in the top-right of the header (e.g. <em>“Default Workspace”</em>) and shows your role and plan as a pill. A workspace groups your materials, moodboards, quotes, finance documents, CRM records and team members. You may belong to more than one workspace and switch between them at any time.</p>
+  <p>Everything you do on MaterialsHub lives inside a <strong>workspace</strong>. A workspace is a self-contained area that groups your <strong>materials, moodboards, quotes, finance documents, CRM records and team members</strong> — what one person sees in a workspace, their teammates in the same workspace see too, while other workspaces stay completely separate.</p>
+  <p>The <strong>workspace switcher</strong> sits in the top-right of the header. It shows the name of the workspace you're currently in, along with a pill that tells you your <strong>role</strong> and the workspace's <strong>plan</strong>. You can belong to more than one workspace at once — for example one for your own studio and one shared with a partner — and switch between them at any time from this menu. Switching workspaces re-loads the app with that workspace's data; nothing you do in one leaks into another.</p>
 
-  <h2>Roles &amp; access</h2>
-  <p>What you can see and do depends on your <strong>role</strong> and the <strong>capabilities</strong> granted to your workspace. Some areas only appear when you have the matching permission:</p>
+  <div class="callout"><p>Not sure which workspace you're in? Glance at the switcher in the top-right before you create or edit anything important — it confirms both the workspace name and your role.</p></div>
+
+  <h2>Roles &amp; capabilities</h2>
+  <p>What you can see and do depends on two things: your <strong>role</strong> within the workspace and the <strong>capabilities / modules</strong> that the workspace has enabled. Core, everyday areas are open to everyone signed in; specialised back-office and partner areas are gated and only appear when you have the matching permission.</p>
+  <div class="table-wrap">
   <table>
     <thead><tr><th>Area</th><th>Typical requirement</th></tr></thead>
     <tbody>
-      <tr><td>Dashboard, Agent Hub, MoodBoards, Discover</td><td>Available to all signed-in users</td></tr>
-      <tr><td>Quotes, Projects, CRM, Finance, Inbox</td><td>Capability / module entitlement on the workspace</td></tr>
+      <tr><td>Dashboard, Agent Hub, MoodBoards, Discover</td><td>Available to every signed-in user</td></tr>
+      <tr><td>Quotes, Projects, CRM, Finance, Inbox</td><td>A capability or module entitlement on the workspace</td></tr>
       <tr><td>Sales Portal</td><td>Sales-rep capability (otherwise shows “Access Restricted”)</td></tr>
-      <tr><td>Factory Analytics</td><td>Factory accounts</td></tr>
+      <tr><td>Factory Analytics</td><td>Factory / manufacturer accounts</td></tr>
     </tbody>
   </table>
-  <div class="callout"><p>If a menu item or page isn't visible to you, it's almost always a role/capability gate — ask a workspace administrator to enable the relevant module or grant the capability.</p></div>
+  </div>
+  <div class="callout warn"><p>If a menu item or page isn't visible to you, it's almost always a role or capability gate — not a bug. Ask a <strong>workspace administrator</strong> to enable the relevant module or grant the capability, then refresh.</p></div>
 
   <h2>Navigating the app</h2>
-  <p>A horizontal <strong>top navigation bar</strong> runs across every page. The logo is on the left, the main links are in the centre, and the workspace switcher + your profile menu are on the right. The primary destinations are:</p>
+  <p>A horizontal <strong>top navigation bar</strong> runs across every page. The logo is on the left, the main destinations are in the centre, and the <strong>workspace switcher</strong> plus your <strong>profile menu</strong> are on the right. The primary destinations are:</p>
   <p>
     <span class="badge route">Dashboard</span>
     <span class="badge route">Agent Hub</span>
@@ -52,15 +59,25 @@
     <span class="badge route">CRM</span>
     <span class="badge route">Finance</span>
   </p>
+  <p>Only the destinations your role and plan unlock will be shown — so your bar may have fewer items than the full list above. The <strong>profile menu</strong> (top-right) is where you reach your <a href="account.html">Account &amp; Billing</a> settings and sign out.</p>
 
   <h2>Credits &amp; plans</h2>
-  <p>AI-heavy actions (image generation, some scans, presentation sheets, 3D/VR, etc.) consume <strong>credits</strong>. Your remaining balance and plan are shown in your profile, and you can top up at any time:</p>
+  <p>MaterialsHub uses a simple, predictable cost model: <strong>reading, searching and browsing are always free</strong>. Only explicit <strong>AI and generation actions</strong> consume <strong>credits</strong> — for example image generation, virtual staging, presentation sheets, 3D/VR worlds, and some market scans.</p>
   <ul class="feat">
-    <li><a href="account.html">Account &amp; Billing</a> → <strong>Credits</strong> tab shows your balance and history.</li>
-    <li><span class="badge route">/billing/credits</span> — buy credit packs.</li>
-    <li><span class="badge route">/billing/subscriptions</span> — upgrade your plan for higher quotas.</li>
+    <li><strong>See your balance &amp; history</strong> — <a href="account.html">Account &amp; Billing</a> → <strong>Credits</strong> tab shows your current balance and every debit.</li>
+    <li><strong>Buy credit packs</strong> — <span class="badge route">/billing/credits</span> for one-off top-ups.</li>
+    <li><strong>Upgrade your plan</strong> — <span class="badge route">/billing/subscriptions</span> for higher quotas and more capabilities.</li>
   </ul>
-  <p>Reading, searching and browsing are free; only the explicit AI/generation actions cost credits, and each such control tells you the cost before you confirm.</p>
+  <div class="callout tip"><p>You'll never be charged by surprise: every metered control <strong>shows you its credit cost before you confirm</strong>. If the cost ever exceeds your balance, the action is blocked until you top up — your work isn't lost.</p></div>
+
+  <h2>First things to try</h2>
+  <p>Once you're in, a good first session looks like this:</p>
+  <div class="cards">
+    <a class="card" href="agent-hub.html"><h3>Open the Agent Hub</h3><p>Ask in plain language — “find grey cement-look tiles” or “stage this empty room”. It's the fastest way to get value from the platform.</p></a>
+    <a class="card" href="dashboard.html"><h3>Explore the Dashboard</h3><p>Get the lay of the land for your workspace and jump into any module from one place.</p></a>
+    <a class="card" href="crm.html"><h3>Set up your contacts</h3><p>Add your customers and suppliers in CRM so quotes, projects and finance documents can reference them later.</p></a>
+  </div>
+  <p>When you're ready to go deeper, the back-office areas — <a href="finance.html">Finance &amp; Invoicing</a> and the rest of the modules in the navigation — are documented on their own pages.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

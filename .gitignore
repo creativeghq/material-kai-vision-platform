@@ -52,3 +52,7 @@ coverage/
 tests/e2e/.auth/
 playwright-report/
 /playwright/.cache/
+
+# agent-browser saved session (never commit)
+mkai-auth.json
+*.auth.json

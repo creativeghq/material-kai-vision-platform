@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inbox | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,31 +11,68 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Inbox</div>
   <h1>Inbox</h1>
   <div class="routes"><span class="badge route">/inbox</span> <span class="badge gated">inbox.use</span></div>
-  <p class="lead">Team conversations, WhatsApp and customer chats — all in one place.</p>
+  <p class="lead">One place for every conversation — internal team chats, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="Inbox">
-    <figcaption>The Inbox with the All / Internal / WhatsApp filters and conversation list.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="The Inbox showing the conversation list, search box, and All / Internal / WhatsApp filters">
+    <figcaption>The Inbox with the conversation count, the <em>Search conversations</em> box, the All / Internal / WhatsApp filters, and the conversation list.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The Inbox unifies the conversations your team has — internal discussions, messages with customers, and WhatsApp threads — so nothing is scattered across separate tools. It's multi-tenant aware, so you can view a single workspace or, where permitted, all workspaces.</p>
+  <p>The Inbox brings together the conversations your team relies on so they don't end up scattered across separate apps. In a single view you can follow internal discussions between colleagues, talk to customers, and read and reply to WhatsApp messages. It is <strong>multi-tenant aware</strong>: by default it shows the conversations for the workspace you're working in, and — where you're permitted — it can show conversations across all the workspaces you belong to.</p>
 
   <h2>Layout &amp; controls</h2>
+  <p>The left side is the conversation list; selecting a conversation opens it on the right, where you read the message history and reply. The header gives you everything you need to find and start conversations:</p>
   <ul class="feat">
-    <li><strong>Conversation list</strong> with a count and a <em>Search conversations</em> box.</li>
-    <li><strong>Filters</strong> — <strong>All</strong>, <strong>Internal</strong>, <strong>WhatsApp</strong>.</li>
-    <li><strong>All workspaces</strong> — switch between a single workspace and a combined view.</li>
-    <li><strong>New conversation</strong> — start a thread.</li>
+    <li><strong>Conversation list with count</strong> — every conversation you can see, with the total shown so you know how many are in the current view.</li>
+    <li><strong>Search conversations</strong> — a search box to filter the list by what you're looking for.</li>
+    <li><strong>Filters: All / Internal / WhatsApp</strong> — narrow the list to everything, to internal team threads only, or to WhatsApp threads only.</li>
+    <li><strong>All workspaces</strong> — a toggle to switch between a single workspace and a combined view across the workspaces you're allowed to see. If you only belong to one workspace, this has no effect.</li>
+    <li><strong>New conversation</strong> — start a fresh thread.</li>
   </ul>
 
-  <h2>WhatsApp</h2>
-  <p>Connected WhatsApp numbers appear here: customer replies land as conversations, are assigned to the right owner, and can be answered from the Inbox. Outbound/marketing sends use approved message templates to respect WhatsApp's rules.</p>
+  <h2>Conversation types</h2>
+  <div class="cards">
+    <div class="card"><div class="ico">👥</div><h3>Internal</h3><p>Discussions between members of your team — questions, hand-offs, and notes that stay inside the workspace.</p></div>
+    <div class="card"><div class="ico">💬</div><h3>WhatsApp</h3><p>Messages exchanged with customers over a connected WhatsApp number, read and answered in the Inbox.</p></div>
+    <div class="card"><div class="ico">🔗</div><h3>Customer / shared</h3><p>Threads opened to an outside party through a link, so they can take part without creating an account.</p></div>
+  </div>
 
-  <h2>Customer / public threads</h2>
-  <p>Some conversations can be shared with an outside party via a token link (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) so a customer can take part without an account. See <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
+  <h2>WhatsApp conversations</h2>
+  <p>When your workspace has a WhatsApp number connected, its conversations appear here alongside everything else.</p>
+  <ul class="feat">
+    <li><strong>Connected numbers show up automatically</strong> — once a number is set up, its threads flow into the Inbox without any extra step.</li>
+    <li><strong>Customer replies become conversations</strong> — when a customer messages or replies, a conversation is created (or updated) and <strong>assigned to the right owner</strong> so the correct person picks it up.</li>
+    <li><strong>Outbound &amp; marketing sends use approved templates</strong> — to start or re-open a conversation outside the active reply window, WhatsApp requires a pre-approved message template. Day-to-day replies inside the 24-hour window can be free-form; messages sent outside that window must use one of the approved templates.</li>
+  </ul>
+  <div class="callout warn"><p>WhatsApp's <strong>24-hour window</strong> rule is set by WhatsApp, not by MaterialsHub. Inside 24&nbsp;hours of the customer's last message you can reply freely; after that, you can only reach out using an approved template. The Inbox follows these rules for you.</p></div>
 
-  <div class="callout"><p>The Inbox is gated by the <code>inbox.use</code> capability and the messaging module being enabled for your workspace.</p></div>
+  <h2>Customer &amp; public threads</h2>
+  <p>A conversation can be opened up to someone outside your team. When a thread is shared, the platform creates a <strong>token link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that the outside party can open in a browser to read and reply — no MaterialsHub account required. This is the same approach used for other shared customer-facing pages, so the experience is familiar to recipients.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Surface</th><th>Who uses it</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge route">/inbox</span></td><td>Your team (signed in)</td><td><span class="badge gated">inbox.use</span></td></tr>
+      <tr><td><span class="badge route">/i/:token</span></td><td>An outside party you've shared a thread with</td><td><span class="badge public">Public link</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>For more about customer-facing links and how they're shared and revoked, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
+
+  <h2>A typical workflow</h2>
+  <ol>
+    <li>Open <span class="badge route">/inbox</span> and use the filters or search to find the conversation you need.</li>
+    <li>Pick a thread to read its history; reply directly — internal note, customer message, or WhatsApp.</li>
+    <li>When a customer replies on WhatsApp, the conversation is assigned to the right owner so it lands with the correct person.</li>
+    <li>To involve an outside party, share the thread and send them the <span class="badge route">/i/:token</span> link.</li>
+    <li>Switch <strong>All workspaces</strong> on or off depending on whether you want one workspace or the combined view.</li>
+  </ol>
+
+  <h2>Access &amp; availability</h2>
+  <div class="callout"><p>The Inbox requires the <code>inbox.use</code> capability and the <strong>messaging module</strong> being enabled for your workspace. WhatsApp conversations only appear once a WhatsApp number is connected. If you don't see the Inbox, ask your workspace administrator to grant access or enable the module.</p></div>
+
+  <div class="callout tip"><p>Looking for the assistant instead of person-to-person chat? The AI workspace lives in the <a href="agent-hub.html">Agent Hub</a>. To browse what's available across the platform, start from <a href="discover.html">Discover</a>.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

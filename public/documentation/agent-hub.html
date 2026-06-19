@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Hub | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,48 +11,52 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Agent Hub</div>
   <h1>Agent Hub (JARVIS)</h1>
   <div class="routes"><span class="badge route">/agent-hub</span></div>
-  <p class="lead">The conversational AI assistant at the centre of the platform. Ask in plain language and it searches, creates, and automates across every module.</p>
+  <p class="lead">The conversational AI workspace at the centre of the platform. Ask in plain language and the assistant searches, creates, and automates across every module — returning rich, interactive results inline in the chat.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/agent-hub.png" alt="Agent Hub home with conversation list">
-    <figcaption>The Agent Hub — “JARVIS” — with the searchable conversation history on the left.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/agent-picker.png" alt="Agent Hub welcome screen with agent selector and composer">
+    <figcaption>The Agent Hub: agent selector (JARVIS / Interior / Demo), conversation history, and a composer with attachments, voice, inspiration-URL and a “/” tools menu.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The Agent Hub is a chat workspace where you talk to the AI assistant. Instead of clicking through menus, you describe what you want — “find 5 cement-based grey tiles for a modern bathroom”, “translate this PDF catalogue”, “track the price of this product” — and the agent uses the platform's tools to do it, returning rich, interactive results inline in the chat.</p>
+  <p>Instead of clicking through menus, you describe what you want — “find 5 cement-based grey tiles for a modern bathroom”, “stage this empty room”, “track the price of this product”, “build a material board from these images” — and the assistant uses the platform's tools to do it. It is the single fastest way to get value from MaterialsHub.</p>
 
   <h2>Layout</h2>
   <ul class="feat">
-    <li><strong>Conversation list</strong> (left) — every chat you've had, with a <em>Search conversations…</em> box. Each item can be <strong>renamed</strong> or <strong>deleted</strong>, and shows the agent/topic it used.</li>
-    <li><strong>Chat panel</strong> (right) — the active conversation, the message composer, and any attachments or results.</li>
+    <li><strong>Conversation list</strong> (left) — every chat you've had, each with a <em>Search conversations…</em> box. Items can be <strong>renamed</strong> or <strong>deleted</strong>, and show the topic/tools they used.</li>
+    <li><strong>Agent selector</strong> (above the composer) — switch between the available <a href="agent-agents.html">AI agents</a>: <strong>JARVIS</strong>, <strong>Interior</strong> (Interior Designer) and <strong>Demo</strong>.</li>
+    <li><strong>Composer</strong> — type a message; the toolbar adds attachments, documents, voice input, an inspiration-URL analyser, and a tools menu. <strong>Shift+Enter</strong> inserts a new line.</li>
+    <li><strong>Chat panel</strong> — the active conversation, where results render as interactive cards (products, images, search specs, price/mention data, sheets, and more).</li>
   </ul>
 
+  <h2>The composer &amp; the “/” tools menu</h2>
+  <p>Type <code>/</code> in the message box to launch a workflow or invoke a specific tool directly, rather than relying on the assistant to choose. The composer toolbar exposes the most-used actions:</p>
+  <ul class="feat">
+    <li><strong>📎 Attach</strong> — add images (e.g. a room photo or material sample) for the assistant to analyse.</li>
+    <li><strong>📄 Document</strong> — attach a document for context.</li>
+    <li><strong>🎤 Voice</strong> — dictate your message.</li>
+    <li><strong>🌐 Inspiration URL</strong> — paste a web page; the assistant extracts its palette, materials and style and finds matching products.</li>
+    <li><strong>Core / + Toolkit</strong> — the assistant's available tool set; the toolkit expands as your plan/role unlocks more.</li>
+  </ul>
+  <p>The full catalogue of what the assistant can do is documented in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
+
+  <h2>An open conversation</h2>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/conversation.png" alt="An open Agent Hub conversation">
-    <figcaption>An open conversation. Results render as interactive cards (products, images, search specs, etc.) directly in the thread.</figcaption>
+    <figcaption>Results stream into the thread as interactive cards you can click, save or act on.</figcaption>
   </figure>
 
-  <h2>What the assistant can do</h2>
-  <p>The agent has access to a broad toolset. Among the things you can ask for:</p>
-  <ul>
-    <li><strong>Material &amp; product search</strong> — multi-vector search across the catalogue, with an explainable “search spec” (colours, materials, style, specifications).</li>
-    <li><strong>Image generation &amp; editing</strong> — create or restyle visuals, virtual staging with before/after comparison.</li>
-    <li><strong>Inspiration from a URL</strong> — paste a web page and it extracts the palette, materials and style, then finds matching products.</li>
-    <li><strong>Moodboard presentation sheets</strong> — generate client-ready sheets (material boards, color palettes, lighting plans, FF&amp;E schedules, full decks).</li>
-    <li><strong>Price monitoring</strong> — track a product's price across retailers and get alerts.</li>
-    <li><strong>Mention monitoring</strong> — track where a brand/product is mentioned across news, blogs and even AI answers.</li>
-    <li><strong>Job research</strong> — set up a recurring job-discovery search with a daily digest.</li>
-    <li><strong>Web / manufacturer search</strong> and general Q&amp;A about your catalogue.</li>
-  </ul>
-
-  <h2>Using it</h2>
+  <h2>Using it — a typical session</h2>
   <ol>
-    <li>Type a request (you can also attach images) and send.</li>
-    <li>Watch results stream in as cards; click through to open materials, save to a moodboard, or continue the task.</li>
-    <li>Start a <strong>new conversation</strong> for a new topic, or reopen an existing one to continue where you left off.</li>
+    <li>Pick an agent (default is JARVIS) and type a request, optionally attaching images.</li>
+    <li>Watch results stream in as cards; open a product, save it to a <a href="moodboards.html">moodboard</a>, or continue refining.</li>
+    <li>Chain follow-ups in the same thread — the assistant keeps the context of the conversation.</li>
+    <li>Start a <strong>new conversation</strong> for a new topic, or reopen any past one to continue.</li>
   </ol>
 
-  <div class="callout"><p><strong>Credits:</strong> chatting and searching are inexpensive, but explicit generation actions (images, sheets, scans, 3D/VR) consume credits. The agent tells you the cost when an action is metered.</p></div>
+  <div class="callout"><p><strong>Credits:</strong> chatting and searching are inexpensive; explicit generation actions (images, presentation sheets, scans, 3D/VR) consume credits, and the assistant tells you the cost when an action is metered. See <a href="account.html">Account &amp; Billing</a>.</p></div>
+
+  <div class="callout tip"><p><strong>Where results go:</strong> many actions create real artefacts — a moodboard sheet, a tracked price/mention subject, a generated image — that also appear in their own module so you can find them later outside the chat.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Factory Analytics | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,25 +11,60 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Factory Analytics</div>
   <h1>Factory Analytics</h1>
   <div class="routes"><span class="badge route">/factory-analytics</span> <span class="badge gated">Factory accounts</span></div>
-  <p class="lead">Market-demand intelligence for manufacturers — what's being searched, saved and specified, and where it's heading.</p>
+  <p class="lead">Market-demand intelligence for manufacturers — see what the platform is searching for, saving and specifying across catalogues, and which way the market is heading week over week.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/factory-analytics/factory-analytics.png" alt="Factory Analytics">
-    <figcaption>Factory Analytics — market trends, demand signals and momentum.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/factory-analytics/factory-analytics.png" alt="Factory Analytics dashboard showing demand signals, market momentum and rising materials">
+    <figcaption>Factory Analytics — headline demand signals, where the market is going, and rising &amp; declining materials.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>Aimed at factories/manufacturers, this dashboard turns platform activity into market intelligence: which materials and categories are in demand, which buyer types are driving it, and how those signals are trending week over week.</p>
+  <p>Built for factory and manufacturer accounts, Factory Analytics turns real platform activity into market intelligence. As designers, architects and other professionals <a href="discover.html">discover</a> products, save them to moodboards and add them to quotes, those actions become demand signals. This page aggregates and trends them so you can answer questions like: <em>which materials and categories are in demand right now? who is doing the buying? what is gaining momentum, and what is fading?</em></p>
+  <p>The intelligence is drawn from across the platform, not just from your own catalogue — giving you a true read on the market you compete in. You can also narrow the view to your own products where higher-tier comparisons are available.</p>
 
-  <h2>What you'll see</h2>
+  <h2>Headline demand signals</h2>
+  <p>A row of summary cards sits at the top, giving you the state of demand at a glance for the selected scope, category and time window:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Signal</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Active Demand Signals</strong></td><td>How many distinct materials are currently generating measurable interest — your overall measure of market activity.</td></tr>
+      <tr><td><strong>Top Demanded Material</strong></td><td>The single material attracting the most attention across the platform this period.</td></tr>
+      <tr><td><strong>Most Saved Category</strong></td><td>The product category accruing the most moodboard saves — where buyers are concentrating.</td></tr>
+      <tr><td><strong>Total Category Saves</strong></td><td>The total volume of saves in the current view, a measure of how much the market is actively collecting.</td></tr>
+      <tr><td><strong>Top Buyer Type</strong></td><td>The professional segment driving the most demand (for example interior designers, architects, sourcing agents) so you know who to design and price for.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout tip"><p>The figures shown in the screenshot are illustrative. Your dashboard reflects live platform activity for the scope and filters you choose.</p></div>
+
+  <h2>Where the market is going</h2>
+  <p>Beyond the current snapshot, a dedicated section reads the <strong>direction</strong> of the market by comparing recent activity with the period before it. It surfaces:</p>
   <ul class="feat">
-    <li><strong>Headline signals</strong> — Active Demand Signals, Top Demanded Material, Most Saved Category, Total Category Saves, Top Buyer Type.</li>
-    <li><strong>Where the Market is Going</strong> — week-over-week momentum: emerging materials, shifting design contexts and growing buyer segments.</li>
-    <li><strong>Rising &amp; Declining Materials</strong> — save-velocity change (recent 4 weeks vs the prior 4), flagging items as “Emerging”.</li>
-    <li><strong>Filters</strong> — by platform scope, category and time window (e.g. 12 weeks), with <strong>Export CSV</strong>.</li>
+    <li><strong>Emerging materials</strong> — items whose interest is accelerating, including materials the market is starting to ask for that may not yet be widely catalogued.</li>
+    <li><strong>Shifting design contexts</strong> — which room types and project settings are growing or cooling, so you can see where your materials will be needed next.</li>
+    <li><strong>Growing buyer segments</strong> — which professional types are increasing their activity fastest, highlighting audiences worth courting.</li>
   </ul>
 
-  <div class="callout"><p>Before your account has enough recorded activity, the page shows clearly-labelled <strong>sample data</strong>, which is automatically replaced with live figures as activity accrues. Deeper geographic, designer-engagement and competitive sections are available on higher tiers.</p></div>
+  <h2>Rising &amp; declining materials</h2>
+  <p>This view ranks materials by <strong>save-velocity change</strong> — comparing saves over the most recent four weeks against the four weeks before. Materials trending upward are flagged as rising; those losing ground are flagged as declining. Fast-accelerating items carry an <strong>“Emerging”</strong> badge to call out genuinely new demand. Reading this alongside the headline signals helps you decide what to promote, what to keep in stock, and where to expand your range.</p>
+
+  <h2>Filters &amp; export</h2>
+  <p>Controls above the dashboard let you focus the analysis:</p>
+  <ul class="feat">
+    <li><strong>Platform scope</strong> — view the whole-platform market, or narrow to your own factory’s products where available.</li>
+    <li><strong>Category</strong> — limit the view to a single product category (tiles, wood, lighting, sanitary and so on) or see all categories together.</li>
+    <li><strong>Time window</strong> — choose how far back to look (for example the last 12 weeks).</li>
+    <li><strong>Export CSV</strong> — download the current material-trend table, including growth and a short forward projection, to work with the numbers in your own tools.</li>
+  </ul>
+
+  <h2>Sample data before you have activity</h2>
+  <div class="callout warn"><p>Until enough real activity has been recorded for your scope and filters, the page displays clearly-labelled <strong>sample data</strong> so you can see what the dashboard will look like. A visible badge marks this state. As genuine activity accrues, the sample figures are replaced with your live numbers automatically — no action needed.</p></div>
+
+  <h2>Higher-tier intelligence</h2>
+  <p>The signals above are available to all factory accounts. Deeper analysis — including <strong>geographic demand</strong>, <strong>designer-engagement</strong> breakdowns and <strong>competitive positioning</strong> against the wider market — unlocks on higher subscription tiers.</p>
+
+  <div class="callout"><p>Factory Analytics is for <strong>factory accounts</strong>. Demand here originates from how the rest of the platform interacts with products — see <a href="discover.html">Discover</a> for the buyer-side experience that generates these signals.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

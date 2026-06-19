@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Discover & Network | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,34 +11,63 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Discover &amp; Network</div>
   <h1>Discover &amp; Network</h1>
   <div class="routes"><span class="badge route">/discover</span> <span class="badge route">/network</span></div>
-  <p class="lead">Explore profiles, factories, products and the surplus marketplace from across the community.</p>
+  <p class="lead">Discover is the community directory — one search box across people, manufacturers, products and the surplus marketplace. Network is where you keep track of the business relationships you build along the way.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/discover.png" alt="Discover">
-    <figcaption>Discover — Profiles / Factory / Products / Marketplace tabs with a unified search.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/discover.png" alt="The Discover directory with Profiles, Factory, Products and Marketplace tabs">
+    <figcaption>Discover — Profiles / Factory / Products / Marketplace, all reachable from one unified search.</figcaption>
   </figure>
 
-  <h2>Discover</h2>
-  <p>Discover is the community directory. A single search box (“Search by name, service, location…”) works across four tabs:</p>
-  <ul class="feat">
-    <li><strong>Profiles</strong> — designers, consultants and other members; open a profile to see their services and work.</li>
-    <li><strong>Factory</strong> — manufacturers, with their material ranges and categories.</li>
-    <li><strong>Products</strong> — browse materials/products across the platform.</li>
-    <li><strong>Marketplace</strong> — the surplus / last-stock marketplace (see below).</li>
-  </ul>
+  <h2>What Discover is for</h2>
+  <p>Discover is the public-facing side of MaterialsHub: the place to see who and what is on the platform beyond your own workspace. Whether you are looking for a designer to collaborate with, a manufacturer whose ranges fit a project, a specific material, or a one-off bargain on surplus stock, you start in the same place. A single search field at the top — <em>“Search by name, service, location…”</em> — filters whichever tab you are on, so you can switch contexts without retyping what you are looking for.</p>
+
+  <h2>The unified search and its four tabs</h2>
+  <p>The search box works across four tabs. Pick the tab that matches what you want to find, then type a name, a service, a location or a keyword to narrow the results.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tab</th><th>What you'll find</th><th>What you can do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Profiles</strong></td><td>Designers, consultants and other members of the community.</td><td>Open a profile to see the person's services and a sample of their work.</td></tr>
+      <tr><td><strong>Factory</strong></td><td>Manufacturers and their material ranges, grouped by category.</td><td>Browse a manufacturer's catalogue and the categories they produce.</td></tr>
+      <tr><td><strong>Products</strong></td><td>Individual materials and products published across the platform.</td><td>Search and browse the wider product catalogue, not just your own.</td></tr>
+      <tr><td><strong>Marketplace</strong></td><td>Surplus and last-stock listings offered by other workspaces.</td><td>Browse listings and send the seller an inquiry. <span class="badge public">Public</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Profiles</h3>
+  <p>The Profiles tab lists members of the community — designers, consultants and other users who have a public presence. Opening a profile shows the services they offer and examples of their work, so you can decide whether to reach out or connect.</p>
+
+  <h3>Factory</h3>
+  <p>The Factory tab is the directory of manufacturers. Each entry leads to that manufacturer's ranges and the product categories they cover, which is the quickest way to discover who makes the kind of material you need.</p>
+
+  <h3>Products</h3>
+  <p>The Products tab lets you browse materials and products from across the platform in one list, rather than searching workspace by workspace. It's a fast way to see what's available before you go deeper into a specific manufacturer or listing. For richer, conversational product search you can also use the <a href="agent-hub.html">Agent Hub</a>.</p>
 
   <h2>Surplus Marketplace</h2>
-  <p>The Marketplace tab lists last-stock and surplus items offered across workspaces at <strong>0% commission</strong>. You can browse listings and send an inquiry to the seller; the conversation is handled through the <a href="inbox.html">Inbox</a>. It's the one place where listings are intentionally visible across workspaces.</p>
+  <p>The <strong>Marketplace</strong> tab is the platform's surplus and last-stock marketplace. Workspaces list items they want to move — overstock, discontinued ranges, end-of-line pieces — and these are offered to the whole community at <strong>0% commission</strong>. You browse the listings just like any other tab, and when something fits you send an <strong>inquiry</strong> directly to the seller.</p>
+  <p>The inquiry doesn't open a separate messaging system: the conversation is handled through your <a href="inbox.html">Inbox</a>, alongside your other platform messages, so you can negotiate, ask for details and arrange the deal in one place.</p>
+
+  <div class="callout"><p>The Marketplace is deliberately the <strong>one place where listings are visible across workspaces</strong>. Everywhere else on the platform, your data stays inside your own workspace — surplus listings are the intentional exception so that stock can find a buyer beyond your own organisation.</p></div>
 
   <h2>Network</h2>
   <div class="routes"><span class="badge route">/network</span> <span class="badge gated">network.manage</span></div>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/network.png" alt="Network">
-    <figcaption>The Network management page.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/network.png" alt="The Network management page for business relationships">
+    <figcaption>Network — manage the connections and business relationships you've built on the platform.</figcaption>
   </figure>
-  <p>The Network page is where you manage your business relationships and connections on the platform — the people and organisations you've linked with. It's capability-gated (<code>network.manage</code>).</p>
+  <p>While Discover is about finding people and businesses, <strong>Network</strong> is about keeping the relationships you form. It's where you manage your business connections on the platform — the members and organisations you've linked with — so you can return to them, keep them organised and work with them over time.</p>
+  <p>Network is capability-gated by <code>network.manage</code>. If you don't see it, your role or plan may not include connection management; an administrator can adjust this.</p>
 
-  <div class="callout tip"><p><strong>Tip:</strong> public profiles you find here are also reachable directly at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span> and can be shared with anyone.</p></div>
+  <h2>How it fits together</h2>
+  <div class="cards">
+    <a class="card" href="inbox.html"><div class="ico">✉️</div><h3>Inbox</h3><p>Marketplace inquiries and other platform conversations land here.</p></a>
+    <a class="card" href="public-pages.html"><div class="ico">🌐</div><h3>Public pages</h3><p>How your public profile appears to others and how to share it.</p></a>
+    <a class="card" href="knowledge-base.html"><div class="ico">📚</div><h3>Knowledge base</h3><p>Reference material and guides published for the community.</p></a>
+  </div>
+
+  <div class="callout tip"><p><strong>Tip:</strong> any public profile you find in Discover is also reachable directly at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span> — a stable link you can copy and share with anyone, even people who aren't signed in. See <a href="public-pages.html">Public pages</a> for more.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

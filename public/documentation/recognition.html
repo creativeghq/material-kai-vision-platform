@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Material Recognition | MaterialsHub Documentation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,32 +11,70 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Material Recognition</div>
   <h1>Material Recognition</h1>
   <div class="routes"><span class="badge route">/recognition</span></div>
-  <p class="lead">Upload one or more photos and let hybrid AI identify the material and its properties.</p>
+  <p class="lead">Upload one or more photos of a real-world surface and let <strong>Hybrid AI</strong> identify the material, describe its visual properties, and match it against the catalogue — turning a single picture into structured, searchable knowledge.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/recognition/recognition.png" alt="Material Recognition">
-    <figcaption>Material Recognition — drop in images to analyse them with hybrid AI.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/recognition/recognition.png" alt="Material Recognition — drag and drop images to analyse them with Hybrid AI">
+    <figcaption>Material Recognition — drop in one or more images and analyse them with Hybrid AI.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
-  <p>Material Recognition turns a photograph into structured knowledge. Point it at a tile, a fabric swatch, a stone sample or a finished surface and it returns the likely material type, colours, textures, finish and other descriptive attributes — and can match the image against the catalogue to surface similar real products.</p>
+  <p>Material Recognition answers the question <em>"what is this, and do you have something like it?"</em> Point it at a tile, a fabric swatch, a stone sample, a wood finish or any finished surface, and it returns the most likely material type and sub-category, a description of how the surface looks (colours, textures, finish, surface pattern), and a set of visually-similar products from the catalogue. It's the fastest way to go from a photo on your phone to a shortlist of real, sourceable materials.</p>
 
-  <h2>Using it</h2>
+  <h2>What "Hybrid AI" means</h2>
+  <p>Rather than relying on a single model, recognition combines several AI models working together on every image:</p>
+  <ul class="feat">
+    <li><strong>A visual encoder</strong> — converts the picture into a visual "fingerprint" that can be compared against catalogue images to find genuine look-alikes.</li>
+    <li><strong>A vision-language analysis</strong> — "reads" the image and writes a structured description: the material type, its category and sub-category, and its visual attributes.</li>
+  </ul>
+  <p>Because two complementary techniques are combined — one for matching, one for describing — the result is richer and more reliable than any one model could produce alone. That's why every result carries the <strong>Hybrid AI</strong> badge.</p>
+
+  <div class="callout tip"><p>Recognition works best on a clear, well-lit, close-up photo of the surface itself, with the material filling most of the frame. Avoid heavy glare, strong shadows or busy backgrounds for the most accurate read.</p></div>
+
+  <h2>Uploading your images</h2>
+  <p>There are three ways to add photos, and you can analyse several at once:</p>
+  <ul class="feat">
+    <li><strong>Choose Files / Select Images</strong> — click the button to browse and pick images from your device.</li>
+    <li><strong>Drag and drop</strong> — drop one or more images straight onto the upload area.</li>
+    <li><strong>Multiple at once</strong> — add a whole batch; each image is analysed independently and gets its own result.</li>
+  </ul>
+  <p>Common image formats are supported (such as JPEG, PNG and WebP). Selected images appear as thumbnails before analysis, and you can <strong>remove</strong> any individual file or <strong>clear all</strong> and start again.</p>
+
+  <h2>Step by step</h2>
   <ol>
-    <li>Click <strong>Choose Files</strong> / <strong>Select Images</strong> (or drag and drop) to add one or more photos.</li>
-    <li>The platform analyses each image with its vision models.</li>
-    <li>Review the recognised attributes and any matching catalogue materials.</li>
-    <li>Act on the results — open a match, add it to a <a href="moodboards.html">moodboard</a>, or refine in the <a href="agent-hub.html">Agent Hub</a>.</li>
+    <li>Add your photos with <strong>Choose Files</strong> / <strong>Select Images</strong>, or drag and drop them onto the upload area.</li>
+    <li>Review the thumbnails of the selected images; remove any you didn't mean to include.</li>
+    <li>Click <strong>Start Recognition</strong> to analyse them with Hybrid AI. A progress indicator shows the work in flight.</li>
+    <li>Read the results — each image returns its identification, visual attributes and similar catalogue products.</li>
+    <li>Act on a result — open a matched product, save it to a moodboard, or take it to the Agent Hub to refine.</li>
   </ol>
 
   <h2>What you get back</h2>
+  <p>For each analysed image, recognition returns three kinds of information:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Result</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Material identification</strong></td><td>The material's type and category, plus a more specific sub-category where it can be determined.</td></tr>
+      <tr><td><strong>Visual attributes</strong></td><td>Descriptive properties of the surface — dominant colours, textures, finish and surface pattern.</td></tr>
+      <tr><td><strong>Similar products</strong></td><td>Visually-matched items from the catalogue, so you can see real materials that look like your photo.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Each identification is shown with an indication of how confident the analysis is, so you can judge how closely the read fits your image.</p>
+
+  <h2>Acting on the results</h2>
   <ul class="feat">
-    <li><strong>Material identification</strong> — type/category and sub-category.</li>
-    <li><strong>Visual attributes</strong> — colours, textures, finish and surface pattern.</li>
-    <li><strong>Similar products</strong> — visually-matched items from the catalogue.</li>
+    <li><strong>Open a match</strong> — jump from a similar product straight to its full catalogue entry to see specifications, availability and more.</li>
+    <li><strong>Add to a moodboard</strong> — collect the materials you like onto a <a href="moodboards.html">moodboard</a> to build out a scheme.</li>
+    <li><strong>Compare options</strong> — line up several matched materials side by side on the <a href="compare.html">Compare</a> page.</li>
+    <li><strong>Refine in the Agent Hub</strong> — take an image or a result into the <a href="agent-hub.html">Agent Hub</a> and ask in plain language for variations, narrower matches or follow-up searches.</li>
   </ul>
 
-  <div class="callout"><p>“Hybrid AI” means several models work together — visual encoders plus a vision-language analysis — to produce a richer, more reliable result than any single model alone.</p></div>
+  <h2>Where recognition fits</h2>
+  <p>Recognition is the visual front door to the catalogue. The same understanding that powers it also drives search across the platform, so a photo here connects naturally to the rest of your workflow — searching the <a href="knowledge-base.html">Knowledge Base</a>, comparing candidates, and building boards and proposals.</p>
+
+  <div class="callout"><p>Recognition is powered by AI analysis. Most identification is included in normal use, but some advanced AI actions may consume credits — where that applies, the platform makes the cost clear before you proceed.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

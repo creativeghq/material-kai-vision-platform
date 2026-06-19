@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Documents | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Documents</div>
+  <h1>Financial Documents</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/invoices/:id</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Create and manage the full set of financial documents — and keep them organised with editable income and expense categories.</p>
+
+  <h2>Document types</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Invoices</strong></td><td>Sales invoices to customers. Each has its own detail page; can be transmitted to ΑΑΔΕ (see <a href="finance-einvoicing.html">e-invoicing</a>) and shared/paid online.</td></tr>
+      <tr><td><strong>Receipts</strong></td><td>Proof-of-payment documents, including those issued from the <a href="pos.html">POS</a>.</td></tr>
+      <tr><td><strong>Credit notes</strong></td><td>Credits/refunds that offset an invoice.</td></tr>
+      <tr><td><strong>Payments</strong></td><td>Recorded money movements (covered under <a href="finance-receivables-payables.html">Receivables &amp; Payables</a>).</td></tr>
+      <tr><td><strong>Expenses</strong></td><td>Business costs, categorised for reporting and payables.</td></tr>
+      <tr><td><strong>Delivery notes</strong></td><td>Goods dispatched, often linked to the dispatch/warehouse flow.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>The invoice detail page</h2>
+  <div class="routes"><span class="badge route">/finance/invoices/:id</span></div>
+  <p>Opening an invoice shows its full detail: the customer, line items, taxes and totals, status, and actions. From here you can issue/transmit it, generate the PDF, and share a payment link.</p>
+
+  <h2>Creating &amp; editing documents</h2>
+  <ol>
+    <li>Open the relevant tab (e.g. Invoices) and start a new document.</li>
+    <li>Pick the customer/supplier and add line items (products/services with quantity, price and VAT).</li>
+    <li>Assign an <strong>income/expense category</strong> — categories are editable and can be assigned inline on the document header.</li>
+    <li>Save; issue/transmit when ready. Issued documents flow into the relevant balances and reports.</li>
+  </ol>
+
+  <h2>Categories</h2>
+  <p>Internal income and expense <strong>categories</strong> can be added and managed directly from a document's header, and used as filters across the document lists and reports. This keeps your books consistent without leaving the document you're working on.</p>
+
+  <h2>Finding documents</h2>
+  <p>Every document list supports <strong>text search</strong> (by supplier/customer, document number or reference) and category filtering, so large histories stay manageable.</p>
+
+  <div class="callout"><p>Invoices and receipts you issue here feed <a href="finance-receivables-payables.html">Receivables</a> and the <a href="finance.html">Dashboard</a> automatically; expenses feed Payables and reporting.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
