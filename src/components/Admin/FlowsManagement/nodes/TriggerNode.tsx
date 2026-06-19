@@ -59,6 +59,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   inventory_low_stock: Package,
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
+  marketplace_want_match: Package,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

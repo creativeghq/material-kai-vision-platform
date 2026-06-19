@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Package, MapPin, Store, Loader2, Tag, Truck, ShieldAlert } from 'lucide-react';
+import { Search, Package, MapPin, Store, Loader2, Tag, Truck, ShieldAlert, Bell, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { MATERIAL_CATS, catLabel } from '@/lib/materialCategories';
-import { marketplaceService, type MarketplaceListing } from '@/services/marketplaceService';
+import { marketplaceService, type MarketplaceListing, type WantList } from '@/services/marketplaceService';
 
 const CONDITION_LABEL: Record<string, string> = {
   new: 'New', open_box: 'Open box', remnant: 'Remnant', lot: 'Mixed lot',
@@ -178,12 +179,42 @@ function ListingDetailModal({
 // ─── Tab ──────────────────────────────────────────────────────────────────────
 
 export const MarketplaceTab: React.FC = () => {
+  const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('all');
   const [selected, setSelected] = useState<MarketplaceListing | null>(null);
+  const [wantLists, setWantLists] = useState<WantList[]>([]);
   const seq = useRef(0);
+
+  const loadAlerts = async () => {
+    try { setWantLists(await marketplaceService.listWantLists()); } catch { setWantLists([]); }
+  };
+  useEffect(() => { void loadAlerts(); }, []);
+
+  // A saved alert must carry at least a category or a keyword (no match-all alerts).
+  const canAlert = cat !== 'all' || search.trim().length > 0;
+  const createAlert = async () => {
+    if (!activeWorkspaceId || !user?.id) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    try {
+      await marketplaceService.createWantList({
+        userId: user.id, workspaceId: activeWorkspaceId,
+        materialCategory: cat === 'all' ? null : cat,
+        keyword: search.trim() || null,
+        label: search.trim() || (cat !== 'all' ? catLabel(cat) : 'Surplus alert'),
+      });
+      toast({ title: 'Alert saved', description: "We'll email you when matching surplus is listed." });
+      await loadAlerts();
+    } catch (err: any) {
+      toast({ title: 'Could not save alert', description: err?.message, variant: 'destructive' });
+    }
+  };
+  const removeAlert = async (id: string) => {
+    try { await marketplaceService.deleteWantList(id); await loadAlerts(); } catch { /* noop */ }
+  };
 
   const load = async () => {
     const mySeq = ++seq.current;
@@ -225,6 +256,20 @@ export const MarketplaceTab: React.FC = () => {
             {MATERIAL_CATS.map((c) => <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" disabled={!canAlert} onClick={createAlert}>
+          <Bell className="h-3.5 w-3.5 mr-1" /> Alert me for these filters
+        </Button>
+        {wantLists.map((w) => (
+          <Badge key={w.id} variant="secondary" className="gap-1 pr-1">
+            {w.label || w.keyword || (w.material_category ? catLabel(w.material_category) : 'Alert')}
+            <button onClick={() => removeAlert(w.id)} className="ml-0.5 rounded hover:text-destructive" title="Remove alert">
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
       </div>
 
       <p className="text-xs text-muted-foreground">

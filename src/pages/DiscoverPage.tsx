@@ -24,6 +24,7 @@ import ProductDetailModal from '@/components/features/products/ProductDetailModa
 import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
+import { marketplaceService } from '@/services/marketplaceService';
 import {
   CAT_COLORS, MATERIAL_CATS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
@@ -184,7 +185,7 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
 
 // ─── Product Row ──────────────────────────────────────────────────────────────
 
-function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawProduct) => void }) {
+function ProductRow({ product, onView, surplus }: { product: RawProduct; onView: (p: RawProduct) => void; surplus?: { price: number; currency: string } }) {
   const color = CAT_COLORS[product.detectedCat] ?? CAT_COLORS.other;
   const rawCat = getMaterialCategory(product.metadata);
   const displayCat = rawCat ? rawCat.replace(/_/g, ' ') : catLabel(product.detectedCat);
@@ -222,7 +223,7 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
       </div>
 
       {/* Category */}
-      <div className="hidden xs:block shrink-0">
+      <div className="hidden xs:flex items-center gap-1.5 shrink-0">
         <Badge
           variant="outline"
           className="text-[10px] px-1.5 py-0 h-4 rounded font-normal capitalize"
@@ -230,6 +231,11 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
         >
           {displayCat}
         </Badge>
+        {surplus && (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded font-normal border-emerald-500/50 text-emerald-500" title="Available as surplus on the Marketplace">
+            Surplus €{surplus.price}
+          </Badge>
+        )}
       </div>
 
       {/* Actions */}
@@ -265,7 +271,7 @@ function ProductRow({ product, onView }: { product: RawProduct; onView: (p: RawP
 
 // ─── Product List with pagination ────────────────────────────────────────────
 
-function ProductList({ products, onView }: { products: RawProduct[]; onView: (p: RawProduct) => void }) {
+function ProductList({ products, onView, surplus }: { products: RawProduct[]; onView: (p: RawProduct) => void; surplus?: Record<string, { price: number; currency: string }> }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(products.length / PER_PAGE);
   const paged = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -286,7 +292,7 @@ function ProductList({ products, onView }: { products: RawProduct[]; onView: (p:
         </div>
         <div className="divide-y divide-border">
           {paged.map((p) => (
-            <ProductRow key={p.id} product={p} onView={onView} />
+            <ProductRow key={p.id} product={p} onView={onView} surplus={surplus?.[p.id]} />
           ))}
         </div>
       </div>
@@ -421,9 +427,12 @@ export const DiscoverPage: React.FC = () => {
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
 
   const [loading, setLoading] = useState(true);
+  // #225 — product_id → cheapest active surplus listing, for the "Surplus €X" badge.
+  const [surplus, setSurplus] = useState<Record<string, { price: number; currency: string }>>({});
 
   useEffect(() => {
     Promise.all([loadCreators(), loadProducts()]).finally(() => setLoading(false));
+    marketplaceService.surplusByProduct().then(setSurplus).catch(() => setSurplus({}));
   }, []);
 
   async function loadCreators() {
@@ -760,7 +769,7 @@ export const DiscoverPage: React.FC = () => {
             ) : filteredProducts.length === 0 ? (
               <Empty icon={Package} text="No materials found." />
             ) : (
-              <ProductList products={filteredProducts} onView={openProduct} />
+              <ProductList products={filteredProducts} onView={openProduct} surplus={surplus} />
             )}
           </TabsContent>
 

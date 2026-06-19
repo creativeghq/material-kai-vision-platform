@@ -117,6 +117,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   inventory_low_stock: Package,
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
+  marketplace_want_match: Package,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -169,6 +170,7 @@ const triggerLabels: Record<TriggerType, string> = {
   inventory_low_stock: 'Low Stock',
   'inbox.message_received': 'Inbox Message Received',
   'inbox.thread_assigned': 'Inbox Thread Assigned',
+  marketplace_want_match: 'Surplus Match',
 };
 
 const statusColors: Record<FlowStatus, string> = {

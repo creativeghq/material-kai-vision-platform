@@ -167,6 +167,11 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Inbox Thread Assigned', description: 'A thread is assigned/handed to a member', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Inbox Thread Assigned', category: 'trigger', triggerType: 'inbox.thread_assigned', config: {} } as TriggerNodeData },
 
+  // #225 — surplus marketplace
+  { type: 'triggerNode', category: 'trigger', subType: 'marketplace_want_match', group: 'Marketplace',
+    label: 'Surplus Match', description: 'A new surplus listing matched a buyer\'s saved alert', icon: 'Package', color: 'emerald',
+    defaultData: { label: 'Surplus Match', category: 'trigger', triggerType: 'marketplace_want_match', config: {} } as TriggerNodeData },
+
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC
   // ════════════════════════════════════════════════════

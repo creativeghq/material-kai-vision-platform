@@ -65,6 +65,17 @@ export interface BrowseFilters {
   offset?: number;
 }
 
+/** A buyer's saved surplus alert (#225). A matching new listing emails + bells them. */
+export interface WantList {
+  id: string;
+  label: string | null;
+  material_category: string | null;
+  keyword: string | null;
+  max_price: number | null;
+  location_city: string | null;
+  is_active: boolean;
+}
+
 const LISTING_COLUMNS =
   'id, workspace_id, seller_name, title, description, material_category, specs, image_urls, ' +
   'price, currency, unit, qty_remaining, condition, batch_lot, location_city, location_region, ' +
@@ -198,6 +209,23 @@ export const marketplaceService = {
     return (data ?? []) as MarketplaceListing[];
   },
 
+  /** product_id → cheapest active surplus listing, for the "also available as surplus" badge. */
+  async surplusByProduct(): Promise<Record<string, { price: number; currency: string }>> {
+    const { data, error } = await sb
+      .from('marketplace_listings')
+      .select('product_id, price, currency')
+      .eq('status', 'active')
+      .not('product_id', 'is', null);
+    if (error) throw error;
+    const map: Record<string, { price: number; currency: string }> = {};
+    for (const r of (data ?? []) as any[]) {
+      const pid = r.product_id as string;
+      const price = Number(r.price);
+      if (!map[pid] || price < map[pid].price) map[pid] = { price, currency: r.currency };
+    }
+    return map;
+  },
+
   async getListing(id: string): Promise<MarketplaceListing | null> {
     const { data, error } = await sb.from('marketplace_listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle();
     if (error) throw error;
@@ -221,6 +249,38 @@ export const marketplaceService = {
 
   async incrementView(id: string): Promise<void> {
     try { await sb.rpc('increment_listing_view', { p_id: id }); } catch { /* analytics-only */ }
+  },
+
+  // ── Want lists / saved surplus alerts (#225) ──────────────────────────────
+  async listWantLists(): Promise<WantList[]> {
+    const { data, error } = await sb
+      .from('marketplace_want_lists')
+      .select('id, label, material_category, keyword, max_price, location_city, is_active')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as WantList[];
+  },
+
+  async createWantList(input: {
+    userId: string; workspaceId: string;
+    materialCategory?: string | null; keyword?: string | null; maxPrice?: number | null;
+    locationCity?: string | null; label?: string | null;
+  }): Promise<void> {
+    const { error } = await sb.from('marketplace_want_lists').insert({
+      user_id: input.userId,
+      workspace_id: input.workspaceId,
+      material_category: input.materialCategory ?? null,
+      keyword: input.keyword ?? null,
+      max_price: input.maxPrice ?? null,
+      location_city: input.locationCity ?? null,
+      label: input.label ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async deleteWantList(id: string): Promise<void> {
+    const { error } = await sb.from('marketplace_want_lists').delete().eq('id', id);
+    if (error) throw error;
   },
 
   /** Pull catalog details for a product so the listing modal pre-fills everything but price. */

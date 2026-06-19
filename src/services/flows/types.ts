@@ -59,12 +59,15 @@ export type TriggerType =
   | 'inventory_low_stock'
   // #209 — multi-tenant inbox (dotted keys; payload-only, no custom config UI)
   | 'inbox.message_received'
-  | 'inbox.thread_assigned';
+  | 'inbox.thread_assigned'
+  // #225 — surplus marketplace: a new listing matched a buyer's saved alert
+  | 'marketplace_want_match';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
+export interface MarketplaceWantMatchTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -221,6 +224,7 @@ export type TriggerConfigMap = {
   inventory_low_stock: InventoryLowStockTriggerConfig;
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
+  marketplace_want_match: MarketplaceWantMatchTriggerConfig;
 };
 
 // =====================================================
