@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -20,11 +20,13 @@ import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/servi
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
+import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
+import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
@@ -73,6 +75,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
+  const [categoryKind, setCategoryKind] = useState<'income' | 'expense' | null>(null);
   const [syncing, setSyncing] = useState(false);
   const syncInbound = async () => {
     setSyncing(true);
@@ -134,6 +137,16 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 {(type === 'invoices' || type === 'expenses') && canOperateFinance && (
                   <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
                     {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
+                  </Button>
+                )}
+                {(type === 'invoices' || type === 'receipts') && canOperateFinance && (
+                  <Button size="sm" variant="outline" onClick={() => setCategoryKind('income')} title="Add an internal income category">
+                    <Tags className="h-3.5 w-3.5 mr-1" /> Income category
+                  </Button>
+                )}
+                {type === 'expenses' && canOperateFinance && (
+                  <Button size="sm" variant="outline" onClick={() => setCategoryKind('expense')} title="Add an internal expense category">
+                    <Tags className="h-3.5 w-3.5 mr-1" /> Expense category
                   </Button>
                 )}
                 {(type === 'invoices' || type === 'receipts') && !isAccountant && (
@@ -254,6 +267,15 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={newCreditNoteOpen}
           onOpenChange={setNewCreditNoteOpen}
           onCreated={() => { setNewCreditNoteOpen(false); load(); }}
+        />
+      )}
+      {activeWorkspaceId && categoryKind && (
+        <QuickCategoryDialog
+          workspaceId={activeWorkspaceId}
+          kind={categoryKind}
+          open={!!categoryKind}
+          onOpenChange={(v) => { if (!v) setCategoryKind(null); }}
+          onChanged={load}
         />
       )}
     </div>
@@ -530,20 +552,19 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{d.status}</Badge></td>
             <td className="px-4 py-2 text-right">
-              {!readOnly && (d.status === 'new' || d.status === 'classified') && (
-                <div className="flex justify-end gap-2 items-center">
-                  {d.status === 'classified' && <span className="text-xs text-emerald-500 mr-1">Bill created</span>}
-                  {d.status === 'new' && (
-                    <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => createBill(d.id)}>
-                      {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create bill'}
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => setReceiveDoc(d)}>Receive stock</Button>
-                  {d.status === 'new' && <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => dismiss(d.id)}>Dismiss</Button>}
+              {!readOnly && workspaceId && (
+                <div className="flex justify-end">
+                  <InboundDocActionsMenu
+                    doc={d}
+                    workspaceId={workspaceId}
+                    busy={busy === d.id}
+                    onCreateBill={() => createBill(d.id)}
+                    onReceiveStock={() => setReceiveDoc(d)}
+                    onDismiss={() => dismiss(d.id)}
+                    onChanged={onChanged}
+                  />
                 </div>
               )}
-              {d.status === 'received' && <span className="text-xs text-emerald-500">Received</span>}
-              {d.status === 'dismissed' && <span className="text-xs text-muted-foreground">Dismissed</span>}
             </td>
           </tr>
         ))}
