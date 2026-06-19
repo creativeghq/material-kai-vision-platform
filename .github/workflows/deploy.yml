@@ -288,3 +288,25 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Deployed:** ${{ needs.changes.outputs.changed_functions_count }} function(s)" >> $GITHUB_STEP_SUMMARY
           echo "- **Targets:** \`${{ needs.changes.outputs.changed_functions }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Post-deploy smoke gate — verify the critical prod flows are actually alive right
+  # after a deploy. A FAIL here turns this run red so breakage is caught in seconds,
+  # not days via a churned customer. Same script as the scheduled smoke monitor.
+  smoke:
+    needs: [deploy-frontend, deploy-functions]
+    if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 🔥 Production smoke checks
+        env:
+          MIVAA_BASE_URL: 'https://v1api.materialshub.gr'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIVAA_CRON_SECRET: ${{ secrets.MIVAA_CRON_SECRET }}
+        run: node scripts/smoke/smoke.mjs

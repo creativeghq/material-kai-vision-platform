@@ -1,0 +1,33 @@
+name: 🔥 Prod Smoke Monitor
+
+# Synthetic monitor: runs the production smoke checks on a schedule against the LIVE
+# system, so breakage that nobody just deployed (a Modal endpoint down, an expired key,
+# a DB/RPC issue, an upstream outage) is caught within minutes — not via a churned customer.
+# The same script also gates deploys (see deploy.yml post-deploy step).
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 min (GitHub may delay scheduled runs under load)
+  workflow_dispatch: {}        # allow manual "run now"
+
+# Don't pile up runs if one is slow.
+concurrency:
+  group: smoke-monitor
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run production smoke checks
+        env:
+          MIVAA_BASE_URL: 'https://v1api.materialshub.gr'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIVAA_CRON_SECRET: ${{ secrets.MIVAA_CRON_SECRET }}
+        run: node scripts/smoke/smoke.mjs
