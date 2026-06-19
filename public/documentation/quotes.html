@@ -63,6 +63,53 @@
   </ol>
   <div class="callout tip"><p><strong>Shortcut — generate from a moodboard.</strong> Open a <a href="moodboards.html">moodboard</a> and use its <em>Generate Quote</em> button. The products on the board become the line items of a new quote, ready for you to set quantities, prices and FF&amp;E detail.</p></div>
 
+  <h2>Line items in detail</h2>
+  <p>A quote is built from line items on the <strong>Items</strong> tab. The items table has the following columns: <strong>#</strong>, <strong>Product</strong>, <strong>Room</strong>, <strong>Qty</strong>, <strong>Price</strong>, <strong>Unit</strong>, <strong>Total</strong> and <strong>Actions</strong>. You can edit <strong>Room</strong> and <strong>Qty</strong> inline per row, and remove rows via <strong>Actions</strong>. Add items with <strong>Add Products</strong>, which offers two modes: <strong>Catalog Search</strong> and <strong>Custom Product</strong>.</p>
+
+  <h3>Catalog Search</h3>
+  <p>Search the catalogue by name, brand, material or colour; tick the items you want, and the button shows <strong>"Add N Products"</strong>. This is the right mode for materials already in your knowledge base.</p>
+
+  <h3>Custom Product (every field)</h3>
+  <p>For one-off items that aren't in the catalogue. The Custom Product form has these fields:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Product Name *</strong></td><td>Required.</td></tr>
+      <tr><td><strong>SKU / Code</strong></td><td>Your internal code.</td></tr>
+      <tr><td><strong>Unit</strong></td><td>Unit of sale (e.g. piece, m², box).</td></tr>
+      <tr><td><strong>Description</strong></td><td>Free text.</td></tr>
+      <tr><td><strong>Unit Price (€)</strong></td><td>Price per unit. A <em>"Get price"</em> helper can propose a market price.</td></tr>
+      <tr><td><strong>Quantity</strong></td><td>How many units.</td></tr>
+      <tr><td><strong>Size / Variant</strong></td><td>E.g. dimensions/variant label.</td></tr>
+      <tr><td><strong>Color / Finish</strong></td><td>—</td></tr>
+      <tr><td><strong>Room / Area</strong></td><td>Which room the item is for (FF&amp;E).</td></tr>
+      <tr><td><strong>Dimensions (W×H×D)</strong></td><td>Physical dimensions (FF&amp;E).</td></tr>
+      <tr><td><strong>Installation Requirements</strong></td><td>Installation notes (FF&amp;E).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Then click <strong>"Add Custom Product"</strong>.</p>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/custom-product.png" alt="Custom product form in a quote"><figcaption>The Custom Product form — full FF&amp;E-aware fields, with a “Get price” market helper.</figcaption></figure>
+
+  <h2>Extras &amp; Timeline</h2>
+  <p>A quote has two further tabs:</p>
+  <ul class="feat">
+    <li><strong>Extras (Extras &amp; Add-ons)</strong> — optional add-on lines beyond the main items.</li>
+    <li><strong>Timeline (Project Timeline)</strong> — a visual delivery/milestone timeline shown to the customer.</li>
+  </ul>
+
+  <h2>Quote actions</h2>
+  <p>The quote header carries these actions:</p>
+  <ul class="feat">
+    <li><strong>Submit Quote Request</strong> — submit the quote.</li>
+    <li><strong>Share</strong> — produce a shareable public link (token-protected, <span class="badge route">/q/:token</span>).</li>
+    <li><strong>Email Quote</strong> — email it to the customer.</li>
+    <li><strong>Preview</strong> — preview the branded PDF (also at <span class="badge route">/quotes/:id/preview</span>).</li>
+    <li><strong>Download PDF</strong> — download the generated PDF.</li>
+  </ul>
+  <div class="callout"><p>The quote title is editable inline (it defaults to <strong>"Untitled Quote"</strong>).</p></div>
+
   <h2>Previewing the branded PDF</h2>
   <p>From the quote you can open a <strong>branded PDF preview</strong> at <span class="badge route">/quotes/:id/preview</span>. The PDF is laid out for your customer and reflects everything you entered:</p>
   <ul class="feat">
