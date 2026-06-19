@@ -29,6 +29,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
+  const [segment, setSegment] = useState<string>('all');
   const [selected, setSelected] = useState<PartyRow | null>(null);
 
   useEffect(() => { void load(); }, [workspaceId, role]);
@@ -54,11 +55,18 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
     }
   };
 
+  const SEGMENT_LABELS: Record<string, string> = {
+    b2b: 'B2B', retail: 'Retail', wholesale: 'Wholesale', public_sector: 'Public sector',
+  };
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((r) => r.display_name?.toLowerCase().includes(term) || r.email?.toLowerCase().includes(term));
-  }, [rows, search]);
+    return rows.filter((r) => {
+      if (segment === 'unsegmented' ? !!r.contact_group : (segment !== 'all' && r.contact_group !== segment)) return false;
+      if (term && !(r.display_name?.toLowerCase().includes(term) || r.email?.toLowerCase().includes(term))) return false;
+      return true;
+    });
+  }, [rows, search, segment]);
 
   const totals = useMemo(() => ({
     rcv: filtered.reduce((acc, r) => acc + Number(r.receivable_outstanding || 0), 0),
@@ -82,6 +90,20 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                 <SelectItem value="customer">Customers</SelectItem>
                 <SelectItem value="supplier">Suppliers</SelectItem>
                 <SelectItem value="both">Both (customer + supplier)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="block text-[10px] text-muted-foreground">Segment</label>
+            <Select value={segment} onValueChange={setSegment}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All segments</SelectItem>
+                <SelectItem value="b2b">B2B</SelectItem>
+                <SelectItem value="retail">Retail</SelectItem>
+                <SelectItem value="wholesale">Wholesale</SelectItem>
+                <SelectItem value="public_sector">Public sector</SelectItem>
+                <SelectItem value="unsegmented">Unsegmented</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -135,9 +157,10 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       {r.email && <div className="text-[10px] text-muted-foreground">{r.email}</div>}
                     </td>
                     <td className="px-4 py-2">
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
                         {r.is_customer && <Badge variant="outline" className="text-[10px]">Customer</Badge>}
                         {r.is_supplier && <Badge variant="default" className="text-[10px]">Supplier</Badge>}
+                        {r.contact_group && <Badge variant="secondary" className="text-[10px]">{SEGMENT_LABELS[r.contact_group] ?? r.contact_group}</Badge>}
                       </div>
                     </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.invoiced_total || 0))}</td>

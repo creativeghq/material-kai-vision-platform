@@ -86,6 +86,18 @@ export interface FiscalInvoiceInput {
   };
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];
+  /** B2G (public-sector) extras — emitted as `providerB2gAdditionalInvoiceDetails`
+   *  on the same SendInvoices envelope. Present only when the invoice is_b2g. */
+  b2g?: {
+    contractReference?: string;
+    buyerReference?: string;
+    buyerLegalRegistrationIdentifier?: string;
+    partyName?: string;
+    dueDate?: string; // YYYY-MM-DD
+    budget?: { type?: number; identifier?: string };
+    buyerIdentifiers?: { buyerIdentifier: string }[];
+    deliveryDetails?: { street?: string; city?: string; postalCode?: string };
+  };
   lines: FiscalLine[];
   // type 7=card, 8=IRIS carry the EFT-POS terminal id + NSP for the Law 5155 signature.
   paymentMethods?: { type: number; amount: number; info?: string; terminalId?: string; posNspId?: number }[];

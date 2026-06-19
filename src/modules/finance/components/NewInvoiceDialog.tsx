@@ -217,6 +217,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [responsible, setResponsible] = useState('');
   const [movePurpose, setMovePurpose] = useState('1');
 
+  // #207 — B2G (public-sector) invoicing. Same myDATA envelope + a B2G reference block.
+  const [isB2g, setIsB2g] = useState(false);
+  const [b2gContractRef, setB2gContractRef] = useState('');
+  const [b2gBuyerRef, setB2gBuyerRef] = useState('');
+  const [b2gBuyerReg, setB2gBuyerReg] = useState('');
+  const [b2gBuyerIdentifier, setB2gBuyerIdentifier] = useState('');
+  const [b2gBudgetIdentifier, setB2gBudgetIdentifier] = useState('');
+  const [b2gDueDate, setB2gDueDate] = useState('');
+
   // ── Reset on open ──
   useEffect(() => {
     if (!open) return;
@@ -232,6 +241,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setLines([emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
+    setIsB2g(false); setB2gContractRef(''); setB2gBuyerRef(''); setB2gBuyerReg('');
+    setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate('');
   }, [open]);
 
   // ── Load catalogs + issuer ──
@@ -309,6 +320,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       // #207 — adopt the party's commercial defaults: ΜΥΦ inclusion preference and
       // (for 0%-VAT lines) the party's default myDATA VAT-exemption category.
       if (data && (data as any).include_in_myf === false) setIncludeInMyf(false);
+      // Public-sector segment → default to B2G issuance + prefill the buyer registration id.
+      if (data && (data as any).contact_group === 'public_sector') {
+        setIsB2g(true);
+        if ((data as any).vat_number) setB2gBuyerReg(String((data as any).vat_number));
+      }
       // Outstanding = sum of still-owed amounts on issued/partially-paid/overdue invoices.
       const col = customer.type === 'company' ? 'customer_company_id' : 'customer_contact_id';
       const { data: openRows } = await supabase
@@ -536,6 +552,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
         vehicle_number: hasShipping ? (vehicleNumber || null) : null, responsible: hasShipping ? (responsible || null) : null,
         move_purpose: hasShipping ? movePurpose : null,
+        // #207 — B2G (public-sector) flag + reference block (consumed by the connector).
+        is_b2g: isB2g,
+        b2g_details: isB2g ? {
+          contractReference: b2gContractRef || null,
+          buyerReference: b2gBuyerRef || null,
+          buyerLegalRegistrationIdentifier: b2gBuyerReg || null,
+          buyerIdentifier: b2gBuyerIdentifier || null,
+          budgetIdentifier: b2gBudgetIdentifier || null,
+          dueDate: b2gDueDate || null,
+        } : null,
         issued_at: null,
         due_at: null,
       }).select().single();
@@ -1047,6 +1073,29 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Label className="text-xs">Notes</Label>
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
             </section>
+
+            {/* #207 — B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
+            {!documentType.startsWith('11') && (
+              <section className="rounded-md border border-border/60 p-3 space-y-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">B2G — public-sector invoice</span>
+                  <input type="checkbox" className="h-4 w-4 rounded" checked={isB2g} onChange={(e) => setIsB2g(e.target.checked)} />
+                </label>
+                {isB2g && (
+                  <>
+                    <p className="text-[11px] text-muted-foreground">Transmitted on the same myDATA envelope with the public-buyer reference block. Fill the references provided by the contracting authority.</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Contract reference (ΑΔΑΜ)</Label><Input className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer reference</Label><Input className="h-8 text-xs" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer legal registration id</Label><Input className="h-8 text-xs" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} placeholder="defaults to buyer VAT" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer identifier (ΚΗΜΔΗΣ/KAE)</Label><Input className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Budget identifier</Label><Input className="h-8 text-xs" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></div>
+                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Payment due date</Label><Input type="date" className="h-8 text-xs" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></div>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
 
             {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
             <section className="rounded-md border border-border/60 p-3 space-y-2">

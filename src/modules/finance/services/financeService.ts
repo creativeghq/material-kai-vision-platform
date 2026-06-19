@@ -1268,6 +1268,7 @@ export interface PartyRow {
   net_position: number;
   credit_limit: number | null;
   over_credit_limit: boolean;
+  contact_group: string | null;
 }
 
 export interface FinanceSettings {

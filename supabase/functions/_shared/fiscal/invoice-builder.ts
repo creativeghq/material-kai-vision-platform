@@ -249,6 +249,30 @@ export async function buildInvoiceInputFromDb(
       })()
     : null;
 
+  // #207 — B2G (public sector). The operator-entered b2g_details ride alongside the
+  // standard envelope; delivery falls back to the counterpart address when unset.
+  const b2gRaw = inv.is_b2g ? (inv.b2g_details ?? {}) : null;
+  const b2g = b2gRaw
+    ? {
+        contractReference: b2gRaw.contractReference || undefined,
+        buyerReference: b2gRaw.buyerReference || undefined,
+        buyerLegalRegistrationIdentifier: b2gRaw.buyerLegalRegistrationIdentifier || counterpart.vatNumber || undefined,
+        partyName: b2gRaw.partyName || counterpart.name || undefined,
+        dueDate: b2gRaw.dueDate || undefined,
+        ...(b2gRaw.budgetIdentifier
+          ? { budget: { type: Number(b2gRaw.budgetType ?? 1) || 1, identifier: String(b2gRaw.budgetIdentifier) } }
+          : {}),
+        ...(b2gRaw.buyerIdentifier
+          ? { buyerIdentifiers: [{ buyerIdentifier: String(b2gRaw.buyerIdentifier) }] }
+          : {}),
+        deliveryDetails: {
+          street: b2gRaw.deliveryStreet || counterpart.address?.street || '',
+          city: b2gRaw.deliveryCity || counterpart.address?.city || '',
+          postalCode: b2gRaw.deliveryPostalCode || counterpart.address?.postalCode || '',
+        },
+      }
+    : undefined;
+
   return {
     issuer,
     counterpart,
@@ -259,6 +283,7 @@ export async function buildInvoiceInputFromDb(
       exchangeRate: inv.exchange_rate ?? undefined,
       ...(movement ?? {}),
     },
+    ...(b2g ? { b2g } : {}),
     // Payment method captured on the invoice (myDATA requires at least one).
     // A POS/IRIS override (#185) wins — it carries the EFT-POS terminal + NSP for the signature.
     paymentMethods: overrides.posPayment

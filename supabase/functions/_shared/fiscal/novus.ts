@@ -152,6 +152,26 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             logoId: input.logoId ?? undefined,
           },
         },
+        // B2G (public sector) — same envelope, extra block. Omitted entirely for
+        // ordinary B2B/B2C so the request shape is unchanged when not B2G.
+        ...(input.b2g
+          ? {
+              providerB2gAdditionalInvoiceDetails: {
+                ...(input.b2g.contractReference ? { contractReference: input.b2g.contractReference } : {}),
+                ...(input.b2g.buyerReference ? { buyerReference: input.b2g.buyerReference } : {}),
+                ...(input.b2g.buyerLegalRegistrationIdentifier ? { buyerLegalRegistrationidentifier: input.b2g.buyerLegalRegistrationIdentifier } : {}),
+                ...(input.b2g.partyName ? { partyName: input.b2g.partyName } : {}),
+                ...(input.b2g.dueDate ? { dueDate: input.b2g.dueDate } : {}),
+                ...(input.b2g.budget?.identifier
+                  ? { budget: { type: input.b2g.budget.type ?? 1, identifier: input.b2g.budget.identifier } }
+                  : {}),
+                ...(input.b2g.buyerIdentifiers?.length ? { buyerIdentifiers: input.b2g.buyerIdentifiers } : {}),
+                ...(input.b2g.deliveryDetails && (input.b2g.deliveryDetails.street || input.b2g.deliveryDetails.city)
+                  ? { deliveryDetails: input.b2g.deliveryDetails }
+                  : {}),
+              },
+            }
+          : {}),
         invoiceSummary: {
           totalNetValue: summary.totalNetValue,
           totalVatAmount: summary.totalVatAmount,
