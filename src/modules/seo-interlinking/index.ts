@@ -6,7 +6,7 @@
 // is kept as a redirect so old links / bookmarks still resolve.
 // Per-user management still lives in Profile → Websites tab (ConnectedWebsitesTab).
 
-import { lazy } from 'react';
+import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 

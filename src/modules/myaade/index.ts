@@ -7,7 +7,7 @@
 //   - manifest, routes, navItems → registers the module on /admin/modules
 //   - /admin/modules/myaade/settings is auto-mounted by ModuleSettingsPage
 
-import { lazy } from 'react';
+import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Building2 } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';

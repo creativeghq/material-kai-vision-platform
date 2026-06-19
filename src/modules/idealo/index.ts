@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { ShoppingCart } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';

@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
+import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 // @ts-ignore - QueryClient types are available at runtime (react-query version conflict with React 18 types)
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
