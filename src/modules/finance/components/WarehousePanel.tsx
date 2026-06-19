@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -115,6 +115,19 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
+  // Record a marketplace sale: decrements on-hand (stock movement) AND syncs the listing's
+  // remaining qty — the correct path vs a plain "Issue", which would leave the listing stale.
+  const sellListing = async (item: WarehouseItem) => {
+    const l = listings[item.id];
+    if (!l) return;
+    const raw = window.prompt(`How many "${item.name}" did you sell on the marketplace? (listed: ${l.qty_remaining})`, String(l.qty_remaining));
+    if (raw === null) return;
+    const qty = parseFloat(raw);
+    if (!Number.isFinite(qty) || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
+    try { await marketplaceService.markSold(l.id, qty); toast({ title: 'Sale recorded — stock updated' }); await load(selectedWh); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+  };
+
   return (
     <div className="space-y-4">
       <PendingProductsCard workspaceId={workspaceId} warehouses={warehouses} onChanged={() => load(selectedWh)} />
@@ -220,7 +233,10 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         <Button size="sm" variant="ghost" title="Issue stock" onClick={() => move(it, 'out')}><PackageMinus className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" title="Transfer to another warehouse" onClick={() => transfer(it)}><ArrowLeftRight className="h-4 w-4" /></Button>
                         {listed ? (
-                          <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-500" /></Button>
+                          <>
+                            <Button size="sm" variant="ghost" title={`Record a marketplace sale (decrements stock)`} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-500" /></Button>
+                            <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-500" /></Button>
+                          </>
                         ) : (
                           <Button size="sm" variant="ghost" title={available > 0 ? 'List to Marketplace' : 'No available stock to list'} disabled={available <= 0} onClick={() => setListItem(it)}><Store className="h-4 w-4" /></Button>
                         )}
