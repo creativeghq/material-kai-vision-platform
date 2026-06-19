@@ -56,6 +56,7 @@ jobs:
           filters: |
             frontend:
               - 'src/**'
+              - 'public/**'
               - 'package.json'
               - 'package-lock.json'
               - 'vite.config.*'
@@ -134,7 +135,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────────
   typecheck:
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,7 +151,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────────
   deploy-frontend:
     needs: [changes, typecheck]
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     env:
