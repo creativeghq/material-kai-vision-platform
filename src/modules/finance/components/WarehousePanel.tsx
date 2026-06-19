@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -29,6 +29,34 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   // Active marketplace listings keyed by warehouse_item_id — drives the "Listed" row badge.
   const [listings, setListings] = useState<Record<string, ActiveListingSummary>>({});
   const [listItem, setListItem] = useState<WarehouseItem | null>(null);
+
+  // #223 — stock filters (sqm/qty range, unit, low-stock, location, marketplace status).
+  const [fSearch, setFSearch] = useState('');
+  const [fUnit, setFUnit] = useState('all');
+  const [fLowOnly, setFLowOnly] = useState(false);
+  const [fListed, setFListed] = useState('all'); // all | listed | unlisted
+  const [fQtyMin, setFQtyMin] = useState('');
+  const [fQtyMax, setFQtyMax] = useState('');
+  const [fLocation, setFLocation] = useState('');
+
+  const units = useMemo(() => Array.from(new Set(items.map((i) => i.unit))).sort(), [items]);
+  const visibleItems = useMemo(() => {
+    const q = fSearch.trim().toLowerCase();
+    const loc = fLocation.trim().toLowerCase();
+    const min = fQtyMin === '' ? null : parseFloat(fQtyMin);
+    const max = fQtyMax === '' ? null : parseFloat(fQtyMax);
+    return items.filter((it) => {
+      if (q && !(`${it.name} ${it.sku ?? ''}`.toLowerCase().includes(q))) return false;
+      if (fUnit !== 'all' && it.unit !== fUnit) return false;
+      if (fLowOnly && !(it.reorder_point > 0 && it.qty_on_hand <= it.reorder_point)) return false;
+      if (loc && !(it.location ?? '').toLowerCase().includes(loc)) return false;
+      if (min != null && it.qty_on_hand < min) return false;
+      if (max != null && it.qty_on_hand > max) return false;
+      if (fListed === 'listed' && !listings[it.id]) return false;
+      if (fListed === 'unlisted' && listings[it.id]) return false;
+      return true;
+    });
+  }, [items, listings, fSearch, fUnit, fLowOnly, fListed, fQtyMin, fQtyMax, fLocation]);
 
   const load = async (whId?: string) => {
     setLoading(true);
@@ -108,6 +136,39 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full" disabled={!selectedWh}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
         </div>
       </CardHeader>
+      {/* #223 — stock filters */}
+      {!loading && items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border/60 bg-muted/10">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Name or SKU…" className="h-8 w-40 pl-7 text-xs" />
+          </div>
+          <Select value={fUnit} onValueChange={setFUnit}>
+            <SelectTrigger className="h-8 w-24 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All units</SelectItem>
+              {units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input value={fQtyMin} onChange={(e) => setFQtyMin(e.target.value)} type="number" placeholder="min qty" className="h-8 w-24 text-xs" />
+          <Input value={fQtyMax} onChange={(e) => setFQtyMax(e.target.value)} type="number" placeholder="max qty" className="h-8 w-24 text-xs" />
+          <Input value={fLocation} onChange={(e) => setFLocation(e.target.value)} placeholder="Location…" className="h-8 w-32 text-xs" />
+          <Select value={fListed} onValueChange={setFListed}>
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any status</SelectItem>
+              <SelectItem value="listed">Listed</SelectItem>
+              <SelectItem value="unlisted">Not listed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant={fLowOnly ? 'default' : 'outline'} className="h-8 rounded-full text-xs" onClick={() => setFLowOnly((v) => !v)}>
+            <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Low stock
+          </Button>
+          {visibleItems.length !== items.length && (
+            <span className="text-xs text-muted-foreground">{visibleItems.length}/{items.length}</span>
+          )}
+        </div>
+      )}
       <CardContent className="p-0">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -128,7 +189,10 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               {items.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No stock items yet.</td></tr>
               )}
-              {items.map((it) => {
+              {items.length > 0 && visibleItems.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No items match the filters.</td></tr>
+              )}
+              {visibleItems.map((it) => {
                 const low = it.qty_on_hand <= it.reorder_point && it.reorder_point > 0;
                 const listed = listings[it.id];
                 const available = it.qty_on_hand - it.qty_reserved;

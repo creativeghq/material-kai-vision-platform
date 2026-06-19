@@ -476,10 +476,16 @@ async function insertMessageAndNotify(
     for (const p of (parts || []) as Array<{ user_id: string; participant_type: string }>) {
       if (p.user_id === opts.senderUserId) continue;
       if (messageType === 'note' && p.participant_type !== 'member') continue;
+      // Resolve the recipient's email so the general inbox flow can email + bell (#224).
+      let email: string | undefined;
+      try { const { data: u } = await db.auth.admin.getUserById(p.user_id); email = u?.user?.email ?? undefined; }
+      catch { /* email is optional; the bell still fires */ }
       await emitFlowEvent('inbox.message_received', {
         user_id: p.user_id,
+        email,
         type: 'inbox_message',
         title: `${opts.senderLabel || 'New message'} · ${subject}`,
+        subject: `New message · ${subject}`,
         body: preview,
         action_url: `/inbox?thread=${threadId}`,
         thread_id: threadId,
