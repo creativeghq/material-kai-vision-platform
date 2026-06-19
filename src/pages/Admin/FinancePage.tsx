@@ -25,6 +25,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
@@ -113,6 +116,11 @@ const FinancePage: React.FC = () => {
   const [settlePreset, setSettlePreset] = useState<RecordPaymentPreset | null>(null);
   const [settleOpen, setSettleOpen] = useState(false);
 
+  // AR/AP list filters (party search + category + age bucket), one set per side.
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
+  const [arQuery, setArQuery] = useState(''); const [arCat, setArCat] = useState('all'); const [arBucket, setArBucket] = useState<string>('all');
+  const [apQuery, setApQuery] = useState(''); const [apCat, setApCat] = useState('all'); const [apBucket, setApBucket] = useState<string>('all');
+
   const openManualEntry = (dir: 'receivable' | 'payable') => { setManualEntryDir(dir); setManualEntryOpen(true); };
   const openSettle = (preset: RecordPaymentPreset) => { setSettlePreset(preset); setSettleOpen(true); };
   const voidManual = async (id: string) => {
@@ -138,16 +146,18 @@ const FinancePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [arRows, apRows, queue, pnlRows, cashRows, invoices] = await Promise.all([
+      const [arRows, apRows, queue, pnlRows, cashRows, invoices, cats] = await Promise.all([
         financeService.getArAging(wsId),
         financeService.getApAging(wsId),
         financeService.getFollowUpQueue(wsId),
         financeService.getMonthlyPnl(wsId, 12),
         financeService.getCashFlowForecast(wsId, 90),
         financeService.listInvoices({ workspaceId: wsId, limit: 25 }),
+        financeCategoriesService.list(wsId).catch(() => [] as FinanceCategory[]),
       ]);
       setAr(arRows);
       setAp(apRows);
+      setCategories(cats);
       setFollowUps(queue);
       setPnl(pnlRows);
       setCashFlow(cashRows);
@@ -178,6 +188,24 @@ const FinancePage: React.FC = () => {
 
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
+
+  const applyAgingFilters = (rows: AgingRow[], q: string, cat: string, bucket: string) => {
+    const term = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (bucket !== 'all' && r.age_bucket !== bucket) return false;
+      if (cat === 'none' ? r.category_id : cat !== 'all' && r.category_id !== cat) return false;
+      if (term) {
+        const hay = [r.party_name, r.internal_number, r.supplier_bill_number, r.description, r.category_name]
+          .map((x) => String(x ?? '').toLowerCase());
+        if (!hay.some((h) => h.includes(term))) return false;
+      }
+      return true;
+    });
+  };
+  const arFiltered = useMemo(() => applyAgingFilters(ar, arQuery, arCat, arBucket), [ar, arQuery, arCat, arBucket]);
+  const apFiltered = useMemo(() => applyAgingFilters(ap, apQuery, apCat, apBucket), [ap, apQuery, apCat, apBucket]);
+  const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
+  const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
 
   if (loading && !workspaceId) {
     return (
@@ -424,17 +452,12 @@ const FinancePage: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              {AGE_BUCKETS.map((b) => (
-                <Card key={b} className="dashboard-card border-0">
-                  <CardContent className="p-3">
-                    <div className="text-xs text-muted-foreground">{ageBucketLabel(b)}</div>
-                    <div className="text-lg font-semibold">{formatMoney(arBuckets[b].total)}</div>
-                    <div className="text-[10px] text-muted-foreground">{arBuckets[b].count} invoice(s)</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <BucketCards buckets={arBuckets} active={arBucket} onPick={setArBucket} noun="invoice(s)" />
+            <AgingFilterBar
+              query={arQuery} setQuery={setArQuery} cat={arCat} setCat={setArCat}
+              bucket={arBucket} setBucket={setArBucket} categories={incomeCats}
+              searchPlaceholder="Search customer / number…"
+            />
 
             <Card>
               <CardContent className="p-0">
@@ -442,6 +465,8 @@ const FinancePage: React.FC = () => {
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
                       <th className="px-4 py-2 text-left">Number</th>
+                      <th className="px-4 py-2 text-left">Customer</th>
+                      <th className="px-4 py-2 text-left">Category</th>
                       <th className="px-4 py-2 text-left">Bucket</th>
                       <th className="px-4 py-2 text-right">Total</th>
                       <th className="px-4 py-2 text-right">Paid</th>
@@ -452,10 +477,10 @@ const FinancePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {ar.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No open receivables.</td></tr>
+                    {arFiltered.length === 0 && (
+                      <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">{ar.length === 0 ? 'No open receivables.' : 'No receivables match the filters.'}</td></tr>
                     )}
-                    {ar.map((r) => {
+                    {arFiltered.map((r) => {
                       const isManual = r.entry_kind === 'manual';
                       return (
                       <tr
@@ -473,6 +498,8 @@ const FinancePage: React.FC = () => {
                             <span className="font-mono text-xs">{r.internal_number}</span>
                           )}
                         </td>
+                        <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">{r.category_name ?? '—'}</td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
@@ -520,17 +547,12 @@ const FinancePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              {AGE_BUCKETS.map((b) => (
-                <Card key={b} className="dashboard-card border-0">
-                  <CardContent className="p-3">
-                    <div className="text-xs text-muted-foreground">{ageBucketLabel(b)}</div>
-                    <div className="text-lg font-semibold">{formatMoney(apBuckets[b].total)}</div>
-                    <div className="text-[10px] text-muted-foreground">{apBuckets[b].count} bill(s)</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <BucketCards buckets={apBuckets} active={apBucket} onPick={setApBucket} noun="bill(s)" />
+            <AgingFilterBar
+              query={apQuery} setQuery={setApQuery} cat={apCat} setCat={setApCat}
+              bucket={apBucket} setBucket={setApBucket} categories={expenseCats}
+              searchPlaceholder="Search supplier / bill #…"
+            />
 
             <Card>
               <CardContent className="p-0">
@@ -538,6 +560,8 @@ const FinancePage: React.FC = () => {
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
                       <th className="px-4 py-2 text-left">Bill #</th>
+                      <th className="px-4 py-2 text-left">Supplier</th>
+                      <th className="px-4 py-2 text-left">Category</th>
                       <th className="px-4 py-2 text-left">Bucket</th>
                       <th className="px-4 py-2 text-right">Total</th>
                       <th className="px-4 py-2 text-right">Paid</th>
@@ -548,10 +572,10 @@ const FinancePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {ap.length === 0 && (
-                      <tr><td colSpan={isAccountant ? 7 : 8} className="px-4 py-8 text-center text-muted-foreground">No open payables.</td></tr>
+                    {apFiltered.length === 0 && (
+                      <tr><td colSpan={isAccountant ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">{ap.length === 0 ? 'No open payables.' : 'No payables match the filters.'}</td></tr>
                     )}
-                    {ap.map((r) => {
+                    {apFiltered.map((r) => {
                       const isManual = r.entry_kind === 'manual';
                       return (
                       <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
@@ -565,6 +589,8 @@ const FinancePage: React.FC = () => {
                             <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
                           )}
                         </td>
+                        <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">{r.category_name ?? '—'}</td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
@@ -759,6 +785,52 @@ function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: 
   }
   return out;
 }
+
+/** Search + category filter bar for the AR/AP list views. */
+const AgingFilterBar: React.FC<{
+  query: string; setQuery: (v: string) => void;
+  cat: string; setCat: (v: string) => void;
+  bucket: string; setBucket: (v: string) => void;
+  categories: FinanceCategory[];
+  searchPlaceholder: string;
+}> = ({ query, setQuery, cat, setCat, bucket, setBucket, categories, searchPlaceholder }) => (
+  <div className="flex flex-wrap items-center gap-2">
+    <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} className="h-8 w-60 text-xs" />
+    <Select value={cat} onValueChange={setCat}>
+      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All categories" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All categories</SelectItem>
+        <SelectItem value="none">Uncategorized</SelectItem>
+        {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+    {bucket !== 'all' && (
+      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setBucket('all')}>
+        Bucket: {ageBucketLabel(bucket as AgeBucket)} ✕
+      </Button>
+    )}
+  </div>
+);
+
+/** Clickable age-bucket cards — clicking toggles the active bucket filter. */
+const BucketCards: React.FC<{
+  buckets: Record<AgeBucket, { count: number; total: number }>;
+  active: string; onPick: (b: string) => void; noun: string;
+}> = ({ buckets, active, onPick, noun }) => (
+  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+    {AGE_BUCKETS.map((b) => (
+      <button key={b} type="button" onClick={() => onPick(active === b ? 'all' : b)} className="text-left">
+        <Card className={`dashboard-card border-0 transition ${active === b ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}>
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground">{ageBucketLabel(b)}</div>
+            <div className="text-lg font-semibold">{formatMoney(buckets[b].total)}</div>
+            <div className="text-[10px] text-muted-foreground">{buckets[b].count} {noun}</div>
+          </CardContent>
+        </Card>
+      </button>
+    ))}
+  </div>
+);
 
 const BucketSummary: React.FC<{
   title: string;

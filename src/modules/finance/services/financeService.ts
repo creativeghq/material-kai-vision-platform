@@ -251,6 +251,11 @@ export interface AgingRow {
   entry_kind?: 'invoice' | 'manual';
   /** Free-text label for manual entries (null for invoices/bills). */
   description?: string | null;
+  /** Resolved counterparty (supplier/customer) display name, for search + display. */
+  party_name?: string | null;
+  /** Internal finance category on the document (nullable). */
+  category_id?: string | null;
+  category_name?: string | null;
 }
 
 export type ManualEntryDirection = 'receivable' | 'payable';
