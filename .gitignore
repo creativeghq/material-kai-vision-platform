@@ -49,3 +49,6 @@ supabase/.temp/
 
 # test coverage output
 coverage/
+tests/e2e/.auth/
+playwright-report/
+/playwright/.cache/

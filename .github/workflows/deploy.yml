@@ -310,3 +310,27 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MIVAA_CRON_SECRET: ${{ secrets.MIVAA_CRON_SECRET }}
         run: node scripts/smoke/smoke.mjs
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Front-end route-load smoke — drives the deployed app in a headless browser and asserts
+  # every top route renders (no white-screen / chunk-load failure / error boundary). Catches
+  # the exact class that took down /quotes /finance /discover after a deploy.
+  fe-smoke:
+    needs: [deploy-frontend]
+    if: ${{ always() && needs.deploy-frontend.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: 🖥️ Front-end route-load smoke
+        env:
+          SMOKE_BASE_URL: 'https://app.materialshub.gr'
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: npx playwright test --reporter=line
