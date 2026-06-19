@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM | MaterialsHub Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / CRM</div>
+  <h1>CRM</h1>
+  <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">Manage the people and companies you do business with, alongside platform users.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm.png" alt="CRM Management">
+    <figcaption>CRM Management — summary counts and the Users / Contacts / Companies / Categories tabs.</figcaption>
+  </figure>
+
+  <h2>What this page is for</h2>
+  <p>The CRM is your relationship hub. A summary strip shows <strong>Total Users</strong>, <strong>Active Users</strong>, <strong>Total Contacts</strong> and <strong>Total Companies</strong>, and the work is organised into tabs.</p>
+
+  <h2>Tabs</h2>
+  <ul class="feat">
+    <li><strong>Users</strong> — platform users, their roles and subscriptions, with a search box.</li>
+    <li><strong>Contacts</strong> — individual people you deal with.</li>
+    <li><strong>Companies</strong> — organisations, suppliers and customers.</li>
+    <li><strong>Categories</strong> — labels to segment contacts and companies.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-contacts.png" alt="CRM Contacts tab">
+    <figcaption>The Contacts tab.</figcaption>
+  </figure>
+
+  <h2>Contact &amp; company detail</h2>
+  <p>Clicking a contact or company opens its detail page (<span class="badge route">/crm/contacts/:id</span> · <span class="badge route">/crm/companies/:id</span>) where you manage its information, categories and associated records.</p>
+
+  <h2>Greek business lookup (ΑΑΔΕ)</h2>
+  <p>For Greek companies, the platform can auto-fill the business profile from the official ΑΑΔΕ registry using the company's ΑΦΜ (VAT number): legal name, address, tax office, activity codes (ΚΑΔ) and status. This keeps customer/supplier records accurate and is used to validate VAT before issuing invoices. Results are cached, so repeat lookups of the same company are instant.</p>
+
+  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. The <strong>Admin</strong> sub-view (visible to operators) adds platform-wide user management beyond the standard CRM.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

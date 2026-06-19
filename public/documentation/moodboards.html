@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoodBoards | MaterialsHub Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / MoodBoards</div>
+  <h1>MoodBoards</h1>
+  <div class="routes"><span class="badge route">/moodboard</span> <span class="badge route">/moodboard/:id</span></div>
+  <p class="lead">Curate and organise your favourite materials, then turn a board into client-ready presentation sheets or a quote.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboards.png" alt="MoodBoards list">
+    <figcaption>The MoodBoards list. Each board shows its visibility (Public/Private) and item count.</figcaption>
+  </figure>
+
+  <h2>The list page</h2>
+  <p>This is where all your boards live. Create a new one with <strong>New MoodBoard</strong>; each card shows the board name, whether it's <strong>Public</strong> or <strong>Private</strong>, and how many materials it holds. From a card you can open, rename, change visibility or delete the board.</p>
+
+  <h2>The board detail page</h2>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
+    <figcaption>A board's detail view with the Items / Tools tabs and the action toolbar.</figcaption>
+  </figure>
+  <p>Opening a board reveals two tabs and an action toolbar:</p>
+  <ul class="feat">
+    <li><strong>Items tab</strong> — the materials and images on the board, arranged as a visual collection.</li>
+    <li><strong>Tools tab</strong> — board-level helpers, including <strong>Find Products</strong> to discover matching catalogue items.</li>
+    <li><strong>Add Products</strong> — add catalogue materials directly to the board.</li>
+    <li><strong>Import from Pinterest</strong> — paste a pin or connect Pinterest to pull images in; imported images are auto-matched to catalogue products.</li>
+    <li><strong>Generate Quote</strong> — turn the board's products into a <a href="quotes.html">quote</a> (enabled once the board has products).</li>
+    <li><strong>Public / Private</strong> toggle and <strong>Delete</strong>.</li>
+  </ul>
+
+  <h2>Presentation sheets</h2>
+  <p>From a board you can produce <strong>presentation sheets</strong> — polished, A3 client deliverables generated via the <a href="agent-hub.html">Agent Hub</a>. Sheet types include:</p>
+  <table>
+    <thead><tr><th>Sheet</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td>Material board</td><td>A grid of selected products with optional descriptions.</td></tr>
+      <tr><td>Color palette</td><td>Swatches with names, optionally pulled from board images.</td></tr>
+      <tr><td>Concept board</td><td>Free-form image layout with captions.</td></tr>
+      <tr><td>Lighting plan</td><td>Fixture symbols placed on a backdrop, with a legend.</td></tr>
+      <tr><td>Annotated render</td><td>Callouts pointing to products on a render.</td></tr>
+      <tr><td>Elevation / render pair</td><td>Dimensions and tile callouts across an elevation + render.</td></tr>
+      <tr><td>FF&amp;E schedule</td><td>A furniture/fixtures/equipment table, often from a quote.</td></tr>
+      <tr><td>Area breakdown</td><td>A one-page room spec (hero render + plan + finishes + palette).</td></tr>
+      <tr><td>Full deck</td><td>Several sheets combined with a cover into one PDF.</td></tr>
+    </tbody>
+  </table>
+  <p>Some sheets are interactive — the platform opens an in-chat canvas so you can place symbols, draw dimensions or position callouts before rendering the PDF.</p>
+
+  <h2>Sharing</h2>
+  <p>A board can be made <strong>Public</strong> and shared via a link (<span class="badge route">/board/:id</span>). For richer, project-level deliverables that bundle sheets across multiple boards, see <a href="projects.html">Projects → Client Views</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
