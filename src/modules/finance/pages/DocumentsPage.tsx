@@ -87,6 +87,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
   const [categoryFilter, setCategoryFilter] = useState<string>('all'); // 'all' | 'none' | <category id>
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
@@ -134,8 +135,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
-  // Reset the category filter whenever the document type changes (categories are side-scoped).
-  useEffect(() => { setCategoryFilter('all'); }, [type]);
+  // Reset filters whenever the document type changes (categories are side-scoped).
+  useEffect(() => { setCategoryFilter('all'); setQuery(''); }, [type]);
 
   // Which finance-category side applies to the active surface (drives filter + inline picker).
   const sideKind: 'income' | 'expense' | null =
@@ -146,16 +147,26 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   );
   const matchesCategoryFilter = (categoryId: any) =>
     categoryFilter === 'all' ? true : categoryFilter === 'none' ? !categoryId : categoryId === categoryFilter;
+  const q = query.trim().toLowerCase();
+  const hit = (...fields: any[]) => !q || fields.some((f) => String(f ?? '').toLowerCase().includes(q));
 
   const rows = useMemo(() => {
     let base: Invoice[] = [];
     if (type === 'invoices') base = invoices.filter((i) => !isReceipt((i as any).document_type));
     else if (type === 'receipts') base = invoices.filter((i) => isReceipt((i as any).document_type));
-    return base.filter((i) => matchesCategoryFilter((i as any).category_id));
-  }, [type, invoices, categoryFilter]);
+    return base
+      .filter((i) => matchesCategoryFilter((i as any).category_id))
+      .filter((i) => hit(i.internal_number, (i as any).customer_name, categoryName((i as any).category_id)));
+  }, [type, invoices, categoryFilter, q]);
 
-  const filteredInbound = useMemo(() => inbound.filter((d) => matchesCategoryFilter((d as any).category_id)), [inbound, categoryFilter]);
-  const filteredPayments = useMemo(() => payments.filter((p) => matchesCategoryFilter((p as any).category_id)), [payments, categoryFilter]);
+  const filteredInbound = useMemo(
+    () => inbound.filter((d) => matchesCategoryFilter((d as any).category_id)).filter((d) => hit(d.issuer_name, d.issuer_vat, d.doc_type)),
+    [inbound, categoryFilter, q],
+  );
+  const filteredPayments = useMemo(
+    () => payments.filter((p) => matchesCategoryFilter((p as any).category_id)).filter((p: any) => hit(p.reference, p.method, p.counterparty_name)),
+    [payments, categoryFilter, q],
+  );
 
   // Inline category assignment — optimistic local update so the cell reflects the change at once.
   const setInvoiceCategory = async (invoiceId: string, categoryId: string | null) => {
@@ -175,6 +186,14 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold capitalize">{DOC_LABEL[type]}</h2>
               <div className="flex items-center gap-2">
+                {(type === 'invoices' || type === 'receipts' || type === 'expenses' || type === 'payments') && (
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={type === 'expenses' ? 'Search supplier / VAT…' : type === 'payments' ? 'Search reference / counterparty…' : 'Search number / customer…'}
+                    className="h-8 w-52 text-xs"
+                  />
+                )}
                 {(type === 'invoices' || type === 'receipts' || type === 'expenses' || type === 'payments') && (
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All categories" /></SelectTrigger>
