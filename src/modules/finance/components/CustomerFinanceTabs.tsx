@@ -196,6 +196,50 @@ export const CustomerAccountOverview: React.FC<Target> = ({ contactId, companyId
   );
 };
 
+/**
+ * Supplier-side account overview — the AP mirror of CustomerAccountOverview. Shows, for a
+ * party we buy from: total they've billed us, total we've paid them, and how much we still
+ * owe (outstanding), plus ordered total + PO count. Mounts on the CRM company/contact page
+ * when the party is_supplier. Data from getSupplierAccount (vw_supplier_account_summary).
+ */
+export const SupplierAccountOverview: React.FC<Target> = ({ contactId, companyId }) => {
+  const [acct, setAcct] = useState<{ poCount: number; orderedTotal: number; billedTotal: number; paidTotal: number; outstandingTotal: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
+  const load = async () => {
+    if (!contactId && !companyId) return;
+    setLoading(true);
+    try { setAcct(await financeService.getSupplierAccount({ contactId, companyId })); }
+    finally { setLoading(false); }
+  };
+
+  if (loading) return <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>;
+
+  const owe = acct?.outstandingTotal ?? 0;
+  const kpi = (label: string, value: React.ReactNode, Icon: React.ElementType, danger = false) => (
+    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Icon className="h-3 w-3" /> {label}</div>
+        <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-primary">Supplier account</h3>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        {kpi('We owe', formatMoney(owe), Wallet, owe > 0)}
+        {kpi('Billed to us', formatMoney(acct?.billedTotal ?? 0), FileText)}
+        {kpi('Paid to them', formatMoney(acct?.paidTotal ?? 0), ArrowUpRight)}
+        {kpi('Ordered', formatMoney(acct?.orderedTotal ?? 0), ShoppingBag)}
+        {kpi('Purchase orders', acct?.poCount ?? 0, ShoppingBag)}
+      </div>
+    </div>
+  );
+};
+
 export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) => {
   const [rows, setRows] = useState<Array<{
     id: string; quote_number: string | null; name: string | null; status: string;
